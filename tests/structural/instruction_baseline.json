@@ -243,7 +243,6 @@
         "## Usage",
         "## When to Run",
         "### Phase 0 \u2014 Refinement interview (only when `--deep` is set)",
-        "### Phase 0.5 \u2014 5-Term Inequality Gate (only when `--deep` is set)",
         "### Phase 0.75 \u2014 Discovery lens calibration",
         "### Phase 1 \u2014 Multi-source gathering",
         "### Phase 2 \u2014 Analysis",
@@ -279,7 +278,6 @@
         "## Usage",
         "## When to Run",
         "### Phase 0 \u2014 Refinement interview (only when `--deep` is set)",
-        "### Phase 0.5 \u2014 5-Term Inequality Gate (only when `--deep` is set)",
         "### Phase 0.75 \u2014 Discovery lens calibration",
         "### Phase 1 \u2014 Multi-source gathering",
         "### Phase 2 \u2014 Analysis",
@@ -475,8 +473,7 @@
         "#### 2.1 Six interview categories (in this order)",
         "#### 2.1.5 \u2014 Oracle elicitation (MANDATORY \u2014 ADR-001/007 of spec-tetrad)",
         "#### 2.2 Promotion rule",
-        "#### 2.3 Round preamble",
-        "#### 2.5 \u2014 5-Term Inequality Gate"
+        "#### 2.3 Round preamble"
       ]
     },
     "spec@task-driven": {
@@ -513,8 +510,7 @@
         "#### 2.1 Six interview categories (in this order)",
         "#### 2.1.5 \u2014 Oracle elicitation (MANDATORY \u2014 ADR-001/007 of spec-tetrad)",
         "#### 2.2 Promotion rule",
-        "#### 2.3 Round preamble",
-        "#### 2.5 \u2014 5-Term Inequality Gate"
+        "#### 2.3 Round preamble"
       ]
     },
     "verify@spec-driven": {
@@ -548,7 +544,7 @@
         "## Usage",
         "## When to Run",
         "### A1. `work_docs/` (underscore) footgun probe",
-        "### Check 1 \u2014 PLAN/SPEC satisfaction + drift verdict",
+        "### Check 1 \u2014 Drift verdict (REVIEW present)",
         "### Check 2 \u2014 Regression smoke",
         "### Check 3 \u2014 Structural delta (formerly \"Health delta\")",
         "### Check 4 \u2014 Security high findings",
@@ -587,7 +583,7 @@
         "## Usage",
         "## When to Run",
         "### A1. `work_docs/` (underscore) footgun probe",
-        "### Check 1 \u2014 PLAN/SPEC satisfaction + drift verdict",
+        "### Check 1 \u2014 Drift verdict (REVIEW present)",
         "### Check 2 \u2014 Regression smoke",
         "### Check 3 \u2014 Structural delta (formerly \"Health delta\")",
         "### Check 4 \u2014 Security high findings",
@@ -722,7 +718,7 @@
     }
   },
   "generated_by": "tests/structural/_instruction_baseline.py",
-  "payload_digest": "d1aebab0546117c9336415f87760b7a9f00e49638200a6efd1bc82640b9e45da",
-  "render_sha": "b778e52415edf3a47d45c6166e4656b4dcba2260",
+  "payload_digest": "a3a55e977ffc82eae5a24f6abdf7ab00b641938f91d3bfc3f6c8c2eb12652d34",
+  "render_sha": "2ff7f03510fefdb474ab639f558eee2eb51fabcd",
   "schema_version": 2
 }

@@ -326,7 +326,7 @@ but not a CLI entrypoint.
 - **Rollback:** Phase 5 state.
 
 ### Phase 7 — Post-land re-freeze on base (S6, second half; ADR-006)
-**Status:** BLOCKED (2026-09-12, post-land attempt) — ran from `/home/noel/harness-maker` on `main` at the landed squash `5d2b763e` and was reverted. `assert_sha_is_durable` passed; the blocker ADR-006 did not anticipate is that `PLAN-token-efficiency-autopilot-ux-speed` is still `status: planning` (15 unchecked boxes) and holds a live `surface_allowance` (1 865 chars, `round_trips: {wrapup: 1, hm-wrapup: 1}`). A wholesale re-freeze folds that PLAN's unlanded growth into the baseline while its allowance stays live, funding the remainder twice. **Unblock:** re-run both freezers once that PLAN reaches `status: complete`. Evidence and measured figures: `BASELINE-DELTA-workflow-steps-vs-model-capability.md`.
+**Status:** DONE (2026-09-13, post-land) — attempted 2026-09-12 and reverted, then executed from `/home/noel/harness-maker` on `main` at `2ff7f035`. `assert_sha_is_durable` passed on BOTH attempts; the blocker ADR-006 did not anticipate is that a **peer PLAN in flight holding a `surface_allowance`** makes a wholesale re-freeze illegitimate — it folds that PLAN's unlanded growth into the frozen figures while its allowance stays live, funding the remainder twice. The peer (`token-efficiency-autopilot-ux-speed`) landed 2026-09-13 and its allowance expired, so the freeze became legitimate and ran: claude 435 437 → 427 617, codex 370 292 → 362 440, both baselines re-based, 23 moved keys attributed per owner. Evidence: `BASELINE-DELTA-workflow-steps-vs-model-capability.md`.
 - `depends_on`: [5, 6]
 - `parallel_group`: serial-7-post-land
 - `merge_hazards`: `tests/structural/surface_baseline.json`, `tests/structural/instruction_baseline.json` (both regenerated at the landed `main` SHA)
@@ -385,7 +385,7 @@ but not a CLI entrypoint.
 - [x] S3 `test_side_defaults_consistent_with_registry` green; non-vacuity floor holds; negative control fails
 - [x] S4 no `5-Term Inequality Gate` / `5-term` / `EIG` / `CLARITI` in rendered research/spec/plan/loop; cap sentence present
 - [x] S5 verify has no `PLAN/SPEC satisfaction`; Checks 1–5 on both arms, Check 6 on spec-driven only; `Check 1 —` prefix survives
-- [x] S6 measured delta < 0 recorded in `BASELINE-DELTA-workflow-steps-vs-model-capability.md` (Phase 5); both baselines re-frozen on `main` after land (Phase 7 — attempted post-land at `5d2b763e` and reverted; BLOCKED on a peer PLAN's live surface allowance, see Phase 7 Status)
+- [x] S6 measured delta < 0 recorded in `BASELINE-DELTA-workflow-steps-vs-model-capability.md` (Phase 5); both baselines re-frozen on `main` after land (Phase 7, executed post-land at `2ff7f035` once the peer PLAN's allowance expired)
 - [x] S7 MATRIX class column + CLAUDE.md section with the four classes, `Side-preset only` caveat, `unsourced` count, and the ADR-007 coverage gap statement
 - [x] `ruff check`, `ruff format --check`, `mypy --strict` clean; full pytest green
 

@@ -82,50 +82,70 @@ arms) was re-based with a `rebases` row pointing here — per-arm deltas `auto_s
 moved command is one of the six this task edits and none of the moves touches the advance or
 picker blocks.
 
-## Phase 7 attempted post-land, then reverted — the freeze is still blocked (2026-09-12)
+## Phase 7 — the post-land re-freeze, executed (2026-09-13)
 
-Phase 7 ran from the base checkout on `main` at the landed squash `5d2b763e`. Both freezers
-succeeded — `assert_sha_is_durable` accepted the SHA, which was the only blocker ADR-006
-anticipated — and the result was reverted anyway. The measured figures are recorded here because
-they are the evidence for the revert, not because they were kept:
+Attempted on 2026-09-12 and **reverted**; executed here. The measured figures are identical both
+times, because no template changed in between — only the precondition did.
 
-| Baseline | Field | Frozen at `85b1216c` | Would become at `5d2b763e` | Delta |
+**What blocked it, and what unblocked it.** ADR-006 named `assert_sha_is_durable` as the blocker.
+That was right but incomplete: the SHA check passed on the first attempt too. The real
+precondition is that **no peer PLAN is in flight holding a `surface_allowance`** — regenerating
+the surface baseline is wholesale, so it folds every in-flight PLAN's unlanded growth into the
+frozen figures while that PLAN's allowance stays live, funding the remainder twice.
+`surface_allowance._sole_active` refuses the summed form of exactly that hazard; arriving through
+the freeze instead does not make it a different hazard. On 2026-09-12 the peer was
+`token-efficiency-autopilot-ux-speed` (`status: planning`, 15 unchecked boxes, 1 865 chars +
+`round_trips: {wrapup: 1, hm-wrapup: 1}`). It landed on 2026-09-13, its allowance expired
+(`load_active_allowances` → none), and the freeze became legitimate.
+
+| Baseline | Field | Before (`85b1216c`) | After (`2ff7f035`) | Delta |
 |---|---|---|---|---|
-| `surface_baseline.json` | `aggregate_chars.claude` | 435 437 | 427 617 | −7 820 |
-| `surface_baseline.json` | `aggregate_chars.codex` | 370 292 | 362 440 | −7 852 |
+| `surface_baseline.json` | `aggregate_chars.claude` | 435 437 | 427 617 | **−7 820** |
+| `surface_baseline.json` | `aggregate_chars.codex` | 370 292 | 362 440 | **−7 852** |
+| `surface_baseline.json` | `payload_digest` | `14994829…` | `160b87ec…` | re-based |
+| `surface_baseline.json` | `render_sha` | `85b1216c…` | `2ff7f035…` | re-based |
+| `instruction_baseline.json` | `payload_digest` | `d1aebab0…` | `a3a55e97…` | re-based |
 
-**Why it was reverted.** `tests/structural/test_baseline_delta_attribution.py` reported seven
-moved keys, and only some of them are this task's: `surface.claude.execute.chars`,
-`surface.claude.health.chars`, `surface.claude.wrapup.chars`,
-`surface.claude.wrapup.round_trips` and the three `codex` counterparts belong to
-**`PLAN-token-efficiency-autopilot-ux-speed`**, which is `status: planning` with 15 unchecked
-boxes — genuinely in flight, not stale bookkeeping. It holds a live
-`surface_allowance` of 1 865 chars plus `round_trips: {wrapup: 1, hm-wrapup: 1}`, and
-`test_round_trip_counts_match_the_live_render` went red on exactly that: frozen 26 plus a
-headroom of 1 against a render of 26.
+**Read the two aggregate figures against the right denominator.** The −8 222 quoted earlier in
+this document is a *per-arm* delta from `autopilot_gate_golden.json` — one autonomy arm's rendered
+command set. The −7 820 / −7 852 here are the *whole-surface* aggregates across all 15 claude
+commands and 10 codex skills at the default config. They measure different things and are expected
+to differ; neither corrects the other. **The direction is down on every arm** — this was a
+surface-reduction unit and the aggregate moved the right way, not the wrong way and not larger.
 
-A wholesale re-freeze would have folded that PLAN's **unlanded** growth into the frozen figures
-while its allowance stayed live, so the remaining work would have been funded twice — once by the
-baseline that now contains it, once by the allowance that still admits it.
-`surface_allowance._sole_active` states the rule this violates in its own docstring: fold a
-**completed** PLAN's growth into the baseline; borrowing across in-flight PLANs is the failure it
-refuses. Re-freezing a subset of keys is not an option either — the freezers regenerate the whole
-payload, and a hand-edited subset would carry a `payload_digest` and `render_sha` that describe
-nothing.
+### Per-key attribution (ADR-010)
 
-This is the same family as `ratchet-rebaselined-by-its-own-subject` (count:2), one step removed:
-the subject here is not this task but the task next to it. ADR-006 predicted the wrong blocker —
-it named `assert_sha_is_durable`, which passed. The real precondition is that **no other PLAN is
-in flight holding a surface allowance**, and ADR-006 did not state it.
+Twenty-three keys moved. They split into two owners, and the split is the point — a wholesale
+re-freeze is the one operation that can silently adopt another task's numbers, so each is named:
 
-**Unblock condition.** Phase 7 becomes runnable once
-`PLAN-token-efficiency-autopilot-ux-speed` reaches `status: complete` (its wrapup lands and its
-allowance expires). At that point re-run both freezers from `/home/noel/harness-maker` on `main`,
-append the closing row, and expect the attribution test to demand rows naming `execute`, `health`,
-`wrapup`, `hm-execute` and `hm-wrapup` — that PLAN's movement, attributed to that PLAN.
+**This task (`workflow-steps-vs-model-capability`)** — the 5-term inequality ceremony removed from
+`research` / `spec` / `plan` (and the `loop` body that embeds them), and verify's Check 1b LLM
+judgement removed:
+`surface.claude.research.chars`, `surface.claude.spec.chars`, `surface.claude.plan.chars`,
+`surface.claude.loop.chars`, `surface.claude.verify.chars`, `surface.claude.review.chars` (one
+word: "recorded by the inequality gate" → "recorded by the interview"), and their six
+`surface.codex.hm-*` counterparts.
+
+**`token-efficiency-autopilot-ux-speed`**, landed at `2ff7f035`'s parent and never re-frozen by
+its own wrapup — three commands and their codex twins:
+
+- `execute` (`surface.claude.execute.chars`) and `hm-execute` — the Phase 0.5 delegation block.
+- `health` (`surface.claude.health.chars`) — the per-model second-opinion smoke.
+- `wrapup` (`surface.claude.wrapup.chars` **and** `surface.claude.wrapup.round_trips`) and
+  `hm-wrapup` — Phase 1's added `autopilot_ledger rollup` call, the one its
+  `surface_allowance.round_trips` funded and the only `round_trips` movement in this freeze.
+
+**Mechanical**: `aggregate_chars.claude`, `aggregate_chars.codex`, `payload_digest`, `render_sha` —
+these move whenever anything else does.
+
+This is deliberately not `[fail:test] ratchet-rebaselined-by-its-own-subject` (count:2): the
+document records the movement, the freeze happens **after** both subjects have landed, by the
+normal process, and no gate was red at the time. Ownership of the frozen figures stays with the
+post-land step per ADR-010.
 
 `_ALLOWED_REMOVALS` entries for
 `workflow-steps-vs-model-capability-phase-3-five-term-ceremony` and `…-phase-4-verify-check1b`
-are kept and remain the mechanism that holds this task's cuts green in the meantime:
-`test_the_allowlist_carries_no_stale_entries` computes `_allowed_for(key) & present`, so an entry
-is stale only while the string it names is still rendered. These strings are gone.
+are **kept**, not pruned. `test_the_allowlist_carries_no_stale_entries` computes
+`_allowed_for(key) & present` — an entry is stale only while the string it names is still being
+rendered. These strings are gone, so the entries are inert history, and the file's own policy
+("each cutting phase adds its entries in its own commit") makes that record the point.
