@@ -82,4 +82,50 @@ arms) was re-based with a `rebases` row pointing here — per-arm deltas `auto_s
 moved command is one of the six this task edits and none of the moves touches the advance or
 picker blocks.
 
-*(Phase 7 appends the post-land frozen aggregate here.)*
+## Phase 7 attempted post-land, then reverted — the freeze is still blocked (2026-09-12)
+
+Phase 7 ran from the base checkout on `main` at the landed squash `5d2b763e`. Both freezers
+succeeded — `assert_sha_is_durable` accepted the SHA, which was the only blocker ADR-006
+anticipated — and the result was reverted anyway. The measured figures are recorded here because
+they are the evidence for the revert, not because they were kept:
+
+| Baseline | Field | Frozen at `85b1216c` | Would become at `5d2b763e` | Delta |
+|---|---|---|---|---|
+| `surface_baseline.json` | `aggregate_chars.claude` | 435 437 | 427 617 | −7 820 |
+| `surface_baseline.json` | `aggregate_chars.codex` | 370 292 | 362 440 | −7 852 |
+
+**Why it was reverted.** `tests/structural/test_baseline_delta_attribution.py` reported seven
+moved keys, and only some of them are this task's: `surface.claude.execute.chars`,
+`surface.claude.health.chars`, `surface.claude.wrapup.chars`,
+`surface.claude.wrapup.round_trips` and the three `codex` counterparts belong to
+**`PLAN-token-efficiency-autopilot-ux-speed`**, which is `status: planning` with 15 unchecked
+boxes — genuinely in flight, not stale bookkeeping. It holds a live
+`surface_allowance` of 1 865 chars plus `round_trips: {wrapup: 1, hm-wrapup: 1}`, and
+`test_round_trip_counts_match_the_live_render` went red on exactly that: frozen 26 plus a
+headroom of 1 against a render of 26.
+
+A wholesale re-freeze would have folded that PLAN's **unlanded** growth into the frozen figures
+while its allowance stayed live, so the remaining work would have been funded twice — once by the
+baseline that now contains it, once by the allowance that still admits it.
+`surface_allowance._sole_active` states the rule this violates in its own docstring: fold a
+**completed** PLAN's growth into the baseline; borrowing across in-flight PLANs is the failure it
+refuses. Re-freezing a subset of keys is not an option either — the freezers regenerate the whole
+payload, and a hand-edited subset would carry a `payload_digest` and `render_sha` that describe
+nothing.
+
+This is the same family as `ratchet-rebaselined-by-its-own-subject` (count:2), one step removed:
+the subject here is not this task but the task next to it. ADR-006 predicted the wrong blocker —
+it named `assert_sha_is_durable`, which passed. The real precondition is that **no other PLAN is
+in flight holding a surface allowance**, and ADR-006 did not state it.
+
+**Unblock condition.** Phase 7 becomes runnable once
+`PLAN-token-efficiency-autopilot-ux-speed` reaches `status: complete` (its wrapup lands and its
+allowance expires). At that point re-run both freezers from `/home/noel/harness-maker` on `main`,
+append the closing row, and expect the attribution test to demand rows naming `execute`, `health`,
+`wrapup`, `hm-execute` and `hm-wrapup` — that PLAN's movement, attributed to that PLAN.
+
+`_ALLOWED_REMOVALS` entries for
+`workflow-steps-vs-model-capability-phase-3-five-term-ceremony` and `…-phase-4-verify-check1b`
+are kept and remain the mechanism that holds this task's cuts green in the meantime:
+`test_the_allowlist_carries_no_stale_entries` computes `_allowed_for(key) & present`, so an entry
+is stale only while the string it names is still rendered. These strings are gone.
