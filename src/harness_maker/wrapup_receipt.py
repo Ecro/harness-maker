@@ -399,10 +399,11 @@ def reconcile(
             )
         )
 
-    # ── verify (Phase 6): its observable output is the JSONL record it appends and
-    # the per-check verdicts. Without these the reconciliation would have nothing in
-    # it — every memory field is legitimately empty for verify, so any claim would
-    # reconcile clean.
+    # ── verify (Phase 6): its observable output is the per-check verdicts (the
+    # slash-command stage no longer appends a JSONL record; the CI `verify` command
+    # in `cli.py` — `hm cli verify` — still does). Without these the reconciliation would
+    # have nothing in it — every memory field is legitimately empty for verify, so any
+    # claim would reconcile clean.
     if receipt.stage == "verify":
         # Every one of these was CONDITIONAL, so `{"schema_version": 1, "stage":
         # "verify"}` produced zero mismatches, reconciled `ok`, and the template then
@@ -417,14 +418,8 @@ def reconcile(
             mismatches.append(
                 Mismatch(kind="verify-checks-missing", detail="receipt claims no checks ran")
             )
-        if not receipt.record_path:
-            checked += 1
-            mismatches.append(
-                Mismatch(
-                    kind="verify-record-missing",
-                    detail="receipt names no record_path, so the run left no verifiable trace",
-                )
-            )
+        # `record_path` is no longer required: the slash-command stage writes no JSONL
+        # record (nothing read it); a receipt that still names one is checked below.
     if receipt.record_path:
         checked += 1
         target = _confined(doc_root, receipt.record_path)

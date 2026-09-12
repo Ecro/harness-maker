@@ -85,6 +85,9 @@ def atomic_write(path: Path, content: str | bytes, *, encoding: str = "utf-8") -
         raise
 
 
+_PIPE_BUF = 4096
+
+
 def atomic_append(path: Path, line: str) -> None:
     """Append one short text line atomically (single os.write on O_APPEND fd).
 
@@ -95,18 +98,33 @@ def atomic_append(path: Path, line: str) -> None:
     therefore unsafe for concurrent appenders (render manifest, orphan log).
 
     The caller MUST include any trailing newline in ``line`` — this helper
-    does not append one. The caller MUST also ensure ``len(line.encode()) <
-    4096``; longer lines lose the POSIX guarantee.
+    does not append one. A line over PIPE_BUF (4096 bytes) is refused with
+    ``ValueError`` rather than written non-atomically; a short write raises
+    ``OSError`` and is never retried — a second ``write()`` could land after a
+    peer's append and splice this row into theirs (same contract as
+    ``append_atomic_line``).
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     data = line.encode("utf-8")
+    if len(data) > _PIPE_BUF:
+        raise ValueError(
+            f"atomic_append line is {len(data)} bytes, over PIPE_BUF ({_PIPE_BUF}); "
+            "the O_APPEND atomicity guarantee does not hold — shorten the record"
+        )
     fd = os.open(
         str(path),
         os.O_WRONLY | os.O_APPEND | os.O_CREAT,
         0o644,
     )
     try:
-        os.write(fd, data)
+        written = os.write(fd, data)
+        if written != len(data):
+            # Do NOT loop: a second write() can land after a peer's append, splicing this
+            # row into theirs (same contract as `append_atomic_line` below).
+            raise OSError(
+                f"short append: wrote {written} of {len(data)} bytes; "
+                "retrying would risk interleaving with a concurrent writer"
+            )
     finally:
         os.close(fd)
 

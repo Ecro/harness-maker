@@ -30,6 +30,7 @@ import json
 import logging
 import os
 import re
+import sys
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -1993,7 +1994,12 @@ def _append_render_manifest(
     line = json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n"
     # Single os.write() on O_APPEND fd — concurrent renderers cannot interleave.
     # The buffered ``open("a")`` could split across syscalls. See atomic_append docstring.
-    atomic_append(manifest_path, line)
+    try:
+        atomic_append(manifest_path, line)
+    except (OSError, ValueError) as exc:
+        # Over-PIPE_BUF manifest line or a refused short write: the render itself
+        # succeeded, so lose the audit row loudly rather than abort every remaining file.
+        sys.stderr.write(f"[render] manifest row skipped: {exc}\n")
 
 
 def compact_render_manifest(

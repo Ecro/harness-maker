@@ -477,47 +477,9 @@ ADR template:
 **Skip gate if early exit**: If the user chose "Plan is sufficiently clear — end interview"
 in Step B this round, skip the gate below and exit the interview immediately.
 
-Otherwise, before declaring the interview complete, run the **5-Term Inequality Gate**
-(0.16.0, PLAN-deep-interview-question-criteria):
+**Open-ended cap** (every round): at most `{{ config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get(config.locale, config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get('default', 1)) }}` open-ended question(s) per turn for locale `{{ config.locale }}`; closed-form (multi-select / yes-no) questions are unrestricted. Ask a follow-up only when its answer would change an ADR, the phase scope, or the risk register.
 
-{% include "agents/_partials/inequality_gate_block.md.j2" %}
-
-**Term meanings (this stage's settings, rendered from harness.yaml):**
-
-1. **EIG** — Expected information gain ≥ `ε = {{ config.interview.deep_gate.eig_epsilon | default(0.5) }}`. Skip Qs whose answer won't change PLAN content (ADRs / phase scope / risk register).
-2. **CLARITI** — Task-relevance × user-answerability ≥ 0.7. Skip Qs the user cannot answer right now (e.g. depends on a downstream measurement).
-3. **Common-ground** — Skip slots already determined by CLAUDE.md / harness.yaml / prior interview answers / SPEC frontmatter (when SPEC exists) / RESEARCH frontmatter / same-slug PLAN|REVIEW history{% if config.interview.deep_gate.common_ground.llm_inference_enabled | default(true) %}, **OR** by LLM self-inference at confidence ≥ {{ config.interview.deep_gate.common_ground.llm_inference_threshold | default(0.95) }} (kill-switch: `interview.deep_gate.common_ground.llm_inference_enabled: false` in harness.yaml){% endif %}.
-4. **Confidence** — Slot's current resolution confidence must be `< τ = {{ config.interview.deep_gate.confidence_tau | default(0.7) }}`. Architectural decisions reach the ADR threshold once confidence ≥ τ.
-5. **Open-ended cap** — At most `{{ config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get(config.locale, config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get('default', 1)) }}` open-ended question(s) per turn for locale `{{ config.locale }}`. Closed-form (multi-select / yes-no) unrestricted.
-
-<!-- F6-deferred: see inequality_gate.py; F6 wires the real mechanism.
-     Locale cap above is render-time baked — re-render to refresh after locale change. -->
-
-**Per-round display (ADR-005):**
-
-```
-✅ EIG ✅ CLARITI ❌ common-ground ✅ confidence ✅ open-ended → 4/5 met (NEEDS)
-```
-
-Render the checklist for EVERY candidate question. A candidate is asked iff
-all 5 terms are ✅. The "common-ground" term is the primary defense against
-asking obvious questions; silent-intent-miss telemetry (ADR-008) monitors
-its post-hoc accuracy and surfaces in `/hm:health`.
-
-**Question generation:** LLM generates 1-3 follow-up candidates targeting the
-PLAN's remaining ambiguity (architecture / contract / risk / phasing).
-WRONG / METHOD / STAKEHOLDER / STYLE / PERF style cues are inputs to the
-generator, not gating labels (post-hoc classification covers coverage drift
-per ADR-010 — see Phase 7 coverage_classifier). Ranking is by EIG descending.
-
-**Gate exit:** proceed to the standard exit conditions below once either:
-- All PLAN slots reach confidence ≥ τ (the inequality naturally stops the loop), OR
-- User chose "Plan is sufficiently clear — end interview", OR
-- User chose "Proceed with current ambiguity accepted" after a non-progressing round.
-
----
-
-After the gate PASSes (or user accepts ambiguity), continue to next round UNLESS:
+After each round, continue to the next round UNLESS:
 - User chose "Plan is sufficiently clear — end interview", OR
 - Zero high/medium-impact ambiguities remain in the internal draft.
 

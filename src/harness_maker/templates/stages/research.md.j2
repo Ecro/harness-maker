@@ -113,47 +113,7 @@ When `--deep` is set, {% if is_codex %}use the `request_user_input` tool (if una
 
 Always include "Skip — proceed with topic as given" as an option. Record interview outcomes under `## Refinement Decisions` in the output document.
 
-### Phase 0.5 — 5-Term Inequality Gate (only when `--deep` is set)
-
-Runs after Phase 0's rubric, before Phase 1 gathering. Each candidate
-follow-up question is filtered through the 5-term inequality (0.16.0,
-PLAN-deep-interview-question-criteria):
-
-{% include "agents/_partials/inequality_gate_block.md.j2" %}
-
-**Skip if user chose Skip**: If the user chose "Skip — proceed with topic as
-given" in Phase 0, skip Phase 0.5 entirely and proceed directly to Phase 1.
-
-**Term meanings (this stage's settings, rendered from harness.yaml):**
-
-1. **EIG** — Expected information gain ≥ `ε = {{ config.interview.deep_gate.eig_epsilon | default(0.5) }}`. Skip Qs whose answer won't change the research direction.
-2. **CLARITI** — Task-relevance × user-answerability ≥ 0.7. Skip Qs the user cannot meaningfully answer right now.
-3. **Common-ground** — Skip slots already determined by CLAUDE.md / harness.yaml / prior answers / SPEC|RESEARCH frontmatter / same-slug PLAN|REVIEW history{% if config.interview.deep_gate.common_ground.llm_inference_enabled | default(true) %}, **OR** by LLM self-inference at confidence ≥ {{ config.interview.deep_gate.common_ground.llm_inference_threshold | default(0.95) }} (kill-switch: set `interview.deep_gate.common_ground.llm_inference_enabled: false` in harness.yaml to disable){% endif %}.
-4. **Confidence** — Slot's current resolution confidence must be `< τ = {{ config.interview.deep_gate.confidence_tau | default(0.7) }}`. Once confidence reaches τ, stop asking about that slot.
-5. **Open-ended cap** — At most `{{ config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get(config.locale, config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get('default', 1)) }}` open-ended question(s) per turn for locale `{{ config.locale }}`. Closed-form (multi-select / yes-no) questions are unrestricted.
-
-<!-- F6-deferred: the apply_inequality_gate Python implementation lives in
-     src/harness_maker/inequality_gate.py; the interview agent (F6) wires
-     the real LLM-backed EIG + common-ground mechanisms. LLMs reading this
-     template at decision time should apply the gate using their own judgment.
-     Note: the locale cap above is baked at render time — switching locale in
-     harness.yaml requires `/harness-maker:make` to refresh the rendered value. -->
-
-**Per-round display (ADR-005):**
-
-```
-✅ EIG ✅ CLARITI ❌ common-ground ✅ confidence ✅ open-ended → 4/5 met (NEEDS)
-```
-
-Render the checklist for EVERY candidate question (not just the ones presented), so the gate's reasoning is transparent. A candidate is asked iff all 5 terms are ✅.
-
-**Question generation:** LLM generates 1-3 follow-up candidates from the gaps Phase 0 rubric did not cover. Generation is mechanism-agnostic (no fixed type labels); ranking is by EIG descending.
-
-**Exit:** Continue presenting passing candidates until either:
-- All research-scoping slots reach confidence ≥ τ (the inequality naturally stops the loop — no more candidates pass the confidence term), OR
-- User chooses "end interview".
-
-If the gate cannot make progress (no candidate passes for 2 consecutive attempts at the SAME slot), offer "Proceed with current scope?" and continue to Phase 1.
+**Open-ended cap** (Phase 0 follow-ups): at most `{{ config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get(config.locale, config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get('default', 1)) }}` open-ended question(s) per turn for locale `{{ config.locale }}`; closed-form (multi-select / yes-no) questions are unrestricted. Which follow-up questions are worth asking is your judgment — ask only those whose answer would change the research direction.
 
 ### Phase 0.75 — Discovery lens calibration
 

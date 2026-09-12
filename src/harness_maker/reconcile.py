@@ -646,7 +646,11 @@ def _log_orphan_kept(
     line = json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n"
     # Single os.write() on O_APPEND fd — interleaving impossible.
     # The buffered ``open("a")`` could split across syscalls. See atomic_append docstring.
-    atomic_append(log_path, line)
+    try:
+        atomic_append(log_path, line)
+    except (OSError, ValueError):
+        # One unloggable orphan row must not stop the sweep from classifying the rest.
+        return
 
 
 def _normalize_expected_path(fe_path: Path) -> str:

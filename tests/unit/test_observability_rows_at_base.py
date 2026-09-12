@@ -147,3 +147,29 @@ def test_health_signal_is_not_applicable_outside_git(tmp_path: Path) -> None:
     ]
     assert sig.passed is True
     assert sig.not_applicable is True
+
+
+def test_tracked_but_ignored_probe_failure_inside_a_checkout_is_not_reported_as_no_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """rev-parse succeeds, ls-files fails (index lock, killed git): the function raises
+    `GitProbeError` and the health signal says the probe did not run — never
+    "not a git checkout" about a checkout it just found, and never a clean green."""
+    from harness_maker import readiness
+    from harness_maker import second_opinion_invoke as soi
+
+    def fake_git_stdout(args: list[str], cwd: Path) -> str | None:
+        return "/repo" if args[0] == "rev-parse" else None
+
+    monkeypatch.setattr(soi, "_git_stdout", fake_git_stdout)
+    with pytest.raises(readiness.GitProbeError):
+        readiness.tracked_but_ignored_observability(tmp_path)
+
+    (tmp_path / ".claude").mkdir(exist_ok=True)
+    sig = {s.id: s for s in readiness._dim_guardrails(tmp_path).signals}[
+        "observability_tracked_but_ignored"
+    ]
+    assert sig.not_applicable is True
+    assert sig.passed is True
+    assert "did not run" in sig.evidence
+    assert "not a git checkout" not in sig.evidence

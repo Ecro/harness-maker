@@ -221,6 +221,12 @@ research → spec → plan → execute → review → verify → wrapup
 
 단계마다 **고유한 책임**이 있고, 이전 단계의 산출물을 입력으로 받는다.
 
+이 단계들에서 렌더되는 모든 Step/Phase/Check 헤딩은 `src/harness_maker/step_sensitivity.py` 에서
+두 축으로 분류된다 — **COMP**(모델 능력이 좋아질수록 줄어듦), **HOST**(호스트 하네스가 네이티브로
+흡수할수록 줄어듦), **INV**(두 축과 무관하게 유지), **TUNE**(삭제 대상이 아니라 주기적으로
+재측정해야 하는 수치 임계값). `tests/structural/test_step_sensitivity_registry.py` 가 렌더된
+헤딩이 하나라도 미분류로 남지 않도록 강제한다.
+
 ---
 
 ### 3.1 /hm:research — 탐색
@@ -815,7 +821,10 @@ BLOCKED: check <N> (<이름>) — <이유>
 `--force` 플래그 시 첫 번째 실패에서 멈추지 않고 계속 진행 (결과는 jsonl 에 기록).
 
 #### 출력물
-- 텍스트 결과 + `.claude/observability/verify-{date}.jsonl`
+- 텍스트 결과만. `/hm:verify` 단계 자체의 JSONL 레저는 없음 — 옛 `verify-{date}.jsonl` 기록은
+  아무도 읽지 않는 손글씨 prose 였기에 은퇴됨 (커밋 `51b5bbfb`); stage 진입/종료는 이미
+  `stage-spans.jsonl` 과 `auto-advance.jsonl` 이 담당. CI 용 `verify` 명령(`cli.py`)은 여전히
+  그 파일군에 자체 machine record 를 남긴다.
 
 ---
 

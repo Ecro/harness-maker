@@ -2401,7 +2401,10 @@ def _write_verify_jsonl(obs_dir: Path, record: dict[str, Any]) -> None:
         date_str = datetime.now(UTC).date().isoformat()
     obs_dir.mkdir(parents=True, exist_ok=True)
     out_path = obs_dir / f"verify-{date_str}.jsonl"
-    atomic_append(out_path, json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
+    try:
+        atomic_append(out_path, json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
+    except (OSError, ValueError) as exc:
+        typer.echo(f"[verify] record not written: {exc}", err=True)
 
 
 def _emit_verify_text(

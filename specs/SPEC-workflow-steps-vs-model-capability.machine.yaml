@@ -1,0 +1,204 @@
+schema_version: 2
+spec_slug: workflow-steps-vs-model-capability
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: tier 2 — registry + structural tests are lookup/coverage
+  code; mutation adequacy adds little over the coverage property
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/step_sensitivity.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: every rendered step heading is classified
+  type: property
+  test_ids:
+  - tests/structural/test_step_sensitivity_registry.py::test_every_rendered_heading_is_classified
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Coverage invariant holds for every render (preset × target): the
+    set of Step/Phase/Check headings extracted from the rendered text is a subset
+    of the registry keys. The relation is over the render output, not the registry
+    code, so it cannot be satisfied by reading the implementation.'
+  oracle_independence_waiver: null
+  input_domain: rendered stage commands for ARMS = {Side, Production} × {spec-driven,
+    task-driven}
+  transformation: render → headings() → filter Step|Phase|Check ordinals (levels 2–5)
+  expected_relation: set(headings) ⊆ set(REGISTRY.keys()) and all TUNE entries have
+    remeasure_on and measure_cmd
+  preconditions: []
+  observable_output: set of heading strings
+  generator_hint: iterate presets × targets via the existing render fixture
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: an unclassified heading fails the structural suite
+  type: mechanical
+  test_ids:
+  - tests/structural/test_step_sensitivity_registry.py::test_unclassified_heading_fails
+  executable_predicate: coverage_failure_names(inject_heading('research', '### Step
+    9 — Foo')) == ('research', '### Step 9 — Foo')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Golden is an injected heading chosen by the test author, absent
+    from the registry by construction; expected failure message content is fixed before
+    the check exists.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Side defaults are consistent with the registry
+  type: mechanical
+  test_ids:
+  - tests/structural/test_step_sensitivity_registry.py::test_side_defaults_consistent_with_registry
+  executable_predicate: all(ordering(side_value(k), production_value(k)) for k in
+    registry_knobs())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Reference is the rendered Production harness.yaml; Side is compared
+    knob-by-knob under the registry's declared ordering. Two independently rendered
+    documents, not the registry itself.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: five-term ceremony absent, open-ended cap retained
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_inequality_gate_removed.py::test_five_term_ceremony_absent_cap_retained
+  executable_predicate: '''5-Term Inequality Gate'' not in rendered and ''open-ended''
+    in rendered'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Negative golden strings are taken from the 0.55.0 render captured
+    before the change (inequality_gate_block.md.j2 partial); positive golden is the
+    locale-cap sentence rendered from harness.yaml, which survives independently of
+    the partial.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: verify has no LLM satisfaction check
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_verify_check1_removed.py::test_verify_has_no_llm_satisfaction_check
+  executable_predicate: '''PLAN/SPEC satisfaction'' not in rendered and all(c in rendered
+    for c in DETERMINISTIC_CHECK_TITLES)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Negative golden is the Check 1 title from the 0.55.0 verify render;
+    positive goldens are the five deterministic check titles, fixed from the pre-change
+    render so renumbering cannot silently drop one.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: surface baseline re-frozen with attributed negative delta
+  type: mechanical
+  test_ids:
+  - tests/structural/test_baseline_delta_attribution.py::test_the_delta_document_exists
+  executable_predicate: surface_delta(frozen_baseline, live_render) < 0 and delta_doc_exists('workflow-steps-vs-model-capability')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Before/after surface_baseline.json are two independently frozen
+    snapshots; the existing attribution test is the reference checker and predates
+    this task.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: docs carry the classes
+  type: mechanical
+  test_ids:
+  - tests/structural/test_step_sensitivity_registry.py::test_docs_carry_classes
+  executable_predicate: has_class_column(matrix_md) and all(c in claude_md for c in
+    SENSITIVITY_CLASSES) and 'Side-preset only' in claude_md
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Golden strings are the four class names and the caveat phrase fixed
+    in this SPEC (R1/R2), independent of the docs being checked.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

@@ -175,6 +175,17 @@ def test_a_verify_receipt_claiming_a_record_that_does_not_exist_is_a_mismatch(
     assert [m.kind for m in result.mismatches] == ["verify-record-missing"]
 
 
+def test_a_verify_receipt_with_no_record_path_reconciles_clean(tmp_path: Path) -> None:
+    """The verify JSONL ledger was retired (nothing read it), so a receipt that names no
+    `record_path` is the normal shape now — it must NOT be a `verify-record-missing`."""
+    _memory(tmp_path, record=False)
+
+    result = wr.reconcile(_receipt().model_copy(update={"record_path": None}), base_root=tmp_path)
+
+    assert result.ok is True
+    assert "verify-record-missing" not in [m.kind for m in result.mismatches]
+
+
 def test_an_overall_pass_contradicted_by_a_failing_check_is_a_mismatch(
     tmp_path: Path,
 ) -> None:

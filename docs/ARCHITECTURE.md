@@ -180,6 +180,14 @@ The `research` fragment includes a discovery-lens calibration step so broad tren
 
 Stages are chained instead by `/hm:loop --per-iter-stages execute,review` or by autopilot's `autonomy.pipeline`. `io_utils.load_harness_yaml` strips the two retired keys at LOAD time (one advisory per project), so an old config keeps working without a re-render.
 
+Every rendered Step/Phase/Check heading across the seven stages is classified in
+`step_sensitivity.py` along two independent axes of "should this shrink": **COMP**
+(capability-compensation — shrinks as the underlying model improves), **HOST** (host-absorbed —
+shrinks as the vendor harness natively absorbs the behavior), **INV** (invariant regardless of
+either axis), and **TUNE** (not a deletion candidate — a numeric threshold with a `remeasure_on`
+trigger and `measure_cmd`). `tests/structural/test_step_sensitivity_registry.py` gates that no
+rendered heading across the `ARMS` (preset × dev_mode) matrix goes unclassified.
+
 ### M4 — Anti-rot Pipeline
 
 The Claude Code ecosystem moves weekly. Skills, agents, and best practices that were optimal on day 1 rot into liabilities by day 90. M4 fights that.

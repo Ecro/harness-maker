@@ -136,48 +136,7 @@ For a `property` oracle, also collect the structured triple `input_domain` /
 > cross-language golden pin; `consensus` ↔ the adversarial 3-skeptic verify;
 > mutation adequacy ↔ shared. `property` has no x-contract equivalent (new).
 
-#### 2.5 — 5-Term Inequality Gate
-
-Runs after the 6 structured categories are complete, before §2.2 promotion.
-This gate surfaces requirements the structured categories miss by filtering
-candidate follow-up questions through the 5-term inequality
-(0.16.0, PLAN-deep-interview-question-criteria):
-
-{% include "agents/_partials/inequality_gate_block.md.j2" %}
-
-**Skip if early exit**: If the user chose "SPEC is sufficiently clear — end
-interview" in any prior §2.1 round, skip §2.5 entirely and proceed to §2.2.
-
-**Term meanings (this stage's settings, rendered from harness.yaml):**
-
-1. **EIG** — Expected information gain ≥ `ε = {{ config.interview.deep_gate.eig_epsilon | default(0.5) }}`. Skip Qs whose answer won't change SPEC content.
-2. **CLARITI** — Task-relevance × user-answerability ≥ 0.7. Skip Qs the user cannot meaningfully answer right now.
-3. **Common-ground** — Skip slots already determined by CLAUDE.md / harness.yaml / prior answers / RESEARCH frontmatter / same-slug PLAN|REVIEW history{% if config.interview.deep_gate.common_ground.llm_inference_enabled | default(true) %}, **OR** by LLM self-inference at confidence ≥ {{ config.interview.deep_gate.common_ground.llm_inference_threshold | default(0.95) }} (kill-switch: `interview.deep_gate.common_ground.llm_inference_enabled: false` in harness.yaml){% endif %}.
-4. **Confidence** — Slot's current resolution confidence must be `< τ = {{ config.interview.deep_gate.confidence_tau | default(0.7) }}`.
-5. **Open-ended cap** — At most `{{ config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get(config.locale, config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get('default', 1)) }}` open-ended question(s) per turn for locale `{{ config.locale }}`. Closed-form (multi-select / yes-no) unrestricted.
-
-<!-- F6-deferred: see inequality_gate.py; F6 wires the real mechanism.
-     Locale cap above is render-time baked — re-render to refresh after locale change. -->
-
-**Per-round display (ADR-005):**
-
-```
-✅ EIG ✅ CLARITI ❌ common-ground ✅ confidence ✅ open-ended → 4/5 met (NEEDS)
-```
-
-Render the checklist for EVERY candidate question. A candidate is asked iff
-all 5 terms are ✅. The "common-ground" term is the primary defense against
-asking obvious questions (silent-intent-miss telemetry per ADR-008 monitors
-its post-hoc accuracy).
-
-**Question generation:** LLM generates 1-3 follow-up candidates targeting the
-SPEC slots Layer-0 categories did not lock down (WRONG / METHOD / STAKEHOLDER
-/ STYLE / PERF style cues are inputs to the generator, not gating labels).
-Ranking among passing candidates is by EIG descending.
-
-**Exit:** Continue until either:
-- All SPEC slots reach confidence ≥ τ (the inequality naturally stops the loop), OR
-- User chooses "end interview" / "Proceed to §2.2 with current ambiguity accepted".
+**Open-ended cap** (follow-ups after the six categories): at most `{{ config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get(config.locale, config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get('default', 1)) }}` open-ended question(s) per turn for locale `{{ config.locale }}`; closed-form (multi-select / yes-no) questions are unrestricted. Ask a follow-up only when its answer would change SPEC content and the user can answer it now; stop when every SPEC slot is settled or the user ends the interview.
 
 ---
 

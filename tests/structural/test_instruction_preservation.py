@@ -180,6 +180,15 @@ _COMPREHENSION_SPEC_HEADING = ("## SPEC Interview Round {N}",)
 #: are ever disabled the whole cross-model section goes and that is a different, larger entry.
 _ANTIGRAVITY_RECIPE_HEADING = ["#### Second opinion — model: `antigravity`"]
 
+_WSVMC_PHASE_3_RESEARCH_HEADINGS = [
+    "### Phase 0.5 — 5-Term Inequality Gate (only when `--deep` is set)",
+]
+_WSVMC_PHASE_3_SPEC_HEADINGS = ["#### 2.5 — 5-Term Inequality Gate"]
+
+_WSVMC_PHASE_4_VERIFY_HEADINGS = [
+    "### Check 1 — PLAN/SPEC satisfaction + drift verdict",
+]
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
     "config-second-opinion-antigravity-off": {
         "plan@task-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
@@ -243,6 +252,26 @@ _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
         "verify@spec-driven": list(_CI_DERIVED_VERIFY_EXAMPLES),
         "wrapup@task-driven": list(_CI_DERIVED_WRAPUP_EXAMPLES),
         "wrapup@spec-driven": list(_CI_DERIVED_WRAPUP_EXAMPLES),
+    },
+    # PLAN-workflow-steps-vs-model-capability Phase 4 (ADR-003): verify Check 1 keeps its
+    # mechanical drift-verdict read and drops the LLM PLAN/SPEC coverage judgement ("1b"), so
+    # the heading is RETITLED — the old title is the removed string, the new one
+    # (`### Check 1 — Drift verdict (REVIEW present)`) is a plain addition the gate does not
+    # track. Listed against BOTH arms because Check 1 sits outside every `dev_mode` gate.
+    # PLAN-workflow-steps-vs-model-capability Phase 3 (ADR-004): the 5-term inequality
+    # ceremony (partial + term list + per-round checklist) is deleted from research Phase 0.5,
+    # spec §2.5, plan Step E and loop §4-H; only the open-ended cap sentence remains. Only
+    # research and spec carried a HEADING for it (plan's lives under Step E, which stays;
+    # loop is not an atomic command). Both arms: the ceremony sat outside every dev_mode gate.
+    "workflow-steps-vs-model-capability-phase-3-five-term-ceremony": {
+        "research@task-driven": list(_WSVMC_PHASE_3_RESEARCH_HEADINGS),
+        "research@spec-driven": list(_WSVMC_PHASE_3_RESEARCH_HEADINGS),
+        "spec@task-driven": list(_WSVMC_PHASE_3_SPEC_HEADINGS),
+        "spec@spec-driven": list(_WSVMC_PHASE_3_SPEC_HEADINGS),
+    },
+    "workflow-steps-vs-model-capability-phase-4-verify-check1b": {
+        "verify@task-driven": list(_WSVMC_PHASE_4_VERIFY_HEADINGS),
+        "verify@spec-driven": list(_WSVMC_PHASE_4_VERIFY_HEADINGS),
     },
 }
 

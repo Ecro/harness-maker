@@ -32,27 +32,35 @@ Block silent regressions and partial completions. Run a rigid {% if config.dev_m
 ## Inputs
 
 - Current working tree state (staged + unstaged).
-- `{{ config.work_docs.dir }}PLAN-{slug}.md` and `{{ config.spec.dir }}SPEC-{slug}.md` (when present) — drive Check 1.
+- `{{ config.work_docs.dir }}REVIEW-{slug}.md` frontmatter — drives Check 1 (drift verdict).
+- `{{ config.work_docs.dir }}PLAN-{slug}.md` and `{{ config.spec.dir }}SPEC-{slug}.md` (when present) — {% if config.dev_mode == 'spec-driven' %}drive Check 6 and {% endif %}inform the `--force` rationale.
 - Most recent Health snapshot at `.claude/observability/dashboard.md` (2-section schema: `Structural` / `Personalization`; pre-0.13.0 single-`Health:` scalar is intentionally unreadable here). ADR-0007 removed the former `External risks` section in 0.22.3.
 - Most recent security findings at `.claude/observability/security/findings-*.jsonl`.
 
 ## The {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %} Checks (run in order; STOP on first FAIL unless `--force`)
 
-### Check 1 — PLAN/SPEC satisfaction + drift verdict
+### Check 1 — Drift verdict (REVIEW present)
 
-**1a. Drift verdict existence** (ADR-006): Read `{{ config.work_docs.dir }}REVIEW-{slug}.md` frontmatter.
-- `drift_verdict` present AND `task_slug` matches current PLAN → proceed to 1b.
+**Drift verdict existence** (ADR-006): Read `{{ config.work_docs.dir }}REVIEW-{slug}.md` frontmatter.
+- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.
 - `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run /hm:review first`.
 
-**1b. PLAN/SPEC coverage**: Every SPEC In-Scope Scenario in `{{ config.spec.dir }}SPEC-{slug}.md` (when SPEC exists) is covered by a passing test in the work unit's diff, OR has an explicit waiver recorded in the PLAN's `## ❓ Open Questions` resolution.
-
-```bash
-# When SPEC exists:
-- For each S1, S2, ... in SPEC: confirm a test function `test_s<N>_*` exists and passes.
-- For each PLAN phase exit-criterion: confirm the criterion command runs GREEN.
-```
-
-FAIL when: any scenario lacks coverage AND lacks waiver.
+This check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here
+as "1b" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is
+enforced where the tests are written: `/hm:execute` Phase A authors one test per SPEC scenario
+and Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a
+TUNE-class gate graded `**` — Side-preset evidence only, no ground-truth arm; see the
+step-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC
+(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or
+manual-checklist exit criterion has **no** automated re-check at this stage{% if config.dev_mode == 'spec-driven' %}, and Check 6 gates the SPEC operation, not scenario coverage{% endif %}.
+**`--no-tdd` path:** `/hm:execute --no-tdd` skips Phase A/A.5, and this stage does not
+re-derive scenario coverage.{% if config.dev_mode == 'spec-driven' %}{% if config.preset == 'Production' %} The mechanical backstop is `/hm:wrapup` Step 3.5's
+`spec_machine find-unbound` gate (fail-closed, STOP on this preset): a closed-type AC still `pending_test`
+after the write-back cannot be committed, whichever way execute ran.{% else %} `/hm:wrapup` Step 3.5's
+`spec_machine find-unbound` scan runs on this preset too but is **advisory only** (Side never STOPs),
+so an AC still `pending_test` after `--no-tdd` is surfaced in the wrapup report, not blocked.{% endif %}{% else %} Task-driven mode has no machine
+SPEC to scan, so on that path an uncovered scenario reaches wrapup unflagged — the accepted
+cost of `--no-tdd` without a SPEC contract.{% endif %}
 
 ### Check 2 — Regression smoke
 
@@ -226,7 +234,7 @@ exit 0
 ```
 === /hm:verify ===
 
-[1/6] PLAN/SPEC satisfaction       ✅ PASS
+[1/6] Drift verdict (REVIEW present) ✅ PASS
 [2/6] Regression smoke             ✅ PASS
 [3/6] Structural delta             ✅ PASS  (structural 87 → 89, +2)
 [4/6] Security high findings       ❌ FAIL
@@ -244,7 +252,7 @@ Override: --force --reason="<text>"
 ```
 === /hm:verify ===
 
-[1/5] PLAN/SPEC satisfaction       ✅ PASS
+[1/5] Drift verdict (REVIEW present) ✅ PASS
 [2/5] Regression smoke             ✅ PASS
 [3/5] Structural delta             ✅ PASS  (structural 87 → 89, +2)
 [4/5] Security high findings       ❌ FAIL
@@ -293,11 +301,11 @@ rest of this step. That is a supported path, not an error.
 **2. Dispatch — self-skipping.** If the subagent-dispatch tool is **unavailable** in
 this IDE (Cursor and Codex sessions), say so in one line and run the checks inline
 instead. Otherwise dispatch `stage-delegate` with the `brief` object verbatim plus
-the instruction: *run Checks 1..N below in order, stopping at the first FAIL, append
-the JSONL record, and return the receipt JSON; do not run git.*
+the instruction: *run Checks 1..N below in order, stopping at the first FAIL, and
+return the receipt JSON; do not run git and do not write a ledger file.*
 
-The receipt must carry `result`, one `checks[]` entry per check with a
-`PASS | FAIL | SKIP` verdict, and `record_path` for the JSONL record it appended.
+The receipt must carry `result` and one `checks[]` entry per check with a `PASS | FAIL |
+SKIP` verdict — no `record_path` (this stage writes no JSONL; the CI `verify` command in `cli.py` still does).
 
 **3. Reconcile before acting on the verdict.** Write the agent's reply to a **fresh
 unique temp file OUTSIDE the repo** — take the path from `mktemp -t hm-receipt.XXXXXXXX`,
@@ -339,15 +347,15 @@ Run the checks yourself, below, **only** when Step 0.5 sent you here.
 {% endif %}
 
 1. Read inputs (PLAN, SPEC, dashboard, security findings).
-2. Run Check 1. If PASS, continue. If FAIL: emit text + JSON record + STOP (unless `--force`).
+2. Run Check 1. If PASS, continue. If FAIL: emit the text summary + STOP (unless `--force`).
 3. Repeat for Checks 2-{% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}.
-4. Emit final RESULT line + JSON record.
+4. Emit the final RESULT line (text summary only — there is no JSONL ledger, see Outputs).
 5. When `--force` is set with FAILing checks: emit the text summary with the override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
 6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was dispatched by `/hm:loop`, which owns the transition to the next stage. Exception: an auto-advance check below returning `proceed: true` supersedes this.
 
 ## Outputs
 
-- Text summary on stdout (human-facing). No JSONL ledger: the former `verify-<date>.jsonl` record was hand-written prose nothing read (3 rows across three projects in four months); stage entry/exit is already recorded by `stage-spans.jsonl` and `auto-advance.jsonl`.
+- Text summary on stdout (human-facing). No JSONL ledger from this stage: the former `verify-<date>.jsonl` record was hand-written prose nothing read (stage entry/exit is already in `stage-spans.jsonl` and `auto-advance.jsonl`); the CI-facing `verify` command in `cli.py` (`_write_verify_jsonl`) still appends its own machine record to that file family.
 - Exit code: `0` for PASS or `--force` override; non-zero for FAIL without override.
 
 ## Quality Bar

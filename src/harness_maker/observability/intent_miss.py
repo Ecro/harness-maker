@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from dataclasses import asdict, dataclass
@@ -88,7 +89,10 @@ def record_intent_miss(
         conf,
     )
     if audit_path is not None:
-        _append_jsonl(audit_path, event)
+        # ValueError is atomic_append's over-PIPE_BUF guard; the no-raise contract wins —
+        # one lost telemetry row, never a failed review step.
+        with contextlib.suppress(OSError, ValueError):
+            _append_jsonl(audit_path, event)
     return event
 
 

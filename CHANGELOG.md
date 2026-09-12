@@ -2,7 +2,31 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Step-sensitivity registry answers "which `/hm:` steps should shrink as models/hosts
+  improve?"** `src/harness_maker/step_sensitivity.py` classifies all 82 rendered
+  Step/Phase/Check headings (across the `ARMS` preset × dev_mode matrix) into four classes:
+  **COMP** (capability-compensation — shrinks as the model improves), **HOST** (host-absorbed
+  — shrinks as the vendor harness absorbs the behavior), **INV** (invariant regardless of
+  either axis), and **TUNE** (not a deletion candidate — a numeric threshold carrying
+  `remeasure_on` + `measure_cmd` for periodic re-measurement). `unsourced` (39/82) is a
+  tracked, legitimate grade rather than a hidden gap. `tests/structural/test_step_sensitivity_registry.py`
+  gates that every rendered heading is classified.
+
+### Removed
+
+- **Two COMP prose deletions the registry justified.** The 5-term inequality ceremony is gone
+  from rendered research/spec/plan/loop (the open-ended cap sentence survives); verify Check 1's
+  LLM PLAN/SPEC-satisfaction judgement is replaced by a read of the existing `drift_verdict`.
+  Net shipped-surface delta: **−8,222 chars** on both rendered variants.
+
 ### Fixed
+
+- **`io_utils.atomic_append` no longer retries a short write.** A retry loop can splice a row
+  into a peer session's concurrent append; it now raises `OSError` on a short write (mirroring
+  the existing `append_atomic_line` "do NOT loop" contract) while keeping the `PIPE_BUF` guard.
+  All six callers now catch `(OSError, ValueError)`.
 
 - **Observability rows no longer vanish at `task-land`.** `review_telemetry emit` filed its
   row at `Path.cwd()` and `spec_need record` at the stage's `--root` — both the worktree —

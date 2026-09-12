@@ -8,7 +8,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde, load_harness_yaml
+from harness_maker.io_utils import (
+    atomic_append,
+    atomic_write,
+    denormalize_home_to_tilde,
+    load_harness_yaml,
+)
 
 
 def test_atomic_write_str_round_trip(tmp_path: Path) -> None:
@@ -213,3 +218,38 @@ def test_load_harness_yaml_skips_provenance_only_truncated_write(
     assert data == {}
     assert "generated_by" not in data
     assert "content_hash" not in data
+
+
+def test_atomic_append_refuses_a_line_over_pipe_buf(tmp_path: Path) -> None:
+    """Over PIPE_BUF the O_APPEND write is no longer atomic between concurrent writers;
+    the helper must refuse loudly rather than silently interleave (same guard as the
+    telemetry / stage-agent ledger writers)."""
+    target = tmp_path / "ledger.jsonl"
+    with pytest.raises(ValueError, match="PIPE_BUF"):
+        atomic_append(target, "x" * 4097 + "\n")
+    assert not target.exists() or target.read_text() == ""
+
+
+def test_atomic_append_writes_the_whole_line(tmp_path: Path) -> None:
+    target = tmp_path / "ledger.jsonl"
+    atomic_append(target, "a\n")
+    atomic_append(target, "b\n")
+    assert target.read_text() == "a\nb\n"
+
+
+def test_atomic_append_never_retries_a_short_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A retry would let a peer's append land between the two syscalls and splice the
+    rows; the helper raises instead (the contract `append_atomic_line` documents)."""
+    calls: list[int] = []
+    real_write = os.write
+
+    def short_write(fd: int, data: bytes) -> int:
+        calls.append(len(data))
+        return real_write(fd, data[: len(data) // 2])
+
+    monkeypatch.setattr(os, "write", short_write)
+    with pytest.raises(OSError, match="short append"):
+        atomic_append(tmp_path / "ledger.jsonl", "abcdef\n")
+    assert calls == [7], "exactly one write() attempt — no retry loop"

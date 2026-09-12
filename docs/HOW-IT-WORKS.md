@@ -221,6 +221,13 @@ research → spec → plan → execute → review → verify → wrapup
 
 Each stage has a **unique responsibility** and receives the output of the previous stage as input.
 
+Every rendered Step/Phase/Check heading across these stages is classified in
+`src/harness_maker/step_sensitivity.py` along two axes — **COMP** (shrinks as model capability
+improves), **HOST** (shrinks as vendor harnesses absorb the behavior natively), **INV**
+(invariant regardless of either axis), and **TUNE** (not a deletion candidate — a numeric
+threshold to periodically re-measure). `tests/structural/test_step_sensitivity_registry.py`
+gates that no rendered heading goes unclassified.
+
 ---
 
 ### 3.1 /hm:research — Exploration
@@ -878,7 +885,11 @@ Remediation hints for each blocking check:
 With `--force` flag, continue without stopping at first failure (results recorded in jsonl).
 
 #### Outputs
-- Text result + `.claude/observability/verify-{date}.jsonl`
+- Text result only. There is no `/hm:verify`-stage JSONL ledger — the former
+  `verify-{date}.jsonl` record was retired (commit `51b5bbfb`) because it was hand-written
+  prose nothing read; stage entry/exit is already covered by `stage-spans.jsonl` and
+  `auto-advance.jsonl`. The CI-facing `verify` command in `cli.py` still writes its own
+  machine record to that file family.
 
 ---
 

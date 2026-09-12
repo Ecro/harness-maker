@@ -549,7 +549,9 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(json.dumps({"written": True}))
             return 0
-        except ValueError as exc:
+        except (OSError, ValueError) as exc:
+            # OSError: atomic_append refuses to retry a short write (io_utils contract);
+            # the CLI keeps its JSON error shape either way.
             print(json.dumps({"error": str(exc)}))
             return 1
 

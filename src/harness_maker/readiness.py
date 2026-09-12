@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -528,6 +529,10 @@ def _dim_context_quality(project_dir: Path, preset: Preset) -> DimensionScore:
     return DimensionScore(name="context_quality", score=_score_signals(signals), signals=signals)
 
 
+class GitProbeError(RuntimeError):
+    """A git probe could not run inside a checkout that does exist."""
+
+
 def tracked_but_ignored_observability(project_dir: Path) -> list[str] | None:
     """Paths under `.claude/observability/` that git both tracks AND would ignore.
 
@@ -544,7 +549,10 @@ def tracked_but_ignored_observability(project_dir: Path) -> list[str] | None:
         project_dir,
     )
     if out is None:
-        return None
+        # The checkout exists (rev-parse succeeded) but the probe did not run — an
+        # index lock, a killed git, disk pressure. Folding this into `None` made the
+        # caller print "not a git checkout" about a checkout it had just found.
+        raise GitProbeError("git ls-files failed inside a git checkout")
     return sorted(p for p in out.split("\0") if p)
 
 
@@ -1315,8 +1323,26 @@ def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> Dime
     # a June `dashboard.md`. The snapshot reads as the ledger to anyone who trusts `git`.
     # harness-maker never runs `git rm --cached` on the user's behalf (CLAUDE.md git policy),
     # so this signal names the paths and the exact command. N-A outside a git checkout.
-    stale = tracked_but_ignored_observability(project_dir)
-    if stale is None:
+    try:
+        stale = tracked_but_ignored_observability(project_dir)
+    except GitProbeError as exc:
+        probe_error: str | None = str(exc)
+        stale = None
+    else:
+        probe_error = None
+    if probe_error is not None:
+        signals.append(
+            _signal(
+                "observability_tracked_but_ignored",
+                True,
+                5,
+                f"{probe_error} — tracked-snapshot probe did not run (transient?); "
+                "re-run /hm:health",
+                None,
+                not_applicable=True,
+            )
+        )
+    elif stale is None:
         signals.append(
             _signal(
                 "observability_tracked_but_ignored",
@@ -1341,7 +1367,7 @@ def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> Dime
                 None
                 if not stale
                 else "Untrack the snapshot (the live rows are in ignored siblings): "
-                f"git rm -r --cached {' '.join(stale)} && git commit -m "
+                f"git rm -r --cached {' '.join(shlex.quote(p) for p in stale)} && git commit -m "
                 '"chore(observability): untrack the pre-gitignore ledger snapshot"',
             )
         )

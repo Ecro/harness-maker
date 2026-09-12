@@ -256,6 +256,29 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 > 존재하지 않는 우회로를 사용자에게 권하지 않는다는 것뿐이다. 언어별 라우팅을 실제로 원하면
 > 그건 `conditional_router` 변경이고, 근거 데이터가 없어 보류 상태다.
 
+## Step sensitivity classes (COMP / HOST / INV / TUNE)
+
+`src/harness_maker/step_sensitivity.py` 가 렌더된 7 stage 의 모든 `Step|Phase|Check` 헤딩에
+감도 클래스를 붙인다 (PLAN-workflow-steps-vs-model-capability). **COMP** = 모델 능력 보상 —
+모델이 좋아질수록 줄여도 되는 산문. **HOST** = 호스트 하네스(Claude Code/Codex/Cursor)가 이제
+네이티브로 하는 것. **INV** = 모델과 무관하게 유지 — 컨텍스트 창을 넘어 살아남는 상태, 결정적
+oracle, 사람의 lock-in, 이종 모델. **TUNE** = 모델마다 값이 뒤집히는 것 (auto-fix cap, A.5,
+plan-validator, fan-out) — `remeasure_on`/`measure_cmd` 필드가 재측정 트리거를 들고 있고, 측정
+전엔 새 모델로 전이하지 않는다 (harness-bench "reversed between models").
+
+- **강제**: `tests/structural/test_step_sensitivity_registry.py` — `ARMS` = preset × dev_mode
+  렌더의 모든 헤딩이 레지스트리에 있어야 하고(무분류 헤딩 = 테스트 실패), Side 기본값은 knob 을
+  가진 어떤 엔트리(HOST 포함)에서도 Production 보다 공격적일 수 없다 (`knob`/`ordering`, 비공허 바닥 ≥3).
+  렌더는 레지스트리를 읽지 않는다 — 검사이지 파생이 아니다 (ADR-005).
+- **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 39` 는 RESEARCH 행이
+  없어 이웃에서 상속한 항목 수 (ADR-009). TUNE 수치는 전부 **Side-preset only, n=** 표기 —
+  stage-agent ledger 에 Production 행이 0 이다. FAIL 율은 가치 증명이 아니다 (plan-validator 는
+  40건 중 37건 MAJOR_REVISION — 변별력 미입증).
+- **커버리지 한계** (ADR-007): `second_opinion.models`/`delegation`/`mechanical_checks` 토글로
+  게이트된 헤딩은 `renders_when` 만 적고 커버리지 약속 밖이다 — toggle on-arm 추가는 후속.
+- **모델 릴리스 시**: `grep TUNE src/harness_maker/step_sensitivity.py` 로 재측정 대상을 뽑고
+  각 `measure_cmd` 를 돌린 뒤 등급/클래스를 갱신한다. 캡·산문 삭제는 그 결과로만.
+
 ## Workflow (autoloop CODER 가 알아야 할 점)
 - **Atomic stage**: 7개 (research/spec/plan/execute/review/wrapup/verify)
 - **Stage 연결** = `/hm:loop --per-iter-stages` 또는 autopilot. 융합 명령 축은 0.47.0 에서 제거됨 (PLAN-harness-diet ADR-001/002).

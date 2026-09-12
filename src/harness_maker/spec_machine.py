@@ -1220,7 +1220,7 @@ def _run_waiver_check(args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001 — the never-raises contract floor
         result = _waiver_error(_slug_from_machine_path(args.yaml_path), f"{type(e).__name__}: {e}")
     # receipt is advisory telemetry — its failure must not break exit-0
-    with contextlib.suppress(OSError):
+    with contextlib.suppress(OSError, ValueError):
         _write_waiver_receipt(args.root, result)
     print(json.dumps(result, ensure_ascii=False))
     return 0

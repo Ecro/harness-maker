@@ -12,7 +12,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from harness_maker.interview import _preset_extras, interview
-from harness_maker.models import HarnessConfig, InterviewAnswers, Preset, ProjectProfile
+from harness_maker.models import (
+    HarnessConfig,
+    InterviewAnswers,
+    Preset,
+    ProjectProfile,
+    interview_deep_gate_defaults,
+)
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -121,28 +127,26 @@ def test_schema_version_field_present_in_models() -> None:
 
 
 def test_stage_template_reads_config_not_hardcoded(tmp_path: Path) -> None:
-    """Stage templates render config values from harness.yaml.interview.deep_gate.
+    """Stage templates render the interview cap FROM harness.yaml.interview.deep_gate.
 
-    Post-0.16.0 (PLAN F5): the 3-layer gate's "streak: {N}/{streak_target}"
-    text is replaced by the 5-term inequality checklist (ADR-005). Templates
-    must render the ε/τ/cap values FROM config, not hardcode them.
+    Post-0.16.0 (PLAN F5) the 3-layer gate became the 5-term inequality checklist; the
+    checklist ceremony itself was retired by PLAN-workflow-steps-vs-model-capability ADR-004
+    (SPEC S4 — `tests/unit/test_render_inequality_gate_removed.py` guards its absence). What
+    survives, and what this test pins, is the config-rendered open-ended cap: the value and the
+    locale must come from config, not be hardcoded in the template.
     """
     out = _render_preset(tmp_path, Preset.SIDE)
     research = (out / "stages" / "research.md").read_text(encoding="utf-8")
-    # ADR-005 5-term checklist line — assert each term individually for clearer failure
-    assert "EIG" in research
-    assert "CLARITI" in research
-    assert "common-ground" in research
-    # Config-rendered ε / τ / locale cap (Side preset renders with default locale "en", cap=2)
-    assert "ε = 0.5" in research
-    assert "τ = 0.7" in research
-    assert "5-Term Inequality Gate" in research
+    assert "open-ended question(s) per turn for locale `en`" in research
+    assert "closed-form (multi-select / yes-no) questions are unrestricted" in research
+    cap = interview_deep_gate_defaults()["open_ended_cap_by_locale"]
+    expected = cap.get("en", cap["default"])
+    assert f"at most `{expected}` open-ended question(s)" in research
 
     out_prod = _render_preset(tmp_path / "prod", Preset.PRODUCTION)
     research_prod = (out_prod / "stages" / "research.md").read_text(encoding="utf-8")
-    # Both presets render the same 5-term gate (ADR-007 uniformity)
-    assert "ε = 0.5" in research_prod
-    assert "τ = 0.7" in research_prod
+    # Both presets render the same cap (ADR-007 uniformity)
+    assert f"at most `{expected}` open-ended question(s)" in research_prod
 
 
 def test_stage_template_no_3layer_remnants(tmp_path: Path) -> None:
