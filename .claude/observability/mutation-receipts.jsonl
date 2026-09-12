@@ -46,3 +46,4 @@
 {"deletes": "src/harness_maker/render.py:2061", "gate": "tests/structural/test_unwired_components.py::test_ac_014_the_linter_sees_every_asset_class", "slug": "token-efficiency-autopilot-ux-speed", "ts": "2026-09-08T12:02:32Z"}
 {"deletes": "src/harness_maker/synthesize.py:268", "gate": "tests/structural/test_unwired_components.py::test_ac_014_every_unwired_agent_is_declared", "slug": "token-efficiency-autopilot-ux-speed", "ts": "2026-09-08T12:02:32Z"}
 {"deletes": "src/harness_maker/templates/stages/verify.md.j2:314", "gate": "tests/structural/test_unwired_components.py::test_ac_014_verify_delegation_is_config_gated", "slug": "token-efficiency-autopilot-ux-speed", "ts": "2026-09-08T12:02:32Z"}
+{"deletes": "src/harness_maker/step_sensitivity.py:349", "gate": "tests/structural/test_step_sensitivity_registry.py::test_every_rendered_heading_is_classified", "slug": "workflow-steps-vs-model-capability", "ts": "2026-09-12T05:58:30Z"}
