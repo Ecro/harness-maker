@@ -19,6 +19,7 @@ from harness_maker.conditional_router import (
     ALL_LENSES,
     CORE_LENSES,
     DOMAIN_LENSES,
+    lens_dispatch_groups,
     mandatory_lenses,
     routable_lenses,
 )
@@ -55,8 +56,14 @@ def _dispatched(block: str) -> set[str]:
     """Lens names taken from the `Task(` lines, not from prose.
 
     Prose mentions a lens for many reasons; only a `Task(` line causes one to run.
+
+    A dispatch now carries a GROUP of lenses, so one `Task(` line can name several
+    (`description="lenses design+functionality+robustness+consistency: {slug}"`). The set this
+    returns is unchanged in meaning — every lens some dispatch actually carries — which is why
+    `_expected_dispatch` needs no change.
     """
-    return set(re.findall(r'description="lens ([a-z]+): \{slug\}"', block))
+    named = re.findall(r'description="lens(?:es)? ([a-z+]+): \{slug\}"', block)
+    return {lens for group in named for lens in group.split("+")}
 
 
 # ── AC-001: round 1 renders the preset's set, and it is the CLI's set ─────────
@@ -170,15 +177,27 @@ def test_confirmation_pass_uses_same_mandatory_set(bodies: dict[str, str], prese
 
 
 @pytest.mark.parametrize("preset", PRESETS)
-def test_both_sites_write_a_result_file_per_lens(bodies: dict[str, str], preset: str) -> None:
+def test_both_sites_write_a_result_file_per_dispatch(bodies: dict[str, str], preset: str) -> None:
+    """One result file per DISPATCH, which is no longer one per lens.
+
+    A merged dispatch produces `core.json` standing for the four lenses it carried; asking for
+    `design.json` beside it would tell the operator to write a file nothing produces, and
+    `lens_coverage` would then require it. The mandatory set is still fully covered — by
+    `lenses_for_result_file`, which maps each stem back to its members.
+    """
     body = bodies[preset]
     for section, stop in (
         ("### Step 3 — Parallel reviewer invocation", "\n### "),
         ("### Step C2 —", "\n### "),
     ):
         block = _section(body, section, stop=stop)
-        for lens in mandatory_lenses(preset):
-            assert f"/{lens}.json" in block, f"{section} does not write {lens}.json"
+        covered: set[str] = set()
+        for group in lens_dispatch_groups(preset):
+            assert f"/{group['file']}.json" in block, (
+                f"{section} does not write {group['file']}.json"
+            )
+            covered |= set(group["lenses"])
+        assert set(mandatory_lenses(preset)) <= covered
 
 
 @pytest.mark.parametrize("preset", PRESETS)

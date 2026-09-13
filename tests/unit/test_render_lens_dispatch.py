@@ -57,7 +57,11 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.conditional_router import OPTIONAL_REVIEWERS, mandatory_lenses
+from harness_maker.conditional_router import (
+    OPTIONAL_REVIEWERS,
+    lens_dispatch_groups,
+    mandatory_lenses,
+)
 from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -200,12 +204,18 @@ def telemetry_block(review_body: str) -> str:
 
 @pytest.mark.parametrize("lens", MANDATORY_LENSES)
 def test_each_mandatory_lens_is_dispatched_not_merely_named(dispatch_block: str, lens: str) -> None:
-    """Anchored to the per-lens result path, which no incidental prose can produce.
+    """Anchored to a result path, which no incidental prose can produce.
 
-    `lens in review_body` was GREEN for `failure` before any implementation existed.
+    `lens in review_body` was GREEN for `failure` before any implementation existed, so the
+    anchor has to be something only a dispatch instruction writes. That anchor used to be
+    `<lens>.json`; four lenses now share one dispatch and one `core.json`, so the anchor is the
+    file of the GROUP that carries the lens. `lenses_for_result_file` is the inverse map, which
+    is what keeps the mandatory set covered by a smaller set of files.
     """
-    assert f"{lens}.json" in dispatch_block, (
-        f"lens {lens!r} has no result-file instruction in the round-1 dispatch block"
+    group = next(g for g in lens_dispatch_groups("Production") if lens in g["lenses"])
+    assert f"{group['file']}.json" in dispatch_block, (
+        f"lens {lens!r} travels in group {group['file']!r}, which has no result-file "
+        "instruction in the round-1 dispatch block"
     )
 
 

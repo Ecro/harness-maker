@@ -689,7 +689,11 @@ findings (1.9 %) while costing a full serialized agent round-trip on every revie
 
 **Step 2 — the lens axis (what runs), then routing (what is mandatory)**
 
-Round 1 dispatches **seven lenses**, on both presets:
+Round 1 covers **seven lenses in four dispatches**, on both presets: the four core lenses
+(`design`/`functionality`/`robustness`/`consistency`) share one `code-reviewer` call — they
+differ only by one brief sentence each — leaving as a single `core.json` whose findings each
+carry their own member `lens`; `security`/`concurrency`/`tests` remain their own dispatches.
+Restoring the four-way fan-out is one dict-literal edit to `conditional_router.LENS_GROUPS`.
 
 | Lens | Asks |
 |---|---|
@@ -711,12 +715,15 @@ sees what they see.
 The conditional router decides which lenses are **mandatory**, not which are dispatched:
 Production requires all seven, Side requires the four core ones and routes the three domain
 lenses by path pattern (`.env` / `/auth/` → `security`, `thread` / `async` → `concurrency`, …).
-**Both dispatch all seven** — a router can only drop what was dispatched, and a lens that never
-ran cannot be routed back in.
+**Both cover all seven lenses** — a router can only drop what was dispatched, and a lens that
+never ran cannot be routed back in.
 
 `hm lens_coverage check` computes which lenses actually delivered, from result files keyed by
 `<slug>/<run-id>/<round>/`. A missing file is the signal that a dispatch died; the coverage
-verdict, not the executing model's self-report, is what the approval gate reads.
+verdict, not the executing model's self-report, is what the approval gate reads. A merged
+`core.json` is evidence for all four core lenses at once — `lenses_for_result_file` resolves
+the merged group id and (for a legacy un-re-rendered harness) a per-lens file the same way, so
+one file credits four lenses without four separate result files existing.
 
 **Step 3 — Parallel Review Execution**
 

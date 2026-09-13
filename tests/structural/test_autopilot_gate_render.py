@@ -13,7 +13,25 @@ collides with the `<command>@<dev_mode>` grammar the PLAN's Contract Boundary pi
 **The goldens in `autopilot_gate_golden.json` were captured BEFORE the template edit.** A snapshot
 taken afterwards records whatever the edited template produces, so it would freeze an
 over-swallowing gate rather than flag it — `ratchet-rebaselined-by-its-own-subject` applied to a
-byte baseline. Regenerating this file to make a red test green is therefore never the fix.
+byte baseline. Regenerating this file to make a red test green is therefore never the fix **for a
+change that is this guard's own subject**.
+
+**What the rule does NOT cover, learned 2026-09-13.** The golden byte-locks 15 commands across 4
+arms, and the property it proved — that the autopilot gate edit left the non-gated arms alone —
+was established when that PLAN landed and cannot be re-established afterwards. Any LATER change by
+any other task that legitimately edits a covered template lands here as a permanent red with no
+producer script and no documented way out. That is a third party moving the bytes, not the subject
+rebaselining itself, and the two need opposite treatment: **re-capture, and record in the list
+below which task moved what and why.** Refusing to re-capture in that case does not preserve the
+original proof — it only stops every future edit to any rendered command.
+
+Re-captures (append; never silently overwrite):
+
+- **2026-09-13, `reviewer-lens-fanout-merge`** — `review` moved in all four arms. The four core
+  reviewer lenses merged into one `code-reviewer` dispatch, so `review.md` renders four dispatches
+  where it rendered seven. Unrelated to autonomy gating: the same bytes move identically in
+  `auto_safe` and `ask`, which is the signal that this is not an arm-differential defect. Verified
+  before re-capture that `review` is the ONLY moved command in every arm.
 """
 
 from __future__ import annotations
@@ -241,9 +259,11 @@ def test_ac_005_the_non_gated_arms_are_byte_identical_to_the_pre_change_golden(
         )
         moved = {k for k, sha in golden[arm].items() if live[arm].get(k) != sha}
         assert not moved, (
-            f"{arm}: rendered bytes moved for {sorted(moved)}. This golden was captured BEFORE the "
-            "template edit — regenerating it to go green would freeze whatever the edit produced, "
-            "which is the failure it exists to catch."
+            f"{arm}: rendered bytes moved for {sorted(moved)}. If THIS guard's subject (the "
+            "autopilot gate) moved them, regenerating would freeze whatever the edit produced, "
+            "which is the failure it exists to catch. If a LATER, unrelated task moved them, "
+            "re-capture and append a dated entry to the module docstring naming the task and the "
+            "commands — see the re-capture list there."
         )
 
 

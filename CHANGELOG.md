@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`/hm:review`'s four core lenses (`design`/`functionality`/`robustness`/`consistency`) now
+  share one `code-reviewer` dispatch instead of four near-identical ones.** They differed only
+  by one brief sentence; the merged dispatch leaves as a single `core.json` whose findings each
+  carry their own member `lens`, and `lens_coverage` gained a merged mode so that one file is
+  evidence for all four lenses. `security`/`concurrency`/`tests` are unchanged. Seven lenses,
+  four dispatches, both presets — round-trip surface for `review` drops from 39 to 33 calls.
+  Restoring the four-way fan-out is one dict-literal edit to `conditional_router.LENS_GROUPS`.
+
 ### Fixed
 
 - **`mypy --strict src tests` is clean repo-wide again.** Nine strict errors in five test files

@@ -46,6 +46,10 @@ def stage_invocation(text: str, is_codex: bool) -> str:
 #: never be approved, because the CLI names a lens the command never told anyone to run.
 TEMPLATE_GLOBALS: dict[str, object] = {
     "lens_dispatch": conditional_router.lens_dispatch,
+    # The unit of DISPATCH, which stopped being the unit of lens when the four core lenses
+    # collapsed into one call. Both dispatch blocks in `review.md.j2` loop over this, so they
+    # cannot drift from each other or from `lens_coverage`'s idea of what a result file covers.
+    "lens_dispatch_groups": conditional_router.lens_dispatch_groups,
     "mandatory_lenses": conditional_router.mandatory_lenses,
     "routable_lenses": conditional_router.routable_lenses,
     # Same reason, different axis: the rendered gate branch and `resolve_churn_threshold`

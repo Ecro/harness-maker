@@ -1,5 +1,5 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
-{% set lenses = lens_dispatch(config.preset) %}{% set lens_names = mandatory_lenses(config.preset) -%}
+{% set lenses = lens_dispatch(config.preset) %}{% set groups = lens_dispatch_groups(config.preset) %}{% set lens_names = mandatory_lenses(config.preset) -%}
 {% import "agents/_partials/dispatch.md.j2" as dsp -%}
 # Stage: review
 
@@ -132,9 +132,10 @@ and an abandoned one are indistinguishable from elapsed time alone.
 ### Step 1 — Reviewer set selection
 
 **The discovery axis** — {% for l in lens_names %}`{{ l }}`{{ ", " if not loop.last }}{% endfor %} —
-is exercised every round. These are review categories, not agent names; the core ones share a single agent and are
-told apart only by the lens line in their brief. Distinct categories find distinct defects: that is
-why one lens's finding stands on its own (Step 4).
+is exercised every round. These are review categories, not agent names: the core ones share an agent
+AND **one dispatch** carrying all their questions. Distinct categories find distinct defects: that is
+why one lens's finding stands on its own (Step 4). This list is what must be *exercised*; Step 3
+says how many dispatches the round sends.
 
 - `routing: always-all` → invoke every enabled reviewer in parallel.
 - `routing: conditional` → use Conditional Router (M6) on the changed-file paths. It may drop **only** `ux-reviewer` / `performance-reviewer`{% if routable_lenses(config.preset) %} and, on this Side harness, the domain lenses {% for l in routable_lenses(config.preset) %}`{{ l }}`{{ ", " if not loop.last }}{% endfor %} — which are mandatory on Production and routable here{% endif %}; a mandatory lens is never routed away, because incomplete coverage blocks approval and a routed-away lens would make every conditional review permanently unapprovable.
@@ -205,14 +206,14 @@ When no drift is detected, emit `result: clean` with empty lists. This record is
 
 ### Step 3 — Parallel reviewer invocation (2-pass redaction)
 
-**Dispatch the {{ lenses | length }} lenses in ONE message, in round 1** — one dispatch
-per lens, same message, so they run concurrently. The core lenses share `code-reviewer` and are
-distinguished only by the lens line, so send that line verbatim.
+**Round 1 — dispatch the {{ lenses | length }} lenses as {{ groups | length }} dispatches, in ONE
+message.** The core lenses share `code-reviewer` and go in one call carrying all their questions;
+each domain lens keeps a call of its own. Send every lens line verbatim.
 
 {{ dsp.dispatch_intro(is_codex) }}
 
 ```
-{% for d in lenses %}{{ dsp.dispatch(is_codex, d.agent, "lens " + d.lens + ": {slug}", "<brief>\\n\\nYour lens: " + d.brief) }}
+{% for g in groups %}{{ dsp.dispatch(is_codex, g.agent, ("lens " + g.lenses[0] if g.lenses | length == 1 else "lenses " + g.lenses | join("+")) + ": {slug}", "<brief>\\n\\n" + (("Your lens: " + g.briefs[0]) if g.lenses | length == 1 else ("You are ACCOUNTABLE for all " + (g.lenses | length) | string + " lenses below; tag each finding with the lens it came from.\\n\\n- " + g.briefs | join("\\n- ")))) }}
 {% endfor %}```
 
 **Put in `<brief>`, so it reaches every lens: the public contract is fixed and out of scope** — no
@@ -230,8 +231,10 @@ carries it and every coverage call is given it.
 > round; it does not separate one invocation from the next.
 
 **You write the result files; the lens agents do not.** For each dispatch that **returns**, write
-its findings JSON to the per-round results directory, adding a `"lens"` key naming the lens and
-the `"run_id"` Step 0's `open` printed — **and stamp the same `"lens"` value on every finding inside it**.
+its findings JSON to the per-round results directory, adding the `"run_id"` Step 0's `open` printed
+and a **file-level** `"lens"` key naming the **group** — the `<group>.json` stem below. **Every
+finding inside carries its own `"lens"`: the member lens that raised it**{% for g in groups if g.lenses | length > 1 %}, one of `{{ g.lenses | join("` `") }}`{% endfor %} — never the
+group name. Same value at both levels for a single-lens group; different for a merged one.
 
 > The per-finding stamp is what makes ADR-007's rule decidable. The core lenses all dispatch to
 > `code-reviewer`, so `reviewer`/`source` collapses them to one voter name; without a per-finding
@@ -240,7 +243,7 @@ the `"run_id"` Step 0's `open` printed — **and stamp the same `"lens"` value o
 > never an input to `codex_adapter finding_id`, so the round-to-round merge key is unchanged.
 
 ```
-{% for l in lenses | map(attribute='lens') %}.claude/observability/.hm-lens-results/<slug>/<run-id>/<round>/{{ l }}.json
+{% for g in groups %}.claude/observability/.hm-lens-results/<slug>/<run-id>/<round>/{{ g.file }}.json
 {% endfor %}```
 
 A dispatch that **returns nothing produces no file** — dead agent, unparseable output, refusal,
@@ -755,9 +758,12 @@ finding sends the auto-fix loop churning on it and it never reaches the operator
 
 ### Re-dispatch what is missing; ask for coverage over EVERY round
 
-Re-dispatch the lenses the previous check named in `missing` — read that list from the CLI's
-output, never from your own recollection of which dispatch failed — and write their results
-into this round's directory.
+Re-dispatch what the previous check named in `missing` — read that list from the CLI's output,
+never from your own recollection of which dispatch failed. `missing` names **member lenses** while
+the dispatch unit is a **group**, so a missing member re-dispatches **its whole group** and writes
+**that group's file** — read both off the dispatch list above, never from a worked example: the
+grouping is one constant, and an example naming today's is wrong the moment it changes. Write the
+results into this round's directory.
 
 Then re-run the check **passing `--round` once per round of this review so far**, because
 coverage is cumulative over a review rather than per round: the auto-fix loop re-spawns only
@@ -970,7 +976,7 @@ owns commits and nothing is committed yet.
 Round 1 wrote `refs/hm-freeze/v1/<slug>-base`. Re-resolving here would recompute against a HEAD
 that has moved during the review, so the span would drift.
 
-### Step C2 — Dispatch all {{ lenses | length }} lenses over `review_base..<freeze commit>`
+### Step C2 — Dispatch all {{ lenses | length }} lenses as {{ groups | length }} dispatches over `review_base..<freeze commit>`
 
 The diff under review is `review_base..<freeze commit>` — **the whole review**, not the repair
 round. Diffing from `HEAD` reinstates the scope-selective re-review this pass replaces: it would
@@ -982,7 +988,7 @@ segment, never a round number. A pass is not a round; reusing a round's director
 that failed during the pass be counted as exercised from that round's stale file.
 
 ```
-{% for l in lenses | map(attribute='lens') %}.claude/observability/.hm-lens-results/<slug>/<run-id>/<pass-id>/{{ l }}.json
+{% for g in groups %}.claude/observability/.hm-lens-results/<slug>/<run-id>/<pass-id>/{{ g.file }}.json
 {% endfor %}```
 
 The dispatch list is the round-1 list, unchanged — same agents, same lens lines:
@@ -990,7 +996,7 @@ The dispatch list is the round-1 list, unchanged — same agents, same lens line
 {{ dsp.dispatch_intro(is_codex) }}
 
 ```
-{% for d in lenses %}{{ dsp.dispatch(is_codex, d.agent, "lens " + d.lens + ": {slug}", "<brief>\\n\\nYour lens: " + d.brief) }}
+{% for g in groups %}{{ dsp.dispatch(is_codex, g.agent, ("lens " + g.lenses[0] if g.lenses | length == 1 else "lenses " + g.lenses | join("+")) + ": {slug}", "<brief>\\n\\n" + (("Your lens: " + g.briefs[0]) if g.lenses | length == 1 else ("You are ACCOUNTABLE for all " + (g.lenses | length) | string + " lenses below; tag each finding with the lens it came from.\\n\\n- " + g.briefs | join("\\n- ")))) }}
 {% endfor %}```
 
 {% if is_codex %}```bash

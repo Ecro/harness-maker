@@ -210,15 +210,46 @@ def test_claude_arm_baseline_shape_is_pinned() -> None:
 # ---------------------------------------------------------------------------
 
 _MARKERS = ("Task(subagent_type=", "AskUserQuestion", "Skill(")
+#: The whole prompt payload of a dispatch line, from the `<brief>` placeholder to the closing
+#: quote. **Structural on purpose.** An earlier version anchored on the literal accountability
+#: sentence, which meant rewording that sentence stopped the merged group from matching at all —
+#: and because the three singleton dispatches still matched, `found` stayed non-empty and the
+#: `assert found` blanket check never fired. The test would have gone on passing while silently
+#: checking four fewer briefs. `_briefs_in` does the unpacking instead, on the delimiter the
+#: template actually emits.
 _LENS_LINE = re.compile(
-    r'(?:spawn_agent\(agent_type|Task\(subagent_type)="[^"]+".*Your lens: (.+?)"\)'
+    r'(?:spawn_agent\(agent_type|Task\(subagent_type)="[^"]+".*?'
+    r'prompt="<brief>\\n\\n(.+?)"\)|'
+    r'(?:spawn_agent\(agent_type)="[^"]+", message="<brief>\\n\\n(.+?)"\)'
 )
+
+
+def _briefs_in(body: str) -> list[str]:
+    """Every lens brief that reached a rendered dispatch argument, merged groups unpacked.
+
+    A singleton payload is `Your lens: <brief>`; a merged one is an accountability sentence
+    followed by `\n- `-separated briefs. Both shapes are handled by structure — the list
+    delimiter and the `Your lens: ` prefix — never by matching prose, so a reworded
+    accountability sentence changes nothing here.
+    """
+    out: list[str] = []
+    for groups in _LENS_LINE.findall(body):
+        payload = next((g for g in groups if g), "")
+        if not payload:
+            continue
+        if "\\n- " in payload:
+            out.extend(part for part in payload.split("\\n- ")[1:] if part)
+        else:
+            out.append(payload.removeprefix("Your lens: "))
+    return out
+
 
 #: The ONLY Claude-arm line the migration legitimately removed: `second-opinion-gate`'s
 #: dispatch was written across two physical lines, and the macro emits one. Its payload is
-#: preserved — the single line carries the same `description=` and `prompt=`. The set now holds
-#: FOUR entries: that one multi-line collapse (one per preset) plus the three from ADR-010's A.5
-#: collapse below. A **fifth** appearing here means a Claude dispatch was actually lost.
+#: preserved — the single line carries the same `description=` and `prompt=`. Every other entry
+#: is a dispatch a documented collapse removed, named where it is listed. Do NOT restate the set's
+#: size here: the previous two wordings each named a threshold the set had already passed, which
+#: tells a future reader to be alarmed at the wrong moment.
 #:
 #: Keep this count in step with the set. It said "exactly these two … a third means a dispatch was
 #: lost" while the set already held four — a tripwire that names a threshold it has passed tells a
@@ -232,9 +263,28 @@ _COLLAPSED_MULTILINE = {
     # `tests/structural/test_multi_lens_a5.py` pins that the surviving dispatch names every lens.
     # Listed here rather than regenerated, per this test's own instruction: regenerating would
     # approve the removal by fiat, which is exactly what the frozen fixture exists to prevent.
+    #
+    # NOTE — the paragraph below counted entries and went stale twice. It is not counted any
+    # more. The invariant is structural: **every entry is a dispatch line the frozen baseline
+    # holds and the current render does not, each with the collapse that removed it named
+    # directly above.** An entry with no such note is the defect to look for; the size of the
+    # set is not.
     'Task(subagent_type="test-reviewer", description="A.5 red-correctness: {slug}", prompt="<brief>\\n\\nYour lens: red-correctness — does each test fail, and for the intended reason?")',  # noqa: E501 — exact baseline string; wrapping breaks the match
     'Task(subagent_type="test-reviewer", description="A.5 discrimination: {slug}", prompt="<brief>\\n\\nYour lens: discrimination — would this assertion also pass against a plausibly WRONG implementation?")',  # noqa: E501 — exact baseline string; wrapping breaks the match
     'Task(subagent_type="test-reviewer", description="A.5 coverage: {slug}", prompt="<brief>\\n\\nYour lens: coverage — does the set cover the criterion, with no missing scenario and no duplicate?")',  # noqa: E501 — exact baseline string; wrapping breaks the match
+    # PLAN-reviewer-lens-fanout-merge (2026-09-13): the SAME collapse one stage over. The four
+    # core review lenses each had their own `code-reviewer` dispatch differing only by one brief
+    # sentence; they now leave in ONE call carrying all four questions. The payload is not lost —
+    # every brief still reaches a rendered dispatch argument, which
+    # `test_rendered_lens_briefs_match_the_baseline_on_both_arms` checks byte-for-byte after
+    # unpacking the merged group, and `tests/render/test_render_review_lens_groups.py` pins that
+    # the surviving dispatch names all four. Listed rather than regenerated, per this test's own
+    # instruction. These four lines appear in BOTH dispatch blocks (round 1 and Step C2), which is
+    # why removing them is eight renders and four unique strings.
+    'Task(subagent_type="code-reviewer", description="lens design: {slug}", prompt="<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.")',  # noqa: E501 — exact baseline string; wrapping breaks the match
+    'Task(subagent_type="code-reviewer", description="lens functionality: {slug}", prompt="<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?")',  # noqa: E501 — exact baseline string; wrapping breaks the match
+    'Task(subagent_type="code-reviewer", description="lens robustness: {slug}", prompt="<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.")',  # noqa: E501 — exact baseline string; wrapping breaks the match
+    'Task(subagent_type="code-reviewer", description="lens consistency: {slug}", prompt="<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.")',  # noqa: E501 — exact baseline string; wrapping breaks the match
 }
 
 
@@ -274,7 +324,7 @@ def test_rendered_lens_briefs_match_the_baseline_on_both_arms(preset: Preset) ->
 
     for path in (".claude/commands/hm/review.md", ".agents/skills/hm-review/SKILL.md"):
         body = files[path]
-        found = _LENS_LINE.findall(body)
+        found = _briefs_in(body)
         assert found, f"{path}: no dispatch line carried a lens brief"
         for brief in found:
             lens = next((k for k, v in expected.items() if v == brief), None)

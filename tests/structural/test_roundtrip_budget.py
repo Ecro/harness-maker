@@ -195,7 +195,15 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # have cost no round trip, and that is exactly why it was rejected: a record-only telemetry
     # failure must not be able to take the churn measurement down with it. The call is
     # Production-gated, so a Side render is unchanged.
-    "review": 39,
+    # 39 -> 33: PLAN-reviewer-lens-fanout-merge. The four core lenses shared `code-reviewer` and
+    # differed only by one brief sentence, so four dispatches bought four independent re-reads of
+    # one diff for four questions one agent can hold at once. They now leave in ONE `Task(`
+    # carrying all four. -3 in round 1 and -3 in Step C2, because ADR-011's rule counts every
+    # `Task(` individually and both blocks render from the same grouping function. The three
+    # domain lenses have their own agents and are untouched, so Production and Side both go from
+    # seven dispatches to four. Nothing else about the command moved: no call was added, removed
+    # or chained, and this is the whole of the -6.
+    "review": 33,
     "spec": 6,
     "uninstall": 3,
     # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.

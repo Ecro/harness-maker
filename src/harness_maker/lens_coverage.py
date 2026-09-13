@@ -8,22 +8,46 @@ import sys
 from pathlib import Path
 
 from harness_maker import command_registry
-from harness_maker.conditional_router import ALL_LENSES, mandatory_lenses
+from harness_maker.conditional_router import (
+    ALL_LENSES,
+    lenses_for_result_file,
+    mandatory_lenses,
+)
 
 
 def exercised_lenses(round_dir: Path, run_id: str) -> set[str]:
     """Build the exercised set from files that exist AND parse AND self-identify AND are OURS.
 
     Fail-closed **as to liveness** (SPEC AC-011, which was demoted from the stronger claim):
-    a lens is exercised only if its result file is
-    present, is valid JSON, and carries a ``lens`` field matching both its filename stem and a
-    known lens name. Absent, unreadable, malformed, mislabelled and unknown-lens files all
-    fall out of the set rather than into it.
+    a file contributes only if it is present, is valid JSON, and carries a ``lens`` field
+    matching both its filename stem and a name ``lenses_for_result_file`` recognises. Absent,
+    unreadable, malformed and mislabelled files all fall out of the set rather than into it.
+
+    **That recognised name is a lens OR a group, and the difference is load-bearing.** A merged
+    dispatch writes ``core.json`` carrying ``"lens": "core"``, and ``core`` is deliberately NOT a
+    member of ``ALL_LENSES``/``KNOWN_LENSES`` — it is a group id, and ``lenses_for_result_file``
+    is the only thing that knows both vocabularies. Do **not** "tighten" the check below to
+    ``payload["lens"] in KNOWN_LENSES``: it reads like a hardening and it silently deletes the
+    whole merged path, because no group file would ever count as exercised again. The earlier
+    wording of this paragraph said "a known lens name" and invited exactly that edit.
 
     The distinction matters because the failure this gate exists to catch — a dispatch that
     never happened — produces exactly an absent or empty file. Anything that treats "cannot
     tell" as "exercised" converts a delivery failure into a clean bill of health, which is the
     outcome the whole mechanism is built to prevent.
+
+    **A group file vouches for several lenses, so a fail-open here costs several times what it
+    used to.** Every *liveness* check below is unchanged and applies to a group file exactly as
+    it did to a per-lens one; what changed is the **weight** of passing them — one file now
+    contributes `lenses_for_result_file`'s whole membership tuple instead of one name.
+
+    **What this does NOT check, stated because three reviewers read it as a defect.** Membership
+    comes from the router, never from the payload, so a merged file whose findings substantively
+    address only two of its four lenses is still credited with all four. That is SPEC AC-004 and
+    ADR-003 as written — the gate answers "was this lens asked", not "did this lens deliver" —
+    and it is the accepted cost of the merge, not an oversight. It is recorded again here because
+    the docstring is where a reader looks, and because a file that could widen its own coverage
+    would be a different and worse thing: a fail-open with extra steps.
 
     ``run_id`` closes the hole the ``<round>`` keying alone does not (F2, demonstrated
     2026-08-15). The directory is keyed by slug and round, so re-running ``/hm:review`` on the
@@ -34,18 +58,20 @@ def exercised_lenses(round_dir: Path, run_id: str) -> set[str]:
     from a round, not one invocation from the next. A file whose ``run_id`` is absent or
     belongs to another invocation is therefore not evidence about this one.
     """
-    # The full vocabulary, NOT the preset's mandatory set. A Side harness whose router pulled
-    # `security` in produced a legitimate result file, and scoping this to the mandatory set
-    # would discard it — `exercised` would under-report and `review_telemetry.lenses_exercised`
-    # would lose a lens that actually ran. What the preset decides is what is REQUIRED, which
-    # is `coverage_verdict`'s job; it is not a filter on what counts as a real result.
-    known = set(ALL_LENSES)
     found: set[str] = set()
     if not round_dir.is_dir():
         return found
     for path in sorted(round_dir.glob("*.json")):
         stem = path.stem
-        if stem not in known:
+        # The router owns which lenses a stem vouches for, NOT the file: `core.json` is one
+        # dispatch's output standing for four lenses, and a per-lens file stands for itself.
+        # Reading membership out of the payload would let a result file widen its own coverage.
+        # The full vocabulary, NOT the preset's mandatory set — a Side harness whose router
+        # pulled `security` in produced a legitimate result file, and scoping this to the
+        # mandatory set would discard it. What the preset decides is what is REQUIRED, which is
+        # `coverage_verdict`'s job; it is not a filter on what counts as a real result.
+        members = lenses_for_result_file(stem)
+        if not members:
             continue
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -57,7 +83,7 @@ def exercised_lenses(round_dir: Path, run_id: str) -> set[str]:
             continue
         if payload.get("run_id") != run_id:
             continue
-        found.add(stem)
+        found.update(members)
     return found
 
 

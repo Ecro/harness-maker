@@ -37,7 +37,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.conditional_router import lens_dispatch
+from harness_maker.conditional_router import lens_dispatch, lens_dispatch_groups
 from harness_maker.models import (
     DevMode,
     InterviewAnswers,
@@ -276,16 +276,25 @@ def test_the_allowlist_does_not_exempt_a_real_call_sharing_its_line() -> None:
 def test_the_codex_arm_actually_renders_its_dispatches(preset: Preset) -> None:
     """POSITIVE control. Every other assertion here is negative, so a macro that emitted
     NOTHING on the Codex arm would pass the whole module cleanly — "no Claude tool" is also
-    true of an empty file. This pins the count the reported symptom is about: seven lenses
-    (`lens_dispatch` returns 7 on both presets) across the two dispatch blocks in
-    `review.md.j2` — round 1 and the confirmation re-dispatch.
+    true of an empty file. This pins the count the reported symptom is about: the DISPATCHES
+    across the two blocks in `review.md.j2` — round 1 and the confirmation re-dispatch.
+
+    **The unit is the group, not the lens.** The four core lenses share one `code-reviewer` call,
+    so seven lenses leave as four dispatches on both presets. A dispatch count alone would not
+    notice a group that quietly dropped a member — which is the same blind spot this test exists
+    to close, one level down — so the lens SET carried by the groups is asserted beside it.
     """
     bodies = _codex_bodies(preset, [Target.CLAUDE_CODE, Target.CODEX], DevMode.SPEC_DRIVEN)
     review = bodies[".agents/skills/hm-review/SKILL.md"]
-    expected = 2 * len(lens_dispatch(preset.value))
+    groups = lens_dispatch_groups(preset.value)
+    expected = 2 * len(groups)
     actual = review.count('spawn_agent(agent_type="')
     assert actual == expected, (
         f"hm-review renders {actual} Codex dispatches, expected {expected} "
-        f"({len(lens_dispatch(preset.value))} lenses x 2 blocks). A shrinking fan-out is "
+        f"({len(groups)} groups x 2 blocks). A shrinking fan-out is "
         "invisible to every other assertion in this file."
+    )
+    carried = {lens for g in groups for lens in g["lenses"]}
+    assert carried == {d["lens"] for d in lens_dispatch(preset.value)}, (
+        "the groups dropped a lens; the dispatch count alone cannot see that"
     )

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TypedDict
 
 from harness_maker.llm_judge import JudgeClient
 
@@ -136,6 +137,96 @@ LENS_DISPATCH: dict[str, tuple[str, str]] = {
         "tests — oracle strength, discrimination, would these tests pass a wrong implementation?",
     ),
 }
+
+
+class LensGroup(TypedDict):
+    """One subagent dispatch: the lenses it carries, and the result file it produces.
+
+    Separate from `LENS_DISPATCH` because the unit of *dispatch* stopped being the unit of
+    *lens* — several lenses now travel in one call, and `lens_coverage` has to map the one
+    file that produces back onto the several lenses it is evidence for.
+    """
+
+    file: str
+    agent: str
+    lenses: list[str]
+    briefs: list[str]
+
+
+#: Which lenses travel in ONE dispatch, keyed by the result-file stem the main loop writes.
+#:
+#: The four core lenses share `code-reviewer` and differ only by their brief sentence, so four
+#: dispatches meant four independent re-reads of the same diff for four questions one agent can
+#: hold at once. Phase A.5 of `/hm:execute` made the same move for its three test lenses and
+#: recorded ≈330k subagent tokens per round — the token claim only: that fan-out was serial
+#: retries, while these four already left in one message, so no latency is recovered here.
+#:
+#: **The yield of the merge is unmeasured, deliberately** (SPEC Intent). `harness-bench` §10's
+#: nearest data point scored a single *generic* call at 11.0 distinct findings against 30.0 for
+#: a six-category fan-out; the enumerated-categories-in-one-call arm this produces was never run.
+#:
+#: **This constant IS the reversal.** Restoring the fan-out is `{lens: (lens,) for lens in
+#: ALL_LENSES}` and nothing else — both rendered dispatch blocks and `lens_coverage` derive from
+#: here, so neither can disagree with the other about what a dispatch is.
+#:
+#: A singleton group is keyed by its own lens name, so a **domain** lens's per-lens result file
+#: resolves through this table. A legacy **core**-lens file (`design.json` and friends) does NOT
+#: — `core` is the only key covering those four, and their stems resolve through the separate
+#: `stem in ALL_LENSES` fallback in `lenses_for_result_file`. Two mechanisms, not one: deleting
+#: that fallback as apparently redundant silently breaks SPEC AC-004's third clause for every
+#: core lens an un-re-rendered harness writes.
+LENS_GROUPS: dict[str, tuple[str, ...]] = {
+    "core": CORE_LENSES,
+    **{lens: (lens,) for lens in DOMAIN_LENSES},
+}
+
+
+def lenses_for_result_file(stem: str) -> tuple[str, ...]:
+    """The lenses a result file with this stem is evidence for; empty when the stem is unknown.
+
+    Fail-closed by returning the empty tuple rather than raising or guessing: a merged file now
+    vouches for four lenses instead of one, so resolving "cannot tell" to "exercised" costs four
+    times what it used to. The caller (`lens_coverage.exercised_lenses`) unions what comes back,
+    and an empty tuple contributes nothing — which is the same shape as an absent file.
+    """
+    if stem in LENS_GROUPS:
+        return LENS_GROUPS[stem]
+    if stem in ALL_LENSES:
+        return (stem,)
+    return ()
+
+
+def lens_dispatch_groups(preset: str = "Production") -> list[LensGroup]:
+    """The preset's dispatch table grouped into one entry per subagent call.
+
+    Derived from `lens_dispatch` rather than beside it, so a lens cannot be dispatched by one
+    and required by the other. Both rendered dispatch sites — round 1 and the confirmation pass
+    — loop over this, which makes their parity structural instead of conventional: a pass
+    missing a lens the coverage CLI requires makes every review permanently unapprovable
+    (SPEC AC-015 of the nine-lens work).
+    """
+    by_lens = {str(d["lens"]): d for d in lens_dispatch(preset)}
+    groups: list[LensGroup] = []
+    for file, members in LENS_GROUPS.items():
+        present = [lens for lens in members if lens in by_lens]
+        if not present:
+            continue
+        agents = {by_lens[lens]["agent"] for lens in present}
+        if len(agents) != 1:
+            # A group is one agent and one dispatch. A mixed group would render a call that
+            # names one agent while carrying another's brief — silently wrong, and invisible
+            # in the rendered command, which is this repository's recurring defect class.
+            msg = f"lens group {file!r} spans agents {sorted(agents)}; a group is one agent"
+            raise ValueError(msg)
+        groups.append(
+            LensGroup(
+                file=file,
+                agent=agents.pop(),
+                lenses=present,
+                briefs=[by_lens[lens]["brief"] for lens in present],
+            )
+        )
+    return groups
 
 
 def lens_dispatch(preset: str = "Production") -> list[dict[str, str]]:

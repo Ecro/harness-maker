@@ -1,0 +1,244 @@
+schema_version: 2
+spec_slug: reviewer-lens-fanout-merge
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: Mixed Python and Jinja work. The Python surface is two
+  small functions (the dispatch-grouping function and lens_coverage's merged mode)
+  and is directly assertable, but four of the eight ACs land in the rendered template
+  where mutation testing has no purchase, so the 85 bar would be measured against
+  a shrinking denominator and read as stronger evidence than it is.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/conditional_router.py
+- src/harness_maker/lens_coverage.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Round 1 sends the four core lenses as exactly one `code-reviewer` dispatch
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_review_lens_groups.py::test_round_one_sends_one_code_reviewer_dispatch
+  - tests/render/test_render_review_lens_groups.py::test_the_core_lenses_leave_in_one_code_reviewer_dispatch
+  executable_predicate: len([g for g in dispatch_groups("Production") if g["agent"]
+    == "code-reviewer"]) == 1
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected count of 1 is fixed by the merge decision recorded
+    in this SPEC's Intent, not read back from the renderer; the fan-out it replaces
+    produced 4, so the two values are distinguishable without consulting the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: The confirmation pass renders the identical grouping to round 1
+  type: property
+  test_ids:
+  - tests/render/test_render_review_lens_groups.py::test_the_confirmation_pass_groups_match_round_one
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Equality of the two extracted group lists holds for ANY grouping
+    the function returns, including a restored fan-out, so the relation cannot be
+    satisfied by reading the implementation and hardcoding one particular list.
+  oracle_independence_waiver: null
+  input_domain: every preset x target render arm (Production/Side x claude/codex)
+  transformation: extract the dispatch groups from Step 3 and from Step C2 of the
+    same rendered command
+  expected_relation: groups(step_3) == groups(step_c2), element for element and in
+    order
+  preconditions:
+  - the render succeeded and both blocks are present
+  observable_output: an ordered list of (agent, lens-set) pairs per block
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: All four core lens questions survive the merge verbatim
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_review_lens_groups.py::test_every_core_lens_brief_survives_verbatim
+  executable_predicate: all(LENS_DISPATCH[lens][1] in merged_brief for lens in CORE_LENSES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The rendered brief is compared against `conditional_router.LENS_DISPATCH`,
+    a separate module that the template does not write; a template that paraphrased
+    a lens question would diverge from the constant and fail.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: One merged result file marks the four core lenses exercised
+  type: mechanical
+  test_ids:
+  - tests/unit/test_lens_coverage_merged.py::test_one_core_file_covers_the_four_core_lenses
+  executable_predicate: coverage_verdict(round_dir, run_id, "Production")["missing"]
+    == []
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected verdict is the empty missing-list stated by this AC
+    and fixed in advance; the fixture directory is hand-built to hold exactly one
+    core.json plus the three domain files, so the expected value comes from the fixture's
+    construction rather than from running the function.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: '`exercised` still names the four core lenses individually'
+  type: mechanical
+  test_ids:
+  - tests/unit/test_lens_coverage_merged.py::test_exercised_names_the_core_lenses_not_the_group
+  executable_predicate: set(coverage_verdict(round_dir, run_id, "Production")["exercised"])
+    >= set(CORE_LENSES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The expected array is the shipped telemetry row in .claude/observability/review-2026-08-19.jsonl:
+    lenses_exercised = [design, functionality, robustness, consistency, security,
+    concurrency, tests], written before this change by the fan-out it replaces.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Merged mode stays fail-closed on every non-conforming file
+  type: property
+  test_ids:
+  - tests/unit/test_lens_coverage_merged.py::test_merged_mode_is_fail_closed_on_every_bad_file
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The invariant is "cannot tell must not resolve to exercised", which
+    exercised_lenses already holds for per-lens files; it is stated over the whole
+    class of non-conforming files rather than over the five enumerated ones, so an
+    implementation that special-cased the listed cases would still fail a sixth.
+  oracle_independence_waiver: null
+  input_domain: a core.json that is absent, unparseable, not a JSON object, carries
+    a lens value other than "core", or carries a run_id from another invocation
+  transformation: run coverage_verdict over the round directory containing that file
+  expected_relation: every core lens appears in missing, and blocks_approval is true,
+    for every member of the input domain
+  preconditions:
+  - the preset resolves the four core lenses as mandatory
+  observable_output: the verdict dict's missing list and blocks_approval flag
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: The round-trip budget and the surface baseline agree on the new value
+  type: mechanical
+  test_ids:
+  - tests/structural/test_roundtrip_budget.py::test_every_command_matches_its_budget
+  - tests/structural/test_roundtrip_budget.py::test_round_trips_match_exactly
+  executable_predicate: roundtrip_budget()["review"] == 33
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The frozen surface_baseline.json and the live render are two independent
+    producers of the same count; the budget table is a third, hand-maintained one.
+    A change that moved only one of the three leaves the other two disagreeing with
+    it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: The grouping function is the sole producer of the dispatch groups
+  type: property
+  test_ids:
+  - tests/render/test_render_review_lens_groups.py::test_no_lens_text_is_a_literal_in_the_template
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation is over the template source rather than over the render,
+    and holds for any grouping the function returns; it cannot be satisfied by reading
+    the current grouping because the assertion is the ABSENCE of that grouping's text
+    from the template.
+  oracle_independence_waiver: null
+  input_domain: the review.md.j2 template source and conditional_router's lens constants
+  transformation: scan both dispatch blocks for literal occurrences of any lens name,
+    agent name or lens brief string
+  expected_relation: zero literal occurrences in the template, while lens_dispatch()
+    still returns one entry per lens for both presets
+  preconditions:
+  - the grouping function is exported as a Jinja global by render._make_env
+  observable_output: the set of literal matches found in the two blocks
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

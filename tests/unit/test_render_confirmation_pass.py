@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.conditional_router import mandatory_lenses
+from harness_maker.conditional_router import lens_dispatch_groups, mandatory_lenses
 from harness_maker.interview import interview
 from harness_maker.models import ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -217,11 +217,15 @@ def test_the_pass_re_reads_the_frozen_cross_model_set(confirm_block: str) -> Non
 def test_the_pass_dispatches_every_mandatory_lens(confirm_block: str, lens: str) -> None:
     """A confirmation pass over a subset would confirm a subset.
 
-    This fixture renders the Side preset, so the mandatory set is the six core categories; the
+    This fixture renders the Side preset, so the mandatory set is the four core categories; the
     three domain lenses are routable here and mandatory on Production. Parity between round 1
     and this pass — for either preset — is `test_render_lens_axis.py`'s subject.
+
+    The anchor is the GROUP's result file: the four core lenses share one dispatch and produce
+    `core.json`, so asking for `design.json` here would demand a file nothing writes.
     """
-    assert f"{lens}.json" in confirm_block
+    group = next(g for g in lens_dispatch_groups("Side") if lens in g["lenses"])
+    assert f"{group['file']}.json" in confirm_block
 
 
 @pytest.fixture(scope="module")

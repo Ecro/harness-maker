@@ -189,7 +189,20 @@ _WSVMC_PHASE_4_VERIFY_HEADINGS = [
     "### Check 1 — PLAN/SPEC satisfaction + drift verdict",
 ]
 
+#: Step C2's heading gained the dispatch count beside the lens count when the four core lenses
+#: merged into one call, so the old wording is gone. The STEP is not removed and neither is the
+#: pass — only the trailing text of one heading moved, which is why this is a removal entry and
+#: not a coverage loss. `step_sensitivity` keys on the ordinal `"Step C2"` alone, so the registry
+#: gate is unaffected.
+_STEP_C2_PRE_MERGE_HEADING: tuple[str, ...] = (
+    "### Step C2 — Dispatch all 7 lenses over `review_base..<freeze commit>`",
+)
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    "reviewer-lens-fanout-merge": {
+        "review@task-driven": list(_STEP_C2_PRE_MERGE_HEADING),
+        "review@spec-driven": list(_STEP_C2_PRE_MERGE_HEADING),
+    },
     "config-second-opinion-antigravity-off": {
         "plan@task-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
         "plan@spec-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
