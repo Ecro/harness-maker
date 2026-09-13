@@ -27,6 +27,12 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-13, release 0.56.0** — ALL FIFTEEN commands moved in all four arms, which looks
+  alarming and is not: the only differing line per command is the frontmatter
+  `harness_maker_version:` key. Verified before re-capturing — 15 lines across 15/15 commands,
+  **zero** non-frontmatter occurrences of the new version string. A version bump moves every
+  rendered artifact by construction, so this fixture will need a re-capture at every release
+  until something keys it on content rather than bytes.
 - **2026-09-13, `reviewer-lens-fanout-merge`** — `review` moved in all four arms. The four core
   reviewer lenses merged into one `code-reviewer` dispatch, so `review.md` renders four dispatches
   where it rendered seven. Unrelated to autonomy gating: the same bytes move identically in
