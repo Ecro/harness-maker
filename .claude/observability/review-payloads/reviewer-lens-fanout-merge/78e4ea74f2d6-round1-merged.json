@@ -1,0 +1,116 @@
+[
+ {
+  "id": "k1",
+  "severity": "P1",
+  "file": "src/harness_maker/lens_coverage.py",
+  "line": 72,
+  "summary": "exercised_lenses unions declared group membership, not what the payload covers",
+  "lens": "concurrency"
+ },
+ {
+  "id": "k2",
+  "severity": "P2",
+  "file": "src/harness_maker/lens_coverage.py",
+  "line": 32,
+  "summary": "docstring claims the per-file checks are unchanged; their semantic weight changed",
+  "lens": "concurrency"
+ },
+ {
+  "id": "c1",
+  "severity": "P1",
+  "file": "src/harness_maker/lens_coverage.py",
+  "line": 23,
+  "summary": "exercised_lenses docstring says accepted files carry a known LENS name; core.json carries a GROUP name",
+  "lens": "consistency"
+ },
+ {
+  "id": "c2",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/stages/review.md.j2",
+  "line": 134,
+  "summary": "Step 1 count clause quotes the dispatched set beside a sentence that enumerated the mandatory set",
+  "lens": "consistency"
+ },
+ {
+  "id": "d1",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/stages/review.md.j2",
+  "line": 284,
+  "summary": "the singleton-vs-merged dispatch ternary is duplicated verbatim in both blocks",
+  "lens": "design"
+ },
+ {
+  "id": "f1",
+  "severity": "P2",
+  "file": "src/harness_maker/conditional_router.py",
+  "line": 174,
+  "summary": "lenses_for_result_file trusts static LENS_GROUPS, not what lens_dispatch_groups rendered",
+  "lens": "functionality"
+ },
+ {
+  "id": "r1",
+  "severity": "P2",
+  "file": "src/harness_maker/lens_coverage.py",
+  "line": 72,
+  "summary": "merged group credits all four members even on a partial answer (disclosed as SPEC Open Question 2)",
+  "lens": "robustness"
+ },
+ {
+  "id": "r2",
+  "severity": "P2",
+  "file": "tests/unit/test_render_dispatch_macro.py",
+  "line": 471,
+  "summary": "_LENS_LINE anchored on the accountability sentence; rewording it silently stops checking four briefs",
+  "lens": "robustness"
+ },
+ {
+  "id": "s1",
+  "severity": "P1",
+  "file": "src/harness_maker/lens_coverage.py",
+  "line": 72,
+  "summary": "merged-group coverage credit is not conditioned on which member lenses the payload's findings name",
+  "lens": "security"
+ },
+ {
+  "id": "s2",
+  "severity": "P2",
+  "file": "src/harness_maker/conditional_router.py",
+  "line": 141,
+  "summary": "mixed-agent guard fires at render time only; degrades to under-report, not over-report",
+  "lens": "security"
+ },
+ {
+  "id": "t1",
+  "severity": "P2",
+  "file": "tests/unit/test_render_dispatch_macro.py",
+  "line": 233,
+  "summary": "_COLLAPSED_MULTILINE tripwire comment names FOUR entries; the set now holds eight",
+  "lens": "tests"
+ },
+ {
+  "id": "t2",
+  "severity": "P2",
+  "file": "tests/render/test_render_review_lens_groups.py",
+  "line": 194,
+  "summary": "stamp-instruction assertion is a substring over a 1400-char window, weaker than its siblings",
+  "lens": "tests"
+ },
+ {
+  "id": "da5d7ffa626388fd",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/stages/review.md.j2",
+  "line": 216,
+  "summary": "the merged reviewer is never told to return each finding's member lens",
+  "source": "codex",
+  "lens": null
+ },
+ {
+  "id": "e421aa33284ae110",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/stages/review.md.j2",
+  "line": 764,
+  "summary": "the hardcoded recovery example breaks the promised one-constant reversal",
+  "source": "codex",
+  "lens": null
+ }
+]
