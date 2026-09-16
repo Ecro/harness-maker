@@ -1,0 +1,267 @@
+schema_version: 2
+spec_slug: objective-gap-proposal
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: 'Same Tier-1 subsystem as the two previous intent SPECs:
+  the gap report is what a proposer reads and the --from-proposal path is a new writer
+  of the record the autopilot gate reads. A surviving mutant in reason derivation
+  silently mislabels an unmeasured outcome as measured; one in the rejected pre-fill
+  silently re-opens rejected work. Scope is world.py; autopilot_ledger.py gains one
+  enum member covered by AC-003.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/world.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: gap report carries measurement reason and every objective state
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_gap.py::test_ac_001_gap_reports_measurement_reason_per_outcome
+  - tests/unit/test_world_gap.py::test_ac_001_gap_lists_every_objective_state_with_rejected
+  - tests/unit/test_world_gap.py::test_ac_001_status_report_payload_is_unchanged_by_the_new_reader
+  - tests/unit/test_world_gap.py::test_ac_001_an_invalid_world_returns_the_status_invalid_payload_verbatim
+  - tests/unit/test_world_gap.py::test_ac_001_cli_gap_json_equals_the_library_report
+  - tests/unit/test_world_gap.py::test_ac_001_cli_gap_on_the_skeleton_prints_not_filled_in
+  executable_predicate: all(row['reason'] in ('never_measured', 'stale_definition',
+    'measured') and 'how_measured' in row for row in world.gap_report(root)['outcomes'].values())
+    and {k for k in world.gap_report(root)['objectives']} == set(world.load_world(root).objectives)
+    and all(world.gap_report(root)['outcomes'][o]['gap'] == world.status_report(root)['outcomes'][o]['gap']
+    for o in world.status_report(root)['outcomes'])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is status_report (shipped, tested) for the outcome
+    subset and load_world for the objective set; reason is cross-checked against LastValue.stale_definition
+    and a None last_value computed by the existing helper, not by the new function.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: gap writes nothing
+  type: property
+  test_ids:
+  - tests/unit/test_world_gap.py::test_ac_002_gap_writes_nothing
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Read-only is an invariant over the whole file tree, checkable by
+    hashing every file before and after regardless of how gap is implemented; the
+    generator draws worlds from the existing fixture builder with random outcome/objective
+    states.
+  oracle_independence_waiver: null
+  input_domain: loadable worlds built by tests.unit.world_fixture with 0-3 outcomes
+    in each measurement reason and 0-4 objectives across every state
+  transformation: run `hm world gap --json` via the CLI entrypoint against the checkout
+  expected_relation: sha256 of every file under the checkout root before == after,
+    and the set of paths is unchanged
+  preconditions:
+  - the world loads without IntentInvalidError
+  observable_output: mapping path -> sha256
+  generator_hint: Hypothesis st.builds over world_fixture with sampled states; ci
+    profile derandomized
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: from-proposal prefills rejected and emits one event
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_doc_new.py::test_ac_003_from_proposal_prefills_rejected_and_emits_one_event
+  - tests/unit/test_intent_doc_new.py::test_ac_003_a_call_without_proposal_flags_writes_the_record_and_no_event
+  - tests/unit/test_intent_doc_new.py::test_ac_003_bad_proposal_flag_combinations_are_refused_before_any_write
+  - tests/unit/test_intent_doc_new.py::test_ac_003_two_accepted_candidates_share_the_declined_list_and_emit_two_events
+  - tests/unit/test_intent_doc_new.py::test_ac_003_a_failed_ledger_append_keeps_the_record_and_warns
+  - tests/unit/test_intent_doc_new.py::test_ac_003_a_linked_worktree_writes_the_row_at_base_and_the_record_in_the_worktree
+  executable_predicate: 'record[''state''] == ''proposed'' and record[''rejected'']
+    == declined and [e for e in ledger_events if e[''event''] == ''objective_proposed'']
+    == [{''objective'': ''OBJ-9'', ''candidates'': 3, ''accepted'': 1}] and ledger_events_without_flag
+    == [] and refused_without_flag.returncode != 0 and not refused_without_flag_path.exists()
+    and all(r[''rejected''] == declined for r in two_accepted_records) and len(two_accepted_events)
+    == 2 and ledger_rows_under(tmp_root) and not ledger_rows_under(base_root)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected ledger line is written by hand in the test from the
+    SPEC S3 table (objective/candidates/accepted), and the record is re-read through
+    load_world, not through the return value of new_objective.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: skill renders the gap situation and candidate rules
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer.py::test_ac_004_skill_renders_gap_situation_and_candidate_rules
+  executable_predicate: 'all(phrase in rendered for phrase in (''hm world gap --json'',
+    ''at most three'', ''overlaps-with'', ''evidence: none — hypothesis only'', ''measure
+    first'', ''answer every candidate before the first write'', ''never runs `approve`''))
+    and all(phrase in rendered_codex for phrase in (''hm world gap --json'', ''at
+    most three'', ''overlaps-with'', ''answer every candidate before the first write''))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The phrase list is fixed in the SPEC (S4) before the template is
+    written; the test greps the rendered skill for both arms, so the template author
+    cannot satisfy it by emitting whatever it emits.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: plan offers a draft after none
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer.py::test_ac_005_plan_offers_draft_after_none_and_creates_at_step_4_9
+  executable_predicate: rendered_plan.index('Draft an objective for this task?') >
+    rendered_plan.index('Which objective does this task serve?') and rendered_plan.index('Step
+    4.9') > rendered_plan.index('Draft an objective for this task?') and rendered_plan.index('--from-proposal
+    --candidates 1') > rendered_plan.index('Step 4.9') and rendered_plan.index('Step
+    4.9') < rendered_plan.index('Step 5 —') and 'print the refusal and continue' in
+    rendered_plan and 'write nothing' in rendered_plan[rendered_plan.index('Draft
+    an objective for this task?'):]
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Question text and ordering are fixed by S5 ahead of the template
+    edit; the ordering assertion (after the existing Step 0.5 question) is independent
+    of how the prose is worded.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: proposed link halts with not_active
+  type: mechanical
+  test_ids:
+  - tests/unit/test_autopilot_caps_objective_gate.py::test_ac_006_a_proposed_record_built_by_the_verb_halts_with_not_active
+  executable_predicate: decision.proceed is False and gate_events[-1]['reason'] ==
+    'not_active'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The reason string comes from the shipped gate's reason table (autopilot_caps
+    objective branch), pinned here as a regression guard for a state combination this
+    task newly makes common; the test builds the proposed record through the CLI,
+    not by editing the file.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: review, help pinned and plan within allowance
+  type: mechanical
+  test_ids:
+  - tests/structural/test_objective_gap_proposal_invariance.py::test_ac_007_review_help_pinned_and_plan_within_allowance
+  - tests/structural/test_objective_gap_proposal_invariance.py::test_ac_007_the_pin_names_every_arm_and_command_it_claims_to_cover
+  executable_predicate: all(live[arm][c] == pin['arms'][arm][c] for arm in pin['arms']
+    for c in ('review', 'help')) and all(len(rendered[arm]['plan']) - pin['plan_len'][arm]
+    <= allowance for arm in pin['arms'])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The pin is the pre-change sha256/length per arm copied at Phase
+    0 into the delta document (same mechanism as playbook-alignment AC-005), taken
+    before any template edit so it cannot be derived from the new render.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: the allowance is retired and the structural suite is green without it
+  type: mechanical
+  test_ids:
+  - tests/structural/test_objective_gap_proposal_invariance.py::test_ac_008_allowance_retired_and_structural_suite_green
+  executable_predicate: '''surface_allowance'' not in plan_frontmatter and structural_suite.returncode
+    == 0 and delta_doc_aggregate == surface_baseline_aggregate'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the shipped structural suite itself (surface_baseline,
+    command_size_budget, baseline_delta_attribution) run with zero in-flight allowances,
+    plus the aggregate figure the delta document quotes compared against the regenerated
+    baseline file; neither is produced by the code under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

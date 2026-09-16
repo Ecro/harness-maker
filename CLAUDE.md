@@ -270,7 +270,7 @@ plan-validator, fan-out) — `remeasure_on`/`measure_cmd` 필드가 재측정 �
   렌더의 모든 헤딩이 레지스트리에 있어야 하고(무분류 헤딩 = 테스트 실패), Side 기본값은 knob 을
   가진 어떤 엔트리(HOST 포함)에서도 Production 보다 공격적일 수 없다 (`knob`/`ordering`, 비공허 바닥 ≥3).
   렌더는 레지스트리를 읽지 않는다 — 검사이지 파생이 아니다 (ADR-005).
-- **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 39` 는 RESEARCH 행이
+- **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 40` 는 RESEARCH 행이
   없어 이웃에서 상속한 항목 수 (ADR-009). TUNE 수치는 전부 **Side-preset only, n=** 표기 —
   stage-agent ledger 에 Production 행이 0 이다. FAIL 율은 가치 증명이 아니다 (plan-validator 는
   40건 중 37건 MAJOR_REVISION — 변별력 미입증).

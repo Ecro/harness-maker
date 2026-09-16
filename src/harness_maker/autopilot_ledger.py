@@ -60,6 +60,10 @@ LedgerEvent = Literal[
     # how many human decisions the widest level skipped.
     "gate_auto_answered",
     "halted_cap",
+    # One row per ACCEPTED objective proposal, written by `hm world objective new
+    # --from-proposal` (PLAN-objective-gap-proposal ADR-003/004). Adoption is read as rows ÷
+    # `proposed`+approved records; a declined-everything turn leaves no row by design.
+    "objective_proposed",
 ]
 # DERIVED from LedgerEvent (not a hand-maintained copy) so the typed signature and the
 # runtime guard cannot drift apart (REVIEW P2). The two module-level asserts make

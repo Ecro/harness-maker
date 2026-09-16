@@ -1,6 +1,6 @@
 ---
 name: {{ name }}
-description: When the operator says they observed something, wants to close, approve or drop an objective, record an outcome value, or asks where the project stands — run the hm world verbs; ask before writes.
+description: When the operator observed something, wants to close, approve or drop an objective, record a value, asks where things stand, what to do next or where the gaps are — run hm world verbs; ask first.
 ---
 
 # {{ name }}
@@ -16,10 +16,11 @@ free to run whenever the operator asks where things stand. Every other verb writ
 
 ```
 hm world status --json
+hm world gap --json
 hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text --observed-at [--claim]
 hm world assume resolve <id> --status --claim
 hm world outcome record <id> --value --observed-at --evidence
-hm world objective new <id> --title --hypothesis --scope --outcome [--non-scope]
+hm world objective new <id> --title --hypothesis --scope --outcome [--non-scope] [--from-proposal --candidates <N> [--declined <title>]…]
 hm world objective <approve|activate|drop|reopen> <id>
 hm world objective close <id> --observed <met|missed|no_data> --note
 hm world objective revisit <id> --json
@@ -39,6 +40,26 @@ needs `--claim`; `close` needs both `--observed` and `--note`.
 3. On an affirmative answer, run the write once with those arguments and show the CLI's
    `changed:` line.
 4. Otherwise — on any other answer or no answer — write nothing. Do not retry, rephrase or infer consent.
+
+## Proposing objectives (only when the operator asks what to do next / where the gaps are)
+
+1. Run `hm world gap --json` — read-only, LLM-free. On `state: invalid` print the error and stop;
+   on `not_filled_in` say the mission and outcomes are unwritten and stop.
+2. Open with a **measure first** block: every outcome whose `reason` is `never_measured` or
+   `stale_definition`, with its `how_measured` — those are gaps in evidence, not in the code.
+3. Read the codebase against the measured outcomes' `gap` and propose **at most three**
+   candidates, unranked, each with `title / hypothesis / scope / non_scope / outcome / evidence /
+   overlaps-with`. A candidate for an unmeasured outcome carries
+   `evidence: none — hypothesis only`. `overlaps-with` names any objective (any state,
+   especially `closed` + `observed:
+   missed`) or any `rejected[]` entry the candidate resembles — never silently re-propose it.
+4. Then ask about each candidate in turn with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (yes / no), and
+   answer every candidate before the first write: the declined titles go into every accepted
+   record's `rejected[]`.
+5. Then, once per accepted candidate, show the exact arguments and run
+   `hm world objective new <ID> … --from-proposal --candidates <N> --declined "<title>"…`
+   (`N` = candidates shown; one `--declined` per no). Nothing else persists a candidate.
+6. The record is `proposed`; the proposer never runs `approve` — that stamp is the operator's.
 
 What the harness guarantees is narrow: the record changes only through these verbs, a terminal
 objective never changes, and the autopilot gate reads the approval you record. Whether the work

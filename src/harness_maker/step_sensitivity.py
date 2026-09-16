@@ -171,6 +171,13 @@ REGISTRY: tuple[StepEntry, ...] = (
         "**",
         f"{_R}; single-pass policy (feedback_plan_validator_single_pass)",
     ),
+    _u(
+        "plan",
+        "Step 4.9",
+        "INV",
+        "plan Step 0.5",
+        note="objective draft consented at 0.5; one answer-gated write, approve stays human",
+    ),
     _u("plan", "Step 5", "INV", "spec Step 3", note="PLAN write"),
     _u("plan", "Step 6", "INV", "spec Step 4", note="write verification"),
     _u(

@@ -157,3 +157,39 @@ def test_ac_013_wrapup_land_stages_the_state_paths_through_the_derived_globs(
     staged: list[Any] = receipt["steps"]["index_after"]
     for p in (".claude/world/assumptions.yaml", "work-docs/INTENT-OBJ-3.md"):
         assert p in staged, (p, staged)
+
+
+# ── SPEC-objective-gap-proposal — gap → proposal → approve → activate, end to end ─────────────
+
+
+def test_gap_proposal_lifecycle_from_an_unmeasured_world(project: Path) -> None:
+    """The proposer's path on a project whose outcomes were never measured: `gap` names the
+    evidence gap, the accepted candidate lands as `proposed` with the declined title in
+    `rejected[]`, the gate would halt on it (no valid approval), and after the human approve +
+    activate the same reader shows it `active`."""
+    before = world.gap_report(project)
+    assert before["state"] == "ok"
+    assert before["outcomes"]["onboarding_minutes"]["reason"] == "never_measured"
+    assert set(before["objectives"]) == {"OBJ-1", "OBJ-2"}
+    rec = world.new_objective(
+        project,
+        "OBJ-9",
+        title="t",
+        hypothesis="h",
+        scope=["s"],
+        outcome_id="onboarding_minutes",
+        from_proposal=True,
+        candidates=2,
+        declined=["the other candidate"],
+    )
+    assert rec["state"] == "proposed"
+    mid = world.gap_report(project)
+    assert mid["objectives"]["OBJ-9"]["rejected"] == ["the other candidate"]
+    assert world.derive(world.load_world(project), "OBJ-9").approval_valid is not True
+    rows = (project / ".claude" / "observability" / "auto-advance.jsonl").read_text().splitlines()
+    assert sum('"objective_proposed"' in ln and '"OBJ-9"' in ln for ln in rows) == 1
+    world.approve(project, "OBJ-9")
+    world.activate(project, "OBJ-9")
+    after = world.gap_report(project)
+    assert after["objectives"]["OBJ-9"]["state"] == "active"
+    assert world.status_report(project)["active"]["OBJ-9"]["approval_valid"] is True

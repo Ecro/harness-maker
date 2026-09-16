@@ -22,7 +22,7 @@ from typing import Any
 
 import yaml
 
-from harness_maker import command_registry
+from harness_maker import autopilot_ledger, command_registry
 from harness_maker import intent as intent_mod
 from harness_maker.frontmatter import split_frontmatter
 from harness_maker.intent import Intent, IntentError, IntentInvalidError, schema_version_error
@@ -703,17 +703,26 @@ def revisit(world: World, objective_id: str) -> dict[str, Any]:
     return out
 
 
+def _invalid_payload(exc: IntentInvalidError) -> dict[str, Any]:
+    first = exc.errors[0]
+    return {
+        "state": "invalid",
+        "error": {"field": first.field, "message": first.message},
+        "errors": [{"field": e.field, "message": e.message} for e in exc.errors],
+    }
+
+
 def status_report(root: Path) -> dict[str, Any]:
     """The `hm world status` payload — read-only, LLM-free."""
     try:
         world = load_world(root)
     except IntentInvalidError as exc:
-        first = exc.errors[0]
-        return {
-            "state": "invalid",
-            "error": {"field": first.field, "message": first.message},
-            "errors": [{"field": e.field, "message": e.message} for e in exc.errors],
-        }
+        return _invalid_payload(exc)
+    return _status_payload(world)
+
+
+def _status_payload(world: World) -> dict[str, Any]:
+    """`status_report` over an already-loaded World — one snapshot, shared with `gap_report`."""
     report: dict[str, Any] = {
         "state": "not_filled_in" if intent_mod.is_not_filled_in(world.intent) else "ok",
         "mission": world.intent.mission,
@@ -751,6 +760,62 @@ def status_report(root: Path) -> dict[str, Any]:
             report["proposed"].append(oid)
         if state in ("active", "proposed") and revisit(world, oid)["result"] == "candidate":
             report["fired_revisits"].append(oid)
+    return report
+
+
+def _measurement_reason(lv: LastValue | None) -> str:
+    if lv is None:
+        return "never_measured"
+    return "stale_definition" if lv.stale_definition else "measured"
+
+
+_GAP_OBJECTIVE_KEYS: tuple[str, ...] = (
+    "state",
+    "title",
+    "hypothesis",
+    "outcome_id",
+    "observed",
+    "rejected",
+    "scope",
+    "non_scope",
+)
+
+
+def gap_report(root: Path) -> dict[str, Any]:
+    """The `hm world gap` payload — the proposer's read, LLM-free (ADR-001).
+
+    A sibling of `status_report`, not an extension: `status` is what the gate-adjacent prose
+    reads and stays frozen, while a proposer needs what `status` deliberately omits — closed and
+    dropped records with their `rejected[]` (so rejected work is not re-proposed) and WHY an
+    outcome cannot be judged (`never_measured` vs `stale_definition`, which `gap` folds into one
+    `unevaluable`). The invalid world returns `status_report`'s payload verbatim: one shape.
+    One `load_world` feeds both halves, so a row can never mix two disk snapshots.
+    """
+    try:
+        world = load_world(root)
+    except IntentInvalidError as exc:
+        return _invalid_payload(exc)
+    status = _status_payload(world)
+    report: dict[str, Any] = {
+        "state": status["state"],
+        "mission": status["mission"],
+        "outcomes": {},
+        "objectives": {},
+        "conflicts": status["conflicts"],
+        "unknowns": status["unknowns"],
+        "fired_revisits": status["fired_revisits"],
+        "broken_references": status["broken_references"],
+    }
+    for outcome in world.intent.outcomes:
+        lv = last_value(world, outcome.id)
+        report["outcomes"][outcome.id] = {
+            **status["outcomes"][outcome.id],
+            "reason": _measurement_reason(lv),
+            "how_measured": outcome.how_measured,
+            "higher_is_better": outcome.higher_is_better,
+        }
+    for oid, rec in sorted(world.objectives.items()):
+        report["objectives"][oid] = {key: rec.get(key) for key in _GAP_OBJECTIVE_KEYS}
     return report
 
 
@@ -1015,15 +1080,38 @@ def new_objective(
     scope: list[str],
     outcome_id: str,
     non_scope: list[str] | None = None,
+    from_proposal: bool = False,
+    candidates: int | None = None,
+    declined: list[str] | None = None,
 ) -> dict[str, Any]:
     """Write the INTENT skeleton the operator then fills in prose (ADR-004).
 
     Every refusal happens before the filesystem is touched: a hand-written frontmatter is the
     class of error that produces `broken` records, so the verb owns the machine half and leaves
     the five Playbook headings empty for the human.
+
+    `from_proposal` is the proposer's path (PLAN-objective-gap-proposal ADR-003): the declined
+    candidates of the same turn pre-fill `rejected[]` — the only provenance a declined candidate
+    gets, so the next gap pass does not re-propose it — and exactly one `objective_proposed`
+    ledger row is appended AFTER the record write. `candidates`/`declined` are proposal-only;
+    accepting them without the flag would let a wrong combination pass silently.
     """
     if not _OBJECTIVE_ID_RE.match(objective_id):
         raise WorldError("id", f"{objective_id!r} must match [A-Z0-9-]+")
+    declined_titles = list(declined or [])
+    if not from_proposal and (candidates is not None or declined_titles):
+        raise WorldError(
+            "from_proposal", "--candidates/--declined are proposal-only; pass --from-proposal"
+        )
+    if from_proposal:
+        if candidates is None:
+            raise WorldError("candidates", "--from-proposal requires --candidates <N>")
+        if candidates < len(declined_titles) + 1:
+            raise WorldError(
+                "candidates",
+                f"--candidates must be at least the declined count + 1 "
+                f"({len(declined_titles) + 1}), got {candidates}",
+            )
     path = objective_doc_path(root, objective_id)
     if path.exists():
         raise WorldError("id", f"{objective_id!r} already exists at {path}; refusing to overwrite")
@@ -1040,7 +1128,7 @@ def new_objective(
         "created_at": _now_iso(),
         "schema_version": intent_mod.KNOWN_MAJOR,
         "non_scope": list(non_scope or []),
-        "rejected": [],
+        "rejected": declined_titles,
         "depends_on": [],
         "approval": None,
         "revisit_when": None,
@@ -1054,7 +1142,29 @@ def new_objective(
     if errs:
         raise WorldError(errs[0].field, errs[0].message)
     _dump_intent(path, rec, PLAYBOOK_BODY.encode("utf-8"))
+    if from_proposal:
+        assert candidates is not None  # guarded above
+        _record_proposal(root, objective_id, candidates=candidates)
     return rec
+
+
+def _record_proposal(root: Path, objective_id: str, *, candidates: int) -> None:
+    """The adoption row, at the BASE root's ledger — a worktree's ledger dies with `task-land`.
+
+    A failed append is a warning, not a retry: the record already exists and `new_objective`
+    refuses to overwrite, so retrying would fail on the id. Exit 0 keeps the verb's contract
+    ("the record stands"); the stderr line is what makes the missing row visible.
+    """
+    base = resolve_base_root(root)
+    try:
+        autopilot_ledger.append_event(
+            base,
+            event="objective_proposed",
+            fields={"objective": objective_id, "candidates": candidates, "accepted": 1},
+            observability_dir=base / ".claude" / "observability",
+        )
+    except (OSError, ValueError) as exc:
+        print(f"[world] objective_proposed NOT recorded: {exc}", file=sys.stderr)
 
 
 def validate_objective_record(
@@ -1096,6 +1206,8 @@ def _parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("status")
     s.add_argument("--json", action="store_true")
+    g = sub.add_parser("gap")
+    g.add_argument("--json", action="store_true")
 
     a = sub.add_parser("assume")
     asub = a.add_subparsers(dest="verb", required=True)
@@ -1132,6 +1244,9 @@ def _parser() -> argparse.ArgumentParser:
     nw.add_argument("--scope", action="append", required=True)
     nw.add_argument("--outcome", required=True, dest="outcome_id")
     nw.add_argument("--non-scope", action="append", default=None, dest="non_scope")
+    nw.add_argument("--from-proposal", action="store_true", dest="from_proposal")
+    nw.add_argument("--candidates", type=int, default=None)
+    nw.add_argument("--declined", action="append", default=None)
     nw.add_argument("--json", action="store_true")
     ap = jsub.add_parser("approve")
     ac = jsub.add_parser("activate")
@@ -1163,6 +1278,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.cmd == "status":
             _emit(status_report(root), as_json=as_json)
+            return 0
+        if args.cmd == "gap":
+            _emit(gap_report(root), as_json=as_json)
             return 0
         if args.cmd == "assume":
             if args.verb == "observe":
@@ -1199,6 +1317,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 scope=args.scope,
                 outcome_id=args.outcome_id,
                 non_scope=args.non_scope,
+                from_proposal=args.from_proposal,
+                candidates=args.candidates,
+                declined=args.declined,
             )
             _emit({"changed": _changed_path(root, args.id), "record": rec}, as_json=as_json)
             return 0

@@ -102,8 +102,10 @@ Bash("uv run --with {{ harness_maker_src_path }} hm world status --json")   # lo
 ```
 {% endif %}
 
-- `state: not_filled_in` / `invalid`, or no `active` and no `proposed` objective → print `[intent] no objectives — skipping` and continue. That line is the whole cost for a project that does not use the layer.
+- `state: not_filled_in` / `invalid` → print `[intent] no objectives — skipping` and continue. That line is the whole cost for a project that does not use the layer.
+- Filled in but **no `active` and no `proposed` objective** (the first objective has not been written yet) → skip the pick and go straight to the consent question below: **"Draft an objective for this task?"**
 - Otherwise ask ONE closed question with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Which objective does this task serve?"** — one option per `active` / `proposed` objective (id + title) plus **"none"**. Step 5 writes the answer as `objective: <id>` (omitted on "none").
+- On **"none"**, ask once, closed: **"Draft an objective for this task?"** Yes records consent only — Step 4.9 writes after the interview. No: write nothing and continue.
 - Then compare the work you are about to plan against each objective's `rejected[]` list (your judgment — read the records). For each matching objective:
 {% if is_codex %}
   ```bash
@@ -716,6 +718,28 @@ Each follow-up interview answer is appended to `## 🎙️ Interview Transcript`
 {% if config.second_opinion.models %}
 > **Cross-model second-opinion relay (main loop owns the call — ADR-005/011).** The Step 4 (pre) main-loop step already ran (or skipped) each enabled model and injected the results into the validator; the agent only reconciles them. After reading the validator's returned JSON and **before** resolving the verdict, inspect its `second_opinion_results` array (each entry echoes the main-loop per-model status). For every entry whose `status` is `"skipped"` or `"failed"`, the model's call could not complete — surface the reason you recorded in Step 4 (pre) to the user in your turn output (one line per model, e.g. `⚠️ Second opinion skipped (antigravity): <reason> — verdict is Claude-only for that model`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without any second-opinion model.
 {% endif %}
+### Step 4.9 — Objective draft (consented at Step 0.5)
+
+Only when Step 0.5 recorded consent. Derive from the interview + RESEARCH: `<ID>` = `OBJ-` +
+the task slug upper-cased, `--title`, `--hypothesis`, one `--scope` per in-scope item,
+`--outcome` = the outcome the interview named (none fits → say so and skip). Show the
+arguments, run once:
+
+{% if is_codex %}
+```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm world objective new <ID> --title '<title>' --hypothesis '<hypothesis>' --scope '<item>' --outcome <outcome-id> --from-proposal --candidates 1")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm world objective new <ID> --title "<title>" --hypothesis "<hypothesis>" --scope "<item>" --outcome <outcome-id> --from-proposal --candidates 1
+```
+{% endif %}
+
+Carry `<ID>` into Step 5's `objective:`. If the verb refuses (id exists, unknown outcome):
+print the refusal and continue with no link — never retry with a mutated id. The record is
+`proposed`: the gate halts with `not_active` until a human runs `approve` + `activate`; an
+orphan is retired with `objective drop`.
+
 ### Step 5 — Write PLAN document
 
 Write to `{{ WTR }}/{{ config.work_docs.dir }}PLAN-{slug}.md` with the structure below.
@@ -735,7 +759,7 @@ interview_rounds: {N}
 adrs: {M}
 validator_outcome: APPROVED | NEEDS_REVISION_RESOLVED | MAJOR_REVISION_RESOLVED | MAJOR_REVISION_TERMINAL
 summary: "{≤100 char one-line TL;DR}"
-objective: <id>  # ONLY when Step 0.5 picked one — the sole task↔objective link the autopilot gate reads; omit on "none"
+objective: <id>  # ONLY when Step 0.5 picked one or Step 4.9 drafted one — the sole task↔objective link the autopilot gate reads; omit on "none"
 {% if config.dev_mode == 'spec-driven' %}spec_need_verdict: <add|change|delete|none|not-evaluated>  # from Step 1.7 verdict; record "none" on confident no-op
 spec_need_target: <slug>  # the task slug or SPEC slug for change/delete{% endif %}
 ---

@@ -50,6 +50,11 @@ Re-captures (append; never silently overwrite):
 - **2026-09-16, `playbook-alignment`** — `wrapup` moved in all four arms, identically in
   `auto_safe` and `ask`: the 5.7 observe line names `--claim` for the `supersedes` relation
   (AC-007). Verified before re-capture that `wrapup` is the ONLY moved command in every arm.
+- **2026-09-16, `objective-gap-proposal`** — `plan` moved in all four arms, identically in
+  `auto_safe` and `ask`: Step 0.5 gained the "Draft an objective for this task?" consent
+  question and a new Step 4.9 (the `objective new … --from-proposal --candidates 1` call after
+  the interview). Verified before re-capture that `plan` is the ONLY moved command in every arm.
+  Attributed in `work-docs/BASELINE-DELTA-objective-gap-proposal.md` §3.
 """
 
 from __future__ import annotations

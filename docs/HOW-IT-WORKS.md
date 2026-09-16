@@ -1485,6 +1485,19 @@ PLAN's linked objective (`scope_drift`, P2, main-loop — not an eighth lens); `
 autopilot gate, `objective_gate`, runs after every existing check in `autopilot_caps.py` and can
 only replace an `advance` with a halt — a PLAN with no `objective:` link is unaffected.
 
+**Gap and proposal (objective-gap-proposal)**: `hm world gap --json` is the proposer's read —
+`status` plus what `status` deliberately omits: every objective in every state with its
+`rejected[]`, and *why* an outcome cannot be judged (`never_measured` vs `stale_definition`).
+It writes nothing. On request ("what should we do next", "where are the gaps") the skill turns
+that table into at most three unranked candidates, asks about each in turn, collects every
+answer, and only then runs `hm world objective new … --from-proposal --candidates N --declined
+"<title>"…` once per accepted candidate — the declined titles become the record's `rejected[]`
+and one `objective_proposed` row lands on the autopilot ledger at the base root. `/hm:plan`
+offers the same consent at Step 0.5 on two branches — after "none" AND on the cold-start branch
+where the world is filled in but has zero currently-active objectives — and creates the record
+at Step 4.9, after the interview. The record is `proposed`; `approve` stays human, so the gate halts with
+`not_active` until it is approved and activated.
+
 ---
 
 ## 7a. Agent Models (per-agent model routing, 0.15.0+)

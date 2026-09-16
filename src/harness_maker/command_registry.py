@@ -52,6 +52,7 @@ MODULES: dict[str, ModuleSpec] = {
         "subparser",
         _s(
             "status",
+            "gap",
             "assume",
             "outcome",
             "objective",

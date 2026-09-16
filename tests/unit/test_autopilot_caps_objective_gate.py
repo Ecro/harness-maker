@@ -327,3 +327,37 @@ def test_ac_012_two_checkouts_the_worktree_link_is_the_one_used(
     _arm(base, "auto_safe")
     from_main = _strip(_boundary(base, "execute", extra, monkeypatch=monkeypatch))
     assert from_main == _BASELINE["matrix"]["execute|armed"]
+
+
+# ── AC-006 (SPEC-objective-gap-proposal) — a CLI-built `proposed` record halts with not_active ──
+
+
+def test_ac_006_a_proposed_record_built_by_the_verb_halts_with_not_active(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The proposal path makes `proposed`-linked PLANs common; the gate reason must stay
+    `not_active` (never `approval_invalid`) so the operator is told to approve + activate."""
+    from harness_maker import world
+
+    root = fx.build_root(tmp_path, git=False, objectives=[])
+    (root / ".claude" / "harness.yaml").write_text("preset: Side\n", encoding="utf-8")
+    world.new_objective(
+        root,
+        "OBJ-9",
+        title="t",
+        hypothesis="h",
+        scope=["s"],
+        outcome_id="onboarding_minutes",
+        from_proposal=True,
+        candidates=1,
+    )
+    plan = root / "work-docs" / f"PLAN-{SLUG}.md"
+    plan.write_text("---\ntype: plan\nobjective: OBJ-9\n---\n\n# PLAN\n", encoding="utf-8")
+    _arm(root, "auto_safe")
+    got = _boundary(
+        root, "execute", ["--step-cap", "20", "--time-cap-min", "300"], monkeypatch=monkeypatch
+    )
+    assert got["proceed"] is False
+    assert got["halt_kind"] == "objective_gate"
+    gate = [e for e in _events(root) if e["event"] == "gate_blocked"]
+    assert gate[-1]["reason"] == "not_active"

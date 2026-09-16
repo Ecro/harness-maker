@@ -19,22 +19,22 @@ set. `tests/structural/test_playbook_alignment_invariance.py` parses the fenced 
 {
  "arms": {
   "ask@flag_off": {
-   "plan": "36241e8cffc9dd6f3f63ab3571591c32a28a7eb56a9a801f237d1e7b76bc1c00",
+   "plan": "08a7e9793074a33ae22f65b347134112f3cb926a718f47f010a44e2c8c553f2c",
    "review": "0bdf6e287a23db5c89fe19bf372bbdaaa344bc1304c0bdb8d1d1abd8ea87cf51",
    "help": "0d1b6929d1b1bd55262d811ce71dfcce01a5eb0d68503ff1b19532effda415f7"
   },
   "ask@flag_on": {
-   "plan": "5bb2146c68153ba3e8c771b615396821f91ffb042e41c6242c948328609afbe7",
+   "plan": "f3e3f2a4c451bcd6e24e70dff551e78e43c3318ed5d9701647341fd045dbb0af",
    "review": "4a2bb22c66535fd481e699ada2122c9f4a6b89e38bc5542868d60cc6822a542d",
    "help": "0d1b6929d1b1bd55262d811ce71dfcce01a5eb0d68503ff1b19532effda415f7"
   },
   "auto_safe@spec-driven": {
-   "plan": "4f121eda5b841d0b92e743525e096614046cde504c080653c6cfab06cabaf4c1",
+   "plan": "f67a2231c896bb8e5cdc36b62fb7b875bf01931128f3c3ea71afc9a52f232d0b",
    "review": "8d25ba69e1dfc332e117f2fb487dbae8af8237b7540c2fded27ea947c513f27e",
    "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52"
   },
   "auto_safe@task-driven": {
-   "plan": "536b93b63335a52c0500707e32aea7145bb9722a623125a1fecca4198f32b973",
+   "plan": "7a7587853d74471463855637d31cd3884aa1503562fa635d3054b27124d02c92",
    "review": "8530386955e0a9cb25c83141c181d8b647271f67cadad7209716012edc81ef22",
    "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52"
   }
@@ -49,6 +49,8 @@ set. `tests/structural/test_playbook_alignment_invariance.py` parses the fenced 
  "harness_maker_version": "0.56.0"
 }
 ```
+
+> **Re-pinned 2026-09-16 by `objective-gap-proposal` (its PLAN ADR-005, Phase 4):** the `plan` hashes in the fence above were re-taken after that task's Step 0.5/4.9 edit (+1 049 chars per arm, attributed in `BASELINE-DELTA-objective-gap-proposal.md` §3). `review`, `help` and the boundary fixture are the original pin — this document still proves playbook-alignment left them alone.
 
 Recompute: `uv run python -c "import json,hashlib,pathlib; …"` over the golden's `arms` and the
 fixture bytes — Phase 0's exit criterion.

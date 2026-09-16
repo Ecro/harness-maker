@@ -203,6 +203,7 @@ Production rows).
 | plan | Step 4 | TUNE | ** |
 | plan | Step 4.4 | INV | unsourced |
 | plan | Step 4.5 | COMP | ** |
+| plan | Step 4.9 | INV | unsourced |
 | plan | Step 5 | INV | unsourced |
 | plan | Step 6 | INV | unsourced |
 | plan | Step A | COMP | unsourced |

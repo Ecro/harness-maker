@@ -205,3 +205,91 @@ def test_ac_007_wrapup_supersedes_carries_claim(
     assert "supersedes" in observe_lines[0]
     assert wrapup.count("<!-- @hm:answer-gated:") == 2
     assert "Otherwise: write nothing" in block
+
+
+# ── AC-004 / AC-005 (SPEC-objective-gap-proposal): the proposer's rules and the plan draft ────
+#
+# Phrase and ordering pins fixed by SPEC S4/S5 BEFORE the templates were edited (golden oracle):
+# the test greps the rendered skill / plan for both arms, so an author cannot satisfy it by
+# emitting whatever the template happens to say.
+
+GAP_SKILL_PHRASES_BOTH = (
+    "hm world gap --json",
+    "at most three",
+    "overlaps-with",
+    "ask about each candidate in turn",
+    "answer every candidate before the first write",
+)
+GAP_SKILL_PHRASES_CLAUDE = (
+    "evidence: none — hypothesis only",
+    "measure first",
+    "never runs `approve`",
+    "--from-proposal --candidates",
+)
+GAP_SKILL_TRIGGER = ("what to do next", "gaps")
+
+
+def _skill_body(files: dict[str, str], path: str) -> str:
+    skill = files[path]
+    return skill[skill.index("# intent-layer") :]
+
+
+@pytest.mark.parametrize(
+    ("target", "path"),
+    [
+        (Target.CLAUDE_CODE, ".claude/skills/intent-layer/SKILL.md"),
+        (Target.CODEX, ".agents/skills/intent-layer/SKILL.md"),
+    ],
+    ids=["claude", "codex"],
+)
+def test_ac_004_skill_renders_gap_situation_and_candidate_rules(target: Target, path: str) -> None:
+    files = _render_target([target])
+    body = _skill_body(files, path)
+    for phrase in GAP_SKILL_PHRASES_BOTH:
+        assert phrase in body, phrase
+    for phrase in GAP_SKILL_PHRASES_CLAUDE:
+        assert phrase in body, phrase
+    description = _frontmatter_description(files[path])
+    for phrase in GAP_SKILL_TRIGGER:
+        assert phrase in description, phrase
+    # ordering: collect every answer, THEN the write, and the proposer never approves
+    assert _in_order(
+        body,
+        (
+            "ask about each candidate in turn",
+            "answer every candidate before the first write",
+            "--from-proposal --candidates",
+            "never runs `approve`",
+        ),
+    ), body
+
+
+@pytest.mark.parametrize("target", ["claude", "codex"])
+def test_ac_005_plan_offers_draft_after_none_and_creates_at_step_4_9(
+    surface: dict[str, dict[str, str]], target: str
+) -> None:
+    plan = _command(surface, target, "plan")
+    q_pick = plan.index("Which objective does this task serve?")
+    q_draft = plan.index("Draft an objective for this task?", q_pick)  # the "none" bullet
+    step_49 = plan.index("Step 4.9")
+    call = plan.index("--from-proposal --candidates 1")
+    step_5 = plan.index("Step 5 —")
+    assert q_pick < q_draft < step_49 < call < step_5, (q_pick, q_draft, step_49, call, step_5)
+    # the consent question sits inside Step 0.5 (before Step 1's heading)
+    assert q_draft < plan.index("Step 1 —")
+    # cold start: a filled-in intent with zero objectives skips the pick, not the consent
+    step_05 = plan[plan.index("Step 0.5") : plan.index("Step 1 —")]
+    assert "no `active` and no `proposed` objective" in step_05
+    assert step_05.count("Draft an objective for this task?") == 2
+    assert step_05.index("no `active` and no `proposed` objective") < step_05.index(
+        "Draft an objective for this task?"
+    )
+    after_draft = plan[q_draft:]
+    assert "write nothing" in after_draft
+    assert "print the refusal and continue" in plan[step_49:step_5]
+    # the call is a mandated line in this target's call form, exactly once
+    call_lines = [
+        ln for ln in plan[step_49:step_5].splitlines() if "--from-proposal --candidates 1" in ln
+    ]
+    assert len(call_lines) == 1, call_lines
+    assert call_lines[0].lstrip().startswith(MANDATED_CALL_PREFIXES[target]), call_lines[0]

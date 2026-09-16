@@ -27,6 +27,18 @@
 
 ### Added
 
+- **`hm world gap --json` + objective proposals** (objective-gap-proposal): a read-only sibling
+  of `status` that names *why* an outcome cannot be judged (`never_measured` / `stale_definition`)
+  and lists every objective in every state with its `rejected[]`; the `intent-layer` skill can
+  turn it into at most three unranked candidates on request, asking about each in turn and
+  writing only accepted ones through `hm world objective new … --from-proposal --candidates N
+  [--declined "<title>"]…` (declined titles pre-fill `rejected[]`; one `objective_proposed`
+  ledger row per accepted record). `/hm:plan` asks "Draft an objective for this task?" after
+  "none" at Step 0.5, and on the cold-start branch too (a world with objectives defined but none
+  currently active — "filled in, zero active" is a distinct consent trigger from "none defined
+  at all"), and creates the record at the new Step 4.9, after the interview. `approve`
+  stays human. Also: the previous task's expired `surface_allowance` (+67) is folded into the
+  baselines first, and this task retires its own allowance before landing (ADR-008).
 - **Intent / world-model / objective layer**: a state-only slice for recording *why*, not just
   *how* and *what happened*. `.claude/intent.yaml` (a human-written skeleton committed at
   `make`), `.claude/world/{assumptions,outcomes,objectives/<id>}.yaml`, and a new

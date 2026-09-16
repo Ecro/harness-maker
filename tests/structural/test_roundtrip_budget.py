@@ -128,7 +128,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `waiver-set`, and the `git diff --name-only $(git merge-base HEAD <base>)` that feeds
     # them; the rest of the rise is the same gate's fenced call sites, which ADR-011's rule
     # counts. Re-baselined here rather than absorbed, per this file's own instruction.
-    "plan": 28,
+    # 28 -> 29 (objective-gap-proposal, Phase 4): Step 4.9 adds the one
+    # `hm world objective new … --from-proposal --candidates 1` call after the interview
+    # (consented at Step 0.5). Attributed in BASELINE-DELTA-objective-gap-proposal.md §3.
+    "plan": 29,
     "research": 8,
     # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
     #
