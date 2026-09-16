@@ -252,10 +252,13 @@ def derive_deliverable_globs(slug: str, worktree: Path | None = None) -> list[st
     `spec.dir` is not covered. The caller still passes its own `--optional` paths and those
     are unioned in, so a customised layout keeps working exactly as before.
     """
-    from harness_maker.worktree import DELIVERABLE_PREFIXES
+    from harness_maker.worktree import DELIVERABLE_PREFIXES, DELIVERABLE_STATE_PATHS
 
     globs = [f"work-docs/{prefix}-*{slug}*.md" for prefix in DELIVERABLE_PREFIXES]
     globs += [f"specs/SPEC-{slug}.md", f"specs/SPEC-{slug}.machine.yaml"]
+    # SPEC-intent-world-model-objective-layer ADR-012: the state files are not slug-keyed —
+    # a task edits the shared intent / assumptions / objectives — so they are staged whole.
+    globs += [p + "*.yaml" if p.endswith("/") else p for p in DELIVERABLE_STATE_PATHS]
     if worktree is None:
         return globs
     return [g for g in globs if list(worktree.glob(g))]

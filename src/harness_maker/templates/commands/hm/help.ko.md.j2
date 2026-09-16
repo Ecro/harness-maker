@@ -45,6 +45,7 @@ stage 연결은 `{{ cmd }}loop` 또는 autopilot 이 담당합니다 — 융합 
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
 | autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, 매 세션 자동 재무장{% endif %} |
+| intent-layer | skill — 관찰한 것을 말하거나, objective 를 close / approve / drop 하거나, outcome 값을 기록하거나, 어디까지 왔는지 물을 때{% if is_codex %} (`@intent-layer` 언급){% endif %} |
 
 {% if "cursor" in config.targets -%}
 > **Cursor:** `/hm:*` 명령이 동일하게 동작. Subagent · skill 은 `.claude/` 에서 공유.

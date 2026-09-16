@@ -284,6 +284,8 @@ _ALL_SKILLS: list[str] = [
     "targeted-test-selection",
     "verify-before-completion",
     "worktree-isolator",
+    # SPEC-intent-world-model-objective-layer S13: the discoverable surface for `hm world`.
+    "intent-layer",
 ]
 
 

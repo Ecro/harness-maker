@@ -88,6 +88,34 @@ knowledge, write a typed `decision` or `preference` note through
 
 If any criterion fails → **run the interview by default** (do not ask permission). When skipped, write a one-line justification under `## 🎙️ Interview Transcript` and proceed to Step 5.
 
+### Step 0.5 — Objective context (intent layer — one line and continue when unused)
+
+Skipped in loop-mode (the per-iter PLAN inherits `objective:` from the master PLAN). Otherwise read the intent state — LLM-free:
+
+{% if is_codex %}
+```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm world status --json")   # loads .claude/intent.yaml + .claude/world/assumptions.yaml
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm world status --json   # loads .claude/intent.yaml + .claude/world/assumptions.yaml
+```
+{% endif %}
+
+- `state: not_filled_in` / `invalid`, or no `active` and no `proposed` objective → print `[intent] no objectives — skipping` and continue. That line is the whole cost for a project that does not use the layer.
+- Otherwise ask ONE closed question with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Which objective does this task serve?"** — one option per `active` / `proposed` objective (id + title) plus **"none"**. Step 5 writes the answer as `objective: <id>` (omitted on "none").
+- Then compare the work you are about to plan against each objective's `rejected[]` list (your judgment — read the records). For each matching objective:
+{% if is_codex %}
+  ```bash
+  Bash("uv run --with {{ harness_maker_src_path }} hm world objective revisit <objective-id> --json")
+  ```
+{% else %}
+  ```bash
+  !uv run --with {{ harness_maker_src_path }} hm world objective revisit <objective-id> --json
+  ```
+{% endif %}
+  Show its title, condition and last value. `candidate` = the revisit condition holds — surface it as a revisit *candidate* in the design brief; `not_met` / `unevaluable` = show and continue. This check never blocks.
+
 ### Step 1 — Pre-interview internal draft (NOT shown to user)
 
 > **Loop-mode short-circuit**: if loop-mode is active for THIS session (the Step 1.5 `loop-mode-active` check exits 0), **skip this entire Step 1** and jump directly to Step 1.5 below. The internal draft is pure waste in loop-mode (the per-iter plan is master-PLAN-derived, not from scratch). Saves tokens + avoids confusing intermediate state.
@@ -707,6 +735,7 @@ interview_rounds: {N}
 adrs: {M}
 validator_outcome: APPROVED | NEEDS_REVISION_RESOLVED | MAJOR_REVISION_RESOLVED | MAJOR_REVISION_TERMINAL
 summary: "{≤100 char one-line TL;DR}"
+objective: <id>  # ONLY when Step 0.5 picked one — the sole task↔objective link the autopilot gate reads; omit on "none"
 {% if config.dev_mode == 'spec-driven' %}spec_need_verdict: <add|change|delete|none|not-evaluated>  # from Step 1.7 verdict; record "none" on confident no-op
 spec_need_target: <slug>  # the task slug or SPEC slug for change/delete{% endif %}
 ---

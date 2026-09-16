@@ -27,6 +27,11 @@ from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips,
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # +2 on `plan`, +1 on `review`, +2 on `wrapup` (2026-09-16,
+    # SPEC-intent-world-model-objective-layer P4): plan Step 0.5 → `hm world status --json` and
+    # `hm world objective revisit <objective-id>`; review Step 3.3 → `hm world objective show`;
+    # wrapup 5.7 → `hm world assume observe` and `hm world objective close`. Every call is
+    # skipped with one line when the project has no intent state; no call was removed.
     # loop 12→10, plan 18→15, review 37→36, total 165→159 (2026-08-16,
     # PLAN-codex-lens-dispatch). **No mandated call was removed and none was added** — the
     # COUNTING RULE was corrected. `count_round_trips` used a bare `text.count("Task(")` for
@@ -123,7 +128,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `waiver-set`, and the `git diff --name-only $(git merge-base HEAD <base>)` that feeds
     # them; the rest of the rise is the same gate's fenced call sites, which ADR-011's rule
     # counts. Re-baselined here rather than absorbed, per this file's own instruction.
-    "plan": 26,
+    "plan": 28,
     "research": 8,
     # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
     #
@@ -203,7 +208,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # domain lenses have their own agents and are untouched, so Production and Side both go from
     # seven dispatches to four. Nothing else about the command moved: no call was added, removed
     # or chained, and this is the whole of the -6.
-    "review": 33,
+    "review": 34,
     "spec": 6,
     "uninstall": 3,
     # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.
@@ -237,7 +242,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `surface_allowance.round_trips`. The first two are frozen descriptions and the third is the
     # declared delta between them, so they are not three copies of one rule; but a change here has
     # to move all three, which is worth saying out loud rather than rediscovering.
-    "wrapup": 26,
+    "wrapup": 28,
 }
 
 

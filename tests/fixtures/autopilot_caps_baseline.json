@@ -1,0 +1,642 @@
+{
+ "inputs": [
+  "armed",
+  "no_marker",
+  "step_cap",
+  "time_cap",
+  "jg_absent_safe",
+  "jg_pending_safe",
+  "jg_clear_safe",
+  "jg_blocked_safe",
+  "jg_pending_full",
+  "jg_clear_full",
+  "jg_blocked_full"
+ ],
+ "stages": [
+  "research",
+  "spec",
+  "plan",
+  "execute",
+  "review",
+  "verify",
+  "wrapup"
+ ],
+ "matrix": {
+  "research|armed": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "spec",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|no_marker": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "kill_switch",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|step_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "step_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|time_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "time_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|jg_absent_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "spec",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|jg_pending_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "spec",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|jg_clear_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "spec",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|jg_blocked_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|jg_pending_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "spec",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|jg_clear_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "spec",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "research|jg_blocked_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|armed": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "plan",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|no_marker": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "kill_switch",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|step_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "step_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|time_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "time_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|jg_absent_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "plan",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|jg_pending_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "plan",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|jg_clear_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "plan",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|jg_blocked_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|jg_pending_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "plan",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|jg_clear_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "plan",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "spec|jg_blocked_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|armed": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|no_marker": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "kill_switch",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|step_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "step_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|time_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "time_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|jg_absent_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|jg_pending_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|jg_clear_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "execute",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|jg_blocked_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|jg_pending_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "execute",
+   "pipeline_complete": false,
+   "judgment_auto_answered": true
+  },
+  "plan|jg_clear_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "execute",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "plan|jg_blocked_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|armed": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "review",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|no_marker": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "kill_switch",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|step_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "step_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|time_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "time_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|jg_absent_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "review",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|jg_pending_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "review",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|jg_clear_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "review",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|jg_blocked_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|jg_pending_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "review",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|jg_clear_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "review",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "execute|jg_blocked_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|armed": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|no_marker": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "kill_switch",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|step_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "step_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|time_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "time_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|jg_absent_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|jg_pending_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|jg_clear_safe": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "verify",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|jg_blocked_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|jg_pending_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "verify",
+   "pipeline_complete": false,
+   "judgment_auto_answered": true
+  },
+  "review|jg_clear_full": {
+   "rc": 0,
+   "proceed": true,
+   "halt_kind": null,
+   "next_stage": "verify",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "review|jg_blocked_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|armed": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "merge_gate",
+   "next_stage": "wrapup",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|no_marker": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "kill_switch",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|step_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "step_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|time_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "time_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|jg_absent_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "merge_gate",
+   "next_stage": "wrapup",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|jg_pending_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "merge_gate",
+   "next_stage": "wrapup",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|jg_clear_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "merge_gate",
+   "next_stage": "wrapup",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|jg_blocked_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|jg_pending_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "merge_gate",
+   "next_stage": "wrapup",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|jg_clear_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "merge_gate",
+   "next_stage": "wrapup",
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "verify|jg_blocked_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "wrapup|armed": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": null,
+   "next_stage": null,
+   "pipeline_complete": true,
+   "judgment_auto_answered": false
+  },
+  "wrapup|no_marker": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "kill_switch",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "wrapup|step_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "step_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "wrapup|time_cap": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "time_cap",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "wrapup|jg_absent_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": null,
+   "next_stage": null,
+   "pipeline_complete": true,
+   "judgment_auto_answered": false
+  },
+  "wrapup|jg_pending_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": null,
+   "next_stage": null,
+   "pipeline_complete": true,
+   "judgment_auto_answered": false
+  },
+  "wrapup|jg_clear_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": null,
+   "next_stage": null,
+   "pipeline_complete": true,
+   "judgment_auto_answered": false
+  },
+  "wrapup|jg_blocked_safe": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  },
+  "wrapup|jg_pending_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": null,
+   "next_stage": null,
+   "pipeline_complete": true,
+   "judgment_auto_answered": false
+  },
+  "wrapup|jg_clear_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": null,
+   "next_stage": null,
+   "pipeline_complete": true,
+   "judgment_auto_answered": false
+  },
+  "wrapup|jg_blocked_full": {
+   "rc": 0,
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
+   "pipeline_complete": false,
+   "judgment_auto_answered": false
+  }
+ }
+}

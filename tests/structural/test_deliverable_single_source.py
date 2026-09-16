@@ -88,3 +88,21 @@ def test_the_rendered_wrapup_command_still_carries_its_own_paths() -> None:
     ).read_text(encoding="utf-8")
     assert "--required" in template
     assert "--optional .claude/memory/" in template, "memory is not a deliverable glob"
+
+
+# ── SPEC-intent-world-model-objective-layer ADR-012: the state paths ride the same source ──
+
+
+def test_state_paths_match_between_the_regex_and_the_derived_globs() -> None:
+    """One constant, two consumers: a state path the regex forgives must be one wrapup_land
+    stages, and vice versa — the drift this file exists to stop, on the new constant."""
+    from harness_maker.worktree import DELIVERABLE_STATE_PATHS
+    from harness_maker.wrapup_land import derive_deliverable_globs
+
+    globs = derive_deliverable_globs("any-slug", None)
+    for p in DELIVERABLE_STATE_PATHS:
+        sample = p + "OBJ-1.yaml" if p.endswith("/") else p
+        assert _is_deliverable_path(sample), sample
+        assert not _is_deliverable_path(p + "nested/OBJ-1.yaml" if p.endswith("/") else p + ".bak")
+        expected_glob = p + "*.yaml" if p.endswith("/") else p
+        assert expected_glob in globs, (expected_glob, globs)

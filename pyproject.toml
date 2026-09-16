@@ -95,6 +95,14 @@ python_version = "3.12"
 module = "regenerate"
 ignore_missing_imports = true
 
+# Same pattern for `tests/structural/_surface_baseline.py`: two files outside that package
+# (tests/fixtures/_gen_autopilot_caps_baseline.py, tests/unit/test_render_intent_layer.py)
+# sys.path-insert its directory and import it as a top-level module rather than a relative
+# import, because they are not themselves inside tests/structural.
+[[tool.mypy.overrides]]
+module = "_surface_baseline"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

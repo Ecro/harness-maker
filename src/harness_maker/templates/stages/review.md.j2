@@ -376,6 +376,24 @@ extras at runtime bringing total > 1, re-enable Pass 1 manually.
    invalidated by context and **dropped** (CP10 contract).
 5. The merged finding list is the input to the consensus filter (Step 4).
 
+### Step 3.3 — Objective drift (main loop, P2 — intent layer)
+
+Runs only when `{{ config.work_docs.dir }}PLAN-{slug}.md`'s frontmatter carries `objective: <id>`; otherwise print `[intent] no objective link — skipping` and continue. `<id>` must match `[A-Z0-9-]+`; on mismatch print `[intent] objective id malformed — skipping` and do not run the command (frontmatter text never reaches the shell unchecked). Load the record:
+{% if is_codex %}
+```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm world objective show <id> --json")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm world objective show <id> --json
+```
+{% endif %}
+Judge the PLAN's Implementation Plan against the record's `scope`, `non_scope` and `hypothesis`, and add one finding per drift to the merged list **before Step 3.4 stamps ids** — severity **P2**, `source: "main-loop"`, category `scope_drift`, `file` = the PLAN path, `message` opening with the objective id (`<id>: …`) so the finding names which record it was judged against:
+- work added outside `scope` (whether or not `non_scope` names it) → cite the offending PLAN item;
+- work added inside `non_scope` → cite the item;
+- the subject of `hypothesis` omitted → cite the requirement and where in the PLAN it is missing.
+No halt, no auto-edit of the record, no gate: P2 keeps it out of `unverified_severe` by construction (SPEC S10).
+
 ### Step 3.4 — Stamp a stable `id` on every merged finding (SINGLE OWNER)
 
 `Write` the merged findings to a temp path (never argv — skill §1), then:

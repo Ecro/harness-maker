@@ -1,0 +1,49 @@
+dimension: objective_scope_drift
+target: .claude/commands/hm/review.md
+rubrics:
+  - id: drift_is_detected_when_present
+    description: >
+      For each of the three drifted fixtures — a PLAN that adds work outside
+      the objective's `scope` which `non_scope` does not name, a PLAN that adds
+      an item inside `non_scope`, and a PLAN that omits the subject of the
+      `hypothesis` — does the review output contain a `scope_drift` finding?
+      Silence on any of the three is the failure this lens exists to catch;
+      the first case is the common one, because non_scope is never complete.
+    severity: P0
+    action: >
+      Make the lens read `objective: <id>` from the PLAN frontmatter, load the
+      objective record, and compare PLAN scope items against `scope` (as the
+      positive boundary), `non_scope` and `hypothesis` before emitting findings.
+  - id: no_drift_no_finding
+    description: >
+      For the in-scope fixture, does the review output contain no
+      `scope_drift` finding? A lens that flags every PLAN is noise, not
+      detection.
+    severity: P1
+    action: >
+      Require concrete evidence before a finding is emitted — for an addition,
+      the offending PLAN item; for an omission, the objective requirement that
+      is missing and the PLAN section where it would belong. No evidence, no
+      finding.
+  - id: finding_cites_objective_and_evidence
+    description: >
+      Does each `scope_drift` finding name the objective id and its evidence —
+      for an addition, the specific PLAN item that falls outside scope or
+      inside non-scope; for an omission, the objective requirement that is
+      missing and the PLAN section where it would belong? A finding without
+      both cannot be acted on or refuted.
+    severity: P1
+    action: >
+      Set `file` to the PLAN path and include the objective id and either the
+      item text or the missing requirement plus location in `message`.
+  - id: finding_not_gate
+    description: >
+      Is the finding reported at P2 through the normal review flow, with no
+      instruction to halt, block approval, or edit the objective record? P2 is
+      deliberate: a voice-less P1 lands in `unverified_severe` and stops the
+      stage, which would make this lens a gate. The Python gate owns record
+      changes; this lens owns judgment only.
+    severity: P1
+    action: >
+      Remove any halt or auto-edit instruction from the lens prose; leave
+      disposition to the operator.

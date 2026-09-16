@@ -46,6 +46,27 @@ def _s(*names: str) -> frozenset[str]:
 MODULES: dict[str, ModuleSpec] = {
     # ── argparse-subparser (guarded) ──
     "autopilot_caps": ModuleSpec("subparser", _s("boundary", "gate-blocked")),
+    # SPEC-intent-world-model-objective-layer ADR-001: one module, four verbs; `assume`,
+    # `outcome` and `objective` carry their own sub-verbs (observe/resolve, record, approve…).
+    "world": ModuleSpec(
+        "subparser",
+        _s(
+            "status",
+            "assume",
+            "outcome",
+            "objective",
+            "observe",
+            "resolve",
+            "record",
+            "approve",
+            "activate",
+            "drop",
+            "reopen",
+            "show",
+            "revisit",
+            "close",
+        ),
+    ),
     "verification_plan": ModuleSpec("subparser", _s("show", "commands")),
     "autopilot_ledger": ModuleSpec("subparser", _s("smoke", "rollup")),
     "codex_ledger": ModuleSpec("subparser", _s("emit")),

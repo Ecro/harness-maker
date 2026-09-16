@@ -1,0 +1,21 @@
+# .claude/intent.yaml — why this project exists. Human-written; nothing here is generated.
+#
+# Fill `mission` first. Until `mission` and `outcomes` are both filled, `hm world status`
+# reports `not_filled_in`. A file with outcomes but no mission is a validation error.
+#
+# Withdrawal criterion (SPEC): if after 10 wrapups no objective carries `observed:` and no
+# `revisit_when` has evaluated `candidate`, this layer is unused and is removed.
+schema_version: 1
+mission: ""
+vision: ""
+# outcomes:
+#   - id: dead_rendered_bytes          # [a-z0-9_]+, unique
+#     description: share of rendered command bytes with zero recorded invocations
+#     target: 10                       # a number; compared to the last recorded value
+#     higher_is_better: false
+#     how_measured: "hm economics stages + metrics invocation counts"
+outcomes: []
+non_negotiables: []
+non_scope: []
+unknowns: []
+owners: []

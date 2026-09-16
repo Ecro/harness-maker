@@ -566,6 +566,24 @@ Bash("uv run --with {{ harness_maker_src_path }} hm second_brain promote --type 
 
 **Receipt (ADR-006):** end this step by printing exactly one line — `promotion evaluated: <N> candidates, <M> promoted`. **`N` = the number of distinct local entries you wrote or touched in 5.1–5.4 that map to a promotable note_type** (every `failures.md` entry, every PLAN ADR, every confirmed preference) — it is NOT 0 if you wrote any such entry this unit. `M` = how many of those `N` you judged cross-project-durable and promoted. When `M < N`, add a one-line reason per skipped candidate. This is what makes silent under-promotion visible — do not collapse `N` to 0 to avoid the work.
 
+#### 5.7 World state — two questions, answer-gated (intent layer)
+
+Print `[intent] not in use` and skip this step when `.claude/intent.yaml` is absent or `hm world status --json` reports `state: not_filled_in`. Otherwise, in order — and **never write without the answer**:
+
+<!-- @hm:answer-gated:assumption -->
+Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Did this task confirm, supersede or contradict a recorded assumption?"** — options: one per assumption id (from the status output), plus **"no"**.
+If the answer is "yes": (an assumption was named) run ONCE, with the id, relation and text the operator confirmed:
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text '<what was observed>' --observed-at <ISO-8601 UTC>"){% else %}!uv run --with {{ harness_maker_src_path }} hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text "<what was observed>" --observed-at <ISO-8601 UTC>{% endif %}
+Otherwise: write nothing.
+<!-- /@hm:answer-gated -->
+
+<!-- @hm:answer-gated:objective-close -->
+Only when the PLAN frontmatter carries `objective: <id>`. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Close objective <id> now?"** — options: **"yes — met"**, **"yes — missed"**, **"yes — no_data"**, **"no, keep it open"**.
+If the answer is "yes": run ONCE, with the observed value chosen and a one-line note from the operator:
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm world objective close <id> --observed <met|missed|no_data> --note '<operator note>'"){% else %}!uv run --with {{ harness_maker_src_path }} hm world objective close <id> --observed <met|missed|no_data> --note "<operator note>"{% endif %}
+Otherwise: write nothing.
+<!-- /@hm:answer-gated -->
+
 ### Steps 6 → 7.6 — Stage, commit, pop, drain (ONE call)
 
 {%- if config.worktree is defined and config.worktree.get('enabled') %}

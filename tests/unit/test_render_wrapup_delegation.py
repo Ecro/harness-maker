@@ -228,7 +228,7 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # branches (codex / non-codex) at 3 lines each. This equality pin is the FOURTH normative site for
 # the wrapup body size, alongside `_ATOMIC_RATCHET`, `surface_baseline.json` and this task's
 # `surface_allowance`; a change to that command moves all four, which is worth stating once here.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 684), ("Production", 717)])
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 702), ("Production", 735)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

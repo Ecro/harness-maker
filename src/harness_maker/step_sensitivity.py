@@ -94,6 +94,9 @@ def _u(stage: str, ordinal: str, cls: str, inherits: str, **kw: Any) -> StepEntr
 
 
 _R = "RESEARCH-workflow-steps-vs-model-capability Table 1"
+#: SPEC-intent-world-model-objective-layer: the two intent-layer headings are graded from that
+#: task's own RESEARCH row (state and human lock-ins survive model change), never `unsourced`.
+_R_INTENT = "RESEARCH-cell-dev-future-and-intent-layer-fit: state + human lock-ins survive"
 
 REGISTRY: tuple[StepEntry, ...] = (
     # ── research ───────────────────────────────────────────────────────────
@@ -126,6 +129,14 @@ REGISTRY: tuple[StepEntry, ...] = (
     _u("spec", "Step 5", "INV", "spec Step 3", note="status write"),
     # ── plan ───────────────────────────────────────────────────────────────
     _u("plan", "Step 0", "INV", "spec Step 0", note="mechanical skip heuristic"),
+    _e(
+        "plan",
+        "Step 0.5",
+        "INV",
+        "**",
+        _R_INTENT,
+        note="intent layer; one line when unused",
+    ),
     _e("plan", "Step 1", "HOST", "*", f"{_R}; plan mode is native in all three vendors"),
     _u("plan", "Step 1.5", "INV", "plan Step 2", note="loop-mode detection (state)"),
     _u("plan", "Step 1.7", "INV", "spec Step 4", note="spec-need detection; spec-driven arm"),
@@ -249,6 +260,14 @@ REGISTRY: tuple[StepEntry, ...] = (
         ordering="subset",
         remeasure_on=("model_release", "language_mix_change"),
         measure_cmd=_BENCH,
+    ),
+    _e(
+        "review",
+        "Step 3.3",
+        "INV",
+        "**",
+        _R_INTENT,
+        note="objective drift, P2, main loop",
     ),
     _e("review", "Step 3.4", "INV", "***", f"{_R}; stable ids make consensus ledgerable"),
     _e(

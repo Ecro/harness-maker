@@ -159,4 +159,8 @@ def test_codex_target_files_total_skill_count() -> None:
     # `targeted-test-selection` skill. Same two constants moved again
     # (`synthesize._ALL_SKILLS` and this one), plus `interview._ALL_SKILLS` /
     # `_SIDE_ENABLED_SKILLS` for the enabled lists.
-    assert len(out_paths) == 21, f"Expected 21 skill paths, got {len(out_paths)}"
+    #
+    # 21 → 22 (2026-09-16, SPEC-intent-world-model-objective-layer S13): the `intent-layer`
+    # skill. Same constants again (`synthesize._ALL_SKILLS`, `interview._ALL_SKILLS`, the Side
+    # enabled list, this count).
+    assert len(out_paths) == 22, f"Expected 22 skill paths, got {len(out_paths)}"

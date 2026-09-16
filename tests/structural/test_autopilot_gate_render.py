@@ -38,6 +38,15 @@ Re-captures (append; never silently overwrite):
   where it rendered seven. Unrelated to autonomy gating: the same bytes move identically in
   `auto_safe` and `ask`, which is the signal that this is not an arm-differential defect. Verified
   before re-capture that `review` is the ONLY moved command in every arm.
+- **2026-09-16, `intent-world-model-objective-layer`** — `plan`, `review`, `wrapup` and `help`
+  moved in all four arms, identically in `auto_safe` and `ask`: plan gained Step 0.5 (objective
+  context), review gained Step 3.3 (objective drift, P2), wrapup gained 5.7 (two answer-gated
+  questions), help gained the `intent-layer` skill row. Verified before re-capture that these
+  four are the ONLY moved commands in every arm and that the command set did not drift; the
+  autopilot advance block itself is untouched. Re-captured a second time the same day after the
+  AC-017 judgment asked Step 3.3 to open each finding with the objective id — `review` alone moved.
+  Re-captured a third time after `/hm:review`'s round-2 fix added the `[A-Z0-9-]+` id check to
+  Step 3.3 (P1 security: frontmatter text reached the shell unchecked) — again `review` alone moved.
 """
 
 from __future__ import annotations

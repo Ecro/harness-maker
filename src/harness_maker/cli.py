@@ -565,6 +565,11 @@ def make(
     from harness_maker.worktree import _ensure_harness_gitignore
 
     _ensure_harness_gitignore(target)
+    # SPEC-intent-world-model-objective-layer S1: the intent skeleton is created once and
+    # never overwritten — write-if-absent, keyed on existence, no LLM-authored content.
+    from harness_maker.intent import write_skeleton_if_absent
+
+    write_skeleton_if_absent(target_dotclaude / "intent.yaml")
     # ADR-005 orphan sweep — delete blueprint-orphaned ours-clean files
     # (legacy commands removed by /hm:make --update). Uses full_bp (with
     # KEEP entries intact) so user-preserved files survive. Runs AFTER

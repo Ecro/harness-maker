@@ -1,0 +1,31 @@
+{
+ "claude": [
+  "configure",
+  "execute",
+  "health",
+  "help",
+  "loop",
+  "loop-p5-batch",
+  "make",
+  "metrics",
+  "plan",
+  "research",
+  "review",
+  "spec",
+  "uninstall",
+  "verify",
+  "wrapup"
+ ],
+ "codex": [
+  "hm-execute",
+  "hm-help",
+  "hm-loop",
+  "hm-loop-p5-batch",
+  "hm-plan",
+  "hm-research",
+  "hm-review",
+  "hm-spec",
+  "hm-verify",
+  "hm-wrapup"
+ ]
+}

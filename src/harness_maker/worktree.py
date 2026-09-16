@@ -193,10 +193,37 @@ DELIVERABLE_PREFIXES: tuple[str, ...] = (
     "DELTA",
 )
 
+#: SPEC-intent-world-model-objective-layer (PLAN ADR-012): the human-written state files are
+#: deliverables too — committed by wrapup, stash-preserved at finalize, forgiven by the
+#: create-guard. ONE constant, two consumers: the regex below and
+#: `wrapup_land.derive_deliverable_globs`; `tests/structural/test_deliverable_single_source.py`
+#: asserts they agree. A trailing `/` means "every `<id>.yaml` directly inside".
+DELIVERABLE_STATE_PATHS: tuple[str, ...] = (
+    ".claude/intent.yaml",
+    ".claude/world/assumptions.yaml",
+    ".claude/world/outcomes.yaml",
+    ".claude/world/objectives/",
+)
+
+
+def _state_path_regex() -> str:
+    parts = []
+    for p in DELIVERABLE_STATE_PATHS:
+        if p.endswith("/"):
+            parts.append(re.escape(p) + r"[^/]+\.yaml")
+        else:
+            parts.append(re.escape(p))
+    return "|".join(parts)
+
+
 # `[^/]+` (not `.+`) so the match is a FLAT file — a nested user dir like
 # `work-docs/PLAN-experiments/notes.md` must NOT be forgiven.
 _DELIVERABLE_RE = re.compile(
-    r"^(?:work-docs/(?:" + "|".join(DELIVERABLE_PREFIXES) + r")-[^/]+\.md|specs/SPEC-[^/]+\.md)$"
+    r"^(?:work-docs/(?:"
+    + "|".join(DELIVERABLE_PREFIXES)
+    + r")-[^/]+\.md|specs/SPEC-[^/]+\.md|"
+    + _state_path_regex()
+    + r")$"
 )
 
 

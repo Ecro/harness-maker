@@ -1464,6 +1464,24 @@ worktree:
   enabled: true           # true = isolate every /hm: stage, false = isolate none
 ```
 
+### 7.13 intent-layer
+
+**Role**: Mention-triggered skill (`@intent-layer` on Codex, natural discovery on Claude
+Code/Cursor) so the operator never has to remember the `hm world` verb by name.
+
+**Backs**: `.claude/intent.yaml` (mission/hypothesis/scope, a human-written skeleton committed
+at `make`) and `.claude/world/{assumptions,outcomes,objectives/<id>}.yaml`, all read and written
+through `hm world {status|assume|outcome|objective}`. Nothing is measured automatically and
+nothing is written without an explicit human answer — the skill surfaces the current status and
+runs the write the operator confirms, never a background one.
+
+**Touchpoints in the atomic stages**: `/hm:plan` Step 0.5 loads status and asks one closed
+question when an objective needs a decision; `/hm:review` Step 3.3 checks the diff against the
+PLAN's linked objective (`scope_drift`, P2, main-loop — not an eighth lens); `/hm:wrapup` Step
+5.7 offers to log an assumption observation or close an objective, each answer-gated. A fourth
+autopilot gate, `objective_gate`, runs after every existing check in `autopilot_caps.py` and can
+only replace an `advance` with a halt — a PLAN with no `objective:` link is unaffected.
+
 ---
 
 ## 7a. Agent Models (per-agent model routing, 0.15.0+)

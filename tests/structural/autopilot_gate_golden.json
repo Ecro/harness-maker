@@ -1,75 +1,75 @@
 {
   "arms": {
-    "ask@flag_off": {
+    "auto_safe@task-driven": {
       "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
-      "execute": "d215a7f56dd972e3c6f34cb5066f8bdff712f75847ca2999f3a977e8f5367c8d",
-      "health": "0e1b2c44865a9cfaff869bec2b2d6fb84c27cfe04209b652e1d1bd6422a1e24f",
-      "help": "a1a6bfec8fcef7218c0d4fdf094caf67d5ee3dd7ac6fd3594017a2dd56fcc525",
-      "loop": "966bd0f02aeba6fee4950d5bb0a00f4771ab56b2a60731430fa23fc5c61801cb",
-      "loop-p5-batch": "8c450ff845dfd7f90bd00755a5eaa71c483b6cb16e4d3cb86c1fbf0030ec57a4",
-      "make": "07976055745989e8e2c85c55665fb8eaac88978bd9bc27898b29e0a86749130f",
-      "metrics": "5f784c234e159343e97473fbf6e95b38b3c8c549dd1b793b1653011898723471",
-      "plan": "546c33ce7f5ba644b3f535f6b2c6ad39030699ae1c8ee16a05d64c6f1cabe0b6",
-      "research": "ddb701020d13867e2c0f0255d1696cb61dd76be79bf9e7625c22651d691d5b5e",
-      "review": "27a41232b812a9c89aae120b9cf0ae7776627611b8aae8ef87e349039e571171",
-      "spec": "37bac15f3234a885746e207ea3595f70f65eb8d64df657e671028c2f86ac2968",
-      "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
-      "verify": "e1a0dd07e7fa6771284a37fafc6047930478ad16228f48bb63cb58cfd6f686e2",
-      "wrapup": "bd10cbf403492ddbdbab8e1ac5fc63a4ea2f75f52d0447b946ba2dbc15702cc2"
-    },
-    "ask@flag_on": {
-      "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
-      "execute": "750ebf2efb572f36447809ca35341e8f04abaf7e2b1fffb15b040489f0ee4c6f",
-      "health": "0e1b2c44865a9cfaff869bec2b2d6fb84c27cfe04209b652e1d1bd6422a1e24f",
-      "help": "a1a6bfec8fcef7218c0d4fdf094caf67d5ee3dd7ac6fd3594017a2dd56fcc525",
-      "loop": "9ad2dc0a1421b90c378a2919eff8784d6d7830c345571bce2dbbe6b28846d137",
+      "execute": "2fe27625dac454d6acade049c9ee75cc3af46588f97f2812e10e9a5c69ce8d14",
+      "health": "8ab40373ebc80654cfb9aef63e066b99c98621c53c6b106f3fa3ac7bd7846e27",
+      "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52",
+      "loop": "6d861cfc8a32c454458d79222d9058dbbcf7c21dde342750819de2e2b2705dbd",
       "loop-p5-batch": "e80f67cdba706ab154da191f37d41b4454923394541f05bf316de408976b831a",
       "make": "07976055745989e8e2c85c55665fb8eaac88978bd9bc27898b29e0a86749130f",
       "metrics": "5f784c234e159343e97473fbf6e95b38b3c8c549dd1b793b1653011898723471",
-      "plan": "16e0813f9e2f4f242a4ca885f87f8d7797d34a235b428ad28f90d624ba77a817",
-      "research": "8830699b93e5451def92c34524e39237ad278ced8758c37f4fcca6ce927eed69",
-      "review": "1422406daaacc17dfa0cc9e04ce5ed851910e510fbf2274cb446cddcc2c36c36",
-      "spec": "3bc70dc076f07dbbd69b18a688104b188adb761e47c729c4524d8be899fd310a",
+      "plan": "536b93b63335a52c0500707e32aea7145bb9722a623125a1fecca4198f32b973",
+      "research": "471d588b5995a4f07359ebcf0922b7d9418d02c9a33e372a3c1779b6e2aeeaec",
+      "review": "8530386955e0a9cb25c83141c181d8b647271f67cadad7209716012edc81ef22",
+      "spec": "52fe5cbd8a22708dfc8d59bcb91701a743b38b227ca17934e6d5cbbd112336bd",
       "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
-      "verify": "ace5a856b9c86aa2c9cf8553eacdd0a0775ec42a12d0cef5c927fbcf88b01764",
-      "wrapup": "ab150bb249dbb7cd7bd27d5f9a656a9d0c5a8071103424143068208f72331675"
+      "verify": "d1bcb87775904777a85e82f59a89184a13fcb5152e99da3fa9edb9627971cc62",
+      "wrapup": "56566955888ea04a52f462a1a617d5ccd8028ead477af1dccc20a1f2954c1404"
     },
     "auto_safe@spec-driven": {
       "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
       "execute": "2fe27625dac454d6acade049c9ee75cc3af46588f97f2812e10e9a5c69ce8d14",
       "health": "8ab40373ebc80654cfb9aef63e066b99c98621c53c6b106f3fa3ac7bd7846e27",
-      "help": "35c3a59d5d1a09be4720db2c729697ce6c489adc22778fb7da970f17a8ece58e",
+      "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52",
       "loop": "6d861cfc8a32c454458d79222d9058dbbcf7c21dde342750819de2e2b2705dbd",
       "loop-p5-batch": "e80f67cdba706ab154da191f37d41b4454923394541f05bf316de408976b831a",
       "make": "07976055745989e8e2c85c55665fb8eaac88978bd9bc27898b29e0a86749130f",
       "metrics": "5f784c234e159343e97473fbf6e95b38b3c8c549dd1b793b1653011898723471",
-      "plan": "d0a8a2b63705b5d7f1afb8833b1a8c540bd1e43703a05c11d6ec6a3ac76c323f",
+      "plan": "4f121eda5b841d0b92e743525e096614046cde504c080653c6cfab06cabaf4c1",
       "research": "471d588b5995a4f07359ebcf0922b7d9418d02c9a33e372a3c1779b6e2aeeaec",
-      "review": "46e2e9fc1269f8ad061de68338950d35a9ce76d52bde5e180fe81a7401a3d291",
+      "review": "8d25ba69e1dfc332e117f2fb487dbae8af8237b7540c2fded27ea947c513f27e",
       "spec": "98cab68a304a7d080d97cb904572456500c9cfa68df2aba5ca4e5b99fdb9afa8",
       "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
       "verify": "acd61ce2f794c416e1d19d03771295832b167d9e8d75b636af8b87f092823f37",
-      "wrapup": "e4ad2d70d5ea73b2094a31b8effd8bcb085aacc25b85aa0b0795a907bb1070c9"
+      "wrapup": "ba49690a7f78296b8f55b4852bfb4de74a921c21aefefaff2c3f4107be62f584"
     },
-    "auto_safe@task-driven": {
+    "ask@flag_on": {
       "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
-      "execute": "2fe27625dac454d6acade049c9ee75cc3af46588f97f2812e10e9a5c69ce8d14",
-      "health": "8ab40373ebc80654cfb9aef63e066b99c98621c53c6b106f3fa3ac7bd7846e27",
-      "help": "35c3a59d5d1a09be4720db2c729697ce6c489adc22778fb7da970f17a8ece58e",
-      "loop": "6d861cfc8a32c454458d79222d9058dbbcf7c21dde342750819de2e2b2705dbd",
+      "execute": "750ebf2efb572f36447809ca35341e8f04abaf7e2b1fffb15b040489f0ee4c6f",
+      "health": "0e1b2c44865a9cfaff869bec2b2d6fb84c27cfe04209b652e1d1bd6422a1e24f",
+      "help": "0d1b6929d1b1bd55262d811ce71dfcce01a5eb0d68503ff1b19532effda415f7",
+      "loop": "9ad2dc0a1421b90c378a2919eff8784d6d7830c345571bce2dbbe6b28846d137",
       "loop-p5-batch": "e80f67cdba706ab154da191f37d41b4454923394541f05bf316de408976b831a",
       "make": "07976055745989e8e2c85c55665fb8eaac88978bd9bc27898b29e0a86749130f",
       "metrics": "5f784c234e159343e97473fbf6e95b38b3c8c549dd1b793b1653011898723471",
-      "plan": "18f1758f5d9eaaf7e4b02b8da8eaccd80c8514f9af6e4b20f64d4681da60fee1",
-      "research": "471d588b5995a4f07359ebcf0922b7d9418d02c9a33e372a3c1779b6e2aeeaec",
-      "review": "c504e29c158291b4125dea027d934ed57b5d2c53e8fb9149df7d4f92fdb1adad",
-      "spec": "52fe5cbd8a22708dfc8d59bcb91701a743b38b227ca17934e6d5cbbd112336bd",
+      "plan": "5bb2146c68153ba3e8c771b615396821f91ffb042e41c6242c948328609afbe7",
+      "research": "8830699b93e5451def92c34524e39237ad278ced8758c37f4fcca6ce927eed69",
+      "review": "4a2bb22c66535fd481e699ada2122c9f4a6b89e38bc5542868d60cc6822a542d",
+      "spec": "3bc70dc076f07dbbd69b18a688104b188adb761e47c729c4524d8be899fd310a",
       "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
-      "verify": "d1bcb87775904777a85e82f59a89184a13fcb5152e99da3fa9edb9627971cc62",
-      "wrapup": "c492f8e9e22bd21a14a8f5d0eb188181981370bb2f7cd5e7cf008facc79ad476"
+      "verify": "ace5a856b9c86aa2c9cf8553eacdd0a0775ec42a12d0cef5c927fbcf88b01764",
+      "wrapup": "1348f8b9d087803596ff3175df8db5681300d5a251c24c8de693f43e232405f6"
+    },
+    "ask@flag_off": {
+      "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
+      "execute": "d215a7f56dd972e3c6f34cb5066f8bdff712f75847ca2999f3a977e8f5367c8d",
+      "health": "0e1b2c44865a9cfaff869bec2b2d6fb84c27cfe04209b652e1d1bd6422a1e24f",
+      "help": "0d1b6929d1b1bd55262d811ce71dfcce01a5eb0d68503ff1b19532effda415f7",
+      "loop": "966bd0f02aeba6fee4950d5bb0a00f4771ab56b2a60731430fa23fc5c61801cb",
+      "loop-p5-batch": "8c450ff845dfd7f90bd00755a5eaa71c483b6cb16e4d3cb86c1fbf0030ec57a4",
+      "make": "07976055745989e8e2c85c55665fb8eaac88978bd9bc27898b29e0a86749130f",
+      "metrics": "5f784c234e159343e97473fbf6e95b38b3c8c549dd1b793b1653011898723471",
+      "plan": "36241e8cffc9dd6f3f63ab3571591c32a28a7eb56a9a801f237d1e7b76bc1c00",
+      "research": "ddb701020d13867e2c0f0255d1696cb61dd76be79bf9e7625c22651d691d5b5e",
+      "review": "0bdf6e287a23db5c89fe19bf372bbdaaa344bc1304c0bdb8d1d1abd8ea87cf51",
+      "spec": "37bac15f3234a885746e207ea3595f70f65eb8d64df657e671028c2f86ac2968",
+      "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
+      "verify": "e1a0dd07e7fa6771284a37fafc6047930478ad16228f48bb63cb58cfd6f686e2",
+      "wrapup": "cab8bd7f2bc9e529c4c593a0a76ddbc4bd792d5ca34bbdd7a613fbaef954b353"
     }
   },
-  "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
+  "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture — a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
   "rebases": [
     {
       "aggregate_delta_chars": 1456,
@@ -81,7 +81,7 @@
       "aggregate_delta_chars": -54,
       "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
       "phase": 5,
-      "reason": "Phase 5 SHRINKS the rendered surface by 54 chars, in two attributed edits: review.md.j2 drops the `- Start from `harness.yaml.reviewers.enabled`.` bullet (-47, AC-015 \u2014 the list is not an input to lens_dispatch, so the instruction was a lever that does not exist), and step_manifest.md.j2's disclosed default for autopilot_persistent goes `false` -> `true` (-1 x 7 commands, AC-007 \u2014 the class default is True). No autopilot advance or picker block moved; the Phase 3 byte-neutrality claim is unaffected because both edits are outside the advance block."
+      "reason": "Phase 5 SHRINKS the rendered surface by 54 chars, in two attributed edits: review.md.j2 drops the `- Start from `harness.yaml.reviewers.enabled`.` bullet (-47, AC-015 — the list is not an input to lens_dispatch, so the instruction was a lever that does not exist), and step_manifest.md.j2's disclosed default for autopilot_persistent goes `false` -> `true` (-1 x 7 commands, AC-007 — the class default is True). No autopilot advance or picker block moved; the Phase 3 byte-neutrality claim is unaffected because both edits are outside the advance block."
     },
     {
       "aggregate_delta_chars": 416,
@@ -110,6 +110,12 @@
       "attributed_in": "work-docs/BASELINE-DELTA-workflow-steps-vs-model-capability.md",
       "phase": "workflow-steps-vs-model-capability Phases 3-4 (2026-09-12)",
       "reason": "Attributed shrink, neither inside the autopilot advance nor the picker block: the 5-term inequality ceremony (partial + term list + per-round checklist) is deleted from research/spec/plan/loop and the comprehension partial's pointer to it is reworded (PLAN ADR-004); verify Check 1 drops its LLM PLAN/SPEC coverage judgement (1b) and keeps the mechanical drift-verdict read (ADR-003); review.md.j2 loses one word. Moved commands per arm: loop, plan, research, review, spec, verify. Deltas are against the base checkout (main @ 51b5bbfb), whose own drift from the frozen surface baseline is the earlier rows' business. Re-measured last after the second /hm:review's fixes (verify Check 1 note narrowed, Step 0.5 receipt sentence, retired-ledger claim scoped, CI verify wording)."
+    },
+    {
+      "aggregate_delta_chars": "review only; one added sentence in Step 3.3 (charset check before the shell line)",
+      "attributed_in": "work-docs/BASELINE-DELTA-intent-world-model-objective-layer.md",
+      "phase": "intent-world-model-objective-layer /hm:review fixes (2026-09-16)",
+      "reason": "/hm:review round 2 fix for a P1 security finding: review.md.j2 Step 3.3 now requires <id> to match [A-Z0-9-]+ before it is substituted into the `hm world objective show` shell line, and skips on mismatch. Verified before re-capture that `review` is the ONLY moved command in every arm and that it moves identically in auto_safe and ask; the advance and picker blocks are untouched."
     }
   ]
 }

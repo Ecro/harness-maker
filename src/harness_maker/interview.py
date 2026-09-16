@@ -124,6 +124,9 @@ _ALL_SKILLS: list[str] = [
     # from an UNGUARDED line. Omitting it from Side's enabled list would leave that pointer
     # dangling in every Side harness.
     "second-opinion-gate",
+    # SPEC-intent-world-model-objective-layer S13: on-demand skill, both presets — it is the
+    # only way an operator finds the `hm world` verbs without remembering them.
+    "intent-layer",
     # Same unguarded-pointer situation as `second-opinion-gate`: review.md.j2's auto-fix
     # verify step names this skill with no `{% if %}` around it, and /hm:execute Phase D
     # runs the same selector. Enabled in BOTH presets for that reason.
@@ -142,6 +145,7 @@ _SIDE_ENABLED_SKILLS: list[str] = [
     "second-opinion-gate",
     # Same reason — review.md.j2's verify step points here unguarded.
     "targeted-test-selection",
+    "intent-layer",
 ]
 _PROD_ENABLED_REVIEWERS: list[str] = [
     "code-reviewer",

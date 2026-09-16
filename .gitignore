@@ -26,6 +26,9 @@
 .claude/*
 !.claude/harness.yaml
 !.claude/memory/
+# SPEC-intent-world-model-objective-layer: human-written state — committed, never regenerated.
+!.claude/intent.yaml
+!.claude/world/
 # Mutation receipts are EVIDENCE, not churn — the re-include for them lives with the
 # observability block further down, NOT here. It was here first, and a concurrent branch
 # added its own `.claude/observability/*` block BELOW it; git resolves by LAST match, so

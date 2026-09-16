@@ -111,7 +111,7 @@ it is the substrate. The question for each row is whether the *role definition* 
 | `autoloop-coder` | ⚠️ same overlap as `executor`, plus `Workflow`'s own subagent default | loss | loss | **merge** |
 | `stage-delegate` | `none` — exists to cut main-loop context carry, which no native agent targets | loss | loss | **keep** |
 
-## Skills (11)
+## Skills (12)
 
 | Subject | native | cursor | codex | verdict |
 |---|---|---|---|---|
@@ -124,6 +124,7 @@ it is the substrate. The question for each row is whether the *role definition* 
 | `targeted-test-selection` | `none` | loss | loss | **keep** |
 | `verify-before-completion` | `none` | loss | loss | **keep** |
 | `second-opinion-gate` | `none` — cross-vendor CLI invocation is ours | loss | loss | **keep** |
+| `intent-layer` | `none` — Auto Memory ✅ stores preferences, not intent / assumptions / objective approvals; no vendor ships epistemic state | loss | loss (mention-only, `@intent-layer`) | **keep** |
 | `autoloop-driver` | ⚠️ **substantial** — `Workflow` ✅ is a deterministic driver with phases, fan-out, budget and resume; `/loop` ✅ covers self-paced iteration | loss | loss | **merge** |
 | `worktree-isolator` | ⚠️ `EnterWorktree` / `ExitWorktree` ✅ exist natively | loss | loss | **merge** — but see the warning below |
 
@@ -192,6 +193,7 @@ Production rows).
 | spec | Step 4.5 | INV | unsourced |
 | spec | Step 5 | INV | unsourced |
 | plan | Step 0 | INV | unsourced |
+| plan | Step 0.5 | INV | ** |
 | plan | Step 1 | HOST | * |
 | plan | Step 1.5 | INV | unsourced |
 | plan | Step 1.7 | INV | unsourced |
@@ -228,6 +230,7 @@ Production rows).
 | review | Step 2 | INV | ** |
 | review | Step 2.5 | INV | unsourced |
 | review | Step 3 | TUNE | *** |
+| review | Step 3.3 | INV | ** |
 | review | Step 3.4 | INV | *** |
 | review | Step 3.5 | INV | *** |
 | review | Step 3.6 | INV | ** |

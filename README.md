@@ -462,6 +462,7 @@ Grouped by what they do for your project, not by component.
 - **Autoloop with adaptive interview + 4-gate convergence.** `/hm:loop` runs time-and-iteration-bounded loops. `autoloop-driver` reads the goal, asks only what's missing, locks intensity + exit checklist, then requires mechanical checks + LLM judgment + regression comparison + 2-iter convergence streak before accepting completion.
 - **3-tier context loading + compaction recovery.** Hot tier (today's session) · Warm tier (failures + wiki first 60/40 lines) · Cold tier (git log / PLANs on demand). `PreCompact` hook flushes session before context compaction; next turn detects the marker and resumes from the last in-progress phase.
 - **Cross-process memory safety.** `.claude/memory/` writers serialise via re-entrant POSIX flock. Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤PIPE_BUF) so concurrent Claude Code + Cursor sessions cannot interleave JSONL lines.
+- **Intent / world-model layer — records why, not just how.** A human-written `.claude/intent.yaml` plus `.claude/world/{assumptions,outcomes,objectives}` and `hm world <verb>` let you state the mission, log assumptions, record measured outcomes, and gate an in-flight PLAN on an approved objective. `/hm:plan`, `/hm:wrapup`, and `/hm:review` each carry one small answer-gated touchpoint; nothing is measured automatically and nothing is written without an explicit answer.
 
 ### 🔧 Advanced features — *background mechanisms, tunable but not in the way*
 

@@ -1,0 +1,845 @@
+schema_version: 2
+spec_slug: intent-world-model-objective-layer
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: 'Tier-1 subsystem that gates autopilot advancement and
+  records what work the human chose; a surviving mutant changes project direction
+  silently. Scope is the two new modules plus autopilot_caps.py (542 lines, the gate
+  wiring). worktree.py is deliberately excluded — an 85% threshold over 5,997 lines
+  is not achievable and would make the gate meaningless; its integration risk is covered
+  behaviourally by AC-012 (differential against a captured pre-change baseline) and
+  AC-013 (full lifecycle on a clean project).
+
+  '
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/intent.py
+- src/harness_maker/world.py
+- src/harness_maker/autopilot_caps.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: an invalid file is refused with the offending field named
+  type: property
+  test_ids:
+  - tests/unit/test_intent_validate.py::test_ac_001_intent_defect_names_its_field
+  - tests/unit/test_intent_validate.py::test_ac_001_valid_file_with_optional_keys_absent_passes
+  - tests/unit/test_world_assumptions.py::test_ac_001_assumptions_defect_names_its_field
+  - tests/unit/test_world_objectives.py::test_ac_001_objective_defect_names_its_field
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'The required, optional and outcome-item field sets are enumerated
+    in the Constraints table before the validator exists. Quantifying over five defect
+    classes catches a validator that special-cases one fixture; the expected field
+    name is the input''s own.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: any intent.yaml with exactly one defect from {unknown top-level key,
+    missing required key, duplicate outcome id, non-numeric target, missing outcome
+    sub-field, empty mission beside non-empty outcomes}; any objective file with exactly
+    one defect from {id not equal to file stem, empty scope, unknown outcome_id, dangling
+    depends_on entry, state closed with null observed}; any assumptions file with
+    exactly one defect from {duplicate id, missing envelope key, null claim, empty
+    claim, non-list evidence, evidence entry missing relation, non-string history
+    entry, unknown key}; and separately any valid file with any subset of optional
+    keys absent
+  transformation: run the kind's loader and read the returned errors
+  expected_relation: a defective file fails with the first error naming the defective
+    field; a valid file with optional keys absent passes
+  preconditions:
+  - exactly one defect per defective input
+  observable_output: the validation error list
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: make creates the typed skeleton and the strict loader accepts it as not_filled_in
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_skeleton.py::test_ac_002_skeleton_is_typed_empty_and_loads_under_the_strict_validator
+  - tests/unit/test_intent_skeleton.py::test_ac_002_skeleton_carries_no_generated_prose_only_comments_and_empties
+  - tests/unit/test_intent_skeleton.py::test_ac_002_half_filled_file_is_an_error_naming_mission_not_a_skeleton
+  - tests/unit/test_world_status_and_revisit.py::test_ac_002_status_on_a_half_filled_intent_names_mission
+  executable_predicate: set(raw_yaml(made_path).keys()) == REQUIRED_FIELDS | OPTIONAL_FIELDS
+    and raw_yaml(made_path)['mission'] == '' and raw_yaml(made_path)['vision'] ==
+    '' and all(raw_yaml(made_path)[k] == [] for k in LIST_FIELDS) and raw_yaml(made_path)['schema_version']
+    == KNOWN_MAJOR and validate_intent(made_path).errors == [] and run_cli(['world',
+    'status', '--json'], cwd=made_root).stdout_json['state'] == 'not_filled_in' and
+    run_cli(['world', 'status', '--json'], cwd=HALF_FILLED_ROOT).stdout_json['error']['field']
+    == 'mission'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'REQUIRED_FIELDS, OPTIONAL_FIELDS, LIST_FIELDS and the typed empty
+    values are the Constraints rows, written before the generator exists. Reading
+    the raw YAML pins the types the skeleton writes; running the same validate_intent
+    that AC-001 uses pins that the strict loader accepts its own output; the HALF_FILLED_ROOT
+    fixture (empty mission, one outcome) pins that a half-filled file is an error,
+    not a skeleton.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: make --update never rewrites a hand-filled intent
+  type: property
+  test_ids:
+  - tests/unit/test_intent_update_invariance.py::test_ac_003_existing_file_bytes_survive_two_runs
+  - tests/unit/test_intent_update_invariance.py::test_ac_003_make_hook_calls_the_write_if_absent_function
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Byte-level invariance of a write-if-absent operation holds for
+    any file content regardless of how the generator is implemented, and is observed
+    on the file rather than on a success flag the implementation returns.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: arbitrary hand-authored intent.yaml byte content, including malformed
+    YAML
+  transformation: run make --update twice against the same existing file
+  expected_relation: the file's bytes after each run equal the bytes before the first
+    run
+  preconditions:
+  - the file exists and is non-empty before the first run
+  observable_output: the file's bytes on disk
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: a contradicts observation yields conflict, retains every evidence tuple,
+    and dependants derive the flag
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_assumptions.py::test_ac_004_contradicts_yields_conflict_keeps_both_tuples_and_derives_flags
+  executable_predicate: reload(world).assumptions['log_location'].status == 'conflict'
+    and [(e.text, e.observed_at, e.relation) for e in reload(world).assumptions['log_location'].evidence]
+    == [E1.tuple, E2.tuple] and reload(world).assumptions['log_location'].claim ==
+    CLAIM_BEFORE and derive(reload(world), 'OBJ-ACTIVE').needs_revalidation is True
+    and derive(reload(world), 'OBJ-CLOSED').needs_revalidation is False and objective_file_bytes_after
+    == objective_file_bytes_before
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Retention is asserted after a save-and-reload round trip as an
+    ordered list of full (text, observed_at, relation) tuples, so deleting E1 and
+    storing E2 twice, or dropping the time or relation, fails. The derived flag is
+    read through the reader on both a non-terminal and a terminal dependant, and the
+    last clause pins that no objective file was written — the flag is computed, not
+    stored.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: supersedes and confirms never produce conflict and lose no evidence
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_assumptions.py::test_ac_005_supersedes_replaces_claim_appends_history_keeps_status
+  - tests/unit/test_world_assumptions.py::test_ac_005_confirms_appends_evidence_only
+  - tests/unit/test_world_assumptions.py::test_ac_005_supersedes_without_a_claim_is_refused_by_field
+  executable_predicate: reload(after_supersede).assumptions['concurrent_users'].claim
+    == E_SUP.claim and reload(after_supersede).assumptions['concurrent_users'].history
+    == HISTORY_BEFORE + [CLAIM_BEFORE] and [e.tuple for e in reload(after_supersede).assumptions['concurrent_users'].evidence]
+    == EVIDENCE_BEFORE + [E_SUP.tuple] and reload(after_supersede).assumptions['concurrent_users'].status
+    == STATUS_BEFORE and reload(after_confirm).assumptions['concurrent_users'].claim
+    == CLAIM_BEFORE and reload(after_confirm).assumptions['concurrent_users'].history
+    == HISTORY_BEFORE and [e.tuple for e in reload(after_confirm).assumptions['concurrent_users'].evidence]
+    == EVIDENCE_BEFORE + [E_CONF.tuple] and reload(after_confirm).assumptions['concurrent_users'].status
+    == STATUS_BEFORE
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The relation is asserted by the caller, so the expected effect
+    of each relation is the Constraints row''s definition. Evidence and history are
+    compared as whole ordered lists against the pre-state plus exactly the new entry,
+    so delete-and-refill passes nothing. after_supersede and after_confirm are two
+    independent fixtures from the same pre-state.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: resolve is the only exit from conflict
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_assumptions.py::test_ac_006_resolve_is_the_only_exit_from_conflict
+  - tests/unit/test_world_assumptions.py::test_ac_006_refused_resolves_write_nothing
+  executable_predicate: reload(resolve(CONFLICTED, status='assumed', claim=NEW)).status
+    == 'assumed' and reload(resolve(CONFLICTED, status='assumed', claim=NEW)).claim
+    == NEW and reload(resolve(CONFLICTED, status='assumed', claim=NEW)).history ==
+    HISTORY_BEFORE + [CLAIM_BEFORE] and [e.tuple for e in reload(resolve(CONFLICTED,
+    status='assumed', claim=NEW)).evidence] == EVIDENCE_BEFORE and derive(after_resolve,
+    'OBJ-ACTIVE').needs_revalidation is False and resolve(CONFLICTED, status='conflict',
+    claim=NEW).refused is True and resolve(KNOWN, status='assumed', claim=NEW).refused
+    is True and bytes_after_refusals == bytes_before
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The resolve contract is the Constraints row. Each resolve(...)
+    call in the predicate denotes the same single invocation''s persisted result (the
+    test performs it once and reloads). Refusals are checked on bytes, and the derived
+    flag on the dependant is read through the reader so a resolve that leaves a stale
+    stored flag somewhere cannot pass.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: every malformed or unprovenanced outcome value is refused by name and a good
+    one carries the definition hash
+  type: property
+  test_ids:
+  - tests/unit/test_world_outcomes.py::test_ac_007_each_defect_is_refused_by_field_and_writes_nothing
+  - tests/unit/test_world_outcomes.py::test_ac_007_complete_record_persists_in_utc_z_with_the_test_computed_hash
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Quantifying over six defect classes means an implementation that
+    checks only presence fails; atomicity is observed on the file. The definition_hash
+    is computed in the test from the Constraints payload rules over the fixture''s
+    intent.yaml, not read back from the implementation, so a hash that omits higher_is_better
+    or concatenates strings fails.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: an outcome value record with exactly one defect from {observed_at
+    missing, observed_at not ISO-8601, observed_at naive (no timezone), evidence missing,
+    evidence empty, value non-numeric, outcome_id unknown}, and separately a complete
+    record whose observed_at carries a non-zero offset
+  transformation: attempt to record it; read the outcomes file's bytes; for the complete
+    record, reload and read the stored definition_hash
+  expected_relation: each defective write is refused with an error naming the defective
+    field and the file bytes are unchanged; the complete write persists with observed_at
+    stored in UTC Z form denoting the same instant, and its definition_hash equals
+    sha256 of the canonical JSON of {higher_is_better, how_measured, target} computed
+    by the test
+  preconditions:
+  - the outcomes file exists before the attempt
+  - the fixture intent.yaml declares the outcome
+  observable_output: the error's field name, the file's bytes, and the stored definition_hash
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: only legal objective transitions are accepted
+  type: property
+  test_ids:
+  - tests/unit/test_world_objectives.py::test_ac_008_direct_transitions_follow_the_table
+  - tests/unit/test_world_objectives.py::test_ac_008_activation_needs_a_valid_approval
+  - tests/unit/test_world_objectives.py::test_ac_008_terminal_records_refuse_every_field_edit
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'The table is enumerated in this SPEC before any state machine
+    exists, and quantifying over all 16 pairs catches the permissive implementation
+    a few-case check admits. With validity derived there is no active→proposed transition
+    at all, which is what removes the revision-2/3 contradictions.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: any (current_state, target_state) pair over {proposed, active, closed,
+    dropped}, with proposed→active attempted both with a valid and with an invalid
+    approval, plus any single field edit on a closed record, plus any single field
+    edit on a dropped record, plus the reopen operation on a dropped record
+  transformation: attempt the transition, the edit, or the reopen, then reload
+  expected_relation: a transition is accepted iff the pair is in {proposed→active
+    with valid approval, active→closed, proposed→dropped, active→dropped, dropped→proposed};
+    proposed→active with an invalid approval is refused; reopen is the only accepted
+    operation on a dropped record and leaves approval null; every field edit of a
+    closed or dropped record is refused and the bytes are unchanged
+  preconditions:
+  - the transition table in AC-008 is the sole reference
+  observable_output: the transition result, the persisted state, the approval block,
+    and the file bytes
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: approval validity is derived from the canonical hash with provenance and
+    verification writes nothing
+  type: property
+  test_ids:
+  - tests/unit/test_world_objectives.py::test_ac_009_hashed_edit_invalidates_without_writing
+  - tests/unit/test_world_objectives.py::test_ac_009_target_edit_in_intent_invalidates
+  - tests/unit/test_world_objectives.py::test_ac_009_how_measured_edit_does_not_invalidate
+  - tests/unit/test_world_objectives.py::test_ac_009_non_hashed_edit_keeps_validity
+  - tests/unit/test_world_objectives.py::test_ac_009_terminal_objectives_read_not_applicable
+  - tests/unit/test_world_objectives.py::test_ac_009_approve_records_git_identity_and_the_canonical_hash
+  - tests/unit/test_world_objectives.py::test_ac_009_approve_with_empty_git_identity_is_refused_and_writes_nothing
+  - tests/unit/test_world_objectives.py::test_ac_009_canonical_json_sorts_keys_it_was_not_handed_sorted
+  - tests/unit/test_world_objectives.py::test_ac_009_approve_reads_the_name_at_the_base_root_from_a_linked_worktree
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: '"Any edit to a hashed input invalidates, and only those" is a
+    relation over the whole field set, so a hash that omits one field fails. The hash
+    is recomputed in the test from the Constraints payload rules. Bytes-unchanged
+    after verification pins that validity is derived. The git identity is the fixture
+    repo''s, set by the test, so a hard-coded approved_by fails.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: an approved active objective and any single edit to one of {scope,
+    non_scope, hypothesis, outcome_id, linked outcome target}; separately any single
+    edit to one of {depends_on, rejected, revisit_when, linked outcome how_measured};
+    separately the same hashed-input edits applied to a closed and to a dropped objective;
+    separately an approval attempt in a repo whose git user.name is empty
+  transformation: apply the edit, run the verifier, reload, and compare bytes
+  expected_relation: for every hashed edit on the active objective approval_valid
+    is false; for every non-hashed edit it is true; in both cases the stored state
+    and the file bytes are unchanged; content_hash equals the test-computed canonical
+    hash; approved_by equals the fixture repo's git user.name and approved_at parses
+    as ISO-8601 UTC; for terminal objectives approval_valid reads n/a; the empty-identity
+    approval is refused and writes nothing
+  preconditions:
+  - the fixture repo has git user.name set to a known value
+  observable_output: approval_valid, the persisted state, the file bytes, the approval
+    block
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: exceeding max_active_objectives warns on the same call that activates
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_objectives.py::test_ac_010_cap_breach_warns_on_the_same_call_that_activates
+  executable_predicate: RESULT.activated is True and RESULT.warning.count == 2 and
+    RESULT.warning.cap == 1 and reload(world).objectives[OBJS.second].state == 'active'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'RESULT is the single return value of one activate(OBJS.second,
+    cap=1) call made after OBJS.first is already active; all three result clauses
+    and the reload read that one call, so an implementation that warns on a later
+    call, or reports activated without persisting, fails. Warn-and-proceed is interview
+    lock-in R4.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: the revisit check has three non-blocking results, four unevaluable causes,
+    prints its inputs, and is invoked per objective by /hm:plan
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer.py::test_ac_011_plan_loads_state_matches_rejected_and_loops_the_revisit_before_step_1
+  - tests/unit/test_world_status_and_revisit.py::test_ac_011_revisit_prints_the_record_condition_and_last_value
+  - tests/unit/test_world_status_and_revisit.py::test_ac_011_three_results_and_four_unevaluable_causes_never_block
+  executable_predicate: 'all(revisit(c).blocked is False for c in CASES) and revisit(CASE_MET).result
+    == ''candidate'' and revisit(CASE_UNMET).result == ''not_met'' and all(revisit(c).result
+    == ''unevaluable'' for c in (CASE_NO_VALUE, CASE_STALE_DEF, CASE_CONFLICT, CASE_DANGLING))
+    and run_cli([''world'', ''objective'', ''revisit'', ''OBJ-3'', ''--json''], cwd=FX_ROOT).stdout_json
+    == {''objective'': ''OBJ-3'', ''title'': FX.obj3_title, ''condition'': FX.obj3_condition,
+    ''last_value'': FX.obj3_last_value, ''result'': ''candidate'', ''blocked'': False}
+    and all(any(l.strip().startswith(MANDATED_CALL_PREFIXES[target]) and ''intent.yaml''
+    in l and ''assumptions.yaml'' in l for l in plan_lines_before(''## Step 1'', target))
+    for target in (''claude'', ''codex'')) and all(''rejected'' in text_before(''##
+    Step 1'', target) and ''For each matching objective:'' in text_before(''## Step
+    1'', target) and any(l.strip().startswith(MANDATED_CALL_PREFIXES[target]) and
+    ''world objective revisit <objective-id>'' in l for l in plan_lines_before(''##
+    Step 1'', target)) and text_before(''## Step 1'', target).index(''rejected'')
+    < text_before(''## Step 1'', target).index(''For each matching objective:'') <
+    text_before(''## Step 1'', target).index(''world objective revisit <objective-id>'')
+    for target in (''claude'', ''codex'')) and text_before(''## Step 1'').index(''rejected'')
+    < text_before(''## Step 1'').index(''For each matching objective:'') < text_before(''##
+    Step 1'').index(''objective revisit <objective-id>'')'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The three results and four unevaluable causes are the Constraints
+    row. The CLI clause runs the shipped verb on a fixture objective and compares
+    the whole printed record, so an argument-less or display-less implementation fails.
+    The render clauses run on BOTH rendered surfaces; MANDATED_CALL_PREFIXES is {''claude'':
+    (''!uv run'', ''!python -m'', ''!hm ''), ''codex'': (''Bash("uv run'', ''Bash("python
+    -m'', ''Bash("hm '')} — the shipped call forms, since a bare `uv run` line is
+    inert on both targets. They require, before Step 1, a mandated load line, a rejected[]
+    matching instruction, the explicit loop line, and a per-objective invocation carrying
+    an id placeholder inside the loop — which stops a helper named only in a comment,
+    a plan that never loads the assumptions, an inert line, and a single hard-coded
+    check.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: the boundary entrypoint reads the link from the current checkout, existing
+    gates are byte-identical, and objective_gate only replaces advance
+  type: mechanical
+  test_ids:
+  - tests/unit/test_autopilot_caps_objective_gate.py::test_ac_012_absent_and_approved_links_equal_the_baseline
+  - tests/unit/test_autopilot_caps_objective_gate.py::test_ac_012_failing_links_only_replace_an_advance
+  - tests/unit/test_autopilot_caps_objective_gate.py::test_ac_012_the_date_link_is_readable_from_the_event_file_as_json
+  - tests/unit/test_autopilot_caps_objective_gate.py::test_ac_012_the_entrypoint_takes_no_objective_argument
+  - tests/unit/test_autopilot_caps_objective_gate.py::test_ac_012_marker_persisted_slug_still_evaluates_the_gate
+  - tests/unit/test_autopilot_caps_objective_gate.py::test_ac_012_two_checkouts_the_worktree_link_is_the_one_used
+  executable_predicate: 'all(boundary_cli(stage, inp, slug=p.slug, cwd=p.root) ==
+    BASELINE[(stage, inp)] for stage in STAGES for inp in INPUTS for p in (PLAN_KEY_ABSENT,
+    PLAN_FILE_ABSENT, PLAN_APPROVED_ACTIVE)) and all((boundary_cli(stage, inp, slug=p.slug,
+    cwd=p.root) == BASELINE[(stage, inp)]) if BASELINE[(stage, inp)].halt_kind is
+    not None else (boundary_cli(stage, inp, slug=p.slug, cwd=p.root).halt_kind ==
+    ''objective_gate'' and p.expected_display_ref in boundary_cli(stage, inp, slug=p.slug,
+    cwd=p.root).message and last_event(p.slug).reason == p.expected_reason and last_event(p.slug).raw_link
+    == p.expected_raw_link and last_event(p.slug).parse_error == p.expected_parse_error
+    and last_event(p.slug).display_ref == p.expected_display_ref) for stage in STAGES
+    for inp in INPUTS for p in (PLAN_NULL, PLAN_EMPTY, PLAN_NUMBER, PLAN_YAML_DATE,
+    PLAN_UNPARSEABLE, PLAN_MISSING_ID, PLAN_NOT_ACTIVE, PLAN_APPROVAL_INVALID)) and
+    json.loads(last_event_raw_text(PLAN_YAML_DATE.slug))[''raw_link''] == {''yaml_type'':
+    ''date'', ''repr'': ''2026-09-16''} and boundary_cli(''plan'', ADVANCING_INPUT,
+    slug=TWO_CHECKOUTS.slug, cwd=TWO_CHECKOUTS.worktree_root).halt_kind == ''objective_gate''
+    and boundary_cli(''plan'', ADVANCING_INPUT, slug=TWO_CHECKOUTS.slug, cwd=TWO_CHECKOUTS.main_root)
+    == BASELINE[(''plan'', ADVANCING_INPUT)] and ''objective'' not in inspect.signature(boundary_entrypoint).parameters'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: 'BASELINE is a boundary-result matrix captured from the pre-change
+    autopilot_caps module at the commit before this work and stored as a fixture,
+    so the comparison cannot be satisfied by re-deriving the expectation from the
+    changed code. Every call goes through the shipped boundary entrypoint with only
+    a slug, on ten fixture projects whose PLAN frontmatter differs; the entrypoint
+    must read the link itself, which the final signature clause enforces. The five
+    malformed shapes expect reason link_invalid with a typed raw_link (null for the
+    unparseable case, with parse_error true; the yaml_type/repr object for the bare-date
+    case, read back from the event file''s JSON text so a non-serialisable value cannot
+    pass) and a display_ref string that the test computes per the S7 rule; the three
+    well-formed failures expect their own reason. Every existing halt must reproduce
+    exactly and only an advance may become objective_gate; the event clause reads
+    the recorded gate-blocked event for that slug. TWO_CHECKOUTS is a fixture repo
+    with a task worktree whose PLAN links an unapproved objective while main''s PLAN
+    has no link: the same slug halts from the worktree and advances from main, which
+    is what pins "current checkout" rather than base root.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-013
+  title: the new paths survive the whole lifecycle as deliverables including real
+    objective files
+  type: mechanical
+  test_ids:
+  - tests/integration/test_intent_layer_lifecycle.py::test_ac_013_paths_are_not_ignored_and_classify_as_deliverable
+  - tests/integration/test_intent_layer_lifecycle.py::test_ac_013_make_update_leaves_every_byte_alone
+  - tests/integration/test_intent_layer_lifecycle.py::test_ac_013_finalize_stash_round_trip_is_byte_identical
+  - tests/integration/test_intent_layer_lifecycle.py::test_ac_013_wrapup_land_stages_the_state_paths_through_the_derived_globs
+  executable_predicate: all(git_check_ignore(p) == '' for p in NEW_PATHS) and all(_path_owner(p)
+    == 'deliverable' for p in NEW_PATHS) and files_byte_identical_after_update(NEW_PATHS)
+    and files_byte_identical_after_finalize_roundtrip(NEW_PATHS) and all(p in git_index_after(run_cli(['wrapup_land',
+    '--worktree', FX_WT, '--base', FX_BASE, '--slug', FX_SLUG, '--message-file', FX_MSG,
+    '--required', FX_PLAN])) for p in NEW_PATHS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: 'NEW_PATHS is the three fixed files plus two real .claude/world/objectives/<id>.yaml
+    files, so an anchored matcher that only knows the directory fails. git''s own
+    check-ignore and index are the reference implementations and are not part of this
+    change. Run on a clean project where the files are untracked. Deliverables are
+    stash-PRESERVED at finalize by design, so the finalize clause asserts byte identity
+    after the stash round trip, not absence. The last clause runs the shipped `hm
+    wrapup_land` with only the PLAN as --required — the four state paths must arrive
+    through derive_deliverable_globs — and reads the git index, not the prose.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-014
+  title: hm status prints the fixture's values on stdout, reaches no LLM, writes nothing
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_status_and_revisit.py::test_ac_014_status_prints_the_fixture_values_reaches_no_llm_writes_nothing
+  - tests/unit/test_world_status_and_revisit.py::test_ac_014_status_on_the_skeleton_prints_not_filled_in
+  - tests/unit/test_world_status_and_revisit.py::test_ac_014_world_entrypoints_reach_no_llm_client
+  executable_predicate: 'OUT == run_cli([''world'', ''status'', ''--json''], cwd=FX_ROOT)
+    and OUT.returncode == 0 and OUT.json[''mission''] == FX.mission and OUT.json[''outcomes''][''onboarding_minutes'']
+    == {''last'': 17, ''target'': 10, ''observed_at'': FX.T1, ''gap'': ''unevaluable'',
+    ''stale_definition'': True} and OUT.json[''outcomes''][''success_rate''][''gap'']
+    == ''below_target'' and OUT.json[''active''][''OBJ-1''] == {''approval_valid'':
+    False, ''needs_revalidation'': True} and OUT.json[''unknowns''] == FX.unknowns
+    and OUT.json[''conflicts''] == [''log_location''] and OUT.json[''fired_revisits'']
+    == [''OBJ-3''] and run_cli([''world'', ''status'', ''--json''], cwd=SKELETON_ROOT).stdout_json[''state'']
+    == ''not_filled_in'' and all(llm_reachable_from(m) is False for m in (subcommand_module(''world'',
+    ''status''), subcommand_module(''world'', ''assume''), subcommand_module(''world'',
+    ''outcome''), subcommand_module(''world'', ''objective''))) and tree_hash(''.claude'',
+    after=OUT) == tree_hash(''.claude'', before=OUT)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'OUT is one subprocess run of the shipped CLI entrypoint with --json,
+    so a status that prints nothing, or a module-level helper that is never wired,
+    fails. The fixture is authored in this SPEC stage: one lower-is-better outcome
+    recorded under a stale definition (gap unevaluable, flag true), one higher-is-better
+    outcome below target, one active objective edited after approval and depending
+    on a conflicted assumption, a known unknowns list, and one objective whose revisit
+    condition holds. Values, not field names, are compared. The import graph is walked
+    from all four shipped verb entrypoints, matching the LLM-boundary Constraints
+    row, and the tree hash pins read-only.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-015
+  title: close persists three fields, is immutable, and wrapup's two writes are answer-gated
+    with an explicit no-branch
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer.py::test_ac_015_wrapup_writes_sit_inside_answer_gated_blocks_with_an_explicit_no_branch
+  - tests/unit/test_world_objectives.py::test_ac_015_close_persists_three_fields
+  - tests/unit/test_world_objectives.py::test_ac_015_refused_closes_name_the_field_and_write_nothing
+  - tests/unit/test_world_objectives.py::test_ac_015_second_close_is_refused
+  executable_predicate: 'reload(CLOSED_OK).state == ''closed'' and reload(CLOSED_OK).observed
+    == ''missed'' and reload(CLOSED_OK).note == NOTE and parse_iso_utc(reload(CLOSED_OK).closed_at)
+    is not None and close(OBJ_ACTIVE, observed=None, note=NOTE).error.field == ''observed''
+    and close(OBJ_ACTIVE, observed=''met'', note='''').error.field == ''note'' and
+    close(OBJ_ACTIVE, observed=''success'', note=NOTE).error.field == ''observed''
+    and bytes_after_refusals == bytes_before and close(CLOSED_OK, observed=''met'',
+    note=NOTE).refused is True and all(block_contains_in_order(rendered_command_text(''hm/wrapup.md''),
+    open_marker, ''<!-- /@hm:answer-gated -->'', [''AskUserQuestion'', ''If the answer
+    is "yes":'', cmd, ''Otherwise: write nothing'']) for open_marker, cmd in ((''<!--
+    @hm:answer-gated:assumption -->'', ''hm world assume''), (''<!-- @hm:answer-gated:objective-close
+    -->'', ''hm world objective close'')))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The observed vocabulary and the two required fields are the Constraints
+    row; CLOSED_OK is one successful close reloaded from disk. The render clause requires
+    each write to sit inside its named, explicitly closed @hm:answer-gated block with,
+    in order, an AskUserQuestion, the literal yes-branch line, the command, and the
+    literal otherwise-write-nothing line — the same marker discipline as @hm:drop-policy
+    — so prose that asks and then writes regardless, that lacks a no-branch, or that
+    never asks about the assumption, fails.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-016
+  title: a missing or foreign-major schema_version is refused naming the file and
+    both versions
+  type: property
+  test_ids:
+  - tests/unit/test_world_schema_version.py::test_ac_016_foreign_or_missing_version_is_refused_naming_path_and_versions
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Quantifying over missing, older and newer majors across all four
+    file kinds rules out a check hard-coded to one version number or one loader; the
+    refusal contract is stated in Constraints before implementation.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: any of the four new file kinds with schema_version missing, or declared
+    with a major lower than, or higher than, the build's known major
+  transformation: attempt to load it through the kind's loader
+  expected_relation: the load is refused and the error names the file path, the found
+    version (or 'missing') and the build's known version
+  preconditions:
+  - the file is otherwise well-formed YAML
+  observable_output: the refusal flag, the error message and the error's path
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-017
+  title: /hm:review emits scope_drift findings that cite the objective and the evidence,
+    judged against the rendered lens
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: objective_scope_drift
+  note: ''
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: 'The fixture directory holds four (PLAN, objective) INPUT pairs
+    only — in scope, work added outside scope that non-scope does not name, work added
+    inside non-scope, hypothesis subject omitted — authored in this SPEC stage before
+    the lens prose exists. At judgment time the judgment-reviewer runs the currently
+    rendered review lens of each target (the Claude command and the codex stage skill)
+    over each pair and the rubric judges what it emitted. Because both rendered surfaces
+    are part of the subject, find-unjudged invalidates the verdict when the lens text
+    changes or disappears on either target; a stored good output cannot carry a pass.
+    Re-judgment on unrelated edits to those files is an accepted cost, stated in S10.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-16'
+  judgment_evidence: 'drift_is_detected_when_present: pass — review.md:434-437 / SKILL.md:448-451
+    name all three drift shapes; fixtures outside_scope_not_named (telemetry item
+    outside scope, unnamed by non_scope), inside_non_scope (renderer rewrite matches
+    non_scope verbatim), hypothesis_subject_omitted (no PLAN item cuts a round) each
+    trip one clause.
+
+    no_drift_no_finding: pass — evidence-gated emission ("cite the offending item"
+    / "cite the requirement"); in_scope''s two items match scope exactly, no citable
+    evidence, no finding.
+
+    finding_cites_objective_and_evidence: pass (round 2; round 1 FAILED because the
+    lens never asked for the objective id) — review.md:434: "`message` opening with
+    the objective id (`<id>: …`)" plus the per-bullet evidence requirement; identical
+    on both targets.
+
+    finding_not_gate: pass — review.md:438 / SKILL.md:452: "No halt, no auto-edit
+    of the record, no gate: P2 keeps it out of unverified_severe by construction (SPEC
+    S10)".
+
+    Judged by judgment-reviewer over both rendered surfaces (worktree re-render, harness-maker
+    0.56.0 source) against the four input pairs under tests/fixtures/objective_scope_drift/.'
+  judgment_subject_paths:
+  - tests/fixtures/objective_scope_drift/
+  - .claude/commands/hm/review.md
+  - .agents/skills/hm-review/SKILL.md
+  judgment_subject_hash: a2e4ab69e0e811070472acd414f62ae4886bc278f4371866f9589daa046ed0ed
+- id: AC-018
+  title: the latest value is selected by observed_at, not by append order, and staleness
+    follows the definition
+  type: property
+  test_ids:
+  - tests/unit/test_world_outcomes.py::test_ac_018_latest_by_instant_ties_to_later_index_and_staleness_by_hash
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'The expected record is computed by the test as argmax over observed_at
+    with the later-index tie rule from the Constraints row, independent of the implementation''s
+    selection; append orders that put an older observation last are generated deliberately,
+    which is exactly the case a last-appended implementation fails. The staleness
+    expectation is computed from the test''s own canonical definition hash.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: any list of 1..8 value records for one outcome whose observed_at values
+    are timezone-aware ISO-8601 strings in any of the forms Z, +00:00, non-zero offset,
+    with or without fractional seconds, including pairs that denote the same instant,
+    appended in any order; and any definition edit including a change to higher_is_better
+    only
+  transformation: record each value through the recorder in the given order (which
+    normalises observed_at to UTC Z form), then read hm status --json for the outcome
+  expected_relation: the reported last value is the record with the greatest normalised
+    instant, ties resolved to the later index; its observed_at is printed in UTC Z
+    form; stale_definition is true iff that record's definition_hash differs from
+    the current definition's hash; gap is unevaluable iff stale, else sign-aware by
+    higher_is_better
+  preconditions:
+  - every record is timezone-aware, so it validates under AC-007 (naive timestamps
+    are outside this domain)
+  observable_output: the outcome's last, observed_at, stale_definition and gap fields
+    on stdout
+  generator_hint: generate instants in UTC, then render each as one of the four accepted
+    forms at random
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-019
+  title: the intent-layer skill renders on every target with the trigger description
+    and the answer-gated rule
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer.py::test_ac_019_the_skill_renders_for_every_target
+  - tests/unit/test_render_intent_layer.py::test_ac_019_the_skill_description_and_body_carry_the_contract
+  - tests/unit/test_render_intent_layer.py::test_ac_019_help_lists_the_skill_and_no_command_was_added
+  executable_predicate: all(skill_exists(target, '.claude/skills/intent-layer/SKILL.md')
+    for target in TARGETS) and skill_exists('codex', '.agents/skills/intent-layer/SKILL.md')
+    and len(skill_frontmatter('intent-layer')['description']) <= 200 and all(phrase
+    in skill_frontmatter('intent-layer')['description'] for phrase in TRIGGER_PHRASES)
+    and all(form in skill_body('intent-layer') for form in VERB_ARGUMENT_FORMS) and
+    'hm world objective close <id> --observed <met|missed|no_data> --note' in skill_body('intent-layer')
+    and in_order(skill_body('intent-layer'), ['AskUserQuestion', 'showing the exact
+    arguments', 'affirmative', 'run the write once', 'on any other answer or no answer',
+    'write nothing']) and 'intent-layer' in rendered_command_text('hm/help.md') and
+    set(rendered_command_names()) == BASELINE_COMMAND_NAMES
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'TRIGGER_PHRASES, VERB_ARGUMENT_FORMS (the four full argument forms
+    in AC-019''s prose) and the ordered literal phrases are the Skill-contract Constraints
+    row; a body that lists bare verb names or the approval words out of order fails.
+    BASELINE_COMMAND_NAMES is the command list captured from the pre-change render,
+    so the last clause fails if any slash command is added. Rendering for every target
+    is the dual-render rule already enforced for existing skills. Whether the model
+    selects the skill is model behaviour and is explicitly outside this AC and this
+    SPEC.
+
+    '
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

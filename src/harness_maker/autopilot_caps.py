@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
+
+import yaml
 
 from harness_maker import autopilot, autopilot_ledger, command_registry
 from harness_maker.models import GATED_LEVEL
@@ -34,6 +37,9 @@ HaltKind = Literal[
     "judgment_gate",
     "unknown_stage",
     "bad_slug",
+    # SPEC-intent-world-model-objective-layer S7: the task's PLAN links an objective that is
+    # not `active` with a valid approval. Only ever replaces an `advance` (gate precedence).
+    "objective_gate",
 ]
 CapKind = Literal["step_cap", "time_cap"]
 
@@ -227,6 +233,107 @@ def _resolve_task_slug(
     if marker.task_slug:
         return marker.task_slug, "persisted"
     return None, None
+
+
+_FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
+_UNPARSEABLE = "<unparseable frontmatter>"
+
+
+def _json_safe(value: Any) -> Any:
+    """The event must always serialise: a YAML scalar JSON cannot carry (a bare date) is
+    encoded as `{"yaml_type", "repr"}` rather than crashing the ledger append (SPEC S7)."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    return {"yaml_type": type(value).__name__, "repr": str(value)}
+
+
+def _plan_link(checkout: Path, slug: str) -> tuple[bool, Any, bool] | None:
+    """Read `objective:` from the task's PLAN in the CURRENT checkout.
+
+    Returns None when the PLAN or the key is absent (no gate — every existing harness), else
+    `(present, raw_value, parse_error)`. Absent and present-but-invalid are different facts:
+    a null, empty, non-string or unparseable link is `link_invalid`, never "no objective".
+    """
+    plan = checkout / "work-docs" / f"PLAN-{slug}.md"
+    if not plan.is_file():
+        return None
+    try:
+        text = plan.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = _FRONTMATTER_RE.match(text)
+    if match is None:
+        return None
+    try:
+        meta = yaml.safe_load(match.group(1))
+    except yaml.YAMLError:
+        return (True, None, True)
+    if not isinstance(meta, dict):
+        return (True, None, True)
+    if "objective" not in meta:
+        return None
+    return (True, meta["objective"], False)
+
+
+def _objective_check(root: Path, *, cwd: Path, slug: str | None, stage: str) -> str | None:
+    """The fourth gate (SPEC S7). Returns the halt message, or None to let the advance stand.
+
+    Runs AFTER every existing check and only where they would advance. The PLAN is read from
+    the current checkout (`world.checkout_root`, the task worktree when run there — never the
+    base root, whose PLAN is the pre-task one); the gate-blocked event lands at `root`, which
+    `_cmd_boundary` already resolved to the base, so a worktree never keeps a ledger.
+    """
+    if not slug:
+        return None
+    from harness_maker import world  # local: keeps the boundary's import graph small
+
+    checkout = world.checkout_root(cwd)
+    link = _plan_link(checkout, slug)
+    if link is None:
+        return None
+    _present, raw, parse_error = link
+    reason: str
+    display_ref: str
+    if parse_error:
+        reason, display_ref = "link_invalid", _UNPARSEABLE
+    elif not isinstance(raw, str) or not raw.strip():
+        reason, display_ref = "link_invalid", repr(raw)
+    else:
+        display_ref = raw
+        try:
+            loaded = world.load_world(checkout)
+        except Exception:  # noqa: BLE001 — an unloadable world is an invalid link, not a crash
+            loaded = None
+        if loaded is None or raw in loaded.broken:
+            reason = "link_invalid"
+        elif raw not in loaded.objectives:
+            reason = "missing"
+        elif loaded.objectives[raw].get("state") != "active":
+            reason = "not_active"
+        elif world.derive(loaded, raw).approval_valid is not True:
+            reason = "approval_invalid"
+        else:
+            return None
+    autopilot_ledger.append_event(
+        root,
+        event="gate_blocked",
+        fields={
+            "stage": stage,
+            "display_ref": display_ref,
+            "raw_link": _json_safe(raw),
+            "parse_error": parse_error,
+            "reason": reason,
+        },
+    )
+    return (
+        f"objective gate: PLAN-{slug} links objective {display_ref} but it is {reason} — "
+        "approve/activate it (hm world objective …) or drop the `objective:` link; "
+        "no advance was authorized. Marker preserved."
+    )
 
 
 def _cmd_boundary(args: argparse.Namespace) -> int:
@@ -456,6 +563,15 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             f"next stage {nxt!r} is human-gated (merge/push, ADR-002) — "
             "autopilot stopped; invoke it manually"
         )
+        print(json.dumps(out))
+        return 0
+    # SPEC-intent-world-model-objective-layer S7 — the objective gate runs LAST, so it can
+    # only turn an advance into a halt; every existing halt above keeps its precedence and
+    # every harness whose PLAN carries no `objective:` link is byte-identical to before.
+    objective_halt = _objective_check(root, cwd=Path.cwd(), slug=slug, stage=args.current)
+    if objective_halt is not None:
+        out["halt_kind"] = "objective_gate"
+        out["reason"] = objective_halt
         print(json.dumps(out))
         return 0
     # AUTHORIZED, not entered — the next stage's own boundary/gate-blocked call confirms

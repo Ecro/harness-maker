@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Intent / world-model / objective layer**: a state-only slice for recording *why*, not just
+  *how* and *what happened*. `.claude/intent.yaml` (a human-written skeleton committed at
+  `make`), `.claude/world/{assumptions,outcomes,objectives/<id>}.yaml`, and a new
+  `hm world {status|assume|outcome|objective}` CLI module (`src/harness_maker/world.py`,
+  `src/harness_maker/intent.py`). A fourth autopilot gate, `objective_gate`, sits after every
+  existing check and can only ever replace an `advance` with a halt — an absent `objective:`
+  link in PLAN frontmatter is a no-op, byte-identical to before this change. New `intent-layer`
+  skill so the operator never has to remember the verb. Three prompt additions, each within the
+  SPEC's declared surface ceiling: `/hm:plan` Step 0.5 (status load, one closed question, the
+  `rejected[]` revisit loop), `/hm:wrapup` Step 5.7 (two answer-gated write prompts), `/hm:review`
+  Step 3.3 (a main-loop `scope_drift` check against the objective, P2).
+
 ## [0.56.0] - 2026-09-13
 
 ### Changed

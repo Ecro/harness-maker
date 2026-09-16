@@ -4,7 +4,7 @@ harness_maker_version: 0.56.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: c4a3fb470a0c085ca7995e2e86d1d62f5ed69558370fa791981903949f7baaf8
+content_hash: 11f4976b8d63da98d6b4afd7e009f83155ec307d964796c92792504f42345706
 ---
 preset: Production
 locale: ko
@@ -117,6 +117,7 @@ skills:
     - context-linter
     - refdocs-search
     - second-opinion-gate
+    - intent-layer
     - targeted-test-selection
   enabled:
     - verify-before-completion
@@ -131,6 +132,7 @@ skills:
     - research-crawler
     - refdocs-search
     - second-opinion-gate
+    - intent-layer
 
 worktree:
   enabled: true

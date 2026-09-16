@@ -1,0 +1,44 @@
+---
+name: {{ name }}
+description: When the operator says they observed something, wants to close, approve or drop an objective, record an outcome value, or asks where the project stands — run the hm world verbs; ask before writes.
+---
+
+# {{ name }}
+
+The operator does not have to remember a verb. When a request in prose fits one of the
+situations in the description, translate it into exactly one of the `hm world` verbs below.
+{% if is_codex %}On Codex this skill starts only when the operator mentions `@intent-layer`.{% endif %}
+
+**Read freely, write only on an answer.** `hm world status --json` is read-only, LLM-free and
+free to run whenever the operator asks where things stand. Every other verb writes a file.
+
+## The verbs (full argument forms)
+
+```
+hm world status --json
+hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text --observed-at [--claim]
+hm world assume resolve <id> --status --claim
+hm world outcome record <id> --value --observed-at --evidence
+hm world objective <approve|activate|drop|reopen> <id>
+hm world objective close <id> --observed <met|missed|no_data> --note
+hm world objective revisit <id> --json
+hm world objective show <id> --json
+```
+
+Prefix each with `uv run --with {{ harness_maker_src_path }}` as every other mandated call
+in this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp; `supersedes`
+needs `--claim`; `close` needs both `--observed` and `--note`.
+
+## The rule for every write
+
+1. Work out the verb and its arguments from what the operator said; read `status` first when
+   an id is ambiguous.
+2. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}, showing the exact arguments
+   you are about to pass.
+3. On an affirmative answer, run the write once with those arguments and show the CLI's
+   `changed:` line.
+4. Otherwise — on any other answer or no answer — write nothing. Do not retry, rephrase or infer consent.
+
+What the harness guarantees is narrow: the record changes only through these verbs, a terminal
+objective never changes, and the autopilot gate reads the approval you record. Whether the work
+serves the objective is the operator's judgment and `/hm:review`'s Step 3.3, not this skill's.
