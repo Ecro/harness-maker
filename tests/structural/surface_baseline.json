@@ -1,12 +1,12 @@
 {
   "aggregate_chars": {
-    "claude": 427369,
-    "codex": 362326
+    "claude": 431477,
+    "codex": 366499
   },
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus that variant's DISPATCH call-site form \u2014 'Task(subagent_type=' on claude, 'spawn_agent(agent_type=\"' on codex; fenced examples included, backticked prose excluded. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
-  "payload_digest": "7e061a325af219d0bf13629986d659692312d700537dfa421bc22aeca1210211",
-  "render_sha": "9ea26255f3c4d3768449add39af855bceb1fb213",
+  "payload_digest": "ad4c653111be213f40ef5f97bb61f526fd54ef43a5aaaa7584b13781ebe7e227",
+  "render_sha": "3edcca62d640708c2f5afbd931457a1eb72f5470",
   "schema_version": 1,
   "surface": {
     "claude": {
@@ -23,7 +23,7 @@
         "round_trips": 6
       },
       "help": {
-        "chars": 1883,
+        "chars": 1995,
         "round_trips": 0
       },
       "loop": {
@@ -43,16 +43,16 @@
         "round_trips": 7
       },
       "plan": {
-        "chars": 63813,
-        "round_trips": 26
+        "chars": 65221,
+        "round_trips": 28
       },
       "research": {
         "chars": 23608,
         "round_trips": 8
       },
       "review": {
-        "chars": 85923,
-        "round_trips": 33
+        "chars": 87153,
+        "round_trips": 34
       },
       "spec": {
         "chars": 30754,
@@ -67,8 +67,8 @@
         "round_trips": 12
       },
       "wrapup": {
-        "chars": 46531,
-        "round_trips": 26
+        "chars": 47889,
+        "round_trips": 28
       }
     },
     "codex": {
@@ -77,7 +77,7 @@
         "round_trips": 16
       },
       "hm-help": {
-        "chars": 2110,
+        "chars": 2243,
         "round_trips": 0
       },
       "hm-loop": {
@@ -89,16 +89,16 @@
         "round_trips": 0
       },
       "hm-plan": {
-        "chars": 58967,
-        "round_trips": 14
+        "chars": 60392,
+        "round_trips": 16
       },
       "hm-research": {
         "chars": 21215,
         "round_trips": 7
       },
       "hm-review": {
-        "chars": 82319,
-        "round_trips": 28
+        "chars": 83556,
+        "round_trips": 29
       },
       "hm-spec": {
         "chars": 28026,
@@ -109,8 +109,8 @@
         "round_trips": 9
       },
       "hm-wrapup": {
-        "chars": 44703,
-        "round_trips": 24
+        "chars": 46081,
+        "round_trips": 26
       }
     }
   }

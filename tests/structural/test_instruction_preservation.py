@@ -194,11 +194,25 @@ _WSVMC_PHASE_4_VERIFY_HEADINGS = [
 #: pass — only the trailing text of one heading moved, which is why this is a removal entry and
 #: not a coverage loss. `step_sensitivity` keys on the ordinal `"Step C2"` alone, so the registry
 #: gate is unaffected.
+#: playbook-alignment AC-007: wrapup 5.7's observe line gained a bracketed `--claim` clause for
+#: the `supersedes` relation (world.observe refuses that relation without one). The call is not
+#: removed — the SAME line renders with more text — so the exact pre-change string leaves the
+#: baseline. Listed against both arms because 5.7 sits outside every `dev_mode` gate.
+_WRAPUP_57_OBSERVE_LINE_PRE_CLAIM: tuple[str, ...] = (
+    "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id>"
+    ' --relation <confirms|supersedes|contradicts> --text "<what was observed>"'
+    " --observed-at <ISO-8601 UTC>",
+)
+
 _STEP_C2_PRE_MERGE_HEADING: tuple[str, ...] = (
     "### Step C2 — Dispatch all 7 lenses over `review_base..<freeze commit>`",
 )
 
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    "playbook-alignment": {
+        "wrapup@task-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_CLAIM),
+        "wrapup@spec-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_CLAIM),
+    },
     "reviewer-lens-fanout-merge": {
         "review@task-driven": list(_STEP_C2_PRE_MERGE_HEADING),
         "review@spec-driven": list(_STEP_C2_PRE_MERGE_HEADING),

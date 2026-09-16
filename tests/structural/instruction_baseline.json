@@ -120,7 +120,9 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.stage_agent_ledger emit --run-id '<run-id>' --agent plan-validator --stage plan --slug '{slug}' --pass <N> --verdict '<APPROVED|NEEDS_REVISION|MAJOR_REVISION>' --terminal --duration-ms '<elapsed>' --barrier-index '<segment>'",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree loop-mode-active \"<PROJECT_ROOT>\" --claude-session-id \"$HM_SESSION_ID\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:plan --claude-session-id \"$HM_SESSION_ID\"",
-        "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\""
+        "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world objective revisit <objective-id> --json",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world status --json   # loads .claude/intent.yaml + .claude/world/assumptions.yaml"
       ],
       "headings": [
         "## Auto-advance check (autopilot \u2014 Claude Code only)",
@@ -140,6 +142,7 @@
         "### Design brief \u2014 show this BEFORE the first interview round",
         "### Interview #{N} \u2014 {short topic}",
         "### Step 0 \u2014 Skip heuristic (ALL 4 criteria must hold to skip the interview)",
+        "### Step 0.5 \u2014 Objective context (intent layer \u2014 one line and continue when unused)",
         "### Step 1 \u2014 Pre-interview internal draft (NOT shown to user)",
         "### Step 1.5 \u2014 Loop-mode detection (ADR-002, ADR-007, ADR-008 of PLAN-loop-mid-stop-and-review-skip)",
         "### Step 1.7 \u2014 SPEC-need detection (spec-driven only, ADR-002/006/007/009)",
@@ -178,7 +181,9 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.stage_agent_ledger emit --run-id '<run-id>' --agent plan-validator --stage plan --slug '{slug}' --pass <N> --verdict '<APPROVED|NEEDS_REVISION|MAJOR_REVISION>' --terminal --duration-ms '<elapsed>' --barrier-index '<segment>'",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree loop-mode-active \"<PROJECT_ROOT>\" --claude-session-id \"$HM_SESSION_ID\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:plan --claude-session-id \"$HM_SESSION_ID\"",
-        "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\""
+        "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world objective revisit <objective-id> --json",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world status --json   # loads .claude/intent.yaml + .claude/world/assumptions.yaml"
       ],
       "headings": [
         "## Auto-advance check (autopilot \u2014 Claude Code only)",
@@ -198,6 +203,7 @@
         "### Design brief \u2014 show this BEFORE the first interview round",
         "### Interview #{N} \u2014 {short topic}",
         "### Step 0 \u2014 Skip heuristic (ALL 4 criteria must hold to skip the interview)",
+        "### Step 0.5 \u2014 Objective context (intent layer \u2014 one line and continue when unused)",
         "### Step 1 \u2014 Pre-interview internal draft (NOT shown to user)",
         "### Step 1.5 \u2014 Loop-mode detection (ADR-002, ADR-007, ADR-008 of PLAN-loop-mid-stop-and-review-skip)",
         "### Step 2 \u2014 SPEC inheritance check (when SPEC exists)",
@@ -313,7 +319,8 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.second_brain search '<changed area or task slug>' --type failure",
         "!uv run --with $HOME/harness-maker python -m harness_maker.second_brain search '<changed area or task slug>' --type preference",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:review --claude-session-id \"$HM_SESSION_ID\"",
-        "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\""
+        "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world objective show <id> --json"
       ],
       "headings": [
         "## Auto-Fix Loop (rounds 2..max_review_rounds)",
@@ -343,13 +350,14 @@
         "### Step 1 \u2014 Reviewer set selection",
         "### Step 2 \u2014 Drift gate (PLAN/SPEC vs actual diff) \u2014 SINGLE OWNER",
         "### Step 3 \u2014 Parallel reviewer invocation (2-pass redaction)",
+        "### Step 3.3 \u2014 Objective drift (main loop, P2 \u2014 intent layer)",
         "### Step 3.4 \u2014 Stamp a stable `id` on every merged finding (SINGLE OWNER)",
         "### Step 3.5 \u2014 Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)",
         "### Step 3.6 \u2014 PIDA refutation gate",
         "### Step 4 \u2014 Consensus filter (surface + reasoning alignment)",
         "### Step 5 \u2014 Write REVIEW report",
         "### Step C1 \u2014 Freeze the artifact",
-        "### Step C2 \u2014 Dispatch all 7 lenses over `review_base..<freeze commit>`",
+        "### Step C2 \u2014 Dispatch all 7 lenses as 4 dispatches over `review_base..<freeze commit>`",
         "### Step C3 \u2014 Outcome",
         "### Task worktree preflight (feature-branch workflow)",
         "#### Pass 1 \u2014 rubric-only (metadata redacted)",
@@ -389,7 +397,8 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.second_brain search '<changed area or task slug>' --type failure",
         "!uv run --with $HOME/harness-maker python -m harness_maker.second_brain search '<changed area or task slug>' --type preference",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:review --claude-session-id \"$HM_SESSION_ID\"",
-        "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\""
+        "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world objective show <id> --json"
       ],
       "headings": [
         "## Auto-Fix Loop (rounds 2..max_review_rounds)",
@@ -419,13 +428,14 @@
         "### Step 1 \u2014 Reviewer set selection",
         "### Step 2 \u2014 Drift gate (PLAN/SPEC vs actual diff) \u2014 SINGLE OWNER",
         "### Step 3 \u2014 Parallel reviewer invocation (2-pass redaction)",
+        "### Step 3.3 \u2014 Objective drift (main loop, P2 \u2014 intent layer)",
         "### Step 3.4 \u2014 Stamp a stable `id` on every merged finding (SINGLE OWNER)",
         "### Step 3.5 \u2014 Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)",
         "### Step 3.6 \u2014 PIDA refutation gate",
         "### Step 4 \u2014 Consensus filter (surface + reasoning alignment)",
         "### Step 5 \u2014 Write REVIEW report",
         "### Step C1 \u2014 Freeze the artifact",
-        "### Step C2 \u2014 Dispatch all 7 lenses over `review_base..<freeze commit>`",
+        "### Step C2 \u2014 Dispatch all 7 lenses as 4 dispatches over `review_base..<freeze commit>`",
         "### Step C3 \u2014 Outcome",
         "### Task worktree preflight (feature-branch workflow)",
         "#### Pass 1 \u2014 rubric-only (metadata redacted)",
@@ -616,6 +626,8 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-land <SLUG> <BASE>",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:wrapup --claude-session-id \"$HM_SESSION_ID\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id> --relation <confirms|supersedes|contradicts> --text \"<what was observed>\" --observed-at <ISO-8601 UTC>",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world objective close <id> --observed <met|missed|no_data> --note \"<operator note>\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_brief --root . --slug '<slug>'",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_land --worktree <WT> --base <BASE> --slug <slug> --message-file <msg-tmpfile> --required work-docs/PLAN-{slug}.md --optional .claude/memory/ --optional work-docs/REVIEW-{slug}-*.md --optional work-docs/RESEARCH-{slug}.md --optional specs/SPEC-{slug}.md --optional specs/SPEC-{slug}.machine.yaml --optional work-docs/BASELINE-ledger-rollup.md",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_receipt --root . --stage wrapup --worktree '<brief.worktree_root>' --receipt-file <the temp path>"
@@ -650,6 +662,7 @@
         "#### 5.3 Failure-driven proposal (MUST \u2014 the escalation last mile)",
         "#### 5.4 Managed documents",
         "#### 5.6 Second Brain promotion (cross-project durable knowledge)",
+        "#### 5.7 World state \u2014 two questions, answer-gated (intent layer)",
         "#### Judgment AC binding \u2014 independent rubric verdict (PLAN-judgment-ac-binding ADR-006)"
       ]
     },
@@ -678,6 +691,8 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-land <SLUG> <BASE>",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:wrapup --claude-session-id \"$HM_SESSION_ID\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id> --relation <confirms|supersedes|contradicts> --text \"<what was observed>\" --observed-at <ISO-8601 UTC>",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world objective close <id> --observed <met|missed|no_data> --note \"<operator note>\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_brief --root . --slug '<slug>'",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_land --worktree <WT> --base <BASE> --slug <slug> --message-file <msg-tmpfile> --required work-docs/PLAN-{slug}.md --optional .claude/memory/ --optional work-docs/REVIEW-{slug}-*.md --optional work-docs/RESEARCH-{slug}.md --optional specs/SPEC-{slug}.md --optional specs/SPEC-{slug}.machine.yaml --optional work-docs/BASELINE-ledger-rollup.md",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_receipt --root . --stage wrapup --worktree '<brief.worktree_root>' --receipt-file <the temp path>"
@@ -713,12 +728,13 @@
         "#### 5.3 Failure-driven proposal (MUST \u2014 the escalation last mile)",
         "#### 5.4 Managed documents",
         "#### 5.6 Second Brain promotion (cross-project durable knowledge)",
+        "#### 5.7 World state \u2014 two questions, answer-gated (intent layer)",
         "#### Judgment AC binding \u2014 independent rubric verdict (PLAN-judgment-ac-binding ADR-006)"
       ]
     }
   },
   "generated_by": "tests/structural/_instruction_baseline.py",
-  "payload_digest": "a3a55e977ffc82eae5a24f6abdf7ab00b641938f91d3bfc3f6c8c2eb12652d34",
-  "render_sha": "2ff7f03510fefdb474ab639f558eee2eb51fabcd",
+  "payload_digest": "15c0e2350a771df286d3eb1a71f66b48d3771f81faa3d04d91416ff17a5d3c84",
+  "render_sha": "3edcca62d640708c2f5afbd931457a1eb72f5470",
   "schema_version": 2
 }

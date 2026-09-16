@@ -15,7 +15,7 @@
       "spec": "52fe5cbd8a22708dfc8d59bcb91701a743b38b227ca17934e6d5cbbd112336bd",
       "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
       "verify": "d1bcb87775904777a85e82f59a89184a13fcb5152e99da3fa9edb9627971cc62",
-      "wrapup": "56566955888ea04a52f462a1a617d5ccd8028ead477af1dccc20a1f2954c1404"
+      "wrapup": "4b846260da4e1cc90c6fc8a9f4681a5b520c056cff224cb0f110a1ab768680f4"
     },
     "auto_safe@spec-driven": {
       "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
@@ -32,7 +32,7 @@
       "spec": "98cab68a304a7d080d97cb904572456500c9cfa68df2aba5ca4e5b99fdb9afa8",
       "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
       "verify": "acd61ce2f794c416e1d19d03771295832b167d9e8d75b636af8b87f092823f37",
-      "wrapup": "ba49690a7f78296b8f55b4852bfb4de74a921c21aefefaff2c3f4107be62f584"
+      "wrapup": "7f0a70db9749b1663b67ccfda19ea90d83de8954b6d4f4b625f8ba56033cbfb3"
     },
     "ask@flag_on": {
       "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
@@ -49,7 +49,7 @@
       "spec": "3bc70dc076f07dbbd69b18a688104b188adb761e47c729c4524d8be899fd310a",
       "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
       "verify": "ace5a856b9c86aa2c9cf8553eacdd0a0775ec42a12d0cef5c927fbcf88b01764",
-      "wrapup": "1348f8b9d087803596ff3175df8db5681300d5a251c24c8de693f43e232405f6"
+      "wrapup": "ca362d51451052d2c6f9057f89b69c933404885bc3e9648c0063b77c9246eb83"
     },
     "ask@flag_off": {
       "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
@@ -66,7 +66,7 @@
       "spec": "37bac15f3234a885746e207ea3595f70f65eb8d64df657e671028c2f86ac2968",
       "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
       "verify": "e1a0dd07e7fa6771284a37fafc6047930478ad16228f48bb63cb58cfd6f686e2",
-      "wrapup": "cab8bd7f2bc9e529c4c593a0a76ddbc4bd792d5ca34bbdd7a613fbaef954b353"
+      "wrapup": "c0a7aba78814073dd7afbbf1b9a064436ea3e003cc7c666d4712a00ba9c65f63"
     }
   },
   "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture — a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
@@ -116,6 +116,15 @@
       "attributed_in": "work-docs/BASELINE-DELTA-intent-world-model-objective-layer.md",
       "phase": "intent-world-model-objective-layer /hm:review fixes (2026-09-16)",
       "reason": "/hm:review round 2 fix for a P1 security finding: review.md.j2 Step 3.3 now requires <id> to match [A-Z0-9-]+ before it is substituted into the `hm world objective show` shell line, and skips on mismatch. Verified before re-capture that `review` is the ONLY moved command in every arm and that it moves identically in auto_safe and ask; the advance and picker blocks are untouched."
+    },
+    {
+      "aggregate_delta_chars": {
+        "claude": 67,
+        "codex": 67
+      },
+      "attributed_in": "work-docs/BASELINE-DELTA-playbook-alignment.md",
+      "phase": "playbook-alignment Phase 4 (2026-09-16)",
+      "reason": "wrapup.md.j2 5.7 observe line gains the `--claim` clause for the supersedes relation (SPEC-playbook-alignment S7 / AC-007, review finding 5202e61acb247105). Verified before re-capture that `wrapup` is the ONLY moved command in every arm and moves identically in auto_safe and ask; advance and picker blocks untouched."
     }
   ]
 }

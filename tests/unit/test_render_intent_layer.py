@@ -36,6 +36,7 @@ VERB_ARGUMENT_FORMS = (
     " --observed-at",
     "hm world assume resolve <id> --status --claim",
     "hm world outcome record <id> --value --observed-at --evidence",
+    "hm world objective new <id> --title --hypothesis --scope --outcome",
     "hm world objective <approve|activate|drop|reopen> <id>",
     "hm world objective close <id> --observed <met|missed|no_data> --note",
 )
@@ -181,3 +182,26 @@ def test_ac_019_help_lists_the_skill_and_no_command_was_added(
     )
     assert sorted(surface["claude"]) == frozen["claude"]
     assert sorted(surface["codex"]) == frozen["codex"]
+
+
+# ── AC-007 (SPEC-playbook-alignment): the supersedes branch names --claim ────────────────────
+
+
+@pytest.mark.parametrize("target", ["claude", "codex"])
+def test_ac_007_wrapup_supersedes_carries_claim(
+    surface: dict[str, dict[str, str]], target: str
+) -> None:
+    """`world.observe` refuses `supersedes` without a claim, so a rendered instruction that
+    offers the relation without the flag fails by construction (review finding 5202e61a)."""
+    wrapup = _command(surface, target, "wrapup")
+    block = _block(wrapup, "<!-- @hm:answer-gated:assumption -->")
+    observe_lines = [
+        ln for ln in block.splitlines() if "hm world assume observe <id> --relation" in ln
+    ]
+    assert len(observe_lines) == 1, block
+    # On the CALL line itself — a `--claim` mentioned in prose beside the command still leaves
+    # the rendered invocation unable to satisfy world.observe's supersedes rule.
+    assert "--claim" in observe_lines[0]
+    assert "supersedes" in observe_lines[0]
+    assert wrapup.count("<!-- @hm:answer-gated:") == 2
+    assert "Otherwise: write nothing" in block

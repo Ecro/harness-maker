@@ -56,7 +56,7 @@ def test_ac_004_contradicts_yields_conflict_keeps_both_tuples_and_derives_flags(
     root = _root(tmp_path)
     before = _assumption(root, "log_location")
     obj_bytes = {
-        oid: fx.objective_path(root, oid).read_bytes() for oid in ("OBJ-ACTIVE", "OBJ-CLOSED")
+        oid: fx.objective_doc_path(root, oid).read_bytes() for oid in ("OBJ-ACTIVE", "OBJ-CLOSED")
     }
     world.observe(
         root, "log_location", text=E2["text"], observed_at=E2["observed_at"], relation="contradicts"
@@ -68,7 +68,7 @@ def test_ac_004_contradicts_yields_conflict_keeps_both_tuples_and_derives_flags(
     w = world.load_world(root)
     assert world.derive(w, "OBJ-ACTIVE").needs_revalidation is True
     assert world.derive(w, "OBJ-CLOSED").needs_revalidation is False
-    assert {oid: fx.objective_path(root, oid).read_bytes() for oid in obj_bytes} == obj_bytes
+    assert {oid: fx.objective_doc_path(root, oid).read_bytes() for oid in obj_bytes} == obj_bytes
 
 
 # ── AC-005 ────────────────────────────────────────────────────────────────────

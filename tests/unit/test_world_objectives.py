@@ -56,9 +56,9 @@ def _obj(oid: str, state: str, *, valid_approval: bool) -> dict[str, Any]:
 @pytest.mark.parametrize(("src", "dst"), list(itertools.product(STATES, STATES)))
 def test_ac_008_direct_transitions_follow_the_table(tmp_path: Path, src: str, dst: str) -> None:
     root = _root(tmp_path, _obj("OBJ-1", src, valid_approval=True))
-    before = fx.objective_path(root, "OBJ-1").read_bytes()
+    before = fx.objective_doc_path(root, "OBJ-1").read_bytes()
     assert (
-        fx.load(fx.objective_path(root, "OBJ-1"))["approval"] is not None
+        fx.load(fx.objective_doc_path(root, "OBJ-1"))["approval"] is not None
     )  # every pre-state carries one
     legal = (src, dst) in LEGAL
     try:
@@ -67,10 +67,10 @@ def test_ac_008_direct_transitions_follow_the_table(tmp_path: Path, src: str, ds
     except world.WorldError:
         accepted = False
     assert accepted is legal, (src, dst)
-    after = fx.load(fx.objective_path(root, "OBJ-1"))
+    after = fx.load(fx.objective_doc_path(root, "OBJ-1"))
     assert after["state"] == (dst if legal else src)
     if not legal:
-        assert fx.objective_path(root, "OBJ-1").read_bytes() == before
+        assert fx.objective_doc_path(root, "OBJ-1").read_bytes() == before
     if (src, dst) == ("dropped", "proposed"):
         assert after["approval"] is None
 
@@ -80,7 +80,7 @@ def test_ac_008_activation_needs_a_valid_approval(tmp_path: Path) -> None:
     with pytest.raises(world.WorldError) as exc:
         world.transition(root, "OBJ-1", "active")
     assert exc.value.field == "approval"
-    assert fx.load(fx.objective_path(root, "OBJ-1"))["state"] == "proposed"
+    assert fx.load(fx.objective_doc_path(root, "OBJ-1"))["state"] == "proposed"
 
 
 @pytest.mark.parametrize("state", ["closed", "dropped"])
@@ -89,12 +89,12 @@ def test_ac_008_terminal_records_refuse_every_field_edit(
     tmp_path: Path, state: str, field: str
 ) -> None:
     root = _root(tmp_path, _obj("OBJ-1", state, valid_approval=True))
-    before = fx.objective_path(root, "OBJ-1").read_bytes()
+    before = fx.objective_doc_path(root, "OBJ-1").read_bytes()
     with pytest.raises(world.WorldError):
         world.edit_objective(
             root, "OBJ-1", **{field: ["x"] if field in ("scope", "depends_on") else "x"}
         )
-    assert fx.objective_path(root, "OBJ-1").read_bytes() == before
+    assert fx.objective_doc_path(root, "OBJ-1").read_bytes() == before
 
 
 # ── AC-009 ────────────────────────────────────────────────────────────────────
@@ -124,15 +124,15 @@ def _two_outcome_root(tmp_path: Path, obj: dict[str, Any]) -> Path:
 @pytest.mark.parametrize("field", sorted(HASHED_EDITS))
 def test_ac_009_hashed_edit_invalidates_without_writing(tmp_path: Path, field: str) -> None:
     root = _two_outcome_root(tmp_path, _obj("OBJ-1", "active", valid_approval=True))
-    doc = fx.load(fx.objective_path(root, "OBJ-1"))
+    doc = fx.load(fx.objective_doc_path(root, "OBJ-1"))
     assert doc["approval"]["content_hash"] == fx.approval_hash(doc, TARGET)
     doc[field] = HASHED_EDITS[field]
-    fx.dump(fx.objective_path(root, "OBJ-1"), doc)
-    before = fx.objective_path(root, "OBJ-1").read_bytes()
+    fx.dump(fx.objective_doc_path(root, "OBJ-1"), doc)
+    before = fx.objective_doc_path(root, "OBJ-1").read_bytes()
     d = world.derive(world.load_world(root), "OBJ-1")
     assert d.approval_valid is False
-    assert fx.objective_path(root, "OBJ-1").read_bytes() == before
-    assert fx.load(fx.objective_path(root, "OBJ-1"))["state"] == "active"
+    assert fx.objective_doc_path(root, "OBJ-1").read_bytes() == before
+    assert fx.load(fx.objective_doc_path(root, "OBJ-1"))["state"] == "active"
 
 
 def test_ac_009_target_edit_in_intent_invalidates(tmp_path: Path) -> None:
@@ -154,25 +154,25 @@ def test_ac_009_how_measured_edit_does_not_invalidate(tmp_path: Path) -> None:
 @pytest.mark.parametrize("field", sorted(NON_HASHED_EDITS))
 def test_ac_009_non_hashed_edit_keeps_validity(tmp_path: Path, field: str) -> None:
     root = _two_outcome_root(tmp_path, _obj("OBJ-1", "active", valid_approval=True))
-    doc = fx.load(fx.objective_path(root, "OBJ-1"))
+    doc = fx.load(fx.objective_doc_path(root, "OBJ-1"))
     doc[field] = NON_HASHED_EDITS[field]
-    fx.dump(fx.objective_path(root, "OBJ-1"), doc)
+    fx.dump(fx.objective_doc_path(root, "OBJ-1"), doc)
     assert world.derive(world.load_world(root), "OBJ-1").approval_valid is True
 
 
 @pytest.mark.parametrize("state", ["closed", "dropped"])
 def test_ac_009_terminal_objectives_read_not_applicable(tmp_path: Path, state: str) -> None:
     root = _two_outcome_root(tmp_path, _obj("OBJ-1", state, valid_approval=True))
-    doc = fx.load(fx.objective_path(root, "OBJ-1"))
+    doc = fx.load(fx.objective_doc_path(root, "OBJ-1"))
     doc["hypothesis"] = "edited after the fact"
-    fx.dump(fx.objective_path(root, "OBJ-1"), doc)
+    fx.dump(fx.objective_doc_path(root, "OBJ-1"), doc)
     assert world.derive(world.load_world(root), "OBJ-1").approval_valid is None
 
 
 def test_ac_009_approve_records_git_identity_and_the_canonical_hash(tmp_path: Path) -> None:
     root = _two_outcome_root(tmp_path, _obj("OBJ-1", "proposed", valid_approval=False))
     world.approve(root, "OBJ-1")
-    doc = fx.load(fx.objective_path(root, "OBJ-1"))
+    doc = fx.load(fx.objective_doc_path(root, "OBJ-1"))
     assert doc["approval"]["content_hash"] == fx.approval_hash(doc, TARGET)
     assert doc["approval"]["approved_by"] == fx.GIT_NAME
     assert doc["approval"]["approved_target"] == TARGET
@@ -218,7 +218,7 @@ def test_ac_009_approve_reads_the_name_at_the_base_root_from_a_linked_worktree(
     monkeypatch.setattr(world, "_git_user_name", _record)
     world.approve(wt, "OBJ-1")
     assert asked == [base.resolve()]
-    assert fx.load(fx.objective_path(wt, "OBJ-1"))["approval"]["approved_by"] == fx.GIT_NAME
+    assert fx.load(fx.objective_doc_path(wt, "OBJ-1"))["approval"]["approved_by"] == fx.GIT_NAME
 
 
 def test_ac_009_approve_with_empty_git_identity_is_refused_and_writes_nothing(
@@ -232,11 +232,11 @@ def test_ac_009_approve_with_empty_git_identity_is_refused_and_writes_nothing(
         tmp_path, git=False, objectives=[_obj("OBJ-1", "proposed", valid_approval=False)]
     )
     fx.git_init(root, name=None)
-    before = fx.objective_path(root, "OBJ-1").read_bytes()
+    before = fx.objective_doc_path(root, "OBJ-1").read_bytes()
     with pytest.raises(world.WorldError) as exc:
         world.approve(root, "OBJ-1")
     assert exc.value.field == "approved_by"
-    assert fx.objective_path(root, "OBJ-1").read_bytes() == before
+    assert fx.objective_doc_path(root, "OBJ-1").read_bytes() == before
 
 
 # ── AC-010 ────────────────────────────────────────────────────────────────────
@@ -253,7 +253,7 @@ def test_ac_010_cap_breach_warns_on_the_same_call_that_activates(tmp_path: Path)
     assert result.warning is not None
     assert result.warning.count == 2
     assert result.warning.cap == 1
-    assert fx.load(fx.objective_path(root, "OBJ-2"))["state"] == "active"
+    assert fx.load(fx.objective_doc_path(root, "OBJ-2"))["state"] == "active"
 
 
 # ── AC-015 close half ─────────────────────────────────────────────────────────
@@ -262,7 +262,7 @@ def test_ac_010_cap_breach_warns_on_the_same_call_that_activates(tmp_path: Path)
 def test_ac_015_close_persists_three_fields(tmp_path: Path) -> None:
     root = _root(tmp_path, _obj("OBJ-1", "active", valid_approval=True))
     world.close(root, "OBJ-1", observed="missed", note="target not reached")
-    doc = fx.load(fx.objective_path(root, "OBJ-1"))
+    doc = fx.load(fx.objective_doc_path(root, "OBJ-1"))
     assert doc["state"] == "closed"
     assert doc["observed"] == "missed"
     assert doc["note"] == "target not reached"
@@ -278,11 +278,11 @@ def test_ac_015_refused_closes_name_the_field_and_write_nothing(
     tmp_path: Path, observed: str | None, note: str, field: str
 ) -> None:
     root = _root(tmp_path, _obj("OBJ-1", "active", valid_approval=True))
-    before = fx.objective_path(root, "OBJ-1").read_bytes()
+    before = fx.objective_doc_path(root, "OBJ-1").read_bytes()
     with pytest.raises(world.WorldError) as exc:
         world.close(root, "OBJ-1", observed=observed, note=note)
     assert exc.value.field == field
-    assert fx.objective_path(root, "OBJ-1").read_bytes() == before
+    assert fx.objective_doc_path(root, "OBJ-1").read_bytes() == before
 
 
 def test_ac_015_second_close_is_refused(tmp_path: Path) -> None:
@@ -321,9 +321,9 @@ def test_ac_001_objective_defect_names_its_field(
     tmp_path: Path, mutate: Any, expected_field: str
 ) -> None:
     root = _root(tmp_path, _obj("OBJ-1", "proposed", valid_approval=False))
-    doc = fx.load(fx.objective_path(root, "OBJ-1"))
+    doc = fx.load(fx.objective_doc_path(root, "OBJ-1"))
     mutate(doc)
-    fx.dump(fx.objective_path(root, "OBJ-1"), doc)
+    fx.dump(fx.objective_doc_path(root, "OBJ-1"), doc)
     w = world.load_world(root)
     errors = w.broken.get("OBJ-1")
     assert errors, "a defective objective must be reported, not loaded silently"

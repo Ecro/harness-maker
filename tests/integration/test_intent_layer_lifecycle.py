@@ -1,5 +1,6 @@
-"""AC-013 — the four new state paths survive the whole lifecycle as deliverables, including
-real `objectives/<id>.yaml` files.
+"""AC-013 — the state paths survive the whole lifecycle as deliverables, including real
+`work-docs/INTENT-<ID>.md` records (SPEC-playbook-alignment moved the record there; the lifecycle
+now authors one through `objective new`, approves and activates it, and lands it).
 
 On a clean consuming project: none of the paths is gitignored (git's own `check-ignore` is
 the oracle), `_path_owner` says `deliverable`, `make --update` leaves every byte alone, a
@@ -27,7 +28,7 @@ import pytest
 from typer.testing import CliRunner
 
 from harness_maker import worktree as wt
-from harness_maker import wrapup_land
+from harness_maker import world, wrapup_land
 from harness_maker.cli import app
 from tests.unit import world_fixture as fx
 
@@ -45,8 +46,8 @@ STATE_PATHS = [
     ".claude/intent.yaml",
     ".claude/world/assumptions.yaml",
     ".claude/world/outcomes.yaml",
-    ".claude/world/objectives/OBJ-1.yaml",
-    ".claude/world/objectives/OBJ-2.yaml",
+    "work-docs/INTENT-OBJ-1.md",
+    "work-docs/INTENT-OBJ-2.md",
 ]
 
 
@@ -102,7 +103,7 @@ def test_ac_013_finalize_stash_round_trip_is_byte_identical(project: Path) -> No
     before = _bytes(project)
     sha = wt._stash_base_dirty(project, "wt-probe")
     assert sha is not None, "the state files are user dirt at finalize and must be stashed"
-    assert not (project / ".claude" / "world" / "objectives" / "OBJ-1.yaml").exists()
+    assert not (project / "work-docs" / "INTENT-OBJ-1.md").exists()
     r = _git(project, "stash", "apply", sha)
     assert r.returncode == 0, r.stderr
     assert _bytes(project) == before
@@ -123,7 +124,18 @@ def test_ac_013_wrapup_land_stages_the_state_paths_through_the_derived_globs(
     doc = fx.load(wt_path / ".claude" / "world" / "assumptions.yaml")
     doc["assumptions"][0]["claim"] = "edited on the task branch"
     fx.dump(wt_path / ".claude" / "world" / "assumptions.yaml", doc)
-    fx.dump(wt_path / ".claude" / "world" / "objectives" / "OBJ-3.yaml", fx.objective("OBJ-3"))
+    # The Playbook path: author through the verb, approve, activate — then land it.
+    world.new_objective(
+        wt_path,
+        "OBJ-3",
+        title="t",
+        hypothesis="h",
+        scope=["s"],
+        outcome_id="onboarding_minutes",
+    )
+    world.approve(wt_path, "OBJ-3")
+    world.activate(wt_path, "OBJ-3")
+    assert world.derive(world.load_world(wt_path), "OBJ-3").approval_valid is True
     msg = tmp_path / "msg.txt"
     msg.write_text("feat: land\n\nbody\n", encoding="utf-8")
     monkeypatch.setattr(wt, "_cli_post_commit_pop", lambda _a: 0)
@@ -143,5 +155,5 @@ def test_ac_013_wrapup_land_stages_the_state_paths_through_the_derived_globs(
     rc, receipt = wrapup_land.run(args)
     assert rc == 0, receipt
     staged: list[Any] = receipt["steps"]["index_after"]
-    for p in (".claude/world/assumptions.yaml", ".claude/world/objectives/OBJ-3.yaml"):
+    for p in (".claude/world/assumptions.yaml", "work-docs/INTENT-OBJ-3.md"):
         assert p in staged, (p, staged)

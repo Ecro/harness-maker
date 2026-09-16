@@ -573,7 +573,7 @@ Print `[intent] not in use` and skip this step when `.claude/intent.yaml` is abs
 <!-- @hm:answer-gated:assumption -->
 Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Did this task confirm, supersede or contradict a recorded assumption?"** — options: one per assumption id (from the status output), plus **"no"**.
 If the answer is "yes": (an assumption was named) run ONCE, with the id, relation and text the operator confirmed:
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text '<what was observed>' --observed-at <ISO-8601 UTC>"){% else %}!uv run --with {{ harness_maker_src_path }} hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text "<what was observed>" --observed-at <ISO-8601 UTC>{% endif %}
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text '<what was observed>' --observed-at <ISO-8601 UTC> [--claim '<new claim>' — required when the relation is supersedes]"){% else %}!uv run --with {{ harness_maker_src_path }} hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text "<what was observed>" --observed-at <ISO-8601 UTC> [--claim "<new claim>" — required when the relation is supersedes]{% endif %}
 Otherwise: write nothing.
 <!-- /@hm:answer-gated -->
 

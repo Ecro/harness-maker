@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The objective record is now `work-docs/INTENT-<ID>.md`** (playbook-alignment): the YAML
+  frontmatter is the machine record `hm world` validates and hashes, the markdown body carries the
+  Playbook's five sections (`Problem`, `Proposed outcome`, `Affected users and systems`,
+  `Constraints`, `Open questions`) and is never touched by a writer. `.claude/world/objectives/`
+  is retired; a file left there is diagnosed by `hm world status`, not loaded. New verb
+  `hm world objective new <ID> --title --hypothesis --scope --outcome [--non-scope]` writes the
+  skeleton. `INTENT` is a deliverable prefix (committable, staged by wrapup unkeyed). New module
+  `harness_maker.frontmatter.split_frontmatter` is the one byte-level fence splitter
+  (`second_brain.parse_frontmatter` delegates to it).
+
+### Fixed
+
+- wrapup 5.7 names `--claim` for the `supersedes` relation on the observe line (it always failed
+  without one); `schema_version: "1.0"` loads exactly when it validates (one major parser);
+  an outcome value row the validator refused no longer reaches `last_value` (`KeyError`).
+- `frontmatter.split_frontmatter`'s `non_mapping` branch returned the whole input as `body`
+  instead of the post-fence bytes, and the BOM was stripped before the status branches ran
+  (caught by cross-model review, not the test suite); both fixed.
+- Both surface baselines re-frozen at `main` (3edcca62) after the intent layer landed and its
+  allowance expired; this task's own +67-char wrapup delta is declared via `surface_allowance`.
+
 ### Added
 
 - **Intent / world-model / objective layer**: a state-only slice for recording *why*, not just

@@ -1,0 +1,326 @@
+schema_version: 2
+spec_slug: playbook-alignment
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: 'Same Tier-1 subsystem as SPEC-intent-world-model-objective-layer:
+  the record the autopilot gate reads moves to a new file shape, and a surviving mutant
+  in the loader or the writer silently loses either the approval or the human''s prose.
+  Scope is world.py and intent.py; worktree.py stays excluded for the reason the previous
+  SPEC gave (5,997 lines, threshold unachievable) and its change is one tuple entry
+  covered by AC-004.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/world.py
+- src/harness_maker/intent.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the INTENT frontmatter loads under the on-disk objective rules
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_doc_record.py::test_ac_001_intent_frontmatter_loads_under_the_disk_rules
+  - tests/unit/test_intent_doc_record.py::test_ac_001_a_good_file_loads_under_the_bare_id
+  - tests/unit/test_intent_doc_record.py::test_ac_001_an_id_field_disagreeing_with_the_stem_is_broken
+  - tests/unit/test_intent_doc_record.py::test_ac_001_a_stem_without_the_prefix_is_never_a_record
+  - tests/unit/test_intent_doc_record.py::test_ac_001_missing_or_non_mapping_frontmatter_is_a_file_error
+  - tests/unit/test_intent_doc_record.py::test_ac_001_an_empty_frontmatter_reports_the_required_keys
+  executable_predicate: world.load_world(root).objectives['OBJ-1'] == frontmatter_of(root
+    / 'work-docs/INTENT-OBJ-1.md') and world.load_world(bad_root).broken['OBJ-1']
+    == world._validate_objective_raw(bad_path, bad_frontmatter, intent_outcomes=outcomes,
+    assumption_ids=assumption_ids)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the existing rule set _validate_objective_raw
+    applied to the parsed mapping, independent of the new loader path; equality of
+    error lists is the oracle, not the loader's own output.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: every writer preserves the body bytes
+  type: property
+  test_ids:
+  - tests/unit/test_intent_doc_record.py::test_ac_002_every_writer_preserves_the_body_bytes
+  - tests/unit/test_intent_doc_record.py::test_ac_002_a_crlf_bom_file_on_disk_survives_every_writer
+  - tests/unit/test_intent_doc_record.py::test_ac_002_a_repeated_no_op_write_is_byte_identical
+  - tests/unit/test_intent_doc_record.py::test_ac_002_the_dump_key_order_covers_every_declared_key_exactly
+  - tests/unit/test_intent_doc_record.py::test_ac_002_a_writer_refuses_to_write_when_the_body_is_unknown
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Metamorphic invariant independent of the implementation: for any
+    body text and any writer, the bytes after the closing frontmatter fence are unchanged;
+    a writer that re-parses the body cannot satisfy it for CRLF or trailing-whitespace
+    inputs.'
+  oracle_independence_waiver: null
+  input_domain: 'arbitrary text bodies: empty, ASCII, non-ASCII, CRLF, trailing whitespace,
+    code fences, lines that look like frontmatter fences'
+  transformation: write a valid INTENT file with that body, then apply one writer
+    from {approve, activate, drop, reopen, close, edit_objective} whose precondition
+    holds
+  expected_relation: body_bytes_after == body_bytes_before
+  preconditions:
+  - the record state admits the chosen writer (LEGAL_TRANSITIONS)
+  - git identity is stubbed for approve
+  observable_output: bytes after the second '---' fence of work-docs/INTENT-<ID>.md
+  generator_hint: hypothesis.strategies.text() plus a few fixed edge bodies
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: prose edits keep approval valid and hashed edits break it
+  type: property
+  test_ids:
+  - tests/unit/test_intent_doc_record.py::test_ac_003_prose_edits_keep_approval_hashed_edits_break_it
+  - tests/unit/test_intent_doc_record.py::test_ac_003_a_hashed_frontmatter_edit_reads_false_and_writes_nothing
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Invariant over all bodies: approval_valid is a function of the
+    hashed frontmatter fields and the outcome target only; any body edit leaves it
+    unchanged, any hashed-field edit flips it to false. Holds regardless of how the
+    hash is implemented.'
+  oracle_independence_waiver: null
+  input_domain: arbitrary body edits; single edits to each of hypothesis, scope, non_scope,
+    outcome_id, and intent.yaml target
+  transformation: edit the file in place without going through a writer, reload the
+    world, derive
+  expected_relation: body edit -> approval_valid unchanged (true); hashed edit ->
+    approval_valid is False and the file bytes are unchanged by derive
+  preconditions:
+  - the record is approved and active before the edit
+  observable_output: Derived.approval_valid and the file bytes
+  generator_hint: hypothesis text() for bodies; parametrize the hashed fields
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: INTENT is a deliverable and the objectives dir is not a state path
+  type: mechanical
+  test_ids:
+  - tests/structural/test_deliverable_single_source.py::test_ac_004_intent_is_a_deliverable_and_objectives_dir_is_not_a_state_path
+  executable_predicate: '''INTENT'' in worktree.DELIVERABLE_PREFIXES and worktree._is_deliverable_path(''work-docs/INTENT-OBJ-7.md'')
+    and not worktree._is_deliverable_path(''.claude/world/objectives/OBJ-7.yaml'')
+    and ''!work-docs/INTENT-*.md'' in gitignore_lines and ''work-docs/INTENT-*.md''
+    in wrapup_land.derive_deliverable_globs(slug, worktree_root)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected values are the existing single-source contract enforced
+    by tests/structural/test_deliverable_single_source.py (gitignore negation mirrors
+    DELIVERABLE_PREFIXES); the golden is that file's rule, not this task's code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: plan review help bytes and the boundary baseline are unchanged
+  type: mechanical
+  test_ids:
+  - tests/structural/test_playbook_alignment_invariance.py::test_ac_005_plan_review_help_bytes_and_boundary_baseline_unchanged
+  - tests/structural/test_playbook_alignment_invariance.py::test_ac_005_the_pin_names_every_arm_and_command_it_claims_to_cover
+  executable_predicate: moved_commands_per_arm == {'wrapup'} and boundary_matrix ==
+    baseline_matrix
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: tests/structural/autopilot_gate_golden.json (captured before this
+    task) and tests/fixtures/autopilot_caps_baseline.json (77 cells captured before
+    the previous task) are pre-change artifacts; equality against them cannot be satisfied
+    by reading the new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: objective new writes a loadable skeleton
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_doc_new.py::test_ac_006_objective_new_writes_a_loadable_skeleton
+  - tests/unit/test_intent_doc_new.py::test_ac_006_a_second_new_is_refused_and_the_file_is_untouched
+  - tests/unit/test_intent_doc_new.py::test_ac_006_a_bad_id_is_refused_naming_the_rule_before_any_write
+  - tests/unit/test_intent_doc_new.py::test_ac_006_an_unknown_outcome_is_refused
+  - tests/unit/test_intent_doc_new.py::test_ac_006_the_python_api_matches_the_cli
+  executable_predicate: rec['state'] == 'proposed' and rec['approval'] is None and
+    'OBJ-9' not in world.load_world(root).broken and all(h in body for h in ('## Problem',
+    '## Proposed outcome', '## Affected users and systems', '## Constraints', '##
+    Open questions')) and second_new_rc != 0 and bad_id_rc != 0 and bytes_after_refusal
+    == bytes_before_refusal
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is load_world's existing acceptance of a record plus
+    the Playbook's five section names (external source, claude.com/blog/the-ai-native-sdlc-playbook);
+    the verb's own output is compared against the loader and the external list, not
+    against itself.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: wrapup supersedes carries claim
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer.py::test_ac_007_wrapup_supersedes_carries_claim
+  executable_predicate: '''--claim'' in rendered_wrapup_57_block and rendered_wrapup_57_block.count(''<!--
+    @hm:answer-gated:'') == 2 and ''Otherwise: write nothing'' in rendered_wrapup_57_block
+    and ''hm world assume observe <id> --relation'' in rendered_wrapup_57_block'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: world.observe's contract (raises WorldError('claim', ...) on supersedes
+    without a claim) is the fixed reference the prose must satisfy; the markers and
+    no-branch are pinned by the previous SPEC's AC-015 test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: schema_version string loads when it validates
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_validate.py::test_ac_008_schema_version_string_loads_when_it_validates
+  executable_predicate: intent.validate_intent(p_10) == [] and intent.load_intent(p_10).schema_version
+    == 1 and intent.validate_intent(p_20) != [] and raises(intent.IntentInvalidError,
+    intent.load_intent, p_20)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The golden is the review's oracle probe recorded in REVIEW-intent-world-model-objective-layer-2026-09-16
+    (validate errors=[] while load raised ValueError for '1.0'); the expected pairing
+    comes from schema_version_error's documented major rule, not from the fix.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: malformed value row is reported not raised
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_outcomes.py::test_ac_009_malformed_value_row_is_reported_not_raised
+  executable_predicate: len(w.values) == 1 and any(e.field == 'outcomes.yaml:values[1].value'
+    for e in w.errors) and world.last_value(w, 'dead_rendered_bytes').value == 12
+    and isinstance(world.status_report(root), dict)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected error field name follows validate_outcomes' existing
+    naming (outcomes.yaml:<field>) and the expected surviving value is the fixture's
+    own literal; the review probe recorded the KeyError this replaces.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: legacy objective path is diagnosed
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_doc_record.py::test_ac_010_legacy_objective_path_is_diagnosed
+  executable_predicate: '''OBJ-7'' not in w.objectives and ''OBJ-7'' not in w.broken
+    and any(''.claude/world/objectives/OBJ-7.yaml'' in e.message and ''work-docs/INTENT-OBJ-7.md''
+    in e.message for e in w.errors)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected message names two paths fixed by this SPEC's Constraints
+    (old storage root, new record location); a loader that silently ignores or silently
+    loads the file fails on either half.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

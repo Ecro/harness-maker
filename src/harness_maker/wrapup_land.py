@@ -254,7 +254,13 @@ def derive_deliverable_globs(slug: str, worktree: Path | None = None) -> list[st
     """
     from harness_maker.worktree import DELIVERABLE_PREFIXES, DELIVERABLE_STATE_PATHS
 
-    globs = [f"work-docs/{prefix}-*{slug}*.md" for prefix in DELIVERABLE_PREFIXES]
+    # INTENT documents are keyed by objective id, not by task slug (SPEC-playbook-alignment
+    # ADR-007): a task may approve or close any objective, so they are staged unkeyed like the
+    # state files below.
+    globs = [
+        f"work-docs/{prefix}-*{slug}*.md" if prefix != "INTENT" else "work-docs/INTENT-*.md"
+        for prefix in DELIVERABLE_PREFIXES
+    ]
     globs += [f"specs/SPEC-{slug}.md", f"specs/SPEC-{slug}.machine.yaml"]
     # SPEC-intent-world-model-objective-layer ADR-012: the state files are not slug-keyed —
     # a task edits the shared intent / assumptions / objectives — so they are staged whole.

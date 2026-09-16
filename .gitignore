@@ -110,6 +110,9 @@ work-docs/*
 !work-docs/REVIEW-*.md
 !work-docs/SPEC-*.md
 !work-docs/CLOSE-*.md
+# The objective record itself (SPEC-playbook-alignment ADR-001/007): frontmatter is the
+# machine record, body is the Playbook prose; committable like every other deliverable.
+!work-docs/INTENT-*.md
 !work-docs/AUDIT-*.md
 # A frozen pre-change measurement is only useful if it is durable — the whole point of
 # PLAN-workflow-step-audit ADR-011 is that the baseline is never recomputed, and an

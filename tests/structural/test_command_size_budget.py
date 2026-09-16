@@ -570,7 +570,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # `step_manifest` gained the `ask-pending` picker branch, both of which every stage
     # command inlines. wrapup is the largest command, so it is the one that crossed its
     # ceiling first. Attributed in work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
-    "wrapup": 42452,
+    # 42452 → 44654 (playbook-alignment, 2026-09-16): the intent layer's wrapup 5.7 (two
+    # answer-gated questions) landed under its own `surface_allowance`, which expired with its
+    # PLAN; the ratchet is re-based to the landed figure so the growth stays attributed
+    # (work-docs/BASELINE-DELTA-playbook-alignment.md §2.1). This task's own +67 (the `--claim`
+    # clause on the observe line) rides on its declared allowance, not on this number.
+    "wrapup": 44654,
 }
 
 

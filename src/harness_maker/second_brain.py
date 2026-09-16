@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 
 from harness_maker import command_registry
+from harness_maker.frontmatter import split_frontmatter
 from harness_maker.io_utils import atomic_write, load_harness_yaml
 from harness_maker.models import SecondBrainConfig, SecondBrainFolder, SecondBrainNoteType
 
@@ -89,21 +90,16 @@ class SearchResult:
 def parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     """Return YAML frontmatter dict and body.
 
-    Missing or malformed frontmatter returns an empty dict and the original body.
-    Validation is handled separately by ``validate_note``.
+    Missing or malformed frontmatter returns an empty dict and the original body; a non-mapping
+    frontmatter returns an empty dict and the body after the fence (unchanged contract). The
+    splitting itself lives in `harness_maker.frontmatter` (ADR-009 of playbook-alignment).
     """
-    if not text.startswith(_FRONTMATTER_OPEN):
+    split = split_frontmatter(text.encode("utf-8"))
+    if split.status == "non_mapping":
+        return {}, split.body.decode("utf-8")
+    if split.status != "ok" or split.mapping is None:
         return {}, text
-    end = text.find(_FRONTMATTER_CLOSE, len(_FRONTMATTER_OPEN))
-    if end == -1:
-        return {}, text
-    raw = text[len(_FRONTMATTER_OPEN) : end]
-    try:
-        parsed = yaml.safe_load(raw)
-    except yaml.YAMLError:
-        return {}, text
-    body = text[end + len(_FRONTMATTER_CLOSE) :]
-    return (parsed if isinstance(parsed, dict) else {}), body
+    return split.mapping, split.body.decode("utf-8")
 
 
 _DEFAULT_REQUIRED_FRONTMATTER = ["type", "created", "updated", "tags", "links"]

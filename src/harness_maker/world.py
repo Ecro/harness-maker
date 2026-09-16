@@ -24,6 +24,7 @@ import yaml
 
 from harness_maker import command_registry
 from harness_maker import intent as intent_mod
+from harness_maker.frontmatter import split_frontmatter
 from harness_maker.intent import Intent, IntentError, IntentInvalidError, schema_version_error
 from harness_maker.io_utils import atomic_write
 from harness_maker.second_opinion_invoke import resolve_base_root
@@ -68,19 +69,20 @@ _OBJECTIVE_REQUIRED: tuple[str, ...] = (
     "created_at",
     "schema_version",
 )
-_OBJECTIVE_OPTIONAL: frozenset[str] = frozenset(
-    {
-        "non_scope",
-        "rejected",
-        "depends_on",
-        "approval",
-        "revisit_when",
-        "observed",
-        "note",
-        "closed_at",
-    }
+#: Ordered on purpose (ADR-011): this tuple is both the membership set and the frontmatter key
+#: order every writer emits, so a repeated no-op write is byte-identical.
+_OBJECTIVE_OPTIONAL: tuple[str, ...] = (
+    "non_scope",
+    "rejected",
+    "depends_on",
+    "approval",
+    "revisit_when",
+    "observed",
+    "note",
+    "closed_at",
 )
-_OBJECTIVE_KEYS: frozenset[str] = frozenset(_OBJECTIVE_REQUIRED) | _OBJECTIVE_OPTIONAL
+_OBJECTIVE_KEYS: frozenset[str] = frozenset(_OBJECTIVE_REQUIRED) | frozenset(_OBJECTIVE_OPTIONAL)
+_INTENT_PREFIX = "INTENT-"
 _APPROVAL_KEYS: frozenset[str] = frozenset(
     {"content_hash", "approved_by", "approved_at", "approved_target"}
 )
@@ -135,12 +137,26 @@ def outcomes_path(root: Path) -> Path:
     return root / ".claude" / "world" / "outcomes.yaml"
 
 
-def objectives_dir(root: Path) -> Path:
+def legacy_objectives_dir(root: Path) -> Path:
+    """The pre-0.57 record location; anything found here is diagnosed, never loaded (ADR-006)."""
     return root / ".claude" / "world" / "objectives"
 
 
-def objective_path(root: Path, objective_id: str) -> Path:
-    return objectives_dir(root) / f"{objective_id}.yaml"
+def intents_dir(root: Path) -> Path:
+    return root / "work-docs"
+
+
+def objective_doc_path(root: Path, objective_id: str) -> Path:
+    """`work-docs/INTENT-<ID>.md` — the record IS the deliverable (ADR-001)."""
+    return intents_dir(root) / f"{_INTENT_PREFIX}{objective_id}.md"
+
+
+def _id_from_stem(path: Path) -> str | None:
+    """The one id-extraction rule (ADR-003): the stem after `INTENT-`, else not a record."""
+    stem = path.stem
+    if not stem.startswith(_INTENT_PREFIX):
+        return None
+    return stem[len(_INTENT_PREFIX) :]
 
 
 def canonical_json(payload: dict[str, Any]) -> str:
@@ -214,6 +230,41 @@ def _read_yaml(path: Path) -> tuple[Any, IntentError | None]:
 
 def _dump_yaml(path: Path, doc: dict[str, Any]) -> None:
     atomic_write(path, yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
+
+
+def _read_intent(path: Path) -> tuple[dict[str, Any], bytes, IntentError | None]:
+    """S1's three shapes: no/unterminated/invalid/non-mapping frontmatter is ONE `file` error; an
+    empty mapping is a record with every required key missing (the rule set reports those)."""
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        return {}, b"", IntentError("file", f"{path}: {exc}")
+    split = split_frontmatter(data)
+    if split.status != "ok" or split.mapping is None:
+        return {}, data, IntentError("file", f"{path}: {split.error}")
+    return split.mapping, split.body, None
+
+
+def _dump_intent(path: Path, record: dict[str, Any], body: bytes) -> None:
+    """Frontmatter in declared key order, then the body bytes verbatim (ADR-002).
+
+    An unknown key is refused rather than dropped: a key the order does not name would otherwise
+    vanish silently on the next write.
+    """
+    unknown = sorted(set(record) - _OBJECTIVE_KEYS)
+    if unknown:
+        raise WorldError(unknown[0], "not an objective field; refusing to write")
+    ordered = {k: record[k] for k in (*_OBJECTIVE_REQUIRED, *_OBJECTIVE_OPTIONAL) if k in record}
+    fm = yaml.safe_dump(ordered, sort_keys=False, allow_unicode=True).encode("utf-8")
+    atomic_write(path, b"---\n" + fm + b"---\n" + body)
+
+
+def _write_record(world: World, root: Path, objective_id: str, record: dict[str, Any]) -> None:
+    """Every writer's single exit; a missing body is refused, never replaced by an empty one."""
+    body = world.bodies.get(objective_id)
+    if body is None:
+        raise WorldError("body", f"{objective_id!r} has no loaded body; refusing to write")
+    _dump_intent(objective_doc_path(root, objective_id), record, body)
 
 
 # ── validation ────────────────────────────────────────────────────────────────
@@ -364,7 +415,8 @@ def validate_outcomes(path: Path, *, intent_outcomes: dict[str, Any]) -> list[In
 def validate_objective(
     path: Path, *, intent_outcomes: dict[str, Any], assumption_ids: set[str]
 ) -> list[IntentError]:
-    raw, err = _read_yaml(path)
+    """The disk validator for one INTENT document; `load_world` runs the same rule set."""
+    raw, _body, err = _read_intent(path)
     if err is not None:
         return [err]
     return _validate_objective_raw(
@@ -396,8 +448,10 @@ def _validate_objective_raw(
     if isinstance(oid, str):
         if not _OBJECTIVE_ID_RE.match(oid):
             errors.append(IntentError("id", "must match [A-Z0-9-]+"))
-        elif oid != path.stem:
-            errors.append(IntentError("id", f"{oid!r} does not equal the file stem {path.stem!r}"))
+        elif oid != _id_from_stem(path):
+            errors.append(
+                IntentError("id", f"{oid!r} does not equal the stem after INTENT- ({path.name})")
+            )
     elif "id" in raw:
         errors.append(IntentError("id", "must be a string"))
     for key in ("title", "hypothesis", "created_at"):
@@ -465,6 +519,9 @@ class World:
     assumptions: dict[str, dict[str, Any]] = field(default_factory=dict)
     values: list[dict[str, Any]] = field(default_factory=list)
     objectives: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: The prose after the frontmatter fence, as bytes, carried opaque so a writer can put it
+    #: back untouched (ADR-002). Present exactly for the ids in `objectives`.
+    bodies: dict[str, bytes] = field(default_factory=dict)
     broken: dict[str, list[IntentError]] = field(default_factory=dict)
     errors: list[IntentError] = field(default_factory=list)
 
@@ -498,20 +555,47 @@ def load_world(root: Path) -> World:
             world.errors.extend(IntentError(f"{opath.name}:{e.field}", e.message) for e in o_errors)
         raw, _ = _read_yaml(opath)
         if isinstance(raw, dict) and isinstance(raw.get("values"), list):
+            # AC-009: a row the validator refused stays out of `values` (its error stays in
+            # `errors`) — `last_value` reads `value` unguarded and must never see that row.
+            refused = {
+                int(m.group(1))
+                for e in o_errors
+                if (m := re.match(r"values\[(\d+)\]", e.field)) is not None
+            }
             world.values = [
-                v for v in raw["values"] if isinstance(v, dict) and v.get("outcome_id") in outcomes
+                v
+                for i, v in enumerate(raw["values"])
+                if i not in refused and isinstance(v, dict) and v.get("outcome_id") in outcomes
             ]
-    odir = objectives_dir(root)
-    if odir.is_dir():
-        for p in sorted(odir.glob("*.yaml")):
-            errs = validate_objective(
-                p, intent_outcomes=outcomes, assumption_ids=set(world.assumptions)
+    idir = intents_dir(root)
+    if idir.is_dir():
+        for p in sorted(idir.glob(f"{_INTENT_PREFIX}*.md")):
+            oid = _id_from_stem(p)
+            if not oid:
+                continue
+            raw, body, err = _read_intent(p)
+            if err is not None:
+                world.broken[oid] = [err]
+                continue
+            errs = _validate_objective_raw(
+                p, raw, intent_outcomes=outcomes, assumption_ids=set(world.assumptions)
             )
             if errs:
-                world.broken[p.stem] = errs
+                world.broken[oid] = errs
                 continue
-            raw, _ = _read_yaml(p)
-            world.objectives[p.stem] = raw
+            world.objectives[oid] = raw
+            world.bodies[oid] = body
+    ldir = legacy_objectives_dir(root)
+    if ldir.is_dir():
+        for p in sorted(ldir.glob("*.yaml")):
+            rel = p.relative_to(root).as_posix()
+            world.errors.append(
+                IntentError(
+                    "objectives",
+                    f"{rel}: the objective record moved; move this file to "
+                    f"work-docs/{_INTENT_PREFIX}{p.stem}.md (frontmatter = the YAML, body = prose)",
+                )
+            )
     return world
 
 
@@ -820,7 +904,7 @@ def approve(root: Path, objective_id: str) -> dict[str, Any]:
         "approved_at": _now_iso(),
         "approved_target": target,
     }
-    _dump_yaml(objective_path(root, objective_id), rec)
+    _write_record(world, root, objective_id, rec)
     return rec
 
 
@@ -852,7 +936,7 @@ def transition(
     if target_state == "proposed":
         rec["approval"] = None
     rec["state"] = target_state
-    _dump_yaml(objective_path(root, objective_id), rec)
+    _write_record(world, root, objective_id, rec)
     return rec
 
 
@@ -896,7 +980,80 @@ def edit_objective(root: Path, objective_id: str, **fields: Any) -> dict[str, An
     errs = validate_objective_record(root, world, rec, objective_id)
     if errs:
         raise WorldError(errs[0].field, errs[0].message)
-    _dump_yaml(objective_path(root, objective_id), rec)
+    _write_record(world, root, objective_id, rec)
+    return rec
+
+
+PLAYBOOK_BODY = """\
+## Problem
+
+
+
+## Proposed outcome
+
+
+
+## Affected users and systems
+
+
+
+## Constraints
+
+
+
+## Open questions
+
+"""
+
+
+def new_objective(
+    root: Path,
+    objective_id: str,
+    *,
+    title: str,
+    hypothesis: str,
+    scope: list[str],
+    outcome_id: str,
+    non_scope: list[str] | None = None,
+) -> dict[str, Any]:
+    """Write the INTENT skeleton the operator then fills in prose (ADR-004).
+
+    Every refusal happens before the filesystem is touched: a hand-written frontmatter is the
+    class of error that produces `broken` records, so the verb owns the machine half and leaves
+    the five Playbook headings empty for the human.
+    """
+    if not _OBJECTIVE_ID_RE.match(objective_id):
+        raise WorldError("id", f"{objective_id!r} must match [A-Z0-9-]+")
+    path = objective_doc_path(root, objective_id)
+    if path.exists():
+        raise WorldError("id", f"{objective_id!r} already exists at {path}; refusing to overwrite")
+    world = load_world(root)
+    if outcome_id not in world.outcome_by_id:
+        raise WorldError("outcome_id", f"{outcome_id!r} is not an outcome in intent.yaml")
+    rec: dict[str, Any] = {
+        "id": objective_id,
+        "title": title,
+        "hypothesis": hypothesis,
+        "scope": list(scope),
+        "outcome_id": outcome_id,
+        "state": "proposed",
+        "created_at": _now_iso(),
+        "schema_version": intent_mod.KNOWN_MAJOR,
+        "non_scope": list(non_scope or []),
+        "rejected": [],
+        "depends_on": [],
+        "approval": None,
+        "revisit_when": None,
+        "observed": None,
+        "note": None,
+        "closed_at": None,
+    }
+    errs = _validate_objective_raw(
+        path, rec, intent_outcomes=world.outcome_by_id, assumption_ids=set(world.assumptions)
+    )
+    if errs:
+        raise WorldError(errs[0].field, errs[0].message)
+    _dump_intent(path, rec, PLAYBOOK_BODY.encode("utf-8"))
     return rec
 
 
@@ -909,7 +1066,7 @@ def validate_objective_record(
     an edit can never persist a record the next read reports as broken.
     """
     return _validate_objective_raw(
-        objective_path(root, objective_id),
+        objective_doc_path(root, objective_id),
         rec,
         intent_outcomes=world.outcome_by_id,
         assumption_ids=set(world.assumptions),
@@ -924,6 +1081,12 @@ def _emit(payload: dict[str, Any], *, as_json: bool) -> None:
         print(json.dumps(payload, ensure_ascii=False))
     else:
         print(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True).rstrip())
+
+
+def _changed_path(root: Path, objective_id: str) -> str:
+    """The `changed:` line the skill shows the operator — the INTENT document, never the
+    retired `objectives/<id>.yaml` literal (review findings ec50e469 / a30ea560)."""
+    return objective_doc_path(root, objective_id).relative_to(root).as_posix()
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -962,6 +1125,14 @@ def _parser() -> argparse.ArgumentParser:
     jsub = j.add_subparsers(dest="verb", required=True)
     # Literal `add_parser` names on purpose: the command-surface gate reads them by AST and
     # the registry must list every one, so a loop over a tuple would hide six verbs from it.
+    nw = jsub.add_parser("new")
+    nw.add_argument("id")
+    nw.add_argument("--title", required=True)
+    nw.add_argument("--hypothesis", required=True)
+    nw.add_argument("--scope", action="append", required=True)
+    nw.add_argument("--outcome", required=True, dest="outcome_id")
+    nw.add_argument("--non-scope", action="append", default=None, dest="non_scope")
+    nw.add_argument("--json", action="store_true")
     ap = jsub.add_parser("approve")
     ac = jsub.add_parser("activate")
     ac.add_argument("--cap", type=int, default=1)
@@ -1019,6 +1190,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit({"changed": "outcomes.yaml", "value": row}, as_json=as_json)
             return 0
         # objective verbs
+        if args.verb == "new":
+            rec = new_objective(
+                root,
+                args.id,
+                title=args.title,
+                hypothesis=args.hypothesis,
+                scope=args.scope,
+                outcome_id=args.outcome_id,
+                non_scope=args.non_scope,
+            )
+            _emit({"changed": _changed_path(root, args.id), "record": rec}, as_json=as_json)
+            return 0
         if args.verb == "show":
             _, rec = _load_objective(root, args.id)
             _emit(rec, as_json=as_json)
@@ -1030,7 +1213,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             rec = approve(root, args.id)
         elif args.verb == "activate":
             result = activate(root, args.id, cap=args.cap)
-            payload: dict[str, Any] = {"changed": f"objectives/{args.id}.yaml", "activated": True}
+            payload: dict[str, Any] = {"changed": _changed_path(root, args.id), "activated": True}
             if result.warning is not None:
                 payload["warning"] = {
                     "active_count": result.warning.count,
@@ -1045,7 +1228,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             rec = transition(root, args.id, "proposed")
         else:
             rec = close(root, args.id, observed=args.observed, note=args.note)
-        _emit({"changed": f"objectives/{args.id}.yaml", "objective": rec}, as_json=as_json)
+        _emit({"changed": _changed_path(root, args.id), "objective": rec}, as_json=as_json)
         return 0
     except (WorldError, IntentInvalidError) as exc:
         if isinstance(exc, WorldError):

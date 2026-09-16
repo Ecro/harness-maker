@@ -112,6 +112,17 @@ def write_skeleton_if_absent(path: Path) -> bool:
     return True
 
 
+def _major_of(found: Any) -> int | None:
+    """The one reading of `schema_version` (AC-008): an int, or the digits before the first dot
+    of a string. The validator and the loader must agree, or `"1.0"` validates and then crashes."""
+    if isinstance(found, int) and not isinstance(found, bool):
+        return found
+    if isinstance(found, str):
+        head = found.split(".", 1)[0]
+        return int(head) if head.isdigit() else None
+    return None
+
+
 def schema_version_error(
     path: Path, raw: Any, *, field: str = "schema_version"
 ) -> IntentError | None:
@@ -125,10 +136,7 @@ def schema_version_error(
             field, f"{path}: schema_version missing (this build reads {KNOWN_MAJOR})"
         )
     found = raw[field]
-    major = found if isinstance(found, int) and not isinstance(found, bool) else None
-    if major is None and isinstance(found, str):
-        head = found.split(".", 1)[0]
-        major = int(head) if head.isdigit() else None
+    major = _major_of(found)
     if major != KNOWN_MAJOR:
         return IntentError(
             field,
@@ -235,8 +243,10 @@ def load_intent(path: Path) -> Intent:
     if errors:
         raise IntentInvalidError(path, errors)
     assert isinstance(raw, dict)
+    major = _major_of(raw["schema_version"])
+    assert major is not None  # validated above
     return Intent(
-        schema_version=int(raw["schema_version"]),
+        schema_version=major,
         mission=raw["mission"],
         vision=raw.get("vision") or "",
         outcomes=tuple(

@@ -144,3 +144,25 @@ def test_ac_018_latest_by_instant_ties_to_later_index_and_staleness_by_hash(
     else:
         # lower is better, target 10
         assert out["gap"] == ("at_or_better" if exp["value"] <= 10 else "above_target")
+
+
+# ── AC-009 (SPEC-playbook-alignment): a malformed value row is reported, never raised ────────
+
+
+def test_ac_009_malformed_value_row_is_reported_not_raised(tmp_path: Path) -> None:
+    """The review found `last_value` raising `KeyError('value')` on a row `validate_outcomes` had
+    already flagged; the row must leave `values` while its error stays visible."""
+    bad = {
+        "outcome_id": "onboarding_minutes",
+        "observed_at": "2026-09-11T09:00:00Z",
+        "evidence": "no value recorded",
+    }
+    good = dict(GOOD, value=12, definition_hash=fx.definition_hash(fx.outcome()))
+    root = fx.build_root(tmp_path, values=[good, bad])
+    w = world.load_world(root)
+    assert len(w.values) == 1
+    assert any(e.field == "outcomes.yaml:values[1].value" for e in w.errors)
+    latest = world.last_value(w, "onboarding_minutes")
+    assert latest is not None
+    assert latest.value == 12
+    assert isinstance(world.status_report(root), dict)

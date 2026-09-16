@@ -47,6 +47,9 @@ Re-captures (append; never silently overwrite):
   AC-017 judgment asked Step 3.3 to open each finding with the objective id — `review` alone moved.
   Re-captured a third time after `/hm:review`'s round-2 fix added the `[A-Z0-9-]+` id check to
   Step 3.3 (P1 security: frontmatter text reached the shell unchecked) — again `review` alone moved.
+- **2026-09-16, `playbook-alignment`** — `wrapup` moved in all four arms, identically in
+  `auto_safe` and `ask`: the 5.7 observe line names `--claim` for the `supersedes` relation
+  (AC-007). Verified before re-capture that `wrapup` is the ONLY moved command in every arm.
 """
 
 from __future__ import annotations

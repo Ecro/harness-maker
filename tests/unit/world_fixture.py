@@ -1,4 +1,4 @@
-"""Shared builders for the `world` tests — a project root with intent, assumptions, objectives.
+"""Shared builders for the `world` tests — a project root with intent, assumptions, INTENT records.
 
 Test-side canonicalisers live here too (`canonical_hash`, `argmax_latest`), restated from the
 SPEC Constraints rows rather than imported from `world`, so the oracle never reads the code.
@@ -156,13 +156,33 @@ def approved(obj: dict[str, Any], target: float, *, by: str = GIT_NAME) -> dict[
     return obj
 
 
+def load(path: Path) -> dict[str, Any]:
+    """YAML files load whole; an INTENT document loads its frontmatter only (the record)."""
+    data = path.read_bytes()
+    if path.suffix == ".md":
+        from harness_maker.frontmatter import split_frontmatter
+
+        split = split_frontmatter(data)
+        assert split.status == "ok", split
+        assert split.mapping is not None
+        return split.mapping
+    return yaml.safe_load(data.decode("utf-8"))  # type: ignore[no-any-return]
+
+
 def dump(path: Path, doc: dict[str, Any]) -> None:
+    """Hand-edit an existing file: an INTENT document keeps its body, a YAML file is rewritten."""
+    if path.suffix == ".md":
+        body = FIXTURE_BODY
+        if path.exists():
+            from harness_maker.frontmatter import split_frontmatter
+
+            split = split_frontmatter(path.read_bytes())
+            if split.status == "ok":
+                body = split.body
+        dump_intent(path, doc, body)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True), encoding="utf-8")
-
-
-def load(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
 
 
 def git_init(root: Path, *, name: str | None = GIT_NAME) -> None:
@@ -199,14 +219,23 @@ def build_root(
     dump(
         claude / "world" / "outcomes.yaml", {"schema_version": KNOWN_MAJOR, "values": values or []}
     )
-    (claude / "world" / "objectives").mkdir(parents=True, exist_ok=True)
     for obj in objectives or []:
-        dump(claude / "world" / "objectives" / f"{obj['id']}.yaml", obj)
+        dump_intent(objective_doc_path(root, obj["id"]), obj)
     return root
 
 
-def objective_path(root: Path, oid: str) -> Path:
-    return root / ".claude" / "world" / "objectives" / f"{oid}.yaml"
+FIXTURE_BODY = b"## Problem\n\nfixture body\n"
+
+
+def dump_intent(path: Path, doc: dict[str, Any], body: bytes = FIXTURE_BODY) -> None:
+    """Independent of the subject's writer: frontmatter via yaml, fences, body bytes verbatim."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fm = yaml.safe_dump(doc, sort_keys=False, allow_unicode=True).encode("utf-8")
+    path.write_bytes(b"---\n" + fm + b"---\n" + body)
+
+
+def objective_doc_path(root: Path, oid: str) -> Path:
+    return root / "work-docs" / f"INTENT-{oid}.md"
 
 
 def assumptions_path(root: Path) -> Path:

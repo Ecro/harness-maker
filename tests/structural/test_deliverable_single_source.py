@@ -106,3 +106,25 @@ def test_state_paths_match_between_the_regex_and_the_derived_globs() -> None:
         assert not _is_deliverable_path(p + "nested/OBJ-1.yaml" if p.endswith("/") else p + ".bak")
         expected_glob = p + "*.yaml" if p.endswith("/") else p
         assert expected_glob in globs, (expected_glob, globs)
+
+
+# ── AC-004 (SPEC-playbook-alignment): INTENT joins the source; the objectives dir leaves ──────
+
+
+def test_ac_004_intent_is_a_deliverable_and_objectives_dir_is_not_a_state_path(
+    tmp_path: Path,
+) -> None:
+    """The record moved to `work-docs/INTENT-<ID>.md` (ADR-001/007); the old state path must
+    stop being forgiven, or a stale YAML there would ride into the plugin as a deliverable."""
+    from harness_maker.worktree import DELIVERABLE_STATE_PATHS
+
+    assert "INTENT" in DELIVERABLE_PREFIXES
+    assert _is_deliverable_path("work-docs/INTENT-OBJ-7.md")
+    assert not _is_deliverable_path(".claude/world/objectives/OBJ-7.yaml")
+    assert not any(p.rstrip("/").endswith("objectives") for p in DELIVERABLE_STATE_PATHS)
+    assert ".claude/intent.yaml" in DELIVERABLE_STATE_PATHS
+    assert "!work-docs/INTENT-*.md" in _GITIGNORE.read_text(encoding="utf-8").splitlines()
+    (tmp_path / "work-docs").mkdir()
+    (tmp_path / "work-docs" / "INTENT-OBJ-7.md").write_text("---\nid: OBJ-7\n---\n")
+    assert "work-docs/INTENT-*.md" in derive_deliverable_globs("some-task", tmp_path)
+    assert not any("objectives" in g for g in derive_deliverable_globs("some-task", tmp_path))

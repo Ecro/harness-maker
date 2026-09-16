@@ -304,7 +304,7 @@ def test_ac_012_two_checkouts_the_worktree_link_is_the_one_used(
     fx.build_root(base, objectives=[obj])
     (base / ".claude" / "harness.yaml").write_text("preset: Side\n", encoding="utf-8")
     plan = base / "work-docs" / f"PLAN-{SLUG}.md"
-    plan.parent.mkdir(parents=True)
+    plan.parent.mkdir(parents=True, exist_ok=True)
     plan.write_text("---\ntype: plan\n---\n# PLAN\n", encoding="utf-8")
     (base / ".gitignore").write_text(".worktrees/\n", encoding="utf-8")
     _git(base, "add", "-A")

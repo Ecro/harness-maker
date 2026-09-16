@@ -1470,8 +1470,11 @@ worktree:
 Code/Cursor) so the operator never has to remember the `hm world` verb by name.
 
 **Backs**: `.claude/intent.yaml` (mission/hypothesis/scope, a human-written skeleton committed
-at `make`) and `.claude/world/{assumptions,outcomes,objectives/<id>}.yaml`, all read and written
-through `hm world {status|assume|outcome|objective}`. Nothing is measured automatically and
+at `make`), `.claude/world/{assumptions,outcomes}.yaml`, and `work-docs/INTENT-<ID>.md` — the
+objective record is that file's YAML frontmatter, not a separate `.claude/world/objectives/`
+YAML file (that path is retired; a file still there is diagnosed, never loaded). The markdown
+body carries the Playbook's five sections and is opaque bytes to every writer. All of it is read
+and written through `hm world {status|assume|outcome|objective}`. Nothing is measured automatically and
 nothing is written without an explicit human answer — the skill surfaces the current status and
 runs the write the operator confirms, never a background one.
 

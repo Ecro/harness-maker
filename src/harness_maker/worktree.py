@@ -191,6 +191,9 @@ DELIVERABLE_PREFIXES: tuple[str, ...] = (
     "MATRIX",
     "EXPERIMENT",
     "DELTA",
+    # SPEC-playbook-alignment ADR-007: the objective record IS this deliverable — keyed by
+    # objective id, not task slug, so `derive_deliverable_globs` stages it unkeyed.
+    "INTENT",
 )
 
 #: SPEC-intent-world-model-objective-layer (PLAN ADR-012): the human-written state files are
@@ -202,7 +205,9 @@ DELIVERABLE_STATE_PATHS: tuple[str, ...] = (
     ".claude/intent.yaml",
     ".claude/world/assumptions.yaml",
     ".claude/world/outcomes.yaml",
-    ".claude/world/objectives/",
+    # `.claude/world/objectives/` left this tuple with SPEC-playbook-alignment ADR-006/007: the
+    # record now lives at `work-docs/INTENT-<ID>.md` (the INTENT prefix above) and a stale
+    # file at the old path is diagnosed by `world.load_world`, never forgiven as a deliverable.
 )
 
 

@@ -28,7 +28,7 @@ def _path(root: Path, kind: str) -> Path:
         "intent": root / ".claude" / "intent.yaml",
         "assumptions": fx.assumptions_path(root),
         "outcomes": fx.outcomes_path(root),
-        "objective": fx.objective_path(root, "OBJ-1"),
+        "objective": fx.objective_doc_path(root, "OBJ-1"),
     }[kind]
 
 

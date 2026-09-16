@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -122,3 +123,26 @@ def test_ac_001_valid_file_with_optional_keys_absent_passes(
 ) -> None:
     tmp_path = tmp_path_factory.mktemp("intent")
     assert intent.validate_intent(_write(tmp_path, _valid(n, subset))) == []
+
+
+# ── AC-008 (SPEC-playbook-alignment): validate and load share one major parser ──────────────
+
+
+@pytest.mark.parametrize(("version", "loads"), [("1.0", True), ("1", True), ("2.0", False)])
+def test_ac_008_schema_version_string_loads_when_it_validates(
+    tmp_path: Path, version: str, loads: bool
+) -> None:
+    """The review probe recorded `validate_intent == []` while `load_intent` raised `ValueError`
+    for `"1.0"`; the two must agree in both directions."""
+    doc = _valid(1, ())
+    doc["schema_version"] = version
+    p = _write(tmp_path, doc)
+    errors = intent.validate_intent(p)
+    if loads:
+        assert errors == []
+        assert intent.load_intent(p).schema_version == 1
+    else:
+        assert errors
+        assert errors[0].field == "schema_version"
+        with pytest.raises(intent.IntentInvalidError):
+            intent.load_intent(p)

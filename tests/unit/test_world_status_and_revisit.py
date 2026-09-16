@@ -74,9 +74,9 @@ def _fixture_root(tmp_path: Path) -> Path:
         },
     )
     # OBJ-1 edited after approval → approval_valid False; its assumption in conflict → flag True
-    doc = fx.load(fx.objective_path(root, "OBJ-1"))
+    doc = fx.load(fx.objective_doc_path(root, "OBJ-1"))
     doc["hypothesis"] = "edited afterwards"
-    fx.dump(fx.objective_path(root, "OBJ-1"), doc)
+    fx.dump(fx.objective_doc_path(root, "OBJ-1"), doc)
     world.observe(
         root, "log_location", text="E2", observed_at="2026-09-12T00:00:00Z", relation="contradicts"
     )
@@ -197,9 +197,9 @@ def test_ac_011_three_results_and_four_unevaluable_causes_never_block(
         doc = fx.load(root / ".claude" / "intent.yaml")
         doc["outcomes"].append(fx.outcome("never_recorded"))
         fx.dump(root / ".claude" / "intent.yaml", doc)
-    obj = fx.load(fx.objective_path(root, "OBJ-3"))
+    obj = fx.load(fx.objective_doc_path(root, "OBJ-3"))
     obj["revisit_when"] = revisit_when
-    fx.dump(fx.objective_path(root, "OBJ-3"), obj)
+    fx.dump(fx.objective_doc_path(root, "OBJ-3"), obj)
     out = fx.stdout_json(fx.run_cli(["objective", "revisit", "OBJ-3", "--json"], cwd=root))
     assert out["result"] == expected
     assert out["blocked"] is False
