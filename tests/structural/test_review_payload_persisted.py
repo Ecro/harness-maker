@@ -49,6 +49,26 @@ _STEP_LANDED = "2026-08-05"
 #: (slug, round) pairs that ran on or after the cutoff WITHOUT persisting. Each needs a
 #: reason. Adding an entry is the visible cost of skipping the step; removing one is free.
 _KNOWN_MISSING: dict[tuple[str, int], str] = {
+    ("objective-gap-proposal", 2): (
+        "Round 2 dispatched no reviewers: the churn gate skipped the re-review "
+        "(`review_consensus plan` → empty `dispatches`, `churn < 0.30`), so no merged payload "
+        "existed to capture — Step 3.4's persist line sits after a merge that never happened, "
+        "the `probe-envelope-contract` shape above. Round 1's merged payload IS on disk "
+        "(`objective-gap-proposal/<run>-round1-merged.json`). Two telemetry rows number the "
+        "round (the terminal row plus the post-review-fix row of 2026-09-16), which is why the "
+        "gate lists it twice. Nothing was reconstructed to clear this (`[fail:design] "
+        "per-round-step-runs-only-in-round-1`)."
+    ),
+    ("outcome-measure", 2): (
+        "Same shape, 2026-09-17: round 2 applied five fixes and the churn gate returned "
+        "`churn 0.15 < 0.30` with an empty `dispatches`, so the round's voting set was the "
+        "round-1 merged set minus the five resolved ids — there was no reviewer reply to "
+        "persist. Round 1's merged payload is at "
+        "`outcome-measure/decaaceffd9e-round1-merged.json`; the two confirmation passes that "
+        "followed captured per-lens files under `.hm-lens-results/outcome-measure/decaaceffd9e/"
+        "confirm-1|confirm-2/` but are not rounds. Listed twice because both the round-2 row "
+        "and the terminal row carry `round: 2`. Nothing was reconstructed."
+    ),
     ("probe-envelope-contract", 2): (
         "Round 2 dispatched no reviewers, so there was no merged payload to capture. The "
         "auto-fix loop's churn gate skipped the re-review (`review_consensus plan` returned an "
