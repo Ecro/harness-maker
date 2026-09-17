@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-09-17
+
 ### Changed
 
 - **The objective record is now `work-docs/INTENT-<ID>.md`** (playbook-alignment): the YAML

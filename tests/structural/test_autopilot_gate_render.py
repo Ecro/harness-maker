@@ -60,6 +60,10 @@ Re-captures (append; never silently overwrite):
   outcomes now?", one `hm world outcome measure --all` call) and its heading now says three
   questions. Verified before re-capture that `wrapup` is the ONLY moved command in every arm.
   Attributed in `work-docs/BASELINE-DELTA-outcome-measure.md` §3.
+- **2026-09-17, release 0.57.0** — ALL FIFTEEN commands moved in all four arms, the per-release
+  case recorded at 0.56.0. Verified before re-capturing — 60 lines (15 commands × 4 arms), every
+  one the frontmatter `harness_maker_version:` key, and each render with `0.57.0` substituted
+  back to `0.56.0` hashes identically to the previous golden, so no content moved.
 """
 
 from __future__ import annotations
