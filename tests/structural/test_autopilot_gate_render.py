@@ -64,6 +64,9 @@ Re-captures (append; never silently overwrite):
   case recorded at 0.56.0. Verified before re-capturing — 60 lines (15 commands × 4 arms), every
   one the frontmatter `harness_maker_version:` key, and each render with `0.57.0` substituted
   back to `0.56.0` hashes identically to the previous golden, so no content moved.
+- **2026-09-17, release 0.57.1** — same per-release case: 60 lines, all the frontmatter
+  `harness_maker_version:` key, and substituting `0.57.1` back to `0.57.0` reproduces every
+  previous hash.
 """
 
 from __future__ import annotations

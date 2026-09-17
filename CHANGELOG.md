@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.57.1] - 2026-09-17
+
+Re-release of 0.57.0 with no code changes. The v0.57.0 tag was pushed, but its release
+quality-gate failed before anything was built or published, so 0.57.0 exists only as a tag
+and never shipped.
+
+### Fixed
+
+- Committed the mutation receipts for the three intent-layer structural gates
+  (`test_{playbook_alignment,objective_gap_proposal,outcome_measure}_invariance.py`) and the
+  review payloads for the four intent-layer tasks. Both were written to the base working tree
+  and left out of the task commits. The local suite passed because the files were on disk;
+  a fresh checkout (CI) failed `test_every_new_structural_gate_has_a_mutation_receipt`.
+
 ## [0.57.0] - 2026-09-17
 
 ### Changed
