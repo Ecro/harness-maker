@@ -208,7 +208,17 @@ _STEP_C2_PRE_MERGE_HEADING: tuple[str, ...] = (
     "### Step C2 — Dispatch all 7 lenses over `review_base..<freeze commit>`",
 )
 
+# outcome-measure: the 5.7 heading counts its answer-gated questions, and the third block
+# (`outcome-measure`) makes "two" wrong — renamed to "three questions", nothing removed.
+_WRAPUP_57_TWO_QUESTIONS_HEADING: tuple[str, ...] = (
+    "#### 5.7 World state \u2014 two questions, answer-gated (intent layer)",
+)
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    "outcome-measure": {
+        "wrapup@task-driven": list(_WRAPUP_57_TWO_QUESTIONS_HEADING),
+        "wrapup@spec-driven": list(_WRAPUP_57_TWO_QUESTIONS_HEADING),
+    },
     "playbook-alignment": {
         "wrapup@task-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_CLAIM),
         "wrapup@spec-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_CLAIM),

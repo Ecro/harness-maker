@@ -11,10 +11,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
+import os
 import re
+import shlex
+import signal
 import subprocess
 import sys
-from collections.abc import Sequence
+import time
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,9 +31,17 @@ import yaml
 from harness_maker import autopilot_ledger, command_registry
 from harness_maker import intent as intent_mod
 from harness_maker.frontmatter import split_frontmatter
-from harness_maker.intent import Intent, IntentError, IntentInvalidError, schema_version_error
+from harness_maker.intent import (
+    Intent,
+    IntentError,
+    IntentInvalidError,
+    Measure,
+    Outcome,
+    schema_version_error,
+)
 from harness_maker.io_utils import atomic_write
 from harness_maker.second_opinion_invoke import resolve_base_root
+from harness_maker.second_opinion_oracle import BUDGET_PER_COMMAND, redact, truncate
 
 KNOWN_MAJOR = intent_mod.KNOWN_MAJOR
 STATUSES: tuple[str, ...] = ("known", "assumed", "unknown", "conflict")
@@ -167,11 +181,30 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def definition_hash(target: int | float, how_measured: str, higher_is_better: bool) -> str:
-    return _sha256(
-        canonical_json(
-            {"higher_is_better": higher_is_better, "how_measured": how_measured, "target": target}
-        )
+def definition_hash(
+    target: int | float, how_measured: str, higher_is_better: bool, *, measure: Measure | None
+) -> str:
+    """`measure` is required (keyword-only) so a caller cannot silently hash a block-less
+    definition for a measurable outcome — that would stale every row forever with no
+    diagnostic. `None` reproduces the pre-`measure` payload byte for byte (ADR-002)."""
+    payload: dict[str, Any] = {
+        "higher_is_better": higher_is_better,
+        "how_measured": how_measured,
+        "target": target,
+    }
+    if measure is not None:
+        payload["measure"] = {
+            "cmd": measure.cmd,
+            "cwd": measure.cwd,
+            "select": measure.select,
+            "timeout_s": measure.timeout_s,
+        }
+    return _sha256(canonical_json(payload))
+
+
+def outcome_definition_hash(outcome: Outcome) -> str:
+    return definition_hash(
+        outcome.target, outcome.how_measured, outcome.higher_is_better, measure=outcome.measure
     )
 
 
@@ -645,7 +678,7 @@ def last_value(world: World, outcome_id: str) -> LastValue | None:
             best, best_ts = row, ts
     if best is None:
         return None
-    current = definition_hash(outcome.target, outcome.how_measured, outcome.higher_is_better)
+    current = outcome_definition_hash(outcome)
     return LastValue(
         value=best["value"],
         observed_at=best["observed_at"],
@@ -813,6 +846,7 @@ def gap_report(root: Path) -> dict[str, Any]:
             "reason": _measurement_reason(lv),
             "how_measured": outcome.how_measured,
             "higher_is_better": outcome.higher_is_better,
+            "measure": outcome.measure is not None,
         }
     for oid, rec in sorted(world.objectives.items()):
         report["objectives"][oid] = {key: rec.get(key) for key in _GAP_OBJECTIVE_KEYS}
@@ -896,32 +930,252 @@ def record_value(
     outcome = next((o for o in loaded.outcomes if o.id == outcome_id), None)
     if outcome is None:
         raise WorldError("outcome_id", f"{outcome_id!r} is not an intent outcome")
+    return _append_value(
+        root, loaded, outcome, value=value, observed_at=observed_at, evidence=evidence
+    )
+
+
+_APPEND_LOCK_TIMEOUT_S = 30.0
+
+
+@contextmanager
+def _rmw_lock(path: Path) -> Iterator[None]:
+    """Serialize the read-modify-write of one YAML file across processes (review 40a36af2).
+
+    `atomic_write` makes the final replace atomic, not the read-append-write around it; two
+    writers (a wrapup's `measure --all` and a hand-run `record`) would otherwise lose a row.
+    flock on a sibling lock file; where the filesystem cannot lock, proceed unlocked — the
+    pre-change behaviour, never a refusal to record.
+    """
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover — non-POSIX
+        yield
+        return
+    # Under `.claude/observability/` — already gitignored and classified as harness churn, so
+    # the lock never shows as user dirt in a tracked directory (confirm-1 finding).
+    lock_path = path.parent.parent / "observability" / ".hm-world-outcomes.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
+    deadline = time.monotonic() + _APPEND_LOCK_TIMEOUT_S
+    try:
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as exc:
+                if exc.errno in (38, 95):  # ENOSYS / EOPNOTSUPP: unlockable filesystem
+                    break
+                if time.monotonic() >= deadline:
+                    raise WorldError(
+                        "lock", f"outcomes.yaml is locked by another writer ({lock_path})"
+                    ) from exc
+                time.sleep(0.05)
+        yield
+    finally:
+        os.close(fd)
+
+
+def _append_value(
+    root: Path, loaded: Intent, outcome: Outcome, *, value: Any, observed_at: Any, evidence: Any
+) -> dict[str, Any]:
+    """One disk snapshot per row (ADR-004): the `Outcome` the caller loaded is the one hashed
+    and appended — the measure path hands in the definition it actually ran, never a reload."""
     if not _is_number(value):
         raise WorldError("value", "must be a number")
     stamp = normalise_timestamp(observed_at, "observed_at")
     if not isinstance(evidence, str) or not evidence.strip():
         raise WorldError("evidence", "must be a non-empty string")
     path = outcomes_path(root)
-    doc: dict[str, Any]
-    if path.exists():
-        errors = validate_outcomes(path, intent_outcomes={o.id: o for o in loaded.outcomes})
-        if errors:
-            raise WorldError(errors[0].field, errors[0].message)
-        doc, _ = _read_yaml(path)
-    else:
-        doc = {"schema_version": KNOWN_MAJOR, "values": []}
     row = {
-        "outcome_id": outcome_id,
+        "outcome_id": outcome.id,
         "value": value,
         "observed_at": stamp,
         "evidence": evidence,
-        "definition_hash": definition_hash(
-            outcome.target, outcome.how_measured, outcome.higher_is_better
-        ),
+        "definition_hash": outcome_definition_hash(outcome),
     }
-    doc["values"].append(row)
-    _dump_yaml(path, doc)
+    doc: dict[str, Any]
+    with _rmw_lock(path):
+        if path.exists():
+            errors = validate_outcomes(path, intent_outcomes={o.id: o for o in loaded.outcomes})
+            if errors:
+                raise WorldError(errors[0].field, errors[0].message)
+            doc, _ = _read_yaml(path)
+        else:
+            doc = {"schema_version": KNOWN_MAJOR, "values": []}
+        doc["values"].append(row)
+        _dump_yaml(path, doc)
     return row
+
+
+# ── outcome measure: the harness records the number, the human never types it ─
+
+_NUMBER_RE = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+
+
+def _shape(value: Any) -> str:
+    """What a refused selection WAS, without what it SAID — stdout never reaches a message
+    (review c55b8855: `value!r` carried secret-shaped stdout into the CLI's own output)."""
+    return f"{type(value).__name__} of length {len(str(value))}"
+
+
+def _finite_number(value: Any) -> int | float:
+    """A bool is not a number and a NaN row would make every `gap` comparison False forever.
+    An int is finite by construction — `math.isfinite` would overflow on a huge one."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise WorldError("select", f"not a number: {_shape(value)}")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise WorldError("select", "not a finite number")
+    if isinstance(value, int):
+        try:
+            float(value)
+        except OverflowError as exc:
+            raise WorldError("select", "integer too large to compare with a target") from exc
+    return _json_number(value)
+
+
+def select_number(text: str, select: str) -> int | float:
+    """Exactly one number out of stdout, by the selector the outcome declared (ADR-003)."""
+    if select == intent_mod.SELECT_LAST_NUMBER:
+        found = _NUMBER_RE.findall(text)
+        if not found:
+            raise WorldError("select", "no number in stdout")
+        return _finite_number(float(found[-1]))
+    if select.startswith("json:"):
+        try:
+            node: Any = json.loads(text)
+        except ValueError as exc:
+            raise WorldError("select", f"stdout is not JSON: {exc}") from exc
+        for part in select[len("json:") :].split("."):
+            if isinstance(node, list) and part.lstrip("-").isdigit():
+                idx = int(part)
+                if not -len(node) <= idx < len(node):
+                    raise WorldError("select", f"index {part} out of range")
+                node = node[idx]
+            elif isinstance(node, dict) and part in node:
+                node = node[part]
+            else:
+                raise WorldError("select", f"path segment {part!r} not found")  # selector text
+        return _finite_number(node)
+    if select.startswith("regex:"):
+        m = re.search(select[len("regex:") :], text)
+        if m is None:
+            raise WorldError("select", "regex did not match stdout")
+        captured = m.group(1)
+        if captured is None:
+            raise WorldError("select", "the regex group did not participate in the match")
+        try:
+            return _finite_number(float(captured))
+        except ValueError as exc:
+            raise WorldError("select", f"group is not a number: {_shape(captured)}") from exc
+    raise WorldError("select", f"unknown selector {select!r}")
+
+
+@dataclass(frozen=True)
+class MeasureResult:
+    value: int | float
+    evidence: str
+
+
+def _short_sha(cwd: Path) -> str:
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(cwd), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "nogit"
+    return proc.stdout.strip() if proc.returncode == 0 and proc.stdout.strip() else "nogit"
+
+
+def run_measure(outcome: Outcome, root: Path) -> MeasureResult:
+    """Run the outcome's `measure` as argv (never a shell), bounded by its timeout; stdout is
+    only ever selected from and never stored, stderr reaches the diagnostic redacted and
+    truncated (ADR-004). `cwd: base` runs at the base root, `checkout` at `root` (ADR-005)."""
+    measure = outcome.measure
+    if measure is None:
+        raise WorldError("measure", f"outcome {outcome.id!r} has no measure block (manual)")
+    argv = shlex.split(measure.cmd)
+    cwd = resolve_base_root(root) if measure.cwd == "base" else root
+    try:
+        # Own session so a timeout can kill the whole process group (review 1b9bdc41):
+        # `subprocess.run`'s timeout path kills the direct child only. The `with` closes the
+        # pipes deterministically on every exit, including the timeout raise.
+        with subprocess.Popen(
+            argv,
+            cwd=str(cwd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        ) as proc:
+            try:
+                stdout, stderr = proc.communicate(timeout=measure.timeout_s)
+            except subprocess.TimeoutExpired as exc:
+                # A child that exits exactly at the boundary makes both kills raise
+                # ProcessLookupError; neither may mask the timeout verdict.
+                with suppress(OSError):
+                    os.killpg(proc.pid, signal.SIGKILL)
+                with suppress(OSError):
+                    proc.kill()
+                proc.wait()
+                raise WorldError("timeout", f"{argv[0]} exceeded {measure.timeout_s}s") from exc
+    except OSError as exc:
+        raise WorldError("exit", f"{argv[0]} did not run: {exc}") from exc
+    if proc.returncode != 0:
+        diag = truncate(redact(stderr or ""), BUDGET_PER_COMMAND)
+        raise WorldError("exit", f"exit={proc.returncode}: {diag}".rstrip(": "))
+    value = select_number(stdout or "", measure.select)
+    evidence = f"auto: {' '.join(argv)} @ {_short_sha(cwd)} exit=0 cwd={measure.cwd}"
+    return MeasureResult(value=value, evidence=evidence)
+
+
+def measure_outcome(root: Path, outcome_id: str, *, dry_run: bool = False) -> dict[str, Any]:
+    """One outcome: run, select, append (unless `dry_run`). The `Outcome` loaded here is the
+    one hashed into the row — never a reload after the command ran (ADR-004)."""
+    loaded = intent_mod.load_intent(intent_path(root))
+    outcome = next((o for o in loaded.outcomes if o.id == outcome_id), None)
+    if outcome is None:
+        raise WorldError("outcome_id", f"{outcome_id!r} is not an intent outcome")
+    result = run_measure(outcome, root)
+    if dry_run:
+        return {
+            "outcome": outcome_id,
+            "status": "would_record",
+            "value": result.value,
+            "evidence": result.evidence,
+        }
+    row = _append_value(
+        root, loaded, outcome, value=result.value, observed_at=_now_iso(), evidence=result.evidence
+    )
+    return {"outcome": outcome_id, "status": "recorded", "value": row["value"], "row": row}
+
+
+def measure_all(root: Path, *, dry_run: bool = False) -> dict[str, Any]:
+    """Every outcome, in intent order: measurable ones run (failures reported, never aborting
+    the rest), manual ones are listed as `manual`. `failed` counts what the exit code reports."""
+    loaded = intent_mod.load_intent(intent_path(root))
+    results: list[dict[str, Any]] = []
+    for outcome in loaded.outcomes:
+        if outcome.measure is None:
+            results.append({"outcome": outcome.id, "status": "manual"})
+            continue
+        try:
+            results.append(measure_outcome(root, outcome.id, dry_run=dry_run))
+        except WorldError as exc:
+            results.append(
+                {
+                    "outcome": outcome.id,
+                    "status": "failed",
+                    "cause": exc.field,
+                    "message": exc.message,
+                }
+            )
+    failed = sum(1 for r in results if r["status"] == "failed")
+    return {"results": results, "failed": failed}
 
 
 def _load_objective(root: Path, objective_id: str) -> tuple[World, dict[str, Any]]:
@@ -1232,6 +1486,11 @@ def _parser() -> argparse.ArgumentParser:
     rc.add_argument("--observed-at", required=True, dest="observed_at")
     rc.add_argument("--evidence", required=True)
     rc.add_argument("--json", action="store_true")
+    ms = osub.add_parser("measure")
+    ms.add_argument("id", nargs="?", default=None)
+    ms.add_argument("--all", action="store_true", dest="all_outcomes")
+    ms.add_argument("--dry-run", action="store_true", dest="dry_run")
+    ms.add_argument("--json", action="store_true")
 
     j = sub.add_parser("objective")
     jsub = j.add_subparsers(dest="verb", required=True)
@@ -1295,6 +1554,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 rec = resolve(root, args.id, status=args.status, claim=args.claim)
             _emit({"changed": "assumptions.yaml", "assumption": rec}, as_json=as_json)
+            return 0
+        if args.cmd == "outcome" and args.verb == "measure":
+            if bool(args.id) == bool(args.all_outcomes):
+                raise WorldError("id", "give exactly one of <id> or --all")
+            if args.all_outcomes:
+                report = measure_all(root, dry_run=args.dry_run)
+                _emit(report, as_json=as_json)
+                return 1 if report["failed"] else 0
+            measured = measure_outcome(root, args.id, dry_run=args.dry_run)
+            _emit(
+                {"changed": None if args.dry_run else "outcomes.yaml", **measured}, as_json=as_json
+            )
             return 0
         if args.cmd == "outcome":
             value = _json_number(args.value)

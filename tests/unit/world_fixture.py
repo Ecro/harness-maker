@@ -32,13 +32,23 @@ def canonical_hash(payload: dict[str, Any]) -> str:
 
 
 def definition_hash(outcome: dict[str, Any]) -> str:
-    return canonical_hash(
-        {
-            "higher_is_better": outcome["higher_is_better"],
-            "how_measured": outcome["how_measured"],
-            "target": outcome["target"],
+    """SPEC-outcome-measure Constraints 'Hash': the `measure` key joins the payload only when a
+    block is present (with its `cwd: base` / `timeout_s: 300` defaults filled in), so a
+    block-less outcome hashes exactly as it did before the block existed."""
+    payload: dict[str, Any] = {
+        "higher_is_better": outcome["higher_is_better"],
+        "how_measured": outcome["how_measured"],
+        "target": outcome["target"],
+    }
+    block = outcome.get("measure")
+    if block is not None:
+        payload["measure"] = {
+            "cmd": block["cmd"],
+            "cwd": block.get("cwd", "base"),
+            "select": block["select"],
+            "timeout_s": block.get("timeout_s", 300),
         }
-    )
+    return canonical_hash(payload)
 
 
 def approval_hash(obj: dict[str, Any], target: float) -> str:

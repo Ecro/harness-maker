@@ -47,6 +47,9 @@ needs `--claim`; `close` needs both `--observed` and `--note`.
    on `not_filled_in` say the mission and outcomes are unwritten and stop.
 2. Open with a **measure first** block: every outcome whose `reason` is `never_measured` or
    `stale_definition`, with its `how_measured` — those are gaps in evidence, not in the code.
+   For the ones with `measure: true`, run `hm world outcome measure --all --dry-run` and show
+   the table; the record call is `hm world outcome measure --all`, gated by
+   "The rule for every write" above (ask once, run once on yes, otherwise write nothing).
 3. Read the codebase against the measured outcomes' `gap` and propose **at most three**
    candidates, unranked, each with `title / hypothesis / scope / non_scope / outcome / evidence /
    overlaps-with`. A candidate for an unmeasured outcome carries

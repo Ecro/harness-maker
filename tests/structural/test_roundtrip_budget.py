@@ -245,7 +245,11 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `surface_allowance.round_trips`. The first two are frozen descriptions and the third is the
     # declared delta between them, so they are not three copies of one rule; but a change here has
     # to move all three, which is worth saying out loud rather than rediscovering.
-    "wrapup": 28,
+    # 28 → 29 (outcome-measure, 2026-09-17): 5.7's third answer-gated block runs
+    # `hm world outcome measure --all` once on "yes". Declared in that PLAN's
+    # `surface_allowance.round_trips` with the call and attributed in
+    # `work-docs/BASELINE-DELTA-outcome-measure.md` §3.
+    "wrapup": 29,
 }
 
 

@@ -15,7 +15,7 @@
    "spec": "52fe5cbd8a22708dfc8d59bcb91701a743b38b227ca17934e6d5cbbd112336bd",
    "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
    "verify": "d1bcb87775904777a85e82f59a89184a13fcb5152e99da3fa9edb9627971cc62",
-   "wrapup": "4b846260da4e1cc90c6fc8a9f4681a5b520c056cff224cb0f110a1ab768680f4"
+   "wrapup": "1eca66e4e2c5ed6aa5041f1683907c48ed739db8cfc36c8236169304fe686d93"
   },
   "auto_safe@spec-driven": {
    "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
@@ -32,7 +32,7 @@
    "spec": "98cab68a304a7d080d97cb904572456500c9cfa68df2aba5ca4e5b99fdb9afa8",
    "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
    "verify": "acd61ce2f794c416e1d19d03771295832b167d9e8d75b636af8b87f092823f37",
-   "wrapup": "7f0a70db9749b1663b67ccfda19ea90d83de8954b6d4f4b625f8ba56033cbfb3"
+   "wrapup": "bcb05a2a66b1840ee514e26f312db973f56b1102c2347ccb6a89dd5b7cc62236"
   },
   "ask@flag_on": {
    "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
@@ -49,7 +49,7 @@
    "spec": "3bc70dc076f07dbbd69b18a688104b188adb761e47c729c4524d8be899fd310a",
    "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
    "verify": "ace5a856b9c86aa2c9cf8553eacdd0a0775ec42a12d0cef5c927fbcf88b01764",
-   "wrapup": "ca362d51451052d2c6f9057f89b69c933404885bc3e9648c0063b77c9246eb83"
+   "wrapup": "34193626f00fb321714dec9c2e34f2b58299c6125668ae20d3083082d9e85561"
   },
   "ask@flag_off": {
    "configure": "292c67669de297da11195af41d3e288da5c5e0196e7362081348927b09d2b057",
@@ -66,10 +66,10 @@
    "spec": "37bac15f3234a885746e207ea3595f70f65eb8d64df657e671028c2f86ac2968",
    "uninstall": "1d6150c45317ccbd8afa5e3e95134a836ecbc058309607f22205d0669723ff0d",
    "verify": "e1a0dd07e7fa6771284a37fafc6047930478ad16228f48bb63cb58cfd6f686e2",
-   "wrapup": "c0a7aba78814073dd7afbbf1b9a064436ea3e003cc7c666d4712a00ba9c65f63"
+   "wrapup": "56014ec6491330fbc30926fc579dd944a51c25bc7ebfb8532b79dd17e9972ac7"
   }
  },
- "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture — a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
+ "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
  "rebases": [
   {
    "aggregate_delta_chars": 1456,
@@ -81,7 +81,7 @@
    "aggregate_delta_chars": -54,
    "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
    "phase": 5,
-   "reason": "Phase 5 SHRINKS the rendered surface by 54 chars, in two attributed edits: review.md.j2 drops the `- Start from `harness.yaml.reviewers.enabled`.` bullet (-47, AC-015 — the list is not an input to lens_dispatch, so the instruction was a lever that does not exist), and step_manifest.md.j2's disclosed default for autopilot_persistent goes `false` -> `true` (-1 x 7 commands, AC-007 — the class default is True). No autopilot advance or picker block moved; the Phase 3 byte-neutrality claim is unaffected because both edits are outside the advance block."
+   "reason": "Phase 5 SHRINKS the rendered surface by 54 chars, in two attributed edits: review.md.j2 drops the `- Start from `harness.yaml.reviewers.enabled`.` bullet (-47, AC-015 \u2014 the list is not an input to lens_dispatch, so the instruction was a lever that does not exist), and step_manifest.md.j2's disclosed default for autopilot_persistent goes `false` -> `true` (-1 x 7 commands, AC-007 \u2014 the class default is True). No autopilot advance or picker block moved; the Phase 3 byte-neutrality claim is unaffected because both edits are outside the advance block."
   },
   {
    "aggregate_delta_chars": 416,
@@ -145,6 +145,16 @@
    "aggregate_delta_chars": 166,
    "attributed_in": "work-docs/BASELINE-DELTA-objective-gap-proposal.md",
    "reason": "Post-review fix (finding 0a2499c3): Step 0.5 now offers the draft-consent question on the filled-in, zero-objective branch instead of exiting early. Verified before re-capture that plan is the ONLY moved command in every arm."
+  },
+  {
+   "task": "outcome-measure",
+   "phase": "3",
+   "moved": [
+    "wrapup"
+   ],
+   "aggregate_delta_chars": 1202,
+   "attributed_in": "work-docs/BASELINE-DELTA-outcome-measure.md",
+   "reason": "wrapup 5.7 gained the third answer-gated block (`outcome-measure`: \"Measure outcomes now?\", one `hm world outcome measure --all` call) and its heading says three questions. Verified before re-capture that wrapup is the ONLY moved command in every arm."
   }
  ]
 }

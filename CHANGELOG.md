@@ -27,6 +27,18 @@
 
 ### Added
 
+- **Outcomes measure themselves** (outcome-measure): an `intent.yaml` outcome may carry
+  `measure: {cmd, select, cwd?, timeout_s?}` — `cmd` is an argv string (`shlex`, never a shell),
+  `select` is `json:<dotted.path>`, `regex:<one group>` or `last-number`, `cwd` is `base`
+  (default; observability data lives there) or `checkout`. `hm world outcome measure <id>` /
+  `--all [--dry-run] [--json]` runs it under a timeout, extracts one finite number and appends a
+  value row with evidence `auto: <argv> @ <sha> exit=0 cwd=<base|checkout>` — no human types
+  the number; failures (`exit`, `select`, `timeout`, `measure`) write nothing. `definition_hash`
+  now covers the block (a block-less outcome hashes exactly as before), so editing the
+  measurement stales history. `hm world gap` rows carry `measure: true|false`. The
+  `intent-layer` skill's "measure first" step runs the dry run and names the record call; wrapup
+  5.7 asks a third answer-gated question, "Measure outcomes now?".
+
 - **`hm world gap --json` + objective proposals** (objective-gap-proposal): a read-only sibling
   of `status` that names *why* an outcome cannot be judged (`never_measured` / `stale_definition`)
   and lists every objective in every state with its `rejected[]`; the `intent-layer` skill can

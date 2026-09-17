@@ -1,0 +1,249 @@
+schema_version: 2
+spec_slug: outcome-measure
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: 'Tier-1: the verb is a new writer of outcome rows the
+  gap table and every objective revisit read, and the selector/hash logic decides
+  whether a number is recorded at all and whether history goes stale. A surviving
+  mutant in the selector silently records a wrong number as evidence; one in definition_hash
+  silently keeps stale values alive. Scope is intent.py and world.py.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/intent.py
+- src/harness_maker/world.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: measure block validates with the outcome
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_measure.py::test_ac_001_measure_block_validates_with_the_outcome
+  executable_predicate: intent.load_intent(good_path).outcomes[0].measure.cmd == 'python
+    probe.py' and all(any(e.field.startswith('outcomes[0].measure') for e in intent.validate_intent(bad))
+    for bad in bad_paths)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The refused inputs and the field names are fixed by S1 before the
+    validator is written; each bad fixture is authored by hand from the SPEC row,
+    not derived from the validator's own error list.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: measure records the extracted number with auto evidence
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_outcome_measure.py::test_ac_002_measure_records_the_extracted_number_with_auto_evidence
+  executable_predicate: 'rows[-1][''value''] == 0.672 and rows[-1][''evidence''] ==
+    f''auto: python probe.py @ {sha} exit=0 cwd=base'' and rows[-1][''observed_at''].endswith(''Z'')
+    and rows[-1][''definition_hash''] == expected_hash and ''carry_ratio'' not in
+    rows[-1][''evidence''] and regex_row[''value''] == 0.672 and last_number_row[''value'']
+    == 0.672'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The probe script's output is a hand-written fixture with a known
+    number (0.672) and a known argv; the expected evidence string and hash are computed
+    in the test from the fixture's own facts (argv, git sha, intent fields via the
+    existing definition_hash helper), never from the verb's return value.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: failures write nothing and name the cause
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_outcome_measure.py::test_ac_003_failures_write_nothing_and_name_the_cause
+  executable_predicate: all(proc.returncode != 0 and cause in proc.stdout + proc.stderr
+    for proc, cause in failures) and outcomes_bytes_after == outcomes_bytes_before
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each failure is injected at the filesystem or by a hand-written
+    probe (exit 3, prints no number, sleeps past timeout, outcome without a block)
+    and the expected cause word comes from S3's table; the untouched-file check is
+    a byte comparison.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: dry-run writes nothing
+  type: property
+  test_ids:
+  - tests/unit/test_world_outcome_measure.py::test_ac_004_dry_run_writes_nothing
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Read-only under --dry-run is an invariant over the whole file tree,
+    checkable by hashing every file before and after regardless of implementation;
+    the generator samples worlds mixing measurable, failing and manual outcomes.
+  oracle_independence_waiver: null
+  input_domain: loadable worlds built by tests.unit.world_fixture with 0-3 outcomes
+    each drawn from {measurable-ok, measurable-failing, manual}
+  transformation: run `hm world outcome measure --all --dry-run --json` via the CLI
+    entrypoint
+  expected_relation: sha256 of every file under the checkout before == after, and
+    the set of paths is unchanged
+  preconditions:
+  - the world loads without IntentInvalidError
+  observable_output: mapping path -> sha256
+  generator_hint: Hypothesis st.lists(st.sampled_from(kinds)); ci profile derandomized
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: editing measure stales history
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_measure.py::test_ac_005_editing_measure_stales_history
+  executable_predicate: world.gap_report(root)['outcomes']['carry']['reason'] == 'measured'
+    and gap_after_edit['outcomes']['carry']['reason'] == 'stale_definition' and gap_after_revert['outcomes']['carry']['reason']
+    == 'measured' and world.definition_hash(10, 'stopwatch', False, measure=None)
+    == legacy_hash_without_measure
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the shipped gap_report / last_value stale logic
+    and the pre-change definition_hash value for a block-less outcome (pinned as a
+    literal from HEAD), so the new hashing cannot satisfy the test by changing what
+    "stale" means.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: default cwd is the base root
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_outcome_measure.py::test_ac_006_default_cwd_is_the_base_root
+  executable_predicate: base_row['value'] == base_marker and checkout_row['value']
+    == worktree_marker and 'base' in base_row['evidence'] and 'checkout' in checkout_row['evidence']
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The probe prints a marker number derived from a file that exists
+    only in the directory it runs in (base vs linked worktree), so the recorded value
+    identifies the cwd independently of the verb's own report.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: skill and wrapup call the verb
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer.py::test_ac_007_skill_and_wrapup_call_the_verb
+  executable_predicate: '''hm world outcome measure --all --dry-run'' in measure_first_step
+    and ''The rule for every write'' in measure_first_step and wrapup.index(''@hm:answer-gated:outcome-measure'')
+    > wrapup.index(''@hm:answer-gated:objective-close'') and ''Measure outcomes now?''
+    in measure_block and measure_block.count(''hm world outcome measure --all'') ==
+    1 and ''write nothing'' in measure_block'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrases, block marker name and ordering are fixed by S7 before
+    the templates are edited; the test greps both rendered arms.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: surface pinned and allowance retired
+  type: mechanical
+  test_ids:
+  - tests/structural/test_outcome_measure_invariance.py::test_ac_008_plan_review_help_pinned_and_wrapup_within_allowance
+  executable_predicate: all(live[arm][c] == pin['arms'][arm][c] for arm in pin['arms']
+    for c in ('plan', 'review', 'help')) and 'surface_allowance' not in plan_frontmatter
+    and delta_doc_aggregate == surface_baseline_aggregate
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The pin is the pre-change sha256 per arm copied at Phase 0 into
+    the delta document, taken before any template edit; the retirement half compares
+    the PLAN and the delta document against the committed baseline file.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

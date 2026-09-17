@@ -59,6 +59,7 @@ MODULES: dict[str, ModuleSpec] = {
             "observe",
             "resolve",
             "record",
+            "measure",
             "new",
             "approve",
             "activate",

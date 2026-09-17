@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -31,7 +32,15 @@ OUTCOME_FIELDS: tuple[str, ...] = (
     "target",
     "higher_is_better",
     "how_measured",
+    "measure",
 )
+#: `measure` is the one optional outcome field (SPEC-outcome-measure S1).
+OPTIONAL_OUTCOME_FIELDS: frozenset[str] = frozenset({"measure"})
+MEASURE_FIELDS: tuple[str, ...] = ("cmd", "select", "cwd", "timeout_s")
+MEASURE_CWDS: tuple[str, ...] = ("base", "checkout")
+SELECT_PREFIXES: tuple[str, ...] = ("json:", "regex:")
+SELECT_LAST_NUMBER = "last-number"
+DEFAULT_MEASURE_TIMEOUT_S = 300
 _ID_RE = re.compile(r"^[a-z0-9_]+$")
 
 SKELETON = """\
@@ -51,6 +60,11 @@ vision: ""
 #     target: 10                       # a number; compared to the last recorded value
 #     higher_is_better: false
 #     how_measured: "hm economics stages + metrics invocation counts"
+#     measure:                         # optional — lets `hm world outcome measure` record it
+#       cmd: "uv run hm economics report --root ."   # argv (shlex), never a shell
+#       select: "json:report.carry_ratio"  # json:<dotted.path> | regex:<one group> | last-number
+#       cwd: base                        # base (default; observability lives there) | checkout
+#       timeout_s: 300                   # optional, positive
 outcomes: []
 non_negotiables: []
 non_scope: []
@@ -77,12 +91,23 @@ class IntentInvalidError(ValueError):
 
 
 @dataclass(frozen=True)
+class Measure:
+    """A machine-runnable measurement; edits stale history because the hash covers it."""
+
+    cmd: str
+    select: str
+    cwd: str = "base"
+    timeout_s: int = DEFAULT_MEASURE_TIMEOUT_S
+
+
+@dataclass(frozen=True)
 class Outcome:
     id: str
     description: str
     target: int | float
     higher_is_better: bool
     how_measured: str
+    measure: Measure | None = None
 
 
 @dataclass(frozen=True)
@@ -150,13 +175,76 @@ def _is_number(v: Any) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
+def _validate_select(prefix: str, select: Any, errors: list[IntentError]) -> None:
+    if not isinstance(select, str) or not select:
+        errors.append(IntentError(f"{prefix}.select", "must be a non-empty string"))
+        return
+    if select == SELECT_LAST_NUMBER:
+        return
+    if select.startswith("json:"):
+        if not select[len("json:") :]:
+            errors.append(IntentError(f"{prefix}.select", "json: needs a dotted path"))
+        return
+    if select.startswith("regex:"):
+        try:
+            groups = re.compile(select[len("regex:") :]).groups
+        except re.error as exc:
+            errors.append(IntentError(f"{prefix}.select", f"regex does not compile: {exc}"))
+            return
+        if groups != 1:
+            errors.append(IntentError(f"{prefix}.select", "regex must have exactly one group"))
+        return
+    errors.append(
+        IntentError(
+            f"{prefix}.select",
+            f"must be json:<path>, regex:<pattern> or exactly {SELECT_LAST_NUMBER!r}",
+        )
+    )
+
+
+def _validate_measure(prefix: str, raw: Any, errors: list[IntentError]) -> None:
+    """Refuse a bad block at load, before any subprocess exists (ADR-001)."""
+    if not isinstance(raw, dict):
+        errors.append(IntentError(prefix, "must be a mapping"))
+        return
+    for key in ("cmd", "select"):
+        if key not in raw:
+            errors.append(IntentError(f"{prefix}.{key}", "missing"))
+    for key in raw:
+        if key not in MEASURE_FIELDS:
+            errors.append(IntentError(f"{prefix}.{key}", "unknown measure field"))
+    if "cmd" in raw:
+        cmd = raw["cmd"]
+        argv: list[str] | None = None
+        if isinstance(cmd, str):
+            try:
+                argv = shlex.split(cmd)
+            except ValueError as exc:
+                errors.append(IntentError(f"{prefix}.cmd", f"not a shell word list: {exc}"))
+        if argv is not None or not isinstance(cmd, str):
+            if not argv:
+                errors.append(IntentError(f"{prefix}.cmd", "must be a non-empty argv string"))
+            elif argv[0].startswith("-"):
+                errors.append(
+                    IntentError(f"{prefix}.cmd", "first token must be a program, not an option")
+                )
+    if "select" in raw:
+        _validate_select(prefix, raw["select"], errors)
+    if "cwd" in raw and raw["cwd"] not in MEASURE_CWDS:
+        errors.append(IntentError(f"{prefix}.cwd", f"must be one of {'|'.join(MEASURE_CWDS)}"))
+    if "timeout_s" in raw:
+        t = raw["timeout_s"]
+        if isinstance(t, bool) or not isinstance(t, int) or t <= 0:
+            errors.append(IntentError(f"{prefix}.timeout_s", "must be a positive int"))
+
+
 def _validate_outcome(i: int, raw: Any, seen: set[str], errors: list[IntentError]) -> None:
     prefix = f"outcomes[{i}]"
     if not isinstance(raw, dict):
         errors.append(IntentError(prefix, "must be a mapping"))
         return
     for key in OUTCOME_FIELDS:
-        if key not in raw:
+        if key not in raw and key not in OPTIONAL_OUTCOME_FIELDS:
             errors.append(IntentError(f"{prefix}.{key}", "missing"))
     for key in raw:
         if key not in OUTCOME_FIELDS:
@@ -177,6 +265,8 @@ def _validate_outcome(i: int, raw: Any, seen: set[str], errors: list[IntentError
         errors.append(IntentError(f"{prefix}.higher_is_better", "must be a bool"))
     if "how_measured" in raw and not isinstance(raw["how_measured"], str):
         errors.append(IntentError(f"{prefix}.how_measured", "must be a string"))
+    if "measure" in raw and raw["measure"] is not None:
+        _validate_measure(f"{prefix}.measure", raw["measure"], errors)
 
 
 def _validate_raw(path: Path, raw: Any) -> list[IntentError]:
@@ -256,6 +346,7 @@ def load_intent(path: Path) -> Intent:
                 target=o["target"],
                 higher_is_better=o["higher_is_better"],
                 how_measured=o["how_measured"],
+                measure=_measure_of(o.get("measure")),
             )
             for o in raw["outcomes"]
         ),
@@ -263,6 +354,17 @@ def load_intent(path: Path) -> Intent:
         non_scope=_strs(raw, "non_scope"),
         unknowns=_strs(raw, "unknowns"),
         owners=_strs(raw, "owners"),
+    )
+
+
+def _measure_of(raw: Any) -> Measure | None:
+    if raw is None:
+        return None
+    return Measure(
+        cmd=raw["cmd"],
+        select=raw["select"],
+        cwd=raw.get("cwd", "base"),
+        timeout_s=raw.get("timeout_s", DEFAULT_MEASURE_TIMEOUT_S),
     )
 
 

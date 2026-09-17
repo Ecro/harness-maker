@@ -632,6 +632,7 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id> --relation <confirms|supersedes|contradicts> --text \"<what was observed>\" --observed-at <ISO-8601 UTC> [--claim \"<new claim>\" \u2014 required when the relation is supersedes]",
         "!uv run --with $HOME/harness-maker python -m harness_maker.world objective close <id> --observed <met|missed|no_data> --note \"<operator note>\"",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world outcome measure --all",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_brief --root . --slug '<slug>'",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_land --worktree <WT> --base <BASE> --slug <slug> --message-file <msg-tmpfile> --required work-docs/PLAN-{slug}.md --optional .claude/memory/ --optional work-docs/REVIEW-{slug}-*.md --optional work-docs/RESEARCH-{slug}.md --optional specs/SPEC-{slug}.md --optional specs/SPEC-{slug}.machine.yaml --optional work-docs/BASELINE-ledger-rollup.md",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_receipt --root . --stage wrapup --worktree '<brief.worktree_root>' --receipt-file <the temp path>"
@@ -666,7 +667,7 @@
         "#### 5.3 Failure-driven proposal (MUST \u2014 the escalation last mile)",
         "#### 5.4 Managed documents",
         "#### 5.6 Second Brain promotion (cross-project durable knowledge)",
-        "#### 5.7 World state \u2014 two questions, answer-gated (intent layer)",
+        "#### 5.7 World state \u2014 three questions, answer-gated (intent layer)",
         "#### Judgment AC binding \u2014 independent rubric verdict (PLAN-judgment-ac-binding ADR-006)"
       ]
     },
@@ -697,6 +698,7 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id> --relation <confirms|supersedes|contradicts> --text \"<what was observed>\" --observed-at <ISO-8601 UTC> [--claim \"<new claim>\" \u2014 required when the relation is supersedes]",
         "!uv run --with $HOME/harness-maker python -m harness_maker.world objective close <id> --observed <met|missed|no_data> --note \"<operator note>\"",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world outcome measure --all",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_brief --root . --slug '<slug>'",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_land --worktree <WT> --base <BASE> --slug <slug> --message-file <msg-tmpfile> --required work-docs/PLAN-{slug}.md --optional .claude/memory/ --optional work-docs/REVIEW-{slug}-*.md --optional work-docs/RESEARCH-{slug}.md --optional specs/SPEC-{slug}.md --optional specs/SPEC-{slug}.machine.yaml --optional work-docs/BASELINE-ledger-rollup.md",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_receipt --root . --stage wrapup --worktree '<brief.worktree_root>' --receipt-file <the temp path>"
@@ -732,13 +734,13 @@
         "#### 5.3 Failure-driven proposal (MUST \u2014 the escalation last mile)",
         "#### 5.4 Managed documents",
         "#### 5.6 Second Brain promotion (cross-project durable knowledge)",
-        "#### 5.7 World state \u2014 two questions, answer-gated (intent layer)",
+        "#### 5.7 World state \u2014 three questions, answer-gated (intent layer)",
         "#### Judgment AC binding \u2014 independent rubric verdict (PLAN-judgment-ac-binding ADR-006)"
       ]
     }
   },
   "generated_by": "tests/structural/_instruction_baseline.py",
-  "payload_digest": "240e82dc7cd107920d46d580d97b38a6d29320ed8496c435d10eba562aa080e8",
-  "render_sha": "2fd69df7d203bd41b5d02dd91e032649273780a6",
+  "payload_digest": "654e924e3da1c27576795d2cb25cd95d07e4afa20bcc9c9d6aeb7088e4fe0053",
+  "render_sha": "6ef0bcf9f086fb48cbe7603e51dcdc03d6eed498",
   "schema_version": 2
 }

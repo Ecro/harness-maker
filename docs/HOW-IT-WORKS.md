@@ -1474,9 +1474,27 @@ at `make`), `.claude/world/{assumptions,outcomes}.yaml`, and `work-docs/INTENT-<
 objective record is that file's YAML frontmatter, not a separate `.claude/world/objectives/`
 YAML file (that path is retired; a file still there is diagnosed, never loaded). The markdown
 body carries the Playbook's five sections and is opaque bytes to every writer. All of it is read
-and written through `hm world {status|assume|outcome|objective}`. Nothing is measured automatically and
-nothing is written without an explicit human answer — the skill surfaces the current status and
-runs the write the operator confirms, never a background one.
+and written through `hm world {status|assume|outcome|objective}`. Nothing is written without an
+explicit human answer — the skill surfaces the current status and runs the write the operator
+confirms, never a background one; the one machine-produced value is the measured outcome below,
+and even that runs only when asked.
+
+**Measured outcomes (outcome-measure)**: an outcome may carry `measure: {cmd, select, cwd?,
+timeout_s?}` next to its human `how_measured`. `cmd` is an argv string (split with `shlex`,
+never a shell), `select` picks exactly one number out of stdout — `json:<dotted.path>` (integer
+segments index lists), `regex:<pattern with one group>` or `last-number` (the last float in
+stdout; `1e-3` and `.672` parse) — and `cwd` is `base` (default: `.claude/observability/` lives
+at the base root, which a task worktree does not have) or `checkout`. `hm world outcome measure
+<id>` and `--all` run the command under `timeout_s` (default 300), refuse a bool or non-finite
+result, and append a value row whose evidence is `auto: <argv> @ <short sha> exit=0
+cwd=<base|checkout>`; stdout is never stored and stderr reaches the diagnostic redacted and
+truncated. `--dry-run` runs and reports but the harness writes nothing. A non-zero exit, no
+number, a timeout or a manual outcome writes nothing and names the cause. The block joins
+`definition_hash` (an outcome without one hashes exactly as before), so editing `cmd`/`select`/
+`cwd`/`timeout_s` makes every earlier row `stale_definition`. `hm world gap` rows carry
+`measure: true|false`; the skill's "measure first" step runs the dry run and names the record
+call, and wrapup 5.7's third answer-gated question, "Measure outcomes now?", runs `--all` once
+on "yes".
 
 **Touchpoints in the atomic stages**: `/hm:plan` Step 0.5 loads status and asks one closed
 question when an objective needs a decision; `/hm:review` Step 3.3 checks the diff against the

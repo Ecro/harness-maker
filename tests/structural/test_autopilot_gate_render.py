@@ -55,6 +55,11 @@ Re-captures (append; never silently overwrite):
   question and a new Step 4.9 (the `objective new … --from-proposal --candidates 1` call after
   the interview). Verified before re-capture that `plan` is the ONLY moved command in every arm.
   Attributed in `work-docs/BASELINE-DELTA-objective-gap-proposal.md` §3.
+- **2026-09-17, `outcome-measure`** — `wrapup` moved in all four arms, identically in
+  `auto_safe` and `ask`: 5.7 gained the third answer-gated block (`outcome-measure` — "Measure
+  outcomes now?", one `hm world outcome measure --all` call) and its heading now says three
+  questions. Verified before re-capture that `wrapup` is the ONLY moved command in every arm.
+  Attributed in `work-docs/BASELINE-DELTA-outcome-measure.md` §3.
 """
 
 from __future__ import annotations

@@ -203,7 +203,8 @@ def test_ac_007_wrapup_supersedes_carries_claim(
     # the rendered invocation unable to satisfy world.observe's supersedes rule.
     assert "--claim" in observe_lines[0]
     assert "supersedes" in observe_lines[0]
-    assert wrapup.count("<!-- @hm:answer-gated:") == 2
+    # 2 at playbook-alignment; SPEC-outcome-measure S7 adds the third (`outcome-measure`) block.
+    assert wrapup.count("<!-- @hm:answer-gated:") == 3
     assert "Otherwise: write nothing" in block
 
 
@@ -293,3 +294,56 @@ def test_ac_005_plan_offers_draft_after_none_and_creates_at_step_4_9(
     ]
     assert len(call_lines) == 1, call_lines
     assert call_lines[0].lstrip().startswith(MANDATED_CALL_PREFIXES[target]), call_lines[0]
+
+
+# ── AC-007 (SPEC-outcome-measure) — the prose calls the verb ─────────────────
+
+
+@pytest.mark.parametrize("target", ["claude", "codex"])
+def test_ac_007_skill_and_wrapup_call_the_verb(
+    surface: dict[str, dict[str, str]], target: str
+) -> None:
+    """Phrases, marker name and ordering are fixed by SPEC S7 before the templates are edited."""
+    wrapup = _command(surface, target, "wrapup")
+    assert wrapup.index("@hm:answer-gated:outcome-measure") > wrapup.index(
+        "@hm:answer-gated:objective-close"
+    )
+    measure_block = _block(wrapup, "<!-- @hm:answer-gated:outcome-measure -->")
+    assert "Measure outcomes now?" in measure_block
+    record_calls = re.findall(r"hm world outcome measure --all(?! --dry-run)", measure_block)
+    assert len(record_calls) == 1, "exactly one bare record call (never the --dry-run preview)"
+    assert "--dry-run" not in measure_block
+    assert "write nothing" in measure_block
+    assert "hm world gap --json" in measure_block, "the listing source (ADR-006)"
+    yes = measure_block.index('If the answer is "yes":')
+    assert _in_order(measure_block[:yes], [ASK_TOKEN[target], "Measure outcomes now?"])
+    assert _in_order(
+        measure_block[yes:], ["hm world outcome measure --all", "Otherwise: write nothing"]
+    ), measure_block
+    assert "three questions" in wrapup
+    assert "two questions, answer-gated" not in wrapup
+
+
+@pytest.mark.parametrize(
+    ("target", "path"),
+    [
+        (Target.CLAUDE_CODE, ".claude/skills/intent-layer/SKILL.md"),
+        (Target.CODEX, ".agents/skills/intent-layer/SKILL.md"),
+    ],
+    ids=["claude", "codex"],
+)
+def test_ac_007_the_skill_measure_first_step_runs_the_verb(target: Target, path: str) -> None:
+    body = _skill_body(_render_target([target]), path)
+    # SPEC S7 names THE existing "measure first" step of "Proposing objectives" (SKILL.md.j2 step 2,
+    # the one unique `**measure first**` block); the step runs to the next numbered item, the next
+    # heading, or the end of the body — whichever comes first.
+    anchor = "**measure first**"
+    assert body.count(anchor) == 1, "the measure-first step must stay a single block"
+    step = body[body.index(anchor) :]
+    call = step.index("hm world outcome measure --all --dry-run")
+    end = re.search(r"\n(?:\d+\. |#)", step[call:])
+    item = step[: call + (end.start() if end else len(step) - call)]
+    assert re.search(r"hm world outcome measure --all(?! --dry-run)", item), (
+        "the record call (without --dry-run) is missing from the measure-first step"
+    )
+    assert "The rule for every write" in item, "the ask is deferred to the shared write rule"

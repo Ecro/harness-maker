@@ -228,7 +228,9 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # branches (codex / non-codex) at 3 lines each. This equality pin is the FOURTH normative site for
 # the wrapup body size, alongside `_ATOMIC_RATCHET`, `surface_baseline.json` and this task's
 # `surface_allowance`; a change to that command moves all four, which is worth stating once here.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 702), ("Production", 735)])
+# 702/735 → 709/742 (outcome-measure, 2026-09-17): wrapup 5.7's third answer-gated block
+# (`outcome-measure`, 7 body lines) — attributed in work-docs/BASELINE-DELTA-outcome-measure.md §3.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 709), ("Production", 742)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

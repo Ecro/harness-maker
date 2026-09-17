@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -193,3 +194,38 @@ def test_gap_proposal_lifecycle_from_an_unmeasured_world(project: Path) -> None:
     after = world.gap_report(project)
     assert after["objectives"]["OBJ-9"]["state"] == "active"
     assert world.status_report(project)["active"]["OBJ-9"]["approval_valid"] is True
+
+
+def test_outcome_measure_lifecycle_never_measured_to_measured_to_stale(project: Path) -> None:
+    """SPEC-outcome-measure end to end on a made project: an outcome with a `measure` block is
+    `never_measured` until the verb runs, `measured` with the right verdict after it (the row
+    hashed against the loaded definition), and `stale_definition` once the block is edited."""
+    intent_file = project / ".claude" / "intent.yaml"
+    (project / "probe.py").write_text("print('carry=0.5')\n", encoding="utf-8")
+    fx.dump(
+        intent_file,
+        fx.intent_doc(
+            fx.outcome(
+                "carry",
+                target=1,
+                higher_is_better=False,
+                measure={"cmd": f"{sys.executable} probe.py", "select": "regex:carry=([0-9.]+)"},
+            ),
+            mission="keep users",
+        ),
+    )
+    assert world.gap_report(project)["outcomes"]["carry"]["reason"] == "never_measured"
+    assert world.gap_report(project)["outcomes"]["carry"]["measure"] is True
+
+    result = world.measure_outcome(project, "carry")
+    assert (result["status"], result["value"]) == ("recorded", 0.5)
+    after = world.gap_report(project)["outcomes"]["carry"]
+    assert (after["reason"], after["gap"], after["last"]) == ("measured", "at_or_better", 0.5)
+    assert after["observed_at"] is not None
+
+    doc = fx.load(intent_file)
+    doc["outcomes"][0]["measure"]["select"] = "last-number"
+    fx.dump(intent_file, doc)
+    assert world.gap_report(project)["outcomes"]["carry"]["reason"] == "stale_definition"
+    assert world.measure_all(project, dry_run=True)["results"][0]["status"] == "would_record"
+    assert world.gap_report(project)["outcomes"]["carry"]["reason"] == "stale_definition"
