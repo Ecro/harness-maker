@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Sourced 10 of the 13 `unsourced` plan-stage step-sensitivity classes** (`src/harness_maker/step_sensitivity.py`):
+  a blind Codex classification against an external evidence bundle, reconciled with Claude's
+  own class-supporting citations under explicit ADR-003 §5 rules, gives each upgraded row a
+  falsifier and tracked excerpt instead of an inherited-from-a-neighbour guess. 3 rows stay
+  `unsourced` where the two readings disagreed with no resolving citation. `unsourced_step_share`
+  moves 47.1% (40/85) → 35.3% (30/85); objective `SOURCE-PLAN-STEPS`'s ≤31.8% target was missed
+  (a valid outcome under ADR-005 — the approved target of 20% is out of reach for a
+  plan-stage-only task). Registry, `MATRIX-native-redundancy.md` rows/census and CLAUDE.md's
+  count all stay in agreement; render output is unchanged.
+
 ## [0.57.1] - 2026-09-17
 
 Re-release of 0.57.0 with no code changes. The v0.57.0 tag was pushed, but its release

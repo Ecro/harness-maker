@@ -14,6 +14,8 @@ built through `interview._build_answers(preset=…)`, the only path that materia
 
 from __future__ import annotations
 
+import dataclasses
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -250,3 +252,46 @@ def test_docs_carry_classes() -> None:
     assert "renders_when" in claude_md
     for row in ss.matrix_rows(ss.REGISTRY):
         assert row in matrix, row[:80]
+
+
+_PLAN_SOURCE_DOC = "RESEARCH-source-plan-steps"
+_PLAN_TABLE = "## Table 2 — Final verdicts"
+
+
+def _table2_mismatches(registry: Sequence[ss.StepEntry], research: str) -> list[str]:
+    """Entries citing the plan-stage RESEARCH table must carry that table's final verdict.
+
+    `test_docs_carry_classes` derives every expected string from REGISTRY itself, so a registry
+    entry transcribed wrongly from its cited evidence stays green there. This binds the other
+    direction: registry ↔ the table the entry names as its source, both ways.
+    """
+    section = research.split(_PLAN_TABLE, 1)[1].split("\n## ", 1)[0]
+    table: dict[str, tuple[str, str]] = {}
+    for line in section.splitlines():
+        cells = [c.strip() for c in line.split("|")]
+        if len(cells) > 6 and cells[1].startswith(("Step ", "Phase ", "Check ")):
+            table[cells[1]] = (cells[4].split()[0], cells[5])
+    cited = {
+        e.ordinal: e
+        for e in registry
+        if e.stage == "plan" and e.source.startswith(f"{_PLAN_SOURCE_DOC} Table 2")
+    }
+    out = [f"{o}: in table, registry does not cite it" for o in table if o not in cited]
+    out += [f"{o}: registry cites the table, no row" for o in cited if o not in table]
+    for o, e in cited.items():
+        if o in table and (e.cls, e.grade) != table[o]:
+            out.append(f"{o}: registry {(e.cls, e.grade)} != table {table[o]}")
+    return out
+
+
+def test_plan_entries_match_their_research_table() -> None:
+    research = (REPO_ROOT / "work-docs" / f"{_PLAN_SOURCE_DOC}.md").read_text(encoding="utf-8")
+    assert _table2_mismatches(ss.REGISTRY, research) == []
+    # Negative control: one entry transcribed with the wrong grade must be caught by name.
+    wrong = tuple(
+        dataclasses.replace(e, grade="**") if (e.stage, e.ordinal) == ("plan", "Step 5") else e
+        for e in ss.REGISTRY
+    )
+    assert _table2_mismatches(wrong, research) == [
+        "Step 5: registry ('INV', '**') != table ('INV', '*')"
+    ]

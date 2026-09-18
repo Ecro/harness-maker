@@ -22,7 +22,8 @@ context window, a deterministic oracle, a human lock-in, or heterogeneity. TUNE:
 per model; never transferred without re-measurement (harness-bench "reversed between models").
 
 Grades follow harness-bench: ``***`` reproduced across models/conditions, ``**`` measured once,
-``*`` judgement, ``unsourced`` inherited from a neighbour with no RESEARCH row (ADR-009).
+``*`` judgement, ``unsourced`` no evidence meeting the bar — either inherited from a neighbour
+with no RESEARCH row (ADR-009), or researched and none found (the source names that row).
 """
 
 from __future__ import annotations
@@ -97,6 +98,9 @@ _R = "RESEARCH-workflow-steps-vs-model-capability Table 1"
 #: SPEC-intent-world-model-objective-layer: the two intent-layer headings are graded from that
 #: task's own RESEARCH row (state and human lock-ins survive model change), never `unsourced`.
 _R_INTENT = "RESEARCH-cell-dev-future-and-intent-layer-fit: state + human lock-ins survive"
+#: SOURCE-PLAN-STEPS: the plan stage's formerly inherited entries, graded against a class-property
+#: evidence bar (that doc's Method); Claude-only after the blind Codex reading was voided.
+_R_PLAN = "RESEARCH-source-plan-steps Table 2"
 
 REGISTRY: tuple[StepEntry, ...] = (
     # ── research ───────────────────────────────────────────────────────────
@@ -128,7 +132,14 @@ REGISTRY: tuple[StepEntry, ...] = (
     _u("spec", "Step 4.5", "INV", "spec Step 4", note="quality gate over the same payload"),
     _u("spec", "Step 5", "INV", "spec Step 3", note="status write"),
     # ── plan ───────────────────────────────────────────────────────────────
-    _u("plan", "Step 0", "INV", "spec Step 0", note="mechanical skip heuristic"),
+    _e(
+        "plan",
+        "Step 0",
+        "INV",
+        "unsourced",
+        f"{_R_PLAN}; no INV property found (model-applied table) but no source for COMP either",
+        note="interview skip heuristic",
+    ),
     _e(
         "plan",
         "Step 0.5",
@@ -138,9 +149,30 @@ REGISTRY: tuple[StepEntry, ...] = (
         note="intent layer; one line when unused",
     ),
     _e("plan", "Step 1", "HOST", "*", f"{_R}; plan mode is native in all three vendors"),
-    _u("plan", "Step 1.5", "INV", "plan Step 2", note="loop-mode detection (state)"),
-    _u("plan", "Step 1.7", "INV", "spec Step 4", note="spec-need detection; spec-driven arm"),
-    _u("plan", "Step 2", "INV", "plan Step 3", note="SPEC inheritance check (state)"),
+    _e(
+        "plan",
+        "Step 1.5",
+        "INV",
+        "*",
+        f"{_R_PLAN}; state: loop.md.j2 writes the session marker, a later plan reads it",
+        note="loop-mode detection",
+    ),
+    _e(
+        "plan",
+        "Step 1.7",
+        "INV",
+        "*",
+        f"{_R_PLAN}; state: resume marker read by the next invocation, verdict by verify Check 6",
+        note="spec-need detection; spec-driven arm",
+    ),
+    _e(
+        "plan",
+        "Step 2",
+        "INV",
+        "*",
+        f"{_R_PLAN}; state: spec Step 5 writes SPEC status, plan reads it in a later stage",
+        note="SPEC inheritance check",
+    ),
     _e(
         "plan",
         "Step 3",
@@ -152,7 +184,14 @@ REGISTRY: tuple[StepEntry, ...] = (
         ordering="le",
         note="None = unlimited = +inf",
     ),
-    _u("plan", "Step 3.0", "INV", "plan Step 3", note="brief lock-in confirmation (human gate)"),
+    _e(
+        "plan",
+        "Step 3.0",
+        "INV",
+        "*",
+        f"{_R_PLAN}; human gate: the operator alone picks proceed / one question / full interview",
+        note="brief lock-in confirmation",
+    ),
     _e(
         "plan",
         "Step 4",
@@ -163,7 +202,14 @@ REGISTRY: tuple[StepEntry, ...] = (
         remeasure_on=("model_release",),
         measure_cmd=_LEDGER,
     ),
-    _u("plan", "Step 4.4", "INV", "plan Step 6", note="revision-size measurement (mechanical)"),
+    _e(
+        "plan",
+        "Step 4.4",
+        "INV",
+        "*",
+        f"{_R_PLAN}; oracle: review_churn.measure ratio + plan_rounds stale threshold",
+        note="revision-size measurement; optional",
+    ),
     _e(
         "plan",
         "Step 4.5",
@@ -171,25 +217,62 @@ REGISTRY: tuple[StepEntry, ...] = (
         "**",
         f"{_R}; single-pass policy (feedback_plan_validator_single_pass)",
     ),
-    _u(
+    _e(
         "plan",
         "Step 4.9",
         "INV",
-        "plan Step 0.5",
+        "*",
+        f"{_R_PLAN}; human gate: write only on Step 0.5 consent, approval is a separate human verb",
         note="objective draft consented at 0.5; one answer-gated write, approve stays human",
     ),
-    _u("plan", "Step 5", "INV", "spec Step 3", note="PLAN write"),
-    _u("plan", "Step 6", "INV", "spec Step 4", note="write verification"),
-    _u(
+    _e(
+        "plan",
+        "Step 5",
+        "INV",
+        "*",
+        f"{_R_PLAN}; state: PLAN read by execute, the objective gate and verify Check 6",
+        note="PLAN write",
+    ),
+    _e(
+        "plan",
+        "Step 6",
+        "INV",
+        "unsourced",
+        f"{_R_PLAN}; tie: model-executed checks (not an oracle), no source for COMP",
+        note="write verification; only guard of an absent spec_need_verdict",
+    ),
+    _e(
         "plan",
         "Step A",
         "COMP",
-        "research Phase 0.5",
+        "unsourced",
+        f"{_R_PLAN}; both readings COMP, neither has evidence; origin is operator comprehension",
         note="render-format instruction for the interview UI",
     ),
-    _u("plan", "Step B", "INV", "plan Step 3", note="AskUserQuestion round (human gate)"),
-    _u("plan", "Step C", "INV", "plan Step 5", note="interview entry record (state)"),
-    _u("plan", "Step D", "INV", "plan Step 3", note="ADR promotion (human lock-in)"),
+    _e(
+        "plan",
+        "Step B",
+        "INV",
+        "*",
+        f"{_R_PLAN}; human gate: unresolved rounds set --judgment-gate pending",
+        note="AskUserQuestion round",
+    ),
+    _e(
+        "plan",
+        "Step C",
+        "INV",
+        "*",
+        f"{_R_PLAN}; state: transcript persisted and handed to the validator context",
+        note="interview entry record",
+    ),
+    _e(
+        "plan",
+        "Step D",
+        "INV",
+        "*",
+        f"{_R_PLAN}; state: ADRs read as binding by execute and by loop-mode plans",
+        note="ADR promotion (human lock-in)",
+    ),
     _e(
         "plan",
         "Step E",

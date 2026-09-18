@@ -6,7 +6,7 @@ hypothesis: plan 의 unsourced 13개 step 에 검증 가능한 근거를 연결�
 scope:
 - 13개 step 의 코드·계약·관측 근거와 반례를 RESEARCH 에 기록하고 레지스트리 등급 갱신
 outcome_id: unsourced_step_share
-state: active
+state: closed
 created_at: '2026-09-18T11:23:50Z'
 schema_version: 1
 non_scope:
@@ -19,9 +19,11 @@ approval:
   approved_at: '2026-09-18T11:25:26Z'
   approved_target: 20
 revisit_when: null
-observed: null
-note: null
-closed_at: null
+observed: missed
+note: '10 of 13 plan steps sourced (all *); unsourced_step_share 47.1 -> 35.3 vs hypothesis
+  <=31.8. Left unsourced: Step 0, 6, A. Codex blind reading voided per ADR-003 4;
+  Step 6 is the only guard of an absent spec_need_verdict.'
+closed_at: '2026-09-18T13:06:50Z'
 ---
 ## Problem
 
