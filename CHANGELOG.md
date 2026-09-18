@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`hm world assume add` and content-fingerprint evidence locators.** The assumption layer had
+  no way in — only `observe`/`resolve` on existing records — so `depends_on` and assumption
+  revisits had nothing to point at. `add` creates a record (refusing an existing id or
+  `conflict`); `--locator <path:A-B>` on `add`/`observe` cites up to 40 lines of the checkout by
+  whitespace-normalised sha256 (never a commit SHA — wrapup records before its commit and
+  `task-land` squashes), refused at record time if the citation does not exist. `hm world gap
+  --json` gains `assumptions`, `stale_evidence`, `moved_evidence` and `needs_revalidation`;
+  `hm world status` is unchanged and never reads cited files. Wrapup 5.7's assumption question
+  now lists stale assumptions first and offers "new — record an assumption" (four options at
+  most), showing the exact `add` arguments and asking once more before writing; the
+  `intent-layer` skill lists the verb. `add`/`observe`/`resolve` now hold a per-file
+  RMW lock (`observe`/`resolve` wrote unlocked before). Limitation: a locator detects drift in
+  cited code, not in claims about external tools (Claude Code, Codex, `agy`) — probe-backed
+  checks are a follow-up.
+
 ### Changed
 
 - **`hm world gap --json` gains a `withdrawal` block** (intent-layer-ops): the intent layer's

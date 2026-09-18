@@ -1,0 +1,371 @@
+schema_version: 2
+spec_slug: assumption-entry-and-evidence-locator
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: 'Tier-1: add is the only entry to the assumption record
+  that depends_on and revisit_when reference, and the fingerprint/relocation logic
+  decides whether a stale citation is reported at all. A surviving mutant in normalization
+  silently reports changed code as fresh; one in the authoritative-evidence selection
+  keeps a cleared assumption stale forever. Scope is world.py and evidence_locator.py.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/world.py
+- src/harness_maker/evidence_locator.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: add creates the assumption record
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_assume_add.py::test_ac_001_add_creates_record
+  executable_predicate: yaml.safe_load(assumptions_file.read_text()) == expected_doc
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: expected_doc is hand-written from S1's literal record shape before
+    add exists; it is not read back from the writer.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: add refusals write nothing and name the field
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_assume_add.py::test_ac_002_add_refusals_write_nothing
+  executable_predicate: all(r.returncode != 0 and field in (r.stdout + r.stderr) and
+    snapshot_after(r) == snapshot_before for r, field in refused_runs)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The six refused inputs and their field names are enumerated in
+    S2 before implementation; the byte snapshot compares raw file bytes, independent
+    of any validator output.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: locator is validated and fingerprinted at record time
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_evidence_locator.py::test_ac_003_locator_validated_and_fingerprinted
+  executable_predicate: stored_locator == EXPECTED_LOCATOR and all(snapshot_after(r)
+    == snapshot_before for r in refused_runs)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: EXPECTED_LOCATOR holds path, lines, k counted by hand from the
+    fixture, and a literal sha256 computed once by hand (hashlib over the normalization
+    rule in Constraints) and pasted into the test; the refused locators come from
+    S3.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: fingerprint is whitespace-invariant and token-sensitive
+  type: property
+  test_ids:
+  - tests/unit/test_world_evidence_locator.py::test_ac_004_fingerprint_whitespace_invariant
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation follows from the Constraints definition of normalization
+    (whitespace runs collapse, empty lines drop) and holds for any text regardless
+    of how fingerprinting is implemented; the token-change half is its converse.
+  oracle_independence_waiver: null
+  input_domain: lists of lines of printable text, including leading/trailing spaces,
+    tabs, CRLF endings and blank lines
+  transformation: apply a whitespace-only perturbation (reindent, trailing spaces,
+    CRLF, insert blank lines) vs a non-whitespace edit
+  expected_relation: fp(perturb_ws(x)) == fp(x) and fp(edit_token(x)) != fp(x)
+  preconditions:
+  - x contains at least one non-whitespace character
+  observable_output: lowercase hex sha256 string
+  generator_hint: hypothesis text strategy over a small alphabet plus whitespace
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: status derives fresh, moved, changed and missing without writing
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_evidence_locator.py::test_ac_005_gap_derives_freshness
+  executable_predicate: report['stale_evidence'] == EXPECTED_STALE and report['moved_evidence']
+    == EXPECTED_MOVED and 'plain' in report['assumptions'] and world_bytes_after ==
+    world_bytes_before and set(status_report(root)) == FROZEN_STATUS_KEYS
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Four hand-built fixture files each realize one S4 case; MOVED_LINE
+    is the line the test itself inserted the snippet at, not a value read from status.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: only the latest locator-bearing evidence decides staleness
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_evidence_locator.py::test_ac_006_latest_locator_is_authoritative
+  executable_predicate: '''x'' not in after_reconfirm[''stale_evidence''] and old_entry_after
+    == old_entry_before and ''y'' in with_newer_plain_entry[''stale_evidence'']'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Scenario S5 fixes the expected set membership; the old entry is
+    compared to its pre-call copy, so immutability is checked against a value captured
+    before the verb ran.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: staleness propagates to dependent objectives only while non-terminal
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_evidence_locator.py::test_ac_007_staleness_propagates_to_objectives
+  executable_predicate: sorted(gap['needs_revalidation']) == ['A', 'P'] and derive(w,
+    'A', staleness=stale).needs_revalidation and not derive(w, 'A').needs_revalidation
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expectation is the S6 table (non-terminal listed, terminal
+    not; derive without staleness unchanged), written before derive changes.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: concurrent writers keep both rows
+  type: mechanical
+  test_ids:
+  - tests/integration/test_world_assume_concurrency.py::test_ac_008_concurrent_writers_keep_both_rows
+  executable_predicate: held_bytes_unchanged and write_landed_after_release and all({'a','b'}
+    <= ids_after(run) for run in add_add_runs) and all(evidence_delta(run) == 1 for
+    run in add_observe_runs)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The held-lock arm waits for a positive contention signal (the writer's
+    first retry) before comparing bytes, so an unlocked writer fails it; the race
+    arms expect exactly what the processes were told to write, independent of the
+    lock code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: a v1 file without locators loads unchanged
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_evidence_locator.py::test_ac_009_v1_file_without_locator_loads
+  executable_predicate: validate_assumptions(v1_fixture) == [] and gap_of(v1_fixture)['stale_evidence']
+    == {} and any('evidence[0].locator' in b for b in gap_of(bad_locator_fixture)['broken_references'])
+    and 'x' in load_world(bad_root).assumptions and 'OBJ' not in load_world(bad_root).broken
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: v1_fixture is copied from a pre-change assumptions.yaml shape defined
+    in SPEC-intent-world-model-objective-layer, not generated by the new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: wrapup 5.7 offers add and lists stale assumptions first
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer_assume_add.py::test_ac_010_wrapup_offers_add_and_lists_stale_first
+  executable_predicate: all(STALE_LABEL in b and NEW_LABEL in b and b.index(ADD_CMD)
+    < b.index(OTHERWISE) for b in assumption_blocks)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The marker order is fixed by the earlier SPEC's Wrapup-questions
+    row; STALE_LABEL='(cited code changed)', NEW_LABEL='new — record an assumption'
+    and ADD_CMD='hm world assume add <id> --claim' are the literals SPEC S8 / AC-010
+    name, written into the test before the template edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: the skill lists the add and locator argument forms
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer_assume_add.py::test_ac_011_skill_lists_add_and_locator
+  executable_predicate: all('hm world assume add' in s and '--locator' in s and s.count('\n')
+    <= 120 for s in rendered_skills)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The 120-line bound is the Skill-contract row of the earlier SPEC;
+    the literals are the CLI forms S1 and S3 define.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: surface growth declared and retired
+  type: mechanical
+  test_ids:
+  - tests/structural/test_assumption_entry_invariance.py::test_ac_012_surface_pinned_and_allowance_retired
+  executable_predicate: all(live[a][c] == pin[a][c] for a in pin for c in ('plan','review','help'))
+    and (growth <= allowance if allowance else live_wrapup == pinned_wrapup)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The pin is taken in Phase 0 before any template edit, so it cannot
+    be derived from the new render; while an allowance is declared wrapup is bounded
+    by it, after retirement wrapup is byte-identical to the re-pin.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-013
+  title: add prints a changed line
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_assume_add.py::test_ac_013_add_prints_changed_line
+  executable_predicate: '''changed: assumptions.yaml'' in ok.stdout and ''changed:''
+    not in refused.stdout'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The literal is what observe and resolve print today (read from
+    the shipped CLI before add exists), so add is checked against its siblings, not
+    itself.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

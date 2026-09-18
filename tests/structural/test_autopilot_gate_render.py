@@ -72,6 +72,12 @@ Re-captures (append; never silently overwrite):
   `[intent] withdrawal criterion met …` when the `gap` output reports `withdrawal.due` (zero new
   calls). Verified before re-capture that `wrapup` is the ONLY moved command in every arm.
   Attributed in `work-docs/BASELINE-DELTA-intent-layer-ops.md` §3.
+- **2026-09-18, `assumption-entry-and-evidence-locator`** — `wrapup` moved in all four arms,
+  identically in `auto_safe` and `ask`: 5.7's assumption block gained the "new — record an
+  assumption" option (one `hm world assume add` call), the four-option cap with stale-first ids
+  from `hm world gap --json`, and `[--locator <path:A-B>]` on the observe line. Verified before
+  re-capture that `wrapup` is the ONLY moved command in every arm. Attributed in
+  `work-docs/BASELINE-DELTA-assumption-entry-and-evidence-locator.md` §3.
 """
 
 from __future__ import annotations

@@ -232,7 +232,9 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # (`outcome-measure`, 7 body lines) — attributed in work-docs/BASELINE-DELTA-outcome-measure.md §3.
 # 709/742 → 711/744 (intent-layer-ops, 2026-09-18): wrapup 5.7 gained the one-sentence
 # `withdrawal.due` line after the outcome-measure block (the sentence + its blank line).
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 711), ("Production", 744)])
+# 711/744 → 713/746 (assumption-entry-and-evidence-locator, 2026-09-18): the 5.7 assumption
+# block gained the "new" branch — one prose line and one `hm world assume add` call line.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 713), ("Production", 746)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

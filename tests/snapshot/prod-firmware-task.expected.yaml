@@ -94,7 +94,7 @@ files:
   body_sha256: cd3b7b880b6667063f3a288cc7d8d980f4e11fed08c89659f7da9dc0a45414f4
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: c3a0931e6a916217125d790543a2be8b2d0249355c4e98069541ea17b184c104
+  body_sha256: e9701e71e1407d0e16237b99ae914edc5cd7998314d21c6b92c4dc75726882c4
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
   body_sha256: 001b2d2923dff8f1a38f0e7af40e3a6b9b0398025c99b88802c4003b8ba0788e
@@ -142,7 +142,7 @@ files:
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 - path: skills/intent-layer/SKILL.md
   template: skills/intent-layer/SKILL.md.j2
-  body_sha256: eb7622f07593ce8ea9fc6a1e0f06375ff24b50441cfb48524c8154e0400631f8
+  body_sha256: 440122aa85590eec79458b1f2ba98ba69c0e9cc9d542ab1af102f20b7ab9beff
 - path: skills/refdocs-search/SKILL.md
   template: skills/refdocs-search/SKILL.md.j2
   body_sha256: cc7d9e2c7dbc02ded11f10bf3acdc9132aba55794452d933a8397d90fe8c8380
@@ -181,4 +181,4 @@ files:
   body_sha256: 533973709f1ec6c1b2bed269e0caec4f83a19b3f8d599c4cb1b7bd3f6278e09f
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 097f8de0556001c505504f6b3f16f9906bdb71475959e9a8bcb11b6879a69b72
+  body_sha256: 536971edadc1aae3eeb86f9527b78344e2f1aefc6ee09cb059c5e4d5efbaf90d

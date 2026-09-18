@@ -1,0 +1,20 @@
+schema_version: 1
+assumptions:
+- id: revalidation_is_report_only
+  claim: 'needs_revalidation is a report only: the autopilot objective gate reads
+    approval_valid from derive() without a staleness map, so stale cited code never
+    halts autopilot'
+  status: known
+  evidence:
+  - text: 'verified during the assumption-entry-and-evidence-locator review: autopilot_caps
+      calls world.derive(loaded, raw) and reads only approval_valid'
+    observed_at: '2026-09-18T21:54:00Z'
+    relation: confirms
+    locator:
+      path: src/harness_maker/autopilot_caps.py
+      lines:
+      - 316
+      - 318
+      fingerprint: 0046f96eb439b879d96f5dfaac80b4b967ba141aa1833d57042b79138d889e68
+      k: 3
+  history: []

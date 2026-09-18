@@ -1513,10 +1513,28 @@ is real, `wrapups_since_fill >= 10`, and both `objectives_observed` and `revisit
 are zero. `status --json` is unaffected — the block lives in `gap` only. Wrapup 5.7 prints the
 criterion once when `due` is true, after the outcome-measure question, and nothing otherwise.
 
+**Assumptions and cited code (assumption-entry-and-evidence-locator)**: `hm world assume add <id>
+--claim --status <known|assumed|unknown> [--text --observed-at] [--locator <path:A-B>]` is the
+only way into `assumptions.yaml` — it refuses an existing id (never upserts) and `conflict`, which
+only a `contradicts` observation produces. `--locator` (also on `observe`) cites at most 40 lines
+of the current checkout and stores `{path, lines, fingerprint, k}`: a sha256 of the span with
+whitespace normalised away, never a commit SHA — wrapup records before its commit and `task-land`
+squashes the task branch, so a SHA would be stale on arrival. A missing path, `..`, an absolute
+path, a span past the end or an all-blank span is refused when recorded. `hm world gap --json`
+then lists every assumption and, from each one's latest locator-bearing evidence (compared as
+instants, not strings), reports `stale_evidence` (`changed` / `missing`), `moved_evidence` (same
+text, new start line) and `needs_revalidation` for non-terminal objectives that `depends_on` a
+stale one. `status` is untouched and never reads a cited file, nor does the autopilot gate; a
+malformed stored locator is listed in `broken_references` and never breaks a dependent objective.
+Re-confirming with a fresh `--locator` clears the report without rewriting history. A locator
+catches drift in code the claim cites; it does not re-check claims about external tools.
+`add`, `observe` and `resolve` share one RMW lock per file (`.hm-world-<stem>.lock`).
+
 **Touchpoints in the atomic stages**: `/hm:plan` Step 0.5 loads status and asks one closed
 question when an objective needs a decision; `/hm:review` Step 3.3 checks the diff against the
 PLAN's linked objective (`scope_drift`, P2, main-loop — not an eighth lens); `/hm:wrapup` Step
-5.7 offers to log an assumption observation or close an objective, each answer-gated. A fourth
+5.7 offers to log an assumption observation (stale ones first, from `gap`), record a new
+assumption, or close an objective, each answer-gated. A fourth
 autopilot gate, `objective_gate`, runs after every existing check in `autopilot_caps.py` and can
 only replace an `advance` with a halt — a PLAN with no `objective:` link is unaffected.
 

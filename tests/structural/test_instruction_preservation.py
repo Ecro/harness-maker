@@ -204,6 +204,16 @@ _WRAPUP_57_OBSERVE_LINE_PRE_CLAIM: tuple[str, ...] = (
     " --observed-at <ISO-8601 UTC>",
 )
 
+#: assumption-entry-and-evidence-locator AC-010: the same observe line gained
+#: `[--locator <path:A-B>]` (content-fingerprint evidence). Not removed — it renders with more
+#: text — so the exact pre-change string leaves the baseline. Both arms: 5.7 is ungated by dev_mode.
+_WRAPUP_57_OBSERVE_LINE_PRE_LOCATOR: tuple[str, ...] = (
+    "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id>"
+    ' --relation <confirms|supersedes|contradicts> --text "<what was observed>"'
+    ' --observed-at <ISO-8601 UTC> [--claim "<new claim>" \u2014 required when the relation is'
+    " supersedes]",
+)
+
 _STEP_C2_PRE_MERGE_HEADING: tuple[str, ...] = (
     "### Step C2 — Dispatch all 7 lenses over `review_base..<freeze commit>`",
 )
@@ -215,6 +225,10 @@ _WRAPUP_57_TWO_QUESTIONS_HEADING: tuple[str, ...] = (
 )
 
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    "assumption-entry-and-evidence-locator": {
+        "wrapup@task-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_LOCATOR),
+        "wrapup@spec-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_LOCATOR),
+    },
     "outcome-measure": {
         "wrapup@task-driven": list(_WRAPUP_57_TWO_QUESTIONS_HEADING),
         "wrapup@spec-driven": list(_WRAPUP_57_TWO_QUESTIONS_HEADING),

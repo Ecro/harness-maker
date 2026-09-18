@@ -17,7 +17,8 @@ free to run whenever the operator asks where things stand. Every other verb writ
 ```
 hm world status --json
 hm world gap --json
-hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text --observed-at [--claim]
+hm world assume add <id> --claim --status <known|assumed|unknown> [--text --observed-at [--locator <path:A-B>]]
+hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text --observed-at [--claim] [--locator <path:A-B>]
 hm world assume resolve <id> --status --claim
 hm world outcome record <id> --value --observed-at --evidence
 hm world objective new <id> --title --hypothesis --scope --outcome [--non-scope] [--from-proposal --candidates <N> [--declined <title>]…]
@@ -30,6 +31,8 @@ hm world objective show <id> --json
 Prefix each with `uv run --with {{ harness_maker_src_path }}` as every other mandated call
 in this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp; `supersedes`
 needs `--claim`; `close` needs both `--observed` and `--note`.
+`--locator <path:A-B>` cites at most 40 lines of this checkout by content; `gap --json` then
+reports `stale_evidence` when that text changed (`hm world status` never reads cited files).
 
 ## The rule for every write
 

@@ -249,7 +249,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `hm world outcome measure --all` once on "yes". Declared in that PLAN's
     # `surface_allowance.round_trips` with the call and attributed in
     # `work-docs/BASELINE-DELTA-outcome-measure.md` §3.
-    "wrapup": 29,
+    # 29 → 30 (assumption-entry-and-evidence-locator, 2026-09-18): 5.7's assumption block runs
+    # `hm world assume add` once on "new". Declared in that PLAN's `surface_allowance.round_trips`
+    # and attributed in `work-docs/BASELINE-DELTA-assumption-entry-and-evidence-locator.md` §3.
+    "wrapup": 30,
 }
 
 

@@ -47,7 +47,7 @@ MODULES: dict[str, ModuleSpec] = {
     # ── argparse-subparser (guarded) ──
     "autopilot_caps": ModuleSpec("subparser", _s("boundary", "gate-blocked")),
     # SPEC-intent-world-model-objective-layer ADR-001: one module, four verbs; `assume`,
-    # `outcome` and `objective` carry their own sub-verbs (observe/resolve, record, approve…).
+    # `outcome` and `objective` carry their own sub-verbs (add/observe/resolve, record, approve…).
     "world": ModuleSpec(
         "subparser",
         _s(
@@ -58,6 +58,7 @@ MODULES: dict[str, ModuleSpec] = {
             "objective",
             "observe",
             "resolve",
+            "add",
             "record",
             "measure",
             "new",

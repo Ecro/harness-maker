@@ -19,7 +19,7 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -28,8 +28,9 @@ from typing import Any
 
 import yaml
 
-from harness_maker import autopilot_ledger, command_registry, stage_spans
+from harness_maker import autopilot_ledger, command_registry, evidence_locator, stage_spans
 from harness_maker import intent as intent_mod
+from harness_maker.evidence_locator import Freshness
 from harness_maker.frontmatter import split_frontmatter
 from harness_maker.intent import (
     Intent,
@@ -52,6 +53,7 @@ TERMINAL_STATES: frozenset[str] = frozenset({"closed", "dropped"})
 OBSERVED_VALUES: tuple[str, ...] = ("met", "missed", "no_data")
 REVISIT_OPS: tuple[str, ...] = ("<", "<=", ">", ">=", "==")
 SUBCOMMANDS: tuple[str, ...] = ("status", "assume", "outcome", "objective")
+STALE_STATES: frozenset[str] = frozenset({"changed", "missing"})
 
 #: SPEC "Transitions": every other pair over the four states is refused. `dropped→proposed`
 #: is the reopen, which clears the approval block; `proposed→active` needs a valid approval.
@@ -368,7 +370,9 @@ def _validate_assumption_record(
                 errors.append(IntentError(ep, "must be a mapping"))
                 continue
             for key in _EVIDENCE_KEYS:
-                if key not in ev:
+                # A locator-bearing entry's stamp belongs to ADR-008's channel (reported by
+                # `_locator_problems`, never fatal): here it would drop the whole ledger.
+                if key not in ev and not (key == "observed_at" and "locator" in ev):
                     errors.append(IntentError(f"{ep}.{key}", "missing"))
             if "text" in ev and (not isinstance(ev["text"], str) or not ev["text"].strip()):
                 errors.append(IntentError(f"{ep}.text", "must be a non-empty string"))
@@ -581,6 +585,7 @@ def load_world(root: Path) -> World:
             raw, _ = _read_yaml(apath)
             for rec in raw["assumptions"]:
                 world.assumptions[rec["id"]] = rec
+            world.errors.extend(_locator_problems(apath.name, raw["assumptions"]))
     opath = outcomes_path(root)
     if opath.exists():
         o_errors = validate_outcomes(opath, intent_outcomes=outcomes)
@@ -632,8 +637,14 @@ def load_world(root: Path) -> World:
     return world
 
 
-def derive(world: World, objective_id: str) -> Derived:
-    """`approval_valid` and `needs_revalidation`, computed — never read from a file."""
+def derive(
+    world: World, objective_id: str, *, staleness: Mapping[str, Freshness] | None = None
+) -> Derived:
+    """`approval_valid` and `needs_revalidation`, computed — never read from a file.
+
+    Cited-code staleness counts only when the caller hands in a map (`gap`): `status`, the
+    autopilot gate and transitions call this without one, so they never read a cited file.
+    """
     rec = world.objectives.get(objective_id)
     if rec is None:
         raise WorldError("objective", f"{objective_id!r} is not a loadable objective")
@@ -646,11 +657,71 @@ def derive(world: World, objective_id: str) -> Derived:
         outcome = world.outcome_by_id.get(str(rec.get("outcome_id")))
         if outcome is not None:
             valid = approval.get("content_hash") == approval_hash(rec, outcome.target)
+    stale = staleness or {}
     needs = any(
         world.assumptions.get(dep, {}).get("status") == "conflict"
+        or (dep in stale and stale[dep].state in STALE_STATES)
         for dep in rec.get("depends_on") or []
     )
     return Derived(approval_valid=valid, needs_revalidation=needs)
+
+
+def _aware_instant(raw: Any) -> datetime | None:
+    """A stored `observed_at` as an instant; anything that is not an aware ISO string is None."""
+    if not isinstance(raw, str):
+        return None
+    text = raw.strip()
+    try:
+        parsed = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _locator_problems(file_name: str, records: list[dict[str, Any]]) -> list[IntentError]:
+    """Reported, never fatal (ADR-008): a bad locator must not make a dependent objective broken."""
+    problems: list[IntentError] = []
+    for i, rec in enumerate(records):
+        for j, ev in enumerate(rec.get("evidence") or []):
+            if not isinstance(ev, dict) or "locator" not in ev:
+                continue
+            prefix = f"{file_name}:assumptions[{i}].evidence[{j}]"
+            err = evidence_locator.shape_error(ev["locator"])
+            if err is not None:
+                problems.append(IntentError(f"{prefix}.locator", f"{err}; ignored for staleness"))
+            elif _aware_instant(ev.get("observed_at")) is None:
+                problems.append(
+                    IntentError(
+                        f"{prefix}.observed_at",
+                        "not an aware ISO-8601 string; this locator is ignored for staleness",
+                    )
+                )
+    return problems
+
+
+def _authoritative_locator(rec: dict[str, Any]) -> dict[str, Any] | None:
+    """The latest usable locator by instant, ties to the later entry — never by string order."""
+    best: tuple[datetime, int] | None = None
+    chosen: dict[str, Any] | None = None
+    for j, ev in enumerate(rec.get("evidence") or []):
+        if not isinstance(ev, dict) or evidence_locator.shape_error(ev.get("locator")) is not None:
+            continue
+        instant = _aware_instant(ev.get("observed_at"))
+        if instant is None:
+            continue
+        if best is None or (instant, j) >= best:
+            best, chosen = (instant, j), ev["locator"]
+    return chosen
+
+
+def staleness(world: World) -> dict[str, Freshness]:
+    """Classify each assumption's authoritative locator against the current checkout."""
+    out: dict[str, Freshness] = {}
+    for aid, rec in world.assumptions.items():
+        locator = _authoritative_locator(rec)
+        if locator is not None:
+            out[aid] = evidence_locator.classify(world.root, locator)
+    return out
 
 
 @dataclass(frozen=True)
@@ -934,6 +1005,9 @@ def gap_report(root: Path) -> dict[str, Any]:
     outcome cannot be judged (`never_measured` vs `stale_definition`, which `gap` folds into one
     `unevaluable`). The invalid world returns `status_report`'s payload verbatim: one shape.
     One `load_world` feeds both halves, so a row can never mix two disk snapshots.
+
+    Cited-code staleness lives here and only here (ADR-007): it reads every cited file, and
+    `status` is the free read path whose payload is frozen.
     """
     try:
         world = load_world(root)
@@ -962,6 +1036,22 @@ def gap_report(root: Path) -> dict[str, Any]:
     for oid, rec in sorted(world.objectives.items()):
         report["objectives"][oid] = {key: rec.get(key) for key in _GAP_OBJECTIVE_KEYS}
     report["withdrawal"] = withdrawal_report(world, root, status["fired_revisits"])
+    stale = staleness(world)
+    report["assumptions"] = {
+        aid: world.assumptions[aid].get("status") for aid in sorted(world.assumptions)
+    }
+    report["stale_evidence"] = {
+        aid: f.state for aid, f in sorted(stale.items()) if f.state in STALE_STATES
+    }
+    report["moved_evidence"] = {
+        aid: f.line for aid, f in sorted(stale.items()) if f.state == "moved"
+    }
+    report["needs_revalidation"] = [
+        oid
+        for oid, rec in sorted(world.objectives.items())
+        if rec.get("state") not in TERMINAL_STATES
+        and derive(world, oid, staleness=stale).needs_revalidation
+    ]
     return report
 
 
@@ -994,6 +1084,7 @@ def observe(
     observed_at: str,
     relation: str,
     claim: str | None = None,
+    locator: str | None = None,
 ) -> dict[str, Any]:
     """File an observation by relation; `contradicts` → conflict with both sides kept."""
     if relation not in RELATIONS:
@@ -1003,17 +1094,17 @@ def observe(
     stamp = normalise_timestamp(observed_at, "observed_at")
     if relation == "supersedes" and (not isinstance(claim, str) or not claim.strip()):
         raise WorldError("claim", "supersedes needs the new claim")
-    doc = _load_assumptions_doc(root)
-    rec = _find(doc, assumption_id)
-    rec.setdefault("evidence", []).append(
-        {"text": text, "observed_at": stamp, "relation": relation}
-    )
-    if relation == "contradicts":
-        rec["status"] = "conflict"
-    elif relation == "supersedes":
-        rec.setdefault("history", []).append(rec["claim"])
-        rec["claim"] = claim
-    _dump_yaml(assumptions_path(root), doc)
+    entry = _evidence_entry(root, text=text, stamp=stamp, relation=relation, locator=locator)
+    with _rmw_lock(assumptions_path(root)):
+        doc = _load_assumptions_doc(root)
+        rec = _find(doc, assumption_id)
+        rec.setdefault("evidence", []).append(entry)
+        if relation == "contradicts":
+            rec["status"] = "conflict"
+        elif relation == "supersedes":
+            rec.setdefault("history", []).append(rec["claim"])
+            rec["claim"] = claim
+        _dump_yaml(assumptions_path(root), doc)
     return rec
 
 
@@ -1023,15 +1114,84 @@ def resolve(root: Path, assumption_id: str, *, status: str, claim: str) -> dict[
         raise WorldError("status", f"must be one of {RESOLVE_TARGETS}")
     if not isinstance(claim, str) or not claim.strip():
         raise WorldError("claim", "must be a non-empty string")
-    doc = _load_assumptions_doc(root)
-    rec = _find(doc, assumption_id)
-    if rec.get("status") != "conflict":
-        raise WorldError("status", f"{assumption_id!r} is {rec.get('status')!r}, not in conflict")
-    rec.setdefault("history", []).append(rec["claim"])
-    rec["claim"] = claim
-    rec["status"] = status
-    _dump_yaml(assumptions_path(root), doc)
+    with _rmw_lock(assumptions_path(root)):
+        doc = _load_assumptions_doc(root)
+        rec = _find(doc, assumption_id)
+        if rec.get("status") != "conflict":
+            raise WorldError(
+                "status", f"{assumption_id!r} is {rec.get('status')!r}, not in conflict"
+            )
+        rec.setdefault("history", []).append(rec["claim"])
+        rec["claim"] = claim
+        rec["status"] = status
+        _dump_yaml(assumptions_path(root), doc)
     return rec
+
+
+def add_assumption(
+    root: Path,
+    assumption_id: str,
+    *,
+    claim: str,
+    status: str,
+    text: str | None = None,
+    observed_at: str | None = None,
+    locator: str | None = None,
+) -> dict[str, Any]:
+    """The only entry into the ledger; refuses an existing id rather than upserting."""
+    if not isinstance(assumption_id, str) or not _ASSUMPTION_ID_RE.fullmatch(assumption_id):
+        raise WorldError("id", "must match [a-z0-9_]+")
+    if not isinstance(claim, str) or not claim.strip():
+        raise WorldError("claim", "must be a non-empty string")
+    if status not in RESOLVE_TARGETS:
+        raise WorldError(
+            "status", f"must be one of {RESOLVE_TARGETS} (conflict comes only from contradicts)"
+        )
+    # `is not None`, not truthiness: `--locator ''` is a supplied flag, and S2 refuses it
+    # without `--text` rather than writing a record that silently dropped it.
+    if (locator is not None or observed_at is not None) and not (
+        isinstance(text, str) and text.strip()
+    ):
+        raise WorldError(
+            "text", "--locator / --observed-at need --text (evidence without text is invalid)"
+        )
+    evidence: list[dict[str, Any]] = []
+    if text is not None:
+        if not text.strip():
+            raise WorldError("text", "must be a non-empty string")
+        if observed_at is None:
+            raise WorldError("observed_at", "--text needs --observed-at")
+        stamp = normalise_timestamp(observed_at, "observed_at")
+        evidence.append(
+            _evidence_entry(root, text=text, stamp=stamp, relation="confirms", locator=locator)
+        )
+    rec: dict[str, Any] = {
+        "id": assumption_id,
+        "claim": claim,
+        "status": status,
+        "evidence": evidence,
+        "history": [],
+    }
+    with _rmw_lock(assumptions_path(root)):
+        doc = _load_assumptions_doc(root)
+        if any(r.get("id") == assumption_id for r in doc["assumptions"]):
+            raise WorldError("id", f"assumption {assumption_id!r} already exists; use observe")
+        doc["assumptions"].append(rec)
+        _dump_yaml(assumptions_path(root), doc)
+    return rec
+
+
+def _evidence_entry(
+    root: Path, *, text: str, stamp: str, relation: str, locator: str | None
+) -> dict[str, Any]:
+    """Capture the locator against the file as it is now — before any lock or write."""
+    entry: dict[str, Any] = {"text": text, "observed_at": stamp, "relation": relation}
+    if locator is not None:
+        try:
+            entry["locator"] = evidence_locator.capture(root, locator)
+        except evidence_locator.LocatorError as exc:
+            raise WorldError(exc.field, exc.message) from exc
+    return entry
 
 
 def record_value(
@@ -1066,7 +1226,8 @@ def _rmw_lock(path: Path) -> Iterator[None]:
         return
     # Under `.claude/observability/` — already gitignored and classified as harness churn, so
     # the lock never shows as user dirt in a tracked directory (confirm-1 finding).
-    lock_path = path.parent.parent / "observability" / ".hm-world-outcomes.lock"
+    # Keyed by the guarded file's stem, so outcomes keep `.hm-world-outcomes.lock` byte-for-byte.
+    lock_path = path.parent.parent / "observability" / f".hm-world-{path.stem}.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
     deadline = time.monotonic() + _APPEND_LOCK_TIMEOUT_S
@@ -1080,7 +1241,7 @@ def _rmw_lock(path: Path) -> Iterator[None]:
                     break
                 if time.monotonic() >= deadline:
                     raise WorldError(
-                        "lock", f"outcomes.yaml is locked by another writer ({lock_path})"
+                        "lock", f"{path.name} is locked by another writer ({lock_path})"
                     ) from exc
                 time.sleep(0.05)
         yield
@@ -1586,7 +1747,16 @@ def _parser() -> argparse.ArgumentParser:
     ob.add_argument("--text", required=True)
     ob.add_argument("--observed-at", required=True, dest="observed_at")
     ob.add_argument("--claim", default=None)
+    ob.add_argument("--locator", default=None)
     ob.add_argument("--json", action="store_true")
+    ad = asub.add_parser("add")
+    ad.add_argument("id")
+    ad.add_argument("--claim", required=True)
+    ad.add_argument("--status", required=True, choices=RESOLVE_TARGETS)
+    ad.add_argument("--text", default=None)
+    ad.add_argument("--observed-at", default=None, dest="observed_at")
+    ad.add_argument("--locator", default=None)
+    ad.add_argument("--json", action="store_true")
     rs = asub.add_parser("resolve")
     rs.add_argument("id")
     rs.add_argument("--status", required=True, choices=RESOLVE_TARGETS)
@@ -1665,6 +1835,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     observed_at=args.observed_at,
                     relation=args.relation,
                     claim=args.claim,
+                    locator=args.locator,
+                )
+            elif args.verb == "add":
+                rec = add_assumption(
+                    root,
+                    args.id,
+                    claim=args.claim,
+                    status=args.status,
+                    text=args.text,
+                    observed_at=args.observed_at,
+                    locator=args.locator,
                 )
             else:
                 rec = resolve(root, args.id, status=args.status, claim=args.claim)

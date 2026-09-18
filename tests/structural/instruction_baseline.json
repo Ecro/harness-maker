@@ -630,7 +630,8 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-land <SLUG> <BASE>",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:wrapup --claude-session-id \"$HM_SESSION_ID\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
-        "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id> --relation <confirms|supersedes|contradicts> --text \"<what was observed>\" --observed-at <ISO-8601 UTC> [--claim \"<new claim>\" \u2014 required when the relation is supersedes]",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world assume add <id> --claim \"<claim>\" --status <known|assumed|unknown> [--text \"<why>\" --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id> --relation <confirms|supersedes|contradicts> --text \"<what was observed>\" --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim \"<new claim>\" \u2014 required when the relation is supersedes]",
         "!uv run --with $HOME/harness-maker python -m harness_maker.world objective close <id> --observed <met|missed|no_data> --note \"<operator note>\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.world outcome measure --all",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_brief --root . --slug '<slug>'",
@@ -696,7 +697,8 @@
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-land <SLUG> <BASE>",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:wrapup --claude-session-id \"$HM_SESSION_ID\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"",
-        "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id> --relation <confirms|supersedes|contradicts> --text \"<what was observed>\" --observed-at <ISO-8601 UTC> [--claim \"<new claim>\" \u2014 required when the relation is supersedes]",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world assume add <id> --claim \"<claim>\" --status <known|assumed|unknown> [--text \"<why>\" --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]",
+        "!uv run --with $HOME/harness-maker python -m harness_maker.world assume observe <id> --relation <confirms|supersedes|contradicts> --text \"<what was observed>\" --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim \"<new claim>\" \u2014 required when the relation is supersedes]",
         "!uv run --with $HOME/harness-maker python -m harness_maker.world objective close <id> --observed <met|missed|no_data> --note \"<operator note>\"",
         "!uv run --with $HOME/harness-maker python -m harness_maker.world outcome measure --all",
         "!uv run --with $HOME/harness-maker python -m harness_maker.wrapup_brief --root . --slug '<slug>'",
@@ -740,7 +742,7 @@
     }
   },
   "generated_by": "tests/structural/_instruction_baseline.py",
-  "payload_digest": "654e924e3da1c27576795d2cb25cd95d07e4afa20bcc9c9d6aeb7088e4fe0053",
-  "render_sha": "6ef0bcf9f086fb48cbe7603e51dcdc03d6eed498",
+  "payload_digest": "8ebf0f54bcd28c21a5ee33328ec665af0707e9c1032167f9005e151ef0d28eeb",
+  "render_sha": "b48bcec4131ffc26f8106d667caf45be6a7f2515",
   "schema_version": 2
 }
