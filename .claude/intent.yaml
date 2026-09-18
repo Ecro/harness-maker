@@ -1,21 +1,91 @@
 # .claude/intent.yaml — why this project exists. Human-written; nothing here is generated.
 #
-# Fill `mission` first. Until `mission` and `outcomes` are both filled, `hm world status`
-# reports `not_filled_in`. A file with outcomes but no mission is a validation error.
-#
 # Withdrawal criterion (SPEC): if after 10 wrapups no objective carries `observed:` and no
 # `revisit_when` has evaluated `candidate`, this layer is unused and is removed.
+#
+# Changing `mission` invalidates nothing mechanically — re-read `outcomes` by hand when it moves.
 schema_version: 1
-mission: ""
-vision: ""
-# outcomes:
-#   - id: dead_rendered_bytes          # [a-z0-9_]+, unique
-#     description: share of rendered command bytes with zero recorded invocations
-#     target: 10                       # a number; compared to the last recorded value
-#     higher_is_better: false
-#     how_measured: "hm economics stages + metrics invocation counts"
-outcomes: []
-non_negotiables: []
-non_scope: []
-unknowns: []
+mission: >-
+  프로젝트에 맞춘 개발 하네스로, 기본 품질과 사람의 결정권을 지키면서 작업을 빠르고 효율적으로
+  완수하게 한다. 모델과 호스트의 발전을 빠르게 측정해 반영하고, 제값을 못 하는 장치는 걷어낸다.
+vision: >-
+  사용자가 의도와 필요한 결정만 주면, 합의된 범위와 권한 안에서 /hm: 가 단계별 지시 없이 작업을
+  검증된 완료까지 이끈다. 각 프로젝트에는 필요한 구성만 렌더되고, 모델·호스트가 대체한 장치는
+  검증을 거쳐 제거된다.
+outcomes:
+  # mission: 빠르고 효율적으로 완수
+  - id: task_lead_time_hours
+    description: 최근 완료된 10개 task 의 첫 stage 시작부터 wrapup 종료까지 시간, 중앙값
+    target: 6
+    higher_is_better: false
+    how_measured: >-
+      stage-spans.jsonl: task_slug 별 첫 start → 짝지은 hm:wrapup end (6h 이내 인접 end,
+      09-12 이전 end 는 slug null). task 크기에 좌우되므로 오름세를 곧바로 하네스 탓으로 읽지 말 것.
+    measure:
+      cmd: "uv run python -c \"import json,statistics as st,datetime as d; P=lambda s:d.datetime.fromisoformat(s.replace('Z','+00:00')); R=[json.loads(l) for l in open('.claude/observability/stage-spans.jsonl')]; F={}; [F.__setitem__(r['task_slug'],min(F.get(r['task_slug'],P(r['ts'])),P(r['ts']))) for r in R if r.get('task_slug')]; W=sorted((P(r['ts']),r['event'],r.get('task_slug')) for r in R if r['stage']=='hm:wrapup'); D={}; [D.setdefault(s,t2) for i,(t,e,s) in enumerate(W) if e=='start' and s for (t2,e2,s2) in W[i+1:i+2] if e2=='end' and s2 in (None,s) and (t2-t).total_seconds()<21600]; L=sorted(D,key=D.get)[-10:]; print(round(st.median((D[s]-F[s]).total_seconds()/3600 for s in L),1))\""
+      select: last-number
+      cwd: base
+  # mission: 기본 품질을 지키면서
+  - id: change_failure_rate
+    description: 결함 수리가 뒤따른 릴리스 태그 비율 (%, 28일 창)
+    target: 10
+    higher_is_better: false
+    how_measured: >-
+      최신 delivery_metrics 스냅샷의 100 * cfr.failed / cfr.total. 스냅샷 갱신은 /hm:metrics (판정 필요,
+      ~25분) — 7일보다 오래된 스냅샷이면 측정이 실패한다. 분모가 작아 태그 하나로 크게 움직인다.
+    measure:
+      cmd: "uv run python -c \"import json,subprocess,sys,datetime as d; s=json.loads(subprocess.run([sys.executable,'-m','harness_maker.delivery_metrics','trend','--root','.','--limit','1'],capture_output=True,text=True,check=True).stdout)['snapshots'][0]; c=s['cfr']; a=(d.datetime.now(d.timezone.utc)-d.datetime.fromisoformat(s['ts'].replace('Z','+00:00'))).days; sys.exit(f'snapshot {a}d old - run /hm:metrics') if a>7 else sys.exit('cfr '+str(c['status'])) if c['status']!='ok' else print(s['ts'], round(100*c['failed']/c['total'],1))\""
+      select: last-number
+      cwd: base
+  - id: post_merge_churn
+    description: 머지 후 14일 안에 다시 쓰인 추가 LOC 비율 (%)
+    target: 12
+    higher_is_better: false
+    how_measured: >-
+      최신 delivery_metrics 스냅샷의 100 * churn.ratio. 14–28일 전에 머지된 코드를 본다 (성숙 지연) —
+      지금 작업의 결과는 2주 뒤에 나타난다. 스냅샷 갱신은 /hm:metrics, 7일 초과면 측정 실패.
+    measure:
+      cmd: "uv run python -c \"import json,subprocess,sys,datetime as d; s=json.loads(subprocess.run([sys.executable,'-m','harness_maker.delivery_metrics','trend','--root','.','--limit','1'],capture_output=True,text=True,check=True).stdout)['snapshots'][0]; h=s['churn']; a=(d.datetime.now(d.timezone.utc)-d.datetime.fromisoformat(s['ts'].replace('Z','+00:00'))).days; sys.exit(f'snapshot {a}d old - run /hm:metrics') if a>7 else sys.exit('churn '+str(h['status'])+(' partial' if h['partial'] else '')) if h['status']!='ok' or h['partial'] else print(s['ts'], round(100*h['ratio'],1))\""
+      select: last-number
+      cwd: base
+  # mission: 모델과 호스트의 발전을 빠르게 측정해 반영
+  - id: unsourced_step_share
+    description: 연구 근거 없이 이웃의 분류를 물려받은 step 비율 (%)
+    target: 20
+    higher_is_better: false
+    how_measured: "step_sensitivity.unsourced_count(REGISTRY) / len(REGISTRY)"
+    measure:
+      cmd: "uv run python -c \"from harness_maker.step_sensitivity import REGISTRY as R, unsourced_count; print(round(100*unsourced_count(R)/len(R),1))\""
+      select: last-number
+      cwd: checkout
+  # mission: 제값을 못 하는 장치는 걷어낸다 / vision: 필요한 구성만 렌더
+  - id: dead_rendered_bytes
+    description: "트랜스크립트 창 안에서 호출 0회인 /hm: 명령의 렌더 바이트 비율 (%)"
+    target: 10
+    higher_is_better: false
+    how_measured: >-
+      economics stages 에서 turn 이 0 인 .claude/commands/hm/*.md 바이트 / 전체. 호출 0회는 삭제
+      후보이지 무가치의 증명이 아니다.
+    measure:
+      cmd: "uv run python -c \"import json,sys,subprocess,pathlib; d=json.loads(subprocess.run([sys.executable,'-m','harness_maker.economics','stages','--root','.'],capture_output=True,text=True,check=True).stdout); u={s['stage'] for s in d['stages'] if s['turns']}; fs=list(pathlib.Path('.claude/commands/hm').glob('*.md')); t=sum(f.stat().st_size for f in fs); print(round(100*sum(f.stat().st_size for f in fs if 'hm:'+f.stem not in u)/t,1))\""
+      select: last-number
+      cwd: base
+non_negotiables:
+  - "품질 하한(결정적 검증·리뷰 게이트)은 크기나 속도를 줄이는 대가로 낮추지 않는다"
+  - "TUNE 값은 재측정 없이 새 모델로 이전하지 않는다"
+  - "사용자가 손댄 파일·hook·deny 규칙은 재렌더에서 보존한다"
+  - "render 는 결정적이다 — render 중 shell-out 없음"
+  - "Claude Code·Cursor·Codex 를 한 소스에서 렌더한다"
+  - "Python only, 텔레메트리 100% 로컬, 사용자 요청 없는 push 금지"
+non_scope:
+  - "intent.yaml 내용의 LLM 자동 작성"
+  - "도메인 콘텐츠(프레임워크 표준 등) 큐레이션 — 사용자가 쓴다"
+  - "Anthropic API 과금 경로 — 구독만"
+unknowns:
+  - "task 완료율 — 09-12 이전 wrapup end 에 slug 가 없어 복원이 부정확; 깨끗한 표본 10개 이상이면 outcome 으로 승격"
+  - "'단계별 지시 없이' — task 별 사람 개입 횟수를 기록하는 데이터가 없다"
+  - "전 인벤토리 설치 중 실제로 안 쓰이는 부분은 프로젝트마다 얼마인가 (이 repo 만 재봄)"
+  - "unsourced 40개 중 INV 로 숨은 COMP 가 몇 개인가"
+  - "새 모델 릴리스 후 TUNE 재측정까지 걸리는 시간 — 기록 필드 없음"
+  - "7렌즈 팬아웃이 비용만큼 재현율을 올리는가; plan-validator 는 변별력이 있는가"
 owners: []

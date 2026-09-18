@@ -1,0 +1,55 @@
+schema_version: 1
+values:
+- outcome_id: task_lead_time_hours
+  value: 8.2
+  observed_at: '2026-09-18T10:40:04Z'
+  evidence: 'auto: uv run python -c import json,statistics as st,datetime as d; P=lambda
+    s:d.datetime.fromisoformat(s.replace(''Z'',''+00:00'')); R=[json.loads(l) for
+    l in open(''.claude/observability/stage-spans.jsonl'')]; F={}; [F.__setitem__(r[''task_slug''],min(F.get(r[''task_slug''],P(r[''ts''])),P(r[''ts''])))
+    for r in R if r.get(''task_slug'')]; W=sorted((P(r[''ts'']),r[''event''],r.get(''task_slug''))
+    for r in R if r[''stage'']==''hm:wrapup''); D={}; [D.setdefault(s,t2) for i,(t,e,s)
+    in enumerate(W) if e==''start'' and s for (t2,e2,s2) in W[i+1:i+2] if e2==''end''
+    and s2 in (None,s) and (t2-t).total_seconds()<21600]; L=sorted(D,key=D.get)[-10:];
+    print(round(st.median((D[s]-F[s]).total_seconds()/3600 for s in L),1)) @ cdfc232b
+    exit=0 cwd=base'
+  definition_hash: 754a4e8cf65695fd99ede671a80587600f565474a4a388a5122ee97ee5d7b866
+- outcome_id: unsourced_step_share
+  value: 47.1
+  observed_at: '2026-09-18T10:40:04Z'
+  evidence: 'auto: uv run python -c from harness_maker.step_sensitivity import REGISTRY
+    as R, unsourced_count; print(round(100*unsourced_count(R)/len(R),1)) @ cdfc232b
+    exit=0 cwd=checkout'
+  definition_hash: 9213740d0ae88c6690466a2d059f646096649288f6bd1b64ee33bdbfd31939b5
+- outcome_id: dead_rendered_bytes
+  value: 23.7
+  observed_at: '2026-09-18T10:40:09Z'
+  evidence: 'auto: uv run python -c import json,sys,subprocess,pathlib; d=json.loads(subprocess.run([sys.executable,''-m'',''harness_maker.economics'',''stages'',''--root'',''.''],capture_output=True,text=True,check=True).stdout);
+    u={s[''stage''] for s in d[''stages''] if s[''turns'']}; fs=list(pathlib.Path(''.claude/commands/hm'').glob(''*.md''));
+    t=sum(f.stat().st_size for f in fs); print(round(100*sum(f.stat().st_size for
+    f in fs if ''hm:''+f.stem not in u)/t,1)) @ cdfc232b exit=0 cwd=base'
+  definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
+- outcome_id: change_failure_rate
+  value: 0
+  observed_at: '2026-09-18T10:40:27Z'
+  evidence: 'hm delivery_metrics compute @ cdfc232b: cfr 0/7 (tag, 28d window), pending_adjudications
+    0'
+  definition_hash: 3e6d1d9b5e8b3abc9f3c17afb1f3e55e7701c3b10ff4f954d867b99e5f04dc02
+- outcome_id: change_failure_rate
+  value: 0
+  observed_at: '2026-09-18T11:09:28Z'
+  evidence: 'auto: uv run python -c import json,subprocess,sys,datetime as d; s=json.loads(subprocess.run([sys.executable,''-m'',''harness_maker.delivery_metrics'',''trend'',''--root'',''.'',''--limit'',''1''],capture_output=True,text=True,check=True).stdout)[''snapshots''][0];
+    c=s[''cfr'']; a=(d.datetime.now(d.timezone.utc)-d.datetime.fromisoformat(s[''ts''].replace(''Z'',''+00:00''))).days;
+    sys.exit(f''snapshot {a}d old - run /hm:metrics'') if a>7 else sys.exit(''cfr
+    ''+str(c[''status''])) if c[''status'']!=''ok'' else print(s[''ts''], round(100*c[''failed'']/c[''total''],1))
+    @ cdfc232b exit=0 cwd=base'
+  definition_hash: 0a15fd8a1350b885c8ed3e738f1d252e15f1f66b4b0dee532990a5c2eb35b952
+- outcome_id: post_merge_churn
+  value: 16.9
+  observed_at: '2026-09-18T11:09:28Z'
+  evidence: 'auto: uv run python -c import json,subprocess,sys,datetime as d; s=json.loads(subprocess.run([sys.executable,''-m'',''harness_maker.delivery_metrics'',''trend'',''--root'',''.'',''--limit'',''1''],capture_output=True,text=True,check=True).stdout)[''snapshots''][0];
+    h=s[''churn'']; a=(d.datetime.now(d.timezone.utc)-d.datetime.fromisoformat(s[''ts''].replace(''Z'',''+00:00''))).days;
+    sys.exit(f''snapshot {a}d old - run /hm:metrics'') if a>7 else sys.exit(''churn
+    ''+str(h[''status''])+('' partial'' if h[''partial''] else '''')) if h[''status'']!=''ok''
+    or h[''partial''] else print(s[''ts''], round(100*h[''ratio''],1)) @ cdfc232b
+    exit=0 cwd=base'
+  definition_hash: 2fb56618dd65935c7a801bc949d423b46ee63946579dab955309d04eaca17ae4
