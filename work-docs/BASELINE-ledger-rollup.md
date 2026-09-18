@@ -5,16 +5,16 @@
 | model | calls | invoked | skipped | failed | loss_rate |
 |---|---|---|---|---|---|
 | antigravity | 101 | 49 | 25 | 27 | 0.5148514851485149 |
-| codex | 121 | 117 | 4 | 0 | 0.03305785123966942 |
+| codex | 123 | 119 | 4 | 0 | 0.032520325203252036 |
 
 ## Per stage
 
 | stage | calls |
 |---|---|
-| plan | 87 |
-| review | 135 |
+| plan | 88 |
+| review | 136 |
 
-Invocation rows counted: 222.
+Invocation rows counted: 224.
 
 ## Exclusions applied
 
@@ -33,7 +33,6 @@ Rows dropped: 150.
 - authorized to `execute` with no confirming entry
 - authorized to `execute` with no confirming entry
 - authorized to `execute` with no confirming entry
-- authorized to `plan` with no confirming entry
 - authorized to `plan` with no confirming entry
 - authorized to `review` with no confirming entry
 - authorized to `review` with no confirming entry

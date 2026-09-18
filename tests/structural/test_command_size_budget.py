@@ -575,7 +575,11 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # PLAN; the ratchet is re-based to the landed figure so the growth stays attributed
     # (work-docs/BASELINE-DELTA-playbook-alignment.md §2.1). This task's own +67 (the `--claim`
     # clause on the observe line) rides on its declared allowance, not on this number.
-    "wrapup": 44654,
+    # 44654 → 45646 (intent-layer-ops, 2026-09-18): outcome-measure's +601 (the third
+    # answer-gated block) and this task's +324 (one 5.7 sentence surfacing
+    # `withdrawal.due`) together took the ask@flag_on render past the 2 % band; re-based
+    # to the landed figure. Attributed in work-docs/BASELINE-DELTA-intent-layer-ops.md §3.1.
+    "wrapup": 45646,
 }
 
 

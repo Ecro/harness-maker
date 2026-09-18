@@ -4,6 +4,21 @@
 
 ### Changed
 
+- **`hm world gap --json` gains a `withdrawal` block** (intent-layer-ops): the intent layer's
+  own kill criterion ("10 wrapups, no observed objective, no fired revisit → remove the layer")
+  was an uncounted skeleton comment; it is now measured from git history (`filled_at`, the
+  committer date of the oldest commit whose `.claude/intent.yaml` is filled in) and base-root
+  `stage-spans.jsonl` `hm:wrapup` **start** events. A count that cannot be taken is `null` with a
+  `reason`, never a disguised `0`. `status --json` is unchanged — the block lives in `gap` only.
+  Wrapup Step 5.7 prints one sentence when `due` is true, reusing the `gap --json` call the
+  outcome-measure question already makes (zero new Bash calls).
+- **Measured outcome evidence is now hash-referenced, not argv-copied**: `hm world outcome
+  measure` used to write the full command argv (300–700 chars for some dogfood commands) into
+  every evidence row; it now writes `auto: measure#<definition_hash[:12]> @ <sha> exit=0
+  cwd=<base|checkout>`. The hash still pins which measure definition produced the number by
+  equality; the argv is recoverable via `git show <sha>:.claude/intent.yaml` only when
+  `intent.yaml` was committed and clean at that sha. Existing rows are untouched.
+
 - **Sourced 10 of the 13 `unsourced` plan-stage step-sensitivity classes** (`src/harness_maker/step_sensitivity.py`):
   a blind Codex classification against an external evidence bundle, reconciled with Claude's
   own class-supporting citations under explicit ADR-003 §5 rules, gives each upgraded row a

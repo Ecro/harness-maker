@@ -1486,15 +1486,32 @@ segments index lists), `regex:<pattern with one group>` or `last-number` (the la
 stdout; `1e-3` and `.672` parse) — and `cwd` is `base` (default: `.claude/observability/` lives
 at the base root, which a task worktree does not have) or `checkout`. `hm world outcome measure
 <id>` and `--all` run the command under `timeout_s` (default 300), refuse a bool or non-finite
-result, and append a value row whose evidence is `auto: <argv> @ <short sha> exit=0
-cwd=<base|checkout>`; stdout is never stored and stderr reaches the diagnostic redacted and
-truncated. `--dry-run` runs and reports but the harness writes nothing. A non-zero exit, no
-number, a timeout or a manual outcome writes nothing and names the cause. The block joins
-`definition_hash` (an outcome without one hashes exactly as before), so editing `cmd`/`select`/
-`cwd`/`timeout_s` makes every earlier row `stale_definition`. `hm world gap` rows carry
-`measure: true|false`; the skill's "measure first" step runs the dry run and names the record
-call, and wrapup 5.7's third answer-gated question, "Measure outcomes now?", runs `--all` once
-on "yes".
+result, and append a value row whose evidence is `auto: measure#<definition_hash[:12]> @ <short
+sha> exit=0 cwd=<base|checkout>` (intent-layer-ops) — the hash (not the argv) pins which measure
+block produced the number, and the argv is recoverable from `git show <sha>:.claude/intent.yaml`
+only when `intent.yaml` was committed and clean at that sha; rows written before this change
+still carry the full argv and are never rewritten. stdout is never stored and stderr reaches the
+diagnostic redacted and truncated. `--dry-run` runs and reports but the harness writes nothing. A
+non-zero exit, no number, a timeout or a manual outcome writes nothing and names the cause. The
+block joins `definition_hash` (an outcome without one hashes exactly as before), so editing
+`cmd`/`select`/`cwd`/`timeout_s` makes every earlier row `stale_definition`. `hm world gap` rows
+carry `measure: true|false`; the skill's "measure first" step runs the dry run and names the
+record call, and wrapup 5.7's third answer-gated question, "Measure outcomes now?", runs `--all`
+once on "yes".
+
+**Withdrawal (intent-layer-ops)**: `hm world gap --json` also carries a `withdrawal` block —
+`{filled_at, wrapups_since_fill, objectives_observed, revisit_candidates_now, due, reason}` —
+that measures the layer's own kill criterion ("10 wrapups, no observed objective, no fired
+revisit → remove the layer") instead of leaving it an uncounted comment. `filled_at` is the
+committer date of the oldest commit whose `.claude/intent.yaml` is filled in (`no_git` on a
+shallow clone or a failed git call); `wrapups_since_fill` counts `hm:wrapup` **start** events in
+the base-root `stage-spans.jsonl` after that date (`end` is written only by the Claude Code Stop
+hook and is missed when stages chain, so `start` is the count that does not undercount). A count
+that cannot be taken is `null` with a `reason` (`not_filled_in`, `no_git`, `fill_uncommitted`,
+`no_stage_spans`, `no_wrapup_spans`), never a disguised `0`; `due` is only `true` when every count
+is real, `wrapups_since_fill >= 10`, and both `objectives_observed` and `revisit_candidates_now`
+are zero. `status --json` is unaffected — the block lives in `gap` only. Wrapup 5.7 prints the
+criterion once when `due` is true, after the outcome-measure question, and nothing otherwise.
 
 **Touchpoints in the atomic stages**: `/hm:plan` Step 0.5 loads status and asks one closed
 question when an objective needs a decision; `/hm:review` Step 3.3 checks the diff against the

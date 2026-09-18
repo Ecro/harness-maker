@@ -1137,4 +1137,27 @@ This task also demonstrated the surface-allowance fold discipline in practice: i
 A genuinely blind cross-model classification needs three things beyond "call the other model": a bundle assembled OUTSIDE the repo (so the model cannot cross-reference the live registry it is being asked to classify blind), an aggregates-only telemetry rule (the task's own intent.yaml `non_negotiable` said telemetry stays local, which constrains what the bundle and the resulting transcript may contain), and an exposure check defined on EXECUTED COMMANDS decided BEFORE the call — not a post-hoc grep of the model's log content. A log-content grep cannot distinguish "the model read a file" from "the model printed a comment that merely names that file's path" — both produce the same substring match, so the check has to gate on what command the harness actually issued (e.g. did it invoke a read tool against a path outside the bundle), decided as part of the bundle-assembly step, not inferred afterward from what came back. Separately, `codex exec` run outside a git repository needs `--skip-git-repo-check` or it refuses to start — worth having in the recipe up front rather than discovering it mid-run (PLAN-source-plan-steps, blind Codex classification for the plan-stage step-sensitivity registry, ADR-003/004/005).
 ## [wiki:gotcha] spec-need-verdict-absent-vs-none | 2026-09-18
 `/hm:verify` Check 6 is the only deterministic guard that reads an in-flight PLAN's `spec_need_verdict` frontmatter field, and it PASSES an absent value rather than failing closed on it — so a PLAN that never went through the spec-need elicitation (no `spec_need_verdict` key at all, as opposed to an explicit `none`) is not caught by any machine check; the absent-case is silently treated the same as an explicit "no SPEC needed" decision. The only thing currently distinguishing the two is a model reading the PLAN and judging whether the field's absence is itself a miss — an LLM-executed check standing in for what should be a deterministic gate. Worth fixing forward: Check 6 (or an earlier stage) should distinguish "field absent" from "field present with value none" and fail closed on the former, per the project's own absent-case rule for optional-field-activated gates.
+## [wiki:architecture] intent-layer-withdrawal-instrument | 2026-09-18
+`hm world gap --json` gained a `withdrawal` block that measures the intent layer's own
+kill criterion ("10 wrapups, no observed objective, no fired revisit → remove the layer"),
+which used to be a skeleton comment nothing counted (intent-layer-ops). The block lives in
+`gap` only — `status --json` stays byte-frozen per SPEC-objective-gap-proposal — and reports
+`{filled_at, wrapups_since_fill, objectives_observed, revisit_candidates_now, due, reason}`.
+`filled_at` is the committer date of the oldest commit whose `.claude/intent.yaml` is filled
+in (a shallow clone forces `no_git` rather than fabricating a boundary date).
+`wrapups_since_fill` counts `hm:wrapup` **start** events in the base-root
+`stage-spans.jsonl` after that date — `end` is written only by the Claude Code Stop hook and
+is missed whenever stages chain (dogfood measured 42 start vs 32 end), so `start` is the
+count that does not silently undercount. A count that cannot be taken is `null` with a
+`reason` (`not_filled_in` / `no_git` / `fill_uncommitted` / `no_stage_spans` /
+`no_wrapup_spans`) — never a disguised `0`, per the absent-case rule. `due` fires only when
+every count is real, `wrapups_since_fill >= 10`, and both `objectives_observed` and
+`revisit_candidates_now` are zero. The same task also shortened measured evidence from the
+full argv to `auto: measure#<definition_hash[:12]> @ <sha> exit=0 cwd=<base|checkout>` — the
+hash still pins which measure definition produced the number by equality, and the argv is
+recoverable only when `.claude/intent.yaml` was committed and clean at that sha (a
+task-worktree measurement with `cwd: base` records the base HEAD sha, so recovery is
+conditional, not universal). Old argv-format rows are never rewritten. Wrapup 5.7 prints the
+withdrawal line exactly once when `due` is true, reading the same `gap --json` call the
+outcome-measure question already makes — zero new Bash calls on the surface.
 <!-- @hm:/user:entries -->

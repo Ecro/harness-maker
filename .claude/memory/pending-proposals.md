@@ -466,6 +466,16 @@ new gate.
 **Triggered by:** [fail:design] wrapup-memory-base-seam (count: 3)
 **Proposed mechanism:** rule update — make Step 7.7's `commit-base-memory` a checked step rather than a conditional one
 **Rationale:** `memory_md` writes the human tiers to the BASE repo, so a wrapup running inside a task worktree never stages them with `git add`, and the squash preserves-but-never-commits them. Step 7.7 already ships `commit-base-memory` for exactly this, but it fires only when `task-land` printed a fresh `SQUASH_SHA` and nothing verifies afterwards that the tiers actually reached a commit. Three recurrences means the conditional is the wrong shape: the fold should be asserted (did the wiki/failure slugs this wrapup wrote end up in `git log -1 --name-only`?) and a miss should be surfaced, not left to the next reader to discover. Observed again this unit: the wrapup delegate reported memory writes it had not made, and the receipt caught that — but a receipt cannot catch the opposite case, where the write happened and the commit did not.
+**Update 2026-09-18 (intent-layer-ops) — same seam, a THIRD writer confirmed (per the entry's
+own 2026-08-23 note about `mutation_receipt.record`).** The AC-006 gate's new mutation-receipt
+row had to be hand-mirrored into both the base copy (read by the gate's `_base_root`-resolved
+`_ledger()`) and the worktree copy (what `task-land` squash-commits), and the base copy must be
+`git checkout`-reverted before `task-land` or the dirty base self-aborts the land. This is not the
+human-memory-tier case the proposed `commit-base-memory` check targets — it is base-only content
+that must NOT be committed to the worktree branch at all, the opposite shape. The proposed
+mechanism as written (assert the fold happened) does not cover this writer; scope may need to
+widen to "assert the RIGHT copy is committed and the OTHER copy is clean," not just "assert a
+commit happened."
 
 ## Proposal: move per-round obligations into the fix-loop body, not the linear first-pass procedure (2026-08-26)
 **Triggered by:** [fail:design] per-round-step-runs-only-in-round-1 (count: 3 as of 2026-08-26; this proposal was written at count: 3)
@@ -476,6 +486,12 @@ new gate.
 **Triggered by:** [fail:process] targeted-phase-d-subset-missed-the-snapshot-test (count: 3)
 **Proposed mechanism:** for any PLAN phase that touches a `templates/` file or a module that `synthesize`/`render` imports, require `tests/unit/test_synthesize_snapshot.py` and the whole-repo `ruff check .` / `ruff format --check .` in that phase's own exit criterion — not delegated to a hand-built subset selector (`grep -rl <symbol> tests/` or `hm test_dep_map`), both of which this entry shows miss the file because it references the changed surface only transitively (through `profile`+`synthesize`, not `interview`/`render` directly).
 **Rationale:** three phases in one unit reported green while this exact file was red since Phase 1, only surfacing in Phase 6 — a subset-selection failure the mechanical dep-map tool does not close either (already recorded separately). A named, non-optional test file in the phase's own criterion cannot be silently excluded by a selector that under-selects; a dep-map heuristic can.
+**Update 2026-09-18 (intent-layer-ops) — count now 6, still unfixed.** `hm test_dep_map`'s
+targeted subset after a `wrapup.md.j2` Phase 3 edit missed both `tests/unit/test_synthesize_snapshot.py`
+and `tests/unit/test_render_wrapup_delegation.py` again; only the Phase 4 full-suite run caught them.
+Fourth confirmed recurrence of the identical mechanism across two independent selection methods
+(hand-built grep subset, `hm test_dep_map`) — the proposed mechanism (name the file explicitly in
+any `templates/`-touching phase's exit criterion) has still not been implemented.
 
 ## Proposal: require a positive-observation check for any "the stage LLM invokes module X" claim (2026-09-13)
 **Triggered by:** [fail:design] green-module-dead-prose-wiring (count: 7)

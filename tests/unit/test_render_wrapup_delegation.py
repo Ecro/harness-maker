@@ -230,7 +230,9 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # `surface_allowance`; a change to that command moves all four, which is worth stating once here.
 # 702/735 → 709/742 (outcome-measure, 2026-09-17): wrapup 5.7's third answer-gated block
 # (`outcome-measure`, 7 body lines) — attributed in work-docs/BASELINE-DELTA-outcome-measure.md §3.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 709), ("Production", 742)])
+# 709/742 → 711/744 (intent-layer-ops, 2026-09-18): wrapup 5.7 gained the one-sentence
+# `withdrawal.due` line after the outcome-measure block (the sentence + its blank line).
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 711), ("Production", 744)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

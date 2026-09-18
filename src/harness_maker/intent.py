@@ -51,6 +51,7 @@ SKELETON = """\
 #
 # Withdrawal criterion (SPEC): if after 10 wrapups no objective carries `observed:` and no
 # `revisit_when` has evaluated `candidate`, this layer is unused and is removed.
+# `hm world gap --json` measures it: `withdrawal.due` is true when the criterion holds.
 schema_version: 1
 mission: ""
 vision: ""
@@ -329,7 +330,14 @@ def _strs(raw: dict[str, Any], key: str) -> tuple[str, ...]:
 
 def load_intent(path: Path) -> Intent:
     raw, err = _read_raw(path)
-    errors = [err] if err is not None else _validate_raw(path, raw)
+    if err is not None:
+        raise IntentInvalidError(path, [err])
+    return intent_from_raw(path, raw)
+
+
+def intent_from_raw(path: Path, raw: Any) -> Intent:
+    """The one construction rule, shared with readers of historical blobs (`world` withdrawal)."""
+    errors = _validate_raw(path, raw)
     if errors:
         raise IntentInvalidError(path, errors)
     assert isinstance(raw, dict)

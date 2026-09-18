@@ -347,3 +347,31 @@ def test_ac_007_the_skill_measure_first_step_runs_the_verb(target: Target, path:
         "the record call (without --dry-run) is missing from the measure-first step"
     )
     assert "The rule for every write" in item, "the ask is deferred to the shared write rule"
+
+
+# ── AC-005 (SPEC-intent-layer-ops) — wrapup surfaces the withdrawal criterion ──
+
+
+def _step57(wrapup: str) -> str:
+    start = wrapup.index("#### 5.7 World state")
+    end = wrapup.index("\n### ", start)
+    return wrapup[start:end]
+
+
+@pytest.mark.parametrize("target", ["claude", "codex"])
+def test_ac_005_wrapup_prints_withdrawal_line_when_due(
+    surface: dict[str, dict[str, str]], target: str
+) -> None:
+    """Literals fixed by SPEC S5 before the template edit; sliced to 5.7 so elsewhere fails."""
+    from harness_maker import intent
+
+    wrapup = _command(surface, target, "wrapup")
+    step = _step57(wrapup)
+    assert step.count("[intent] withdrawal criterion met") == 1, step
+    assert "withdrawal.due" in step
+    line_at = step.index("[intent] withdrawal criterion met")
+    # V-10: the sentence reads the gap output the outcome-measure check already obtained.
+    assert line_at > step.index("<!-- @hm:answer-gated:outcome-measure -->")
+    assert wrapup.count("[intent] withdrawal criterion met") == 1
+    assert "hm world gap" in intent.SKELETON
+    assert "withdrawal.due" in intent.SKELETON

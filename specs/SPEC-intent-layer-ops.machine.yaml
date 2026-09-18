@@ -1,0 +1,278 @@
+schema_version: 2
+spec_slug: intent-layer-ops
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: 'Tier-2: both changes are read-side reporting (a gap payload
+  block) and a provenance string on an append-only row; neither gates a write or an
+  advance. A surviving mutant in the due predicate misreports the criterion, which the
+  parametric AC-003 table pins at every boundary. Scope is world.py.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/world.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: measured evidence references the definition, not the command
+  type: property
+  test_ids:
+  - tests/unit/test_world_evidence_ref.py::test_ac_001_measured_evidence_references_the_definition_not_the_command
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The expected string is built from the row's own definition_hash
+    and the fixture repo's short sha, both independent of how the verb formats evidence;
+    constant length across generated commands and the absence of every argv token longer
+    than 3 characters hold
+    for any correct implementation and fail for the shipped argv-copying one.
+  oracle_independence_waiver: null
+  input_domain: measure commands `python -c "print(<n>)"` padded with 0-600 characters
+    of inert trailing comment text, over tests.unit.world_fixture worlds
+  transformation: run `hm world outcome measure <id>` and read the appended row
+  expected_relation: >-
+    row['evidence'] == f"auto: measure#{row['definition_hash'][:12]} @ {sha} exit=0 cwd=base"
+    and no shlex token of cmd longer than 3 characters occurs in row['evidence']
+    and len(row['evidence']) is the same for every generated cmd
+  preconditions:
+  - the command exits 0 and its stdout contains one number
+  observable_output: the last row of .claude/world/outcomes.yaml
+  generator_hint: Hypothesis st.integers(0, 600) for padding length; ci profile derandomized
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: gap reports the withdrawal block
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_002_gap_reports_the_withdrawal_block
+  executable_predicate: set(w) == {'filled_at', 'wrapups_since_fill', 'objectives_observed',
+    'revisit_candidates_now', 'due', 'reason'} and w['filled_at'] == fill_commit_iso and
+    w['wrapups_since_fill'] == 3 and w['reason'] == 'ok' and 'withdrawal' not in status
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fixture builds a tmp git repo with two commits at pinned committer
+    dates (GIT_COMMITTER_DATE, isolated git config) and a stage-spans file with 2 hm:wrapup
+    start events before and 3 after the fill commit plus uncounted end/naive-ts lines, so every expected value is fixed by the fixture, not
+    read back from the reader.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: due is the criterion exactly
+  type: parametric
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_003_due_is_the_criterion_exactly
+  executable_predicate: null
+  golden_table:
+  - input:
+      wrapups_since_fill: 9
+      objectives_observed: 0
+      revisit_candidates_now: 0
+    expected: due=false
+    edge: true
+    note: one below the threshold
+  - input:
+      wrapups_since_fill: 10
+      objectives_observed: 0
+      revisit_candidates_now: 0
+    expected: due=true
+    edge: true
+    note: at the threshold
+  - input:
+      wrapups_since_fill: 25
+      objectives_observed: 0
+      revisit_candidates_now: 0
+    expected: due=true
+    edge: false
+    note: ''
+  - input:
+      wrapups_since_fill: 10
+      objectives_observed: 1
+      revisit_candidates_now: 0
+    expected: due=false
+    edge: true
+    note: one observed objective keeps the layer
+  - input:
+      wrapups_since_fill: 10
+      objectives_observed: 0
+      revisit_candidates_now: 1
+    expected: due=false
+    edge: true
+    note: one fired revisit keeps the layer
+  - input:
+      wrapups_since_fill: null
+      objectives_observed: 0
+      revisit_candidates_now: 0
+    expected: due=false
+    edge: true
+    note: an unmeasured count never reads as unused
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The table is the criterion sentence of SPEC-intent-world-model-objective-layer
+    (Constraints, withdrawal row) evaluated by hand at each boundary; it was written
+    before any implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: unmeasurable counts are null with reason
+  type: parametric
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_004_unmeasurable_counts_are_null_with_reason
+  executable_predicate: null
+  golden_table:
+  - input:
+      world: not_filled_in skeleton, committed
+    expected: filled_at=None wrapups_since_fill=None due=false reason=not_filled_in
+    edge: true
+    note: ''
+  - input:
+      world: filled, git binary missing (FileNotFoundError)
+    expected: filled_at=None wrapups_since_fill=None due=false reason=no_git
+    edge: true
+    note: ''
+  - input:
+      world: filled, checkout is not a git repository
+    expected: filled_at=None wrapups_since_fill=None due=false reason=no_git
+    edge: true
+    note: ''
+  - input:
+      world: filled and committed in a shallow clone
+    expected: filled_at=None wrapups_since_fill=None due=false reason=no_git
+    edge: true
+    note: a shallow boundary would fabricate filled_at
+  - input:
+      world: history contains a commit that deleted intent.yaml before it was re-added filled
+    expected: filled_at=<fill commit iso> reason=ok
+    edge: true
+    note: per-blob git show failure skips the blob, never no_git
+  - input:
+      world: skeleton committed, filled only in the working tree
+    expected: filled_at=None wrapups_since_fill=None due=false reason=fill_uncommitted
+    edge: true
+    note: ''
+  - input:
+      world: filled and committed, no stage-spans.jsonl at the base root
+    expected: filled_at=<commit iso> wrapups_since_fill=None due=false reason=no_stage_spans
+    edge: true
+    note: ''
+  - input:
+      world: filled and committed, a directory at the stage-spans path
+    expected: filled_at=<commit iso> wrapups_since_fill=None due=false reason=no_stage_spans
+    edge: true
+    note: ''
+  - input:
+      world: filled and committed, stage-spans has only non-wrapup events
+    expected: filled_at=<commit iso> wrapups_since_fill=None due=false reason=no_wrapup_spans
+    edge: true
+    note: wrapup spans not instrumented (worktree off, Cursor/Codex) is not zero
+  - input:
+      world: intent.yaml invalid
+    expected: state=invalid and no withdrawal key
+    edge: true
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each row is a fixture shape with the expected reason named in S4's
+    precedence order; the no_git rows are forced by patching subprocess.run to raise
+    or by an un-initialised tmp dir, not by reading the reader's own error path.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: wrapup prints withdrawal line when due
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer.py::test_ac_005_wrapup_prints_withdrawal_line_when_due
+  executable_predicate: all(step57(r).count('[intent] withdrawal criterion met') == 1
+    and 'withdrawal.due' in step57(r) for r in wrapup_renders) and 'hm world gap' in
+    intent.SKELETON and 'withdrawal.due' in intent.SKELETON
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The literals are fixed by this SPEC's S5 text; the test renders the
+    real templates for the Claude and Codex arms and slices Step 5.7 by its heading,
+    so it cannot pass on a line placed elsewhere in the command.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: surface pinned and allowance retired
+  type: mechanical
+  test_ids:
+  - tests/structural/test_intent_layer_ops_invariance.py::test_ac_006_surface_pinned_and_allowance_retired
+  executable_predicate: all(live[arm][c] == pin['arms'][arm][c] for arm in pin['arms']
+    for c in ('plan', 'review', 'help')) and 'surface_allowance' not in plan_frontmatter
+    and delta_doc_aggregate == surface_baseline_aggregate
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The pin is the pre-change sha256 per arm copied at Phase 0 into
+    the delta document, taken before any template edit; the retirement half compares
+    the PLAN and the delta document against the committed baseline file.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

@@ -269,7 +269,7 @@ observed, not what the machine inferred.
 | Scope-drift lens | `/hm:review` reads `objective: <id>` from the PLAN in a main-loop step before Step 3.4; emits `scope_drift` findings judged by the `objective_scope_drift` rubric; severity **P2**; no gate; the judgment subject includes the rendered review surface of **every target** (`.claude/commands/hm/review.md`, `.agents/skills/hm-review/SKILL.md`) so a changed or removed lens on any target invalidates the verdict; re-judgment on unrelated edits to those files is an accepted cost | decision A: LLM judgment, Python stores |
 | LLM boundary | the `world` module's four subcommand entrypoints must not import an LLM client | deterministic, free read path |
 | Data versioning | `schema_version` required in every new file; missing → refused; major ≠ the build's known major (older **or** newer) → refused naming file and both versions | long-lived, hand-edited data |
-| Withdrawal criterion | skeleton comment: after 10 wrapups with no `observed:` on any objective and no `candidate` revisit, remove the layer | the 58.5% instrument, applied from day one |
+| Withdrawal criterion | after 10 wrapups with no `observed:` on any objective and no `candidate` revisit, remove the layer — measured by `hm world gap --json` → `withdrawal` since 2026-09-18 ([[SPEC-intent-layer-ops]]; was a skeleton comment only) | the 58.5% instrument, applied from day one |
 
 ## ✅ Verification Criteria
 

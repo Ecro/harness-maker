@@ -53,8 +53,9 @@ a non-mapping `measure`.
 **Given** the outcome above and a `probe.py` that prints `{"report": {"carry_ratio": 0.672}}`
 **When** the operator runs `hm world outcome measure carry --json`
 **Then** a value row is appended with `value: 0.672`, `observed_at` = now (UTC `Z`),
-`evidence` = `auto: python probe.py @ <short sha> exit=0 cwd=base`, and `definition_hash` of the current
-definition
+`evidence` = `auto: measure#<first 12 hex of definition_hash> @ <short sha> exit=0 cwd=base`, and
+`definition_hash` of the current definition (amended 2026-09-18 by [[SPEC-intent-layer-ops]]: the
+argv was copied into every row; the hash already binds the command)
 **And** the process runs with `shell=False`, a timeout, and its captured output is redacted and
 truncated before any of it reaches stderr — stdout never lands in the row
 **And** `select: "regex:carry=([0-9.]+)"` and `select: "last-number"` extract the same value
@@ -147,7 +148,7 @@ zero in-flight allowances.
 `load_intent` accepts `measure: {cmd, select, cwd}` (cwd optional, default `base`; `timeout_s` optional positive int) and exposes it on `Outcome.measure`; `validate_intent` refuses an empty or option-shaped `cmd`, an unknown `select` prefix, a `cwd` outside `base|checkout`, a non-positive `timeout_s`, and a non-mapping `measure`, naming `outcomes[i].measure.<field>`.
 
 ### AC-002: measure records the extracted number with auto evidence
-`hm world outcome measure <id>` runs `shlex.split(cmd)` with `shell=False`, `cwd` resolved per the block and `timeout`, extracts one number via `json:`/`regex:`/`last-number`, and appends a row equal to `record_value(root, outcome_id, value, now_utc, "auto: <argv> @ <sha> exit=0")`; captured output is redacted/truncated and never stored.
+`hm world outcome measure <id>` runs `shlex.split(cmd)` with `shell=False`, `cwd` resolved per the block and `timeout`, extracts one number via `json:`/`regex:`/`last-number`, and appends a row equal to `record_value(root, outcome_id, value, now_utc, "auto: measure#<definition_hash[:12]> @ <sha> exit=0 cwd=<base|checkout>")` (format amended by SPEC-intent-layer-ops AC-001; the command text is recoverable from `intent.yaml` at `<sha>` only when that file was committed and clean there — accepted trade-off, PLAN-intent-layer-ops ADR-001); captured output is redacted/truncated and never stored.
 
 ### AC-003: failures write nothing and name the cause
 Non-zero exit, no selector match, timeout, and a missing `measure` block each exit non-zero with `field ∈ {exit, select, timeout, measure}` and leave `outcomes.yaml` byte-identical.

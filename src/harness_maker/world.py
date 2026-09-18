@@ -28,7 +28,7 @@ from typing import Any
 
 import yaml
 
-from harness_maker import autopilot_ledger, command_registry
+from harness_maker import autopilot_ledger, command_registry, stage_spans
 from harness_maker import intent as intent_mod
 from harness_maker.frontmatter import split_frontmatter
 from harness_maker.intent import (
@@ -802,6 +802,117 @@ def _measurement_reason(lv: LastValue | None) -> str:
     return "stale_definition" if lv.stale_definition else "measured"
 
 
+#: The withdrawal criterion's threshold (SPEC-intent-world-model-objective-layer, Constraints).
+WITHDRAWAL_WRAPUPS = 10
+_INTENT_REL = ".claude/intent.yaml"
+_GIT_TIMEOUT_S = 10
+
+
+def withdrawal_due(wrapups: int | None, observed: int, candidates: int) -> bool:
+    """An uncounted wrapup total never reads as "unused" — that would retire a layer blind."""
+    return (
+        wrapups is not None and wrapups >= WITHDRAWAL_WRAPUPS and observed == 0 and candidates == 0
+    )
+
+
+def _git_out(args: list[str], cwd: Path) -> str | None:
+    """stdout, or None when git cannot answer (missing, hung, refused, non-zero, undecodable).
+
+    `git show` returns historical file bytes verbatim; a blob that is not UTF-8 must read as
+    "no answer" (the blob is skipped), never as a crash of the read-only report.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=_GIT_TIMEOUT_S,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _blob_is_filled(text: str) -> bool:
+    try:
+        raw = yaml.safe_load(text)
+        return not intent_mod.is_not_filled_in(intent_mod.intent_from_raw(Path(_INTENT_REL), raw))
+    except (yaml.YAMLError, IntentInvalidError, ValueError):
+        # ValueError: PyYAML's constructors (e.g. an impossible date literal) raise it directly,
+        # not as YAMLError — a history typo must skip that blob, not break every `gap` call.
+        return False
+
+
+def _filled_at(root: Path) -> tuple[str | None, str | None]:
+    """(UTC `Z` committer date of the oldest commit whose intent.yaml is filled, reason).
+
+    A shallow clone is refused: its oldest visible commit is the clone boundary, which would
+    report a fabricated date as `ok`. A commit whose blob cannot be shown (it deleted the file)
+    or parsed is skipped, not treated as git failing (ADR-003).
+    """
+    shallow = _git_out(["rev-parse", "--is-shallow-repository"], root)
+    if shallow is None or shallow.strip() == "true":
+        return None, "no_git"
+    log = _git_out(["log", "--reverse", "--format=%H%x09%cI", "--", _INTENT_REL], root)
+    if log is None:
+        return None, "no_git"
+    for line in log.splitlines():
+        sha, _, date = line.partition("\t")
+        blob = _git_out(["show", f"{sha}:{_INTENT_REL}"], root)
+        if blob is not None and _blob_is_filled(blob):
+            return normalise_timestamp(date, "filled_at"), None
+    return None, "fill_uncommitted"
+
+
+def _count_wrapups(base: Path, since: str) -> tuple[int | None, str | None]:
+    """`hm:wrapup` START events after `since` (ADR-004).
+
+    `start` because every wrapup that emits spans writes one; `end` comes only from the
+    Claude-Code Stop hook and is lost when a later stage closes the span first. A ledger with
+    no wrapup event at all means the instrument is absent here, not that nothing ran.
+    """
+    path = base / ".claude" / "observability" / "stage-spans.jsonl"
+    if not path.is_file():
+        return None, "no_stage_spans"
+    try:
+        events, _diag = stage_spans.read_events(path)
+    except OSError:
+        return None, "no_stage_spans"
+    wrapups = [e for e in events if e.stage == "hm:wrapup"]
+    if not wrapups:
+        return None, "no_wrapup_spans"
+    cutoff = datetime.fromisoformat(since.replace("Z", "+00:00"))
+    count = sum(
+        1 for e in wrapups if e.event == "start" and e.ts.tzinfo is not None and e.ts > cutoff
+    )
+    return count, None
+
+
+def withdrawal_report(world: World, root: Path, fired: list[str]) -> dict[str, Any]:
+    """The layer's own retirement instrument; a count it cannot take is None with its reason."""
+    observed = sum(1 for rec in world.objectives.values() if rec.get("observed") is not None)
+    candidates = len(fired)
+    filled: str | None = None
+    wrapups: int | None = None
+    if intent_mod.is_not_filled_in(world.intent):
+        reason: str | None = "not_filled_in"
+    else:
+        filled, reason = _filled_at(root)
+        if reason is None and filled is not None:
+            wrapups, reason = _count_wrapups(resolve_base_root(root), filled)
+    return {
+        "filled_at": filled,
+        "wrapups_since_fill": wrapups,
+        "objectives_observed": observed,
+        "revisit_candidates_now": candidates,
+        "due": withdrawal_due(wrapups, observed, candidates),
+        "reason": reason or "ok",
+    }
+
+
 _GAP_OBJECTIVE_KEYS: tuple[str, ...] = (
     "state",
     "title",
@@ -850,6 +961,7 @@ def gap_report(root: Path) -> dict[str, Any]:
         }
     for oid, rec in sorted(world.objectives.items()):
         report["objectives"][oid] = {key: rec.get(key) for key in _GAP_OBJECTIVE_KEYS}
+    report["withdrawal"] = withdrawal_report(world, root, status["fired_revisits"])
     return report
 
 
@@ -1129,7 +1241,10 @@ def run_measure(outcome: Outcome, root: Path) -> MeasureResult:
         diag = truncate(redact(stderr or ""), BUDGET_PER_COMMAND)
         raise WorldError("exit", f"exit={proc.returncode}: {diag}".rstrip(": "))
     value = select_number(stdout or "", measure.select)
-    evidence = f"auto: {' '.join(argv)} @ {_short_sha(cwd)} exit=0 cwd={measure.cwd}"
+    # The row's definition_hash already binds cmd/select/cwd/timeout; copying argv here grew the
+    # file by the command length on every measurement (PLAN-intent-layer-ops ADR-001).
+    ref = outcome_definition_hash(outcome)[:12]
+    evidence = f"auto: measure#{ref} @ {_short_sha(cwd)} exit=0 cwd={measure.cwd}"
     return MeasureResult(value=value, evidence=evidence)
 
 

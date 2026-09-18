@@ -93,7 +93,8 @@ def test_ac_002_measure_records_the_extracted_number_with_auto_evidence(tmp_path
     assert proc.returncode == 0, proc.stdout + proc.stderr
     rows = _rows(root)
     assert rows[-1]["value"] == 0.672
-    assert rows[-1]["evidence"] == f"auto: python probe.py @ {sha} exit=0 cwd=base"
+    ref = fx.definition_hash(carry)[:12]
+    assert rows[-1]["evidence"] == f"auto: measure#{ref} @ {sha} exit=0 cwd=base"
     assert rows[-1]["observed_at"].endswith("Z")
     assert rows[-1]["definition_hash"] == fx.definition_hash(carry)
     assert "carry_ratio" not in rows[-1]["evidence"]
@@ -117,7 +118,7 @@ def test_ac_002_the_recorded_row_is_what_record_value_would_write(tmp_path: Path
         outcome_id="carry",
         value=0.672,
         observed_at=measured["observed_at"],
-        evidence=f"auto: python probe.py @ {sha} exit=0 cwd=base",
+        evidence=f"auto: measure#{fx.definition_hash(carry)[:12]} @ {sha} exit=0 cwd=base",
     )
     assert manual == measured
 

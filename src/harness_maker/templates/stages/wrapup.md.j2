@@ -591,6 +591,8 @@ If the answer is "yes": run ONCE (it records every measurable outcome that succe
 Otherwise: write nothing.
 <!-- /@hm:answer-gated -->
 
+Withdrawal: when the `hm world gap --json` output of the outcome-measure check above reports `withdrawal.due: true`, print once `[intent] withdrawal criterion met — <wrapups_since_fill> wrapups since <filled_at>, no observed objective, no fired revisit; removing the layer is the operator's call`. Otherwise print nothing.
+
 ### Steps 6 → 7.6 — Stage, commit, pop, drain (ONE call)
 
 {%- if config.worktree is defined and config.worktree.get('enabled') %}

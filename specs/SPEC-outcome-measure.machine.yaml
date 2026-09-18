@@ -50,13 +50,14 @@ ac:
   test_ids:
   - tests/unit/test_world_outcome_measure.py::test_ac_002_measure_records_the_extracted_number_with_auto_evidence
   executable_predicate: 'rows[-1][''value''] == 0.672 and rows[-1][''evidence''] ==
-    f''auto: python probe.py @ {sha} exit=0 cwd=base'' and rows[-1][''observed_at''].endswith(''Z'')
+    f''auto: measure#{expected_hash[:12]} @ {sha} exit=0 cwd=base'' and rows[-1][''observed_at''].endswith(''Z'')
     and rows[-1][''definition_hash''] == expected_hash and ''carry_ratio'' not in
     rows[-1][''evidence''] and regex_row[''value''] == 0.672 and last_number_row[''value'']
     == 0.672'
   golden_table: []
   rubric_id: null
-  note: ''
+  note: 'Evidence format amended 2026-09-18 by SPEC-intent-layer-ops AC-001 (argv -> definition_hash
+    reference).'
   pending_test: false
   oracle_source: golden
   oracle_evidence: The probe script's output is a hand-written fixture with a known

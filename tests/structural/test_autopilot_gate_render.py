@@ -67,6 +67,11 @@ Re-captures (append; never silently overwrite):
 - **2026-09-17, release 0.57.1** — same per-release case: 60 lines, all the frontmatter
   `harness_maker_version:` key, and substituting `0.57.1` back to `0.57.0` reproduces every
   previous hash.
+- **2026-09-18, `intent-layer-ops`** — `wrapup` moved in all four arms, identically in
+  `auto_safe` and `ask`: 5.7 gained one sentence after the `outcome-measure` block that prints
+  `[intent] withdrawal criterion met …` when the `gap` output reports `withdrawal.due` (zero new
+  calls). Verified before re-capture that `wrapup` is the ONLY moved command in every arm.
+  Attributed in `work-docs/BASELINE-DELTA-intent-layer-ops.md` §3.
 """
 
 from __future__ import annotations
