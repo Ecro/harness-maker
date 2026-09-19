@@ -118,6 +118,8 @@ MODULES: dict[str, ModuleSpec] = {
             "mark-judged",
             "find-unjudged",
             "check",
+            "approve",
+            "approval-status",
         ),
     ),
     "spec_mutation": ModuleSpec("subparser", _s("gate", "classify")),

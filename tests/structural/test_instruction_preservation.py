@@ -224,7 +224,19 @@ _WRAPUP_57_TWO_QUESTIONS_HEADING: tuple[str, ...] = (
     "#### 5.7 World state \u2014 two questions, answer-gated (intent layer)",
 )
 
+_SPEC_GATE_FIRST_LINE: tuple[str, ...] = (
+    "!uv run --with $HOME/harness-maker python -m harness_maker.autopilot_caps gate-blocked "
+    '--root . --stage spec --session-id "$HM_SESSION_ID"',
+)
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    # SPEC-ai-native-sdlc-vs-intent-world IRR-003: `spec` became a judgment-gated stage, so the
+    # shared end-of-stage partial renders the classify-then-boundary branch instead of the
+    # gate-first `gate-blocked` call — the same shape plan and review already have.
+    "ai-native-sdlc-vs-intent-world": {
+        "spec@task-driven": list(_SPEC_GATE_FIRST_LINE),
+        "spec@spec-driven": list(_SPEC_GATE_FIRST_LINE),
+    },
     "assumption-entry-and-evidence-locator": {
         "wrapup@task-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_LOCATOR),
         "wrapup@spec-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_LOCATOR),

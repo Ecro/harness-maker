@@ -49,7 +49,17 @@ Skip the SPEC interview ONLY when:
 | **Contracts** | No API / IPC / DB schema / file format change |
 | **Risk** | Reversible in <1h with no user-facing impact |
 
-When skipped: write a minimal SPEC (Intent + 1 happy-path scenario in G-W-T form + Verification = "manual smoke") and continue. Do NOT ask permission to skip — proceed and log rationale in the SPEC's `## Refinement Decisions` section.
+When skipped: write a minimal SPEC (Intent + 1 happy-path scenario in G-W-T form + Verification = "manual smoke") and continue. Do NOT ask permission to skip — proceed and log rationale in the SPEC's `## Refinement Decisions` section. Its machine.yaml is `schema_version: 3` with `irreversible_decisions: []` (the four criteria above rule out every irreversible category), and it is stamped **exempt** — no identity, no prompt; the stamp stays valid only while the list stays empty:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --exempt")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --exempt
+```
+{% endif %}
 
 ### Step 1 — Knowledge retrieval
 
@@ -82,7 +92,7 @@ Same UX rules as `/hm:plan`:
   labels, and validation prompt.
 - {% if is_codex %}Use the `request_user_input` tool (if unavailable, ask in your response). **Batch independent questions** per round{% else %}Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds){% endif %}.
 - Always include **"Other — let me describe"**.
-- From Round 2 onward, include **"SPEC is sufficiently clear — end interview"** on one foundational question per round.
+- From Round 2 onward, include **"Approve this SPEC and end interview"** on one foundational question per round. Choosing it is the DRI's acceptance of the SPEC — remember it and stamp it in Step 5, after the files pass Step 4. It is the only approval: no answer, no question tool, or loop mode never counts as one.
 - Visualization OPTIONAL — prose / bullets preferred, ASCII for topology, Mermaid only in the final document (never in live terminal).
 
 {%- with block = 'brief', stage = 'spec' %}
@@ -135,6 +145,17 @@ For a `property` oracle, also collect the structured triple `input_domain` /
 > `oracle_source` ↔ sw-improve x-contract `conformance.kind`; `differential` ↔ a
 > cross-language golden pin; `consensus` ↔ the adversarial 3-skeptic verify;
 > mutation adequacy ↔ shared. `property` has no x-contract equivalent (new).
+
+**Irreversible decisions (every SPEC — `irreversible_decisions`).** Before closing, list the
+decisions this change makes that cannot be cheaply undone, judged against five categories:
+schema/file format/storage layout · public API/CLI contract · data migration ·
+security/permission boundary · new external dependency. Use the narrowing questions only to
+**drop** candidates — could two units working independently choose incompatibly? is the call
+non-obvious? is it a real trade-off? — never to exclude an obviously destructive change; cost,
+scale and compliance are judgment examples inside a category, not categories. Each entry is
+`{id: IRR-NNN, decision, category, rationale, source: spec}` with sequential ids that are never
+renumbered. Show the list to the DRI in the interview (they add or remove entries); an empty
+list is valid and is written as `irreversible_decisions: []`.
 
 **Open-ended cap** (follow-ups after the six categories): at most `{{ config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get(config.locale, config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get('default', 1)) }}` open-ended question(s) per turn for locale `{{ config.locale }}`; closed-form (multi-select / yes-no) questions are unrestricted. Ask a follow-up only when its answer would change SPEC content and the user can answer it now; stop when every SPEC slot is settled or the user ends the interview.
 
@@ -209,14 +230,15 @@ summary: "{≤100 char one-line: what this SPEC is for}"
    | Performance | `{budget}` | {source of bound} |
    | Security | `{requirement}` | {threat model} |
    | Compatibility | `{version range}` | {ecosystem} |
-6. **✅ Verification Criteria** — per-scenario:
+6. **🔒 Irreversible Decisions** — table `| Id | Decision | Category | Rationale |`, one row per `irreversible_decisions` entry (write "none" when the list is empty).
+7. **✅ Verification Criteria** — per-scenario:
    | Scenario | Verification mode | Test name / manual step |
    |---|---|---|
    | S1 | unit | `test_s1_happy_path` |
    | S2 | integration | `test_s2_with_db` |
    | S3 | manual | "open settings, click X, confirm Y" |
-7. **❓ Open Questions** — items the user could not resolve in interview. These feed `/hm:plan`'s ADRs. Empty list = SPEC ready for plan.
-8. **🔍 Refinement Decisions** — 1-line per round summarizing what was locked in (or "skipped — task is trivial: {reason}").
+8. **❓ Open Questions** — items the user could not resolve in interview. These feed `/hm:plan`'s ADRs. Empty list = SPEC ready for plan.
+9. **🔍 Refinement Decisions** — 1-line per round summarizing what was locked in (or "skipped — task is trivial: {reason}").
 
 ### Step 3.5 — Write SPEC.machine.yaml (ADR-006 dual-file)
 
@@ -226,16 +248,25 @@ fields that AI verifiers consume directly (test_ids[], executable_predicate,
 golden_table, rubric_id, mutation_threshold, verification_tier) — values
 the human SPEC.md describes but doesn't structure.
 
-**Required machine.yaml schema (schema_version=2):**
+**Required machine.yaml schema (schema_version=3):**
 
 > **Version note (ADR-006 of spec-tetrad):** new specs declare `schema_version: 2`.
 > An **omitted** version pins to v1 (oracle_source NOT required) so legacy specs
 > keep working; do NOT hand-edit a v2 oracle field into a v1 file — declare the
 > version. v2 requires `oracle_source` + `oracle_evidence` on **every** AC.
+> **v3 (SPEC approval)** additionally requires `irreversible_decisions` (a list, possibly empty).
+> Never hand-write `approval:` — `hm spec_machine approve` writes it, bound to a hash of every
+> authored field (tooling fields such as `test_ids` / `pending_test` are excluded).
 
 ```yaml
-schema_version: 2
+schema_version: 3
 spec_slug: {slug}
+irreversible_decisions:               # [] when none — the key is required at v3
+  - id: IRR-001
+    decision: "<what is decided>"
+    category: public API/CLI contract   # one of the five categories
+    rationale: "<why it cannot be cheaply undone>"
+    source: spec                        # execute when appended during /hm:execute
 parent_spec: SPEC-{l1-cluster-slug}   # null OR L1 file in same specs/ dir
 verification_tier: 1 | 2 | 3          # T1/T2/T3 per ADR-008
 mutation_threshold: 85 | 70 | null    # Python only; null = ADR-009 3-layer
@@ -343,13 +374,29 @@ If `## ❓ Open Questions` is empty: update frontmatter `status: approved`. Othe
 
 The user can resume by editing the SPEC directly or re-running `/hm:spec {slug}` (interview will read the existing SPEC and re-engage on draft items).
 
+**Stamp the DRI's acceptance.** Only when the DRI chose "Approve this SPEC and end interview"
+(and Step 4 passed), record it — content hash, base-root identity, time:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml
+```
+{% endif %}
+
+Otherwise leave the SPEC unstamped: autopilot stops at this stage, and `/hm:wrapup` asks again
+before landing. `status:` above is the document lifecycle; acceptance lives only in `approval`.
+
 **Stage terminal**: On success, output the SPEC path and its status (`draft` / `approved`), then **STOP**. Do not proceed to `/hm:plan` or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated. Exception: an auto-advance check below returning `proceed: true` supersedes this.
 
 {% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "spec" %}{% set gate0_pass = "SPEC written with valid frontmatter; status is `draft` or `approved`." %}{% set gate0_fail = "SPEC write failed validation or the dual-file cross-validate step returned errors." %}{% set gate0_standalone = true %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 
 ## Outputs
 
-- `{{ config.spec.dir }}SPEC-{slug}.md` — frontmatter + 8 sections above.
+- `{{ config.spec.dir }}SPEC-{slug}.md` — frontmatter + 9 sections above.
 - Status: `draft` (open questions remain) or `approved` (ready for `/hm:plan`).
 
 ## Quality Bar
@@ -365,7 +412,7 @@ The user can resume by editing the SPEC directly or re-running `/hm:spec {slug}`
 {% set summary_artifact = "specs/SPEC-{slug}.md" -%}
 {% set summary_next = "`/hm:plan {slug}` (STOP — user-initiated)" -%}
 {% set summary_stage = "spec" -%}
-{% set summary_autopilot_gate = "No mandatory gate — spec may auto-advance." -%}
+{% set summary_autopilot_gate = "Read the SPEC's acceptance with `hm spec_machine approval-status --root . --slug <slug>`: pass --judgment-gate clear when state is approved or exempt, blocked when malformed, pending otherwise. The boundary re-derives the same verdict from the SPEC, so a clear the SPEC does not support never advances. At auto_full a pending is answered WITHOUT writing an approval — the land hold covers the SPEC's irreversible decisions." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

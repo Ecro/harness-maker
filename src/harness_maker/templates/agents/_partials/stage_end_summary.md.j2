@@ -32,7 +32,7 @@ to the STOP banner, running nothing below — **if any of: no `Skill` tool (Curs
 no active marker, or loop-mode is on for THIS session (a `.claude/.hm-loop-*` marker
 matches `$HM_SESSION_ID`, or a legacy `.hm-loop-active` exists).**
 
-{% set judgment_stage = summary_stage in ["plan", "review"] -%}
+{% set judgment_stage = summary_stage in ["plan", "review", "spec"] -%}
 {#- ADR-009.4: DERIVED from `summary_stage`, never a caller-set variable. This partial is
     one shared include under StrictUndefined, so a new required var would break the five
     stage templates outside B3's scope. Kept in sync with

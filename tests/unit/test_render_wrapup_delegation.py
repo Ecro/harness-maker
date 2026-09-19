@@ -246,7 +246,11 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # re-review's P1 fix made that check state the base path (+1 line).
 # 735/768 + 729/762 → 751/784 (rebase onto observed-harness-gaps-salvage, 2026-09-19): the two
 # tasks' additions are disjoint (Steps 6 → 7.6 vs 5.1.0), so the deltas add: +22 and +16.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 751), ("Production", 784)])
+# 751/784 → 769/802 (ai-native-sdlc-vs-intent-world, 2026-09-19): +18 per preset — the
+# "Before landing — the DRI's acceptance of the SPEC" block ahead of the roll-up: the fenced
+# `hm spec_machine approval-status` call, the ok/hold/no-answer bullets. Attributed in
+# work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md §3.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 769), ("Production", 802)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

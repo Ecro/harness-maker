@@ -88,6 +88,15 @@ Re-captures (append; never silently overwrite):
   Codex P1 fix added the exact-slug Grep check to 5.1.0, and twice more for its base-path note
   (re-review P1; then `/hm:verify` removed a `<WT>` token that leaked into the worktree-OFF
   render) — `wrapup` the ONLY moved command each time.
+- **2026-09-19, `ai-native-sdlc-vs-intent-world`** — `spec`, `execute` and `wrapup` moved in all
+  four arms and `loop` in the three worktree-on arms (its finalize block does not render with
+  isolation off), identically in `auto_safe` and `ask`: spec became judgment-gated (the shared
+  partial renders its classify-then-boundary branch) and gained the approve/exempt stamps and the
+  irreversible-decision list; execute gained the escalation rule; wrapup gained the
+  `approval-status` check before the land call; loop gained the `[finalize] hold:` HALT note.
+  Verified before re-capture that these four are the ONLY moved commands in every arm and the
+  command set did not drift. Attributed in
+  `work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md` §3.
 """
 
 from __future__ import annotations

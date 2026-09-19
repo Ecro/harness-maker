@@ -346,6 +346,35 @@ In-Scope Scenarios 는 BDD 형식 사용:
 
 ---
 
+#### SPEC 승인과 land 보류
+
+SPEC을 쓰는 것은 에이전트이고, 수락하는 것은 task를 책임지는 사람(DRI)입니다. 인터뷰의 마지막
+선택지 **"Approve this SPEC and end interview"** 를 고르면 `hm spec_machine approve` 가
+machine SPEC에 `approval: {kind: human, content_hash, approved_by, approved_at}` 도장을
+찍습니다. 해시는 작성된 모든 필드를 덮고(`test_ids` / `pending_test` 같은 도구 기록 필드는
+제외), AC·oracle·아래 목록을 고치면 도장은 무효가 됩니다. Step 0 skip은 `kind: exempt` 로
+찍히고, 되돌릴 수 없는 결정이 없을 때만 유효합니다.
+
+`schema_version: 3` 부터 모든 SPEC은 `irreversible_decisions` (비어 있어도 됨)를
+선언합니다 — 스키마/파일 포맷/저장 레이아웃 · 공개 API/CLI 계약 · 데이터 마이그레이션 ·
+보안/권한 경계 · 새 외부 의존성. `/hm:execute` 가 새 결정을 발견하면 `source: execute` 로
+추가하고, 그 순간 승인은 의도대로 무효가 됩니다.
+
+`hm spec_machine approval-status --root . --slug <slug>` 가 상태를 알려줍니다. autopilot은
+SPEC이 승인·면제 상태가 아니면 `spec` 에서 멈추고(`auto_full` 은 도장 없이 진행), wrapup
+커밋·`worktree task-land`·`/hm:loop` 의 `finalize success` 는 되돌릴 수 없는 결정에 유효한
+승인이 없으면 `hold:` 줄과 함께 land를 거부합니다. wrapup은 먼저 DRI에게 묻고, 응답이 없거나
+질문 도구가 없거나 loop 모드면 승인으로 보지 않습니다. 도장은 흐름을 기록할 뿐 사람임을
+증명하지 않습니다(objective 승인과 같은 한계).
+
+hold 검사는 fail-closed 이고, task 단위가 아니라 파일 단위로 찾습니다: `git` 이 브랜치가
+건드린 SPEC 목록을 못 읽으면 SPEC-less로 취급하지 않고 hold 됩니다. `worktree task-land` 는
+task worktree 가 이미 사라졌을 때 임시 checkout 으로 브랜치의 SPEC 들을 확인합니다. 브랜치에서
+바뀐 SPEC 파일은 task의 slug 하나만이 아니라 각각 독립적으로 검사됩니다. SPEC 디렉터리 탐색은
+**base** 저장소에 설정된 `spec.dir` 을 먼저 보고, 그다음 checkout 의 것을 봅니다 — 절대경로나
+`..` 를 포함한 값은 무시되고 `specs/` 로 대체됩니다. SPEC 의 `spec_slug` 는 파일명에 묶여
+있어서, 재승인 없이 파일명만 바꾸면 승인이 따라오지 않습니다.
+
 ### 3.3 /hm:plan — 구현 계획
 
 **목적**: 코드를 쓰기 전에 "어떻게 만들 것인가"를 결정한다. 심층 인터뷰로 아키텍처 결정(ADR)을 확정하고, 구현 단계를 세분화한다.

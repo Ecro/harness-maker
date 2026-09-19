@@ -359,6 +359,38 @@ Save to `specs/SPEC-{slug}.md`. Frontmatter includes:
 
 ---
 
+#### SPEC approval and the land hold
+
+The human who owns the task (the DRI) accepts a SPEC; agents write it. The interview's closing
+option is **"Approve this SPEC and end interview"** — choosing it runs
+`hm spec_machine approve`, which stamps `approval: {kind: human, content_hash, approved_by,
+approved_at}` into the machine SPEC. The hash covers every authored field (tooling fields such as
+`test_ids` / `pending_test` are excluded), so editing an AC, an oracle or the list below
+invalidates the stamp. A Step 0 skip is stamped `kind: exempt`, valid only while nothing
+irreversible is listed.
+
+From `schema_version: 3` every SPEC declares `irreversible_decisions` (possibly empty):
+schema/file format/storage layout · public API/CLI contract · data migration ·
+security/permission boundary · new external dependency. `/hm:execute` appends a decision it
+discovers (`source: execute`), which invalidates the approval by design.
+
+`hm spec_machine approval-status --root . --slug <slug>` reports the state
+(`approved / exempt / missing / invalid / malformed / legacy / no_spec`). Autopilot stops at
+`spec` unless the SPEC is approved or exempt (`auto_full` proceeds without writing a stamp), and
+every land path — wrapup's commit, `worktree task-land`, `/hm:loop`'s `finalize success` —
+refuses with `hold:` lines while irreversible decisions lack a valid approval. Wrapup asks the
+DRI first; no answer, no question tool, or loop mode is never an approval. The stamp records the
+flow; it does not prove a human (the same limit as objective approval).
+
+The hold check fails closed and discovers per-file, not per-task: if `git` cannot list the
+SPECs a branch touches, the branch holds rather than being treated as SPEC-less; `worktree
+task-land` checks the branch's SPECs through a throwaway checkout when the task worktree is
+already gone; every SPEC file changed on the branch is checked independently, not just the one
+named by the task's slug. The SPEC directory search looks at the **base** repo's configured
+`spec.dir` first, then the checkout's; an absolute path or one containing `..` is ignored and
+falls back to `specs/`. A SPEC's `spec_slug` is bound to its file name, so renaming the file
+without re-approving does not carry the approval with it.
+
 ### 3.3 /hm:plan — Implementation Plan
 
 **Purpose**: Decide "how to build it" before writing code. Finalize architecture decisions (ADRs) through a deep interview, and decompose implementation into stages.

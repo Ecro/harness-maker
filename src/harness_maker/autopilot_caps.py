@@ -57,7 +57,22 @@ _HUMAN_GATED_STAGES: frozenset[str] = frozenset({"wrapup"})
 #
 # `_HUMAN_GATED_STAGES` stays next-stage-keyed. It guards a one-way door (wrapup lands to
 # main), so what matters there is what is about to be ENTERED, not what just finished.
-_JUDGMENT_GATED_STAGES: frozenset[str] = frozenset({"plan", "review"})
+_JUDGMENT_GATED_STAGES: frozenset[str] = frozenset({"plan", "review", "spec"})
+#: The escalation ladder a derived verdict is compared on — `pending` is the one value
+#: `auto_full` clears, so a tie never resolves downward.
+_GATE_RANK: dict[str, int] = {"clear": 0, "pending": 1, "blocked": 2}
+
+
+def _derived_spec_gate(root: Path, slug: str | None) -> str:
+    """SPEC-ai-native-sdlc ADR-004: the spec stage's gate comes from the SPEC, not its claim.
+
+    No slug means no SPEC can be located — that is not evidence of acceptance, so `pending`.
+    """
+    if not slug:
+        return "pending"
+    from harness_maker.spec_machine import approval_state
+
+    return approval_state(root, slug).gate
 
 
 @dataclass(frozen=True)
@@ -461,6 +476,13 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             autopilot.clear(root, session_id=args.session_id)
         print(json.dumps(out))
         return 0
+    # SPEC-ai-native-sdlc ADR-004 — placed BEFORE the `blocked` check so a derived `blocked`
+    # (a malformed SPEC) halts at every level instead of reaching the auto_full answer branch.
+    # An ABSENT caller flag is left untouched: absence stays un-clearable everywhere.
+    if args.current == "spec" and args.judgment_gate is not None:
+        derived = _derived_spec_gate(root, slug)
+        if _GATE_RANK[derived] > _GATE_RANK[args.judgment_gate]:
+            args.judgment_gate = derived
     # `blocked` is a caller ASSERTION that a quality threshold failed, so it is honoured on
     # ANY stage, not only the two that own a judgment gate. Today no other stage's template
     # sends it, so this is future-proofing rather than a fail-open being closed — but the
@@ -539,7 +561,9 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             "stopped at — read `proceed`/`halt_kind` for what the chain then did. Record the "
             "answer you took — for `plan`, write the recommended option into the PLAN's "
             "Interview Transcript; for `review`, write the passed-over finding ids into the "
-            "REVIEW document. An unrecorded auto-answer is an unauditable skip."
+            "REVIEW document; for `spec`, write NO approval — the SPEC stays unaccepted and the "
+            "land hold stops its irreversible decisions. An unrecorded auto-answer is an "
+            "unauditable skip."
         )
     nxt = next_stage(marker.pipeline, args.current)
     if nxt is None:

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker import autopilot, autopilot_caps, autopilot_ledger
+from harness_maker import autopilot, autopilot_caps, autopilot_ledger, spec_machine
 from harness_maker.models import AtomicStage
 
 PIPELINE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.PLAN, AtomicStage.EXECUTE]
@@ -56,14 +56,29 @@ def _events(root: Path) -> list[tuple[str, object]]:
 # --- ADR-004/005: the authorize → enter cycle -----------------------------------
 
 
+def _exempt_spec(root: Path, slug: str) -> None:
+    """A clean pipeline's spec stage: an accepted (here exempt) SPEC, since `spec` is gated."""
+    specs = root / "specs"
+    specs.mkdir(parents=True, exist_ok=True)
+    (specs / f"SPEC-{slug}.md").write_text("---\ntype: spec\n---\n", encoding="utf-8")
+    yaml_path = specs / f"SPEC-{slug}.machine.yaml"
+    yaml_path.write_text(
+        "schema_version: 3\nspec_slug: " + slug + "\nverification_tier: 1\n"
+        "irreversible_decisions: []\nac: []\n",
+        encoding="utf-8",
+    )
+    spec_machine.approve(yaml_path, exempt=True)
+
+
 def test_chain_records_authorized_then_entered(tmp_path: Path) -> None:
     _arm(tmp_path)
+    _exempt_spec(tmp_path, "s")
     first = _boundary(tmp_path, "research", "--slug", "s")
     assert first["proceed"] is True
     assert first["next_stage"] == "spec"
     assert _events(tmp_path) == [("advance_authorized", "spec")]
 
-    second = _boundary(tmp_path, "spec", "--slug", "s")
+    second = _boundary(tmp_path, "spec", "--slug", "s", "--judgment-gate", "clear")
     assert second["next_stage"] == "plan"
     assert _events(tmp_path) == [
         ("advance_authorized", "spec"),

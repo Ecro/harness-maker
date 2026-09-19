@@ -55,7 +55,7 @@ files:
   body_sha256: 9b2ecf7fae62c92cee1a66d2acb2c4b826b1a74f9ed6a31f34e2970cdb4fc8fd
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: f56fb2cba1610e7a532dcaa109bb39bc513c3f959e0853ccdb0df4c9ce8d5b54
+  body_sha256: 3b7fc695baf8c490e6495bddf9c4b4b1c3bfacf0b2cba76a486e79f75d24c5b2
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: b16b0c64191d45f0b5d01ffa6e3f68ff8f0cf46a6b361f0193fc57ad692db222
@@ -85,7 +85,7 @@ files:
   body_sha256: bfb43a0ed7f9b0762c71dfb8d36ab37afd278011867470bb19c06f9115e4b6d2
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 51310d92d5ccad9410e9032354a6c2c5b52ea6731057d66ee71df4b1112f281d
+  body_sha256: bbd02d3c9b4c9bff7635f3a46694ea18bd5b3ec9c459edca27c1fd0a42765fec
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: 86a9b22c2d05bb4c25d11d38a50fb331dda627fe91c0348f95acee03f3be15a1
@@ -94,7 +94,7 @@ files:
   body_sha256: b41649d3efb41911b725b63eaf1d4ca0f1872c11fc254681642c786d9ba0e8df
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: f1725d40fed8a7f6c226ff8c046ca4979631e8ad2460bc6cf3c3f365bc86d805
+  body_sha256: 6414a568f60568aea0d2a282b162f2d6a5311441d6012c880d091258f713faac
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: 875c92a36ead45bb99c6171e7639ec01d21389ce2165a8cf9867386ea9fae864
@@ -166,7 +166,7 @@ files:
   body_sha256: b3ce34ea25321280d309fe3188fd757e1665aad75a95aa76ecd942bdcc128b47
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: b7c177ef6a7a6a56f1e5212e402d2e33747f7a78eeac6139c5fc4c11d572494f
+  body_sha256: 290728d119d58e689a95903b18e8c0181fadf324c0863497abf2d45b59cbbb68
 - path: stages/plan.md
   template: stages/plan.md.j2
   body_sha256: 290c56eee056a9cf113227e923d0cec14cb2ebca9f0065367fe5d8e0b50e3762
@@ -178,10 +178,10 @@ files:
   body_sha256: 7b8e56ddd5e9cdaf254c8a18ad90d512168ce886c2268c25b80f21d53cd39bf8
 - path: stages/spec.md
   template: stages/spec.md.j2
-  body_sha256: 83933d1e04df195d2d7f1a8eb43c4abebbe54f1a205cd32c273d562858774e89
+  body_sha256: 967c8d8f31a42586a8d3b48ab396d059483f149eec02bb00843a457723018726
 - path: stages/verify.md
   template: stages/verify.md.j2
   body_sha256: fecab8c0847f49175da7570e7fa748cfb3dcf9ac69b98841b2d7bc3617f2a60e
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 67808482a75b35e72d451659e7d2ba579efc782304e1fd529b596d2407b270cd
+  body_sha256: 638caa0ce4b50e6f4bd9a4ebb94010ec1f0c6841f6ebc914d252ed5c51d9a50d

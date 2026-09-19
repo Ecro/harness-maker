@@ -26,6 +26,7 @@ from typing import Any
 
 from harness_maker import command_registry
 from harness_maker import worktree as wt
+from harness_maker.spec_machine import hold_lines, land_states
 
 #: Exit codes are part of the contract the stage prose reads.
 EXIT_OK = 0
@@ -288,6 +289,18 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             receipt["steps"]["legacy_ref_scan"] = {"status": "abort", "refs": legacy}
             return EXIT_FAILED, receipt
         receipt["steps"]["legacy_ref_scan"] = {"status": "clean"}
+
+    # SPEC-ai-native-sdlc ADR-005 — BEFORE staging: a SPEC whose irreversible decisions no
+    # human accepted must not land, and aborting here leaves nothing staged to retry over.
+    holds = [s for s in land_states(base, worktree, [args.slug]) if s.land == "hold"]
+    if holds:
+        for line in hold_lines(holds):
+            print(line, file=sys.stderr)
+        receipt["steps"]["approval_hold"] = {
+            "status": "hold",
+            "specs": [h.as_json() for h in holds],
+        }
+        return EXIT_FAILED, receipt
 
     message = Path(args.message_file).read_text(encoding="utf-8")
     subject = message.splitlines()[0].strip() if message.strip() else ""

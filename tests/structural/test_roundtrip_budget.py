@@ -215,7 +215,12 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # seven dispatches to four. Nothing else about the command moved: no call was added, removed
     # or chained, and this is the whole of the -6.
     "review": 34,
-    "spec": 6,
+    # 6 → 7 (ai-native-sdlc-vs-intent-world, 2026-09-19): spec runs `hm spec_machine approve`
+    # twice as rendered calls (Step 0 `--exempt`, Step 5 human stamp) and, now judgment-gated,
+    # no longer renders the gate-first `autopilot_caps gate-blocked` line: +2 -1. Declared in
+    # that PLAN's `surface_allowance.round_trips.spec` and attributed in
+    # `work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md` §3.
+    "spec": 7,
     "uninstall": 3,
     # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.
     # 15 → 12: SPEC-ci-derived-verification-plan replaces the four EXAMPLE gate commands
@@ -263,7 +268,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # the wiki write (search-before-write, fact-safe). Declared in that PLAN's
     # `surface_allowance.round_trips` and attributed in
     # `work-docs/BASELINE-DELTA-mission-context-loop.md` §3.
-    "wrapup": 32,
+    # 32 → 33 (ai-native-sdlc-vs-intent-world, 2026-09-19): `hm spec_machine approval-status`
+    # once before the land call (the DRI's acceptance check). Declared in that PLAN's
+    # `surface_allowance.round_trips.wrapup`, attributed in its BASELINE-DELTA §3.
+    "wrapup": 33,
 }
 
 

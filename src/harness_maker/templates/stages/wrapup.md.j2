@@ -668,6 +668,29 @@ Step 7.7 below is deliberately NOT in it: it is the only step that can lose work
 keeps its own invocation and its own operator decision point (ADR-006).
 {% endif -%}
 
+**Before landing — the DRI's acceptance of the SPEC.** Read the task SPEC's state from the
+checkout that is about to land:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approval-status --root {{ '<BASE>' if wt_on else '"$(pwd)"' }} --slug <slug> --checkout {{ '<WT>' if wt_on else '"$(pwd)"' }}")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_machine approval-status --root {{ '<BASE>' if wt_on else '"$(pwd)"' }} --slug <slug> --checkout {{ '<WT>' if wt_on else '"$(pwd)"' }}
+```
+{% endif %}
+
+- `land: ok` → continue (a `notice` is informational: no SPEC, or a pre-approval SPEC).
+- `land: hold` → show the DRI each `irreversible` id with its decision from the SPEC (and
+  `detail` when the SPEC is malformed), then ask ONE closed question{% if is_codex %} with
+  `request_user_input`{% endif %}: approve these and land / keep the worktree. Approve → run
+  `hm spec_machine approve --yaml {{ '<WT>' if wt_on else '"$(pwd)"' }}/{{ config.spec.dir }}SPEC-<slug>.machine.yaml`,
+  re-read the status, continue. Keep → STOP here; do not run the land call; leave the checkout.
+- **No answer, no question tool, or loop mode is never an approval** — stop with the hold.
+  `wrapup_land` re-checks on its own and refuses with `hold:` lines (exit 1); never retry it
+  without the DRI.
+
 **First, produce the ledger roll-up** — the manifest stages it; nothing else writes it. Rows come
 from the **base** repo; the document lands where this wrapup commits. On `invalid choice:
 'rollup'` the pinned plugin predates the subcommand: note it, continue (the file is optional),

@@ -1031,6 +1031,12 @@ When the loop halts (convergence, safety rail, or hard error):
    list in step 6 and instruct the user to resolve manually with
    `cd <WT> && git status && git merge --abort` or similar.
 
+   **A `[finalize] hold:` line means HALT, not converge.** A SPEC this loop changed carries
+   irreversible decisions no human accepted (or its approval went stale after an appended
+   decision). Finalize merged nothing and kept `<WT>`: record the iteration as `fail`, surface
+   the hold lines, and stop. The DRI accepts with `hm spec_machine approve` and re-runs the
+   land — never re-run the loop to get past it.
+
 {%- else -%}
 5. **No worktree to finalize** — isolation is off, so step 5 created nothing. The
    loop's changes are already in this working tree; wrapup owns the commit.

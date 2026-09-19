@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from harness_maker import autopilot, autopilot_caps, autopilot_ledger
+from harness_maker import autopilot, autopilot_caps, autopilot_ledger, spec_machine
 from harness_maker.models import AutonomyConfig
 
 # Use the CANONICAL default pipeline (verify BEFORE wrapup) — NOT list(AtomicStage), whose
@@ -38,17 +38,33 @@ def _boundary(root: Path, current: str, capsys: pytest.CaptureFixture[str]) -> d
             "50",
             "--time-cap-min",
             "600",
-            # B3 made `--judgment-gate` fail-closed, and `plan`/`review` own judgment gates.
+            # B3 made `--judgment-gate` fail-closed, and `plan`/`review`/`spec` own judgment
+            # gates; `spec` derives its gate from the SPEC, so the chain carries an exempt one.
             # This test walks a CLEAN chain to the land gate, so the judgment verdict a real
             # stage would compute is declared clear here; the gate's own matrix lives in
             # tests/unit/test_autopilot_judgment_gate.py.
             "--judgment-gate",
             "clear",
+            "--slug",
+            "s",
         ]
     )
     assert rc == 0
     value: dict[str, Any] = json.loads(capsys.readouterr().out)
     return value
+
+
+def _exempt_spec(root: Path) -> None:
+    """A clean chain's accepted SPEC (SPEC-ai-native-sdlc-vs-intent-world ADR-004)."""
+    (root / "specs").mkdir(parents=True, exist_ok=True)
+    (root / "specs" / "SPEC-s.md").write_text("---\ntype: spec\n---\n", encoding="utf-8")
+    yaml_path = root / "specs" / "SPEC-s.machine.yaml"
+    yaml_path.write_text(
+        "schema_version: 3\nspec_slug: s\nverification_tier: 1\n"
+        "irreversible_decisions: []\nac: []\n",
+        encoding="utf-8",
+    )
+    spec_machine.approve(yaml_path, exempt=True)
 
 
 def test_full_pipeline_chain_advances_then_stops_before_wrapup(
@@ -58,6 +74,7 @@ def test_full_pipeline_chain_advances_then_stops_before_wrapup(
     autopilot.write(
         tmp_path, level="auto_safe", pipeline=_PIPELINE, now=datetime.now(UTC).isoformat()
     )
+    _exempt_spec(tmp_path)
 
     # The auto-chain advances research → … → verify (every two-way-door boundary), but the
     # NEXT stage after verify is the human-gated `wrapup` (P1-1) — so the chain stops there.
@@ -97,6 +114,7 @@ def test_chain_halts_at_step_cap(tmp_path: Path, capsys: pytest.CaptureFixture[s
     autopilot.write(
         tmp_path, level="auto_safe", pipeline=_PIPELINE, now=datetime.now(UTC).isoformat()
     )
+    _exempt_spec(tmp_path)
     cap = 2
     advanced = 0
     for stage in _STAGES[:-1]:
@@ -111,6 +129,12 @@ def test_chain_halts_at_step_cap(tmp_path: Path, capsys: pytest.CaptureFixture[s
                 str(cap),
                 "--time-cap-min",
                 "600",
+                # `spec` is judgment-gated and reads the SPEC; a clean chain carries an exempt
+                # one, so the cap — not the gate — is what stops it.
+                "--judgment-gate",
+                "clear",
+                "--slug",
+                "s",
             ]
         )
         assert rc == 0

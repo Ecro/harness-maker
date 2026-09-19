@@ -1,0 +1,488 @@
+schema_version: 3
+spec_slug: ai-native-sdlc-vs-intent-world
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: 'Tier-1: the approval hash, the state table and the
+  land decision are the only record that a human accepted irreversible decisions before
+  land, and the spec boundary decides whether autopilot stops. A surviving mutant
+  in the deny-list keeps a stale approval valid; one in the hold predicate lands unreviewed
+  irreversible decisions.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/spec_machine.py
+- src/harness_maker/autopilot_caps.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: approve records a content-bound stamp at the base-root identity
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_approval.py::test_ac_001_approve_records_stamp
+  - tests/unit/test_spec_approval.py::test_ac_001_empty_user_name_refuses
+  - tests/unit/test_spec_approval.py::test_ac_001_exempt_stamp_needs_no_identity
+  - tests/unit/test_spec_approval.py::test_ac_001_verbs_are_registered
+  executable_predicate: approval["kind"] == "human" and approval["content_hash"] ==
+    expected_hash and approval["approved_by"] == base_root_user_name
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: expected_hash is computed in the test from the deny-list written
+    in this SPEC's Constraints table; the identity rule is copied from the objective
+    approval contract (world.py reads the base root); the registry requirement comes
+    from the observed exit-2 misroute (command_registry.py:65) — none is read back
+    from new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: approval is valid iff only deny-listed fields changed
+  type: property
+  test_ids:
+  - tests/unit/test_spec_approval.py::test_ac_002_every_model_field_has_a_mutation
+  - tests/unit/test_spec_approval.py::test_ac_002_valid_iff_only_denylisted_fields_changed
+  - tests/unit/test_spec_approval.py::test_ac_002_non_model_edits_invalidate
+  - tests/unit/test_spec_approval.py::test_ac_002_new_defaulted_model_field_keeps_the_hash
+  - tests/unit/test_spec_approval.py::test_ac_002_title_edits_change_the_hash_iff_the_text_differs
+  - tests/unit/test_spec_approval.py::test_ac_002_round_trip_keeps_new_fields
+  - tests/unit/test_spec_approval.py::test_ac_002_round_trip_keeps_legacy_shape
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Validity after a single-field edit is decided by deny-list membership
+    alone, for every field in the model regardless of implementation. The first draft
+    used an allow-list and missed rubric_id and judgment_subject_paths (Codex review);
+    enumerating every model field in the test is what catches that class.
+  oracle_independence_waiver: null
+  input_domain: any schema-valid machine.yaml with an approval, and any single field
+    path among all SpecMachine / AcceptanceCriterion fields (top-level and per-AC),
+    including appending to or emptying irreversible_decisions and a key unknown to
+    the model; plus adding a new defaulted field to the model (hash must not change)
+  transformation: change that one field to a different valid value, write, then read
+    the state
+  expected_relation: (state == 'approved') == (field in DENY_LIST)
+  preconditions:
+  - the SPEC was approved before the edit
+  observable_output: approval-status JSON state
+  generator_hint: iterate over model_fields of both models rather than sampling
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: spec boundary follows the approval state, not the caller's claim
+  type: parametric
+  test_ids:
+  - tests/unit/test_autopilot_spec_gate.py::test_ac_003_spec_boundary_table
+  - tests/unit/test_autopilot_spec_gate.py::test_ac_003_no_slug_derives_pending
+  executable_predicate: null
+  golden_table:
+  - input:
+      level: auto_safe
+      state: approved
+      caller_flag: clear
+    expected:
+      proceed: true
+    edge: false
+    note: accepted SPEC advances
+  - input:
+      level: auto_safe
+      state: exempt
+      caller_flag: clear
+    expected:
+      proceed: true
+    edge: false
+    note: Step 0 skip adds no prompt
+  - input:
+      level: auto_safe
+      state: missing
+      caller_flag: clear
+    expected:
+      proceed: false
+      halt_kind: judgment_gate
+    edge: false
+    note: a caller clear does not override the derived pending
+  - input:
+      level: auto_safe
+      state: invalid
+      caller_flag: pending
+    expected:
+      proceed: false
+      halt_kind: judgment_gate
+    edge: false
+    note: edited after approval
+  - input:
+      level: auto_full
+      state: missing
+      caller_flag: pending
+    expected:
+      proceed: true
+      ledger_event: gate_auto_answered
+      approval_written: false
+    edge: false
+    note: explicit delegation, no forged stamp
+  - input:
+      level: auto_full
+      state: malformed
+      caller_flag: clear
+    expected:
+      proceed: false
+      halt_kind: judgment_gate
+    edge: false
+    note: malformed blocks at every level
+  - input:
+      level: auto_full
+      state: approved
+      caller_flag: absent
+    expected:
+      proceed: false
+      halt_kind: judgment_gate
+    edge: false
+    note: an absent --judgment-gate stays un-clearable at every level
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: rows transcribed from the SPEC's state table (gate column) and
+    the Round 1 and Revision 1 decisions (auto_full without stamp, caller flag not
+    trusted), plus the existing absent-flag rule in autopilot_caps.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: schema v3 requires a well-formed irreversible-decision list
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_approval.py::test_ac_004_schema_v3_requires_a_well_formed_list
+  executable_predicate: all(validate(f) for f in REJECTED_V3_FIXTURES) and not any(validate(f)
+    for f in ACCEPTED_LEGACY_FIXTURES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: fixtures and verdicts come from this SPEC's Irreversible-item and
+    Schema constraint rows (id pattern IRR-NNN, uniqueness, five categories, source
+    enum, v1/v2 exemption); validate(f) is the error list, so a non-empty list means
+    rejected.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: approval-status follows the state table
+  type: parametric
+  test_ids:
+  - tests/unit/test_spec_approval.py::test_ac_005_state_table
+  - tests/unit/test_spec_approval.py::test_ac_005_malformed_approval_block_is_malformed
+  - tests/unit/test_spec_approval.py::test_ac_005_explicit_checkout_wins_over_same_slug_task_worktree
+  executable_predicate: null
+  golden_table:
+  - input:
+      spec_md: false
+      machine_yaml: false
+    expected:
+      state: no_spec
+      land: ok
+      notice: true
+    edge: false
+    note: row 1
+  - input:
+      spec_md: true
+      machine_yaml: false
+    expected:
+      state: malformed
+      land: hold
+    edge: false
+    note: row 2
+  - input:
+      schema_version: 3
+      irreversible_decisions: absent
+      approval: human_valid_before_strip
+    expected:
+      state: malformed
+      land: hold
+    edge: false
+    note: row 3 — older writer stripped the new fields
+  - input:
+      schema_version: 3
+      irreversible_decisions:
+      - IRR-001
+      approval: human
+      edited_after: true
+    expected:
+      state: invalid
+      land: hold
+    edge: false
+    note: row 4
+  - input:
+      schema_version: 3
+      irreversible_decisions: []
+      approval: human
+      edited_after: emptied_list
+    expected:
+      state: invalid
+      land: hold
+    edge: false
+    note: row 4 — approved then emptied still holds
+  - input:
+      schema_version: 3
+      irreversible_decisions:
+      - IRR-001
+      approval: exempt
+    expected:
+      state: invalid
+      land: hold
+    edge: false
+    note: row 5
+  - input:
+      schema_version: 3
+      irreversible_decisions: []
+      approval: exempt
+    expected:
+      state: exempt
+      land: ok
+    edge: false
+    note: row 6
+  - input:
+      schema_version: 3
+      irreversible_decisions:
+      - IRR-001
+      approval: human
+    expected:
+      state: approved
+      land: ok
+    edge: false
+    note: row 7
+  - input:
+      schema_version: omitted
+      irreversible_decisions: absent
+      approval: absent
+    expected:
+      state: legacy
+      land: ok
+      notice: true
+    edge: false
+    note: row 8 — v1
+  - input:
+      schema_version: 3
+      irreversible_decisions: []
+      approval: absent
+    expected:
+      state: missing
+      land: ok
+    edge: false
+    note: row 9 — nothing irreversible
+  - input:
+      schema_version: 3
+      irreversible_decisions:
+      - IRR-001
+      approval: absent
+    expected:
+      state: missing
+      land: hold
+    edge: false
+    note: row 9 — auto_full path
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: every row is the SPEC's nine-row state table, written before any
+    implementation; the two extra rows (emptied list, stripped writer) are the Codex
+    bypasses the table exists to close.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: every land entry refuses on hold
+  type: parametric
+  test_ids:
+  - tests/unit/test_land_hold.py::test_ac_006_land_entries_refuse_on_hold
+  - tests/unit/test_land_hold.py::test_ac_006_hold_then_approve_keeps_the_curated_squash_message
+  executable_predicate: null
+  golden_table:
+  - input:
+      entry: wrapup_land
+      state: invalid
+    expected:
+      exit: nonzero
+      reason_prefix: 'hold:'
+      staged: false
+    edge: false
+    note: aborts before staging
+  - input:
+      entry: task-land
+      state: missing_with_list
+    expected:
+      exit: nonzero
+      reason_prefix: 'hold:'
+      squashed: false
+      worktree_kept: true
+      captured: true
+    edge: false
+    note: after the pending-edit capture
+  - input:
+      entry: finalize_success
+      state: malformed
+    expected:
+      exit: nonzero
+      reason_prefix: 'hold:'
+      merged: false
+    edge: false
+    note: loop close path
+  - input:
+      entry: wrapup_land
+      state: approved
+    expected:
+      exit: 0
+      committed: true
+    edge: false
+    note: ok state proceeds unchanged
+  - input:
+      entry: finalize_success
+      checkout: execute-uuid
+      branch_change: appended IRR to an approved SPEC
+      spec_slug_arg: absent
+    expected:
+      exit: nonzero
+      reason_prefix: 'hold:'
+      merged: false
+    edge: false
+    note: loop path — the SPEC set comes from the branch diff, not a slug
+  - input:
+      entry: finalize_success
+      checkout: execute-uuid
+      branch_change: no SPEC files
+    expected:
+      exit: 0
+      merged: true
+    edge: false
+    note: SPEC-less loop still lands
+  - input:
+      entry: finalize_success
+      worktrees: two
+      hold_in: second
+    expected:
+      exit: nonzero
+      reason_prefix: 'hold:'
+      merged_any: false
+    edge: false
+    note: checked for all worktrees before any merge
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the three entries and their abort points come from the Codex review's
+    cited paths (wrapup.md.j2:115 bundle, worktree.py:5254 capture, loop.md.j2:976-999)
+    and the Revision 1 decision to enforce at Python land entries.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: stage renders carry the acceptance flow
+  type: mechanical
+  test_ids:
+  - tests/render/test_spec_acceptance_render.py::test_ac_007_stage_renders_carry_the_acceptance_flow
+  - tests/render/test_spec_acceptance_render.py::test_ac_007_wrapup_checks_approval_before_it_lands
+  - tests/render/test_spec_acceptance_render.py::test_ac_007_spec_no_longer_ends_on_clear_alone
+  executable_predicate: all(marker in rendered[stage] for stage, marker in REQUIRED_MARKERS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: REQUIRED_MARKERS is written from the AC-007 sentence in this SPEC
+    — accepted as a weak text oracle in Round 3.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: machine.yaml gains `approval` and `irreversible_decisions`; `schema_version`
+    3
+  category: schema/file format/storage layout
+  rationale: every future SPEC and reader depends on the shape
+  source: spec
+- id: IRR-002
+  decision: CLI verbs `hm spec_machine approve` and `approval-status`
+  category: public API/CLI contract
+  rationale: rendered stages in user harnesses call them by name
+  source: spec
+- id: IRR-003
+  decision: '`spec` becomes a judgment-gated autopilot stage whose gate is derived
+    from the SPEC'
+  category: public API/CLI contract
+  rationale: changes when every armed pipeline stops
+  source: spec
+- id: IRR-004
+  decision: land entries (`wrapup_land`, `task-land`, `finalize` success) refuse on
+    hold
+  category: public API/CLI contract
+  rationale: changes the exit behaviour of three existing commands
+  source: spec
+approval:
+  kind: human
+  content_hash: 9b4df032189323f6a9daf25ccb27aae3a8bfeba199c85f315cf2161a53d0042e
+  approved_by: Ecro
+  approved_at: '2026-09-19T14:20:04Z'

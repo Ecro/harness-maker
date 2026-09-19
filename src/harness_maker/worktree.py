@@ -2317,6 +2317,39 @@ def _branch_tip(base: Path, branch: str) -> str | None:
     return sha if _SHA_RE.match(sha) else None
 
 
+_CAPTURE_SUBJECT_PREFIX = "wip(execute): capture uncommitted work"
+
+
+def _approval_holds(base: Path, checkout: Path, slugs: list[str]) -> list[str]:
+    """Hold reasons for a land from `checkout`; [] = nothing to hold (SPEC-ai-native-sdlc)."""
+    from harness_maker.spec_machine import hold_lines, land_states
+
+    return hold_lines(land_states(base, checkout, slugs))
+
+
+def _branch_approval_holds(base: Path, ref: str, slugs: list[str]) -> list[str]:
+    """`_approval_holds` for a commit with no checkout, via a throwaway detached worktree.
+
+    A land of a branch whose task worktree was removed carries the same SPECs; skipping the
+    check because there is nowhere to read them from would land them unreviewed. Called inside
+    the merge fence, like the worktree path's own check: reading outside it would need the
+    branch, the base HEAD and the base's uncommitted config all pinned and re-verified.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="hm-approval-") as tmp:
+        probe = Path(tmp) / Path(tmp).name  # unique basename → unique git worktree id
+        try:
+            _run(["git", "worktree", "add", "--detach", str(probe), ref], cwd=base)
+        except RuntimeError as e:
+            return [f"hold: could not check out {ref} to read its SPECs: {e}"]
+        try:
+            return _approval_holds(base, probe, slugs)
+        finally:
+            with contextlib.suppress(RuntimeError):
+                _run(["git", "worktree", "remove", "--force", str(probe)], cwd=base)
+
+
 def _branch_tip_message(base: Path, branch: str) -> str | None:
     """Return branch's tip commit message (full subject + body), or None.
 
@@ -2327,10 +2360,16 @@ def _branch_tip_message(base: Path, branch: str) -> str | None:
     so the tip is the wrapup Step-7 commit, not a later `wip(execute): capture`.
     Returns None on git failure or an empty message so the caller can fall back."""
     try:
-        msg = _run(["git", "log", "-1", "--format=%B", branch], cwd=base).stdout.strip()
+        out = _run(["git", "log", "-50", "--format=%B%x00", branch], cwd=base).stdout
     except RuntimeError:
         return None
-    return msg or None
+    # A land held for approval (SPEC-ai-native-sdlc ADR-005) leaves a `wip(execute): capture`
+    # commit on top; the retry must still land under the curated message beneath it.
+    for raw in out.split("\x00"):
+        msg = raw.strip()
+        if msg and not msg.startswith(_CAPTURE_SUBJECT_PREFIX):
+            return msg
+    return None
 
 
 def _write_landed_marker(base: Path, branch: str) -> None:
@@ -3481,6 +3520,19 @@ def _cli_finalize(args: list[str]) -> int:
                 )
                 overall_rc = 1
         return overall_rc
+
+    # SPEC-ai-native-sdlc ADR-005 — ONE pass over every worktree before any capture, stash
+    # or merge, so a hold in a sibling repo merges nothing anywhere. `success` only:
+    # stage-only leaves the commit to wrapup, whose own land entry holds.
+    if status == "success":
+        holds: list[str] = []
+        for current_wt in all_wts:
+            if current_wt.is_dir():
+                holds.extend(_approval_holds(current_wt.resolve().parent.parent, current_wt, []))
+        if holds:
+            for line in holds:
+                print(f"[finalize] {line}", file=sys.stderr)
+            return 1
 
     # success / stage-only: fail-fast multi-WT merge loop.
     succeeded: list[Path] = []
@@ -5272,6 +5324,21 @@ def task_land(
             already = _read_landed_marker(base, branch) == _branch_tip(
                 base, branch
             ) or _branch_content_in_head(base, branch)
+
+            # SPEC-ai-native-sdlc ADR-005 — AFTER the capture (a late edit is on the branch,
+            # so it is checked too) and BEFORE the squash. The branch and worktree survive.
+            # Skipped once the content is in base: a hold then blocks only the teardown.
+            if not already:
+                holds = (
+                    _approval_holds(base, wt, [slug])
+                    if wt.is_dir()
+                    else _branch_approval_holds(base, branch, [slug])
+                )
+                if holds:
+                    for line in holds:
+                        print(f"[land] {line}", file=sys.stderr)
+                    return 1
+
             if already:
                 print(
                     f"[land] {branch} already landed — skipping squash "

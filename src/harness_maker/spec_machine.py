@@ -15,26 +15,28 @@ import contextlib
 import hashlib
 import json
 import os
+import posixpath
 import re
 import shlex
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from harness_maker import command_registry
 from harness_maker.io_utils import atomic_append, atomic_write
 
-#: Current authored schema version. Templates write ``schema_version: 2``.
+#: Current authored schema version. Templates write ``schema_version: 3``.
 #: NOTE (ADR-006): the SpecMachine field default is the LITERAL ``1``, NOT this
 #: constant — an OMITTED schema_version must pin to v1 so a constant bump never
 #: silently re-tags legacy files as v2 (the migration footgun).
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 #: ADR-007 rule 2 fuzzy-match threshold. P4 calibration may tune this.
 FUZZY_RATIO_THRESHOLD: float = 0.85
@@ -107,6 +109,9 @@ def score_ac_oracle_evidence(ac: dict[str, Any]) -> int:
 class GoldenRow(BaseModel):
     """One row of a parametric AC's golden table (ADR-003)."""
 
+    # Same rule as AcceptanceCriterion: an authored row key must round-trip and be hashed.
+    model_config = ConfigDict(extra="allow")
+
     input: dict[str, Any]
     expected: Any
     edge: bool = False
@@ -115,6 +120,11 @@ class GoldenRow(BaseModel):
 
 class AcceptanceCriterion(BaseModel):
     """One AC entry in SPEC.machine.yaml (ADR-006)."""
+
+    # Unknown keys round-trip and are hashed by the approval (SPEC-ai-native-sdlc ADR-002): an
+    # authored extension field must not fall out of the approved content just because this
+    # release's model does not know it.
+    model_config = ConfigDict(extra="allow")
 
     id: str  # AC-001, AC-002, …
     title: str
@@ -182,8 +192,46 @@ class AcceptanceCriterion(BaseModel):
         return v
 
 
+IRREVERSIBLE_CATEGORIES: tuple[str, ...] = (
+    "schema/file format/storage layout",
+    "public API/CLI contract",
+    "data migration",
+    "security/permission boundary",
+    "new external dependency",
+)
+IRREVERSIBLE_SOURCES: tuple[str, ...] = ("spec", "execute")
+_IRR_ID = re.compile(r"^IRR-\d{3,}$")
+
+
+class IrreversibleDecision(BaseModel):
+    """One entry of a v3 SPEC's irreversible-decision list.
+
+    Category/source/id are plain strings so a bad entry still loads — `validate` reports it,
+    and the approval state is decided from the file rather than from a load failure.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    decision: str
+    category: str
+    rationale: str
+    source: str
+
+
+class SpecApproval(BaseModel):
+    """The DRI's stamp: which content was accepted, by whom, when. Not proof of a human."""
+
+    kind: Literal["human", "exempt"]
+    content_hash: str
+    approved_by: str | None = None
+    approved_at: str
+
+
 class SpecMachine(BaseModel):
     """Top-level SPEC.machine.yaml shape (ADR-006)."""
+
+    model_config = ConfigDict(extra="allow")
 
     #: LITERAL 1 by design (ADR-006): an omitted schema_version pins to v1 so a
     #: SCHEMA_VERSION bump never silently promotes legacy files to v2. New specs
@@ -250,6 +298,9 @@ class SpecMachine(BaseModel):
     spec_quality_score: int | None = None
     spec_quality_score_at: str | None = None
     ac: list[AcceptanceCriterion] = Field(default_factory=list)
+    #: None = absent (a v1/v2 file); a v3 file must carry a list, possibly empty.
+    irreversible_decisions: list[IrreversibleDecision] | None = None
+    approval: SpecApproval | None = None
 
     @field_validator("spec_slug")
     @classmethod
@@ -364,6 +415,28 @@ def validate(model: SpecMachine) -> list[str]:
             errors.append(f"{ac.id}: needs >=1 test_ids OR pending_test=true")
         if is_v2:
             errors.extend(_oracle_errors(ac))
+    errors.extend(_irreversible_errors(model))
+    return errors
+
+
+def _irreversible_errors(model: SpecMachine) -> list[str]:
+    items = model.irreversible_decisions
+    if items is None:
+        if model.schema_version >= 3:
+            return ["schema_version 3 requires irreversible_decisions (a list, possibly empty)"]
+        return []
+    errors: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        if not _IRR_ID.match(item.id):
+            errors.append(f"{item.id}: irreversible decision id must match IRR-NNN")
+        if item.id in seen:
+            errors.append(f"{item.id}: duplicate irreversible decision id")
+        seen.add(item.id)
+        if item.category not in IRREVERSIBLE_CATEGORIES:
+            errors.append(f"{item.id}: unknown category {item.category!r}")
+        if item.source not in IRREVERSIBLE_SOURCES:
+            errors.append(f"{item.id}: unknown source {item.source!r}")
     return errors
 
 
@@ -621,6 +694,11 @@ def _dump_machine_yaml(yaml_path: Path, model: SpecMachine) -> None:
     No field is lost — all model fields, including nested golden rows, are dumped.
     """
     payload = model.model_dump(mode="json")
+    # Absent stays absent: a legacy file written back by mark-tested must not gain
+    # `approval: null` / `irreversible_decisions: null` (SPEC-ai-native-sdlc ADR-003).
+    for key in ("approval", "irreversible_decisions"):
+        if payload.get(key) is None:
+            payload.pop(key, None)
     text = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     atomic_write(yaml_path, text)
 
@@ -1366,6 +1444,331 @@ def _run_check_all(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+# ── SPEC approval (SPEC-ai-native-sdlc-vs-intent-world) ─────────────────────────────────────
+
+#: Tooling-written fields. Everything else — including keys this model does not know — is the
+#: authored content an approval binds to (ADR-002). A new tooling field must join these lists,
+#: or tooling will invalidate every approval it touches.
+HASH_DENYLIST_TOP: tuple[str, ...] = (
+    "approval",
+    "spec_quality_score",
+    "spec_quality_score_at",
+    "last_mutation_run",
+)
+HASH_DENYLIST_AC: tuple[str, ...] = (
+    "test_ids",
+    "pending_test",
+    "judgment_verdict",
+    "judged_at",
+    "judgment_evidence",
+    "judgment_subject_hash",
+)
+
+ApprovalStateName = Literal[
+    "no_spec", "malformed", "invalid", "exempt", "approved", "legacy", "missing"
+]
+
+
+class ApprovalError(Exception):
+    """`approve` refused to write a stamp."""
+
+
+def approval_content_hash(model: SpecMachine) -> str:
+    """Defaults are omitted so a field added in a later release does not move old hashes."""
+    payload = model.model_dump(mode="json", exclude_defaults=True)
+    for key in HASH_DENYLIST_TOP:
+        payload.pop(key, None)
+    for ac in payload.get("ac", []):
+        for key in HASH_DENYLIST_AC:
+            ac.pop(key, None)
+    text = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class ApprovalState:
+    """One SPEC's acceptance state; `gate` feeds the spec boundary, `land` every land entry."""
+
+    slug: str
+    state: ApprovalStateName
+    land: Literal["ok", "hold"]
+    gate: Literal["clear", "pending", "blocked"]
+    irreversible: tuple[str, ...] = ()
+    #: Set only on rows that pass WITH a one-line notice (no_spec, legacy).
+    notice: str | None = None
+    #: Why a malformed SPEC is malformed — carried into the land-hold reason.
+    detail: str | None = None
+
+    def as_json(self) -> dict[str, Any]:
+        return {
+            "slug": self.slug,
+            "state": self.state,
+            "land": self.land,
+            "gate": self.gate,
+            "irreversible": list(self.irreversible),
+            "notice": self.notice,
+            "detail": self.detail,
+        }
+
+
+def _spec_dir(root: Path) -> str:
+    try:
+        cfg = yaml.safe_load((root / ".claude" / "harness.yaml").read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        cfg = None
+    spec = cfg.get("spec") if isinstance(cfg, dict) else None
+    value = spec.get("dir") if isinstance(spec, dict) else None
+    if not isinstance(value, str) or not value.strip():
+        return "specs/"
+    # Repo-relative only: an absolute or `..` value would let a checkout point the gate at
+    # a SPEC outside the tree being landed.
+    rel = Path(value)
+    if rel.is_absolute() or ".." in rel.parts:
+        return "specs/"
+    return posixpath.normpath(rel.as_posix()) + "/"
+
+
+def _resolve_checkout(base: Path, slug: str, checkout: Path | None) -> Path:
+    if checkout is not None:
+        return checkout
+    task = base / ".worktrees" / slug
+    return task if task.is_dir() else base
+
+
+def _state(
+    slug: str,
+    name: ApprovalStateName,
+    irreversible: tuple[str, ...],
+    notice: str | None = None,
+    detail: str | None = None,
+) -> ApprovalState:
+    if name in ("approved", "exempt"):
+        gate: Literal["clear", "pending", "blocked"] = "clear"
+    elif name == "malformed":
+        gate = "blocked"
+    else:
+        gate = "pending"
+    hold = name in ("invalid", "malformed") or (bool(irreversible) and name != "approved")
+    return ApprovalState(slug, name, "hold" if hold else "ok", gate, irreversible, notice, detail)
+
+
+def approval_state_of(slug: str, yaml_path: Path, md_path: Path | None = None) -> ApprovalState:
+    """The SPEC's nine-row state table, evaluated in order (first match wins)."""
+    if not yaml_path.is_file():
+        if md_path is not None and md_path.is_file():
+            return _state(slug, "malformed", (), detail=f"{md_path.name} has no machine SPEC")
+        return _state(slug, "no_spec", (), f"no SPEC for {slug!r} — nothing to gate")
+    try:
+        model = load(yaml_path)
+    except (OSError, yaml.YAMLError, ValidationError) as exc:
+        reason = f"unreadable machine SPEC: {type(exc).__name__}"
+        return _state(slug, "malformed", (), detail=reason)
+    items = model.irreversible_decisions
+    ids = tuple(i.id for i in items or [])
+    if model.schema_version >= 3 and items is None:
+        return _state(
+            slug, "malformed", (), detail="schema_version 3 without irreversible_decisions"
+        )
+    approval = model.approval
+    if approval is not None:
+        if approval.content_hash != approval_content_hash(model):
+            return _state(slug, "invalid", ids, detail="edited after approval")
+        # The hash binds the content to itself, not to this file name: an approved SPEC copied
+        # under another slug would otherwise read as approved for a task nobody reviewed.
+        if model.spec_slug != slug:
+            return _state(slug, "invalid", ids, detail=f"approval is for {model.spec_slug!r}")
+        if approval.kind == "exempt":
+            if ids:
+                return _state(slug, "invalid", ids, detail="exempt with irreversible decisions")
+            return _state(slug, "exempt", ids)
+        return _state(slug, "approved", ids)
+    if model.schema_version < 3 and items is None:
+        return _state(slug, "legacy", ids, f"pre-approval SPEC {slug!r} — not gated")
+    return _state(slug, "missing", ids)
+
+
+def _spec_dirs(base: Path, checkout: Path) -> list[str]:
+    """The base's configured SPEC dir first, then the checkout's if it differs.
+
+    The checkout is the thing being gated, so its own config cannot be the only word on where
+    its SPECs live — an edited `spec.dir` would otherwise point the gate away from them.
+    """
+    return list(dict.fromkeys([_spec_dir(base), _spec_dir(checkout)]))
+
+
+def _is_plain_slug(slug: str) -> bool:
+    return bool(slug) and slug not in (".", "..") and "/" not in slug and "\\" not in slug
+
+
+def _named_spec_dir(base: Path, slug: str, root: Path) -> Path:
+    """Where a named slug's SPEC lives: the first configured dir holding either file."""
+    dirs = [root / d for d in _spec_dirs(base, root)]
+    for spec_dir in dirs:
+        if (spec_dir / f"SPEC-{slug}.machine.yaml").is_file() or (
+            spec_dir / f"SPEC-{slug}.md"
+        ).is_file():
+            return spec_dir
+    return dirs[0]
+
+
+def _state_at(slug: str, spec_dir: Path) -> ApprovalState:
+    yaml_path, md_path = spec_dir / f"SPEC-{slug}.machine.yaml", spec_dir / f"SPEC-{slug}.md"
+    if not yaml_path.is_file() and not md_path.is_file():
+        return approval_state_of(slug, yaml_path)
+    return approval_state_of(slug, yaml_path, md_path)
+
+
+def approval_state(base: Path, slug: str, checkout: Path | None = None) -> ApprovalState:
+    """Explicit checkout wins; else the per-task worktree; else the base (ADR-003)."""
+    if not _is_plain_slug(slug):
+        return _state(slug, "malformed", (), detail="slug is not a plain name")
+    root = _resolve_checkout(base, slug, checkout)
+    return _state_at(slug, _named_spec_dir(base, slug, root))
+
+
+def _git_lines(cwd: Path, *args: str) -> list[str] | None:
+    try:
+        proc = subprocess.run(
+            ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=30, check=False
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return [line for line in proc.stdout.splitlines() if line.strip()]
+
+
+def _git_paths(cwd: Path, *args: str) -> list[str] | None:
+    """NUL-separated path listing — default `core.quotePath` would quote non-ASCII names."""
+    out = _git_lines(cwd, *args, "-z")
+    if out is None:
+        return None
+    return [p for line in out for p in line.split("\0") if p]
+
+
+_SPEC_FILE = re.compile(r"^SPEC-(?P<slug>.+)\.(?P<kind>machine\.yaml|md)$")
+
+
+def _changed_spec_units(base: Path, checkout: Path) -> list[tuple[str, str]] | None:
+    """`(slug, repo-relative dir)` of every SPEC the branch changed since the base (+ uncommitted).
+
+    Keyed by file, not by slug or configured dir: a moved `spec.dir`, a `./specs/` spelling or a
+    same-slug copy elsewhere must not hide a changed machine SPEC. A bare `SPEC-*.md` counts only
+    inside a configured dir — older harnesses wrote prose SPECs under `work-docs/`.
+    None = git could not enumerate; `land_states` turns that into a hold.
+    """
+    base_head = _git_lines(base, "rev-parse", "HEAD")
+    if not base_head:
+        return None
+    merge_base = _git_lines(checkout, "merge-base", "HEAD", base_head[0])
+    changed = _git_paths(checkout, "diff", "--name-only", merge_base[0]) if merge_base else None
+    untracked = _git_paths(checkout, "ls-files", "--others", "--exclude-standard")
+    if changed is None or untracked is None:
+        return None
+    dirs = {d.rstrip("/") for d in _spec_dirs(base, checkout)}
+    units: list[tuple[str, str]] = []
+    for path in [*changed, *untracked]:
+        parent, name = posixpath.split(path)
+        m = _SPEC_FILE.match(name)
+        if m is None or (m["kind"] == "md" and (parent or ".") not in dirs):
+            continue
+        unit = (m["slug"], parent or ".")
+        if unit not in units:
+            units.append(unit)
+    return units
+
+
+def land_states(
+    base: Path, checkout: Path, slugs: list[str] | tuple[str, ...] = ()
+) -> list[ApprovalState]:
+    """Every SPEC a land would carry — named slugs plus the branch's changed SPECs (ADR-003).
+
+    A loop's slug is not a SPEC slug, so the branch diff, not the caller, decides the set. When
+    git cannot list it, the land holds: the SPECs it would carry are unknown, and the named
+    slugs are only part of them.
+    """
+    found = _changed_spec_units(base, checkout)
+    states: list[ApprovalState] = []
+    # One state per distinct (dir, slug): a dir holds many SPECs, a slug may sit in two dirs.
+    pairs: dict[tuple[Path, str], None] = {}
+    for slug in slugs:
+        if _is_plain_slug(slug):
+            pairs[(_named_spec_dir(base, slug, checkout), slug)] = None
+        else:
+            states.append(approval_state(base, slug, checkout=checkout))
+    for slug, rel in found or []:
+        pairs[(Path(posixpath.normpath(checkout / rel)), slug)] = None
+    states += [_state_at(slug, spec_dir) for spec_dir, slug in pairs]
+    if found is None:
+        states.append(_state("*", "malformed", (), detail="git could not list the branch's SPECs"))
+    return states
+
+
+def hold_lines(states: list[ApprovalState]) -> list[str]:
+    """`hold:` reasons naming state and ids — the backstop's only output (AC-006)."""
+    lines = []
+    for st in states:
+        if st.land != "hold":
+            continue
+        ids = " ".join(st.irreversible) or "-"
+        detail = f" ({st.detail})" if st.detail else ""
+        lines.append(f"hold: SPEC {st.slug} is {st.state}; irreversible: {ids}{detail}")
+    return lines
+
+
+def _git_user_name(root: Path) -> str:
+    try:
+        proc = subprocess.run(
+            ["git", "config", "user.name"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, PermissionError):
+        return ""
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def approve(yaml_path: Path, *, exempt: bool = False) -> SpecApproval:
+    """Stamp the SPEC. The identity is read at the BASE root, like objective approval."""
+    from harness_maker.second_opinion_invoke import resolve_base_root
+
+    model = load(yaml_path)
+    name: str | None = None
+    if not exempt:
+        name = _git_user_name(resolve_base_root(yaml_path.parent))
+        if not name:
+            raise ApprovalError("git config user.name is empty at the base root; set it first")
+    model.approval = None
+    stamp = SpecApproval(
+        kind="exempt" if exempt else "human",
+        content_hash=approval_content_hash(model),
+        approved_by=name,
+        approved_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
+    model.approval = stamp
+    _dump_machine_yaml(yaml_path, model)
+    return stamp
+
+
+def _run_approve(args: argparse.Namespace) -> int:
+    try:
+        stamp = approve(args.yaml_path, exempt=args.exempt)
+    except (ApprovalError, OSError, yaml.YAMLError, ValidationError) as exc:
+        print(f"approve: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(stamp.model_dump(mode="json")))
+    return 0
+
+
+def _run_approval_status(args: argparse.Namespace) -> int:
+    state = approval_state(args.root, args.slug, args.checkout)
+    print(json.dumps(state.as_json()))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point for validate / cross-validate / mark-tested / waiver-check / find-unbound."""
     _guard = command_registry.guard_or_none("spec_machine", argv)
@@ -1439,7 +1842,24 @@ def main(argv: list[str] | None = None) -> int:
     p_check.add_argument("--md", dest="md_path", type=Path, required=True)
     p_check.add_argument("--dev-mode", dest="dev_mode", default="task-driven")
 
+    p_approve = sub.add_parser("approve", help="stamp the SPEC as accepted (content-hash bound)")
+    p_approve.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_approve.add_argument(
+        "--exempt", action="store_true", help="Step 0 skip: exempt stamp, no identity"
+    )
+
+    p_status = sub.add_parser("approval-status", help="approval state + land/gate verdict (JSON)")
+    p_status.add_argument("--root", type=Path, default=Path.cwd())
+    p_status.add_argument("--slug", required=True)
+    p_status.add_argument("--checkout", type=Path, default=None)
+
     args = parser.parse_args(argv)
+
+    if args.cmd == "approve":
+        return _run_approve(args)
+
+    if args.cmd == "approval-status":
+        return _run_approval_status(args)
 
     if args.cmd == "check":
         return _run_check_all(args)

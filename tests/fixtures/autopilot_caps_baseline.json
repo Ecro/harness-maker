@@ -112,9 +112,9 @@
   },
   "spec|armed": {
    "rc": 0,
-   "proceed": true,
-   "halt_kind": null,
-   "next_stage": "plan",
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
    "pipeline_complete": false,
    "judgment_auto_answered": false
   },
@@ -144,25 +144,25 @@
   },
   "spec|jg_absent_safe": {
    "rc": 0,
-   "proceed": true,
-   "halt_kind": null,
-   "next_stage": "plan",
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
    "pipeline_complete": false,
    "judgment_auto_answered": false
   },
   "spec|jg_pending_safe": {
    "rc": 0,
-   "proceed": true,
-   "halt_kind": null,
-   "next_stage": "plan",
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
    "pipeline_complete": false,
    "judgment_auto_answered": false
   },
   "spec|jg_clear_safe": {
    "rc": 0,
-   "proceed": true,
-   "halt_kind": null,
-   "next_stage": "plan",
+   "proceed": false,
+   "halt_kind": "judgment_gate",
+   "next_stage": null,
    "pipeline_complete": false,
    "judgment_auto_answered": false
   },
@@ -180,7 +180,7 @@
    "halt_kind": null,
    "next_stage": "plan",
    "pipeline_complete": false,
-   "judgment_auto_answered": false
+   "judgment_auto_answered": true
   },
   "spec|jg_clear_full": {
    "rc": 0,
@@ -188,7 +188,7 @@
    "halt_kind": null,
    "next_stage": "plan",
    "pipeline_complete": false,
-   "judgment_auto_answered": false
+   "judgment_auto_answered": true
   },
   "spec|jg_blocked_full": {
    "rc": 0,

@@ -29,6 +29,8 @@ def _pair(
         yaml.safe_dump(
             {
                 "schema_version": SCHEMA_VERSION,
+                # Required from v3 (SPEC-ai-native-sdlc-vs-intent-world); [] = nothing irreversible.
+                "irreversible_decisions": [],
                 "spec_slug": "x",
                 "verification_tier": 1,
                 "mutation_threshold": 85,

@@ -60,8 +60,9 @@ def test_oracle_source_enum_has_six_values() -> None:
     assert "legacy-unspecified" in ORACLE_SOURCES
 
 
-def test_schema_version_constant_is_2() -> None:
-    assert SCHEMA_VERSION == 2
+def test_schema_version_constant_is_3() -> None:
+    # 2 → 3: SPEC-ai-native-sdlc-vs-intent-world IRR-001 (irreversible_decisions + approval).
+    assert SCHEMA_VERSION == 3
 
 
 # --- migration footgun (ADR-006) -------------------------------------------

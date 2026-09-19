@@ -17,7 +17,7 @@ from typing import Literal
 import pytest
 from pydantic import ValidationError
 
-from harness_maker import autopilot, autopilot_caps
+from harness_maker import autopilot, autopilot_caps, spec_machine
 from harness_maker.models import (
     AutonomyConfig,
     InterviewAnswers,
@@ -141,6 +141,17 @@ def test_unlimited_run_terminates_within_pipeline_length(
     import json
 
     _arm(tmp_path, created=datetime.now(UTC))
+    # A clean pipeline has an accepted SPEC: `spec` is judgment-gated and derives its gate
+    # from the SPEC (SPEC-ai-native-sdlc-vs-intent-world ADR-004), so an exempt one is used.
+    (tmp_path / "specs").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "specs" / "SPEC-s.md").write_text("---\ntype: spec\n---\n", encoding="utf-8")
+    spec_yaml = tmp_path / "specs" / "SPEC-s.machine.yaml"
+    spec_yaml.write_text(
+        "schema_version: 3\nspec_slug: s\nverification_tier: 1\n"
+        "irreversible_decisions: []\nac: []\n",
+        encoding="utf-8",
+    )
+    spec_machine.approve(spec_yaml, exempt=True)
     stages = [s.value for s in _PIPELINE]
     current = "research"
     terminated = False
@@ -157,6 +168,8 @@ def test_unlimited_run_terminates_within_pipeline_length(
                 current,
                 "--judgment-gate",
                 "clear",
+                "--slug",
+                "s",
             ]
         )
         out = json.loads(capsys.readouterr().out)

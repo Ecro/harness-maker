@@ -453,6 +453,20 @@ Write the implementation. No untested code paths — every public function added
 
 Constraints from PLAN's ADRs are binding: do NOT introduce a pattern that contradicts an ADR; surface as a Phase D blocker if the ADR turns out wrong.
 
+> **An irreversible decision the SPEC does not list.** Implementation can reach a decision in
+> one of five categories — schema/file format/storage layout · public API/CLI contract ·
+> data migration · security/permission boundary · new external dependency — that the machine
+> SPEC's `irreversible_decisions` does not cover. Narrow first:
+> could two units working independently choose incompatibly? is the call non-obvious?
+> is it a real trade-off? Narrowing only drops candidates — an obviously destructive change
+> stays in — and cost, scale and compliance are judgment examples inside a category, not
+> categories. A decision that survives is appended as
+> `{id: IRR-<next>, decision, category, rationale, source: execute}` — never renumber existing
+> ids. Appending changes the approval hash, so the SPEC's approval becomes invalid **by
+> design**. Interactive session: ask the DRI now, one closed question (approve with this
+> decision / stop), and on approve run `hm spec_machine approve --yaml <the machine SPEC>`.
+> Autopilot or loop: keep going — the land hold stops the work at wrapup until the DRI accepts.
+
 Type-check once per FILE, when you finish that file — not after each edit. Include the output when surfacing progress.
 
 #### Phase D — Post-GREEN verification

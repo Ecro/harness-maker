@@ -361,7 +361,11 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # warning + what the `high-recurrence` fence section is) instead of a one-line skim. The
     # prose is the salvaged source's, already cut once to fit a zero-slack budget in 2026-08.
     # Attributed in work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md.
-    "execute": 49290,
+    # 49290 → 50383 (ai-native-sdlc-vs-intent-world, 2026-09-19): +1093, Phase C's rule for an
+    # irreversible decision the SPEC does not list (five categories, the narrowing questions,
+    # append-then-invalidate, interactive re-approve). Attributed in
+    # work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md §3.1.
+    "execute": 50383,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -563,7 +567,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # would instruct it to show an artifact it never produces. §2.3's existing round
     # preamble is SUBSUMED rather than stacked, so the round-state half is close to a swap.
     # Attributed in work-docs/BASELINE-DELTA-plan-interview-comprehension.md.
-    "spec": 32114,
+    # 32114 → 34664 (ai-native-sdlc-vs-intent-world, 2026-09-19): `spec` became judgment-gated,
+    # so the shared end-of-stage partial renders its classify-then-boundary branch (the larger
+    # share), plus the approve/exempt stamps, the irreversible-decision rule, the 🔒 section and
+    # the v3 schema note.
+    # Attributed in work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md §3.1.
+    "spec": 34664,
     # 23796 → 24935 (+1139, 2026-08-16, cross-runtime test-execution recipe). One paragraph,
     # in the stage that owns the whole-suite pass, saying: ask `hm test_runners plan` for THIS
     # runner rather than pasting a parallel flag. The flag is not portable advice — `cargo`,

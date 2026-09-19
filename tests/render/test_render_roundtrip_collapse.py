@@ -322,6 +322,9 @@ def test_the_wrapup_git_tail_is_the_expected_call_sequence() -> None:
     tail = body[body.index("### Steps 6 → 7.6") : body.index("### Step 8")]
     assert _hm_call_sequence(tail) == (
         "proposals summary",
+        # SPEC-ai-native-sdlc-vs-intent-world: the DRI's acceptance is read before the roll-up
+        # and the land call, funded by that PLAN's `surface_allowance.round_trips.wrapup: 1`.
+        "spec_machine approval-status",
         "autopilot_ledger rollup",
         "wrapup_land",
         "worktree task-land",

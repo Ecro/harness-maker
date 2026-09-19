@@ -4,6 +4,22 @@
 
 ### Added
 
+- **The DRI accepts the SPEC, and nothing irreversible lands without that acceptance.**
+  `hm spec_machine approve [--exempt]` stamps a content-hash-bound `approval` into the machine
+  SPEC (every authored field hashed, tooling fields excluded); `approval-status` reports one of a
+  nine-row state table. `schema_version: 3` requires an `irreversible_decisions` list
+  (`IRR-NNN`, five categories, `source: spec|execute`). `spec` is now a judgment-gated autopilot
+  stage whose gate is derived from the SPEC, not the stage's claim; `/hm:spec` ends on
+  "Approve this SPEC and end interview"; `/hm:execute` appends newly discovered irreversible
+  decisions (invalidating the approval); wrapup asks the DRI before landing, and `wrapup_land`,
+  `worktree task-land` and `worktree finalize success` refuse with `hold:` lines — finalize
+  checks every worktree before merging any and finds SPECs from the branch diff. Pre-v3 SPECs
+  pass with a notice. The stamp records the flow; it does not prove a human. The hold fails
+  closed: a branch whose SPECs git cannot list holds, a task-land whose worktree is gone checks
+  the branch through a throwaway checkout, and a checkout's own `spec.dir` cannot point the
+  gate away from its SPECs (the base's dir is searched first; absolute or `..` values fall
+  back to `specs/`).
+
 - **The proposal backlog gets a reader, and wrapup says so where you can see it.**
   `.claude/memory/pending-proposals.md` had one writer (wrapup Step 5.3) and no reader — 27 open
   proposals, the oldest from 2026-05-17. `hm proposals list|count [--open|--triaged]` and
