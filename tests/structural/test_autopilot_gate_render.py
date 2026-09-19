@@ -97,6 +97,9 @@ Re-captures (append; never silently overwrite):
   Verified before re-capture that these four are the ONLY moved commands in every arm and the
   command set did not drift. Attributed in
   `work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md` §3.
+- **2026-09-20, release 0.58.0** — same per-release case: 60 lines, all the frontmatter
+  `harness_maker_version:` key, and substituting `0.58.0` back to `0.57.1` reproduces every
+  previous hash.
 """
 
 from __future__ import annotations

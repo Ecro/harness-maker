@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-09-20
+
 ### Added
 
 - **The DRI accepts the SPEC, and nothing irreversible lands without that acceptance.**
