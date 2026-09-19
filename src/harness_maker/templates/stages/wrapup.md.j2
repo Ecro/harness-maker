@@ -397,6 +397,26 @@ Use a single Edit / Write call (atomic). Verify by reading back: assert `status:
 
 #### 5.1 Wiki
 
+> **5.1.0 — search-before-write (fact-safe).** A write replaces the whole entry under its slug,
+> category included, so a summary written under a fresh slug leaves the old truth beside it,
+> and one written under the wrong slug erases it. Search first; reuse a matching slug only when
+> that entry is **not** a `[wiki:fact]` — then carry forward what is still true in its body.
+> **never reuse a [wiki:fact] slug**: facts change only when the DRI corrects them (the
+> `project-knowledge` skill). No usable match → derive a new slug from the work unit, then
+> check the exact slug is free with the Grep tool on the base `.claude/memory/wiki.md`
+> (two levels above a task worktree — its own copy is stale) for a `## [wiki:` heading
+> with that slug; the search is top-k, so a taken slug → pick another.
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic \"<subsystem this task changed>\" --k 6 --pre-k 30")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic "<subsystem this task changed>" --k 6 --pre-k 30
+```
+{% endif %}
+
 Insert (or update) one entry in `.claude/memory/wiki.md` **via the locked memory CLI** — it owns the flock, slug-dedup, and `@hm:user:entries` marker placement so concurrent fleet wrapups cannot clobber each other (H1, PLAN-multisession-fleet-reverify). **Do NOT `Edit`/`Write` `wiki.md` directly** — a raw whole-file edit races other sessions and can silently drop the close marker (regression 2026-05-17: 5 wiki entries lost; the CLI's read-modify-write happens inside the lock and is marker-safe).
 
 Write the one-paragraph body to a fresh temp file **outside the repo** with the **Write tool** — take the path from `mktemp -t hm-wiki.XXXXXXXX`, never a constructed or fixed in-repo name (a slug-derived `/tmp` name is predictable and the Write tool follows a planted symlink) (a predictable path collides under concurrent fleet wrapups, and a leftover under `.claude/memory/` would be mis-staged by Step 6's `git add`). Verbatim bytes — no shell expansion of backticks / `$`. Then run the CLI and delete the temp file:
@@ -413,7 +433,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm memory_md upsert-wiki --root
 
 - **body** = the summary paragraph ONLY — the CLI builds the `## [wiki:<category>] <slug> | <YYYY-MM-DD>` heading.
 - **category**: `pattern` | `convention` | `gotcha` | `architecture` | `tooling` | `api` | `other`.
-- **slug**: kebab-case, ≤40 chars, derived from the work unit. Same slug → replaced in place (no duplicate).
+- **slug**: kebab-case, ≤40 chars — the non-fact slug 5.1.0 chose to reuse, else derived from the work unit. Same slug → replaced in place (no duplicate).
 - **Check the exit code.** Non-zero = the CLI fail-closed on a malformed tier file (duplicate/absent marker, etc.) — surface the stderr reason to the user; do not retry blindly.
 
 #### 5.2 Failures

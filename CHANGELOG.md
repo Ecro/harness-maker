@@ -24,6 +24,34 @@
   `failures.md` head-skim plus a slug `rg` — the one stage that writes code was the only one
   reading slugs without bodies.
 
+- **`project-knowledge` skill — capture code-absent project facts in the shared wiki**
+  (SPEC-mission-context-loop S0).
+  - **The gap.** Code-absent knowledge the DRI holds had no capture path: how an external
+    system behaves, an ops quirk, a correction of something previously believed. Claude Code's
+    default files "remember X" in machine-local auto-memory, which is invisible to git, Cursor,
+    Codex and `memory_retrieve`.
+  - **Capture.** When the DRI explicitly asks to remember a fact, or corrects a recorded one,
+    the skill searches first and writes a `[wiki:fact]` entry via the existing `hm memory_md
+    upsert-wiki`. It reuses only a `[wiki:fact]` slug, and checks a new slug with the Grep
+    tool so it does not overwrite a fact the search missed. A correction replaces the entry and
+    ends with `Supersedes: <old claim> (first recorded <date>)`, carrying the original capture
+    date forward.
+  - **What it refuses.** It never records an inferred fact. It surfaces the CLI's stderr on
+    failure instead of falling back to auto-memory. Personal preferences stay in auto-memory.
+  - **Always-loaded pointer.** A pointer of at most 300 characters in `CLAUDE.md`, `AGENTS.md`
+    and `.cursor/rules/harness.mdc` routes shared facts to the wiki even when the skill does not
+    trigger. The Codex copy names the skill file, because Codex starts skills only on mention.
+  - **wrapup 5.1** gains a 5.1.0 search-before-write step: it reuses a matching **non-fact**
+    slug and never reuses a `[wiki:fact]` slug, so a task summary cannot overwrite a DRI's
+    fact.
+  - **Templates.** The wiki templates document the `fact` category and the `Supersedes:` line,
+    and `/hm:help` lists the skill.
+  - **Withdrawal (pre-registered).** 28 days (UTC dates, inclusive) from the first `v*` release
+    that ships it, `scripts/measure_wiki_fact_window.py` counts `[wiki:fact]` subjects: ≥5 → S1
+    (subject files) becomes a candidate task; 0 → the skill and pointers are removed. It is
+    anchored as this repo's `wiki_fact_entries_28d` outcome and refuses to measure before the
+    window closes.
+
 - **`hm world assume add` and content-fingerprint evidence locators.** The assumption layer had
   no way in — only `observe`/`resolve` on existing records — so `depends_on` and assumption
   revisits had nothing to point at. `add` creates a record (refusing an existing id or
@@ -71,6 +99,16 @@
   (a valid outcome under ADR-005 — the approved target of 20% is out of reach for a
   plan-stage-only task). Registry, `MATRIX-native-redundancy.md` rows/census and CLAUDE.md's
   count all stay in agreement; render output is unchanged.
+
+### Fixed
+
+- **`memory_retrieve` reads where `memory_md` writes.** Without `--memory-dir` the reader now
+  resolves the base root with `memory_md._memory_dir`. Before, a stage whose cwd was a task
+  worktree read the branch copy of `wiki.md`/`failures.md`, which never holds entries captured
+  mid-task (they are written to the base and folded only at land). An explicit `--memory-dir`
+  is unchanged, and the `high-recurrence` count floor reads the same resolved root — so
+  `/hm:execute`'s warm tier, which runs from the task worktree, now sees base-captured failures.
+  `tests/unit/test_memory_retrieve_root.py` fails loudly if the default is lost.
 
 ## [0.57.1] - 2026-09-17
 

@@ -286,6 +286,9 @@ _ALL_SKILLS: list[str] = [
     "worktree-isolator",
     # SPEC-intent-world-model-objective-layer S13: the discoverable surface for `hm world`.
     "intent-layer",
+    # SPEC-mission-context-loop S1: the capture path for code-absent project facts. The
+    # always-loaded pointer (CLAUDE.md / AGENTS.md / harness.mdc) names it in every preset.
+    "project-knowledge",
 ]
 
 

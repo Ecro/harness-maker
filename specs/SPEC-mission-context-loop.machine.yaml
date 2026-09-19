@@ -1,0 +1,279 @@
+schema_version: 2
+spec_slug: mission-context-loop
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: 'Tier-2: the only Python behaviour change is the default
+  memory-dir resolution in memory_retrieve (a read path; a wrong root silently hides
+  captured facts but never corrupts a tier). The rest of the task is rendered prose,
+  pinned by golden-token render tests that mutation testing cannot reach. Scope is
+  memory_retrieve.py.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/memory_retrieve.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: default memory dir resolves to the writer's root
+  type: property
+  test_ids:
+  - tests/unit/test_memory_retrieve_root.py::test_ac_001_default_memory_dir_is_writer_root
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the writer itself, memory_md._memory_dir, which
+    already ships and is tested; the reader's default is compared to it for generated
+    worktree depths, so the expected value never comes from memory_retrieve's own
+    code.
+  oracle_independence_waiver: null
+  input_domain: cwd paths <base>, <base>/.worktrees/<name>, and <base>/.worktrees/<name>/<k
+    nested dirs>, for generated names and k in 0..3
+  transformation: resolve the default memory dir from that cwd with no --memory-dir
+    given
+  expected_relation: default_memory_dir(cwd) == memory_md._memory_dir(cwd) for every
+    generated cwd
+  preconditions:
+  - no explicit --memory-dir argument
+  observable_output: a resolved absolute Path
+  generator_hint: Hypothesis st.from_regex for worktree names, st.integers(0, 3) for
+    depth; ci profile derandomized
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: an explicit memory dir is used unchanged
+  type: mechanical
+  test_ids:
+  - tests/unit/test_memory_retrieve_root.py::test_ac_002_explicit_memory_dir_wins
+  executable_predicate: resolve_memory_dir(explicit, cwd=worktree_cwd) == explicit
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected value is the literal argument the caller passed; no
+    computation by the implementation can produce it except returning the input.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: same-slug upsert replaces in place and keeps the Supersedes line
+  type: property
+  test_ids:
+  - tests/unit/test_memory_md_fact_supersede.py::test_ac_003_same_slug_upsert_replaces_and_keeps_supersedes
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: Regression guard on existing upsert-wiki semantics the capture contract relies
+    on.
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Replace-by-key is an invariant of any upsert regardless of implementation;
+    the expected body is the test's own second input, so heading count 1 and body
+    equality are decided without reading memory_md.
+  oracle_independence_waiver: null
+  input_domain: slug from [a-z0-9-]{3,30}, two distinct non-marker bodies, the second
+    ending in a 'Supersedes:' line
+  transformation: upsert-wiki(slug, body1) then upsert-wiki(slug, body2) on a fresh
+    tier
+  expected_relation: wiki.count(f'] {slug} |') == 1 and body_of(slug) == body2.strip('\n')
+  preconditions:
+  - bodies contain no memory marker strings and no '## [x:y]' heading-shaped lines
+  observable_output: .claude/memory/wiki.md text
+  generator_hint: Hypothesis st.text over printable non-marker characters; ci profile
+    derandomized
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: the rendered skill carries the capture contract
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_project_knowledge.py::test_ac_004_skill_carries_capture_contract
+  executable_predicate: all(tok in skill_text for tok in REQUIRED_TOKENS) and len(rendered_copies)
+    == expected_copy_count
+  golden_table: []
+  rubric_id: null
+  note: REQUIRED_TOKENS = upsert-wiki, --category fact, memory_retrieve, Supersedes:,
+    auto-memory, never record an inferred fact, surface the stderr, reuse only a [wiki:fact]
+    slug
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The token list was fixed in this SPEC before the skill template
+    exists, so the template is written to satisfy the gate rather than the gate being
+    fitted to the text (context_discipline ADR-006 precedent).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: every always-loaded file carries a bounded pointer
+  type: parametric
+  test_ids:
+  - tests/render/test_render_project_knowledge.py::test_ac_005_pointer_present_and_bounded
+  executable_predicate: null
+  golden_table:
+  - input:
+      file: CLAUDE.md
+      preset: Production
+      locale: en
+    expected:
+      max_chars: 300
+      names:
+      - project-knowledge
+      - auto-memory
+    edge: false
+    note: ''
+  - input:
+      file: CLAUDE.md
+      preset: Production
+      locale: ko
+    expected:
+      max_chars: 300
+      names:
+      - project-knowledge
+      - auto-memory
+    edge: false
+    note: ''
+  - input:
+      file: CLAUDE.md
+      preset: Side
+      locale: en
+    expected:
+      max_chars: 300
+      names:
+      - project-knowledge
+      - auto-memory
+    edge: false
+    note: ''
+  - input:
+      file: CLAUDE.md
+      preset: Side
+      locale: ko
+    expected:
+      max_chars: 300
+      names:
+      - project-knowledge
+      - auto-memory
+    edge: false
+    note: ''
+  - input:
+      file: AGENTS.md
+      preset: Production
+      locale: en
+    expected:
+      max_chars: 300
+      names:
+      - project-knowledge
+      - auto-memory
+      - .agents/skills/project-knowledge/SKILL.md
+    edge: false
+    note: ''
+  - input:
+      file: .cursor/rules/harness.mdc
+      preset: Production
+      locale: en
+    expected:
+      max_chars: 300
+      names:
+      - project-knowledge
+      - auto-memory
+    edge: false
+    note: ''
+  rubric_id: null
+  note: Each row must contain the pointer section naming project-knowledge and auto-memory.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The 300-character cap and the two required names are set in this
+    SPEC from the always-loaded cost budget, independent of the pointer text that
+    will be written.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: wrapup 5.1 searches before it writes
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_project_knowledge.py::test_ac_006_wrapup_51_searches_before_write
+  executable_predicate: section_51.index('memory_retrieve') < section_51.index('upsert-wiki')
+    and 'reuse' in section_51 and 'never reuse a [wiki:fact] slug' in section_51
+  golden_table: []
+  rubric_id: null
+  note: Checked in every rendered wrapup arm (preset x dev_mode x target).
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The ordering requirement mirrors the already-shipped 5.2.0 search-before-write
+    rule, an independent in-repo reference for what the step must contain.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: wiki templates document the fact category and Supersedes convention
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_project_knowledge.py::test_ac_007_wiki_template_documents_fact_and_supersedes
+  executable_predicate: all('fact' in category_line(t) and 'Supersedes:' in t for
+    t in rendered_wiki_templates)
+  golden_table: []
+  rubric_id: null
+  note: Both locales (wiki.en.md.j2, wiki.ko.md.j2).
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The two literals come from this SPEC's S1/S2 contract, not from
+    the template text.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

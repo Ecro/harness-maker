@@ -1,0 +1,69 @@
+---
+name: {{ name }}
+description: When the DRI asks you to remember or record a project fact the code does not show, or says a recorded fact is wrong — capture or correct it in the shared wiki, not auto-memory.
+---
+
+# {{ name }}
+
+Project knowledge the code cannot show — how an external system behaves, an ops quirk, why a
+decision stands, the correction of something previously believed — belongs in the git-shared
+`.claude/memory/wiki.md` as a `[wiki:fact]` entry, where every IDE and every teammate reads it.
+Personal working preferences are the host's business: leave those to its auto-memory.
+{% if is_codex %}On Codex this skill starts only when the operator mentions `@{{ name }}`, or when `AGENTS.md` points here.{% endif %}
+
+## When to write — and when not
+
+- **Write** only when the DRI explicitly asks you to remember or record a project fact, or
+  says a fact already in the wiki is wrong.
+- **never record an inferred fact.** Something you noticed yourself is not a request: mention
+  it if it helps, and write nothing.
+- **Personal preferences** ("I prefer short answers") stay in host auto-memory, never the wiki.
+
+## Procedure
+
+1. **Search first**, so a correction replaces the old truth instead of sitting beside it.
+   Compose the search words yourself — a few plain words naming the subject, only letters,
+   digits, spaces and hyphens. Never paste the DRI's wording into a command: a quote, backtick
+   or `$` in it would be run by the shell before any harness check sees it.
+{% if is_codex %}
+   ```
+   Bash("uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic '<search words>' --k 6 --pre-k 30")
+   ```
+{% else %}
+   ```bash
+   !uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic '<search words>' --k 6 --pre-k 30
+   ```
+{% endif %}
+2. **Pick the slug — reuse only a [wiki:fact] slug.** If a `[wiki:fact]` entry covers the same
+   subject, reuse its slug: that is a correction. If the closest match has any other category
+   (pattern, gotcha, architecture, …), do not reuse it — the write replaces the whole entry,
+   category included, and would erase it. Choose a new kebab-case fact slug (`[a-z0-9-]`,
+   ≤ 40 chars) — that alphabet is also what keeps the slug inert in the shell command below.
+   Before using a **new** slug, check the exact slug is free: the search is top-k and can miss
+   an entry. Use the Grep tool (not a shell command) on the **base** checkout's
+   `.claude/memory/wiki.md` — the current directory, or two levels above it when you are inside
+   `.worktrees/<name>/` (a worktree's own copy is stale; writes always land at the base). Look
+   for a `## [wiki:` heading carrying exactly that slug. A `[wiki:fact]` on this same subject
+   that the DRI is correcting → reuse it; any other hit → pick another slug. The check and the
+   write are not atomic: two sessions choosing the same new slug at once leave the last write.
+3. **Write the body** with the Write tool to a temp file outside the repo (take the path from
+   `mktemp -t hm-fact.XXXXXXXX`): the current truth in the present tense, one short paragraph,
+   plus who stated it and when. On a correction, end with one line
+   `Supersedes: <old claim> (first recorded <YYYY-MM-DD>)`. That date is when the fact was
+   first recorded: carry it forward from the old entry's own `first recorded` date, else take
+   the old heading's date. The write re-dates the heading; this line keeps the origin.
+4. **Run the write once:**
+{% if is_codex %}
+   ```
+   Bash("uv run --with {{ harness_maker_src_path }} hm memory_md upsert-wiki --root . --category fact --slug '<slug>' --body-file <tmpfile>")
+   ```
+{% else %}
+   ```bash
+   !uv run --with {{ harness_maker_src_path }} hm memory_md upsert-wiki --root . --category fact --slug '<slug>' --body-file <tmpfile>
+   ```
+{% endif %}
+5. **On a non-zero exit, surface the stderr** to the DRI verbatim and stop. Do not save the fact
+   to auto-memory instead: a fact that lands in a machine-local store is lost to everyone else.
+6. Report the slug you wrote. The wiki lives at the base checkout; the next `/hm:wrapup` that
+   lands a task folds it into that commit, and outside a task it stays uncommitted until someone
+   commits it.

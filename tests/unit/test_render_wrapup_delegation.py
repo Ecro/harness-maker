@@ -238,7 +238,15 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # paragraph at the head of `Steps 6 → 7.6` (22 body lines: call, JSON contract, warning line,
 # degrade + halt-exemption) — attributed in
 # work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 735), ("Production", 768)])
+# 713/746 → 726/759 (mission-context-loop, 2026-09-19): wrapup 5.1 gained the 5.1.0 fact-safe
+# search-before-write blockquote (6 lines), its fenced `hm memory_retrieve` call (both
+# `is_codex` arms render one fence) and spacing; +13 per preset, attributed in
+# work-docs/BASELINE-DELTA-mission-context-loop.md §3. 726/759 → 728/761: the review's Codex P1
+# fix added the exact-slug Grep check to that blockquote (+2 lines); 728/761 → 729/762: the
+# re-review's P1 fix made that check state the base path (+1 line).
+# 735/768 + 729/762 → 751/784 (rebase onto observed-harness-gaps-salvage, 2026-09-19): the two
+# tasks' additions are disjoint (Steps 6 → 7.6 vs 5.1.0), so the deltas add: +22 and +16.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 751), ("Production", 784)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

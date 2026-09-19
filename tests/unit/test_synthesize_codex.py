@@ -70,7 +70,8 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     # greps that found those missed this one because it is an arithmetic literal, not a
     # total. `[fail:test] enumeration-tests-not-updated-with-new-rendered-artifact`.
     # 11 → 12 base skills (2026-09-16, SPEC-intent-world-model-objective-layer S13: `intent-layer`).
-    expected = 12 + 7 + 1 + 1 + 1
+    # 12 → 13 (2026-09-19, SPEC-mission-context-loop: `project-knowledge`).
+    expected = 13 + 7 + 1 + 1 + 1
     assert len(skill_paths) == expected, (
         f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
     )

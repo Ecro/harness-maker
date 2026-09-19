@@ -590,7 +590,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # head of `Steps 6 → 7.6` (call, JSON contract, warning line, degrade + halt exemption)
     # took ask@flag_on past it. Re-based to the landed figure, attributed in
     # work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md.
-    "wrapup": 47413,
+    # 47413 → 48388 (mission-context-loop, 2026-09-19): +975, the wrapup 5.1.0 fact-safe
+    # search-before-write (one `hm memory_retrieve` call, the exact-slug Grep check and its
+    # base-path rule). First re-based to 47084 on top of assumption-entry; re-based again at
+    # wrapup onto observed-harness-gaps-salvage, whose Steps 6 → 7.6 paragraph is disjoint, so
+    # the deltas add. Attributed in work-docs/BASELINE-DELTA-mission-context-loop.md §3.1.
+    "wrapup": 48388,
 }
 
 

@@ -36,7 +36,8 @@ def test_side_and_production_install_full_inventory() -> None:
 
 def test_side_file_count_in_range() -> None:
     # 17 atomic+stages+fixed + _ALL_AGENTS + 11 skills + harness/settings/CLAUDE/memory etc.
-    assert 40 <= len(SIDE_FILES) <= 60
+    # 60 → 61 (2026-09-19, SPEC-mission-context-loop): the `project-knowledge` skill.
+    assert 40 <= len(SIDE_FILES) <= 61
 
 
 def test_synthesize_side_returns_blueprint() -> None:

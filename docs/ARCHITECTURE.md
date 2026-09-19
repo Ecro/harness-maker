@@ -77,10 +77,11 @@ Three design commitments shape every decision below:
         │    refresh.md       ◀── M4 anti-rot, manual confirm │
         │  second_brain       ◀── typed Obsidian R/W memory    │
         │                          with project namespaces     │
-        │  skills/  (12)      ◀── including verify-before,    │
+        │  skills/  (14)      ◀── including verify-before,    │
         │                          conditional-router,        │
         │                          refdocs-search,            │
         │                          targeted-test-selection,   │
+        │                          project-knowledge,         │
         │                          worktree-isolator, ...     │
         │  agents/            ◀── M12 reviewer/executor       │
         │                          privilege separation       │

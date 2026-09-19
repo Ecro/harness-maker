@@ -78,6 +78,16 @@ Re-captures (append; never silently overwrite):
   from `hm world gap --json`, and `[--locator <path:A-B>]` on the observe line. Verified before
   re-capture that `wrapup` is the ONLY moved command in every arm. Attributed in
   `work-docs/BASELINE-DELTA-assumption-entry-and-evidence-locator.md` §3.
+- **2026-09-19, `mission-context-loop`** — `wrapup` and `help` moved in all four arms,
+  identically in `auto_safe` and `ask`: wrapup 5.1 gained the 5.1.0 fact-safe
+  search-before-write blockquote (one `hm memory_retrieve` call; never reuse a `[wiki:fact]`
+  slug) and its slug bullet now names the reused non-fact slug; help gained the
+  `project-knowledge` skill row. Verified before re-capture that these two are the ONLY moved
+  commands in every arm and the command set did not drift. Attributed in
+  `work-docs/BASELINE-DELTA-mission-context-loop.md` §3. Re-captured again after `/hm:review`'s
+  Codex P1 fix added the exact-slug Grep check to 5.1.0, and twice more for its base-path note
+  (re-review P1; then `/hm:verify` removed a `<WT>` token that leaked into the worktree-OFF
+  render) — `wrapup` the ONLY moved command each time.
 """
 
 from __future__ import annotations

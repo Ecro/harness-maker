@@ -125,6 +125,7 @@ it is the substrate. The question for each row is whether the *role definition* 
 | `verify-before-completion` | `none` | loss | loss | **keep** |
 | `second-opinion-gate` | `none` — cross-vendor CLI invocation is ours | loss | loss | **keep** |
 | `intent-layer` | `none` — Auto Memory ✅ stores preferences, not intent / assumptions / objective approvals; no vendor ships epistemic state | loss | loss (mention-only, `@intent-layer`) | **keep** |
+| `project-knowledge` | ⚠️ partial — Auto Memory ✅ saves "remember X" as project context, but machine-local: not in git, not read by Cursor/Codex, not in `memory_retrieve` (SPEC-mission-context-loop) | loss | loss (AGENTS.md pointer names the skill file) | **keep** — withdrawal pre-registered: 0 `[wiki:fact]` entries in 28 days after release → remove |
 | `autoloop-driver` | ⚠️ **substantial** — `Workflow` ✅ is a deterministic driver with phases, fan-out, budget and resume; `/loop` ✅ covers self-paced iteration | loss | loss | **merge** |
 | `worktree-isolator` | ⚠️ `EnterWorktree` / `ExitWorktree` ✅ exist natively | loss | loss | **merge** — but see the warning below |
 

@@ -35,7 +35,7 @@ harness-maker 는 Claude Code + Cursor 양쪽 IDE 의 플러그인으로, **LLM 
 - **인터뷰 정책**: 명시 multi-select 강제. **auto-detect 금지** (`.cursor/` 디렉토리 존재 여부 등으로 추론하지 않음). 사용자 의도 확인 필수.
 - **Default fallback**: 옛 harness.yaml 에 `targets` 키 없을 때만 `[claude-code]` silent fallback + 경고 로그. 신규 인터뷰는 항상 명시 선택.
 - **Single source 원칙**: agents / skills / hooks / MCP 자산은 `.claude/` 한 곳에서 양쪽 IDE 가 공유 (Cursor 가 `.claude/agents/` 를 native 로 읽음, hooks schema 호환 — IDE 모드 인식은 Phase 1 manual 검증 결과 따름).
-- **Cursor 추가 자산**: `targets` 에 `cursor` 포함 시에만 `.cursor/rules/*.mdc`, `.cursor/commands/hm-*.md`, `.cursor/mcp.json` 추가 렌더.
+- **Cursor 추가 자산**: `targets` 에 `cursor` 포함 시에만 `.cursor/rules/harness.mdc` (`alwaysApply: true`), `.cursor/hooks.json`, `.cursor/mcp.json` 추가 렌더 (`synthesize._cursor_target_files`). 슬래시 명령은 Cursor 가 `.claude/commands/hm/` 를 native 로 읽으므로 별도 렌더 없음.
 - **Cursor 사용자 모델 권장**: `harness.yaml.recommended_model: claude-opus-4-7` + agent frontmatter `model` 명시. user override 자유. prompt 자체는 model-agnostic 재작성 안 함 (`<thinking>` blocks 등 Claude-specific 표현 유지).
 - **최소 지원 Cursor 버전**: 2.4 (subagents + skills + Claude Code hooks 호환 최초 도입). Cursor 3.0 이상 권장.
 - **Codex dual role** (PLAN-codex-second-llm-integration ADR-009): `codex` 는 IDE asset 렌더링 (`.codex/`) 뿐 아니라 second-LLM provider 역할도 한다. 이 provider 축은 **`harness.yaml.second_opinion`** (PLAN-second-opinion-multi-model 이 옛 `codex_second_opinion` 을 대체) 로 제어된다 — `targets` 와 직교. 자세한 건 아래 **Cross-model second opinion (multi-model)**.
@@ -114,9 +114,10 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 - `.worktrees/` (gitignored)
 
 **Cursor target 추가** (`targets` 에 `cursor` 포함 시):
-- `.cursor/rules/<name>.mdc` — Cursor rules (CLAUDE.md 의 .mdc 변환본)
-- `.cursor/commands/hm-<name>.md` — Cursor 위치의 슬래시 명령 (Phase 1 검증 결과 따라 `.claude/commands/` 만으로 가능할 수 있음)
+- `.cursor/rules/harness.mdc` — 고정 템플릿 `templates/cursor/rules/harness.mdc.j2` 하나 (`alwaysApply: true`, `globs: []` — 경로 스코프 규칙 아님)
+- `.cursor/hooks.json` — Cursor native camelCase hooks (위 "Hook schema diverges by design")
 - `.cursor/mcp.json` — MCP server (Cursor 별도 위치)
+- `.cursor/commands/` 는 **렌더되지 않는다** — Cursor 2.4+ 가 `.claude/commands/hm/*.md` 를 native 로 읽는다 (kairos 0.5.7 forensic, `tests/cursor-compat/results-2026-05-08.md`). `render.py` 의 `.cursor/commands/` dispatch 는 회귀 대비 예약 코드일 뿐 공급 템플릿이 없다.
 
 **Codex target 추가** (`targets` 에 `codex` 포함 시):
 - `.codex/config.toml` — Codex CLI 전역 설정 (features, mcp_servers)

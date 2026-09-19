@@ -47,6 +47,7 @@ Stages are chained by `{{ cmd }}loop` or by autopilot — there is no fused work
 | targets | `{{ config.targets | join(", ") }}` |
 | autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, re-armed every session{% endif %} |
 | intent-layer | skill — say what you observed, close / approve / drop an objective, record an outcome value, or ask where the project stands{% if is_codex %} (mention `@intent-layer`){% endif %} |
+| project-knowledge | skill — ask to remember a project fact the code does not show, or correct a recorded one; it lands in the shared wiki, not auto-memory{% if is_codex %} (mention `@project-knowledge`){% endif %} |
 
 {% if "cursor" in config.targets -%}
 > **Cursor:** `/hm:*` commands work identically. Subagents and skills are read from `.claude/`.

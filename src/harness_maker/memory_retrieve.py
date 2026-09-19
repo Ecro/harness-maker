@@ -22,6 +22,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from harness_maker import memory_md
+
 WORD_RE = re.compile(r"[A-Za-z0-9_]+")
 
 # Sentinel for the fence-close substring; entry bodies containing this literal
@@ -543,6 +545,19 @@ def _emit_error(args: argparse.Namespace, reason: str) -> None:
     )
 
 
+def resolve_memory_dir(explicit: Path | None, cwd: Path) -> Path:
+    """Root the default where `memory_md` writes, so a worktree stage sees base captures.
+
+    `memory_md` strips `.worktrees/<name>` and writes every tier at the base root; a
+    cwd-relative default read the worktree's branch copy, which never holds a fact captured
+    mid-task. Reusing the writer's own function keeps the two rooting rules from drifting.
+    An explicit value is the caller's choice and is never re-rooted.
+    """
+    if explicit is not None:
+        return explicit
+    return memory_md._memory_dir(cwd)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="harness_maker.memory_retrieve",
@@ -552,9 +567,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--k", type=int, default=6)
     parser.add_argument("--pre-k", type=int, default=30, dest="pre_k")
     parser.add_argument("--byte-cap", type=int, default=10240, dest="byte_cap")
-    parser.add_argument(
-        "--memory-dir", type=Path, default=Path(".claude/memory"), dest="memory_dir"
-    )
+    parser.add_argument("--memory-dir", type=Path, default=None, dest="memory_dir")
     parser.add_argument(
         "--count-floor",
         type=int,
@@ -586,6 +599,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="floor SECTION body budget; computed after parsing when omitted",
     )
     args = parser.parse_args(argv)
+    args.memory_dir = resolve_memory_dir(args.memory_dir, Path.cwd())
 
     try:
         if not args.memory_dir.is_dir():

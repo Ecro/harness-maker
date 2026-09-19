@@ -1628,6 +1628,26 @@ key remains valid as a Pydantic `AliasChoices` input alongside
 
 ---
 
+### 7.14 project-knowledge
+
+**Role**: Captures code-absent project facts (external-system behavior, ops quirks, a
+correction of something previously believed) that Claude Code's machine-local auto-memory
+cannot share with git, Cursor, Codex, or `memory_retrieve`.
+
+**Mechanism**: on an explicit "remember this" or a correction from the DRI, the skill searches
+existing `[wiki:fact]` entries first and writes via `hm memory_md upsert-wiki --category fact`.
+It reuses only a `[wiki:fact]` slug (never a dev pattern/gotcha/convention slug, and vice versa),
+never records an inferred fact, and surfaces the CLI's stderr on failure rather than falling back
+to auto-memory. A correction replaces the entry in place and appends `Supersedes: <old claim>
+(first recorded <date>)`. A ≤300-char pointer in `CLAUDE.md`, `AGENTS.md`, and
+`.cursor/rules/harness.mdc` routes facts to the skill even when it does not auto-trigger.
+
+**Withdrawal (pre-registered)**: `scripts/measure_wiki_fact_window.py` counts `[wiki:fact]`
+entries over a 28-day window from first release; the criterion and outcome are anchored in this
+repo's own `intent.yaml` as `wiki_fact_entries_28d`.
+
+---
+
 ## 8. Agent Reference
 
 Agents are sub-agents with independent contexts. When the main Claude context invokes them with the Task tool, a separate LLM call occurs and returns results.
@@ -2209,7 +2229,7 @@ Cold tier → git log, work-docs/PLAN-*.md       (decision history)
 
 **wrapup updates memory after every unit of work**:
 
-- `wiki.md`: Classified with category tags like `[wiki:pattern]`, `[wiki:convention]`. Instantly searchable with `rg -F "[wiki:" wiki.md`.
+- `wiki.md`: Classified with category tags like `[wiki:pattern]`, `[wiki:convention]`. Instantly searchable with `rg -F "[wiki:" wiki.md`. `[wiki:fact]` is a distinct category for code-absent project facts (external-system behavior, ops quirks, corrected assumptions) captured by the `project-knowledge` skill, never overwritten by a dev-pattern entry and vice versa.
 - `failures.md`: Tags like `[fail:import]`, `[fail:hook]`. **Same slug increments count instead of creating duplicate section**. Track repeated patterns with `rg -F "[fail:" failures.md`.
 
 When the next session's execute loads the Warm tier, it uses `rg -F "[fail:" failures.md` to target-search only failure patterns relevant to the current work area. No need to read the entire file.

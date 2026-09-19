@@ -163,4 +163,8 @@ def test_codex_target_files_total_skill_count() -> None:
     # 21 → 22 (2026-09-16, SPEC-intent-world-model-objective-layer S13): the `intent-layer`
     # skill. Same constants again (`synthesize._ALL_SKILLS`, `interview._ALL_SKILLS`, the Side
     # enabled list, this count).
-    assert len(out_paths) == 22, f"Expected 22 skill paths, got {len(out_paths)}"
+    #
+    # 22 → 23 (2026-09-19, SPEC-mission-context-loop): the `project-knowledge` skill. Same
+    # constants (`synthesize._ALL_SKILLS`, `interview._ALL_SKILLS`, the Side enabled list,
+    # this count, `test_synthesize_codex`'s base).
+    assert len(out_paths) == 23, f"Expected 23 skill paths, got {len(out_paths)}"

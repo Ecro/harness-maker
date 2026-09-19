@@ -259,7 +259,11 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `hm proposals summary` once at the head of `Steps 6 → 7.6`, so the backlog warning is
     # printed where the operator sees it (Step 5.3 runs inside stage-delegate). Declared in that
     # PLAN's `surface_allowance.round_trips`, attributed in its BASELINE-DELTA.
-    "wrapup": 31,
+    # 31 → 32 (mission-context-loop, 2026-09-19): 5.1.0 runs `hm memory_retrieve` once before
+    # the wiki write (search-before-write, fact-safe). Declared in that PLAN's
+    # `surface_allowance.round_trips` and attributed in
+    # `work-docs/BASELINE-DELTA-mission-context-loop.md` §3.
+    "wrapup": 32,
 }
 
 

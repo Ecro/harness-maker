@@ -1,10 +1,10 @@
 preset: Side
 dev_mode: task-driven
-file_count: 60
+file_count: 61
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.en.md.j2
-  body_sha256: 1d59993ac6d145bdc61426b6fc3c3e991fab4497621ae9e369aea77ae8b2e1be
+  body_sha256: b37a3ab5b70e0d924c3789a4bfac2c453bcac73684a5beaa1ff6cd0658f61bc3
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
   body_sha256: 37c6a5d761e169c3247145c71d451f988c3bb1608ee01b29cbb876eec392f154
@@ -61,7 +61,7 @@ files:
   body_sha256: b16b0c64191d45f0b5d01ffa6e3f68ff8f0cf46a6b361f0193fc57ad692db222
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: 70a644de59a093e67dceac6221076d4f0c927ec44ccd40ad1de2ef493df9e9a4
+  body_sha256: 9e1a1c4f09efbeefee99405f3e2f7f663bc88c4a72fe9cd0cda7e035200e47cb
 - path: commands/hm/loop-p5-batch.md
   template: commands/hm/loop-p5-batch.md.j2
   body_sha256: 71d837717af12de134250b81385524e9694875dd510e51e5ed2915c345763951
@@ -94,10 +94,10 @@ files:
   body_sha256: b41649d3efb41911b725b63eaf1d4ca0f1872c11fc254681642c786d9ba0e8df
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: c39aa888b00c104b9880e91fe12dcf6a95bf7d014f220f008bdcf445a35053be
+  body_sha256: f1725d40fed8a7f6c226ff8c046ca4979631e8ad2460bc6cf3c3f365bc86d805
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: f2f5ff0383c106210132d4e5528985879e59d5de67bd3e8f1aa3df6b3c8afaa2
+  body_sha256: 875c92a36ead45bb99c6171e7639ec01d21389ce2165a8cf9867386ea9fae864
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: b146802f48337b5f0d9651ab9a4d735036bb3cefca8ff3ecfb9c63ee01c31e72
@@ -106,7 +106,7 @@ files:
   body_sha256: f25091c2339e67ef173f8e8ed415db0f71535c50b27ec7a95e5ac18734f68fd0
 - path: memory/wiki.md
   template: memory/wiki.en.md.j2
-  body_sha256: bc575d04e5ae1aedced9093ae7fc9513f3cfda0352ccbaf6d1b51137735ef0e6
+  body_sha256: 0949781fe44172d76b24e9e1e581f8bcac90cd66f59882e22de83d23c55bd396
 - path: observability/dashboard.md
   template: observability/dashboard.md.j2
   body_sha256: a0676b4aaf02cd671ed94b741b11b54aecdf2d3d5babc7d816af6b02ad693a8c
@@ -143,6 +143,9 @@ files:
 - path: skills/intent-layer/SKILL.md
   template: skills/intent-layer/SKILL.md.j2
   body_sha256: 440122aa85590eec79458b1f2ba98ba69c0e9cc9d542ab1af102f20b7ab9beff
+- path: skills/project-knowledge/SKILL.md
+  template: skills/project-knowledge/SKILL.md.j2
+  body_sha256: 3917bfb9902dad068aa9d267375e85eb27fe2724da184e71fbcc4c5966756210
 - path: skills/refdocs-search/SKILL.md
   template: skills/refdocs-search/SKILL.md.j2
   body_sha256: cc7d9e2c7dbc02ded11f10bf3acdc9132aba55794452d933a8397d90fe8c8380
@@ -181,4 +184,4 @@ files:
   body_sha256: fecab8c0847f49175da7570e7fa748cfb3dcf9ac69b98841b2d7bc3617f2a60e
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 1b2c53c0689e6abeaa7b5ddc67953eecb176bb6e5da183cbcf885d63bf077971
+  body_sha256: 67808482a75b35e72d451659e7d2ba579efc782304e1fd529b596d2407b270cd

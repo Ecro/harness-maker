@@ -131,6 +131,9 @@ _ALL_SKILLS: list[str] = [
     # verify step names this skill with no `{% if %}` around it, and /hm:execute Phase D
     # runs the same selector. Enabled in BOTH presets for that reason.
     "targeted-test-selection",
+    # SPEC-mission-context-loop: the always-loaded pointer names it in every preset, so it is
+    # enabled in both (same unguarded-pointer reason).
+    "project-knowledge",
 ]
 
 _SIDE_ENABLED_REVIEWERS: list[str] = ["code-reviewer"]
@@ -146,6 +149,7 @@ _SIDE_ENABLED_SKILLS: list[str] = [
     # Same reason — review.md.j2's verify step points here unguarded.
     "targeted-test-selection",
     "intent-layer",
+    "project-knowledge",
 ]
 _PROD_ENABLED_REVIEWERS: list[str] = [
     "code-reviewer",
@@ -274,9 +278,10 @@ def _ask_targets() -> list[Target]:
     """IDE target multi-select. comma-separated; 빈 입력은 default [claude-code].
 
     PLAN-cursor-target-support.md § Targets 정책: single source 원칙으로
-    ``.claude/agents/``, ``.claude/skills/``, ``.claude/hooks/`` 는 양쪽 IDE 가
-    공유; cursor target 추가 시 ``.cursor/rules/``, ``.cursor/commands/``,
-    ``.cursor/mcp.json`` 도 렌더.
+    ``.claude/agents/``, ``.claude/skills/``, ``.claude/commands/hm/`` 는 양쪽
+    IDE 가 공유; hooks 는 IDE 별 native 파일 (Claude = ``.claude/settings.json``,
+    Cursor = ``.cursor/hooks.json``). cursor target 추가 시
+    ``.cursor/rules/harness.mdc``, ``.cursor/hooks.json``, ``.cursor/mcp.json`` 렌더.
     """
     options = ", ".join(t.value for t in Target)
     default = Target.CLAUDE_CODE.value

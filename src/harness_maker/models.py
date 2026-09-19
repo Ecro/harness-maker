@@ -64,8 +64,9 @@ class ModelTier(str, Enum):  # noqa: UP042
 class Target(str, Enum):  # noqa: UP042
     """IDE target — which IDE(s) the rendered harness must work in.
 
-    Drives whether ``.cursor/rules/``, ``.cursor/commands/``, ``.cursor/mcp.json``
-    are rendered alongside the shared ``.claude/`` assets. preset/dev_mode 와
+    Drives whether ``.cursor/rules/harness.mdc``, ``.cursor/hooks.json``,
+    ``.cursor/mcp.json`` are rendered alongside the shared ``.claude/`` assets
+    (Cursor reads ``.claude/commands/hm/`` natively — no ``.cursor/commands/``). preset/dev_mode 와
     직교; 인터뷰에서 명시 multi-select 강제. 옛 yaml fallback 은
     ``HarnessConfig._targets_schema_gap_fallback`` validator 가 처리.
     """
