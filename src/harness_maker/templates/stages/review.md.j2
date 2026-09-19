@@ -1184,8 +1184,11 @@ ran out **while still progressing** — the only exit that says a higher cap wou
 
 After each round's REVIEW report write, append one line to
 `.claude/observability/review-{YYYY-MM-DD}.jsonl` via the harness CLI.
-Round-level numeric fields default to 0; `fixture_label` / `verifier_false_*` /
-`fallback` are null on real runs. **The `verifier_kept_n` / `verifier_dropped_n`
+Round-level numeric fields default to 0, **except `wall_time_ms`, which is optional and
+defaults to `null`** — the warning below forbids interpolating it, so requiring it made the
+two instructions contradict. Send an integer when measured, omit it otherwise — never `0` for an
+unmeasured round.
+`fixture_label` / `verifier_false_*` / `fallback` are null on real runs. **The `verifier_kept_n` / `verifier_dropped_n`
 fields are now null too** — Pass 1.5 no longer runs (ADR-001), and emitting `0`
 would be indistinguishable from "the verifier ran and dropped nothing", silently
 poisoning the very rate a later analysis reads. Omit them, or send `null`; never

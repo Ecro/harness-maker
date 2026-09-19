@@ -610,6 +610,32 @@ First write the commit message to a file. `<type>(<scope>): <subject ≤72 chars
 one, then a body explaining **why**, not **what** — the diff already says what. **Type**
 (per CLAUDE.md convention): `feat | fix | chore | ci | test | docs | refactor`.
 
+**Proposal backlog — print it here, in the main loop.** Step 5.3 writes proposals; nothing
+reads them unless this does. Ask the CLI; do **not** describe a counting rule here —
+resolved proposals carry no heading of their own, so a prose rule would disagree with it:
+
+{% if is_codex %}
+```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm proposals summary")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm proposals summary
+```
+{% endif %}
+
+It prints one JSON object, `{"open": N, "oldest": "YYYY-MM-DD" | null}`. At **5 or more**
+open, print one line — drop ` (oldest …)` when `oldest` is null:
+
+> ⚠️ **{N} unresolved proposals** (oldest {oldest}) in `.claude/memory/pending-proposals.md` —
+> run `hm proposals list --open` to triage.
+
+Below 5, print nothing. On any failure — not found, a non-zero exit (a pre-release plugin
+answers `unknown module`), stdout that is not a JSON object with an integer `open` — print
+ONE line naming it and continue. A failure of this call is never a reason to halt: the
+"surface verbatim and halt" rule below covers the commit and land calls only. Never halt,
+never treat an error string as a count, never skip silently.
+
 {% if not wt_on %}> **Isolation off:** there is no worktree, so `--worktree` and `--base` are both
 > this project's root. The call is rendered with `"$(pwd)"` in both positions — do not
 > substitute anything, and do not pass a relative path: `wrapup_land` rejects a

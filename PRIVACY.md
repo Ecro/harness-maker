@@ -92,7 +92,7 @@ All paths are inside your project root (or `CLAUDE_PROJECT_DIR` / `CURSOR_PROJEC
 | `fixture_label` | string \| null | Labeled-fixture identifier (null on real runs) |
 | `pass2_kept_n` | int | Findings surviving Pass 2 (full-context review) |
 | `consensus_passed_n` | int | Findings surviving consensus filter |
-| `wall_time_ms` | int | Wall-clock time of the review round |
+| `wall_time_ms` | int \| null | Wall-clock time of the review round; `null`/omitted when not measured — never `0` in its place |
 | `build_break_count` | int | How many auto-fixes broke the build |
 | `auto_fix_reverted_n` | int | How many auto-fixes were reverted because of build break |
 | `fallback` | string \| null | Set only when the verifier model was unavailable and a fallback path ran |

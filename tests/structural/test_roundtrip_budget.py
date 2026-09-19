@@ -96,7 +96,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # check sets, so a marker written after a TARGETED run would let the next verify/wrapup skip
     # the whole suite), which left a consumer that can never hit, because this stage changes
     # files before it reaches the read.
-    "execute": 17,
+    # 17 -> 18 on 2026-09-19 (PLAN-observed-harness-gaps-salvage Phase 3): the warm tier now
+    # loads failure BODIES through `hm memory_retrieve` instead of a head-skim + slug `rg` — the
+    # one stage that writes code was the only one still reading slugs without bodies.
+    "execute": 18,
     # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml
     # second_opinion.models` dropped `antigravity`, and `/hm:health` runs ONE per-model
     # positive smoke-test per enabled model, so its `second_opinion_invoke` smoke call for that
@@ -252,7 +255,11 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 29 → 30 (assumption-entry-and-evidence-locator, 2026-09-18): 5.7's assumption block runs
     # `hm world assume add` once on "new". Declared in that PLAN's `surface_allowance.round_trips`
     # and attributed in `work-docs/BASELINE-DELTA-assumption-entry-and-evidence-locator.md` §3.
-    "wrapup": 30,
+    # 30 → 31 (observed-harness-gaps-salvage, 2026-09-19): the main loop runs
+    # `hm proposals summary` once at the head of `Steps 6 → 7.6`, so the backlog warning is
+    # printed where the operator sees it (Step 5.3 runs inside stage-delegate). Declared in that
+    # PLAN's `surface_allowance.round_trips`, attributed in its BASELINE-DELTA.
+    "wrapup": 31,
 }
 
 

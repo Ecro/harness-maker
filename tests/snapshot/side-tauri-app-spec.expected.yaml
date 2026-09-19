@@ -55,7 +55,7 @@ files:
   body_sha256: 9b2ecf7fae62c92cee1a66d2acb2c4b826b1a74f9ed6a31f34e2970cdb4fc8fd
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 874a31d2cb5e350e0e99e6ac717bc2800140e2b0ba860f8eb4478d51ba77466f
+  body_sha256: f56fb2cba1610e7a532dcaa109bb39bc513c3f959e0853ccdb0df4c9ce8d5b54
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: b16b0c64191d45f0b5d01ffa6e3f68ff8f0cf46a6b361f0193fc57ad692db222
@@ -82,7 +82,7 @@ files:
   body_sha256: dde0e561673b8ea696adc58b65e384e363ea4a0cfb78ff7667189ad0bbbd191b
 - path: commands/hm/review.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 5c28326be4c65f8fd79d1a63596088b4a701f91645101b819f66c37d82049edb
+  body_sha256: 4facceb603f6e59a2a287102a315f43695d37004d4ed89a52da4b95ecf7941e7
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 02327767f2d476e1b7bb761f6cd90fb28c4573c7a449d69d214e29172bd6cf36
@@ -94,7 +94,7 @@ files:
   body_sha256: f9faa3de835e78dde16ae3c71706ba1b663c9bb134ebe3169b323d764d54b602
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: dcf0d115b2c514a45ced279c1f669e7d62595f4ed1440137cb091da63e209342
+  body_sha256: aaef1acb978c0bc47bee74313719c9bf82bac0637328e25d52161654d5c57fcc
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: 489460d04ba408e5f2479dde01693f8f6e1b465ad3a6422bd56a5b8f10d029fa
@@ -163,7 +163,7 @@ files:
   body_sha256: b3ce34ea25321280d309fe3188fd757e1665aad75a95aa76ecd942bdcc128b47
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: f11f66edac9dd946a47bc640e1f0210190c5959f8785e63c5d207f1cd737122f
+  body_sha256: b7c177ef6a7a6a56f1e5212e402d2e33747f7a78eeac6139c5fc4c11d572494f
 - path: stages/plan.md
   template: stages/plan.md.j2
   body_sha256: 2b2bc91cab98713d20c5f2ee81da0a606026ec9b861119e59e0bd51e5924242d
@@ -172,7 +172,7 @@ files:
   body_sha256: 8ab211ea20b2989d5801842b1b9ed278974c96ad8c94dcd47a66afddb64613f0
 - path: stages/review.md
   template: stages/review.md.j2
-  body_sha256: 5f66d3ab21278892f9af45e62bba632f282c2a83293ce27be30cf7961a8b8cbd
+  body_sha256: b13247439ce4733f810b1a2665b1e3b8fff3138c95207895766c33f71876aed8
 - path: stages/spec.md
   template: stages/spec.md.j2
   body_sha256: 0a1779579ac366edac7e9e95367abd91d1f70600eff2edf03ea95c5e70c39e54
@@ -181,4 +181,4 @@ files:
   body_sha256: 0a0fd5a9b3727e7257c33476659c5f13b1bf5f7fcb3af23933be9670c08143c0
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: edb76f86886f0b4467381ec7f18dd4a2041231badbd72c42ab1dbe8c83eae308
+  body_sha256: c8843cd82e0a032c7aedb030dad07f0d83a20510013ee59bce3c831e45a4af2a

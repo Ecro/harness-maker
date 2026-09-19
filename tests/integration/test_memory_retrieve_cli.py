@@ -147,5 +147,78 @@ def test_cli_byte_cap_enforced(tmp_path: Path) -> None:
 
     result = _run_cli("--topic", "boundary parse", "--memory-dir", str(memdir))
     assert result.returncode == 0
-    # 10KB cap; allow small overhead for fence + instruction line
+    # 10KB cap; allow small overhead for fence + instruction line.
+    # This fixture is wiki-tier with no `count:`, so the count floor's source set is empty
+    # and the bound still describes the whole output. A floor-bearing corpus is covered by
+    # test_cli_count_floor_adds_its_own_budget below — do NOT loosen this one to make room.
     assert len(result.stdout.encode("utf-8")) <= 11 * 1024
+
+
+def _floor_bearing_memdir(tmp_path: Path) -> Path:
+    """A corpus the floor actually fires on: fail-tier entries carrying `count:`."""
+    memdir = tmp_path / "memory"
+    memdir.mkdir()
+    (memdir / "wiki.md").write_text(
+        "# Wiki\n\n---\n\n<!-- @hm:user:entries -->\n"
+        + "".join(
+            f"## [wiki:pattern] hit-{i:02d} | 2026-05-19\nboundary parse "
+            + ("filler-data " * 200)
+            + "\n\n"
+            for i in range(20)
+        )
+        + "<!-- @hm:/user:entries -->\n",
+        encoding="utf-8",
+    )
+    (memdir / "failures.md").write_text(
+        "# Failures\n\n---\n\n<!-- @hm:user:entries -->\n"
+        + "".join(
+            f"## [fail:test] recurring-{i:02d} | 2026-06-0{i + 1} | count:{12 - i}\n"
+            f"- [2026-06-0{i + 1}] unrelated vocabulary entirely " + ("z" * 2500) + "\n\n"
+            for i in range(4)
+        )
+        + "<!-- @hm:/user:entries -->\n",
+        encoding="utf-8",
+    )
+    return memdir
+
+
+def test_cli_count_floor_adds_its_own_budget(tmp_path: Path) -> None:
+    """ADR-001: the floor is additive — its bytes come on top of `byte_cap`, not out of it."""
+    memdir = _floor_bearing_memdir(tmp_path)
+    off = _run_cli("--topic", "boundary parse", "--memory-dir", str(memdir), "--no-count-floor")
+    on = _run_cli("--topic", "boundary parse", "--memory-dir", str(memdir))
+    assert off.returncode == 0, off.stderr
+    assert on.returncode == 0, on.stderr
+
+    assert "recurring-00" not in off.stdout, "floor-off must not admit a zero-overlap entry"
+    assert "recurring-00" in on.stdout, "the highest-count entry was not admitted"
+    assert "high-recurrence" in on.stdout
+
+    # Additive, and bounded by the floor's own budget — not by the lexical cap.
+    grew = len(on.stdout.encode("utf-8")) - len(off.stdout.encode("utf-8"))
+    assert 0 < grew <= 3 * (1000 + 256)
+
+
+def test_cli_no_count_floor_flag_is_equivalent_to_count_floor_zero(tmp_path: Path) -> None:
+    """The two spellings of the off switch must agree byte-for-byte.
+
+    Named for what it proves (review d1fb99ca): both flags take the same `count_floor == 0`
+    branch, so this pins flag-alias equivalence — NOT that the off path reproduces the
+    pre-floor render. Nothing pins that render against a pre-feature capture; the nearest
+    property is `test_count_floor_is_additive_to_k` (the lexical section is byte-identical with
+    the floor on and off under a binding cap)."""
+    memdir = _floor_bearing_memdir(tmp_path)
+    a = _run_cli("--topic", "boundary parse", "--memory-dir", str(memdir), "--no-count-floor")
+    b = _run_cli("--topic", "boundary parse", "--memory-dir", str(memdir), "--count-floor", "0")
+    assert a.returncode == 0, a.stderr
+    assert b.returncode == 0, b.stderr
+    assert a.stdout == b.stdout
+
+
+@pytest.mark.parametrize("value", ["0", "-5"])
+def test_cli_rejects_a_non_positive_floor_entry_budget(tmp_path: Path, value: str) -> None:
+    """Review 60a1e752: a zero budget used to render the whole body (`[-0:]`)."""
+    memdir = _floor_bearing_memdir(tmp_path)
+    r = _run_cli("--topic", "x", "--memory-dir", str(memdir), "--floor-entry-bytes", value)
+    assert r.returncode == 2, r.stderr
+    assert "positive integer" in r.stderr

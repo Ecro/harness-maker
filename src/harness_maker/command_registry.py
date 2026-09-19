@@ -168,6 +168,7 @@ MODULES: dict[str, ModuleSpec] = {
     "lens_coverage": ModuleSpec("manual-dispatch", _s("check")),
     "review_consensus": ModuleSpec("manual-dispatch", _s("finalize", "plan")),
     "plan_rounds": ModuleSpec("manual-dispatch", _s("plan", "outcome")),
+    "proposals": ModuleSpec("subparser", _s("list", "count", "summary")),
     "test_runners": ModuleSpec("manual-dispatch", _s("plan", "list")),
     "review_churn": ModuleSpec(
         "manual-dispatch", _s("measure", "pin", "oscillation", "complexity")

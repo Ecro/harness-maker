@@ -234,7 +234,11 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # `withdrawal.due` line after the outcome-measure block (the sentence + its blank line).
 # 711/744 → 713/746 (assumption-entry-and-evidence-locator, 2026-09-18): the 5.7 assumption
 # block gained the "new" branch — one prose line and one `hm world assume add` call line.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 713), ("Production", 746)])
+# 713/746 → 735/768 (observed-harness-gaps-salvage, 2026-09-19): the main-loop proposal-backlog
+# paragraph at the head of `Steps 6 → 7.6` (22 body lines: call, JSON contract, warning line,
+# degrade + halt-exemption) — attributed in
+# work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 735), ("Production", 768)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

@@ -280,6 +280,90 @@ def top_candidates(
     return [e for _s, e in scored[:pre_k]]
 
 
+#: The floor's per-entry marker. The reranking turn uses it to tell a high-recurrence
+#: admission from a lexical hit and discard it cheaply when it is not relevant.
+FLOOR_LABEL = "high-recurrence"
+FLOOR_SECTION_HEADER = (
+    f"### {FLOOR_LABEL} entries (count floor — admitted regardless of lexical overlap)\n"
+)
+DEFAULT_COUNT_FLOOR = 3
+DEFAULT_FLOOR_ENTRY_BYTES = 1000
+#: heading + label + separator + elision marker, per floor entry.
+FLOOR_ENTRY_OVERHEAD = 256
+
+#: Failure bodies are append-chronological: each recurrence appends a `- [YYYY-MM-DD]` block.
+_BLOCK_START = re.compile(r"(?m)^(?=- \[\d{4}-\d{2}-\d{2}\])")
+
+
+def _positive_int(raw: str) -> int:
+    """argparse type: a per-entry byte budget of 0 or less has no meaningful excerpt."""
+    value = int(raw)
+    if value <= 0:
+        raise argparse.ArgumentTypeError(f"must be a positive integer, got {value}")
+    return value
+
+
+def floor_byte_cap_for(count_floor: int, floor_entry_bytes: int) -> int:
+    """Computed AFTER parsing — a static default would make `--count-floor 5` admit 3."""
+    return max(count_floor, 0) * (floor_entry_bytes + FLOOR_ENTRY_OVERHEAD)
+
+
+def _excerpt_recent_blocks(body: str, max_bytes: int) -> tuple[str, int]:
+    """Return (excerpt, dropped_bytes) — trailing whole `- [date]` blocks within budget.
+
+    Tail-biased because head truncation INVERTS this corpus: the heading is the oldest
+    text and every correction appends beneath it, so a head excerpt of the highest-`count`
+    entry emits guidance a later block explicitly retracted. Whole blocks are preferred but
+    never required — when the newest block alone exceeds the budget it is tail-truncated,
+    because dropping it degenerates to heading-only, which is the outcome this excerpt
+    strategy exists to avoid.
+    """
+    total = len(body.encode("utf-8"))
+    if max_bytes <= 0:
+        # `[-0:]` is the WHOLE string, so a zero budget must be handled before any slicing.
+        return "", total
+    if total <= max_bytes:
+        return body, 0
+    blocks = [b for b in _BLOCK_START.split(body) if b]
+    kept: list[str] = []
+    used = 0
+    for block in reversed(blocks):
+        size = len(block.encode("utf-8"))
+        if used + size > max_bytes:
+            break
+        kept.insert(0, block)
+        used += size
+    if kept:
+        excerpt = "".join(kept)
+        return excerpt, total - len(excerpt.encode("utf-8"))
+    newest = blocks[-1] if blocks else body
+    tail = newest.encode("utf-8")[-max_bytes:].decode("utf-8", errors="ignore")
+    return tail, total - len(tail.encode("utf-8"))
+
+
+def floor_candidates(
+    entries: Sequence[MemoryEntry],
+    *,
+    exclude_slugs: set[str],
+    n: int,
+) -> list[MemoryEntry]:
+    """Highest-`count` failure entries not already emitted lexically.
+
+    Source set is `tier == "fail"` with a parsed `count:` — a wiki entry outranking a
+    failure on count would be admitted under a label whose meaning is failure-specific.
+    Ordering mirrors the lexical path's determinism; the corpus has many ties.
+    """
+    if n <= 0:
+        return []
+    pool = [
+        e
+        for e in entries
+        if e.tier == "fail" and e.count is not None and e.slug not in exclude_slugs
+    ]
+    pool.sort(key=lambda e: (-(e.count or 0), _date_desc_key(e.date), e.slug))
+    return pool[:n]
+
+
 def render_candidates_block(
     candidates: Sequence[MemoryEntry],
     topic: str,
@@ -287,8 +371,19 @@ def render_candidates_block(
     k: int = 6,
     pre_k: int = 30,
     byte_cap: int = 10240,
+    all_entries: Sequence[MemoryEntry] | None = None,
+    count_floor: int = DEFAULT_COUNT_FLOOR,
+    floor_entry_bytes: int = DEFAULT_FLOOR_ENTRY_BYTES,
+    floor_byte_cap: int | None = None,
 ) -> str:
     """Emit the fenced markdown block per PLAN §Output schema.
+
+    Two independently-capped sections, concatenated (ADR-001). The lexical section obeys
+    exactly the rule it always did — `byte_cap` net of the fence and instruction overhead,
+    tail-popped until it fits — so the count floor cannot evict a lexical hit. The floor
+    section has its OWN budget on top. Measuring both against one string was the bug: the
+    renderer pops from the tail, so a floor appended into the same measured output would
+    silently displace the entries it was supposed to accompany.
 
     The instruction line is OUTSIDE the closing fence so the fence body is
     the data and the line is the directive to the running Claude turn.
@@ -305,14 +400,15 @@ def render_candidates_block(
     fence_open = f'<memory_candidates topic="{safe_topic}" k="{k}" pre_k="{pre_k}">\n'
     fence_close = _FENCE_CLOSE + "\n"
 
-    if not candidates:
-        return fence_open + "(no entries matched)\n" + fence_close + instruction
-
     seen_slugs: dict[str, str] = {}
 
-    def _heading(e: MemoryEntry, *, dup_annotation: str = "") -> str:
+    def _heading(e: MemoryEntry, *, dup_annotation: str = "", floor: bool = False) -> str:
         count_part = f" | count:{e.count}" if e.count is not None else ""
-        return f"## [{e.tier}:{e.category}] {e.slug} | {e.date}{count_part}{dup_annotation}"
+        floor_part = f" | {FLOOR_LABEL}" if floor else ""
+        return (
+            f"## [{e.tier}:{e.category}] {e.slug} | {e.date}{count_part}"
+            f"{dup_annotation}{floor_part}"
+        )
 
     def _neutralize_fence(body: str) -> str:
         # Prevent a malicious entry body from closing the fence early
@@ -327,60 +423,85 @@ def render_candidates_block(
             dup = ""
         return f"{_heading(e, dup_annotation=dup)}\n{_neutralize_fence(e.body)}\n"
 
-    rendered = [_render_one(e) for e in candidates]
+    def _render_lexical(entries: Sequence[MemoryEntry], cap: int) -> tuple[str, set[str]]:
+        """Byte-for-byte the pre-floor rule, expressed against a body-only cap."""
+        if not entries:
+            return "", set()
 
-    # Single-entry oversize → truncate body + sentinel, then re-check the cap
-    # is actually satisfied (code review P1, 2026-05-19 — long topic + long
-    # slug used to push final output past the cap).
-    if len(rendered) == 1:
-        out = fence_open + rendered[0] + fence_close + instruction
-        if len(out.encode("utf-8")) <= byte_cap:
-            return out
-        e = candidates[0]
-        # Account for actual fence + heading + instruction overhead rather
-        # than a fixed 1KB reservation.
-        body_bytes = _neutralize_fence(e.body).encode("utf-8")
-        sentinel_template = "\n[... truncated {} bytes for byte-cap]\n"
-        fixed_overhead = (
-            len(fence_open.encode("utf-8"))
-            + len(_heading(e).encode("utf-8"))
-            + len(b"\n")
-            + len(sentinel_template.format(99999).encode("utf-8"))
-            + len(fence_close.encode("utf-8"))
-            + len(instruction.encode("utf-8"))
-        )
-        max_body_bytes = max(byte_cap - fixed_overhead, 256)
-        truncated_body = body_bytes[:max_body_bytes].decode("utf-8", errors="ignore")
-        dropped = len(body_bytes) - len(truncated_body.encode("utf-8"))
-        sentinel = sentinel_template.format(dropped)
-        out = fence_open + f"{_heading(e)}\n{truncated_body}{sentinel}" + fence_close + instruction
-        # Defensive: if our overhead accounting underestimated (extreme topic
-        # length / unicode escape expansion), shrink the body further until
-        # the cap holds. Bounded loop — at worst halves body each iter.
-        while len(out.encode("utf-8")) > byte_cap and max_body_bytes > 256:
-            max_body_bytes //= 2
-            truncated_body = body_bytes[:max_body_bytes].decode("utf-8", errors="ignore")
-            dropped = len(body_bytes) - len(truncated_body.encode("utf-8"))
-            sentinel = sentinel_template.format(dropped)
-            out = (
-                fence_open
-                + f"{_heading(e)}\n{truncated_body}{sentinel}"
-                + fence_close
-                + instruction
+        # Single-entry oversize → truncate body + sentinel, then re-check the cap
+        # is actually satisfied (code review P1, 2026-05-19 — long topic + long
+        # slug used to push final output past the cap).
+        if len(entries) == 1:
+            e = entries[0]
+            rendered_one = _render_one(e)
+            if len(rendered_one.encode("utf-8")) <= cap:
+                return rendered_one, {e.slug}
+            body_bytes = _neutralize_fence(e.body).encode("utf-8")
+            sentinel_template = "\n[... truncated {} bytes for byte-cap]\n"
+            fixed_overhead = (
+                len(_heading(e).encode("utf-8"))
+                + len(b"\n")
+                + len(sentinel_template.format(99999).encode("utf-8"))
             )
-        return out
+            max_body_bytes = max(cap - fixed_overhead, 256)
+            while True:
+                truncated_body = body_bytes[:max_body_bytes].decode("utf-8", errors="ignore")
+                dropped = len(body_bytes) - len(truncated_body.encode("utf-8"))
+                out = f"{_heading(e)}\n{truncated_body}{sentinel_template.format(dropped)}"
+                if len(out.encode("utf-8")) <= cap or max_body_bytes <= 256:
+                    return out, {e.slug}
+                max_body_bytes //= 2
 
-    # Multi-entry: drop tail (lowest-scored) until under cap. Never mid-body
-    # truncate.
-    items = list(rendered)
-    while items:
-        body = "\n".join(items) + "\n"
-        out = fence_open + body + fence_close + instruction
-        if len(out.encode("utf-8")) <= byte_cap:
-            return out
-        items.pop()
+        # Multi-entry: drop tail (lowest-scored) until under cap. Never mid-body truncate.
+        items = [_render_one(e) for e in entries]
+        while items:
+            body = "\n".join(items) + "\n"
+            if len(body.encode("utf-8")) <= cap:
+                return body, {e.slug for e in entries[: len(items)]}
+            items.pop()
+        return "", set()
 
-    return fence_open + "(no entries matched)\n" + fence_close + instruction
+    def _render_floor(picked: Sequence[MemoryEntry], *, cap: int, entry_bytes: int) -> str:
+        if not picked:
+            return ""
+        parts = [FLOOR_SECTION_HEADER]
+        used = len(FLOOR_SECTION_HEADER.encode("utf-8"))
+        for e in picked:
+            excerpt, dropped = _excerpt_recent_blocks(_neutralize_fence(e.body), entry_bytes)
+            sentinel = (
+                f"\n[... {dropped} bytes elided — most recent blocks kept]\n" if dropped else "\n"
+            )
+            chunk = f"{_heading(e, floor=True)}\n{excerpt.rstrip()}{sentinel}"
+            size = len(chunk.encode("utf-8"))
+            if used + size > cap:
+                break
+            parts.append(chunk)
+            used += size
+        return "".join(parts) if len(parts) > 1 else ""
+
+    overhead = len((fence_open + fence_close + instruction).encode("utf-8"))
+    lexical_body, emitted = _render_lexical(candidates, max(byte_cap - overhead, 0))
+
+    floor_body = ""
+    if count_floor > 0 and all_entries:
+        cap = (
+            floor_byte_cap
+            if floor_byte_cap is not None
+            else floor_byte_cap_for(count_floor, floor_entry_bytes)
+        )
+        floor_body = _render_floor(
+            floor_candidates(all_entries, exclude_slugs=emitted, n=count_floor),
+            cap=cap,
+            entry_bytes=floor_entry_bytes,
+        )
+
+    if not lexical_body and not floor_body:
+        return fence_open + "(no entries matched)\n" + fence_close + instruction
+    if not lexical_body:
+        # The shape the floor exists for: zero lexical hits, high-recurrence entries present.
+        # `(no entries matched)` here would contradict the section right beneath it.
+        lexical_body = "(no lexical matches)\n"
+    return fence_open + lexical_body + floor_body + fence_close + instruction
 
 
 def load_memory_dir(memory_dir: Path) -> list[MemoryEntry]:
@@ -434,6 +555,36 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--memory-dir", type=Path, default=Path(".claude/memory"), dest="memory_dir"
     )
+    parser.add_argument(
+        "--count-floor",
+        type=int,
+        default=DEFAULT_COUNT_FLOOR,
+        dest="count_floor",
+        help=(
+            "admit up to N highest-count failure entries regardless of lexical overlap, "
+            "in a separate labelled section with its own byte budget. 0 disables."
+        ),
+    )
+    parser.add_argument(
+        "--no-count-floor",
+        action="store_const",
+        const=0,
+        dest="count_floor",
+        help="disable the count floor (equivalent to --count-floor 0)",
+    )
+    parser.add_argument(
+        "--floor-entry-bytes",
+        type=_positive_int,
+        default=DEFAULT_FLOOR_ENTRY_BYTES,
+        dest="floor_entry_bytes",
+    )
+    parser.add_argument(
+        "--floor-byte-cap",
+        type=int,
+        default=None,
+        dest="floor_byte_cap",
+        help="floor SECTION body budget; computed after parsing when omitted",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -443,7 +594,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         entries = load_memory_dir(args.memory_dir)
         ranked = top_candidates(entries, args.topic, pre_k=args.pre_k)
         out = render_candidates_block(
-            ranked, args.topic, k=args.k, pre_k=args.pre_k, byte_cap=args.byte_cap
+            ranked,
+            args.topic,
+            k=args.k,
+            pre_k=args.pre_k,
+            byte_cap=args.byte_cap,
+            all_entries=entries,
+            count_floor=args.count_floor,
+            floor_entry_bytes=args.floor_entry_bytes,
+            floor_byte_cap=args.floor_byte_cap,
         )
         sys.stdout.write(out)
     except Exception as e:  # noqa: BLE001 — top-level graceful fallback per PLAN

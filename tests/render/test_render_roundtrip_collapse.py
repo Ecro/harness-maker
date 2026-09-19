@@ -311,10 +311,17 @@ def test_the_wrapup_git_tail_is_the_expected_call_sequence() -> None:
     green through a substitution or a re-ordering, which is most of what could actually go wrong
     here. The sequence is compared instead, so the allowance's one added call has to be *that*
     call, in that position.
+
+    **Re-based again, same rule** (PLAN-observed-harness-gaps-salvage ADR-006/009): the main
+    loop's `hm proposals summary` now opens the section, ahead of the roll-up and every
+    halting call, so the backlog line prints where the operator sees it and a later halt cannot
+    swallow it. Funded by that PLAN's `surface_allowance.round_trips.wrapup: 1`; the position is
+    part of the contract, which is why it is asserted here rather than counted.
     """
     body = _commands(_CLAUDE_ONLY)["wrapup"]
     tail = body[body.index("### Steps 6 → 7.6") : body.index("### Step 8")]
     assert _hm_call_sequence(tail) == (
+        "proposals summary",
         "autopilot_ledger rollup",
         "wrapup_land",
         "worktree task-land",

@@ -2232,6 +2232,8 @@ harness-maker has wrapup track the `count` of failure entries, and **automatical
 
 When the user reviews and adopts a proposal, a new skill/agent/hook is added to the harness. **A feedback loop where harness-maker proposes its own upgrades**.
 
+`pending-proposals.md` now has a reader as well as a writer: `hm proposals list|count [--open|--triaged]` and `hm proposals summary` (`{"open": N, "oldest": "YYYY-MM-DD"|null}`, open proposals only). Wrapup's main loop calls `summary` once per run and prints a one-line warning — `⚠️ **{N} unresolved proposals** (oldest {date})` — whenever the open count reaches 5, so an accumulating backlog is visible in the transcript rather than only inside `pending-proposals.md` itself.
+
 ---
 
 ### 11.3 PreCompact Hook + checkpoint:compaction — No Work Lost on Context Compression

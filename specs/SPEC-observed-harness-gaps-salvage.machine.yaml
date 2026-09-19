@@ -1,0 +1,307 @@
+schema_version: 2
+spec_slug: observed-harness-gaps-salvage
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 85
+mutation_threshold_rationale: >-
+  Python-only change touching two existing ranking/validation modules whose defects
+  are silent (a dropped candidate, an omitted field). Mutants that survive here are
+  exactly the class that shipped the original bugs, so T2's 85 applies.
+last_mutation_run: null
+paths_to_mutate:
+  - src/harness_maker/memory_retrieve.py
+  - src/harness_maker/review_telemetry.py
+  - src/harness_maker/proposals.py
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+  - id: AC-001
+    title: "proposals list --open lists every unresolved proposal"
+    type: mechanical
+    test_ids:
+      - tests/unit/test_proposals.py::test_proposals_list_open_lists_unresolved
+    executable_predicate: "set(list_proposals(FIXTURE_BACKLOG, OPEN)) == EXPECTED_OPEN_SLUGS"
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: golden
+    oracle_evidence: >-
+      The expected open set is hand-authored into the fixture backlog file itself
+      (a small file whose resolved/unresolved split is visible on inspection), not
+      produced by running the parser under test.
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-002
+    title: "--open and --triaged partition the backlog exactly"
+    type: property
+    test_ids:
+      - tests/unit/test_proposals.py::test_proposals_open_triaged_partition
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: property
+    oracle_evidence: >-
+      Partition is a set-algebra relation over the parser's own two outputs and the
+      independently-counted heading set; it holds for any correct implementation and
+      cannot be satisfied by an implementation that, say, drops malformed headings
+      from both buckets. Reading the parser's source cannot make it pass.
+    oracle_independence_waiver: null
+    input_domain: "any pending-proposals.md content, including empty, all-open, all-resolved, and malformed headings"
+    transformation: "parse the file into the open set and the triaged set"
+    expected_relation: "open & triaged == empty AND open | triaged == all proposal headings"
+    preconditions: []
+    observable_output: "two sets of proposal identifiers"
+    generator_hint: "vary heading kinds: '## Proposal:', '## RESOLVED …', '## Backlog note'"
+
+  - id: AC-003
+    title: "wrapup warns from the main loop when open proposals reach five"
+    type: mechanical
+    test_ids:
+      - tests/unit/test_render_wrapup_backlog_warning.py::test_wrapup_renders_backlog_warning_threshold
+      - tests/unit/test_render_wrapup_backlog_warning.py::test_wrapup_backlog_check_runs_in_the_main_loop
+    executable_predicate: "proposals_call_offset(render_stage(WRAPUP)) > step_heading_offset(render_stage(WRAPUP), '### Steps 6 ')"
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: golden
+    oracle_evidence: >-
+      The placement rule comes from wrapup's own structure (Step 0.5 delegates Steps
+      1-5.6 to stage-delegate, and its degraded path says skip straight to Step 6; the
+      `### Steps 6 → 7.6` section always renders and runs in the main loop) and the user's
+      2026-09-19 answer, and the threshold (>= 5) from the salvaged SPEC Round 3. Both
+      are authored here, not read back out of the template under test.
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-004
+    title: "the count floor admits a zero-overlap high-recurrence entry"
+    type: mechanical
+    test_ids:
+      - tests/unit/test_memory_retrieve_count_floor.py::test_count_floor_admits_zero_overlap_entry
+    executable_predicate: "HIGH_COUNT_SLUG in emitted_slugs(render_candidates_block(FIXTURE_CORPUS, UNRELATED_TOPIC))"
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: golden
+    oracle_evidence: >-
+      The fixture corpus is constructed so the high-count entry shares no normalized
+      token with the topic, verified by asserting score_entry() == 0 for that pair
+      as a fixture precondition. Expected membership follows from the fixture's
+      construction, not from the floor implementation.
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-005
+    title: "floor entries are labelled in the fence"
+    type: mechanical
+    test_ids:
+      - tests/unit/test_memory_retrieve_count_floor.py::test_count_floor_entries_are_labelled
+    executable_predicate: "all(FLOOR_LABEL in heading for heading in floor_admitted_headings(FENCE))"
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: golden
+    oracle_evidence: >-
+      The label string is specified by this SPEC and asserted against the rendered
+      fence; the set of floor-admitted entries is derived from the fixture (the
+      zero-lexical-score subset), independently of which entries the code labelled.
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-006
+    title: "the count floor is additive to k and never displaces a lexical hit"
+    type: property
+    test_ids:
+      - tests/unit/test_memory_retrieve_count_floor.py::test_count_floor_is_additive_to_k
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: property
+    oracle_evidence: >-
+      Subset-preservation is a metamorphic relation between two runs of the same
+      function under a single flag flip. It holds for every correct additive
+      composition and is violated by exactly the carve-out design RESEARCH pitfall 1
+      warns against — so it discriminates the two designs without reference to how
+      either is coded.
+    oracle_independence_waiver: null
+    input_domain: "any memory corpus, any topic string, any k >= 1"
+    transformation: "run retrieval with the count floor disabled, then enabled, on identical inputs"
+    expected_relation: "result(floor_off) is a subset of result(floor_on)"
+    preconditions:
+      - "both runs use identical corpus, topic, k and byte_cap"
+    observable_output: "the set of entry slugs emitted in the fence"
+    generator_hint: "include corpora where the highest-count entry is also a top lexical hit, and where it is not"
+
+  - id: AC-007
+    title: "execute warm tier invokes memory_retrieve"
+    type: mechanical
+    test_ids:
+      - tests/unit/test_render_execute_warm_tier.py::test_execute_warm_tier_uses_memory_retrieve
+    executable_predicate: "MEMORY_RETRIEVE_CALL in render_stage(EXECUTE) and SLUG_SCAN_INSTRUCTION not in render_stage(EXECUTE)"
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: golden
+    oracle_evidence: >-
+      Both expected substrings are fixed by this SPEC (the call form the four other
+      stages already use, and the literal skim instruction being removed). The
+      negative half is what makes it non-vacuous: a template that adds the call while
+      keeping the skim fails.
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-008
+    title: "emit accepts a record omitting wall_time_ms"
+    type: mechanical
+    test_ids:
+      - tests/unit/test_review_telemetry_optional_wall_time.py::test_emit_accepts_record_without_wall_time_ms
+    executable_predicate: "emit_record(RECORD_WITHOUT_WALL_TIME) == 0 and jsonl_line_count(TODAY) == 1"
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: golden
+    oracle_evidence: >-
+      The record is a hand-authored JSON object with the key absent, and the expected
+      outcome (exit 0, exactly one appended line) is stated by this SPEC. Neither is
+      obtained by inspecting the pydantic model under change.
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-009
+    title: "previously valid telemetry records remain valid"
+    type: property
+    test_ids:
+      - tests/unit/test_review_telemetry_optional_wall_time.py::test_previously_valid_records_still_validate
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: property
+    oracle_evidence: >-
+      Superset-of-accepted-inputs is a relation between the pre-change and post-change
+      acceptance sets, checked against records captured before the change. An
+      implementation that made the field optional by renaming or retyping it would
+      violate the relation even though it "looks" optional in the source.
+    oracle_independence_waiver: null
+    input_domain: "every record shape that validated under the required-field schema, including real rows already on disk"
+    transformation: "validate the same record against the post-change schema"
+    expected_relation: "accepted_before implies accepted_after, and the parsed wall_time_ms value is unchanged"
+    preconditions: []
+    observable_output: "validation outcome and the parsed field value"
+    generator_hint: "seed from existing .claude/observability/review-*.jsonl rows"
+
+  - id: AC-010
+    title: "the review stage doc matches the wall_time_ms optionality"
+    type: mechanical
+    test_ids:
+      - tests/unit/test_render_telemetry_contract_docs.py::test_review_doc_matches_wall_time_optionality
+    executable_predicate: "DEFAULTS_TO_ZERO_CLAIM not in telemetry_paragraph(render_stage(REVIEW))"
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: golden
+    oracle_evidence: >-
+      The forbidden claim is the exact sentence identified in RESEARCH as
+      contradicting the schema; the assertion is scoped to the telemetry paragraph so
+      an unrelated occurrence elsewhere cannot make it pass or fail spuriously.
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-011
+    title: "plan documents --barrier-index as an integer"
+    type: mechanical
+    test_ids:
+      - tests/unit/test_render_telemetry_contract_docs.py::test_plan_barrier_index_documented_as_int
+    executable_predicate: "INTEGER_QUALIFIER in barrier_index_guidance(render_stage(PLAN))"
+    golden_table: []
+    rubric_id: null
+    pending_test: false
+    oracle_source: golden
+    oracle_evidence: >-
+      The required qualifier is fixed by the CLI's own argparse type=int, read once
+      from stage_agent_ledger.py:556 and pinned into the test as a constant; the
+      template being checked is not the source of the expectation.
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-012
+    title: "the proposals CLI reports the oldest open proposal's date"
+    type: parametric
+    test_ids:
+      - tests/unit/test_proposals.py::test_ac_012_oldest_open_date
+    executable_predicate: null
+    golden_table:
+      - input: {absent: false, open: [["alpha", "2026-05-17"], ["beta", "2026-08-14"]], resolved: ["gamma"]}
+        expected: {open: 2, oldest: "2026-05-17"}
+        note: resolved-names-ignored
+      - input: {absent: false, open: [["undated", null]], resolved: []}
+        expected: {open: 1, oldest: null}
+        note: undated-open-yields-null
+      - input: {absent: true, open: [], resolved: []}
+        expected: {open: 0, oldest: null}
+        note: absent-backlog-yields-null
+      - input: {absent: false, open: [["late", "2026-08-14"], ["early", "2026-05-17"]], resolved: []}
+        expected: {open: 2, oldest: "2026-05-17"}
+        note: order-independent
+      - input: {absent: false, open: [["dated", "2026-03-01"], ["undated", null]], resolved: []}
+        expected: {open: 2, oldest: "2026-03-01"}
+        note: undated-entry-does-not-mask-a-dated-one
+    rubric_id: null
+    pending_test: false
+    oracle_source: golden
+    oracle_evidence: >-
+      Each row states the open proposals and their dates as data; the expected
+      oldest date is the minimum of those dates read off the row by hand, and the test
+      builds the backlog file from the row, so the expectation never comes from the
+      parser under test. Resolved names live only in a RESOLVED batch table. The null rows encode
+      the absent-case rule (CLAUDE.md count:8) as data.
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null

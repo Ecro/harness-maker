@@ -55,8 +55,28 @@ Parse from the user's natural-language input:
 Before any code edits, load memory in tier order (stops at first miss):
 
 1. **Hot tier (compaction checkpoint only)** — Read `.claude/memory/session/<today>.md` if it exists, but inspect **only** the `checkpoint:compaction` entry — it means the prior session was interrupted mid-stage, so check `.claude-progress.json` for partial state and resume from the last in-progress phase. Ignore any historical `[decision:*]` blocks: they are legacy and no longer maintained.
-2. **Warm tier** — Skim `.claude/memory/failures.md` first 60 lines; targeted: `rg -F "[fail:" .claude/memory/failures.md` for patterns relevant to the task.
-3. **Warm tier** — Skim `.claude/memory/wiki.md` first 40 lines for conventions in the implementation area.
+2. **Warm tier** — surface wiki + failures entries **with bodies**, as the other stages do.
+   A slug says a failure class exists; it does not say how to recognise an instance, and
+   execute is where instances get created.
+
+   **Substitute the topic before running** — the PLAN slug plus this phase's files and
+   operation, never the literal `<topic>` placeholder. Nothing asserts the substitution and a
+   placeholder still returns a plausible fence, so a miss is silent.
+
+{% if is_codex %}
+```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic '<slug> + this phase files and operation' --k 6 --pre-k 30")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic "<slug> + this phase files and operation" --k 6 --pre-k 30
+```
+{% endif %}
+
+   The fence's `high-recurrence` section comes from the **count floor** — the repo's most
+   repeated failures, admitted regardless of vocabulary. Excerpts are tail-biased, so a
+   correction that superseded the entry's original guidance is the part you see. The fence
+   carries `wiki.md` entries too, so there is no separate wiki skim.
 
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set cdwt = 'cd <WT> && ' if wt_on else '' %}
 ## Procedure

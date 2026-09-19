@@ -4,6 +4,26 @@
 
 ### Added
 
+- **The proposal backlog gets a reader, and wrapup says so where you can see it.**
+  `.claude/memory/pending-proposals.md` had one writer (wrapup Step 5.3) and no reader — 27 open
+  proposals, the oldest from 2026-05-17. `hm proposals list|count [--open|--triaged]` and
+  `hm proposals summary` (open-only, `{"open": N, "oldest": date|null}`) read it; an absent file
+  is an empty backlog, not an error. Wrapup's **main loop** now calls `summary` at the head of
+  `Steps 6 → 7.6` and prints one line at five or more open proposals — not in Step 5.3, which runs
+  inside `stage-delegate` whose output never reaches the operator. A failure of the call prints
+  one line and never halts (a pre-release plugin answers `unknown module`).
+- **High-recurrence failures reach every retrieving stage regardless of vocabulary.**
+  `hm memory_retrieve` adds a labelled `high-recurrence` section: the top `--count-floor N`
+  (default 3) `[fail:*]` entries by recurrence, with their own additive byte budget, so the
+  lexical section is byte-identical with the floor on or off. Excerpts keep the newest dated
+  blocks, so a later correction is what the reader sees. Measured: the topic "repair round broke
+  something new while the suite stayed green" returned `(no entries matched)` before (297 B) and
+  now surfaces the three most-recurring failures, including `fix-introduced-defect-passes-all-gates`
+  (count:13) that it paraphrases (2649 B); `worktree finalize stash merge` grows 8661 → 11013 B.
+- **`/hm:execute` loads failure bodies**, through `hm memory_retrieve`, instead of a
+  `failures.md` head-skim plus a slug `rg` — the one stage that writes code was the only one
+  reading slugs without bodies.
+
 - **`hm world assume add` and content-fingerprint evidence locators.** The assumption layer had
   no way in — only `observe`/`resolve` on existing records — so `depends_on` and assumption
   revisits had nothing to point at. `add` creates a record (refusing an existing id or
@@ -20,6 +40,12 @@
   checks are a follow-up.
 
 ### Changed
+
+- **`review_telemetry` `wall_time_ms` is optional** (`null` = not measured, never `0`). The
+  review stage's own paragraph forbade interpolating it while the schema required it, so the first
+  emit of every round failed; the doc and `PRIVACY.md` now state the same contract. `/hm:plan`
+  states that `stage_agent_ledger --barrier-index` takes an integer (`type=int`), as `/hm:execute`
+  already did, at every comprehension depth.
 
 - **`hm world gap --json` gains a `withdrawal` block** (intent-layer-ops): the intent layer's
   own kill criterion ("10 wrapups, no observed objective, no fired revisit → remove the layer")

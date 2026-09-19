@@ -355,7 +355,13 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # asked whether the red light was about something reachable at all. `grep -in 'unreachable'`
     # over this template returned zero before this. The rule itself is in the skill, which
     # neither ratchet measures; what is charged here is the pointer and the D.5 relation.
-    "execute": 48199,
+    # 48199 → 49290 (observed-harness-gaps-salvage, 2026-09-19): +1091 over the recorded figure
+    # (+713 of it this task's, the rest landed-but-unrecorded slack); the warm tier now loads
+    # failure BODIES via `hm memory_retrieve` (is_codex-branched call + the topic-substitution
+    # warning + what the `high-recurrence` fence section is) instead of a one-line skim. The
+    # prose is the salvaged source's, already cut once to fit a zero-slack budget in 2026-08.
+    # Attributed in work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md.
+    "execute": 49290,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -579,7 +585,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # answer-gated block) and this task's +324 (one 5.7 sentence surfacing
     # `withdrawal.due`) together took the ask@flag_on render past the 2 % band; re-based
     # to the landed figure. Attributed in work-docs/BASELINE-DELTA-intent-layer-ops.md §3.1.
-    "wrapup": 45646,
+    # 45646 → 47413 (observed-harness-gaps-salvage, 2026-09-19): the previous task's +713 had
+    # stayed inside the 2 % band; this task's +1054 main-loop proposal-backlog paragraph at the
+    # head of `Steps 6 → 7.6` (call, JSON contract, warning line, degrade + halt exemption)
+    # took ask@flag_on past it. Re-based to the landed figure, attributed in
+    # work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md.
+    "wrapup": 47413,
 }
 
 

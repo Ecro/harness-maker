@@ -685,6 +685,9 @@ Bash("uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --ru
 ```
 {% endif %}
 
+- `--barrier-index` takes an **integer** — the ordinal of the serial segment this pass sat in.
+  The CLI parses it with `type=int`, so `A.5`, `pass-1` or any other label is rejected outright.
+  Plan validation is its own barrier, so `1` on pass 1 and `2` on pass 2.
 - Omit `--terminal` on pass 1 when a pass 2 will follow; pass it on the pass that ends Step 4.
   **Exactly one row per `(agent, stage, slug, run-id)` may carry `--terminal`** — the run
   identity is all four, not `<run-id>` alone, so another stage emitting its own terminal row

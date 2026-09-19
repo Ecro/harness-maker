@@ -96,7 +96,11 @@ class ReviewTelemetryRecord(BaseModel):
     fixture_label: str | None = Field(default=None, max_length=200)
     pass2_kept_n: int = Field(ge=0)
     consensus_passed_n: int = Field(ge=0)
-    wall_time_ms: int = Field(ge=0)
+    # Optional because the same rendered paragraph that documents this emit forbids
+    # interpolating wall_time_ms (determinism leakage) while a required field made the first
+    # emit of every round fail without it. `None` means "not measured" and is distinct from 0 —
+    # the same rule the verifier counters already follow.
+    wall_time_ms: int | None = Field(default=None, ge=0)
     build_break_count: int = Field(ge=0)
     auto_fix_reverted_n: int = Field(ge=0)
     fallback: str | None = Field(default=None, max_length=64)
