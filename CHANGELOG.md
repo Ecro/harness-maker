@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A mutant that breaks the module at import time is no longer counted as surviving.**
+  `mutmut.tests_pass` is `return returncode != 1`, so every exit status except 1 reads as
+  "the tests passed": pytest exits 2 on a collection error and pytest-xdist exits 2 when
+  `-x` stops the session. Measured 2026-09-20 — mutating `ACType = Literal["mechanical", …]`
+  fails 8 tests at collection and mutmut recorded it as survived. `measure_baseline` now
+  wraps the SPEC's runner in `harness_maker.mutation_runner`, which maps every non-zero exit
+  to 1 (mutmut runs the runner through `shlex.split` with no shell, so `|| exit 1` is not
+  available). Every mutation score this project has reported was deflated by its own
+  import-breaking mutants.
+- **`.mutmut-cache` is untracked and ignored.** `mutmut run` re-runs every untested mutant in
+  the cache, not only the ones under `--paths-to-mutate`; the tracked copy carried 52
+  `cache.py` mutants from 0.18.0, so a run aimed at two other modules mutated `cache.py`.
+  This is the most plausible cause of the execute-stage gate reporting zero mutants for a
+  SPEC that named real paths.
+
 ## [0.58.0] - 2026-09-20
 
 ### Added

@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
@@ -205,6 +206,22 @@ def _detect_unsupported_mutmut(cwd: Path) -> str | None:
     return None
 
 
+#: The module that maps every non-zero runner exit to 1 — see `mutation_runner`'s docstring
+#: for why exit 2 (collection error, xdist `-x` stop) otherwise reads as "mutant survived".
+_RUNNER_WRAPPER = "harness_maker.mutation_runner"
+
+
+def _normalised_runner(runner: str) -> str:
+    """Wrap the caller's test command so mutmut can tell killed from survived.
+
+    mutmut executes the runner with `shlex.split` and no shell, so the exit-code fix cannot
+    be `|| exit 1` in the string — it has to be a process that wraps the command.
+    """
+    if _RUNNER_WRAPPER in runner:
+        return runner  # a SPEC may already record the wrapped spelling
+    return shlex.join([sys.executable, "-m", _RUNNER_WRAPPER, *shlex.split(runner)])
+
+
 def measure_baseline(
     paths_to_mutate: list[str],
     *,
@@ -244,7 +261,7 @@ def measure_baseline(
         return _parse_mutmut_output(unsupported, tuple(paths_to_mutate), sampled=sampled)
     args = ["mutmut", "run", "--paths-to-mutate", ",".join(paths_to_mutate)]
     if runner:
-        args.extend(["--runner", runner])
+        args.extend(["--runner", _normalised_runner(runner)])
     if sampled:
         args.extend(["--use-coverage"])  # narrow the universe
     # Compute timeout: wall budget in seconds, capped 600 per Bash policy

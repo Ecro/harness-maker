@@ -46,6 +46,9 @@ def _s(*names: str) -> frozenset[str]:
 MODULES: dict[str, ModuleSpec] = {
     # ── argparse-subparser (guarded) ──
     "autopilot_caps": ModuleSpec("subparser", _s("boundary", "gate-blocked")),
+    # Not a user-facing verb: mutmut runs it as `python -m` around the SPEC's test
+    # command (see spec_mutation._normalised_runner), so it takes the command as argv.
+    "mutation_runner": ModuleSpec("flagonly"),
     # SPEC-intent-world-model-objective-layer ADR-001: one module, four verbs; `assume`,
     # `outcome` and `objective` carry their own sub-verbs (add/observe/resolve, record, approve…).
     "world": ModuleSpec(

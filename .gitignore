@@ -118,6 +118,9 @@ work-docs/*
 # PLAN-workflow-step-audit ADR-011 is that the baseline is never recomputed, and an
 # ignored file is recomputed by whoever regenerates it next.
 !work-docs/BASELINE-*.md
+# A mutation measurement is durable for the same reason: it costs hours of wall time, the
+# SPEC's `last_mutation_run` points at it, and an ignored file is a number nobody can check.
+!work-docs/MUTATION-*.md
 !work-docs/RECEIPT-*.md
 # Same durability argument, for the one work-docs artifact that is a script rather than a
 # document: `probe-*.py` is the falsifiability probe ADR-011 of
@@ -211,6 +214,10 @@ tests/_env_isolation_probe_*/
 # `paths_to_mutate` before committing.
 .coverage
 *.py.bak
+# The verdict cache. It MUST NOT be committed: `mutmut run` re-runs every untested mutant
+# IN the cache, not only the ones under --paths-to-mutate, so a checked-in cache silently
+# mixes another module's mutants into the measurement (tests/structural/test_mutmut_cache_untracked.py).
+.mutmut-cache
 
 # Scratch render output — `render(..., Path("out"))` probes land here when run from the
 # repo root. Never a deliverable; it reached a tagged commit once via `git add -A`.

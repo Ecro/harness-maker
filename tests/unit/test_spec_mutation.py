@@ -873,9 +873,13 @@ def test_fault2_the_runner_is_passed_through_to_mutmut(monkeypatch: pytest.Monke
 
     measure_baseline(["src/x.py"], cwd=Path("."), runner="python -m pytest -q tests/unit/test_x.py")
     assert "--runner" in seen["args"]
-    assert (
-        seen["args"][seen["args"].index("--runner") + 1]
-        == "python -m pytest -q tests/unit/test_x.py"
+    # The caller's command reaches mutmut INSIDE the exit-code wrapper (2026-09-20): mutmut
+    # reads killed/survived from one integer and counts everything but 1 as survived, so a
+    # bare pytest command reports its collection errors as surviving mutants. The wrapper's
+    # own gate is tests/unit/test_mutation_runner.py; here we only assert the caller's
+    # command is still the tail of what mutmut runs.
+    assert seen["args"][seen["args"].index("--runner") + 1].endswith(
+        "-m pytest -q tests/unit/test_x.py"
     )
 
     seen.clear()

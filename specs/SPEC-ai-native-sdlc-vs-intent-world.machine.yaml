@@ -8,7 +8,7 @@ mutation_threshold_rationale: 'Tier-1: the approval hash, the state table and th
   land, and the spec boundary decides whether autopilot stops. A surviving mutant
   in the deny-list keeps a stale approval valid; one in the hold predicate lands unreviewed
   irreversible decisions.'
-last_mutation_run: null
+last_mutation_run: "2026-09-20"
 paths_to_mutate:
 - src/harness_maker/spec_machine.py
 - src/harness_maker/autopilot_caps.py
