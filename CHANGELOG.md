@@ -2,7 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- Internal Codex bootstrap helpers validate plugin/engine version identity and track
+  plugin, engine and project update completion independently. A bounded Claude result
+  parser validates successful structured responses and reports fixed error codes.
+  These pure helpers do not yet install plugins or invoke Claude as a second opinion.
+
 ### Fixed
+
+- Land-hold tests now reference the accepted SPEC's current AC tables and preserve
+  explicit subject-cap boundary cases, restoring full-suite collection.
 
 - **The approval stamp names which field moved, not just that the hash mismatched.**
   `spec_machine`'s approval stamp now carries a per-field digest map alongside the aggregate

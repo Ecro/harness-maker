@@ -353,7 +353,7 @@ def test_land_states_finds_a_changed_spec_left_behind_by_a_moved_spec_dir(repo: 
     assert (_SLUG, "missing") in held
 
 
-# ══ SPEC-mutation-survivors-and-approval-p2s — AC-007..AC-010 ═══════════════════
+# ══ SPEC-mutation-survivors-and-approval-p2s — AC-008..AC-011 ═══════════════════
 #
 # These are CHARACTERIZATION tests for shipped behaviour: the 2026-09-20 mutation run
 # named these branches as survivors, so each one already does the right thing and no
@@ -372,28 +372,27 @@ from harness_maker.spec_machine import (  # noqa: E402
 _P2S_YAML = (
     Path(__file__).parents[2] / "specs/SPEC-mutation-survivors-and-approval-p2s.machine.yaml"
 )
-_SLUG_ROWS = load_golden_table(_P2S_YAML, "AC-007")
-_DIR_ROWS = load_golden_table(_P2S_YAML, "AC-008")
-_CAP_ROWS = load_golden_table(_P2S_YAML, "AC-010")
+_SLUG_ROWS = load_golden_table(_P2S_YAML, "AC-008")
+_DIR_ROWS = load_golden_table(_P2S_YAML, "AC-009")
 
 
 @pytest.mark.parametrize("row", _SLUG_ROWS, ids=[r.note for r in _SLUG_ROWS])
-def test_ac_007_a_slug_that_is_not_a_plain_name_is_rejected(row: Any) -> None:
+def test_ac_008_a_slug_that_is_not_a_plain_name_is_rejected(row: Any) -> None:
     """Each row is a path-traversal shape the predicate exists to refuse."""
     assert _is_plain_slug(row.input["slug"]) is row.expected
 
 
 @pytest.mark.parametrize("row", _DIR_ROWS, ids=[r.note for r in _DIR_ROWS])
-def test_ac_008_the_configured_spec_dir_is_normalised(row: Any, tmp_path: Path) -> None:
+def test_ac_009_the_configured_spec_dir_is_normalised(row: Any, tmp_path: Path) -> None:
     """Absent, empty, whitespace, absolute, parent-escaping and dot-relative each resolve."""
     (tmp_path / ".claude").mkdir()
-    value = row.input["dir"]
+    value = row.input["value"]
     if value is not None:
         (tmp_path / ".claude" / "harness.yaml").write_text(f"spec:\n  dir: {value!r}\n")
     assert _spec_dir(tmp_path) == row.expected
 
 
-def test_ac_009_an_md_file_counts_only_inside_a_configured_spec_dir(tmp_path: Path) -> None:
+def test_ac_010_an_md_file_counts_only_inside_a_configured_spec_dir(tmp_path: Path) -> None:
     """A changed `SPEC-<slug>.md` outside the configured dirs is documentation, not a unit."""
     root = tmp_path / "repo"
     root.mkdir()
@@ -414,11 +413,13 @@ def test_ac_009_an_md_file_counts_only_inside_a_configured_spec_dir(tmp_path: Pa
     assert units == [(_SLUG, "specs")]
 
 
-@pytest.mark.parametrize("row", _CAP_ROWS, ids=[r.note for r in _CAP_ROWS])
-def test_ac_010_the_subject_hash_refuses_an_oversized_subject(
-    row: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "case", ["per_file_size", "total_bytes", "file_count", "unreadable", "empty_subject"]
+)
+def test_ac_011_the_subject_hash_refuses_an_oversized_subject(
+    case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The three cap rows bind the COMPARISON, not the shipped literal.
+    """AC-011 checks each cap boundary; unreadable and empty inputs retain coverage.
 
     Writing 200 MB or 5000 inodes in a unit test buys nothing: the surviving mutants were
     `>` vs `>=` on these lines, so each cap row is run twice against a patched cap — once at
@@ -426,7 +427,6 @@ def test_ac_010_the_subject_hash_refuses_an_oversized_subject(
     only patched the constant and wrote one oversized file would pass against the mutated
     comparison, which is the shape this AC exists to kill.
     """
-    case = row.input["case"]
     (tmp_path / "s").mkdir()
 
     if case == "per_file_size":
@@ -466,4 +466,4 @@ def test_ac_010_the_subject_hash_refuses_an_oversized_subject(
         with pytest.raises(SubjectHashError):
             compute_subject_hash(["s/"], tmp_path)
     else:  # pragma: no cover - a new row with no arm is a test gap, not a pass
-        pytest.fail(f"unhandled golden row: {case}")
+        pytest.fail(f"unhandled subject case: {case}")
