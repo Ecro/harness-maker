@@ -85,12 +85,14 @@ def test_ac_007_dispatch_is_conditional(rendered: Path) -> None:
     out of, which is the risk RESEARCH Follow-up 3(a) named when it recommended the relocation.
     """
     text = _spec_stage(rendered)
-    window = text[text.index("spec-validator") - 3000 : text.index("spec-validator") + 1500]
-    assert "irreversible" in window.lower(), (
-        "the dispatch does not state its trigger condition; an unconditional critic is the "
-        "0-APPROVED-in-54 shape being relocated rather than fixed"
+    trigger = text.split("**Trigger.**", 1)[1].split("**One pass.", 1)[0]
+    trigger = " ".join(trigger.split())
+    assert "Dispatch ONLY when" in trigger
+    assert "non-empty `irreversible_decisions`" in trigger
+    assert "Step 0's skip heuristic did not fire" in trigger
+    assert (
+        "A Step-0 skip-path SPEC with `irreversible_decisions: []` is **not** dispatched" in trigger
     )
-    assert "skip" in window.lower(), "the Step 0 skip path is not named as a non-trigger"
 
 
 def test_ac_008_every_dispatch_emits_a_ledger_row(rendered: Path) -> None:
@@ -109,10 +111,16 @@ def test_ac_009_spec_frontmatter_declares_interview_rounds(rendered: Path) -> No
     afterwards whether the merge actually reduced rounds.
     """
     text = _spec_stage(rendered)
-    assert "interview_rounds" in text, (
-        "the rendered spec stage never names `interview_rounds`, so the merged interview's "
-        "round count is not recorded anywhere and the reduction cannot be measured"
+    frontmatter = next(
+        block
+        for block in re.findall(r"```yaml\n(.*?)```", text, re.DOTALL)
+        if re.search(r"^type: spec$", block, re.MULTILINE)
     )
+    assert re.search(
+        r"^interview_rounds: \{N\}\s+# rounds this interview took; 0 when Step 0 skipped it$",
+        frontmatter,
+        re.MULTILINE,
+    ), "SPEC frontmatter must record the round count, including zero on the skip path"
 
 
 def test_ac_007_approval_cannot_read_the_verdict(rendered: Path) -> None:

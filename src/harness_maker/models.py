@@ -557,6 +557,19 @@ class SecondOpinionConfig(BaseModel):
         default_factory=SecondOpinionAntigravityConfig
     )
 
+    @field_validator("agents")
+    @classmethod
+    def _migrate_retired_validator(cls, agents: list[str]) -> list[str]:
+        """Carry the selected critic across retirement without widening opt-outs."""
+        if "plan-validator" not in agents:
+            return agents
+        migrated: list[str] = []
+        for agent in agents:
+            replacement = "spec-validator" if agent == "plan-validator" else agent
+            if replacement != "spec-validator" or replacement not in migrated:
+                migrated.append(replacement)
+        return migrated
+
     @field_validator("models")
     @classmethod
     def _dedupe_models(cls, v: list[str]) -> list[str]:

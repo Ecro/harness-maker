@@ -29,18 +29,19 @@ from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
 
-def _execute(tmp_path: Path, dev_mode: DevMode) -> str:
+def _execute(tmp_path: Path, dev_mode: DevMode, target: Target = Target.CLAUDE_CODE) -> str:
     """Render a full harness and return the execute stage command body."""
     bp = synthesize(
         ProjectProfile(),
         InterviewAnswers(
             preset=Preset.PRODUCTION,
-            targets=[Target.CLAUDE_CODE],
+            targets=[target],
             dev_mode=dev_mode,
         ),
     )
-    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    files = list(tmp_path.rglob("commands/hm/execute.md"))
+    render(bp, tmp_path / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
+    pattern = "hm-execute/SKILL.md" if target == Target.CODEX else "commands/hm/execute.md"
+    files = list(tmp_path.rglob(pattern))
     assert files, "execute.md command file not found in rendered output"
     return files[0].read_text(encoding="utf-8")
 
@@ -109,15 +110,25 @@ def test_spec_driven_writes_through_the_preserving_verb(spec_driven: str) -> Non
 
 def test_spec_driven_asserts_the_key_is_present_after_the_write(spec_driven: str) -> None:
     """The absent case is the whole failure mode — Check 6 reads an absent key as PASS."""
-    assert "spec_need_verdict" in spec_driven
-    lowered = spec_driven.lower()
-    assert "absent" in lowered, (
-        "Step 0.1 never names the absent case, which is the one /hm:verify Check 6 reads as PASS"
-    )
-    assert "retry" in lowered, (
-        "Step 0.1 does not tell the reader to retry once; a write that silently did nothing "
-        "turns /hm:verify Check 6 permanently green"
-    )
+    after_write = spec_driven.split("spec_need frontmatter-upsert", 1)[1]
+    guard = " ".join(after_write.split("#### Step 0.2", 1)[0].lower().split())
+    readback = guard.index("read the frontmatter back")
+    absent = guard.index("if `spec_need_verdict` is absent", readback)
+    retry = guard.index("retry the call once", absent)
+    terminal = guard.index("if it is still absent", retry)
+    assert "surface the path and the error and stop" in guard[terminal:]
+
+
+@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CODEX])
+def test_execute_inputs_allow_step_zero_to_author_missing_plan(
+    tmp_path: Path, target: Target
+) -> None:
+    text = _execute(tmp_path, DevMode.SPEC_DRIVEN, target)
+    inputs = text.split("## Inputs", 1)[1].split("## Session Context Loading", 1)[0]
+    plan_input = next(line for line in inputs.splitlines() if "PLAN-{slug}.md" in line)
+    assert "reuse" in plan_input
+    assert "Step 0 creates it if absent" in plan_input
+    assert "error if missing" not in plan_input
 
 
 # ── (c) the gate is gone, and that is asserted, not assumed ──────────────────

@@ -207,7 +207,8 @@ positives against the tree BEFORE building the gate, and drop it if the ratio re
 ---
 
 ## Proposal: a whole-file substring assertion may not stand in for a per-item claim (2026-08-08)
-**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 14 as of 2026-08-19.
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 18 as of 2026-09-21).
+Latest repair: post-write guard deletion, unconditional dispatch, and nonnumeric round-count mutants all passed broad keyword checks. Scope prose contracts to their owning block and require a failing forbidden-form mutation. Existing mechanism and historical evidence follow (count: 14 as of 2026-08-19.
 Instance 14 (ai-work-boundaries) is the **negative-over-prose** direction, which is invariant in
 BOTH directions at once and so is not covered by any "can this assertion fail in the broken world"
 phrasing that assumes a single failing case exists: a gate asserted a token list is ABSENT from a

@@ -98,6 +98,11 @@ sign in with the Claude CLI. Optional `second_opinion.claude.model` and
 `timeout` control the call. The shared invoker runs Claude in safe-mode
 without tools or session persistence, using an isolated directory and stdin context.
 Validated findings and invocation outcomes follow the existing review ledger path.
+After PLAN-stage retirement, existing `second_opinion.agents` entries naming
+`plan-validator` migrate to `spec-validator` when configuration is loaded. Custom
+agents and explicit empty allowlists are preserved. The generated validator lists
+the enabled providers, including Claude when configured, so an upgraded allowlist
+continues to select the reconciliation instructions.
 See [SPEC-codex-claude-integration](../specs/SPEC-codex-claude-integration.md) for
 acceptance criteria and the live integration boundary.
 
@@ -439,6 +444,10 @@ PLAN: 9.70 interview rounds per task (SPEC 4.65 + PLAN 5.05) became an estimated
 about 11 % in the same change.
 
 ### 3.4 /hm:execute — TDD Implementation
+
+An existing PLAN is optional on entry: execute Step 0 creates it when absent.
+The SPEC-need frontmatter write preserves an existing decision under a lock that
+covers the full read-modify-write cycle, including concurrent non-isolated runs.
 
 **Purpose**: Implement each PLAN stage using TDD. The 4-step cycle of writing tests first, verifying test quality, implementing, then validating is repeated for each PLAN stage.
 

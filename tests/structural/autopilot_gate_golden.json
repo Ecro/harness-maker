@@ -2,7 +2,7 @@
   "arms": {
     "ask@flag_off": {
       "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
-      "execute": "f493afbc473e3597bce86e0d6ad9ef31052ba4f9621d91754e31a7a688e4cd40",
+      "execute": "c1e8329d6cb1e6e82f4230c64534608702951338be88736fb1161d3391a1d578",
       "health": "0c439915f82c5779445201c41b493ab26e97ecacf1091fefbe2be0dd9c210194",
       "help": "39428efdf44e3f598ba8604e691ffa231989d60981072e169f383318c79c761a",
       "loop": "d662d5864eeeb374b0d486bb0a8cb88dfacea60f92f4dbad6d6afcc3f577a404",
@@ -18,7 +18,7 @@
     },
     "ask@flag_on": {
       "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
-      "execute": "8bb9f175659b2b7f1f7cc5c0314d2e912381dfc12b7d413e3ad3247c6e2d9b43",
+      "execute": "d4ef2be3adcfbcf2e44bb2739bf2ec4de5c3fa46232e30c67148faab97f03945",
       "health": "0c439915f82c5779445201c41b493ab26e97ecacf1091fefbe2be0dd9c210194",
       "help": "39428efdf44e3f598ba8604e691ffa231989d60981072e169f383318c79c761a",
       "loop": "a8f44bbffb41a839edeb052b7f8547b7106f5d6631aa155a566f30f86fc31890",
@@ -34,7 +34,7 @@
     },
     "auto_safe@spec-driven": {
       "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
-      "execute": "d1c0554d26287f9d787b4145064895f0f0590515dc19a08e01b255ec09cbd892",
+      "execute": "01d1d9191514d62522004437d2c7fca155d6b897c3c3781a60c1669af02c3db4",
       "health": "564609a25b9071d8c79bce1d5102727922f6434953b3aa6ce4455a2ae3153ca9",
       "help": "62a59c34a71450bbd0de578c098e9cd59797c2de2e3e4fa884794901096408c8",
       "loop": "4b71d6fe6c7b9f0cee5d6afe9e57d0ba0b8e9289d8abf4d936f582b4fcc22caa",
@@ -50,7 +50,7 @@
     },
     "auto_safe@task-driven": {
       "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
-      "execute": "9593fa659f61965e31a9cab6cb97cc43737f8048d64980ec7135237124ccbeb4",
+      "execute": "981125171a684e783b1b028534ff3440af02d98625141bc638d7bf0ba095662e",
       "health": "564609a25b9071d8c79bce1d5102727922f6434953b3aa6ce4455a2ae3153ca9",
       "help": "62a59c34a71450bbd0de578c098e9cd59797c2de2e3e4fa884794901096408c8",
       "loop": "4b71d6fe6c7b9f0cee5d6afe9e57d0ba0b8e9289d8abf4d936f582b4fcc22caa",

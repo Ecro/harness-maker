@@ -27,6 +27,11 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-21, `codex-plan-integration-repair`** — only `execute` moved in all four
+  arms; command sets are unchanged. Inputs now reuse a PLAN or let Step 0 create it,
+  fixing the contradictory missing-PLAN error after plan-stage retirement. Autonomy
+  gating is unchanged. Verified each arm's moved set before re-capturing.
+
 - **2026-09-20, rebase of `plan-stage-absorption` onto `main` (fifth re-capture)** — `wrapup`
   moved in all four arms, identically in `auto_safe` and `ask`. Command set unchanged. **Not this
   task's movement**: `697036be fix(intent): the withdrawal criterion counts a quiet window` edits

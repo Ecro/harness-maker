@@ -22,7 +22,9 @@ actually preserving. SPEC AC-002, IRR-004.
 from __future__ import annotations
 
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event, local
 
 import pytest
 from hypothesis import given
@@ -219,3 +221,72 @@ def test_ac_002_root_is_required_at_the_cli_too() -> None:
                 ["frontmatter-upsert", "--plan", str(plan), "--verdict", "add", "--target", "p"]
             )
         assert argparse  # the failure above is argparse's, i.e. the argument is required
+
+
+def test_concurrent_upserts_preserve_the_first_decision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Force a competing caller into the first caller's read/write window."""
+    fcntl = pytest.importorskip("fcntl")
+    plan = _write_plan(tmp_path, {"type": "plan"})
+    alias = tmp_path / "PLAN-alias.md"
+    alias.symlink_to(plan)
+    first_read = Event()
+    second_attempted = Event()
+    first_done = Event()
+    caller = local()
+    read_fence = spec_need._read_fence
+    flock = fcntl.flock
+
+    def synchronized_read(path: Path) -> tuple[list[str], int, dict[str, str]]:
+        snapshot = read_fence(path)
+        if caller.second:
+            # Without the lock, return a stale snapshot only AFTER the first write.
+            second_attempted.set()
+            assert first_done.wait(5), "first caller did not finish"
+        elif not first_read.is_set():
+            first_read.set()
+            assert second_attempted.wait(5), "second caller never reached read or lock"
+        return snapshot
+
+    def observed_flock(fd: int, operation: int) -> None:
+        try:
+            flock(fd, operation)
+        except BlockingIOError:
+            if caller.second:
+                second_attempted.set()
+            raise
+
+    def call(second: bool) -> dict[str, str | bool | None]:
+        caller.second = second
+        try:
+            return spec_need.frontmatter_upsert(
+                alias if second else plan,
+                "delete" if second else "add",
+                "second" if second else "first",
+                root=tmp_path,
+            )
+        finally:
+            if not second:
+                first_done.set()
+
+    monkeypatch.setattr(spec_need, "_read_fence", synchronized_read)
+    monkeypatch.setattr(fcntl, "flock", observed_flock)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(call, False)
+        assert first_read.wait(5), "first caller never read the PLAN"
+        second = executor.submit(call, True)
+        first_result = first.result(timeout=10)
+        second_result = second.result(timeout=10)
+
+    assert first_result["wrote"] is True
+    assert second_result["wrote"] is False
+    assert second_result["preserved_verdict"] is True
+    for result in (first_result, second_result):
+        assert result["spec_need_verdict"] == "add"
+        assert result["spec_need_target"] == "first"
+    assert _frontmatter(plan.read_text(encoding="utf-8")) == {
+        "type": "plan",
+        "spec_need_verdict": "add",
+        "spec_need_target": "first",
+    }

@@ -42,6 +42,14 @@
 
 ### Fixed
 
+- **Preserve Codex/Claude integration after PLAN-stage retirement.** Legacy
+  `second_opinion.agents` entries for `plan-validator` migrate to `spec-validator`
+  through the shared configuration model, preserving custom agents and opt-outs.
+  The validator declares the configured providers, including Claude, and the English
+  README again documents native Codex install/update entrypoints. Execute accepts
+  an absent PLAN for Step 0 to create; concurrent SPEC-decision writes now lock the
+  entire read-modify-write operation so the first recorded decision survives.
+
 - **A mutant that breaks the module at import time is no longer counted as surviving.**
   `mutmut.tests_pass` is `return returncode != 1`, so every exit status except 1 reads as
   "the tests passed": pytest exits 2 on a collection error and pytest-xdist exits 2 when

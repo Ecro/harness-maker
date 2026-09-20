@@ -144,7 +144,7 @@ yourself (you have no Bash) — you **reconcile** the pre-injected findings.
 model is enabled your returned object **MUST** carry one **additional top-level** key alongside
 `overall_assessment`, `critiques`, and `clean_categories` (NOT nested inside `critiques`):
 - `second_opinion_results`: an array with **exactly one entry per enabled model**, each:
-  `{ "model": "codex" | "antigravity", "status": "invoked" | "skipped" | "failed", "reconciliation": [ { "finding_ref": "...", "disposition": "accepted" | "rejected" | "duplicate" | "unresolved", "reason": "..." }, ... ] }`.
+  `{ "model": {{ _so.get('models') | map('tojson') | join(' | ') }}, "status": "invoked" | "skipped" | "failed", "reconciliation": [ { "finding_ref": "...", "disposition": "accepted" | "rejected" | "duplicate" | "unresolved", "reason": "..." }, ... ] }`.
   A model's `reconciliation` is `[]` when its `status` is `"skipped"` or `"failed"`.
 
 **Anti-boilerplate floor** — every reconciliation entry's `finding_ref` MUST cite the specific

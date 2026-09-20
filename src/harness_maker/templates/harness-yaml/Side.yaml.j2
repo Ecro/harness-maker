@@ -114,7 +114,7 @@ feedback:
   enabled: {{ (config.feedback.enabled if config.feedback else false) | string | lower }}
 second_opinion:
   models: {{ (config.second_opinion.models if config.second_opinion else []) | tojson }}
-  agents: {{ (config.second_opinion.agents if config.second_opinion else ['code-reviewer', 'consensus-arbiter', 'plan-validator']) | tojson }}
+  agents: {{ (config.second_opinion.agents if config.second_opinion else ['code-reviewer', 'consensus-arbiter', 'spec-validator']) | tojson }}
   failure_policy: {{ (config.second_opinion.failure_policy if config.second_opinion else "warn-and-proceed") | tojson }}
   codex:
     hermetic: {{ (config.second_opinion.codex.hermetic if config.second_opinion else true) | string | lower }}

@@ -40,7 +40,7 @@ Parse from the user's natural-language input:
 
 ## Inputs
 
-- `{{ config.work_docs.dir }}PLAN-{slug}.md` (required — error if missing).
+- `{{ config.work_docs.dir }}PLAN-{slug}.md` (reuse; Step 0 creates it if absent).
 - From PLAN frontmatter:
   - `spec: "[[SPEC-{slug}]]"` → resolves to `{{ config.spec.dir }}SPEC-{slug}.md`.
   - `research_doc: "[[RESEARCH-{slug}]]"` → resolves to `{{ config.work_docs.dir }}RESEARCH-{slug}.md`.

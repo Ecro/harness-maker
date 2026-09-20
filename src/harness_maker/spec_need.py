@@ -20,6 +20,7 @@ unreachable at runtime — surfaced instead by the ``plan_verify_dev_mode_match`
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import re as _re
@@ -32,7 +33,7 @@ from typing import Any, Literal
 import yaml
 
 from harness_maker import command_registry
-from harness_maker.io_utils import atomic_append, atomic_write, load_harness_yaml
+from harness_maker.io_utils import atomic_append, atomic_write, load_harness_yaml, rmw_lock
 
 logger = logging.getLogger(__name__)
 
@@ -365,50 +366,52 @@ def frontmatter_upsert(
     * verdict absent   → there is no recorded decision, so write BOTH fresh, replacing a stray
       target line. A target with no verdict beside it is not a decision to protect.
 
-    **Concurrency.** Two sessions can reach this for one slug. The fence is re-read immediately
-    before the splice and the result is read BACK off disk, so a peer that won the race is
-    reported as a preserved value rather than silently overwritten. The residual window — a peer
-    replacing the file between the re-read and `os.replace` — cannot corrupt the file (the
-    replace is atomic) and cannot lie about it either: the returned values come from the
-    post-write read, not from this call's intent.
+    **Concurrency.** A stable lock keyed by the resolved PLAN path covers the entire
+    read/splice/write/readback transaction. Cooperating sessions therefore preserve the
+    first recorded decision, including callers using different aliases for the same PLAN.
+    Atomic replacement alone prevents torn files, but cannot prevent lost decisions.
+    Lock availability and timeout behavior follow `io_utils.rmw_lock`.
     """
     if verdict not in _VALID_VERDICTS:
         raise ValueError(f"invalid verdict: {verdict!r} (expected one of {_VALID_VERDICTS})")
     _validate_slug(target)
     plan_path = _confined_plan_path(plan_path, root)
 
-    wanted = {"spec_need_verdict": verdict, "spec_need_target": target}
-    # Re-read here rather than reusing an earlier snapshot: everything below decides what to
-    # splice, so a stale view is exactly how a peer's key gets dropped.
-    lines, close, existing = _read_fence(plan_path)
+    plan_key = hashlib.sha256(str(plan_path).encode("utf-8")).hexdigest()
+    lock_path = root.resolve() / ".claude" / "observability" / f"spec-need-{plan_key}.lock"
+    with rmw_lock(lock_path):
+        wanted = {"spec_need_verdict": verdict, "spec_need_target": target}
+        lines, close, existing = _read_fence(plan_path)
 
-    if "spec_need_verdict" in existing:
-        additions = [f"spec_need_target: {target}\n"] if "spec_need_target" not in existing else []
-        kept = list(lines)
-    else:
-        # No decision on disk. Write the pair together and drop any orphan target line, so the
-        # two values that Check 6 reads as one pair always come from one judgment.
-        kept = [
-            line
-            for i, line in enumerate(lines)
-            if not (1 <= i < close and line.startswith("spec_need_target:"))
-        ]
-        close -= len(lines) - len(kept)
-        additions = [f"{k}: {wanted[k]}\n" for k in _SPEC_NEED_KEYS]
+        if "spec_need_verdict" in existing:
+            additions = (
+                [f"spec_need_target: {target}\n"] if "spec_need_target" not in existing else []
+            )
+            kept = list(lines)
+        else:
+            # No decision on disk. Write the pair together and drop any orphan target line, so the
+            # two values that Check 6 reads as one pair always come from one judgment.
+            kept = [
+                line
+                for i, line in enumerate(lines)
+                if not (1 <= i < close and line.startswith("spec_need_target:"))
+            ]
+            close -= len(lines) - len(kept)
+            additions = [f"{k}: {wanted[k]}\n" for k in _SPEC_NEED_KEYS]
 
-    if additions:
-        kept[close:close] = additions
-        atomic_write(plan_path, "".join(kept))
+        if additions:
+            kept[close:close] = additions
+            atomic_write(plan_path, "".join(kept))
 
-    _, _, on_disk = _read_fence(plan_path)
-    return {
-        "spec_need_verdict": on_disk.get("spec_need_verdict"),
-        "spec_need_target": on_disk.get("spec_need_target"),
-        "preserved_verdict": "spec_need_verdict" in existing,
-        "preserved_target": "spec_need_verdict" in existing and "spec_need_target" in existing,
-        "repaired": "spec_need_verdict" in existing and "spec_need_target" not in existing,
-        "wrote": bool(additions),
-    }
+        _, _, on_disk = _read_fence(plan_path)
+        return {
+            "spec_need_verdict": on_disk.get("spec_need_verdict"),
+            "spec_need_target": on_disk.get("spec_need_target"),
+            "preserved_verdict": "spec_need_verdict" in existing,
+            "preserved_target": "spec_need_verdict" in existing and "spec_need_target" in existing,
+            "repaired": "spec_need_verdict" in existing and "spec_need_target" not in existing,
+            "wrote": bool(additions),
+        }
 
 
 def marker_path(root: Path, slug: str) -> Path:

@@ -17,6 +17,19 @@ fresh working directory, safe-mode, empty tools, stdin context and bounded strea
 It validates one terminal result, maps findings into the shared ledger contract,
 and cleans up the owned process group on success, failure or cancellation.
 
+### Integration compatibility repair (2026-09-21)
+
+`SecondOpinionConfig` migrates the exact retired `plan-validator` agent name to
+`spec-validator` before either YAML reader feeds synthesis and rendering. It
+collapses replacement-name collisions while retaining custom names, their order
+and explicit empty allowlists. The validator prompt derives its provider list
+from the enabled configuration, including Claude.
+
+Execute can begin without a PLAN: Step 0 creates the document. The
+`spec_need frontmatter-upsert` operation holds the existing read-modify-write
+lock from reading through replacement, preserving the first SPEC decision even
+when non-isolated sessions write concurrently.
+
 ## 0. Loop Configuration
 
 ```json

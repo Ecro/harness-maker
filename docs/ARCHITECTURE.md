@@ -29,6 +29,17 @@ through safe-mode and an isolated working directory. It bounds the deadline and
 stream sizes and returns fixed failure codes without exposing stderr contents.
 Historical stage identities and existing providers remain supported.
 
+The shared `SecondOpinionConfig` boundary migrates the retired
+`plan-validator` allowlist identity to `spec-validator` for direct configuration
+loads and both YAML readers. Synthesis and rendering therefore see the same
+identity; the validator prompt lists configured providers instead of a separate
+hardcoded subset. Explicit opt-outs and custom agent names remain intact.
+
+SPEC-decision frontmatter writes hold the existing read-modify-write lock across
+read, presence checks and atomic replacement. This makes the first recorded
+decision survive concurrent non-isolated writers, rather than protecting only
+the final replacement.
+
 ## 2. Data Flow
 
 ```
