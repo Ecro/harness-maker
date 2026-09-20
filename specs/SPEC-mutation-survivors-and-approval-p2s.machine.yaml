@@ -1,0 +1,464 @@
+schema_version: 3
+spec_slug: mutation-survivors-and-approval-p2s
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: 'Tier-1: the digest map is what a hold message names
+  a field from, so a surviving mutant there makes the gate accuse the wrong field
+  — worse than the silence it replaces. The module is small and its runner is scoped,
+  so the gate finishes inside its 600s cap instead of reporting truncated.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/spec_field_digest.py
+mutation_runner: python -m harness_maker.mutation_runner python -m pytest -x -q -p
+  no:cacheprovider tests/unit/test_spec_field_digest.py tests/unit/test_spec_approval.py
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: every hashed field has its own digest, and only those
+  type: property
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: Metamorphic pair against the SHIPPED hash - for each field, mutating
+    it must move both the content hash and that field's digest; for each deny-listed
+    field, neither. The relation is stated over the hash's observed behaviour, not
+    over the digest implementation, so a digest built from a second payload builder
+    fails it.
+  oracle_independence_waiver: null
+  input_domain: machine SPECs built from the repo's own specs/ plus generated variants
+    with unknown extra keys at both the top level and inside an acceptance criterion
+  transformation: mutate exactly one field, then recompute the content hash and the
+    digest map
+  expected_relation: 'for a hashed field f: hash changes AND digests[f] changes AND
+    every other digest is unchanged; for a deny-listed field: hash unchanged AND digest
+    map unchanged; and set(digests) equals the set of fields the hash covers'
+  preconditions:
+  - the SPEC loads and validates before the mutation
+  observable_output: the content hash string and the digest mapping
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: an excluded field moves neither the digest map nor the hash
+  type: property
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: The deny-list is the pre-existing contract this SPEC must not change;
+    the invariant is quantified over every excluded field rather than a sampled one,
+    so adding an exclusion without extending the view fails without anyone remembering
+    to update a list.
+  oracle_independence_waiver: null
+  input_domain: every field name on the approval deny-list, including the per-AC tooling
+    fields and the approval block itself
+  transformation: edit that field to a different valid value and recompute both views
+  expected_relation: content hash is byte-identical AND the digest map is byte-identical
+  preconditions: []
+  observable_output: the content hash string and the digest mapping
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: a hold names the edited field
+  type: mechanical
+  test_ids: []
+  executable_predicate: changed_fields(approval_state(base, slug).detail) == ['ac[1].expected']
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The expected field path is chosen by the test's own edit - the
+    test writes ac[1].expected and nothing else, so the expected value comes from
+    the fixture's construction rather than from reading what the implementation reports.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: a stamp without digests is still approved
+  type: mechanical
+  test_ids: []
+  executable_predicate: approval_state(base, legacy_slug).state == 'approved'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference is the SHIPPED behaviour at commit 865e3ef5 - the
+    fixture is a stamp this repo's own approve wrote before the digest map existed,
+    and the expected states are the ones that commit's approval_state returns for
+    it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: two processes writing the same SPEC lose nothing
+  type: property
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: A lost-update invariant holds for every interleaving, so it needs
+    no reference run - the final file must contain both writers' effects whatever
+    the order. Reading the implementation cannot satisfy it; only serialising the
+    read-modify-write can.
+  oracle_independence_waiver: null
+  input_domain: two concurrent OS processes, one running approve and one running mark-tested
+    against the same machine SPEC, started within the same scheduling window
+  transformation: run both to completion and reload the file from disk
+  expected_relation: the reloaded SPEC carries the approval stamp AND the recorded
+    test id, and any process that exited zero has its effect present
+  preconditions:
+  - both processes target the same absolute path
+  - the SPEC validates before the run
+  observable_output: the machine SPEC on disk after both processes exit
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: the lock file is git-ignored
+  type: mechanical
+  test_ids: []
+  executable_predicate: is_ignored(repo, lock_path_for(yaml_path)) and porcelain_entries(repo,
+    lock_path_for(yaml_path)) == []
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: git itself is the oracle - check-ignore and status --porcelain
+    are asked about the real path in a real repository, so the answer comes from the
+    tool that decides it rather than from a rule the test restates.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: a malformed SPEC reports the validation error
+  type: mechanical
+  test_ids: []
+  executable_predicate: '"irreversible_decisions" in approval_state(base, slug).detail
+    and len(approval_state(base, slug).detail) <= 200'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The fixture omits a required key the test names, so the substring
+    expected in the detail is fixed by the fixture's construction; the cap is a declared
+    constant, not a measurement of current output.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: the slug rejection table
+  type: parametric
+  test_ids: []
+  executable_predicate: null
+  golden_table:
+  - input:
+      slug: demo-slug
+    expected: true
+    edge: false
+    note: a plain name is accepted
+  - input:
+      slug: ''
+    expected: false
+    edge: true
+    note: empty
+  - input:
+      slug: .
+    expected: false
+    edge: true
+    note: current directory
+  - input:
+      slug: ..
+    expected: false
+    edge: true
+    note: parent directory
+  - input:
+      slug: a/b
+    expected: false
+    edge: true
+    note: forward slash
+  - input:
+      slug: a\b
+    expected: false
+    edge: true
+    note: backslash - the clause the mutation run found unasserted
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Each row's expected value follows from the documented rule that
+    a slug is a plain file-name component; the rows were chosen from the surviving
+    mutants' clauses, so each row kills a specific deletion rather than restating
+    the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: the spec.dir normalisation table
+  type: parametric
+  test_ids: []
+  executable_predicate: null
+  golden_table:
+  - input:
+      value: null
+    expected: specs/
+    edge: false
+    note: key absent
+  - input:
+      value: ''
+    expected: specs/
+    edge: true
+    note: empty string
+  - input:
+      value: '   '
+    expected: specs/
+    edge: true
+    note: whitespace only - the strip() the mutation run found unasserted
+  - input:
+      value: /abs/specs
+    expected: specs/
+    edge: true
+    note: absolute paths are refused
+  - input:
+      value: ../outside
+    expected: specs/
+    edge: true
+    note: parent escape is refused
+  - input:
+      value: specs
+    expected: specs/
+    edge: false
+    note: a bare name gains the trailing slash
+  - input:
+      value: ./specs/
+    expected: specs/
+    edge: true
+    note: dot-slash normalises
+  - input:
+      value: docs/specs/
+    expected: docs/specs/
+    edge: false
+    note: a nested dir is preserved
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Expected values come from the documented contract - refuse absolute
+    and escaping paths, otherwise normalise with one trailing slash - and the refused
+    rows are security-relevant, so their expectation is fixed independently of what
+    the code returns.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: an md file counts only inside a configured spec dir
+  type: mechanical
+  test_ids: []
+  executable_predicate: changed_spec_units(base, checkout) == [('demo', 'specs')]
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The fixture places one SPEC md inside the configured dir and an
+    identically named one at the repo root; the expected single unit follows from
+    which file the land decision is allowed to see, decided by the fixture rather
+    than by the function.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: the subject-hash caps hold at the boundary
+  type: mechanical
+  test_ids: []
+  executable_predicate: compute_subject_hash(paths_at_cap) is not None and raises(SubjectHashError,
+    compute_subject_hash, paths_over_cap)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: The at-limit and over-limit pair is what separates > from >=; the
+    expected outcomes follow from the cap constants themselves, so neither side can
+    be satisfied by an off-by-one implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: a hold line with no irreversible ids prints the placeholder
+  type: mechanical
+  test_ids: []
+  executable_predicate: hold_lines(states_without_ids)[0].split()[1] == '-'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The placeholder is a declared output contract for the empty case;
+    the test builds a held state with an empty list, so the expectation comes from
+    the contract rather than from running the current renderer.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-013
+  title: approve without a git identity fails and writes nothing
+  type: mechanical
+  test_ids: []
+  executable_predicate: raises(ApprovalError, approve, yaml_path) and read_bytes(yaml_path)
+    == before_bytes
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The expected bytes are captured before the call, so the no-write
+    assertion compares against the file's own prior content and cannot be satisfied
+    by a partial write that merely looks plausible.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: The approval stamp gains a per-field digest map alongside its content
+    hash.
+  category: schema/file format/storage layout
+  rationale: Every consumer of the stamp — approval-status, the land hold, any later
+    reader — sees the new key. Once stamps carrying it exist across repos, removing
+    it strips their diagnostic and breaks any reader keyed on it.
+  source: spec
+- id: IRR-002
+  decision: A stamp written without the digest map stays valid; its hold falls back
+    to the pre-change wording.
+  category: data migration
+  rationale: This decides whether existing approvals survive the upgrade. Reversing
+    it later forces every project holding an approved SPEC to re-stamp before it can
+    land.
+  source: spec
+- id: IRR-003
+  decision: 'The lock key rule: one lock file per guarded file, under a gitignored
+    directory.'
+  category: public API/CLI contract
+  rationale: Mutual exclusion holds only while every writer derives the same key.
+    A later writer that derives a different path gets no exclusion and no error —
+    the failure is silent by construction.
+  source: spec
+approval:
+  kind: human
+  content_hash: c05b5bd55183f7736b1bd6b1242802dfe5b896196edfb8bf58f1303ad4cca6f7
+  approved_by: Ecro
+  approved_at: '2026-09-20T04:26:12Z'

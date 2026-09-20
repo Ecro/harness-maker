@@ -2,15 +2,73 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import tempfile
+import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+class LockTimeoutError(RuntimeError):
+    """`rmw_lock` waited out its budget. Callers translate it into their own error type."""
+
+
+#: ENOSYS / EOPNOTSUPP — the filesystem cannot lock at all. Proceeding unlocked is the
+#: policy `world._rmw_lock` shipped with, kept verbatim so both callers behave alike.
+_UNLOCKABLE_ERRNOS = (38, 95)
+
+_DEFAULT_LOCK_TIMEOUT_S = 30.0
+
+
+@contextlib.contextmanager
+def rmw_lock(lock_path: Path, *, timeout: float = _DEFAULT_LOCK_TIMEOUT_S) -> Iterator[None]:
+    """Serialize a read-modify-write of one file across processes.
+
+    `atomic_write` makes the final replace atomic, not the read-append-write around it: two
+    writers that both load, mutate and rewrite the same document lose one update, whatever
+    the replace does. Extracted from `world._rmw_lock` (PLAN-mutation-survivors ADR-002) so
+    the intent layer and the machine-SPEC writers share one policy rather than two copies.
+
+    **The caller passes `lock_path`** — this helper never derives it from the guarded file.
+    The original derived `path.parent.parent / "observability"`, which is right for
+    `.claude/intent.yaml` and wrong for `specs/SPEC-x.machine.yaml`: the same expression puts
+    the lock at `<repo>/observability/`, outside the gitignored churn set.
+    """
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover - non-POSIX
+        yield
+        return
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    # `O_NOFOLLOW` for parity with `append_atomic_line` below, which added it because a
+    # symlink planted at the ledger path turns every write into a write to its target. This
+    # lock guards the same directory class; nothing is ever written through this fd, so the
+    # worst case here is an advisory lock taken on someone else's file rather than corruption
+    # — still not a thing to leave to chance when one flag closes it.
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as exc:
+                if exc.errno in _UNLOCKABLE_ERRNOS:
+                    break  # unlockable filesystem: proceed, as the original did
+                if time.monotonic() >= deadline:
+                    raise LockTimeoutError(f"{lock_path.name} is held by another writer") from exc
+                time.sleep(0.05)
+        yield
+    finally:
+        os.close(fd)
+
 
 # Top-level `harness.yaml` keys this project used to emit and has since RETIRED.
 #

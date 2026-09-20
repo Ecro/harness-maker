@@ -4,6 +4,21 @@
 
 ### Fixed
 
+- **The approval stamp names which field moved, not just that the hash mismatched.**
+  `spec_machine`'s approval stamp now carries a per-field digest map alongside the aggregate
+  content hash, so a hold reports the one field that changed instead of an undifferentiated
+  hash mismatch. The digest map lives inside the stamp, which the existing hash deny-list
+  already excludes, so adding it does not invalidate any prior approval. A pre-digest stamp
+  keeps its recorded verdict and says it cannot name fields, rather than failing closed.
+- **`spec_machine`'s three writers (`approve`, `mark-tested`, `mark-judged`) share one lock.**
+  `io_utils.rmw_lock` extracts the flock-based read-modify-write lock previously private to
+  `world.py` into a reusable helper, closing a race between concurrent writers to the same
+  machine SPEC. A malformed SPEC now reports the underlying pydantic validation error in its
+  detail (bounded, moved into the state constructor so no return branch can bypass the cap)
+  instead of a generic failure.
+- **`worktree.py`'s `DELIVERABLE_PREFIXES` gained `"MUTATION"`.** `.gitignore` had carried
+  `!work-docs/MUTATION-*.md` since `865e3ef5` without the matching source-of-truth entry,
+  leaving `tests/structural/test_deliverable_single_source.py` red on `main`.
 - **A mutant that breaks the module at import time is no longer counted as surviving.**
   `mutmut.tests_pass` is `return returncode != 1`, so every exit status except 1 reads as
   "the tests passed": pytest exits 2 on a collection error and pytest-xdist exits 2 when

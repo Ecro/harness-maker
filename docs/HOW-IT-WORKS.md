@@ -380,7 +380,12 @@ discovers (`source: execute`), which invalidates the approval by design.
 every land path — wrapup's commit, `worktree task-land`, `/hm:loop`'s `finalize success` —
 refuses with `hold:` lines while irreversible decisions lack a valid approval. Wrapup asks the
 DRI first; no answer, no question tool, or loop mode is never an approval. The stamp records the
-flow; it does not prove a human (the same limit as objective approval).
+flow; it does not prove a human (the same limit as objective approval). The stamp also carries a
+per-field digest map, so a hash mismatch names the field that moved instead of just failing
+closed on an undifferentiated hash; a pre-digest stamp keeps its recorded verdict and says it
+cannot name fields. The three writers that touch the machine SPEC (`approve`, `mark-tested`,
+`mark-judged`) serialize through one shared flock-based read-modify-write lock
+(`io_utils.rmw_lock`), so concurrent writers cannot silently drop each other's update.
 
 The hold check fails closed and discovers per-file, not per-task: if `git` cannot list the
 SPECs a branch touches, the branch holds rather than being treated as SPEC-less; `worktree

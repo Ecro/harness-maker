@@ -20,6 +20,7 @@ import re
 import shlex
 import subprocess
 import sys
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
@@ -30,7 +31,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from harness_maker import command_registry
-from harness_maker.io_utils import atomic_append, atomic_write
+from harness_maker.io_utils import LockTimeoutError, atomic_append, atomic_write, rmw_lock
 
 #: Current authored schema version. Templates write ``schema_version: 3``.
 #: NOTE (ADR-006): the SpecMachine field default is the LITERAL ``1``, NOT this
@@ -226,6 +227,11 @@ class SpecApproval(BaseModel):
     content_hash: str
     approved_by: str | None = None
     approved_at: str
+    #: Per-field digests over the same payload `content_hash` covers, so a later mismatch can
+    #: name what moved instead of only that something did. Absent on every stamp written
+    #: before this feature — the read path says so rather than naming nothing (ADR-003).
+    #: Inside `approval`, which `HASH_DENYLIST_TOP` excludes, so adding it releases no stamp.
+    field_hashes: dict[str, str] | None = None
 
 
 class SpecMachine(BaseModel):
@@ -557,6 +563,11 @@ def cross_validate(md_path: Path, yaml_path: Path) -> list[str]:
     return errors
 
 
+#: Wall cap on one `pytest --collect-only` probe. Named because `_LOCK_TIMEOUT_S` is sized
+#: against it — the lock is held across one of these, so the budget must be the larger.
+_COLLECT_TIMEOUT_S = 60
+
+
 def _check_pytest_collect(test_ids: list[str], cwd: Path) -> list[str]:
     """Return the subset of test_ids that pytest --collect-only does NOT find.
 
@@ -591,7 +602,7 @@ def _check_pytest_collect(test_ids: list[str], cwd: Path) -> list[str]:
             cwd=str(cwd),
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=_COLLECT_TIMEOUT_S,
             check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -710,6 +721,34 @@ def mark_tested(
     *,
     validate_after: bool = True,
 ) -> list[str]:
+    """Locked wrapper — see `_mark_tested_locked` for the contract.
+
+    The lock spans load-to-write, including the `pytest --collect-only` pre-check, because
+    the pre-check sits inside the window that loses an update. It does NOT span the
+    `cross_validate` that follows: that runs a SECOND collect subprocess over every AC in the
+    file and only reads, so holding the lock across both put the worst-case hold at roughly
+    twice the peer's wait budget and made a slow-but-correct holder fail its peer.
+
+    The cost of that split, stated rather than implied: `cross_validate` re-loads the file,
+    so it reports on the document **as it is on disk when it runs**, not the one this call
+    wrote. A peer write landing in that window makes these errors describe the peer's
+    content. Nothing is torn — the read-modify-write is still serialized — but a caller
+    cannot assume every returned error is about its own change.
+    """
+    with _spec_write_lock(yaml_path):
+        errors = _mark_tested_locked(yaml_path, md_path, ac_test_ids, validate_after=validate_after)
+    if errors or not validate_after:
+        return errors
+    return cross_validate(md_path, yaml_path)
+
+
+def _mark_tested_locked(
+    yaml_path: Path,
+    md_path: Path,
+    ac_test_ids: dict[str, list[str]],
+    *,
+    validate_after: bool = True,
+) -> list[str]:
     """Flip ``pending_test→false`` + record test_ids for the named ACs, then cross_validate.
 
     The forward-accumulation write-back: wrapup calls this in the base repo
@@ -757,8 +796,6 @@ def mark_tested(
         ac.test_ids = merged_by_ac[ac.id]
         ac.pending_test = False
     _dump_machine_yaml(yaml_path, model)
-    if validate_after:
-        return cross_validate(md_path, yaml_path)
     return []
 
 
@@ -1046,6 +1083,19 @@ def compute_subject_hash(subject_paths: list[str], root: Path) -> str:
 
 
 def mark_judged(
+    yaml_path: Path,
+    ac_id: str,
+    verdict: str,
+    evidence: str,
+    *,
+    cwd: Path,
+) -> list[str]:
+    """Locked wrapper — see `_mark_judged_locked` for the contract."""
+    with _spec_write_lock(yaml_path):
+        return _mark_judged_locked(yaml_path, ac_id, verdict, evidence, cwd=cwd)
+
+
+def _mark_judged_locked(
     yaml_path: Path,
     ac_id: str,
     verdict: str,
@@ -1343,7 +1393,15 @@ def _run_mark_judged(args: argparse.Namespace) -> int:
         except OSError as e:
             print(f"mark-judged: cannot read --evidence-file: {e}", file=sys.stderr)
             return 1
-    errors = mark_judged(args.yaml_path, args.ac_id, args.verdict, evidence or "", cwd=args.root)
+    try:
+        errors = mark_judged(
+            args.yaml_path, args.ac_id, args.verdict, evidence or "", cwd=args.root
+        )
+    except (ApprovalError, OSError) as exc:
+        # `OSError` for the same reason as the mark-tested branch: `O_NOFOLLOW` reports a
+        # symlinked lock path as `ELOOP` before any lock is taken.
+        print(f"mark-judged: {exc}", file=sys.stderr)
+        return 1
     for err in errors:
         print(err, file=sys.stderr)
     if errors:
@@ -1473,16 +1531,119 @@ class ApprovalError(Exception):
     """`approve` refused to write a stamp."""
 
 
-def approval_content_hash(model: SpecMachine) -> str:
-    """Defaults are omitted so a field added in a later release does not move old hashes."""
+class FieldDigestCollisionError(ApprovalError):
+    """An authored top-level field name collides with a key `field_digests` synthesises.
+
+    An `ApprovalError` subclass on purpose: it is raised on the approval path, and every CLI
+    handler that already reports an approval refusal then covers it for free. Making it a
+    bare `Exception` reproduced, inside the fix for one review finding, the uncaught-at-the-
+    CLI-boundary shape of another one in the same round.
+    """
+
+
+def _hash_payload(model: SpecMachine) -> dict[str, Any]:
+    """The authored content, deny-list applied — the one walk both consumers read.
+
+    Two independent walks would drift, and the drift is invisible: the hash would cover a
+    field the digest map does not, so a hold would fire naming nothing.
+    """
     payload = model.model_dump(mode="json", exclude_defaults=True)
     for key in HASH_DENYLIST_TOP:
         payload.pop(key, None)
     for ac in payload.get("ac", []):
         for key in HASH_DENYLIST_AC:
             ac.pop(key, None)
-    text = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return payload
+
+
+def _canonical(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def approval_content_hash(model: SpecMachine) -> str:
+    """Defaults are omitted so a field added in a later release does not move old hashes."""
+    return hashlib.sha256(_canonical(_hash_payload(model)).encode("utf-8")).hexdigest()
+
+
+def field_digests(model: SpecMachine) -> dict[str, str]:
+    """One digest per hashed field, with `ac` expanded into its criteria.
+
+    Keys: every hashed top-level name except `ac`, one key per AC id, and `ac_order`.
+
+    `ac` is expanded rather than carried beside its expansion — carrying both would make a
+    single AC edit name two fields. `ac_order` exists because `json.dumps(sort_keys=True)`
+    sorts dict keys and leaves LIST order alone: the order of the `ac` list is hashed, so
+    without that key a permuted list moves the content hash while no digest changes and the
+    hold names nothing.
+    """
+    payload = _hash_payload(model)
+    acs = payload.get("ac", [])
+    digests = {
+        key: hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+        for key, value in payload.items()
+        if key != "ac"
+    }
+    synthetic = [str(ac.get("id")) for ac in acs] + ["ac_order"]
+    collisions = sorted(set(synthetic) & set(digests))
+    if collisions:
+        # `SpecMachine` is `extra="allow"`, so a SPEC may carry an authored top-level key
+        # literally named `AC-001` or `ac_order`. Overwriting it would drop that field's
+        # digest while the content hash still covers it — editing only that field would move
+        # the hash and name nothing, which is the silence this map exists to remove.
+        raise FieldDigestCollisionError(
+            "top-level field name(s) collide with the digest map's own keys: "
+            + ", ".join(collisions)
+        )
+    for ac in acs:
+        digests[str(ac.get("id"))] = hashlib.sha256(_canonical(ac).encode("utf-8")).hexdigest()
+    order = [ac.get("id") for ac in acs]
+    digests["ac_order"] = hashlib.sha256(_canonical(order).encode("utf-8")).hexdigest()
+    return digests
+
+
+#: How many field names a detail lists before it stops. The detail travels into JSON output
+#: and a ledger row; a SPEC with fifty edited criteria must not produce a fifty-name line.
+_MAX_NAMED_FIELDS = 6
+
+#: The detail crosses into JSON output and a ledger row, so it is bounded — in EVERY state,
+#: not only `malformed`: the SPEC's Constraints row is not scoped to one verdict. Applied in
+#: `_state`, the single constructor every branch uses, NOT at the composition sites; see the
+#: comment there for why the per-branch placement failed twice.
+_MAX_DETAIL_CHARS = 200
+
+
+def _changed_field_names(model: SpecMachine, recorded: dict[str, str] | None) -> str:
+    """The `added / removed / changed` names, or why they cannot be given.
+
+    A three-way diff, not an intersection over the stamp's keys: `exclude_defaults=True` omits
+    a field sitting at its default, so setting one ADDS a key and clearing one REMOVES it. An
+    implementation that walked only the recorded keys would report nothing for an addition —
+    the silent hold ADR-003 rejects.
+    """
+    if recorded is None:
+        return "this stamp carries no digest map, so the fields cannot be named"
+    try:
+        # No clone: `_hash_payload` pops `approval` itself, so nulling it first was a
+        # round-trip that changed nothing (review round 1, P2).
+        current = field_digests(model)
+    except FieldDigestCollisionError as exc:
+        # One collision name per AC in the file, so this is as long as the SPEC is. The
+        # caller owns the cap — see the return below.
+        return str(exc)
+    names = sorted(
+        set(current) - set(recorded)
+        | (set(recorded) - set(current))
+        | {k for k in set(current) & set(recorded) if current[k] != recorded[k]}
+    )
+    if not names:
+        return "no field digest moved — the change is not one the map covers"
+    shown = names[:_MAX_NAMED_FIELDS]
+    suffix = f" (+{len(names) - len(shown)} more)" if len(names) > len(shown) else ""
+    # NOT truncated here. Every return in this function feeds one caller, which prepends a
+    # 24-character phrase and owns the cap. Truncating in both places bounded the wrong
+    # string: this came back at exactly 200 and the composed detail went out at 224
+    # (confirmation pass, P1).
+    return "changed: " + ", ".join(shown) + suffix
 
 
 @dataclass(frozen=True)
@@ -1549,7 +1710,35 @@ def _state(
     else:
         gate = "pending"
     hold = name in ("invalid", "malformed") or (bool(irreversible) and name != "approved")
+    # THE one place the detail is bounded. Every branch that reports a state passes through
+    # here, which is the point: the cap lived at a composition site twice, and twice a sibling
+    # branch a few lines away was missed — the content-hash-mismatch fix left the
+    # `spec_slug`-mismatch branch uncapped, and the round before that left the collision
+    # message uncapped. A constructor-level cap cannot be bypassed by a branch nobody thought
+    # about, including one written later.
+    if detail is not None:
+        detail = detail[:_MAX_DETAIL_CHARS]
     return ApprovalState(slug, name, "hold" if hold else "ok", gate, irreversible, notice, detail)
+
+
+def _malformed_detail(exc: Exception) -> str:
+    """Name the field, not just the exception class.
+
+    `unreadable machine SPEC: ValidationError` told the operator a class name and nothing
+    about which field the loader rejected — a carried P2 from the 2026-09-19 review. pydantic
+    reports a location and a message per error; the first one is what a reader acts on.
+    """
+    prefix = "unreadable machine SPEC"
+    if isinstance(exc, ValidationError):
+        errors = exc.errors()
+        if errors:
+            first = errors[0]
+            loc = ".".join(str(part) for part in first.get("loc", ())) or "<root>"
+            msg = str(first.get("msg", "")).strip()
+            more = f" (+{len(errors) - 1} more)" if len(errors) > 1 else ""
+            return f"{prefix}: {loc}: {msg}{more}"
+    text = str(exc).strip().splitlines()[0] if str(exc).strip() else type(exc).__name__
+    return f"{prefix} ({type(exc).__name__}): {text}"
 
 
 def approval_state_of(slug: str, yaml_path: Path, md_path: Path | None = None) -> ApprovalState:
@@ -1561,8 +1750,7 @@ def approval_state_of(slug: str, yaml_path: Path, md_path: Path | None = None) -
     try:
         model = load(yaml_path)
     except (OSError, yaml.YAMLError, ValidationError) as exc:
-        reason = f"unreadable machine SPEC: {type(exc).__name__}"
-        return _state(slug, "malformed", (), detail=reason)
+        return _state(slug, "malformed", (), detail=_malformed_detail(exc))
     items = model.irreversible_decisions
     ids = tuple(i.id for i in items or [])
     if model.schema_version >= 3 and items is None:
@@ -1572,7 +1760,8 @@ def approval_state_of(slug: str, yaml_path: Path, md_path: Path | None = None) -
     approval = model.approval
     if approval is not None:
         if approval.content_hash != approval_content_hash(model):
-            return _state(slug, "invalid", ids, detail="edited after approval")
+            named = _changed_field_names(model, approval.field_hashes)
+            return _state(slug, "invalid", ids, detail=f"edited after approval; {named}")
         # The hash binds the content to itself, not to this file name: an approved SPEC copied
         # under another slug would otherwise read as approved for a task nobody reviewed.
         if model.spec_slug != slug:
@@ -1731,25 +1920,86 @@ def _git_user_name(root: Path) -> str:
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
+#: The read-modify-write budget for a machine SPEC.
+#:
+#: It must EXCEED the longest operation performed while the lock is held, or a correctly
+#: behaving holder makes its peer fail: `mark_tested` runs a `pytest --collect-only`
+#: subprocess inside the lock, capped at `_COLLECT_TIMEOUT_S`. A flat 30 s against a 60 s
+#: subprocess turned ordinary contention into a spurious `ApprovalError` — the lock traded a
+#: lost update for an availability regression (review round 1, P1). The test pins the
+#: RELATIONSHIP, not the number.
+_LOCK_TIMEOUT_S = _COLLECT_TIMEOUT_S * 1.5
+
+
+def _spec_lock_path(yaml_path: Path) -> Path:
+    """Where the read-modify-write lock for this machine SPEC lives.
+
+    Agreement is what a lock needs: every writer of one file must compute the same path, or
+    mutual exclusion is silently gone. Two situations, and they are not the same:
+
+    * **A base root resolves** — `<base>/.claude/observability/.hm-spec-<stem>.lock`. Under
+      the gitignored churn set, so `approve` never leaves repo dirt. NOT
+      `path.parent.parent / "observability"`, which `world._rmw_lock` uses: that is right for
+      `.claude/intent.yaml` and puts a SPEC's lock at `<repo>/observability/`, outside the
+      ignore set.
+    * **No base root, and no repository anywhere above the SPEC** — a sibling
+      `.hm-spec-<stem>.lock`. Deterministic, so every writer agrees, and there is no tracked
+      directory to dirty because there is no repo.
+
+    Between them sits the case that must fail: a repository IS there (a `.git` up the tree)
+    but git would not resolve it — an ownership refusal on a mounted filesystem is the common
+    one. `resolve_base_root` answers that by returning its own argument, so a peer with
+    working git and this process would take DIFFERENT lock files and neither would know.
+    That is IRR-003's stated failure, so this refuses rather than guessing.
+    """
+    from harness_maker.second_opinion_invoke import resolve_base_root
+
+    base = resolve_base_root(yaml_path.parent)
+    if (base / ".git").exists():
+        return base / ".claude" / "observability" / f".hm-spec-{yaml_path.stem}.lock"
+    here = yaml_path.parent.resolve()
+    for parent in (here, *here.parents):
+        if (parent / ".git").exists():
+            raise ApprovalError(
+                f"a git repository exists above {yaml_path.parent} but git will not resolve "
+                "its root, so the lock location is ambiguous and a peer would take a "
+                "different one; fix git's view of the repository (an ownership refusal "
+                "answers the same way a missing repository does) and retry"
+            )
+    return yaml_path.parent / f".hm-spec-{yaml_path.stem}.lock"
+
+
+@contextlib.contextmanager
+def _spec_write_lock(yaml_path: Path) -> Iterator[None]:
+    """One policy for every machine-SPEC writer; a timeout reaches the CLI as ApprovalError."""
+    try:
+        with rmw_lock(_spec_lock_path(yaml_path), timeout=_LOCK_TIMEOUT_S):
+            yield
+    except LockTimeoutError as exc:
+        raise ApprovalError(f"{yaml_path.name} is being written by another process") from exc
+
+
 def approve(yaml_path: Path, *, exempt: bool = False) -> SpecApproval:
     """Stamp the SPEC. The identity is read at the BASE root, like objective approval."""
     from harness_maker.second_opinion_invoke import resolve_base_root
 
-    model = load(yaml_path)
-    name: str | None = None
-    if not exempt:
-        name = _git_user_name(resolve_base_root(yaml_path.parent))
-        if not name:
-            raise ApprovalError("git config user.name is empty at the base root; set it first")
-    model.approval = None
-    stamp = SpecApproval(
-        kind="exempt" if exempt else "human",
-        content_hash=approval_content_hash(model),
-        approved_by=name,
-        approved_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    )
-    model.approval = stamp
-    _dump_machine_yaml(yaml_path, model)
+    with _spec_write_lock(yaml_path):
+        model = load(yaml_path)
+        name: str | None = None
+        if not exempt:
+            name = _git_user_name(resolve_base_root(yaml_path.parent))
+            if not name:
+                raise ApprovalError("git config user.name is empty at the base root; set it first")
+        model.approval = None
+        stamp = SpecApproval(
+            kind="exempt" if exempt else "human",
+            content_hash=approval_content_hash(model),
+            approved_by=name,
+            approved_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            field_hashes=field_digests(model),
+        )
+        model.approval = stamp
+        _dump_machine_yaml(yaml_path, model)
     return stamp
 
 
@@ -1759,7 +2009,9 @@ def _run_approve(args: argparse.Namespace) -> int:
     except (ApprovalError, OSError, yaml.YAMLError, ValidationError) as exc:
         print(f"approve: {exc}", file=sys.stderr)
         return 1
-    print(json.dumps(stamp.model_dump(mode="json")))
+    # The four established keys, explicitly: a declared model field reaches this dump
+    # automatically, and IRR-001 authorised a disk-format extension, not a CLI change.
+    print(json.dumps(stamp.model_dump(mode="json", exclude={"field_hashes"})))
     return 0
 
 
@@ -1887,7 +2139,16 @@ def main(argv: list[str] | None = None) -> int:
         if not ac_test_ids:
             print("mark-tested: no --ac or --test-id given (nothing to do)", file=sys.stderr)
             return 2
-        errors = mark_tested(args.yaml_path, args.md_path, ac_test_ids)
+        try:
+            errors = mark_tested(args.yaml_path, args.md_path, ac_test_ids)
+        except (ApprovalError, OSError) as exc:
+            # The lock this change added raises here too, and only `_run_approve` was
+            # catching it — the other two writers printed a traceback on ordinary
+            # contention (review round 1, P1). `OSError` joined the clause because
+            # `O_NOFOLLOW` reports a symlinked lock path as `ELOOP`, raised BEFORE the
+            # polling loop and so never a `LockTimeoutError` (confirmation pass, P2).
+            print(f"mark-tested: {exc}", file=sys.stderr)
+            return 1
 
     for e in errors:
         print(e, file=sys.stderr)

@@ -191,6 +191,9 @@ DELIVERABLE_PREFIXES: tuple[str, ...] = (
     "MATRIX",
     "EXPERIMENT",
     "DELTA",
+    # A mutation measurement costs hours of wall time and a SPEC's `last_mutation_run` points
+    # at it, so it is committed like every other measurement (PLAN-mutation-survivors).
+    "MUTATION",
     # SPEC-playbook-alignment ADR-007: the objective record IS this deliverable — keyed by
     # objective id, not task slug, so `derive_deliverable_globs` stages it unkeyed.
     "INTENT",

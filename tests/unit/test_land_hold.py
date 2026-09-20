@@ -351,3 +351,119 @@ def test_land_states_finds_a_changed_spec_left_behind_by_a_moved_spec_dir(repo: 
     _write_spec(repo, "missing")
     held = _held(spec_machine.land_states(repo, repo, [_SLUG]))
     assert (_SLUG, "missing") in held
+
+
+# ══ SPEC-mutation-survivors-and-approval-p2s — AC-007..AC-010 ═══════════════════
+#
+# These are CHARACTERIZATION tests for shipped behaviour: the 2026-09-20 mutation run
+# named these branches as survivors, so each one already does the right thing and no
+# test noticed when it stopped. They pass before any implementation change, by design —
+# their RED evidence is the per-AC inversion artefact Phase 4's exit criterion requires,
+# not a missing implementation.
+
+from harness_maker.spec_machine import (  # noqa: E402
+    SubjectHashError,
+    _changed_spec_units,
+    _is_plain_slug,
+    _spec_dir,
+    compute_subject_hash,
+)
+
+_P2S_YAML = (
+    Path(__file__).parents[2] / "specs/SPEC-mutation-survivors-and-approval-p2s.machine.yaml"
+)
+_SLUG_ROWS = load_golden_table(_P2S_YAML, "AC-007")
+_DIR_ROWS = load_golden_table(_P2S_YAML, "AC-008")
+_CAP_ROWS = load_golden_table(_P2S_YAML, "AC-010")
+
+
+@pytest.mark.parametrize("row", _SLUG_ROWS, ids=[r.note for r in _SLUG_ROWS])
+def test_ac_007_a_slug_that_is_not_a_plain_name_is_rejected(row: Any) -> None:
+    """Each row is a path-traversal shape the predicate exists to refuse."""
+    assert _is_plain_slug(row.input["slug"]) is row.expected
+
+
+@pytest.mark.parametrize("row", _DIR_ROWS, ids=[r.note for r in _DIR_ROWS])
+def test_ac_008_the_configured_spec_dir_is_normalised(row: Any, tmp_path: Path) -> None:
+    """Absent, empty, whitespace, absolute, parent-escaping and dot-relative each resolve."""
+    (tmp_path / ".claude").mkdir()
+    value = row.input["dir"]
+    if value is not None:
+        (tmp_path / ".claude" / "harness.yaml").write_text(f"spec:\n  dir: {value!r}\n")
+    assert _spec_dir(tmp_path) == row.expected
+
+
+def test_ac_009_an_md_file_counts_only_inside_a_configured_spec_dir(tmp_path: Path) -> None:
+    """A changed `SPEC-<slug>.md` outside the configured dirs is documentation, not a unit."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    _git(root, "init", "-q")
+    _git(root, "config", "user.name", "T")
+    _git(root, "config", "user.email", "t@example.com")
+    (root / "specs").mkdir()
+    (root / "docs").mkdir()
+    (root / "README.md").write_text("x\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "base")
+
+    (root / "specs" / f"SPEC-{_SLUG}.md").write_text("# in the spec dir\n")
+    (root / "docs" / f"SPEC-{_SLUG}.md").write_text("# not a spec unit\n")
+
+    units = _changed_spec_units(root, root)
+    assert units is not None
+    assert units == [(_SLUG, "specs")]
+
+
+@pytest.mark.parametrize("row", _CAP_ROWS, ids=[r.note for r in _CAP_ROWS])
+def test_ac_010_the_subject_hash_refuses_an_oversized_subject(
+    row: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The three cap rows bind the COMPARISON, not the shipped literal.
+
+    Writing 200 MB or 5000 inodes in a unit test buys nothing: the surviving mutants were
+    `>` vs `>=` on these lines, so each cap row is run twice against a patched cap — once at
+    the boundary, which must hash, and once one unit past it, which must raise. A test that
+    only patched the constant and wrote one oversized file would pass against the mutated
+    comparison, which is the shape this AC exists to kill.
+    """
+    case = row.input["case"]
+    (tmp_path / "s").mkdir()
+
+    if case == "per_file_size":
+        monkeypatch.setattr(spec_machine, "_SUBJECT_FILE_SIZE_CAP", 64)
+        at = tmp_path / "s" / "at.txt"
+        at.write_bytes(b"x" * 64)
+        assert compute_subject_hash(["s/at.txt"], tmp_path)  # at the cap: allowed
+        over = tmp_path / "s" / "over.txt"
+        over.write_bytes(b"x" * 65)
+        with pytest.raises(SubjectHashError):
+            compute_subject_hash(["s/over.txt"], tmp_path)
+    elif case == "total_bytes":
+        monkeypatch.setattr(spec_machine, "_SUBJECT_TOTAL_BYTES_CAP", 64)
+        (tmp_path / "s" / "a.txt").write_bytes(b"x" * 64)
+        assert compute_subject_hash(["s/a.txt"], tmp_path)  # sum at the cap: allowed
+        (tmp_path / "s" / "b.txt").write_bytes(b"x")
+        with pytest.raises(SubjectHashError):
+            compute_subject_hash(["s/a.txt", "s/b.txt"], tmp_path)
+    elif case == "file_count":
+        monkeypatch.setattr(spec_machine, "_SUBJECT_TOTAL_FILES_CAP", 2)
+        for n in range(2):
+            (tmp_path / "s" / f"f{n}.txt").write_text("x")
+        assert compute_subject_hash(["s/f0.txt", "s/f1.txt"], tmp_path)  # exactly the cap
+        (tmp_path / "s" / "f2.txt").write_text("x")
+        with pytest.raises(SubjectHashError):
+            compute_subject_hash(["s/f0.txt", "s/f1.txt", "s/f2.txt"], tmp_path)
+    elif case == "unreadable":
+        bad = tmp_path / "s" / "bad.txt"
+        bad.write_text("x")
+        bad.chmod(0o000)
+        try:
+            with pytest.raises(SubjectHashError):
+                compute_subject_hash(["s/bad.txt"], tmp_path)
+        finally:
+            bad.chmod(0o644)
+    elif case == "empty_subject":
+        with pytest.raises(SubjectHashError):
+            compute_subject_hash(["s/"], tmp_path)
+    else:  # pragma: no cover - a new row with no arm is a test gap, not a pass
+        pytest.fail(f"unhandled golden row: {case}")

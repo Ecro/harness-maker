@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
 
 from harness_maker.io_utils import (
+    LockTimeoutError,
     atomic_append,
     atomic_write,
     denormalize_home_to_tilde,
     load_harness_yaml,
+    rmw_lock,
 )
 
 
@@ -253,3 +257,56 @@ def test_atomic_append_never_retries_a_short_write(
     with pytest.raises(OSError, match="short append"):
         atomic_append(tmp_path / "ledger.jsonl", "abcdef\n")
     assert calls == [7], "exactly one write() attempt — no retry loop"
+
+
+# ── rmw_lock (SPEC-mutation-survivors-and-approval-p2s, AC-004/AC-005) ──────────
+
+
+def _hold_the_lock(lock_path: str, ready: Any, release: Any) -> None:  # pragma: no cover - child
+    from harness_maker.io_utils import rmw_lock as _rmw_lock
+
+    with _rmw_lock(Path(lock_path), timeout=5.0):
+        ready.set()
+        release.wait(timeout=30)
+
+
+def test_a_held_lock_times_out_instead_of_blocking(tmp_path: Path) -> None:
+    """Real `flock`, no monkeypatch — this is the only test that binds the actual flags.
+
+    The 2026-09-20 mutation run left `fcntl.flock(fd, LOCK_EX | LOCK_NB)` alive: every other
+    lock test patches `fcntl`, so nothing noticed what the flags were. Dropping `LOCK_NB`
+    makes the second writer BLOCK instead of polling, and a blocked writer never reaches the
+    deadline — the timeout contract silently becomes "wait forever". The wall-clock bound
+    below is what makes that visible: a blocking mutant fails by exhausting the 30 s join,
+    not by raising something else.
+    """
+    import multiprocessing
+
+    ctx = multiprocessing.get_context("fork")
+    ready, release = ctx.Event(), ctx.Event()
+    lock_path = tmp_path / "obs" / ".hm-spec-demo.lock"
+    holder = ctx.Process(target=_hold_the_lock, args=(str(lock_path), ready, release))
+    holder.start()
+    try:
+        assert ready.wait(timeout=30), "the holder never acquired the lock"
+        started = time.monotonic()
+        with pytest.raises(LockTimeoutError), rmw_lock(lock_path, timeout=0.3):
+            pass  # pragma: no cover - the lock is held, so this never runs
+        waited = time.monotonic() - started
+        assert 0.3 <= waited < 10, f"waited {waited:.2f}s — not the declared budget"
+    finally:
+        release.set()
+        holder.join(timeout=30)
+    assert holder.exitcode == 0
+
+
+def test_an_uncontended_lock_is_released_on_exit(tmp_path: Path) -> None:
+    """The `finally: os.close(fd)` arm — a leaked descriptor holds the lock for the process."""
+    lock_path = tmp_path / "obs" / ".hm-spec-demo.lock"
+    for _ in range(3):
+        with rmw_lock(lock_path, timeout=0.5):
+            pass
+    assert lock_path.exists()
+    # The creation mode, which the 2026-09-20 run left alive: the lock names a path inside the
+    # project, and a world-writable one lets any local account stall this repo's writers.
+    assert lock_path.stat().st_mode & 0o777 == 0o600

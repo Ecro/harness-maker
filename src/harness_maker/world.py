@@ -18,7 +18,6 @@ import shlex
 import signal
 import subprocess
 import sys
-import time
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
@@ -40,7 +39,7 @@ from harness_maker.intent import (
     Outcome,
     schema_version_error,
 )
-from harness_maker.io_utils import atomic_write
+from harness_maker.io_utils import LockTimeoutError, atomic_write, rmw_lock
 from harness_maker.second_opinion_invoke import resolve_base_root
 from harness_maker.second_opinion_oracle import BUDGET_PER_COMMAND, redact, truncate
 
@@ -1214,39 +1213,20 @@ _APPEND_LOCK_TIMEOUT_S = 30.0
 def _rmw_lock(path: Path) -> Iterator[None]:
     """Serialize the read-modify-write of one YAML file across processes (review 40a36af2).
 
-    `atomic_write` makes the final replace atomic, not the read-append-write around it; two
-    writers (a wrapup's `measure --all` and a hand-run `record`) would otherwise lose a row.
-    flock on a sibling lock file; where the filesystem cannot lock, proceed unlocked — the
-    pre-change behaviour, never a refusal to record.
+    The mechanism now lives in `io_utils.rmw_lock` (PLAN-mutation-survivors ADR-002) so the
+    machine-SPEC writers share one policy with this one. What stays here is what is local to
+    the intent layer: the lock path and the error type.
+
+    Under `.claude/observability/` — already gitignored and classified as harness churn, so the
+    lock never shows as user dirt in a tracked directory (confirm-1 finding). Keyed by the
+    guarded file's stem, so outcomes keep `.hm-world-outcomes.lock` byte-for-byte.
     """
-    try:
-        import fcntl
-    except ImportError:  # pragma: no cover — non-POSIX
-        yield
-        return
-    # Under `.claude/observability/` — already gitignored and classified as harness churn, so
-    # the lock never shows as user dirt in a tracked directory (confirm-1 finding).
-    # Keyed by the guarded file's stem, so outcomes keep `.hm-world-outcomes.lock` byte-for-byte.
     lock_path = path.parent.parent / "observability" / f".hm-world-{path.stem}.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
-    deadline = time.monotonic() + _APPEND_LOCK_TIMEOUT_S
     try:
-        while True:
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except OSError as exc:
-                if exc.errno in (38, 95):  # ENOSYS / EOPNOTSUPP: unlockable filesystem
-                    break
-                if time.monotonic() >= deadline:
-                    raise WorldError(
-                        "lock", f"{path.name} is locked by another writer ({lock_path})"
-                    ) from exc
-                time.sleep(0.05)
-        yield
-    finally:
-        os.close(fd)
+        with rmw_lock(lock_path, timeout=_APPEND_LOCK_TIMEOUT_S):
+            yield
+    except LockTimeoutError as exc:
+        raise WorldError("lock", f"{path.name} is locked by another writer ({lock_path})") from exc
 
 
 def _append_value(
