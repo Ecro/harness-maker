@@ -10,7 +10,7 @@ this class of change ships half-done.
 
 **Phase A.4 justified pass — `test_this_plan_satisfies_the_rule_it_introduces`.** It is
 GREEN before the template change, and that is not a false RED. Its subject is a different
-artifact: `work-docs/PLAN-ai-work-boundaries.md`, which was written during `/hm:plan` and
+artifact: `work-docs/PLAN-ai-work-boundaries.md`, which was written during planning and
 already complies. It goes red the moment a Do-not-change bullet drifts out of the grammar —
 which it did, on that PLAN's own fourth bullet, during plan validation. Its RED positive
 sibling is `test_entry_grammar_is_stated`: until the template states the grammar, this
@@ -94,9 +94,14 @@ _REQUIRED_ENTRY = re.compile(r"^\d+\. \*\*🚧 Contract Boundaries\*\*", re.M)
 #: lines. The list title is "Required sections (in this order)" and the Technical Design
 #: table fixes the position, so the ordinal and the heading at each index are both under test.
 _EXPECTED_ORDER: tuple[str, ...] = (
+    # `🎙️ Interview Transcript` and `🔍 Plan Validation` were dropped by
+    # SPEC-plan-stage-absorption: `/hm:execute` Step 0 authors the PLAN with no
+    # interview and no `plan-validator`, so both would have had nothing to hold. 11 → 9.
+    # `_PLAN_DOC_ORDER` below stays at 11 on purpose — it describes a LANDED document
+    # from the old regime, and the decoupling exists so a live-contract change cannot
+    # redden it.
     "🎯 Executive Summary",
     "📚 Prior Work",
-    "🎙️ Interview Transcript",
     "📐 Architecture Decision Records",
     "🏗️ Technical Design",
     "📝 Implementation Plan",
@@ -104,7 +109,6 @@ _EXPECTED_ORDER: tuple[str, ...] = (
     "🧪 Testing Strategy",
     "⚠️ Risks & Mitigation",
     "✅ Success Criteria",
-    "🔍 Plan Validation",
 )
 _EXPECTED_SECTIONS = len(_EXPECTED_ORDER)
 
@@ -148,7 +152,10 @@ def _slice(text: str, start: str, end: re.Pattern[str]) -> str:
 
 _NEXT_H2 = re.compile(r"^## ", re.M)
 _REQUIRED_ANCHOR = "**Required sections (in this order):**"
-_STEP6_ANCHOR = "### Step 6"
+# Was `### Step 6` in `/hm:plan`. The verification step travelled to `/hm:execute`
+# Step 0.3 (SPEC-plan-stage-absorption); the property is "the write is verified",
+# never the step number.
+_STEP6_ANCHOR = "#### Step 0.3"
 
 
 def _required_block(text: str) -> str:
@@ -171,7 +178,7 @@ def _render_root() -> Path:
 
 @cache
 def _plan_variants() -> dict[str, str]:
-    """The rendered `/hm:plan` surface, keyed by variant.
+    """The rendered `/hm:execute` surface, keyed by variant.
 
     Keyed rather than merged so a missing Codex arm is a KeyError naming the variant,
     not a silently smaller corpus that still passes every `any(...)`.
@@ -180,9 +187,9 @@ def _plan_variants() -> dict[str, str]:
     out: dict[str, str] = {}
     for path in sorted(root.rglob("*.md")):
         rel = path.relative_to(root).as_posix()
-        if rel.endswith("commands/hm/plan.md"):
+        if rel.endswith("commands/hm/execute.md"):
             out["claude"] = path.read_text(encoding="utf-8")
-        elif "skills/hm-plan/" in rel:
+        elif "skills/hm-execute/" in rel:
             out["codex"] = path.read_text(encoding="utf-8")
     return out
 
@@ -212,13 +219,24 @@ def _fake_block(pairs: list[tuple[int, str]]) -> str:
 #: discharged the A.5 gate in place of a third reviewer round — a negative case is cheaper
 #: and more reviewable than a verdict, and twice today an assertion that read correctly
 #: was not.
+#: Both ordinal lists are DERIVED from where the section actually sits, not typed out. They
+#: were `[1..10]` literals pinned to an eleven-entry contract; SPEC-plan-stage-absorption cut
+#: the list to nine and the literals silently became the wrong length — caught only by
+#: `strict=True`. Deriving them keeps the negative cases correct the next time the list moves,
+#: and the length coupling that made the staleness visible is preserved.
+_CB = "🚧 Contract Boundaries"
+_CB_INDEX = _EXPECTED_ORDER.index(_CB)  # 0-based
+_DUPLICATE_ORDINALS = [
+    *range(1, _CB_INDEX + 2),  # 1..CB, correct
+    *range(_CB_INDEX + 1, len(_EXPECTED_ORDER)),  # the tail left unrenumbered
+]
 _WRONG_IMPLEMENTATIONS = {
     "duplicate-ordinal": [
-        (n, h) for n, h in zip([1, 2, 3, 4, 5, 6, 7, 7, 8, 9, 10], _EXPECTED_ORDER, strict=True)
+        (n, h) for n, h in zip(_DUPLICATE_ORDINALS, _EXPECTED_ORDER, strict=True)
     ],
     "appended-last": [
-        *enumerate([h for h in _EXPECTED_ORDER if h != "🚧 Contract Boundaries"], start=1),
-        (11, "🚧 Contract Boundaries"),
+        *enumerate([h for h in _EXPECTED_ORDER if h != _CB], start=1),
+        (len(_EXPECTED_ORDER), _CB),
     ],
 }
 
@@ -303,7 +321,7 @@ def test_step6_verification_asserts_the_section(variant: str) -> None:
     assert "non-empty" in block, f"{variant}: Step 6 does not assert sub-list non-emptiness"
     assert "admitted forms" in block, f"{variant}: Step 6 does not check the entry grammar"
     # Self-repair, never a stage halt: the grammar bullet must say so, or Step 6's
-    # retry-once-then-stop rule silently claims it and /hm:plan halts on prose formatting.
+    # retry-once-then-stop rule silently claims it and /hm:execute halts on prose formatting.
     assert "self-repaired inline" in block, f"{variant}: grammar bullet's gate semantics undefined"
 
 
@@ -385,7 +403,7 @@ def _do_not_change_bullets() -> list[str]:
     section = _boundaries_section()
     pin = section.split(f"### {_SUBLIST_PIN}", 1)
     assert len(pin) > 1, "the Do not change sub-list is missing"
-    # `lstrip` because plan.md.j2 renders its own examples as an INDENTED nested list; a
+    # `lstrip` because execute.md.j2 renders its own examples as an INDENTED nested list; a
     # column-0 filter cannot see them, so an indented `- none` would bypass both the grammar
     # check and the sole-bullet cardinality rule.
     return [ln.lstrip() for ln in pin[1].splitlines() if ln.lstrip().startswith("- ")]

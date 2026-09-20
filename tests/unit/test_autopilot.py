@@ -20,7 +20,6 @@ from harness_maker.worktree import _HARNESS_CHURN_FILES, _current_session_uuid
 DEFAULT_PIPELINE = [
     AtomicStage.RESEARCH,
     AtomicStage.SPEC,
-    AtomicStage.PLAN,
     AtomicStage.EXECUTE,
     AtomicStage.REVIEW,
     AtomicStage.VERIFY,
@@ -287,12 +286,12 @@ def test_cli_custom_pipeline_valid(tmp_path: Path) -> None:
     from harness_maker.cli import app
 
     res = CliRunner().invoke(
-        app, ["autopilot", "on", "--pipeline", "research,plan", "--root", str(tmp_path)]
+        app, ["autopilot", "on", "--pipeline", "research,execute", "--root", str(tmp_path)]
     )
     assert res.exit_code == 0, res.output
     m = autopilot.active_marker(tmp_path)
     assert m is not None
-    assert [s.value for s in m.pipeline] == ["research", "plan"]
+    assert [s.value for s in m.pipeline] == ["research", "execute"]
 
 
 def test_cli_invalid_pipeline_exits_2(tmp_path: Path) -> None:

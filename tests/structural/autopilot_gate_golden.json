@@ -1,212 +1,200 @@
 {
- "arms": {
-  "auto_safe@task-driven": {
-   "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
-   "execute": "ae2a6c217c1ed1f7a6642c98a496d6fcd8907a58d08d1ecc0bc97a10c1cc50bb",
-   "health": "4a09d57b660cf0f70f9bd3840476f32356c7e1d1b9b9b26a3426eb973a837709",
-   "help": "806c74441c6994b790a0223042b574ed99a1cb838ca0a630d8d94692046ec9b8",
-   "loop": "bb1558f3ee6b15ea799ccb04d1bcc77e7b1bea8c6f1651a871e0a19c56bc9f38",
-   "loop-p5-batch": "2429f826943fffcb8f8205dff25d3530d3471d4f15051adc9d8c1538231a38cc",
-   "make": "4c974e3d03821b3dec0be7c49f15caa8c5981c0d936acec4f0fcab7f9b61f523",
-   "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
-   "plan": "f8957fc421da02c5309de50e9dae4fb34e966d65906a49e905dd2b6011daa359",
-   "research": "8cb6a6d33dd7d83b2f6d7da7ccdd0a1afdf88216fb0de8b329f82321269979c6",
-   "review": "836c45a7e82ff3590bf51b0522842f8993fb279ff3407733948171a4ec7b8e1f",
-   "spec": "f5ee20ab59a67a2cf713eac4df1d4e2dcedbab35b6566fbbfc326a0dd19cecf6",
-   "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
-   "verify": "bd3b9b24078ee84992efcb345ed28bc218065b15233d9615f8272bda9d66105d",
-   "wrapup": "026bed65eefcb13bd82e0b8de6d78987882168a669898c678c288806ae3bbf80"
+  "arms": {
+    "ask@flag_off": {
+      "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
+      "execute": "f493afbc473e3597bce86e0d6ad9ef31052ba4f9621d91754e31a7a688e4cd40",
+      "health": "0c439915f82c5779445201c41b493ab26e97ecacf1091fefbe2be0dd9c210194",
+      "help": "39428efdf44e3f598ba8604e691ffa231989d60981072e169f383318c79c761a",
+      "loop": "d662d5864eeeb374b0d486bb0a8cb88dfacea60f92f4dbad6d6afcc3f577a404",
+      "loop-p5-batch": "d4d7044b1a58f643330dacce632f2c491c5437127fff7c62e77acd8d80e2cdfb",
+      "make": "4c974e3d03821b3dec0be7c49f15caa8c5981c0d936acec4f0fcab7f9b61f523",
+      "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
+      "research": "13220eb5be2b19192707aa6b8725a16a7e5c6b77e3e894fee48295ff48665285",
+      "review": "f07c8079b54798276a3b132dd806d4603ecf1262b3948f76923fa09cce38331a",
+      "spec": "d1104b2c0dce92ba083a40697b688de33ea737ca0d9eb82e59df7f8f7e6e64cf",
+      "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
+      "verify": "f22764104b617613f3fe70158187166286ea6d4e68de1628a433629c5aca2a60",
+      "wrapup": "20df6100f876e64af07075793725747926905c82bb1a7f1c061dfaf0de34e96e"
+    },
+    "ask@flag_on": {
+      "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
+      "execute": "8bb9f175659b2b7f1f7cc5c0314d2e912381dfc12b7d413e3ad3247c6e2d9b43",
+      "health": "0c439915f82c5779445201c41b493ab26e97ecacf1091fefbe2be0dd9c210194",
+      "help": "39428efdf44e3f598ba8604e691ffa231989d60981072e169f383318c79c761a",
+      "loop": "a8f44bbffb41a839edeb052b7f8547b7106f5d6631aa155a566f30f86fc31890",
+      "loop-p5-batch": "2429f826943fffcb8f8205dff25d3530d3471d4f15051adc9d8c1538231a38cc",
+      "make": "4c974e3d03821b3dec0be7c49f15caa8c5981c0d936acec4f0fcab7f9b61f523",
+      "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
+      "research": "c51eb536c4e38c52e3903081faf296ed2f10545cdfcf8649fdd17ac06b7e971f",
+      "review": "355216f737e484272a0adfa9e681a9dd9e4365cf99ea361bd9d629635d190973",
+      "spec": "8b861f5c230b88487d9a7096223f7d0486228a759890f804a1d433eecc5be5d6",
+      "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
+      "verify": "23723fddbd411c6595839017962449a291868ca6f629426627027d2dd8474256",
+      "wrapup": "3de67c098d6e63506551291f3bd4606a79536d1f07bc5d9fb0dcc7578ef44df4"
+    },
+    "auto_safe@spec-driven": {
+      "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
+      "execute": "d1c0554d26287f9d787b4145064895f0f0590515dc19a08e01b255ec09cbd892",
+      "health": "564609a25b9071d8c79bce1d5102727922f6434953b3aa6ce4455a2ae3153ca9",
+      "help": "62a59c34a71450bbd0de578c098e9cd59797c2de2e3e4fa884794901096408c8",
+      "loop": "4b71d6fe6c7b9f0cee5d6afe9e57d0ba0b8e9289d8abf4d936f582b4fcc22caa",
+      "loop-p5-batch": "2429f826943fffcb8f8205dff25d3530d3471d4f15051adc9d8c1538231a38cc",
+      "make": "4c974e3d03821b3dec0be7c49f15caa8c5981c0d936acec4f0fcab7f9b61f523",
+      "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
+      "research": "4324bb7b871fb2e6444f024d84b7a2d13f19b7e883b3d35fe554a3439c0f15ab",
+      "review": "2f9694b15242bcd7abd472a9e7122354342528fc399977aa12135f148dd043ab",
+      "spec": "cb7fb680abc45ac1fcd17c4a08f03ecf0c772321195a8b6fd9d846943ba9dcd2",
+      "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
+      "verify": "2dcc5d2b224e03eec13e01cb8a22eb829a7ccad88cf222ee04a13f521ae662c7",
+      "wrapup": "068cc835650d48d59fed7f7918be381136dd3bb2d80effea99b0e20cf6d616cc"
+    },
+    "auto_safe@task-driven": {
+      "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
+      "execute": "9593fa659f61965e31a9cab6cb97cc43737f8048d64980ec7135237124ccbeb4",
+      "health": "564609a25b9071d8c79bce1d5102727922f6434953b3aa6ce4455a2ae3153ca9",
+      "help": "62a59c34a71450bbd0de578c098e9cd59797c2de2e3e4fa884794901096408c8",
+      "loop": "4b71d6fe6c7b9f0cee5d6afe9e57d0ba0b8e9289d8abf4d936f582b4fcc22caa",
+      "loop-p5-batch": "2429f826943fffcb8f8205dff25d3530d3471d4f15051adc9d8c1538231a38cc",
+      "make": "4c974e3d03821b3dec0be7c49f15caa8c5981c0d936acec4f0fcab7f9b61f523",
+      "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
+      "research": "4324bb7b871fb2e6444f024d84b7a2d13f19b7e883b3d35fe554a3439c0f15ab",
+      "review": "e933d4bf4c5d7523d0c29863bf1aeb086e4188853756aa4cd0ff657555641517",
+      "spec": "eb634d6c8a088cdf5d350c062127fea14f45061204c07d6443e478de245389c2",
+      "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
+      "verify": "b4854952af1e9b8294214d9ac18555c8ec5f2efe80beb3c2831712e9e1e456e2",
+      "wrapup": "80e40f14dde6de6487c33aaf7182a9392f5bc7425dd7368cfd904da0d3660296"
+    }
   },
-  "auto_safe@spec-driven": {
-   "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
-   "execute": "ae2a6c217c1ed1f7a6642c98a496d6fcd8907a58d08d1ecc0bc97a10c1cc50bb",
-   "health": "4a09d57b660cf0f70f9bd3840476f32356c7e1d1b9b9b26a3426eb973a837709",
-   "help": "806c74441c6994b790a0223042b574ed99a1cb838ca0a630d8d94692046ec9b8",
-   "loop": "bb1558f3ee6b15ea799ccb04d1bcc77e7b1bea8c6f1651a871e0a19c56bc9f38",
-   "loop-p5-batch": "2429f826943fffcb8f8205dff25d3530d3471d4f15051adc9d8c1538231a38cc",
-   "make": "4c974e3d03821b3dec0be7c49f15caa8c5981c0d936acec4f0fcab7f9b61f523",
-   "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
-   "plan": "1331111a33f1ed741a745c17689c2ea31c8f647ae4b5d77b3e96ac3a7d6aa412",
-   "research": "8cb6a6d33dd7d83b2f6d7da7ccdd0a1afdf88216fb0de8b329f82321269979c6",
-   "review": "b8959e60c5b8d28927ea1dad9b00641d542d17074d0743b1c2bd79a4500a9eee",
-   "spec": "4e03ca5c5f27ba74dbbd7b61ce0ac08ae66cef1a4ebb28686c27cce248589aeb",
-   "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
-   "verify": "6563cef1ca86e9b887540aa38e5d1b1861285c2ccb2a02ba1bb21724b3c2fadc",
-   "wrapup": "78d71893f0683ad3b599a7dc879dbea18597461c8d701ae338f0a55f5e4a669a"
-  },
-  "ask@flag_on": {
-   "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
-   "execute": "98c4c9dc838f2851d9699527d581a6c1ceaa39e85c83fc4323d8d19ed99fd3e5",
-   "health": "0c439915f82c5779445201c41b493ab26e97ecacf1091fefbe2be0dd9c210194",
-   "help": "59b71676618690f197a7d7e9a2d06e249070afcd514a6fe3509622fa8a6c4909",
-   "loop": "bdb2d4b6d77be5cedc6e72b427614d026411b3328321ca2163bcace6ceefb24e",
-   "loop-p5-batch": "2429f826943fffcb8f8205dff25d3530d3471d4f15051adc9d8c1538231a38cc",
-   "make": "4c974e3d03821b3dec0be7c49f15caa8c5981c0d936acec4f0fcab7f9b61f523",
-   "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
-   "plan": "69ac476bb016c20d074c881f39e0b757b5b3f62c8a5e8835237ea0de56c0479c",
-   "research": "7ba0cdad8b6c19b4c1bd6e116b1c1967577f1b61f60ee10b523bae197726117c",
-   "review": "42bcd652ce4b0938965da5ed98ca855bea9da894db2fcb6ffcc7a30e6d529ca2",
-   "spec": "f93f6a41d0728567361f5cc6e50e39e72ec5595dfdc979783ce6bb826fd54ff8",
-   "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
-   "verify": "26d8ab91904089292a38bc3667741e7f565477015379cc2fd5092b4de81b8e07",
-   "wrapup": "6b1ae2ce78c8717fe4977f36c068fa5e9ec324183341babf3b5a471673637693"
-  },
-  "ask@flag_off": {
-   "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
-   "execute": "e483d2f849641f7fb5647ef038fd933b45dd3f9350d751e010ec6cf692c96bad",
-   "health": "0c439915f82c5779445201c41b493ab26e97ecacf1091fefbe2be0dd9c210194",
-   "help": "59b71676618690f197a7d7e9a2d06e249070afcd514a6fe3509622fa8a6c4909",
-   "loop": "acd92a2220d4e44865d278d848a523dff368738e69c91201860c7667e2fa7dfa",
-   "loop-p5-batch": "d4d7044b1a58f643330dacce632f2c491c5437127fff7c62e77acd8d80e2cdfb",
-   "make": "4c974e3d03821b3dec0be7c49f15caa8c5981c0d936acec4f0fcab7f9b61f523",
-   "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
-   "plan": "65627c78aeeece3967c50eea506c6a8a111a3aed6a3fff2f14e3edebe656d086",
-   "research": "2245517daccc3298205ef458f3a793171f8aa14cafe13a55276a9fca8dd3c5f0",
-   "review": "52d9bbd8253ae688d50121b02da00828f0167e2b422035df7ca6242ee823adfa",
-   "spec": "461cb932985551de63e2e8125b8e942b0548825cd477a056bb3951654fc65e7b",
-   "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
-   "verify": "0831a6b0b782343df6180a05f98933825f957209e3d1caf38a7cb310392978b6",
-   "wrapup": "c6d390f2299f9c08ba5c5427bb9a9b03b948dd2e3d25468c530294c223f95bc5"
-  }
- },
- "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture — a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
- "rebases": [
-  {
-   "aggregate_delta_chars": 1456,
-   "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
-   "phase": 4,
-   "reason": "Phase 4 adds the stage-guarded backgrounding blocks to the shared second-opinion dispatch partial, which this repo renders because second_opinion.models is non-empty. Phase 3's byte-neutrality was verified against the pre-Phase-3 capture first."
-  },
-  {
-   "aggregate_delta_chars": -54,
-   "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
-   "phase": 5,
-   "reason": "Phase 5 SHRINKS the rendered surface by 54 chars, in two attributed edits: review.md.j2 drops the `- Start from `harness.yaml.reviewers.enabled`.` bullet (-47, AC-015 — the list is not an input to lens_dispatch, so the instruction was a lever that does not exist), and step_manifest.md.j2's disclosed default for autopilot_persistent goes `false` -> `true` (-1 x 7 commands, AC-007 — the class default is True). No autopilot advance or picker block moved; the Phase 3 byte-neutrality claim is unaffected because both edits are outside the advance block."
-  },
-  {
-   "aggregate_delta_chars": 416,
-   "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
-   "phase": "review-fixes",
-   "reason": "/hm:review returned two P1s whose fix was an ADDED rendered instruction: wrapup.md.j2 gains the roll-up producer (the manifest staged a path nothing wrote, so ADR-002's survives-a-clone guarantee was unreachable), and health.md.j2 passes --targets (smoke_check's applicability parameter had no production caller, so the cursor-only false alarm shipped unchanged). Only wrapup moves in these arms; the autopilot advance and picker blocks are untouched, so Phase 3's byte-neutrality claim for them still holds."
-  },
-  {
-   "aggregate_delta_chars": {
-    "ask@flag_off": -1463,
-    "ask@flag_on": -1463,
-    "auto_safe@spec-driven": -1463,
-    "auto_safe@task-driven": -1399
-   },
-   "attributed_in": "work-docs/BASELINE-DELTA-observability-rows-at-base.md",
-   "phase": "observability-rows-at-base (2026-09-12)",
-   "reason": "Two attributed template edits, neither inside the autopilot advance or picker blocks. verify.md.j2 retires the hand-written verify-<date>.jsonl record (nothing read it; -1484 in the spec-driven-carrying arms, -1420 task-driven). wrapup.md.j2's roll-up paragraph now names the invalid-choice failure of a pre-rollup plugin and was compacted to net +21."
-  },
-  {
-   "aggregate_delta_chars": {
-    "ask@flag_off": -8234,
-    "ask@flag_on": -8234,
-    "auto_safe@spec-driven": -8222,
-    "auto_safe@task-driven": -8360
-   },
-   "attributed_in": "work-docs/BASELINE-DELTA-workflow-steps-vs-model-capability.md",
-   "phase": "workflow-steps-vs-model-capability Phases 3-4 (2026-09-12)",
-   "reason": "Attributed shrink, neither inside the autopilot advance nor the picker block: the 5-term inequality ceremony (partial + term list + per-round checklist) is deleted from research/spec/plan/loop and the comprehension partial's pointer to it is reworded (PLAN ADR-004); verify Check 1 drops its LLM PLAN/SPEC coverage judgement (1b) and keeps the mechanical drift-verdict read (ADR-003); review.md.j2 loses one word. Moved commands per arm: loop, plan, research, review, spec, verify. Deltas are against the base checkout (main @ 51b5bbfb), whose own drift from the frozen surface baseline is the earlier rows' business. Re-measured last after the second /hm:review's fixes (verify Check 1 note narrowed, Step 0.5 receipt sentence, retired-ledger claim scoped, CI verify wording)."
-  },
-  {
-   "aggregate_delta_chars": "review only; one added sentence in Step 3.3 (charset check before the shell line)",
-   "attributed_in": "work-docs/BASELINE-DELTA-intent-world-model-objective-layer.md",
-   "phase": "intent-world-model-objective-layer /hm:review fixes (2026-09-16)",
-   "reason": "/hm:review round 2 fix for a P1 security finding: review.md.j2 Step 3.3 now requires <id> to match [A-Z0-9-]+ before it is substituted into the `hm world objective show` shell line, and skips on mismatch. Verified before re-capture that `review` is the ONLY moved command in every arm and that it moves identically in auto_safe and ask; the advance and picker blocks are untouched."
-  },
-  {
-   "aggregate_delta_chars": {
-    "claude": 67,
-    "codex": 67
-   },
-   "attributed_in": "work-docs/BASELINE-DELTA-playbook-alignment.md",
-   "phase": "playbook-alignment Phase 4 (2026-09-16)",
-   "reason": "wrapup.md.j2 5.7 observe line gains the `--claim` clause for the supersedes relation (SPEC-playbook-alignment S7 / AC-007, review finding 5202e61acb247105). Verified before re-capture that `wrapup` is the ONLY moved command in every arm and moves identically in auto_safe and ask; advance and picker blocks untouched."
-  },
-  {
-   "task": "objective-gap-proposal",
-   "phase": 4,
-   "moved": [
-    "plan"
-   ],
-   "aggregate_delta_chars": 1049,
-   "attributed_in": "work-docs/BASELINE-DELTA-objective-gap-proposal.md",
-   "reason": "plan gained the Step 0.5 consent question and Step 4.9 (objective draft after the interview, one --from-proposal call). Verified before re-capture that plan is the ONLY moved command in every arm and identically in auto_safe and ask."
-  },
-  {
-   "task": "objective-gap-proposal",
-   "phase": "review-fix",
-   "moved": [
-    "plan"
-   ],
-   "aggregate_delta_chars": 166,
-   "attributed_in": "work-docs/BASELINE-DELTA-objective-gap-proposal.md",
-   "reason": "Post-review fix (finding 0a2499c3): Step 0.5 now offers the draft-consent question on the filled-in, zero-objective branch instead of exiting early. Verified before re-capture that plan is the ONLY moved command in every arm."
-  },
-  {
-   "task": "outcome-measure",
-   "phase": "3",
-   "moved": [
-    "wrapup"
-   ],
-   "aggregate_delta_chars": 1202,
-   "attributed_in": "work-docs/BASELINE-DELTA-outcome-measure.md",
-   "reason": "wrapup 5.7 gained the third answer-gated block (`outcome-measure`: \"Measure outcomes now?\", one `hm world outcome measure --all` call) and its heading says three questions. Verified before re-capture that wrapup is the ONLY moved command in every arm."
-  },
-  {
-   "task": "intent-layer-ops",
-   "phase": "3",
-   "moved": [
-    "wrapup"
-   ],
-   "aggregate_delta_chars": 648,
-   "attributed_in": "work-docs/BASELINE-DELTA-intent-layer-ops.md",
-   "reason": "wrapup 5.7 gained one sentence after the outcome-measure block: print `[intent] withdrawal criterion met ...` when the gap output reports withdrawal.due (ADR-005, zero new calls). Verified before re-capture that wrapup is the ONLY moved command in every arm."
-  },
-  {
-   "task": "assumption-entry-and-evidence-locator",
-   "phase": "4",
-   "moved": [
-    "wrapup"
-   ],
-   "aggregate_delta_chars": 713,
-   "attributed_in": "work-docs/BASELINE-DELTA-assumption-entry-and-evidence-locator.md",
-   "reason": "wrapup 5.7's assumption block gained the 'new — record an assumption' option (one `hm world assume add` call), the four-option cap with stale-first ids from `hm world gap --json`, and `[--locator <path:A-B>]` on the observe line. Re-captured on top of intent-layer-ops (rebased). Verified before re-capture that wrapup is the ONLY moved command in every arm and the command set did not drift. Re-captured again after the post-review fix: the 5.7 'new' branch now shows the exact add arguments and asks once more before running (codex dbc13952); wrapup the ONLY moved command."
-  },
-  {
-   "task": "observed-harness-gaps-salvage",
-   "phase": "6",
-   "moved": [
-    "execute",
-    "plan",
-    "review",
-    "wrapup"
-   ],
-   "aggregate_delta_chars": 2258,
-   "attributed_in": "work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md",
-   "reason": "Salvage of observed-harness-gaps: execute warm tier -> hm memory_retrieve (bodies, not slugs); plan's --barrier-index integer note (every depth); review telemetry paragraph (wall_time_ms optional, never 0); wrapup main-loop proposal-backlog line at the head of Steps 6 -> 7.6. Verified before re-capture that only these commands moved in every arm and the command set did not drift. Re-captured again after the user-directed review repair: execute dropped its now-redundant item-3 wiki skim and review's telemetry sentence was tightened ('never 0 for an unmeasured round'); execute and review the ONLY moved commands."
-  },
-  {
-   "aggregate_delta_chars": 1014,
-   "attributed_in": "work-docs/BASELINE-DELTA-mission-context-loop.md",
-   "moved": [
-    "help",
-    "wrapup"
-   ],
-   "phase": "4",
-   "reason": "wrapup 5.1 gained the 5.1.0 fact-safe search-before-write blockquote (one `hm memory_retrieve` call; never reuse a [wiki:fact] slug) and the slug bullet names the reused non-fact slug; help gained the `project-knowledge` skill row. Verified before re-capture that help and wrapup are the ONLY moved commands in every arm and the command set did not drift. Re-captured again after the review's Codex P1 fixes (2026-09-19): 5.1.0 gained the exact-slug Grep check (+187 per variant, zero new calls); wrapup the ONLY moved command in every arm. Re-captured a third time after the re-review's P1 fix (exact-slug Grep states the base path, two levels above <WT>); wrapup the ONLY moved command. Re-captured a fourth time at /hm:verify: the 5.1.0 base-path note no longer names `<WT>` (it leaked into the worktree-OFF render; test_worktree_surface_gating); wrapup the ONLY moved command. Re-captured once more at wrapup after rebasing onto observed-harness-gaps-salvage (its wrapup Steps 6 -> 7.6 paragraph and this task's 5.1.0 are disjoint); wrapup and help the ONLY moved commands relative to that landed golden.",
-   "task": "mission-context-loop"
-  },
-  {
-   "commands": [
-    "wrapup"
-   ],
-   "phase": "3",
-   "reason": "The withdrawal notice in wrapup Step 5.7 now quotes `quiet_wrapups` and `last_signal_at` and no longer asserts 'no observed objective' - the replacement rule never evaluates how many objectives carry `observed:`, so the old sentence told the operator the criterion checked something it did not. Verified before re-capture that `wrapup` is the ONLY moved command in EVERY one of the four arms and that no command was added or removed. The notice is a net 10 characters SHORTER than the one it replaces, so no `surface_allowance` was declared: an allowance would have had to be retired at wrapup, and the recorded failure mode of that mechanism is that nothing folds the growth and main goes red by the declared delta after the task lands.",
-   "task": "withdrawal-criterion-window"
-  }
- ]
+  "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
+  "rebases": [
+    {
+      "aggregate_delta_chars": 1456,
+      "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
+      "phase": 4,
+      "reason": "Phase 4 adds the stage-guarded backgrounding blocks to the shared second-opinion dispatch partial, which this repo renders because second_opinion.models is non-empty. Phase 3's byte-neutrality was verified against the pre-Phase-3 capture first."
+    },
+    {
+      "aggregate_delta_chars": -54,
+      "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
+      "phase": 5,
+      "reason": "Phase 5 SHRINKS the rendered surface by 54 chars, in two attributed edits: review.md.j2 drops the `- Start from `harness.yaml.reviewers.enabled`.` bullet (-47, AC-015 \u2014 the list is not an input to lens_dispatch, so the instruction was a lever that does not exist), and step_manifest.md.j2's disclosed default for autopilot_persistent goes `false` -> `true` (-1 x 7 commands, AC-007 \u2014 the class default is True). No autopilot advance or picker block moved; the Phase 3 byte-neutrality claim is unaffected because both edits are outside the advance block."
+    },
+    {
+      "aggregate_delta_chars": 416,
+      "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
+      "phase": "review-fixes",
+      "reason": "/hm:review returned two P1s whose fix was an ADDED rendered instruction: wrapup.md.j2 gains the roll-up producer (the manifest staged a path nothing wrote, so ADR-002's survives-a-clone guarantee was unreachable), and health.md.j2 passes --targets (smoke_check's applicability parameter had no production caller, so the cursor-only false alarm shipped unchanged). Only wrapup moves in these arms; the autopilot advance and picker blocks are untouched, so Phase 3's byte-neutrality claim for them still holds."
+    },
+    {
+      "aggregate_delta_chars": {
+        "ask@flag_off": -1463,
+        "ask@flag_on": -1463,
+        "auto_safe@spec-driven": -1463,
+        "auto_safe@task-driven": -1399
+      },
+      "attributed_in": "work-docs/BASELINE-DELTA-observability-rows-at-base.md",
+      "phase": "observability-rows-at-base (2026-09-12)",
+      "reason": "Two attributed template edits, neither inside the autopilot advance or picker blocks. verify.md.j2 retires the hand-written verify-<date>.jsonl record (nothing read it; -1484 in the spec-driven-carrying arms, -1420 task-driven). wrapup.md.j2's roll-up paragraph now names the invalid-choice failure of a pre-rollup plugin and was compacted to net +21."
+    },
+    {
+      "aggregate_delta_chars": {
+        "ask@flag_off": -8234,
+        "ask@flag_on": -8234,
+        "auto_safe@spec-driven": -8222,
+        "auto_safe@task-driven": -8360
+      },
+      "attributed_in": "work-docs/BASELINE-DELTA-workflow-steps-vs-model-capability.md",
+      "phase": "workflow-steps-vs-model-capability Phases 3-4 (2026-09-12)",
+      "reason": "Attributed shrink, neither inside the autopilot advance nor the picker block: the 5-term inequality ceremony (partial + term list + per-round checklist) is deleted from research/spec/plan/loop and the comprehension partial's pointer to it is reworded (PLAN ADR-004); verify Check 1 drops its LLM PLAN/SPEC coverage judgement (1b) and keeps the mechanical drift-verdict read (ADR-003); review.md.j2 loses one word. Moved commands per arm: loop, plan, research, review, spec, verify. Deltas are against the base checkout (main @ 51b5bbfb), whose own drift from the frozen surface baseline is the earlier rows' business. Re-measured last after the second /hm:review's fixes (verify Check 1 note narrowed, Step 0.5 receipt sentence, retired-ledger claim scoped, CI verify wording)."
+    },
+    {
+      "aggregate_delta_chars": "review only; one added sentence in Step 3.3 (charset check before the shell line)",
+      "attributed_in": "work-docs/BASELINE-DELTA-intent-world-model-objective-layer.md",
+      "phase": "intent-world-model-objective-layer /hm:review fixes (2026-09-16)",
+      "reason": "/hm:review round 2 fix for a P1 security finding: review.md.j2 Step 3.3 now requires <id> to match [A-Z0-9-]+ before it is substituted into the `hm world objective show` shell line, and skips on mismatch. Verified before re-capture that `review` is the ONLY moved command in every arm and that it moves identically in auto_safe and ask; the advance and picker blocks are untouched."
+    },
+    {
+      "aggregate_delta_chars": {
+        "claude": 67,
+        "codex": 67
+      },
+      "attributed_in": "work-docs/BASELINE-DELTA-playbook-alignment.md",
+      "phase": "playbook-alignment Phase 4 (2026-09-16)",
+      "reason": "wrapup.md.j2 5.7 observe line gains the `--claim` clause for the supersedes relation (SPEC-playbook-alignment S7 / AC-007, review finding 5202e61acb247105). Verified before re-capture that `wrapup` is the ONLY moved command in every arm and moves identically in auto_safe and ask; advance and picker blocks untouched."
+    },
+    {
+      "aggregate_delta_chars": 1049,
+      "attributed_in": "work-docs/BASELINE-DELTA-objective-gap-proposal.md",
+      "moved": [
+        "plan"
+      ],
+      "phase": 4,
+      "reason": "plan gained the Step 0.5 consent question and Step 4.9 (objective draft after the interview, one --from-proposal call). Verified before re-capture that plan is the ONLY moved command in every arm and identically in auto_safe and ask.",
+      "task": "objective-gap-proposal"
+    },
+    {
+      "aggregate_delta_chars": 166,
+      "attributed_in": "work-docs/BASELINE-DELTA-objective-gap-proposal.md",
+      "moved": [
+        "plan"
+      ],
+      "phase": "review-fix",
+      "reason": "Post-review fix (finding 0a2499c3): Step 0.5 now offers the draft-consent question on the filled-in, zero-objective branch instead of exiting early. Verified before re-capture that plan is the ONLY moved command in every arm.",
+      "task": "objective-gap-proposal"
+    },
+    {
+      "aggregate_delta_chars": 1202,
+      "attributed_in": "work-docs/BASELINE-DELTA-outcome-measure.md",
+      "moved": [
+        "wrapup"
+      ],
+      "phase": "3",
+      "reason": "wrapup 5.7 gained the third answer-gated block (`outcome-measure`: \"Measure outcomes now?\", one `hm world outcome measure --all` call) and its heading says three questions. Verified before re-capture that wrapup is the ONLY moved command in every arm.",
+      "task": "outcome-measure"
+    },
+    {
+      "aggregate_delta_chars": 648,
+      "attributed_in": "work-docs/BASELINE-DELTA-intent-layer-ops.md",
+      "moved": [
+        "wrapup"
+      ],
+      "phase": "3",
+      "reason": "wrapup 5.7 gained one sentence after the outcome-measure block: print `[intent] withdrawal criterion met ...` when the gap output reports withdrawal.due (ADR-005, zero new calls). Verified before re-capture that wrapup is the ONLY moved command in every arm.",
+      "task": "intent-layer-ops"
+    },
+    {
+      "aggregate_delta_chars": 713,
+      "attributed_in": "work-docs/BASELINE-DELTA-assumption-entry-and-evidence-locator.md",
+      "moved": [
+        "wrapup"
+      ],
+      "phase": "4",
+      "reason": "wrapup 5.7's assumption block gained the 'new \u2014 record an assumption' option (one `hm world assume add` call), the four-option cap with stale-first ids from `hm world gap --json`, and `[--locator <path:A-B>]` on the observe line. Re-captured on top of intent-layer-ops (rebased). Verified before re-capture that wrapup is the ONLY moved command in every arm and the command set did not drift. Re-captured again after the post-review fix: the 5.7 'new' branch now shows the exact add arguments and asks once more before running (codex dbc13952); wrapup the ONLY moved command.",
+      "task": "assumption-entry-and-evidence-locator"
+    },
+    {
+      "aggregate_delta_chars": 2258,
+      "attributed_in": "work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md",
+      "moved": [
+        "execute",
+        "plan",
+        "review",
+        "wrapup"
+      ],
+      "phase": "6",
+      "reason": "Salvage of observed-harness-gaps: execute warm tier -> hm memory_retrieve (bodies, not slugs); plan's --barrier-index integer note (every depth); review telemetry paragraph (wall_time_ms optional, never 0); wrapup main-loop proposal-backlog line at the head of Steps 6 -> 7.6. Verified before re-capture that only these commands moved in every arm and the command set did not drift. Re-captured again after the user-directed review repair: execute dropped its now-redundant item-3 wiki skim and review's telemetry sentence was tightened ('never 0 for an unmeasured round'); execute and review the ONLY moved commands.",
+      "task": "observed-harness-gaps-salvage"
+    },
+    {
+      "aggregate_delta_chars": 1014,
+      "attributed_in": "work-docs/BASELINE-DELTA-mission-context-loop.md",
+      "moved": [
+        "help",
+        "wrapup"
+      ],
+      "phase": "4",
+      "reason": "wrapup 5.1 gained the 5.1.0 fact-safe search-before-write blockquote (one `hm memory_retrieve` call; never reuse a [wiki:fact] slug) and the slug bullet names the reused non-fact slug; help gained the `project-knowledge` skill row. Verified before re-capture that help and wrapup are the ONLY moved commands in every arm and the command set did not drift. Re-captured again after the review's Codex P1 fixes (2026-09-19): 5.1.0 gained the exact-slug Grep check (+187 per variant, zero new calls); wrapup the ONLY moved command in every arm. Re-captured a third time after the re-review's P1 fix (exact-slug Grep states the base path, two levels above <WT>); wrapup the ONLY moved command. Re-captured a fourth time at /hm:verify: the 5.1.0 base-path note no longer names `<WT>` (it leaked into the worktree-OFF render; test_worktree_surface_gating); wrapup the ONLY moved command. Re-captured once more at wrapup after rebasing onto observed-harness-gaps-salvage (its wrapup Steps 6 -> 7.6 paragraph and this task's 5.1.0 are disjoint); wrapup and help the ONLY moved commands relative to that landed golden.",
+      "task": "mission-context-loop"
+    }
+  ]
 }

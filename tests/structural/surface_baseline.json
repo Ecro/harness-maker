@@ -1,12 +1,12 @@
 {
   "aggregate_chars": {
-    "claude": 444697,
-    "codex": 378032
+    "claude": 401697,
+    "codex": 340105
   },
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus that variant's DISPATCH call-site form \u2014 'Task(subagent_type=' on claude, 'spawn_agent(agent_type=\"' on codex; fenced examples included, backticked prose excluded. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
-  "payload_digest": "ea3a80b1ce33f2c7b4c4a7b06a7df798667b83f16d0f6bf412dc86dd69ac5979",
-  "render_sha": "fb8bfaca99c5571f03b2752545b7fa8c306793c9",
+  "payload_digest": "9391eaf58c15bf135725e61d3a964f4adf45a198578624f3ea042d1e092cf1ab",
+  "render_sha": "865e3ef578f5954da05c06b2d5264d76fe4d63bb",
   "schema_version": 1,
   "surface": {
     "claude": {
@@ -15,19 +15,19 @@
         "round_trips": 4
       },
       "execute": {
-        "chars": 51627,
-        "round_trips": 18
+        "chars": 62670,
+        "round_trips": 25
       },
       "health": {
         "chars": 9641,
         "round_trips": 6
       },
       "help": {
-        "chars": 2097,
+        "chars": 2047,
         "round_trips": 0
       },
       "loop": {
-        "chars": 51265,
+        "chars": 51336,
         "round_trips": 10
       },
       "loop-p5-batch": {
@@ -42,74 +42,66 @@
         "chars": 15416,
         "round_trips": 7
       },
-      "plan": {
-        "chars": 66702,
-        "round_trips": 29
-      },
       "research": {
-        "chars": 23608,
+        "chars": 23649,
         "round_trips": 8
       },
       "review": {
-        "chars": 87407,
+        "chars": 87395,
         "round_trips": 34
       },
       "spec": {
-        "chars": 35251,
-        "round_trips": 7
+        "chars": 47904,
+        "round_trips": 12
       },
       "uninstall": {
         "chars": 1700,
         "round_trips": 3
       },
       "verify": {
-        "chars": 23930,
+        "chars": 23898,
         "round_trips": 12
       },
       "wrapup": {
-        "chars": 52551,
+        "chars": 52539,
         "round_trips": 33
       }
     },
     "codex": {
       "hm-execute": {
-        "chars": 50501,
-        "round_trips": 17
+        "chars": 61595,
+        "round_trips": 24
       },
       "hm-help": {
-        "chars": 2371,
+        "chars": 2321,
         "round_trips": 0
       },
       "hm-loop": {
-        "chars": 50173,
+        "chars": 50244,
         "round_trips": 11
       },
       "hm-loop-p5-batch": {
         "chars": 5251,
         "round_trips": 0
       },
-      "hm-plan": {
-        "chars": 61880,
-        "round_trips": 17
-      },
       "hm-research": {
-        "chars": 21215,
+        "chars": 21256,
         "round_trips": 7
       },
       "hm-review": {
-        "chars": 83810,
+        "chars": 83798,
         "round_trips": 29
       },
       "hm-spec": {
-        "chars": 30733,
-        "round_trips": 7
+        "chars": 43586,
+        "round_trips": 12
       },
       "hm-verify": {
-        "chars": 21292,
+        "chars": 21260,
         "round_trips": 9
       },
       "hm-wrapup": {
-        "chars": 50806,
+        "chars": 50794,
         "round_trips": 31
       }
     }

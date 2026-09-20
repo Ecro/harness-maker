@@ -78,11 +78,11 @@ def _in_order(text: str, needles: tuple[str, ...] | list[str]) -> bool:
 
 
 @pytest.mark.parametrize("target", ["claude", "codex"])
-def test_ac_011_plan_loads_state_matches_rejected_and_loops_the_revisit_before_step_1(
+def test_ac_011_spec_loads_state_matches_rejected_and_loops_the_revisit_before_step_1(
     surface: dict[str, dict[str, str]], target: str
 ) -> None:
-    plan = _command(surface, target, "plan")
-    before = plan[: plan.index("Step 1 — Pre-interview")]
+    plan = _command(surface, target, "spec")
+    before = plan[: plan.index("Step 1 — Knowledge retrieval")]
     lines = _mandated_lines(before, target)
     assert any("intent.yaml" in ln and "assumptions.yaml" in ln for ln in lines), lines
     assert "rejected" in before
@@ -266,10 +266,10 @@ def test_ac_004_skill_renders_gap_situation_and_candidate_rules(target: Target, 
 
 
 @pytest.mark.parametrize("target", ["claude", "codex"])
-def test_ac_005_plan_offers_draft_after_none_and_creates_at_step_4_9(
+def test_ac_005_spec_offers_draft_after_none_and_creates_at_step_4_9(
     surface: dict[str, dict[str, str]], target: str
 ) -> None:
-    plan = _command(surface, target, "plan")
+    plan = _command(surface, target, "spec")
     q_pick = plan.index("Which objective does this task serve?")
     q_draft = plan.index("Draft an objective for this task?", q_pick)  # the "none" bullet
     step_49 = plan.index("Step 4.9")

@@ -22,8 +22,8 @@ def test_resolve_toggle_config_valid_defaults() -> None:
 
 
 def test_resolve_toggle_config_custom_pipeline() -> None:
-    _level, stages = autopilot.resolve_toggle_config("full", "research,plan")
-    assert [s.value for s in stages] == ["research", "plan"]
+    _level, stages = autopilot.resolve_toggle_config("full", "research,execute")
+    assert [s.value for s in stages] == ["research", "execute"]
 
 
 def test_resolve_toggle_config_rejects_bad_level() -> None:
@@ -38,7 +38,7 @@ def test_resolve_toggle_config_rejects_bad_pipeline() -> None:
 
 def test_dotform_on_writes_then_off_clears(tmp_path: Path) -> None:
     rc = autopilot.main(
-        ["on", "--level", "auto_safe", "--pipeline", "research,plan", "--root", str(tmp_path)]
+        ["on", "--level", "auto_safe", "--pipeline", "research,execute", "--root", str(tmp_path)]
     )
     assert rc == 0
     assert autopilot.load(tmp_path, session_id=None) is not None

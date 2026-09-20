@@ -12,7 +12,6 @@
 |---|---|
 | `{{ cmd }}research` | 컨텍스트·선행 작업·라이브러리 문서 조사 |
 | `{{ cmd }}spec`     | 수용 기준 확정 (intent / outcomes / scenarios) |
-| `{{ cmd }}plan`     | 깊은 인터뷰 → ADR → 단계 분해 |
 | `{{ cmd }}execute`  | TDD 머신 — PLAN 단계별 RED → GREEN |
 | `{{ cmd }}review`   | 다중 reviewer 합의 + grade gate + auto-fix |
 | `{{ cmd }}wrapup`   | 단일 commit, CHANGELOG, 문서 갱신 |
@@ -32,7 +31,7 @@
 ## 🔁 추천 워크플로
 
 ```
-  research ─► spec ─► plan ─► execute ─► review ─► verify ─► wrapup
+  research ─► spec ─► execute ─► review ─► verify ─► wrapup
 ```
 
 stage 연결은 `{{ cmd }}loop` 또는 autopilot 이 담당합니다 — 융합 워크플로우 명령은 없습니다. <!-- @hm:axis-removed -->

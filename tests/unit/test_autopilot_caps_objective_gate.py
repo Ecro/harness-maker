@@ -268,7 +268,7 @@ def test_ac_012_the_entrypoint_takes_no_objective_argument() -> None:
     assert "objective" not in inspect.signature(autopilot_caps._cmd_boundary).parameters
     with pytest.raises(SystemExit):
         autopilot_caps.main(
-            ["boundary", "--root", ".", "--current", "plan", "--objective", "OBJ-1"]
+            ["boundary", "--root", ".", "--current", "execute", "--objective", "OBJ-1"]
         )
 
 

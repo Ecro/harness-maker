@@ -40,9 +40,7 @@ from _surface_baseline import measure_surface  # noqa: E402
 
 #: The shipped pipeline order (harness.yaml), not the enum order — the fixture must describe
 #: the surface a real session runs.
-_PIPELINE = [
-    AtomicStage(s) for s in ("research", "spec", "plan", "execute", "review", "verify", "wrapup")
-]
+_PIPELINE = [AtomicStage(s) for s in ("research", "spec", "execute", "review", "verify", "wrapup")]
 _STAGES = [s.value for s in _PIPELINE]
 _KEEP = ("proceed", "halt_kind", "next_stage", "pipeline_complete", "judgment_auto_answered")
 

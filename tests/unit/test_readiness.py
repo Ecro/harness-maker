@@ -223,7 +223,7 @@ def test_workflow_clarity_full_setup(tmp_path: Path) -> None:
     cmd_dir.mkdir(parents=True)
     # atomic_stages_complete needs ALL seven, not just one (it replaced the old
     # fused_workflow_present signal — PLAN-harness-diet ADR-002).
-    for stage in ("research", "spec", "plan", "execute", "review", "wrapup", "verify"):
+    for stage in ("research", "spec", "execute", "review", "wrapup", "verify"):
         (cmd_dir / f"{stage}.md").write_text(f"---\ncontent_hash: abc\n---\n# /hm:{stage}\n")
     res = compute_readiness(tmp_path, Preset.SIDE)
     w = res.dimensions["workflow_clarity"]

@@ -19,7 +19,7 @@ import pytest
 from harness_maker import autopilot, autopilot_caps, autopilot_ledger, spec_machine
 from harness_maker.models import AtomicStage
 
-PIPELINE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.PLAN, AtomicStage.EXECUTE]
+PIPELINE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.EXECUTE]
 
 
 @pytest.fixture(autouse=True)
@@ -79,11 +79,11 @@ def test_chain_records_authorized_then_entered(tmp_path: Path) -> None:
     assert _events(tmp_path) == [("advance_authorized", "spec")]
 
     second = _boundary(tmp_path, "spec", "--slug", "s", "--judgment-gate", "clear")
-    assert second["next_stage"] == "plan"
+    assert second["next_stage"] == "execute"
     assert _events(tmp_path) == [
         ("advance_authorized", "spec"),
         ("advance_entered", "spec"),
-        ("advance_authorized", "plan"),
+        ("advance_authorized", "execute"),
     ]
 
 
@@ -146,7 +146,7 @@ def test_step_cap_fires_once_entries_accumulate(tmp_path: Path) -> None:
     _arm(tmp_path)
     _boundary(tmp_path, "research", "--slug", "s")
     _boundary(tmp_path, "spec", "--slug", "s")  # 1 entry recorded
-    blocked = _boundary(tmp_path, "plan", "--slug", "s", "--step-cap", "1")
+    blocked = _boundary(tmp_path, "execute", "--slug", "s", "--step-cap", "1")
     assert blocked["proceed"] is False
     assert blocked["halt_kind"] == "step_cap"
 

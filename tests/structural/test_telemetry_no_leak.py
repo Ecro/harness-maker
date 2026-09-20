@@ -50,6 +50,10 @@ def test_no_jinja_injection_of_wall_time_ms_in_templates() -> None:
 _OBSERVABILITY_ALLOWLIST: frozenset[str] = frozenset(
     {
         "src/harness_maker/templates/stages/review.md.j2",  # Phase A4 emitter
+        # spec-validator cites `.claude/observability/stage-agents.jsonl` for the 0-APPROVED
+        # -in-54 record that justifies its single-pass, never-blocking contract. Inherited
+        # from `plan-validator_body.md.j2`, which held the same allowlist slot.
+        "src/harness_maker/templates/agents/spec-validator_body.md.j2",
         "src/harness_maker/templates/stages/verify.md.j2",  # pre-existing
         # /hm:health absorbs ai-readiness/refresh/personalization-audit (ADR-006)
         "src/harness_maker/templates/commands/hm/health.md.j2",

@@ -1,4 +1,6 @@
-"""Phase 7 tests: Codex skills dual-render + 7 stage skills.
+"""Phase 7 tests: Codex skills dual-render + 6 stage skills.
+
+`plan` was removed by SPEC-plan-stage-absorption (IRR-001), taking `@hm-plan` with it.
 
 RED before Phase 7:
 - templates/codex/stage_skill.md.j2 does not exist
@@ -26,7 +28,7 @@ from harness_maker.synthesize import (
     _codex_target_files,
 )
 
-_STAGES = _ATOMIC_STAGES  # ["research", "spec", "plan", "execute", "review", "wrapup", "verify"]
+_STAGES = _ATOMIC_STAGES  # ["research", "spec", "execute", "review", "wrapup", "verify"]
 
 
 def _render_stage_skill(stage: str) -> str:
@@ -106,7 +108,7 @@ def test_stage_skill_research_mentions_harness_maker() -> None:
 def test_codex_stage_skills_returns_7_entries() -> None:
     """_codex_stage_skills() must return 7 entries (one per atomic stage)."""
     specs = _codex_stage_skills()
-    assert len(specs) == 7, f"Expected 7 stage skill specs, got {len(specs)}"
+    assert len(specs) == 6, f"Expected 6 stage skill specs, got {len(specs)}"
 
 
 def test_codex_stage_skills_output_paths() -> None:
@@ -132,7 +134,7 @@ def test_codex_target_files_includes_existing_skills() -> None:
 
 
 def test_codex_target_files_includes_stage_skills() -> None:
-    """_codex_target_files() must include all 7 stage skills at .agents/skills/hm-<stage>/."""
+    """_codex_target_files() must include all 6 stage skills at .agents/skills/hm-<stage>/."""
     out_paths = {out for _, out, _ in _codex_target_files()}
     for stage in _STAGES:
         assert f".agents/skills/hm-{stage}/SKILL.md" in out_paths, (
@@ -167,4 +169,4 @@ def test_codex_target_files_total_skill_count() -> None:
     # 22 → 23 (2026-09-19, SPEC-mission-context-loop): the `project-knowledge` skill. Same
     # constants (`synthesize._ALL_SKILLS`, `interview._ALL_SKILLS`, the Side enabled list,
     # this count, `test_synthesize_codex`'s base).
-    assert len(out_paths) == 23, f"Expected 23 skill paths, got {len(out_paths)}"
+    assert len(out_paths) == 22, f"Expected 22 skill paths, got {len(out_paths)}"

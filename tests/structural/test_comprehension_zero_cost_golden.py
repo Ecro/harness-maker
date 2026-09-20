@@ -55,7 +55,18 @@ def test_the_golden_parses_and_is_not_a_stub(golden: dict[str, object]) -> None:
     assert isinstance(digests, dict)
     measured = {(v, c) for v, cmds in TRACKED_COMMANDS.items() for c in cmds}
     recorded = {(v, c) for v, cmds in digests.items() for c in cmds}
-    assert recorded == measured, "golden's variant/command set drifted from the tracked set"
+    # Containment, not equality — and the direction matters. This golden is a PRE-CHANGE
+    # capture whose `source_sha` must name a commit where the partial did not exist, so it
+    # can never be regenerated to follow the tracked set (the test below is what enforces
+    # that, and regenerating it here would launder the very oracle AC-003 compares against).
+    # A command REMOVED since the capture therefore stays in the file forever:
+    # SPEC-plan-stage-absorption removed `plan` / `hm-plan`, and both digests remain below.
+    # What must still hold is that nothing TRACKED is missing — a new command with no frozen
+    # digest is the drift this originally caught, and that half is unchanged.
+    assert measured <= recorded, (
+        "a tracked command has no digest in the golden: "
+        f"{sorted(measured - recorded)} — the pre-change oracle does not cover it"
+    )
     for variant, cmds in digests.items():
         for name, value in cmds.items():
             assert isinstance(value, str), (variant, name, value)

@@ -104,7 +104,10 @@ def test_the_committed_numbers_are_not_zeros(frozen: dict[str, object]) -> None:
     surface = frozen["surface"]
     assert isinstance(surface, dict)
     entries = [(v, n, e) for v, cmds in surface.items() for n, e in cmds.items()]
-    assert len(entries) >= 25, f"only {len(entries)} commands measured"
+    # 25 -> 23: `/hm:plan` and `@hm-plan` were removed (SPEC-plan-stage-absorption
+    # IRR-001), one per target. A floor, not an equality — it guards a degraded render
+    # that measured almost nothing, and that property is unchanged.
+    assert len(entries) >= 23, f"only {len(entries)} commands measured"
     for variant, name, entry in entries:
         assert isinstance(entry["chars"], int), (variant, name, entry)
         assert entry["chars"] > 0, (variant, name, entry)
@@ -361,8 +364,10 @@ def test_the_generator_measured_both_target_variants(
     """`.cursor/commands/` is dead code in `render.py` (:571-582 — no template feeds it),
     so Cursor reads the Claude render and there are exactly two distinct artifacts."""
     assert set(measured) == {CLAUDE_VARIANT, CODEX_VARIANT}
-    assert len(measured[CLAUDE_VARIANT]) >= 15, "Claude render produced too few commands"
-    assert len(measured[CODEX_VARIANT]) >= 10, "Codex render produced too few stage skills"
+    # 15 -> 14 for the same reason as the floor above.
+    assert len(measured[CLAUDE_VARIANT]) >= 14, "Claude render produced too few commands"
+    # 10 -> 9: `@hm-plan` went with the stage (SPEC-plan-stage-absorption IRR-001).
+    assert len(measured[CODEX_VARIANT]) >= 9, "Codex render produced too few stage skills"
 
 
 # ── staleness arms (PLAN follow-up: a template change that never re-froze) ─────

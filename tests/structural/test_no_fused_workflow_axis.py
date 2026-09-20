@@ -158,7 +158,7 @@ def renders(tmp_path_factory: pytest.TempPathFactory) -> dict[str, dict[str, str
 def test_the_render_fixture_is_not_empty(renders: dict[str, dict[str, str]]) -> None:
     """Positive control — every absence assertion below is vacuous against an empty render."""
     for label, files in renders.items():
-        stages = [p for p in files if re.search(r"commands/hm/(execute|review|plan)\.md$", p)]
+        stages = [p for p in files if re.search(r"commands/hm/(execute|review|spec)\.md$", p)]
         assert len(stages) == 3, f"{label}: expected 3 atomic stage commands, got {stages}"
         assert any(len(t) > 10_000 for t in files.values()), f"{label}: render looks truncated"
 

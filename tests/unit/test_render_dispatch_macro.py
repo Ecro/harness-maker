@@ -254,7 +254,28 @@ def _briefs_in(body: str) -> list[str]:
 #: Keep this count in step with the set. It said "exactly these two … a third means a dispatch was
 #: lost" while the set already held four — a tripwire that names a threshold it has passed tells a
 #: future reader to be alarmed at the wrong moment, which is worse than no tripwire.
+#: Baseline paths whose COMMAND was removed outright, not collapsed. A deleted command has no
+#: surviving render to compare its lines against, and enumerating every line of one in
+#: `_COLLAPSED_MULTILINE` would drown the set that exists to make each lost line reviewable.
+#: The removal itself is asserted elsewhere — `tests/structural/test_autopilot_gate_render.py`
+#: pins that `plan` left every arm's command set, and
+#: `tests/structural/test_documented_commands_exist.py` pins that nothing still names it.
+#: Named as data so adding a path here is a visible edit, never a silent skip.
+_REMOVED_COMMANDS = {
+    # SPEC-plan-stage-absorption (2026-09-20), IRR-001.
+    ".claude/commands/hm/plan.md",
+    ".claude/stages/plan.md",
+}
+
 _COLLAPSED_MULTILINE = {
+    # SPEC-plan-stage-absorption (2026-09-20): `plan` left `autonomy.pipeline`, and
+    # `step_manifest.md.j2` interpolates that list into EVERY stage's autopilot picker. So the
+    # one picker line below is the frozen spelling; the current render says the same sentence
+    # with `plan` gone. Nothing was lost — the picker still offers the pipeline, it is one stage
+    # shorter — and listing it here rather than regenerating follows this fixture's own rule: a
+    # post-migration capture would approve whatever the macro emits. The surviving line is
+    # pinned by `tests/render/test_render_autopilot_picker_runtimes.py`.
+    ">   `AskUserQuestion` for the `research \u2192 spec \u2192 plan \u2192 execute \u2192 review \u2192 verify \u2192 wrapup` pipeline:",  # noqa: E501 — exact baseline string
     'Task(subagent_type="code-verifier", description="Mode B PIDA: <slug>",',
     # ADR-010 of PLAN-self-induced-regression-gate (2026-08-17): Phase A.5 dispatched three
     # `test-reviewer` calls, one per lens, and now dispatches ONE carrying all three lens
@@ -350,6 +371,8 @@ def test_rendered_claude_arm_still_matches_the_frozen_baseline(preset: Preset) -
     for key, lines in baseline.items():
         key_preset, _, path = key.partition("::")
         if key_preset != preset.value or not path.startswith(".claude/"):
+            continue
+        if path in _REMOVED_COMMANDS:
             continue
         current = {_norm(line) for line in files.get(path, "").splitlines()}
         for line in lines:

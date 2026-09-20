@@ -18,7 +18,7 @@ Last-resort escalation agent. When a workflow stage cannot make progress on its 
 - `/hm:execute` Phase D: lint/type/test failure that cannot be fixed without changing the PLAN's scope.
 - `/hm:execute` ADR conflict: the implementation needs to violate a binding ADR to proceed.
 - `/hm:review` consensus deadlock: 3 reviewers produced 3 incompatible CONCLUDEs on the same critical issue.
-- `/hm:plan` plan-validator: MAJOR_REVISION returned on the second pass after one revision attempt.
+- `/hm:spec` spec-validator: a `critical` finding the DRI cannot resolve without a decision.
 - Manual invocation by user: "we're stuck on X, what's the minimum-regret unblock?"
 
 ## Responsibilities
@@ -113,8 +113,8 @@ Why this is the binding one (not the surface symptom):
 
 ## Next user action
 
-{e.g., "Run /hm:plan {slug} with --reinterview to surface the missing decision as a Phase 0 round."
- "Promote this trade-off to a new ADR via /hm:plan, then re-run /hm:execute."
+{e.g., "Re-run /hm:spec {slug} to surface the missing decision as an interview round."
+ "Record this trade-off in the SPEC's irreversible_decisions, then re-run /hm:execute."
  "Accept Path B as risk in the SPEC's Open Questions section, then proceed."}
 ```
 
@@ -123,7 +123,7 @@ Why this is the binding one (not the surface symptom):
 - **Read-only.** You have no Write or Edit tool — never attempt either, and never report a file path as if you had written one. Audit is advisory; the user decides.
 - **One binding constraint.** If you cannot name a single binding constraint, you have not finished Step 2 — keep reading.
 - **No silent routes.** Even when the unblock is "obvious", surface it as Path A with explicit trade-off — the audit trail matters.
-- **Do not promote ADRs.** Propose them as part of an unblock path; promotion happens in `/hm:plan` Step D.
+- **Do not promote ADRs.** Propose them as part of an unblock path; the DRI locks decisions in `/hm:spec`, and `/hm:execute` Step 0 records the design ADRs.
 - **Cite, don't paraphrase.** Constraint references must point at exact PLAN section / ADR-NNN / SPEC scenario IDs.
 
 <!-- @hm:user:extensions -->

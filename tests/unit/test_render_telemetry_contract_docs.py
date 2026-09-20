@@ -96,7 +96,7 @@ def test_plan_barrier_index_documented_as_int(tmp_path: Path, depth: str | None)
     golden's byte-identity was narrowed on 2026-08-15, and the gate left `minimal` users
     without the type — reopening AC-011 at that depth.
     """
-    body = _rendered(tmp_path, depth)["plan"]
+    body = _rendered(tmp_path, depth)["spec"]
     idx = body.index("--barrier-index")
     window = body[idx : idx + 2500]
     assert "integer" in window, "the plan stage must say the segment is an integer"

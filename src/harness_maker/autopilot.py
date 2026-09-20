@@ -25,6 +25,7 @@ from harness_maker.models import (
     AtomicStage,
     AutonomyConfig,
     OperationalLevel,
+    drop_retired_stages,
     normalize_level,
 )
 from harness_maker.worktree import (
@@ -1030,7 +1031,8 @@ def resolve_toggle_config(
         stages = list(AutonomyConfig().pipeline)
     else:
         try:
-            stages = [AtomicStage(s.strip()) for s in pipeline.split(",") if s.strip()]
+            _kept, _ = drop_retired_stages([s.strip() for s in pipeline.split(",") if s.strip()])
+            stages = [AtomicStage(s) for s in _kept]
         except ValueError as exc:
             raise ValueError(f"invalid --pipeline ({exc})") from None
     return level, stages

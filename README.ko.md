@@ -305,7 +305,7 @@ harness-maker profile . --json
 harness-maker make . --preset Production --locale ko --targets claude-code,cursor
 ```
 
-일회성 렌더는 가능하지만, IDE 내 슬래시 명령 (`/hm:health`, `/hm:plan`, `/hm:execute` 등)은 IDE plugin이 로드해야 나타납니다.
+일회성 렌더는 가능하지만, IDE 내 슬래시 명령 (`/hm:health`, `/hm:spec`, `/hm:execute` 등)은 IDE plugin이 로드해야 나타납니다.
 
 </details>
 
@@ -352,7 +352,7 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 - **Block-merge 보존.** 어떤 agent, skill, CLAUDE.md 섹션이든 손편집. `--update`를 견딤 — 파일별 content hash + `@hm:user:*` 마커가 사용자 편집과 템플릿 소유 영역을 분리하기 때문. `@hm:harness:*` inverted 마커는 외부 설정 흡수용으로 반대 동작.
 - **3-tier 메모리 축적.** `wiki.md` (패턴) · `failures.md` (slug 기반 dedup된 반복 실수) · `session/<date>.md` (non-obvious 결정). Wrapup이 자동으로 쓰고, 모든 stage가 자동으로 읽음.
 - **자기개선 failure 제안.** `[fail:*]` slug가 세션 간 3× 재발하면, wrapup이 `pending-proposals.md`에 제안 작성 — 그 재발을 막을 수 있었을 새 skill / rule / hook. 검토 후 ingest 결정.
-- **ADR 시스템 = execute의 binding 제약.** `/hm:plan` 동안 promote 된 ADR은 `/hm:execute`의 hard 제약. 충돌은 blocker로 surface, silent proceed 절대 없음. 미래 세션이 이미 결정된 사항을 재논의하지 않음.
+- **ADR 시스템 = execute의 binding 제약.** SPEC 의 `irreversible_decisions` 와 `/hm:execute` Step 0 이 PLAN 을 쓰며 기록한 ADR 은 구현의 hard 제약. 충돌은 blocker로 surface, silent proceed 절대 없음. 미래 세션이 이미 결정된 사항을 재논의하지 않음.
 - **Refdocs search.** 아키텍처 문서, API spec, design 문서를 `harness.yaml`에 등록. `refdocs-search` skill이 무손실 full-text search 제공 — 청킹 없음, RAG 인덱스 없음.
 - **선택적 Second Brain.** Obsidian vault 통합. Note 타입별 (decision · preference · failure · project · reference · journal) allowlist 된 쓰기 폴더. 플러그인 재설치나 머신 이동에도 세션 간 메모리 생존.
 - **Brownfield-safe 업그레이드.** `Reconciler`가 기존 `.claude/`를 hash하고 충돌별 keep/replace/both 제공. 적용은 timestamped backup과 함께 ADD-only. 사용자 편집이 silent 덮어쓰여지지 않음.
@@ -373,8 +373,8 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 
 ### 🔁 워크플로 프리미티브 — *나머지 툴체인*
 
-- **권장 순서.** 사소하지 않은 변경은 7-stage 시퀀스를 순서대로 따르는 것을 권장합니다 — `/hm:research` → `/hm:spec` → `/hm:plan` → `/hm:execute` → `/hm:review` → `/hm:wrapup` → `/hm:verify`. 각 stage의 출력이 다음 stage로 이어지며, `/hm:execute`로 바로 건너뛰면 SPEC 게이트·consensus 리뷰·verify 체크를 잃습니다. stage 사이 hand-off 없이 이어가려면 `/hm:loop`(경계 있는 autoloop) 또는 autopilot 을 사용하세요.
-- **구현 전 깊은 인터뷰.** `/hm:spec`이 6-카테고리 인터뷰 (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification)를 완전성 점수화하여 실행. `/hm:plan`이 9-카테고리 인터뷰 (scope → architecture → contract → risk → testing → phasing → dependencies → failure handling → observability)를 impact 순서로 실행. 모든 settled 결정이 binding ADR로 promote.
+- **권장 순서.** 사소하지 않은 변경은 6-stage 시퀀스를 순서대로 따르는 것을 권장합니다 — `/hm:research` → `/hm:spec` → `/hm:execute` → `/hm:review` → `/hm:wrapup` → `/hm:verify`. 각 stage의 출력이 다음 stage로 이어지며, `/hm:execute`로 바로 건너뛰면 SPEC 게이트·consensus 리뷰·verify 체크를 잃습니다. stage 사이 hand-off 없이 이어가려면 `/hm:loop`(경계 있는 autoloop) 또는 autopilot 을 사용하세요.
+- **구현 전 깊은 인터뷰.** `/hm:spec`이 6-카테고리 인터뷰 (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification)를 완전성 점수화하여 실행. 되돌리기 어려운 결정은 같은 인터뷰의 `irreversible_decisions` 로 잠기고, phase·순서·위험 같은 *how* 는 `/hm:execute` Step 0 이 사람 게이트 없이 직접 씁니다.
 - **적응형 인터뷰 + 4-게이트 수렴 autoloop.** `/hm:loop`이 time-and-iteration-bounded 루프 실행. `autoloop-driver`가 goal을 읽고 누락된 것만 질문, loop intensity + exit checklist lock, 그 후 mechanical check + LLM judgment + regression 비교 + 2-iter convergence streak가 완료 수락 전 모두 필요.
 - **3-tier 컨텍스트 로딩 + compaction 복구.** Hot tier (오늘 session) · Warm tier (failures + wiki 첫 60/40줄) · Cold tier (git log / PLAN on demand). `PreCompact` hook이 context compaction 전에 session flush; 다음 turn이 마커를 감지하고 마지막 in-progress phase에서 resume.
 - **Cross-process 메모리 안전성.** `.claude/memory/` 쓰기는 re-entrant POSIX flock으로 serialize. Telemetry hook이 `O_APPEND`에 raw `os.write()`로 원자적 append (single-syscall, ≤PIPE_BUF) — concurrent Claude Code + Cursor 세션이 JSONL 라인을 interleave 불가.
@@ -389,7 +389,7 @@ harness-maker는 `0.x` 단계이며 1.0 약속이 정직해질 만큼의 의존 
 
 **고정 표면(Frozen surfaces)** — deprecation cycle 없이는 어떤 0.x.minor에서도 깨지지 않습니다:
 
-- **슬래시 명령 이름**: `/hm:make`, `/hm:research`, `/hm:plan`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/harness-maker:make`.
+- **슬래시 명령 이름**: `/hm:make`, `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/harness-maker:make`.
 - **`harness.yaml` 최상위 키**: `targets`, `preset`, `dev_mode`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
 - **Plugin manifest 스키마**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — 각 marketplace 공식 spec에 포함된 필드들.
 - **로컬 전용 telemetry 보장** — [`PRIVACY.md`](PRIVACY.md) 참조. 문서-vs-실제 불일치는 P0 버그로 취급합니다.

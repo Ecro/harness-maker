@@ -26,7 +26,6 @@ CLAUDE = SANDBOX / ".claude"
 REQUIRED_COMMANDS = [
     "research",
     "spec",
-    "plan",
     "execute",
     "review",
     "wrapup",

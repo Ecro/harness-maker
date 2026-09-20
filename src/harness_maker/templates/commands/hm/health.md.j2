@@ -68,7 +68,7 @@ rate-limit / subscription cap, schema/flag drift) look identical to "model agree
 add". A silently-degraded model means every *mandatory* review/plan second opinion is running
 without that voice and nobody notices.
 > **Same entrypoint, base-only.** The smoke calls `harness_maker.second_opinion_invoke` — the
-> identical path `/hm:review` and `/hm:plan` use. A hand-copied duplicate drifted before and
+> identical path `/hm:review` and `/hm:spec` use. A hand-copied duplicate drifted before and
 > reported green for months against a dead codex vote. But `/hm:health` has no worktree
 > preflight, so a pass proves the shared path works *from the base* only; the worktree branch of
 > base-root/config resolution is carried by unit tests and the manual check. Never read green

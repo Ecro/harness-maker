@@ -6,7 +6,7 @@
   For each enabled model, includes the right per-model transport partial (codex / antigravity),
   each of which emits its own invoke + adapt + graceful-skip recipe.
 
-  Callers set `second_opinion_stage` ("review" | "plan") and `is_codex` before the include.
+  Callers set `second_opinion_stage` ("review" | "spec") and `is_codex` before the include.
   The `{%- ... %}` whitespace control keeps the disabled render byte-zero.
 -#}
 {%- set _so = (config.get('second_opinion', {})) if config else {} -%}
@@ -42,9 +42,9 @@
 > actually overlaps is a property of one real dispatch; fixture-shaped output proves the validator
 > and never the producer.
 {%- endif %}
-{%- if second_opinion_stage == 'plan' %}
+{%- if second_opinion_stage == 'spec' %}
 
-> **⏱️ Do NOT background the invoker at this stage.** `/hm:plan` must *inject* the adapted findings
+> **⏱️ Do NOT background the invoker at this stage.** `/hm:spec` must *inject* the adapted findings
 > into the plan validator's prompt **before** dispatching it, so a backgrounded call would have
 {#- The agent's name is left UNBACKTICKED on purpose: `test_render_review_read_budget`'s
     `_VALIDATOR_DISPATCH` counts a backticked mention as a dispatch witness, and this paragraph is

@@ -13,7 +13,6 @@
 |---|---|
 | `{{ cmd }}research` | Gather context, prior art, library docs |
 | `{{ cmd }}spec`     | Lock acceptance criteria (intent / outcomes / scenarios) |
-| `{{ cmd }}plan`     | Deep interview → ADRs → phase decomposition |
 | `{{ cmd }}execute`  | TDD machine — RED → GREEN per PLAN phase |
 | `{{ cmd }}review`   | Multi-reviewer consensus + grade gate + auto-fix |
 | `{{ cmd }}wrapup`   | Single commit, CHANGELOG, doc updates |
@@ -33,7 +32,7 @@
 ## 🔁 Recommended workflow
 
 ```
-  research ─► spec ─► plan ─► execute ─► review ─► verify ─► wrapup
+  research ─► spec ─► execute ─► review ─► verify ─► wrapup
 ```
 
 Stages are chained by `{{ cmd }}loop` or by autopilot — there is no fused workflow command. <!-- @hm:axis-removed -->

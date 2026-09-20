@@ -229,7 +229,25 @@ _SPEC_GATE_FIRST_LINE: tuple[str, ...] = (
     '--root . --stage spec --session-id "$HM_SESSION_ID"',
 )
 
+#: SPEC-plan-stage-absorption's review round 2. These two are NOT deletions — both calls still
+#: render, with every model-filled placeholder single-quoted and `frontmatter-upsert` carrying
+#: the `--root` its confinement check now requires. The round-trip arm compares exact strings,
+#: so a re-quote reads as a removal; the entry is here because the arm cannot tell the two
+#: apart, not because the instruction went away. Listed on `spec-driven` ONLY: the whole
+#: Step 0.1 block sits inside `{% if config.dev_mode == 'spec-driven' %}`, so it never existed
+#: on the task-driven arm and listing it there would be a stale entry.
+_REVIEW_R2_SPEC_NEED_UNQUOTED = [
+    "!cd <WT> && uv run --with $HOME/harness-maker python -m harness_maker.spec_need "
+    "frontmatter-upsert --plan work-docs/PLAN-<slug>.md --verdict <verdict> --target <target>",
+    "!uv run --with $HOME/harness-maker python -m harness_maker.spec_need record "
+    '--verdict <verdict> --target <target> --root <WT> --rationale "<why>"',
+]
+
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    "plan-stage-absorption": {
+        "execute@spec-driven": list(_REVIEW_R2_SPEC_NEED_UNQUOTED),
+    },
     # SPEC-ai-native-sdlc-vs-intent-world IRR-003: `spec` became a judgment-gated stage, so the
     # shared end-of-stage partial renders the classify-then-boundary branch instead of the
     # gate-first `gate-blocked` call — the same shape plan and review already have.
@@ -254,14 +272,10 @@ _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
         "review@spec-driven": list(_STEP_C2_PRE_MERGE_HEADING),
     },
     "config-second-opinion-antigravity-off": {
-        "plan@task-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
-        "plan@spec-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
         "review@task-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
         "review@spec-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
     },
     "plan-interview-comprehension": {
-        "plan@task-driven": list(_COMPREHENSION_PLAN_HEADING),
-        "plan@spec-driven": list(_COMPREHENSION_PLAN_HEADING),
         "spec@task-driven": list(_COMPREHENSION_SPEC_HEADING),
         "spec@spec-driven": list(_COMPREHENSION_SPEC_HEADING),
     },

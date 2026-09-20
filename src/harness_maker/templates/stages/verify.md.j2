@@ -195,7 +195,7 @@ The `waiver-check` command **recomputes** the content hash against the live diff
 ```
 BLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>
 The required SPEC operation was not performed and no valid waiver exists.
-To resolve: author the SPEC via /hm:plan re-entry (/hm:plan <slug> — the
+To resolve: author the SPEC via /hm:spec <slug> (the
 resume-marker skips re-detection and routes directly to /hm:spec) or record
 a fresh, non-empty-rationale waiver with:
   uv run --with {{ harness_maker_src_path }} hm spec_need waiver-set --root {{ WTR }} --slug <slug> \

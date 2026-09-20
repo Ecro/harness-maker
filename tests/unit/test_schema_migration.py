@@ -165,7 +165,6 @@ def test_stage_template_no_3layer_remnants(tmp_path: Path) -> None:
     targets = {
         "stages/research.md": out / "stages" / "research.md",
         "stages/spec.md": out / "stages" / "spec.md",
-        "stages/plan.md": out / "stages" / "plan.md",
         "commands/hm/loop.md": out / "commands" / "hm" / "loop.md",
     }
     for label, path in targets.items():
@@ -177,12 +176,16 @@ def test_stage_template_no_3layer_remnants(tmp_path: Path) -> None:
             )
 
 
-def test_plan_template_reads_main_loop_config(tmp_path: Path) -> None:
-    """Plan template still uses interview.main_loop.max_rounds (kept in 0.16.0)."""
+def test_spec_template_reads_main_loop_config(tmp_path: Path) -> None:
+    """`interview.main_loop.max_rounds` bounds the one surviving interview.
+
+    It bounded `/hm:plan`'s loop until SPEC-plan-stage-absorption removed that stage. The knob
+    was kept in 0.16.0 and would have become inert; it is wired to `/hm:spec` Step 2 instead.
+    """
     out = _render_preset(tmp_path, Preset.SIDE)
-    plan = (out / "stages" / "plan.md").read_text(encoding="utf-8")
+    plan = (out / "stages" / "spec.md").read_text(encoding="utf-8")
     assert "up to 5 rounds" in plan
 
     out_prod = _render_preset(tmp_path / "prod", Preset.PRODUCTION)
-    plan_prod = (out_prod / "stages" / "plan.md").read_text(encoding="utf-8")
+    plan_prod = (out_prod / "stages" / "spec.md").read_text(encoding="utf-8")
     assert "unlimited rounds" in plan_prod

@@ -31,7 +31,7 @@ _REPO = Path(__file__).resolve().parents[2]
 _DELTA = _REPO / "work-docs" / "BASELINE-DELTA-mission-context-loop.md"
 _PLAN = _REPO / "work-docs" / "PLAN-mission-context-loop.md"
 _FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
-_PINNED_UNCHANGED = ("plan", "review")
+_PINNED_UNCHANGED = ("review",)
 _BOUNDED = ("wrapup", "help")
 
 

@@ -9,9 +9,9 @@ outliers were the CONSUMERS that compared three — review's Step 4b and `code-v
 own DROP rubric. So this module asserts the four-step shape at the two live consumer sites
 and does NOT assert its absence anywhere.
 
-Two sites remain 3-step and are deliberately out of scope: `plan-validator_body.md.j2` and
+Two sites remain 3-step and are deliberately out of scope: `spec-validator_body.md.j2` and
 `test-reviewer_body.md.j2`. Neither is on the `/hm:review` acceptance path this work owns,
-and editing the plan-validator's prose mid-task would have changed the artifact that was
+and editing the spec-validator's prose mid-task would have changed the artifact that was
 validating the plan. They are named here so the next reader does not re-derive the
 "single outlier" premise this test exists to correct.
 """
@@ -73,6 +73,6 @@ def test_the_two_deferred_three_step_sites_are_still_the_only_ones() -> None:
     longer accurate and this test should force it to be revisited."""
     agents = (_TEMPLATES / "agents").glob("*_body.md.j2")
     three_step = sorted(p.name for p in agents if "OBSERVE → INFER → CONCLUDE" in _text(p))
-    assert three_step == ["plan-validator_body.md.j2", "test-reviewer_body.md.j2"], (
+    assert three_step == ["spec-validator_body.md.j2", "test-reviewer_body.md.j2"], (
         f"unexpected 3-step site set: {three_step}"
     )

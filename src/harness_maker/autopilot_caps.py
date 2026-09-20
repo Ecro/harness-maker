@@ -57,7 +57,7 @@ _HUMAN_GATED_STAGES: frozenset[str] = frozenset({"wrapup"})
 #
 # `_HUMAN_GATED_STAGES` stays next-stage-keyed. It guards a one-way door (wrapup lands to
 # main), so what matters there is what is about to be ENTERED, not what just finished.
-_JUDGMENT_GATED_STAGES: frozenset[str] = frozenset({"plan", "review", "spec"})
+_JUDGMENT_GATED_STAGES: frozenset[str] = frozenset({"review", "spec"})
 #: The escalation ladder a derived verdict is compared on — `pending` is the one value
 #: `auto_full` clears, so a tie never resolves downward.
 _GATE_RANK: dict[str, int] = {"clear": 0, "pending": 1, "blocked": 2}

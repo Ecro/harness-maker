@@ -264,7 +264,7 @@ _ALL_AGENTS: list[str] = [
     "executor",
     "judgment-reviewer",
     "performance-reviewer",
-    "plan-validator",
+    "spec-validator",
     "security-auditor",
     "security-reviewer",
     "stage-delegate",
@@ -368,9 +368,6 @@ _COMMAND_DESCRIPTIONS: dict[str, str] = {
     "commands/hm/spec.md": (
         "Lock what and why — acceptance criteria via a 6-category interview into a SPEC doc."
     ),
-    "commands/hm/plan.md": (
-        "Lock how and in what order — deep interview, ADRs and validated phases into a PLAN doc."
-    ),
     "commands/hm/execute.md": ("Implement a PLAN's phases TDD-first. Stages, never commits."),
     "commands/hm/review.md": (
         "Multi-reviewer consensus review with a grade gate and an auto-fix loop."
@@ -438,7 +435,7 @@ _COMMUNICATION_VARIANT: dict[str, str] = {
     "consensus-arbiter": "reframe",
     "judgment-reviewer": "reframe",
     "performance-reviewer": "reframe",
-    "plan-validator": "reframe",
+    "spec-validator": "reframe",
     "security-auditor": "reframe",
     "security-reviewer": "reframe",
     "test-reviewer": "reframe",
@@ -517,11 +514,11 @@ _CODEX_AGENT_META: dict[str, str] = {
     "executor": "Workflow executor with worktree-bounded write permissions — only writes to .worktrees/, never to repo root",  # noqa: E501
     "judgment-reviewer": "Independently evaluates a judgment AC's subject against its rubric and returns a per-criterion verdict with cited locators (PLAN-judgment-ac-binding ADR-006). Read-only.",  # noqa: E501
     "performance-reviewer": "Reviews changes for hot-path regressions, allocation hotspots, and algorithmic inefficiency",  # noqa: E501
-    "plan-validator": "Critiques a draft PLAN document for gaps, ambiguities, missing exit criteria, and feasibility risks before /hm:execute is invoked. Read-only.",  # noqa: E501
+    "spec-validator": "Critiques a SPEC and its machine.yaml for missing or contradictory ACs, circular oracles, and irreversible decisions the ACs imply but do not list. Single pass, advisory — never blocks approval. Read-only.",  # noqa: E501
     "security-auditor": "Deep 5-gate security audit (secrets, permissions, hook injection, dependency CVEs, prompt injection) — read-only, returns structured findings JSON",  # noqa: E501
     "security-reviewer": "Reviews changes for secrets exposure, injection, auth flaws, and unsafe permission grants",  # noqa: E501
     "stage-delegate": "Runs a whole pipeline stage body (wrapup or verify) from a validated brief and returns a machine receipt, cutting main-loop context carry",  # noqa: E501
-    "stuck": "Escalation analyst — invoked when /hm:execute, /hm:review, or /hm:plan blocks. Performs root-cause analysis, proposes 2-3 unblock paths, and returns a structured escalation note. Read-only.",  # noqa: E501
+    "stuck": "Escalation analyst — invoked when /hm:execute, /hm:review, or /hm:spec blocks. Performs root-cause analysis, proposes 2-3 unblock paths, and returns a structured escalation note. Read-only.",  # noqa: E501
     "test-reviewer": "Phase A.5 gate for /hm:execute. Critiques RED-stage tests for SPEC alignment, banned-pattern violations, and assertion quality before Phase B (RED gate) runs. Read-only.",  # noqa: E501
     "ux-reviewer": "Reviews UI changes for accessibility, consistency, and interaction quality",
 }

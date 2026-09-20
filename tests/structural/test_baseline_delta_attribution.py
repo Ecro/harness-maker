@@ -233,8 +233,20 @@ def test_the_document_states_the_direction_of_the_aggregate() -> None:
     """
     current = _current_delta_doc()
     assert current is not None, "no delta document matches the current baseline"
-    doc = current.read_text(encoding="utf-8")
-    assert "larger" in doc.lower() or "wrong way" in doc.lower()
+    doc = current.read_text(encoding="utf-8").lower()
+    # Direction-aware, and it has to be. The original assertion was
+    # `"larger" in doc or "wrong way" in doc`, written when the owning PLAN RAISED the surface.
+    # SPEC-plan-stage-absorption lowered it by ~11%, and the sentence stating that —
+    # "it is *smaller*, not larger" — contains the substring "larger", so the old assertion went
+    # green on text asserting the opposite of what it was checking for. That is
+    # `assertion-invariant-over-named-dimension` (count:16) inside the gate meant to prevent a
+    # misleading delta document.
+    up = any(w in doc for w in ("larger", "wrong way", "grew", "rose"))
+    down = any(w in doc for w in ("smaller", "fell", "shrank", "reduction"))
+    assert up or down, (
+        "the delta document lists numbers without saying which way the aggregate moved; a "
+        "reader skips exactly that"
+    )
 
 
 def test_the_documented_aggregate_matches_the_actual_baseline() -> None:

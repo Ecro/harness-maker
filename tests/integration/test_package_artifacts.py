@@ -25,7 +25,6 @@ _INTEGRATION_ENABLED = os.environ.get("INTEGRATION") == "1"
 # directory (``harness_maker-<X.Y.Z>/src/harness_maker/templates/...``).
 _REQUIRED_TEMPLATE_PATHS = (
     "harness_maker/templates/agents/code-reviewer.md.j2",
-    "harness_maker/templates/stages/plan.md.j2",
     "harness_maker/templates/rubrics/agent_prompt.yaml.j2",
     "harness_maker/templates/skills/verify-before-completion/SKILL.md.j2",
     "harness_maker/templates/commands/hm/configure.md.j2",

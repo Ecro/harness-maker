@@ -26,7 +26,7 @@ from harness_maker.models import (
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
-_REVIEWERS = ("code-reviewer", "consensus-arbiter", "plan-validator")
+_REVIEWERS = ("code-reviewer", "consensus-arbiter", "spec-validator")
 _CODEX_MARKER = "Bash(codex exec:*)"
 _AGY_MARKER = "Bash(agy --sandbox --print:*)"
 

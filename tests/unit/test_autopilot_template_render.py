@@ -21,8 +21,8 @@ from harness_maker.models import ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
-_STAGES = ("research", "spec", "plan", "execute", "review", "wrapup", "verify")
-_GATED_STAGES = ("plan", "review", "wrapup", "verify")  # have a real mandatory gate
+_STAGES = ("research", "spec", "execute", "review", "wrapup", "verify")
+_GATED_STAGES = ("review", "wrapup", "verify")  # have a real mandatory gate
 _TEMPLATES = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
 
 

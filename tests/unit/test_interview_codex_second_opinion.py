@@ -51,7 +51,7 @@ def test_interview_codex_answer_enables_second_opinion(
     assert result.second_opinion.agents == [
         "code-reviewer",
         "consensus-arbiter",
-        "plan-validator",
+        "spec-validator",
     ]
 
 

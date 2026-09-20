@@ -20,7 +20,7 @@ _ALL_AGENTS: list[str] = [
     "consensus-arbiter",
     "executor",
     "performance-reviewer",
-    "plan-validator",
+    "spec-validator",
     "security-auditor",
     "security-reviewer",
     "stuck",
@@ -55,7 +55,7 @@ def _render_agent(name: str) -> str:
     # Phase 3 (PLAN-model-routing-multi-ide) added claude_model/cursor_model/
     # codex_reasoning_effort context vars. Pass the Production preset's resolved
     # values so the sha256 pin reflects what synthesize() emits in real renders
-    # (autoloop-coder/plan-validator/stuck → opus; others → sonnet).
+    # (autoloop-coder/spec-validator/stuck → opus; others → sonnet).
     spec = resolve_agent_spec(name, HarnessConfig(preset=Preset.PRODUCTION))
     return tpl.render(
         name=name,
@@ -119,7 +119,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     # cursor-concrete-id behavior — Claude Code now respects the field (#43869),
     # so a pinned id fails to launch in a newer-model session. Pre-bump hashes
     # are in git history.
-    # code-reviewer + consensus-arbiter + plan-validator: 0.28.5 added an
+    # code-reviewer + consensus-arbiter + spec-validator (was plan-validator): 0.28.5 added an
     # UNCONDITIONAL `Bash` to `tools:`; 0.28.6 (PLAN-spoton-codex-rm-stash-
     # rootcause follow-up) made it CONDITIONAL on codex_second_opinion.enabled
     # — subagent-frontmatter `permissions.deny` is NOT enforced by Claude Code,
@@ -136,7 +136,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     # deletion reached past the include.
     "code-reviewer": "d09023357e53929d9eee5059ecb624a0f502115da3f1dda7b00c4252de2e5169",
     "concurrency-reviewer": "ffc8b5f6bcc43dd33fc6353e87797216a5c8eb39494e8b762beaab50f31ff359",
-    # consensus-arbiter + plan-validator: hashes bumped 2026-05-24 per
+    # consensus-arbiter + spec-validator (was plan-validator): hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.
     # Both agents previously had NO frontmatter permissions block; Phase 2
     # added a minimal one with allow: [Read(*), Grep(*), Glob(*)] + conditional
@@ -160,11 +160,18 @@ _EXPECTED_SHA256: dict[str, str] = {
     # level guidance, not runtime-enforced". Pre-bump hash in git history.
     "executor": "0a4a5e34f5b7d985eab1b0b8b2ee79d898d3d95ddd4d68eea051536939e96874",
     "performance-reviewer": "869fa3131ffa6cae4be84232deca0174df7d9cd973cc203499f13f75977771e6",
-    "plan-validator": "2116a5ce4fb8053c0a8c921f2a1e2c022ea5099f488e8bc315a6a87b097ec36b",
+    # spec-validator REPLACES plan-validator (SPEC-plan-stage-absorption ADR-004): relocated
+    # to /hm:spec, re-scoped to ACs / circular oracles / implied-but-unlisted irreversible
+    # decisions / scope boundary, single-pass and never-blocking. New body, new pin.
+    "spec-validator": "53421574d8ccc9bd63e6769225d3c8acae5ecac7e71e7757ddb9109f4e0c3662",
     "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",
     # `return_envelope` include removed — see the code-reviewer note above.
     "security-reviewer": "aadcaf6606ce6b7483f4994f190c919cfba8e9a32d987a4a046e2d9491d19c0e",
-    # stuck re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 4). `stuck` is the
+    # stuck re-pinned 2026-09-20 (SPEC-plan-stage-absorption): its trigger list and two
+    # escalation examples named `/hm:plan` and `plan-validator`, which no longer exist. The
+    # trigger is now a `/hm:spec` spec-validator `critical` the DRI cannot resolve, and the
+    # ADR examples point at the SPEC's irreversible_decisions instead of a plan ADR.
+    # Previously re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 4). `stuck` is the
     # agent A.5 escalates to, and its incoming brief still described the budget as "2 attempts"
     # after the stage renamed the unit to rounds — three lens dispatches now share one round, so
     # the old wording named a unit the stage no longer uses. Its "last 3 reviewer outputs"
@@ -180,7 +187,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     # PATH that could not exist. Step 5 now returns the note inline. Found by four review lenses
     # independently, none of which was looking at this file. Body change outside the codex
     # conditional. Pre-bump hash in git history.
-    "stuck": "2ed15a8cdadeb5b8d6d61b84ba0855b314d786c352618228a4f63984d0c1a4b7",
+    "stuck": "46db889587156f0024083ee4fd6e96a6fdc5ae36235347bfae535f1e64e1bb65",
     # test-reviewer re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 2). Two
     # rules changed, both because Phase A.5 now runs three lens-scoped instances of this agent:
     # (a) `passing_tests[]` was declared FROZEN, which conflicted with the caller's merge rule —

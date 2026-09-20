@@ -49,7 +49,7 @@ def loop_md(rendered_root: Path) -> str:
 
 @pytest.fixture(scope="module")
 def plan_md(rendered_root: Path) -> str:
-    return (rendered_root / "commands" / "hm" / "plan.md").read_text(encoding="utf-8")
+    return (rendered_root / "commands" / "hm" / "execute.md").read_text(encoding="utf-8")
 
 
 def test_sessionstart_hook_registered(settings_json: str) -> None:
@@ -94,6 +94,6 @@ def test_loop_global_marker_is_conditional(loop_md: str) -> None:
 def test_plan_loop_mode_detection_is_session_scoped(plan_md: str) -> None:
     """bug-2: plan loop-mode detection must use the session-scoped CLI."""
     assert "loop-mode-active" in plan_md, (
-        "plan.md Step 1.5 must detect loop-mode via `worktree loop-mode-active "
+        "execute.md Step 0.2 must detect loop-mode via `worktree loop-mode-active "
         "--claude-session-id` so another session's loop can't skip the interview"
     )

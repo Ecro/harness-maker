@@ -133,7 +133,7 @@ def test_the_class_default_and_the_conservative_fallback_differ_on_purpose() -> 
 def test_the_pipeline_source_of_truth_is_unaffected_by_the_flip() -> None:
     """`autopilot.py` reads only `pipeline` from a bare construction — it stays bare."""
     stages = [s.value for s in AutonomyConfig().pipeline]
-    assert stages == ["research", "spec", "plan", "execute", "review", "verify", "wrapup"]
+    assert stages == ["research", "spec", "execute", "review", "verify", "wrapup"]
 
 
 @pytest.mark.parametrize("preset_name", ["Side", "Production"])

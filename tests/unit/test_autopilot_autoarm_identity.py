@@ -28,7 +28,7 @@ from harness_maker import autopilot, autopilot_caps
 from harness_maker.hooks import autopilot_autoarm
 from harness_maker.models import AtomicStage
 
-PIPELINE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.PLAN]
+PIPELINE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.EXECUTE]
 
 
 def _harness(root: Path, *, persistent: bool = True, level: str = "auto_safe") -> None:

@@ -20,9 +20,11 @@ TEACH_BACK = "<!-- @hm:comprehension:teach_back -->"
 ALL_MARKERS = (BRIEF, ROUND_STATE, DECISION_DEPTH, TEACH_BACK)
 
 #: ADR-008 — the sentence the depth branch REPLACES at standard/deep.
-OPTIONAL_SENTENCE = "visualization OPTIONAL"
 
-_STAGES = ("plan", "spec")
+# `plan` left this tuple with the stage (SPEC-plan-stage-absorption). `spec.md.j2` is now the
+# ONLY template that includes `comprehension_block.md.j2` — verified by grep over templates/ —
+# so every per-stage parametrisation below runs on one member.
+_STAGES = ("spec",)
 
 
 @pytest.fixture(scope="module")
@@ -67,7 +69,7 @@ def test_teach_back_states_it_is_output_only_and_creates_no_gate(
 ) -> None:
     """SPEC S2's second Then. A readback that silently became a gate would change the
     autopilot contract — the Non-Goals say no mandatory gate is added."""
-    text = rendered["deep"][CLAUDE_VARIANT]["plan"]
+    text = rendered["deep"][CLAUDE_VARIANT]["spec"]
     block = text.split(TEACH_BACK, 1)[1][:1200].lower()
     assert "no response" in block or "requires no user response" in block, block[:300]
     assert "no gate" in block or "not a gate" in block, block[:300]
@@ -157,29 +159,26 @@ def test_the_non_minimal_levels_actually_grow_the_render(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("depth", ["standard", "deep"])
-def test_spec_stage_carries_the_same_block_set(
-    rendered: dict[str, dict[str, dict[str, str]]], depth: str
-) -> None:
-    plan = _markers(rendered[depth][CLAUDE_VARIANT]["plan"])
-    spec = _markers(rendered[depth][CLAUDE_VARIANT]["spec"])
-    assert plan == spec, f"depth={depth}: plan enables {plan}, spec enables {spec}"
-
-
-def test_the_brief_subject_differs_by_stage(
+def test_the_spec_brief_names_what_that_stage_actually_has(
     rendered: dict[str, dict[str, dict[str, str]]],
 ) -> None:
-    """ADR-007. `/hm:spec` has no pre-interview architecture draft to disclose, so identical
-    TEXT would instruct it to show an artifact it never produces. Identity is on the block
-    SET (asserted above), not on the prose."""
-    plan_brief = rendered["standard"][CLAUDE_VARIANT]["plan"].split(BRIEF, 1)[1][:1500]
+    """What survives of the two stage-comparative tests this replaces.
+
+    They were `test_spec_stage_carries_the_same_block_set` (plan's marker set == spec's) and
+    `test_the_brief_subject_differs_by_stage` (identical block set, different prose). Both
+    compared two interview stages; SPEC-plan-stage-absorption left one, and a comparison with
+    one operand is not a weaker test, it is not a test. The half that still has a subject is
+    ADR-007's actual concern: the brief must disclose what THIS stage holds. `/hm:spec` has no
+    pre-interview architecture draft, so a brief naming one would instruct it to show an
+    artifact it never produces.
+    """
     spec_brief = rendered["standard"][CLAUDE_VARIANT]["spec"].split(BRIEF, 1)[1][:1500]
-    assert plan_brief != spec_brief, (
-        "the brief is stage-blind — spec would disclose a draft it has none of"
-    )
-    assert "Step 1" in plan_brief, "the plan brief must name the internal draft it discloses"
     assert "SPEC" in spec_brief or "acceptance" in spec_brief.lower(), (
         "the spec brief must name what /hm:spec actually has to disclose"
+    )
+    assert "internal draft" not in spec_brief.lower(), (
+        "the spec brief discloses an architecture draft — that was `/hm:plan` Step 1, and "
+        "`/hm:spec` produces no such artifact"
     )
 
 
@@ -210,26 +209,15 @@ def test_each_stage_emits_exactly_one_round_state_instruction(
 # ---------------------------------------------------------------------------
 
 
-def test_the_optional_sentence_survives_at_minimal(
-    rendered: dict[str, dict[str, dict[str, str]]],
-) -> None:
-    assert OPTIONAL_SENTENCE in rendered["minimal"][CLAUDE_VARIANT]["plan"]
-
-
-@pytest.mark.parametrize("depth", ["standard", "deep"])
-def test_the_optional_sentence_is_gone_at_standard_and_deep(
-    rendered: dict[str, dict[str, dict[str, str]]], depth: str
-) -> None:
-    """Two contradicting instructions in one command leave the model to pick, and which one
-    it picks is nondeterministic."""
-    assert OPTIONAL_SENTENCE not in rendered[depth][CLAUDE_VARIANT]["plan"], (
-        f"depth={depth}: 'visualization OPTIONAL' still ships alongside required-when-changed"
-    )
-
-
-# ---------------------------------------------------------------------------
-# The round-trip gates must stay GREEN — the partial adds no call site
-# ---------------------------------------------------------------------------
+# `test_the_optional_sentence_survives_at_minimal` and
+# `test_the_optional_sentence_is_gone_at_standard_and_deep` were removed by
+# SPEC-plan-stage-absorption. They asserted that `"visualization OPTIONAL"` appears at
+# `minimal` depth and is replaced by the round-state contract at `standard`/`deep`. That
+# depth-conditional sentence lived in `plan.md.j2` Step A only. `spec.md.j2:97` carries an
+# UNCONDITIONAL "Visualization OPTIONAL" line with a different capitalisation, so the pair
+# had no subject left: one failed, and the other PASSED VACUOUSLY because the constant
+# never matched anything in the surviving stage. Keeping the vacuous half would have been
+# worse than removing both.
 
 
 @pytest.mark.parametrize("depth", ["standard", "deep"])

@@ -11,10 +11,10 @@ this file, `skipif`'d on `INTEGRATION=1` **and** CLI presence (ADR-009) — outs
 **skips**, which is not a pass.
 The SPEC records the resulting status as MECHANISM LANDED, ORACLE UNVERIFIED rather than green.
 
-**The stage guard is the load-bearing half.** `/hm:plan` must inject the adapted findings into
-`plan-validator`'s prompt *before* dispatching it, so backgrounding there would leave nothing to
+**The stage guard is the load-bearing half.** `/hm:spec` must inject the adapted findings into
+`spec-validator`'s prompt *before* dispatching it, so backgrounding there would leave nothing to
 inject and the validator would silently become Claude-only. The dispatch partial is SHARED between
-the two stages, so a single unguarded `run_in_background` would have broken the plan stage while the
+the two stages, so a single unguarded `run_in_background` would have broken the spec stage while the
 review-stage test went green.
 """
 
@@ -75,21 +75,21 @@ def test_ac_006_the_review_render_backgrounds_the_invoker(models_on: dict[str, s
     review = models_on["review"]
 
     assert _BACKGROUND in review, "the review render does not tell the model to background the call"
-    assert _REFUSAL not in review, "the review render carries the plan stage's refusal"
+    assert _REFUSAL not in review, "the review render carries the spec stage's refusal"
 
 
-def test_ac_006_the_plan_render_refuses_to_background(models_on: dict[str, str]) -> None:
+def test_ac_006_the_spec_render_refuses_to_background(models_on: dict[str, str]) -> None:
     """The stage guard, from the other side — and this is the half a shared partial would break.
 
-    `/hm:plan` consumes the findings in its very next step (the `plan-validator` dispatch injects
+    `/hm:spec` consumes the findings in its very next step (the `spec-validator` dispatch injects
     them), so a backgrounded call there has nothing to inject. An unguarded `run_in_background` in
-    the shared partial would satisfy the review test above and silently make plan validation
+    the shared partial would satisfy the review test above and silently make spec validation
     Claude-only.
     """
-    plan = models_on["plan"]
+    plan = models_on["spec"]
 
-    assert _REFUSAL in plan, "the plan render does not refuse to background"
-    assert _BACKGROUND not in plan, "the plan render tells the model to background the call"
+    assert _REFUSAL in plan, "the spec render does not refuse to background"
+    assert _BACKGROUND not in plan, "the spec render tells the model to background the call"
 
 
 def test_ac_006_the_wiring_sits_inside_the_models_gate(models_off: dict[str, str]) -> None:
@@ -118,13 +118,13 @@ def test_ac_006_the_wiring_sits_inside_the_models_gate(models_off: dict[str, str
 
     gate_at = partial.index("{%- if _models %}")
     review_block_at = partial.index("{%- if second_opinion_stage == 'review' %}")
-    plan_block_at = partial.index("{%- if second_opinion_stage == 'plan' %}")
+    plan_block_at = partial.index("{%- if second_opinion_stage == 'spec' %}")
 
     assert review_block_at > gate_at, "the review backgrounding block escaped the models gate"
-    assert plan_block_at > gate_at, "the plan refusal block escaped the models gate"
+    assert plan_block_at > gate_at, "the spec refusal block escaped the models gate"
 
     # cheap sanity arm, deliberately not the load-bearing one (see the docstring)
-    for name in ("review", "plan"):
+    for name in ("review", "spec"):
         assert _BACKGROUND not in models_off[name]
         assert _REFUSAL not in models_off[name]
 

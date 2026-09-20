@@ -71,7 +71,7 @@ def test_no_claude_or_cursor_file_is_flagged_as_codex(entries: list[tuple[str, b
         (".codex/hooks.json", True),
         (".agents/skills/hm-plan/SKILL.md", True),
         ("AGENTS.md", True),
-        ("commands/hm/plan.md", False),
+        ("commands/hm/spec.md", False),
         ("agents/code-reviewer.md", False),  # `agents/`, NOT `.agents/` — one dot apart
         ("skills/context-linter/SKILL.md", False),
         ("", False),

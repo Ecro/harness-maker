@@ -64,7 +64,7 @@ def _has_command_line(text: str, needle: str) -> bool:
 
 def test_recipe_present_in_review_and_plan_stages_when_enabled(tmp_path: Path) -> None:
     files = _render(tmp_path, models=["codex"])
-    for stage in ("review", "plan"):
+    for stage in ("review", "spec"):
         body = _stage(files, stage)
         assert "second_opinion_invoke --model codex" in body, f"{stage} stage missing invoker call"
         assert "dangerouslyDisableSandbox" in body, f"{stage} stage missing sandbox directive"
@@ -76,7 +76,7 @@ def test_recipe_present_in_review_and_plan_stages_when_enabled(tmp_path: Path) -
 
 def test_recipe_absent_from_stages_when_disabled(tmp_path: Path) -> None:
     files = _render(tmp_path, models=[])
-    for stage in ("review", "plan"):
+    for stage in ("review", "spec"):
         body = _stage(files, stage)
         assert "codex exec" not in body
         assert "dangerouslyDisableSandbox" not in body
@@ -114,10 +114,10 @@ def test_partial_stage_param_interpolated(tmp_path: Path) -> None:
         config=cfg, second_opinion_stage="review", harness_maker_src_path="/cache/hm/0.0.0"
     )
     plan = tpl.render(
-        config=cfg, second_opinion_stage="plan", harness_maker_src_path="/cache/hm/0.0.0"
+        config=cfg, second_opinion_stage="spec", harness_maker_src_path="/cache/hm/0.0.0"
     )
     assert "--stage review" in review
-    assert "--stage plan" in plan
+    assert "--stage spec" in plan
     for out in (review, plan):
         assert "dangerouslyDisableSandbox" in out
         assert "second_opinion_invoke" in out

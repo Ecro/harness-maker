@@ -306,6 +306,111 @@ def waiver_valid(root: Path, slug: str, changed_files: list[str]) -> bool:
 _MARKER_PREFIX = ".hm-spec-need-"
 
 
+_SPEC_NEED_KEYS: tuple[str, ...] = ("spec_need_verdict", "spec_need_target")
+
+
+def _confined_plan_path(plan_path: Path, root: Path) -> Path:
+    """Resolve `plan_path` and refuse anything outside `root`.
+
+    WHY this is not optional (`root` is required, no default): every other path-bearing verb in
+    this module derives its path from a `_validate_slug`-checked component under `root`, and
+    this one took a caller-supplied `Path` raw. A confinement check that can be skipped by
+    omitting an argument is the absent-case black hole (count:8) — it would never fire for the
+    one caller that forgot it, which is exactly the caller that needs it.
+    """
+    resolved = plan_path.resolve()
+    base = root.resolve()
+    if resolved != base and base not in resolved.parents:
+        raise ValueError(f"{plan_path} resolves outside the project root {root}")
+    return resolved
+
+
+def _read_fence(plan_path: Path) -> tuple[list[str], int, dict[str, str]]:
+    """Split a PLAN into (lines, closing-fence index, the SPEC-need keys already in the fence)."""
+    lines = plan_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        raise ValueError(f"{plan_path} does not open with a `---` frontmatter fence")
+    close = next(
+        (i for i in range(1, len(lines)) if lines[i].rstrip("\r\n") == "---"),
+        None,
+    )
+    if close is None:
+        raise ValueError(f"{plan_path} has an unterminated frontmatter fence")
+
+    existing: dict[str, str] = {}
+    for line in lines[1:close]:
+        for key in _SPEC_NEED_KEYS:
+            if line.startswith(f"{key}:"):
+                existing[key] = line[len(key) + 1 :].split("#", 1)[0].strip()
+    return lines, close, existing
+
+
+def frontmatter_upsert(
+    plan_path: Path, verdict: str, target: str, *, root: Path
+) -> dict[str, str | bool | None]:
+    """Write the SPEC-need pair into a PLAN's frontmatter WITHOUT overwriting a recorded decision.
+
+    WHY this is a function and not a line of prose in `execute.md.j2` (IRR-004): `verify.md.j2`
+    Check 6 treats an absent `spec_need_verdict` as ``PASS (N-A)``, so the only failure mode
+    that matters here is silent — a writer that no-ops, or one that clobbers a verdict the DRI
+    already recorded, produces a green gate either way. A prose recipe has no execution surface,
+    so a test could only grep its text; that shape shipped four silent-skip bugs in this repo.
+
+    **The unit of preservation is the PAIR, not the key.** Check 6 reads the two together to
+    decide which SPEC the verdict applies to, so a preserved verdict beside a freshly-supplied
+    target would point an old decision at a new subject. The verdict is the decision and the
+    target only names its subject, so the verdict alone decides whether a decision exists:
+
+    * verdict present  → preserve it, and fill the target only if it is missing (`repaired`).
+    * verdict absent   → there is no recorded decision, so write BOTH fresh, replacing a stray
+      target line. A target with no verdict beside it is not a decision to protect.
+
+    **Concurrency.** Two sessions can reach this for one slug. The fence is re-read immediately
+    before the splice and the result is read BACK off disk, so a peer that won the race is
+    reported as a preserved value rather than silently overwritten. The residual window — a peer
+    replacing the file between the re-read and `os.replace` — cannot corrupt the file (the
+    replace is atomic) and cannot lie about it either: the returned values come from the
+    post-write read, not from this call's intent.
+    """
+    if verdict not in _VALID_VERDICTS:
+        raise ValueError(f"invalid verdict: {verdict!r} (expected one of {_VALID_VERDICTS})")
+    _validate_slug(target)
+    plan_path = _confined_plan_path(plan_path, root)
+
+    wanted = {"spec_need_verdict": verdict, "spec_need_target": target}
+    # Re-read here rather than reusing an earlier snapshot: everything below decides what to
+    # splice, so a stale view is exactly how a peer's key gets dropped.
+    lines, close, existing = _read_fence(plan_path)
+
+    if "spec_need_verdict" in existing:
+        additions = [f"spec_need_target: {target}\n"] if "spec_need_target" not in existing else []
+        kept = list(lines)
+    else:
+        # No decision on disk. Write the pair together and drop any orphan target line, so the
+        # two values that Check 6 reads as one pair always come from one judgment.
+        kept = [
+            line
+            for i, line in enumerate(lines)
+            if not (1 <= i < close and line.startswith("spec_need_target:"))
+        ]
+        close -= len(lines) - len(kept)
+        additions = [f"{k}: {wanted[k]}\n" for k in _SPEC_NEED_KEYS]
+
+    if additions:
+        kept[close:close] = additions
+        atomic_write(plan_path, "".join(kept))
+
+    _, _, on_disk = _read_fence(plan_path)
+    return {
+        "spec_need_verdict": on_disk.get("spec_need_verdict"),
+        "spec_need_target": on_disk.get("spec_need_target"),
+        "preserved_verdict": "spec_need_verdict" in existing,
+        "preserved_target": "spec_need_verdict" in existing and "spec_need_target" in existing,
+        "repaired": "spec_need_verdict" in existing and "spec_need_target" not in existing,
+        "wrote": bool(additions),
+    }
+
+
 def marker_path(root: Path, slug: str) -> Path:
     """Return the path for the durable one-shot resume marker."""
     _validate_slug(slug)
@@ -460,6 +565,16 @@ def _build_parser() -> argparse.ArgumentParser:
     mf.add_argument("--slug", required=True)
     mf.add_argument("--changed-files-hash", required=True, dest="changed_files_hash")
 
+    # frontmatter-upsert (IRR-004 of SPEC-plan-stage-absorption)
+    fu = sub.add_parser(
+        "frontmatter-upsert",
+        help="Write spec_need_verdict/target into a PLAN's frontmatter, preserving existing values",
+    )
+    fu.add_argument("--plan", required=True, type=Path, metavar="PATH")
+    fu.add_argument("--root", required=True, type=Path)
+    fu.add_argument("--verdict", required=True, choices=_VALID_VERDICTS)
+    fu.add_argument("--target", required=True)
+
     return parser
 
 
@@ -502,6 +617,17 @@ def main(argv: list[str] | None = None) -> int:
         return _guard
     parser = _build_parser()
     args = parser.parse_args(argv)
+
+    if args.cmd == "frontmatter-upsert":
+        if rc := _cli_validate_slug(args.target, "target"):
+            return rc
+        try:
+            result = frontmatter_upsert(args.plan, args.verdict, args.target, root=args.root)
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            print(json.dumps({"error": str(exc)}, ensure_ascii=False))
+            return 1
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
 
     if args.cmd == "prefilter":
         results = prefilter(args.specs_dir, args.changed_files)

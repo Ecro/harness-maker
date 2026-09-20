@@ -15,7 +15,6 @@
  "stages": [
   "research",
   "spec",
-  "plan",
   "execute",
   "review",
   "verify",
@@ -178,7 +177,7 @@
    "rc": 0,
    "proceed": true,
    "halt_kind": null,
-   "next_stage": "plan",
+   "next_stage": "execute",
    "pipeline_complete": false,
    "judgment_auto_answered": true
   },
@@ -186,99 +185,11 @@
    "rc": 0,
    "proceed": true,
    "halt_kind": null,
-   "next_stage": "plan",
+   "next_stage": "execute",
    "pipeline_complete": false,
    "judgment_auto_answered": true
   },
   "spec|jg_blocked_full": {
-   "rc": 0,
-   "proceed": false,
-   "halt_kind": "judgment_gate",
-   "next_stage": null,
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|armed": {
-   "rc": 0,
-   "proceed": false,
-   "halt_kind": "judgment_gate",
-   "next_stage": null,
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|no_marker": {
-   "rc": 0,
-   "proceed": false,
-   "halt_kind": "kill_switch",
-   "next_stage": null,
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|step_cap": {
-   "rc": 0,
-   "proceed": false,
-   "halt_kind": "step_cap",
-   "next_stage": null,
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|time_cap": {
-   "rc": 0,
-   "proceed": false,
-   "halt_kind": "time_cap",
-   "next_stage": null,
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|jg_absent_safe": {
-   "rc": 0,
-   "proceed": false,
-   "halt_kind": "judgment_gate",
-   "next_stage": null,
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|jg_pending_safe": {
-   "rc": 0,
-   "proceed": false,
-   "halt_kind": "judgment_gate",
-   "next_stage": null,
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|jg_clear_safe": {
-   "rc": 0,
-   "proceed": true,
-   "halt_kind": null,
-   "next_stage": "execute",
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|jg_blocked_safe": {
-   "rc": 0,
-   "proceed": false,
-   "halt_kind": "judgment_gate",
-   "next_stage": null,
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|jg_pending_full": {
-   "rc": 0,
-   "proceed": true,
-   "halt_kind": null,
-   "next_stage": "execute",
-   "pipeline_complete": false,
-   "judgment_auto_answered": true
-  },
-  "plan|jg_clear_full": {
-   "rc": 0,
-   "proceed": true,
-   "halt_kind": null,
-   "next_stage": "execute",
-   "pipeline_complete": false,
-   "judgment_auto_answered": false
-  },
-  "plan|jg_blocked_full": {
    "rc": 0,
    "proceed": false,
    "halt_kind": "judgment_gate",

@@ -22,7 +22,6 @@ END_MARKER = "<!-- @hm:banner:end -->"
 _ATOMIC_STAGES = (
     "research",
     "spec",
-    "plan",
     "execute",
     "review",
     "verify",

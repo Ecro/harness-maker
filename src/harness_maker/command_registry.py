@@ -138,6 +138,7 @@ MODULES: dict[str, ModuleSpec] = {
             "marker-read",
             "marker-clear",
             "marker-fresh",
+            "frontmatter-upsert",
         ),
     ),
     # ── manual-dispatch (guarded; SOME subcommands mutate on bare invocation) ──

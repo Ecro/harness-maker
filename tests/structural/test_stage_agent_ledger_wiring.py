@@ -35,12 +35,12 @@ _DISPATCH_SITE = {
     # `(?:sub)?agent_type` — Claude dispatches with `Task(subagent_type=…)`, Codex with
     # `spawn_agent(agent_type=…)`. A pattern naming only the Claude spelling finds zero sites in
     # every Codex skill and reports the ledger as unwired where it is merely spelled otherwise.
-    "plan-validator": re.compile(r'(?:sub)?agent_type="plan-validator"'),
+    "spec-validator": re.compile(r'(?:sub)?agent_type="spec-validator"'),
     "test-reviewer": re.compile(r'(?:sub)?agent_type="test-reviewer"'),
 }
 
 _STAGE_MARKERS = {
-    "plan": "### Step 4 — Plan validation",
+    "spec": "### Step 4.6 — `spec-validator` (single pass, advisory)",
     "execute": "#### Phase A.5 — test-reviewer gate",
     "review": "### Step 3.4 — Stamp a stable `id`",
 }
@@ -88,7 +88,7 @@ def test_each_stage_is_discovered_on_all_three_targets(stage: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("stage", "agent"), [("plan", "plan-validator"), ("execute", "test-reviewer")]
+    ("stage", "agent"), [("spec", "spec-validator"), ("execute", "test-reviewer")]
 )
 def test_every_dispatch_site_is_accompanied_by_an_emit_line(stage: str, agent: str) -> None:
     """Exit 2 + exit 3. The expected count comes from the DISPATCH sites, not the emits.
@@ -161,12 +161,12 @@ def test_the_review_stage_persists_reviewer_payloads() -> None:
         assert _PERSIST.search(text), f"{name}: no payload persistence — replay stays impossible"
 
 
-@pytest.mark.parametrize("stage", ["plan", "execute"])
+@pytest.mark.parametrize("stage", ["spec", "execute"])
 def test_the_launch_failure_path_is_documented_as_a_row(stage: str) -> None:
     """A dispatch that never ran must not be silence.
 
     Silence makes an unavailable validator indistinguishable from an approving one — and
-    `plan.md.j2` explicitly tells the model to self-review in the validator's place, so this
+    `spec.md.j2` carries the dispatch-failure row contract the removed `plan.md.j2` owned, so this
     path is reachable by design rather than only by accident.
     """
     for name, text in artifacts_for(stage).items():
@@ -175,7 +175,7 @@ def test_the_launch_failure_path_is_documented_as_a_row(stage: str) -> None:
         )
 
 
-@pytest.mark.parametrize("stage", ["plan", "execute"])
+@pytest.mark.parametrize("stage", ["spec", "execute"])
 def test_the_emit_guidance_forbids_zero_for_unmeasured_duration(stage: str) -> None:
     """The null-vs-zero lesson has to reach the CALLER, not only the schema.
 
@@ -195,7 +195,7 @@ def test_both_stages_share_one_ledger_file() -> None:
     Asserted because the natural drift is a second file: it looks tidier and silently
     halves every cross-agent aggregation.
     """
-    for stage in ("plan", "execute"):
+    for stage in ("spec", "execute"):
         for name, text in artifacts_for(stage).items():
             assert "stage_agent_ledger emit" in text, f"{name}: not using the shared writer"
             # A second writer module is how the "one file" decision gets undone quietly.
@@ -213,8 +213,13 @@ def test_the_validator_pass_cap_is_stated_in_the_guidance() -> None:
     A third pass then ran (`msms-20260807-1`) with no instruction covering it, and the
     pre-registered aggregation — an equality on `== 2` — silently dropped the row.
     """
-    for name, text in artifacts_for("plan").items():
-        assert "The cap is 2 passes" in text, f"{name}: the pass cap is not stated"
+    for name, text in artifacts_for("spec").items():
+        # The VALUE moved (2 under `/hm:plan`, 1 under `/hm:spec` — ADR-004 made the relocated
+        # critic single-pass), so the assertion is on a cap being STATED, not on its number.
+        # Pinning the literal would have made this test about the predecessor's policy.
+        assert re.search(r"[Tt]he cap is \d+ pass(?:es)?", text), (
+            f"{name}: the pass cap is not stated"
+        )
         assert "--pass <1|2>" not in text, (
             f"{name}: the placeholder still implies the cap instead of the guidance stating it"
         )
@@ -227,13 +232,13 @@ def test_an_over_cap_pass_must_still_be_recorded_with_a_reason() -> None:
     a reason the ledger cannot separate "the operator asked" from "the stage overran its own
     limit" — opposite remedies.
     """
-    for name, text in artifacts_for("plan").items():
+    for name, text in artifacts_for("spec").items():
         assert re.search(r"still record it.*--reason", text, re.S), f"{name}: no over-cap rule"
         assert "Never drop the row" in text, f"{name}: dropping the row is not forbidden"
 
 
 def test_exactly_one_terminal_row_per_run_is_stated() -> None:
-    for name, text in artifacts_for("plan").items():
+    for name, text in artifacts_for("spec").items():
         assert re.search(r"[Ee]xactly one row per .* may carry `--terminal`", text), (
             f"{name}: the one-terminal-per-run invariant is not stated"
         )

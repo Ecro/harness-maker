@@ -45,7 +45,7 @@ SourceKind = Literal["yaml", "python"]
 
 CLASSES: tuple[str, ...] = get_args(Class)
 GRADES: tuple[str, ...] = get_args(Grade)
-STAGES: tuple[str, ...] = ("research", "spec", "plan", "execute", "review", "verify", "wrapup")
+STAGES: tuple[str, ...] = ("research", "spec", "execute", "review", "verify", "wrapup")
 
 #: The render matrix the coverage gate is a union over (ADR-007). Targets are deliberately
 #: absent: commands render to one file family regardless of target.
@@ -130,158 +130,67 @@ REGISTRY: tuple[StepEntry, ...] = (
     _u("spec", "Step 3.5", "INV", "spec Step 4", note="machine.yaml write"),
     _e("spec", "Step 4", "INV", "**", f"{_R}; deterministic spec_machine check"),
     _u("spec", "Step 4.5", "INV", "spec Step 4", note="quality gate over the same payload"),
-    _u("spec", "Step 5", "INV", "spec Step 3", note="status write"),
-    # ── plan ───────────────────────────────────────────────────────────────
-    _e(
-        "plan",
-        "Step 0",
-        "INV",
-        "unsourced",
-        f"{_R_PLAN}; no INV property found (model-applied table) but no source for COMP either",
-        note="interview skip heuristic",
-    ),
-    _e(
-        "plan",
+    _u(
+        "spec",
         "Step 0.5",
         "INV",
-        "**",
-        _R_INTENT,
-        note="intent layer; one line when unused",
+        "plan Step 0.5",
+        note="objective context; human lock-in that survives model change",
     ),
-    _e("plan", "Step 1", "HOST", "*", f"{_R}; plan mode is native in all three vendors"),
-    _e(
-        "plan",
-        "Step 1.5",
-        "INV",
-        "*",
-        f"{_R_PLAN}; state: loop.md.j2 writes the session marker, a later plan reads it",
-        note="loop-mode detection",
-    ),
-    _e(
-        "plan",
-        "Step 1.7",
-        "INV",
-        "*",
-        f"{_R_PLAN}; state: resume marker read by the next invocation, verdict by verify Check 6",
-        note="spec-need detection; spec-driven arm",
-    ),
-    _e(
-        "plan",
-        "Step 2",
-        "INV",
-        "*",
-        f"{_R_PLAN}; state: spec Step 5 writes SPEC status, plan reads it in a later stage",
-        note="SPEC inheritance check",
-    ),
-    _e(
-        "plan",
-        "Step 3",
-        "INV",
-        "**",
-        f"{_R}; harness-diet + step-audit both kept it",
-        knob="interview.main_loop.max_rounds",
-        source_kind="yaml",
-        ordering="le",
-        note="None = unlimited = +inf",
-    ),
-    _e(
-        "plan",
-        "Step 3.0",
-        "INV",
-        "*",
-        f"{_R_PLAN}; human gate: the operator alone picks proceed / one question / full interview",
-        note="brief lock-in confirmation",
-    ),
-    _e(
-        "plan",
-        "Step 4",
-        "TUNE",
-        "**",
-        f"{_R}; verdict changes on a later pass 2/9 (22%, {_LEDGER_SIDE}, n=9); "
-        "37/40 MAJOR_REVISION — discrimination unproven",
-        remeasure_on=("model_release",),
-        measure_cmd=_LEDGER,
-    ),
-    _e(
-        "plan",
-        "Step 4.4",
-        "INV",
-        "*",
-        f"{_R_PLAN}; oracle: review_churn.measure ratio + plan_rounds stale threshold",
-        note="revision-size measurement; optional",
-    ),
-    _e(
-        "plan",
-        "Step 4.5",
-        "COMP",
-        "**",
-        f"{_R}; single-pass policy (feedback_plan_validator_single_pass)",
-    ),
-    _e(
-        "plan",
+    _u(
+        "spec",
         "Step 4.9",
         "INV",
+        "plan Step 4.9",
+        note="objective draft after consent; writes intent-layer state",
+    ),
+    _e(
+        "spec",
+        "Step 4.6",
+        "TUNE",
         "*",
-        f"{_R_PLAN}; human gate: write only on Step 0.5 consent, approval is a separate human verb",
-        note="objective draft consented at 0.5; one answer-gated write, approve stays human",
+        "SPEC-plan-stage-absorption ADR-004; predecessor `plan-validator` returned APPROVED "
+        "0/54 — discrimination UNMEASURED, which is why the relocated critic is single-pass "
+        "and never blocks. Re-measure before tightening either.",
+        remeasure_on=("model_release",),
+        measure_cmd=_LEDGER,
+        note="spec-validator dispatch; conditional on irreversible decisions",
     ),
-    _e(
-        "plan",
-        "Step 5",
-        "INV",
-        "*",
-        f"{_R_PLAN}; state: PLAN read by execute, the objective gate and verify Check 6",
-        note="PLAN write",
-    ),
-    _e(
-        "plan",
-        "Step 6",
-        "INV",
-        "unsourced",
-        f"{_R_PLAN}; tie: model-executed checks (not an oracle), no source for COMP",
-        note="write verification; only guard of an absent spec_need_verdict",
-    ),
-    _e(
-        "plan",
-        "Step A",
-        "COMP",
-        "unsourced",
-        f"{_R_PLAN}; both readings COMP, neither has evidence; origin is operator comprehension",
-        note="render-format instruction for the interview UI",
-    ),
-    _e(
-        "plan",
-        "Step B",
-        "INV",
-        "*",
-        f"{_R_PLAN}; human gate: unresolved rounds set --judgment-gate pending",
-        note="AskUserQuestion round",
-    ),
-    _e(
-        "plan",
-        "Step C",
-        "INV",
-        "*",
-        f"{_R_PLAN}; state: transcript persisted and handed to the validator context",
-        note="interview entry record",
-    ),
-    _e(
-        "plan",
-        "Step D",
-        "INV",
-        "*",
-        f"{_R_PLAN}; state: ADRs read as binding by execute and by loop-mode plans",
-        note="ADR promotion (human lock-in)",
-    ),
-    _e(
-        "plan",
-        "Step E",
-        "COMP",
-        "*",
-        _R,
-        note="5-term ceremony deleted by Phase 3; exit conditions remain",
-    ),
+    _u("spec", "Step 5", "INV", "spec Step 3", note="status write"),
     # ── execute ────────────────────────────────────────────────────────────
+    # SPEC-plan-stage-absorption: these three headings ARE the deleted plan stage's Step 5,
+    # Step 1.7 and Step 1.5, relocated. The class travels with the work, not with the stage
+    # name — the PLAN document is still state that outlives a context window, and Check 6 is
+    # still a deterministic oracle reading it.
+    _u(
+        "execute",
+        "Step 0",
+        "INV",
+        "plan Step 5",
+        note="authors the PLAN document (context-window-surviving state)",
+    ),
+    _u(
+        "execute",
+        "Step 0.1",
+        "INV",
+        "plan Step 1.7",
+        note="SPEC-need pair; verify Check 6 is the deterministic oracle that reads it",
+        renders_when="dev_mode == spec-driven",
+    ),
+    _u(
+        "execute",
+        "Step 0.2",
+        "INV",
+        "plan Step 1.5",
+        note="per-iter PLAN under /hm:loop; per-iteration state",
+    ),
+    _u(
+        "execute",
+        "Step 0.3",
+        "INV",
+        "plan Step 6",
+        note="PLAN write verification; the only guard of an absent spec_need_verdict",
+    ),
     _u("execute", "Step 1", "INV", "execute Step 2", note="PLAN load + boundaries (state)"),
     _u(
         "execute",

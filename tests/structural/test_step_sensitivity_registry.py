@@ -14,7 +14,6 @@ built through `interview._build_answers(preset=…)`, the only path that materia
 
 from __future__ import annotations
 
-import dataclasses
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -37,7 +36,7 @@ from .conftest import pin_install_ref
 from .test_command_size_budget import headings
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-STAGES = ("research", "spec", "plan", "execute", "review", "verify", "wrapup")
+STAGES = ("research", "spec", "execute", "review", "verify", "wrapup")
 
 
 def _answers(preset: Preset, dev_mode: DevMode) -> InterviewAnswers:
@@ -284,14 +283,19 @@ def _table2_mismatches(registry: Sequence[ss.StepEntry], research: str) -> list[
     return out
 
 
-def test_plan_entries_match_their_research_table() -> None:
-    research = (REPO_ROOT / "work-docs" / f"{_PLAN_SOURCE_DOC}.md").read_text(encoding="utf-8")
-    assert _table2_mismatches(ss.REGISTRY, research) == []
-    # Negative control: one entry transcribed with the wrong grade must be caught by name.
-    wrong = tuple(
-        dataclasses.replace(e, grade="**") if (e.stage, e.ordinal) == ("plan", "Step 5") else e
-        for e in ss.REGISTRY
+def test_the_plan_stage_left_no_registry_residue() -> None:
+    """Replaces `test_plan_entries_match_their_research_table` (SPEC-plan-stage-absorption).
+
+    That test cross-checked the registry's 19 `plan` entries against
+    `RESEARCH-source-plan-steps.md` Table 2. IRR-001 removed the stage, so one side of that
+    correspondence no longer exists and the check has nothing left to compare. Deleting it
+    outright would leave the removal unguarded, so what it guarded becomes the assertion: the
+    stage is gone from BOTH the ordered tuple and the registry. `_table2_mismatches` is kept
+    below — it is still the transcription check for whatever cites that document next.
+    """
+    assert "plan" not in ss.STAGES, f"`plan` is still in STAGES: {ss.STAGES}"
+    residue = [(e.stage, e.ordinal) for e in ss.REGISTRY if e.stage == "plan"]
+    assert not residue, (
+        f"the registry still classifies headings for the removed plan stage: {residue}. "
+        "An entry for a stage that does not render is a classification nothing can falsify."
     )
-    assert _table2_mismatches(wrong, research) == [
-        "Step 5: registry ('INV', '**') != table ('INV', '*')"
-    ]

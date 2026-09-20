@@ -85,7 +85,7 @@ Parse from the user's natural-language input:
 - `--failed-streak-cap <N>` — max consecutive failures before halting (default `5`). Raise when features are expected to fail multiple times before succeeding.
 - `--per-iter-stages <a,b,...>` — the atomic stages each iter runs, in order.
   Default: `execute,review` (wrapup is deferred to loop close to avoid a
-  commit per iter). Recommended override: `plan,execute,review` for big
+  commit per iter). Recommended override: `spec,execute,review` for big
   features needing per-iter planning. Every name must be an atomic stage with a
   rendered `.claude/commands/hm/<stage>.md`; **`wrapup` is rejected** — loop close
   owns it, and running it per iter would commit and merge on every iteration.
@@ -610,9 +610,9 @@ there is no fused command to invoke (ADR-014).
 - **Default**: `execute,review`. Wrapup is **deferred to loop close** (step 7);
   running it per iter would commit + merge on every iter, defeating the per-loop
   worktree.
-- **`--per-iter-stages plan,execute,review`** (Codex: `stages: plan,execute,review`):
-  include the plan stage per iter.
-  Recommended for big features where each iter needs fresh planning.
+- **`--per-iter-stages spec,execute,review`** (Codex: `stages: spec,execute,review`):
+  include the spec stage per iter. Recommended when each iteration needs its own acceptance
+  criteria. There is no plan stage — `/hm:execute` Step 0 writes the per-iter PLAN itself.
 - **`--per-iter-stages <other>`** (Codex: `stages: <other>`): explicit override,
   comma-separated atomic stage names.
 
@@ -620,8 +620,8 @@ Choose once at loop start, store the ordered list as `STAGES`.
 
 #### Stage list validation (before iter 1)
 
-Every name in `STAGES` must be one of the seven atomic stages —
-`research, spec, plan, execute, review, wrapup, verify` — and must exist as
+Every name in `STAGES` must be one of the six atomic stages —
+`research, spec, execute, review, wrapup, verify` — and must exist as
 `.claude/commands/hm/<stage>.md`. `wrapup` is rejected outright. If validation
 fails, **halt** with this user-facing error:
 
@@ -634,7 +634,7 @@ loop halted — invalid stage list '<STAGES>'
 
 Re-run with a comma-separated list of atomic stages, e.g.
   --per-iter-stages execute,review
-  --per-iter-stages plan,execute,review
+  --per-iter-stages spec,execute,review
 ```
 
 Do NOT silently drop or substitute a stage — that masks intent and could iterate

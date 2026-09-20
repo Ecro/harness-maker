@@ -30,7 +30,6 @@ from harness_maker.synthesize import synthesize
 DEFAULT_PIPELINE = [
     AtomicStage.RESEARCH,
     AtomicStage.SPEC,
-    AtomicStage.PLAN,
     AtomicStage.EXECUTE,
     AtomicStage.REVIEW,
     AtomicStage.VERIFY,
@@ -140,6 +139,12 @@ def test_reverse_mapper_absent_autonomy_is_gated(tmp_path: Path) -> None:
 
 
 def test_reverse_mapper_roundtrips_autonomy(tmp_path: Path) -> None:
+    """Also covers the IRR-002 migration: the yaml below names the retired `plan` stage.
+
+    Kept in the input on purpose — every harness.yaml rendered before
+    SPEC-plan-stage-absorption carries it, so this is the realistic legacy shape. The expected
+    pipeline drops it; `test_atomic_stage_plan_retirement.py` owns the advisory and idempotence.
+    """
     body = (
         "preset: Production\nlocale: en\ntargets: [claude-code]\n"
         "autonomy:\n"
@@ -155,7 +160,6 @@ def test_reverse_mapper_roundtrips_autonomy(tmp_path: Path) -> None:
     assert answers.autonomy.level == "auto_safe"
     assert answers.autonomy.pipeline == [
         AtomicStage.RESEARCH,
-        AtomicStage.PLAN,
         AtomicStage.EXECUTE,
         AtomicStage.REVIEW,
         AtomicStage.WRAPUP,

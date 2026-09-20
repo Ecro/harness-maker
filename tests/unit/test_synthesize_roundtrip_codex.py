@@ -54,7 +54,7 @@ fused_workflows:
     assert answers.second_opinion.agents == [
         "code-reviewer",
         "consensus-arbiter",
-        "plan-validator",
+        "spec-validator",
     ]
 
 

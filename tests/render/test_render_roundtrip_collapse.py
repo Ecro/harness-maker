@@ -128,7 +128,7 @@ _WITH_CODEX = (Target.CLAUDE_CODE, Target.CODEX)
 def test_the_render_helper_produces_the_seven_atomic_commands() -> None:
     """Without this, every `not in` assertion below would pass on an empty render."""
     cmds = _commands(_CLAUDE_ONLY)
-    for stage in ("research", "spec", "plan", "execute", "review", "verify", "wrapup"):
+    for stage in ("research", "spec", "execute", "review", "verify", "wrapup"):
         assert stage in cmds, f"{stage} did not render"
         assert len(cmds[stage]) > 2000
 

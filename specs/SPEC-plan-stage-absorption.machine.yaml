@@ -1,0 +1,342 @@
+schema_version: 3
+spec_slug: plan-stage-absorption
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: 'Tier-1: the pipeline migration rewrites user configuration
+  in place and the enum removal decides whether an existing harness loads at all.
+  A surviving mutant in the drop predicate leaves `plan` in the pipeline so autopilot
+  advances to a stage that no longer renders; one in the advisory guard warns on every
+  load or never; one in the stage-name tuple silently re-admits the deleted stage.
+  spec_need.py joins the set with IRR-004: a surviving mutant in the presence-preserving
+  write silently overwrites a verdict the DRI already recorded.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/models.py
+- src/harness_maker/interview.py
+- src/harness_maker/step_sensitivity.py
+- src/harness_maker/autopilot_caps.py
+- src/harness_maker/spec_need.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the plan stage renders on no target in any arm
+  type: property
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: 'Absence quantified over the whole render matrix, not one arm:
+    an implementation can only satisfy it by removing the stage everywhere, including
+    arms the author never rendered, so it cannot be derived from reading the arm that
+    was edited.'
+  oracle_independence_waiver: null
+  input_domain: every (preset, dev_mode, targets) combination the renderer accepts
+  transformation: render the harness and collect the rendered artifact paths
+  expected_relation: no rendered command, skill or stage-trigger artifact has stem
+    `plan`, for all combinations
+  preconditions: []
+  observable_output: the set of rendered artifact paths
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: execute writes the SPEC-need fields and preserves a pre-existing verdict
+  type: property
+  test_ids:
+  - tests/unit/test_spec_need_frontmatter_upsert.py::test_ac_002_upsert_preserves_and_guarantees_presence
+  - tests/unit/test_spec_need_frontmatter_upsert.py::test_ac_002_upsert_is_idempotent
+  - tests/unit/test_spec_need_frontmatter_upsert.py::test_ac_002_verb_is_registered
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: Preservation-and-presence is a metamorphic relation over arbitrary
+    prior frontmatter states — write(P) keeps P's verdict when it has one and has
+    the key in every case — and holds regardless of how the writer is implemented,
+    so reading the writer cannot produce it.
+  oracle_independence_waiver: null
+  input_domain: arbitrary PLAN frontmatter states, with and without a pre-existing
+    `spec_need_verdict`
+  transformation: run the Step 0 SPEC-need write against the frontmatter
+  expected_relation: the key is present afterwards in every case, and equals its prior
+    value whenever one existed
+  preconditions: []
+  observable_output: the PLAN frontmatter mapping after the write
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: every discovered PLAN reader resolves against an execute-written PLAN
+  type: property
+  test_ids:
+  - tests/structural/test_plan_reader_baseline.py::test_at_least_one_template_authors_the_plan_frontmatter
+  - tests/structural/test_plan_reader_baseline.py::test_execute_is_a_plan_author
+  - tests/structural/test_plan_reader_baseline.py::test_no_plan_frontmatter_key_is_orphaned
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: 'Readers are DISCOVERED by import-graph / AST traversal, never
+    enumerated: this repo hand-listed the reader set three times and was wrong all
+    three times (`new-marker-content-field-must-update-every-reader`, count:3), so
+    a discovered set is independent of the author''s belief about who reads.'
+  oracle_independence_waiver: null
+  input_domain: every module and template that reads PLAN frontmatter or PLAN sections,
+    discovered by traversal
+  transformation: absorb the plan stage and let /hm:execute Step 0 write the PLAN
+  expected_relation: every discovered reader resolves the same required keys before
+    and after the producer change
+  preconditions: []
+  observable_output: per-reader key-resolution result
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: a legacy pipeline naming plan loads, migrates once, and says so once
+  type: property
+  test_ids:
+  - tests/unit/test_atomic_stage_plan_retirement.py::test_ac_004_legacy_pipeline_migrates_once
+  - tests/unit/test_atomic_stage_plan_retirement.py::test_ac_004_second_load_is_silent
+  - tests/unit/test_atomic_stage_plan_retirement.py::test_ac_004_atomic_stage_no_longer_admits_plan
+  - tests/structural/test_retired_stage_single_reader.py::test_every_dynamic_atomicstage_construction_filters_retired_names
+  - tests/structural/test_retired_stage_single_reader.py::test_the_discovery_actually_finds_the_known_readers
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: One-shot migration is an idempotence relation over repeated loads
+    — the second load must change nothing and say nothing — which is independent of
+    how the drop is coded. The in-repo precedent is the `codex_second_opinion` to
+    `second_opinion` migration at schema_version 2 to 3.
+  oracle_independence_waiver: null
+  input_domain: harness.yaml files whose autonomy.pipeline contains `plan`, in any
+    position
+  transformation: load, then load the migrated result again
+  expected_relation: first load drops `plan` and emits exactly one advisory; second
+    load drops nothing and emits none
+  preconditions: []
+  observable_output: the loaded pipeline list and the advisory count
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: the per-iter PLAN keeps its frontmatter contract under a new producer
+  type: mechanical
+  test_ids: []
+  executable_predicate: '{"derived_from", "iter", "phase", "loop_mode"} <= set(parse_frontmatter(per_iter_plan_path))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The four keys are pinned by the pre-absorption `plan.md.j2` Step
+    1.5 loop-mode contract, read from that template before it is deleted — the expected
+    set predates the new writer and is not derived from it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: the removal is announced and leaves no stub
+  type: mechanical
+  test_ids: []
+  executable_predicate: '"plan" not in rendered_help_stage_names and changelog_breaking_entries("hm:plan")
+    != []'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The announcement form — CHANGELOG BREAKING plus `/hm:help`, no
+    stub — is copied from `PLAN-harness-diet` ADR-009, which shipped exactly this
+    when the fused-workflow axis was removed; the expectation comes from that shipped
+    precedent.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: spec-validator is single-pass, conditional, and cannot move approval
+  type: property
+  test_ids:
+  - tests/render/test_spec_validator_dispatch.py::test_ac_007_dispatched_at_most_once
+  - tests/render/test_spec_validator_dispatch.py::test_ac_007_dispatch_is_conditional
+  - tests/render/test_spec_validator_dispatch.py::test_ac_007_approval_cannot_read_the_verdict
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: 'Invariance of approval under the verdict is metamorphic: hold
+    the SPEC fixed, vary the returned verdict across its whole range, and the approval
+    state must not move. Only an implementation with no coupling between the two can
+    satisfy it, so it cannot be faked by reading the dispatch code.'
+  oracle_independence_waiver: null
+  input_domain: SPECs with and without declared or implied irreversible decisions,
+    paired with every verdict the validator can return
+  transformation: run /hm:spec's validation point
+  expected_relation: dispatch count is at most one and zero for a skip-path SPEC declaring
+    no irreversible decision; approval state is identical across all verdicts
+  preconditions: []
+  observable_output: dispatch count and the SPEC's approval state
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: every spec-validator dispatch is recorded
+  type: mechanical
+  test_ids:
+  - tests/render/test_spec_validator_dispatch.py::test_ac_008_every_dispatch_emits_a_ledger_row
+  executable_predicate: ledger_rows(agent="spec-validator", slug=slug) == spec_validator_dispatch_count
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The one-row-per-dispatch rule and the row shape are the existing
+    `stage_agent_ledger emit` contract that produced the 54-row plan-validator series
+    this SPEC's Intent measures; the expectation is read from that shipped ledger,
+    not from the new agent.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: the merged interview records its round count on the SPEC
+  type: mechanical
+  test_ids:
+  - tests/render/test_spec_validator_dispatch.py::test_ac_009_spec_frontmatter_declares_interview_rounds
+  executable_predicate: isinstance(parse_frontmatter(spec_md_path)["interview_rounds"],
+    int)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The field name and its integer semantics are taken from the 140
+    existing PLAN frontmatters that already carry `interview_rounds`; this continues
+    that series rather than defining a new one, so the expectation predates the change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: the PLAN document keeps its required per-phase fields
+  type: mechanical
+  test_ids: []
+  executable_predicate: all(REQUIRED_PHASE_FIELDS <= set(phase) for phase in parse_plan_phases(plan_path))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The seven per-phase fields are pinned by the pre-absorption `plan.md.j2`
+    Step 5 required-sections list, read from that template before deletion; the expected
+    set predates the new writer.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: the `/hm:plan` slash command is removed from all three targets with no
+    stub
+  category: public API/CLI contract
+  rationale: a user-facing surface of a published plugin; restoring it costs a release
+    and a second announcement
+  source: spec
+- id: IRR-002
+  decision: '`AtomicStage.PLAN` is removed from the enum and `plan` is dropped once
+    from `autonomy.pipeline` at load'
+  category: data migration
+  rationale: the migration rewrites user configuration in place; the original pipeline
+    value is not recoverable afterwards
+  source: spec
+- id: IRR-003
+  decision: the producer of `spec_need_verdict` / `spec_need_target` moves from `/hm:plan`
+    to `/hm:execute` Step 0
+  category: schema/file format/storage layout
+  rationale: verify Check 6 reads these fields and its absent-key path is a silent
+    PASS, so two units implementing this differently kill the gate with no error
+  source: spec
+- id: IRR-004
+  decision: a new public CLI verb `hm spec_need frontmatter-upsert` owns the presence-preserving
+    PLAN frontmatter write
+  category: public API/CLI contract
+  rationale: rendered stages in user harnesses call it by name, so its name and signature
+    are a contract; AC-002's property oracle over arbitrary prior frontmatter states
+    requires an execution surface that a prose recipe cannot provide
+  source: execute
+approval:
+  kind: human
+  content_hash: abb87e254e41b7a52317bee7f35d6628345a11e962aef43940e4678f1538aae7
+  approved_by: Ecro
+  approved_at: '2026-09-20T02:52:53Z'

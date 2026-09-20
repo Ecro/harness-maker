@@ -1489,7 +1489,7 @@ def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
     # `fused_workflow_present` signal is NOT simply deleted — a weight-30 signal that
     # can never pass again is a permanent phantom penalty. The successor asks the
     # question that still has an answer: is every atomic stage actually installed?
-    atomic_stages = {"research", "spec", "plan", "execute", "review", "wrapup", "verify"}
+    atomic_stages = {"research", "spec", "execute", "review", "wrapup", "verify"}
     present = {c.stem for c in commands} & atomic_stages
     missing = sorted(atomic_stages - present)
     signals.append(

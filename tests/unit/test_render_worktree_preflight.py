@@ -20,7 +20,7 @@ from harness_maker import synthesize as _synth
 from harness_maker.models import Blueprint, InterviewAnswers, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 
-WIRED_STAGES = ("execute", "plan", "review", "wrapup", "verify", "research", "spec")
+WIRED_STAGES = ("execute", "review", "wrapup", "verify", "research", "spec")
 
 
 def _render(tmp_path: Path, *, flag_on: bool) -> dict[str, str]:

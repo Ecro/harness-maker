@@ -62,7 +62,7 @@ def test_disabled_is_byte_zero_second_opinion(tmp_path: Path) -> None:
     assert "Bash(agy --sandbox --print:*)" not in settings
     assert "Bash(codex exec:*)" not in settings
     review = (root / "commands/hm/review.md").read_text()
-    plan = (root / "commands/hm/plan.md").read_text()
+    plan = (root / "commands/hm/spec.md").read_text()
     assert "Cross-model heterogeneous" not in review
     assert "second_opinion_results" not in plan
     assert not (root / "schemas/second-opinion-finding.schema.json").exists()
@@ -97,9 +97,9 @@ def test_dispatch_partial_loops_both_models_in_review(tmp_path: Path) -> None:
     assert "timeout 240 agy" not in review  # NOT the external-timeout wrapper either
 
 
-def test_plan_uses_second_opinion_results_contract(tmp_path: Path) -> None:
+def test_spec_uses_second_opinion_results_contract(tmp_path: Path) -> None:
     root = _render(["codex"], tmp_path)
-    plan = (root / "commands/hm/plan.md").read_text()
+    plan = (root / "commands/hm/spec.md").read_text()
     assert "second_opinion_results" in plan
     assert "codex_status" not in plan
     assert "codex_reconciliation" not in plan

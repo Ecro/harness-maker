@@ -14,7 +14,7 @@
 3. [7단계 원자 워크플로우](#3-7단계-원자-워크플로우)
    - 3.1 [/hm:research — 탐색](#31-hmresearch--탐색)
    - 3.2 [/hm:spec — 인수 조건](#32-hmspec--인수-조건)
-   - 3.3 [/hm:plan — 구현 계획](#33-hmplan--구현-계획)
+   - 3.3 [plan 스테이지는 흡수됐다](#33-plan-스테이지는-흡수됐다--내용물이-간-곳)
    - 3.4 [/hm:execute — TDD 구현](#34-hmexecute--tdd-구현)
    - 3.5 [/hm:review — 코드 리뷰](#35-hmreview--코드-리뷰)
    - 3.6 [/hm:verify — 완료 검증](#36-hmverify--완료-검증)
@@ -88,7 +88,7 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                     사용자 슬래시 명령 호출                           │
-│          /hm:research  /hm:spec  /hm:plan  /hm:execute  ...          │
+│          /hm:research  /hm:spec  /hm:execute  ...          │
 └─────────────────────────┬────────────────────────────────────────────┘
                           │
                           ▼
@@ -375,131 +375,27 @@ task worktree 가 이미 사라졌을 때 임시 checkout 으로 브랜치의 SP
 `..` 를 포함한 값은 무시되고 `specs/` 로 대체됩니다. SPEC 의 `spec_slug` 는 파일명에 묶여
 있어서, 재승인 없이 파일명만 바꾸면 승인이 따라오지 않습니다.
 
-### 3.3 /hm:plan — 구현 계획
+### 3.3 plan 스테이지는 흡수됐다 — 내용물이 간 곳
 
-**목적**: 코드를 쓰기 전에 "어떻게 만들 것인가"를 결정한다. 심층 인터뷰로 아키텍처 결정(ADR)을 확정하고, 구현 단계를 세분화한다.
+plan 스테이지는 더 이상 존재하지 않는다. `SPEC-plan-stage-absorption` 이 스테이지·인터뷰·
+auto-advance 게이트를 제거했다. **PLAN 문서는 남는다** — 컨텍스트 창을 넘어 살아남는 상태이고
+이후 다섯 스테이지가 읽기 때문이다.
 
-#### 실행 절차
+소유자별 이동:
 
-**Step 0 — 스킵 휴리스틱 (4개 기준 모두 충족 시 인터뷰 건너뜀)**
+| plan 스테이지가 담던 것 | 지금 위치 |
+|---|---|
+| 되돌리기 어려운 결정 (스키마 · 공개 API/CLI · 파일 포맷 · 마이그레이션 · 보안 경계 · 새 의존성) | **`/hm:spec`** 의 `irreversible_decisions` — land hold 기준이기도 하다 |
+| objective 연결 (Step 0.5) 과 objective 초안 (Step 4.9) | **`/hm:spec`** Step 0.5 / 4.9, 그리고 SPEC frontmatter `objective:` |
+| phase · 파일 목록 · 순서 · 위험 · exit criteria | **`/hm:execute` Step 0** 이 사람 게이트 없이 작성 |
+| SPEC-need 판정 (`spec_need_verdict` / `spec_need_target`) | **`/hm:execute` Step 0.1** — `prefilter` + `record` + 선존재 보존 쓰기. *멈춤* 은 의도적으로 버렸고 집행은 `/hm:verify` Check 6 이 맡는다 |
+| loop per-iter PLAN | **`/hm:execute` Step 0.2** |
+| `plan-validator` | **`spec-validator`** 로 `/hm:spec` Step 4.6 에 재배치 — 단일 패스, 조건부, 승인을 막지 않는다 |
 
-| 기준 | 스킵 조건 |
-|------|---------|
-| 범위 | 단일 파일 또는 설정/문서만 변경 |
-| 아키텍처 | 컴포넌트 경계 변경 없음, 새 모듈 없음 |
-| 계약 | API/IPC/DB 스키마/파일 형식 변경 없음 |
-| 위험 | 1시간 내 롤백 가능, 사용자 영향 없음 |
-
-4개 중 하나라도 해당되면 인터뷰 진행.
-
-**Step 1 — 내부 초안 작성 (사용자에게 미표시)**
-
-코드베이스를 읽고 내부적으로:
-- 잠정 아키텍처 (컴포넌트, 경계, 데이터 흐름)
-- 후보 단계 분해
-- 폭발 반경 순으로 정렬한 모호한 점 목록
-
-**Step 2 — SPEC 상속 확인**
-
-SPEC 파일이 있으면 읽어서 상태 확인:
-
-- **Case A** — `status: approved` + 미해결 질문 없음: 인터뷰 생략, Step 3.0 (간단 확인) 만 수행
-- **Case B** — `status: draft`: SPEC에서 해소된 카테고리는 재질문 않고, 남은 질문만 인터뷰
-- **Case C** — SPEC 없음: 처음부터 전체 인터뷰
-
-**Step 3.0 — Case A 에서의 간단 확인**
-
-구조화 질문 도구로 딱 하나만 물음:
-- "단계 분해로 바로 진행" vs "먼저 아키텍처 결정이 있음" vs "여러 아키텍처 질문 있음"
-
-**Step 3 — 인터뷰 루프**
-
-> **언어 규칙**: 라이브 인터뷰 UI 는 `harness.yaml.locale` 언어로 진행 (ko→한국어, en→영어, 미지원 언어→영어 fallback). 단, **디스크에 저장되는 PLAN 문서는 항상 영어**. 사용자 자유형 답변은 Step 5 에서 영어로 번역하여 아카이빙.
-
-무제한 라운드. 각 라운드는 A→E 단계:
-
-**A. 현재 계획 상태 시각화** (필요한 경우):
-- 기본: 산문/불릿 형식
-- 비교할 때: 표
-- 위상 파악 시: ASCII 박스
-- Mermaid 는 최종 PLAN 문서에만 사용 (터미널에서는 날 텍스트로 보임)
-
-**B. 구조화 질문** (우선순위 순서):
-1. 범위 경계 (안/밖, 호환성 파괴 여부)
-2. 아키텍처 (컴포넌트 소유권, 패턴 선택)
-3. 계약 형태 (API 시그니처, 스키마, 파일 형식)
-4. 위험 허용도 (단계적 vs 빅뱅, 롤백 전략)
-5. 테스트 깊이 (단위/통합/수동)
-6. 구현 순서 (피처 플래그, 의존성)
-7. 의존성 (라이브러리 추가 vs 직접 구현)
-8. 실패 처리 (재시도 정책, 서킷 브레이크)
-9. 관측 가능성 (로그 레벨, 메트릭 이름)
-
-라운드 2 부터는 "인터뷰 충분함 — 종료" 옵션 제공.
-
-**C. 답변을 Interview Entry 로 기록**
-
-| # | 토픽 | 카테고리 | 질문 | 선택 | 비고 | → ADR |
-
-**D. ADR 승격 체크**
-
-다음 중 하나라도 해당되면 공식 **ADR (Architecture Decision Record)** 생성:
-- 컴포넌트 경계/소유권 변경
-- 새 계약 (API, IPC, 스키마) 도입/변경
-- 합리적인 대안을 거부
-- 장기 영향이 있는 결정
-- 미래 유연성 제한 (프레임워크, 라이브러리 고정)
-
-ADR 형식:
-```markdown
-### ADR-{NNN}: {제목}
-**Status:** Accepted ({날짜}, via /hm:plan interview)
-**Context:** 이 결정이 필요했던 이유
-**Decision:** 선택한 것
-**Consequences:**
-- ✅ 긍정적 결과
-- ⚠️ 수용된 트레이드오프
-**Rejected alternatives:** 거부된 대안과 이유
-**Source:** Interview #{N}
-```
-
-**E. 종료 체크**
-
-사용자가 "충분함 — 종료" 선택 또는 모든 고영향 모호점 해소 시 인터뷰 종료.
-
-**Step 4 — plan-validator 에이전트 호출**
-
-인터뷰 종료 후, 완성된 PLAN 초안을 `plan-validator` 에이전트에게 전달:
-
-- `APPROVED` → 그대로 PLAN 저장
-- `NEEDS_REVISION` (경고만) → 경고별 1회 추가 인터뷰 라운드 후 저장
-- `MAJOR_REVISION` (심각한 문제) → 추가 인터뷰 후 재검증 1회. 두 번째도 MAJOR_REVISION 이면 사용자에게 에스컬레이션
-
-**Step 5 — PLAN 문서 작성**
-
-`work-docs/PLAN-{slug}.md` 에 10개 필수 섹션:
-1. 🎯 Executive Summary
-2. 📚 Prior Work
-3. 🎙️ Interview Transcript
-4. 📐 Architecture Decision Records
-5. 🏗️ Technical Design
-6. 📝 Implementation Plan (각 단계: 범위 / 완료 기준 / 위험 / 롤백 포인트)
-7. 🧪 Testing Strategy
-8. ⚠️ Risks & Mitigation
-9. ✅ Success Criteria
-10. 🔍 Plan Validation
-
-각 구현 단계에는 **4개 필수 필드**: 범위, 완료 기준(실행 가능한 명령), 위험도(`low|medium|high`), 롤백 포인트.
-
-**Step 6 — 저장 후 검증**
-
-파일을 읽어서: frontmatter 시작, Interview Transcript 섹션 존재, ADR 수 일치, 4개 필드 모두 있는지 확인.
-
-#### 출력물
-- `work-docs/PLAN-{slug}.md` (frontmatter + 10개 섹션)
-- ADR 세트 (ADR-001, ADR-002, …)
-
----
+**근거.** 이 저장소에서 인터뷰를 거친 SPEC 과 PLAN 을 모두 가진 21개 slug 실측: 작업당 9.70
+라운드 (SPEC 4.65 + PLAN 5.05) 가 병합 추정 6.55 로 줄었다. PLAN 인터뷰 항목의 52% 는 SPEC
+인터뷰가 이미 묻던 질문이었고, 21% 는 사람에게 갈 일이 아닌 IC 질문이었다. 같은 변경으로 출하
+프롬프트 표면이 약 11% 줄었다.
 
 ### 3.4 /hm:execute — TDD 구현
 
@@ -1485,7 +1381,7 @@ Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 
 
 ### 8.7 plan-validator
 
-**역할**: `/hm:plan` Step 4 에서 PLAN 초안의 품질을 독립적으로 비판한다.
+**역할**: `/hm:spec` Step 4.6 에서 SPEC 의 품질을 독립적으로 비판한다.
 
 **호출 시점**: PLAN 파일을 디스크에 쓰기 **전** — 아직 임시 상태인 초안을 검증
 
@@ -1557,7 +1453,7 @@ Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 
 - `/hm:execute` Phase D: PLAN 범위 변경 없이 수정 불가한 실패
 - `/hm:execute` ADR 충돌: 구현이 ADR 을 위반해야만 진행 가능
 - `/hm:review` 합의 교착: 3개 리뷰어가 동일 이슈에 상충 CONCLUDE
-- `/hm:plan` plan-validator: 2차 MAJOR_REVISION
+- `/hm:spec` spec-validator: critical 미해결
 
 **분석 과정**:
 
@@ -2062,11 +1958,11 @@ OBSERVE → INFER → CONCLUDE 체인 비교:
 
 **일반 워크플로우**: "왜 Redis 대신 SQLite 를 썼나?" 라는 질문에 답할 수 있는 사람이 팀에 없어지면 영원히 알 수 없다. 다음 AI 세션은 이미 거부된 대안을 다시 제안한다.
 
-harness-maker 의 `/hm:plan` 은 모든 아키텍처 결정을 ADR (Architecture Decision Record) 로 공식화한다:
+harness-maker 는 아키텍처 결정을 ADR (Architecture Decision Record) 로 공식화한다:
 
 ```markdown
 ### ADR-001: Redis 대신 SQLite 사용
-**Status:** Accepted (2026-05-09, via /hm:plan interview)
+**Status:** Accepted (2026-05-09, via /hm:spec interview)
 **Context:** 단일 인스턴스 배포, 외부 서비스 의존성 최소화 요건
 **Decision:** SQLite
 **Consequences:**
@@ -2328,7 +2224,7 @@ WSL2/NTFS 환경에서 Edit 도구가 파일을 corrupt 할 수 있는 알려진
 
 **Before**: 대부분의 AI 워크플로우는 작업 설명만 받고 구현에 들어간다. 모호한 요구사항은 구현 중에 발견되고, 그때 다시 돌아가서 고치는 비용이 발생한다.
 
-**After**: `/hm:spec` 과 `/hm:plan` 은 구현 전에 심층 인터뷰를 시행한다. 질문은 고정 스크립트가 아니라 LLM 이 컨텍스트를 읽어 동적으로 생성한다.
+**After**: `/hm:spec` 이 구현 전에 심층 인터뷰를 시행한다. 질문은 고정 스크립트가 아니라 LLM 이 컨텍스트를 읽어 동적으로 생성한다.
 
 #### /hm:spec 의 6-카테고리 인터뷰
 
@@ -2343,9 +2239,9 @@ SPEC 인터뷰는 **6개 카테고리를 순서대로** 커버한다:
 | Constraints | 기술적·비즈니스적 제약 |
 | Verification | 어떻게 완료를 증명할 것인가 |
 
-6개 카테고리 커버리지와 시나리오 구체성을 **completeness scorer** 가 0-1 점수로 평가한다. 점수 미달 시 부족한 카테고리만 추가 질문한다. 완료된 SPEC 은 `status: approved` 로 마킹되어 이후 `/hm:plan` 이 재질문을 생략한다 (Case A — 중복 인터뷰 없음).
+6개 카테고리 커버리지와 시나리오 구체성을 **completeness scorer** 가 0-1 점수로 평가한다. 점수 미달 시 부족한 카테고리만 추가 질문한다. 완료된 SPEC 은 `status: approved` 로 마킹되어 이후 the plan stage 이 재질문을 생략한다 (Case A — 중복 인터뷰 없음).
 
-#### /hm:plan 의 9-카테고리 우선순위 인터뷰
+#### plan 스테이지의 9개 카테고리가 간 곳
 
 PLAN 인터뷰는 "어떻게 만들 것인가"를 결정한다. 질문 카테고리는 **영향도 역순**으로 진행된다:
 
@@ -2532,7 +2428,7 @@ PLAN 이행 여부는 체크박스 체크만으로는 판정할 수 없다. PLAN
 | Conditional Router | 불필요한 리뷰어 → 토큰 낭비 | conditional-router 스킬 |
 | 2-pass 리댁션 | 메타데이터 앵커링 | two_pass_review CLI (+47pp) |
 | Reasoning Alignment | 가짜 합의 → 잘못된 수정 | consensus-arbiter 에이전트 |
-| ADR 시스템 | 설계 결정 WHY 유실 | /hm:plan interview / PLAN-*.md |
+| ADR 시스템 | 설계 결정 WHY 유실 | /hm:spec interview / PLAN-*.md |
 | Fingerprint + Block-merge | 업그레이드가 커스터마이제이션 덮음 | content_hash / @hm:user:* markers |
 | Drift Gate | 범위 이탈 감지 못함 | wrapup Step 3 / pending-drift.md |
 | 2-tier refdocs 검색 | 대용량 지식 베이스 전체 로드 | refdocs-search + relevance-filter |

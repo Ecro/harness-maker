@@ -25,7 +25,7 @@ _TEMPLATES_DIR = _REPO_ROOT / "src" / "harness_maker" / "templates" / "stages"
 def stage_source() -> dict[str, str]:
     """Read the three stage `.j2` source bodies."""
     out: dict[str, str] = {}
-    for stage in ("research", "plan", "spec"):
+    for stage in ("research", "execute", "spec"):
         path = _TEMPLATES_DIR / f"{stage}.md.j2"
         assert path.is_file(), f"missing template: {path}"
         out[stage] = path.read_text(encoding="utf-8")
@@ -44,9 +44,9 @@ def test_research_template_drops_first_60_lines_pattern(stage_source: dict[str, 
     )
 
 
-def test_plan_template_invokes_memory_retrieve(stage_source: dict[str, str]) -> None:
-    body = stage_source["plan"]
-    assert "hm memory_retrieve" in body, "plan stage must invoke memory_retrieve helper"
+def test_execute_template_invokes_memory_retrieve(stage_source: dict[str, str]) -> None:
+    body = stage_source["execute"]
+    assert "hm memory_retrieve" in body, "execute stage must invoke memory_retrieve helper"
 
 
 def test_spec_template_invokes_memory_retrieve(stage_source: dict[str, str]) -> None:
@@ -74,9 +74,10 @@ def test_session_hot_tier_dropped_in_research(stage_source: dict[str, str]) -> N
     )
 
 
-def test_session_hot_tier_dropped_in_plan_and_review() -> None:
-    """plan + review are decision-journal consumers → session read removed (ADR-001)."""
-    for stage in ("plan", "review"):
+def test_session_hot_tier_dropped_in_review() -> None:
+    """`plan` carried this with `review` until SPEC-plan-stage-absorption removed the stage;
+    `review` is the surviving decision-journal consumer (ADR-001)."""
+    for stage in ("review",):
         body = (_TEMPLATES_DIR / f"{stage}.md.j2").read_text(encoding="utf-8")
         assert ".claude/memory/session" not in body, (
             f"{stage} stage must NOT read the session tier (ADR-001)"
@@ -100,7 +101,7 @@ def test_all_three_templates_use_is_codex_branch_for_invocation(
     """All three templates must wrap the helper invocation in the is_codex branch
     so Codex gets `Bash("...")` form and Claude Code/Cursor get `!...` form
     (matches existing hm second_brain pattern)."""
-    for stage in ("research", "plan", "spec"):
+    for stage in ("research", "execute", "spec"):
         body = stage_source[stage]
         # Find the memory_retrieve invocation context. The block should sit
         # inside a `{% if is_codex %}` ... `{% endif %}` region.

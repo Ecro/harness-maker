@@ -84,7 +84,6 @@ def test_deep_interview_templates_have_configured_locale_contracts() -> None:
     paths = [
         "src/harness_maker/templates/stages/research.md.j2",
         "src/harness_maker/templates/stages/spec.md.j2",
-        "src/harness_maker/templates/stages/plan.md.j2",
         "src/harness_maker/templates/commands/hm/loop.md.j2",
     ]
     for relpath in paths:

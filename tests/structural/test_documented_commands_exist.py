@@ -200,12 +200,27 @@ def test_the_slash_scanner_rejects_a_name_that_does_not_render() -> None:
     assert sorted(w for w in found if w not in registered) == ["does-not-exist"]
 
 
+#: Files whose `/hm:<name>` mentions are HISTORICAL RECORD, not a claim that the command
+#: exists. `pre-change-checklist.md` holds an incident write-up naming the two stages an
+#: `awk` bug actually occurred in; one of them was later removed
+#: (SPEC-plan-stage-absorption), and editing the name out would rewrite the record. It is also
+#: pinned BYTE-FOR-BYTE by `tests/unit/test_claude_md_second_opinion_guidance.py` as a
+#: relocated block, so the two gates would otherwise contradict each other — and the one that
+#: must win is the frozen capture.
+#:
+#: Named as data, not matched by a pattern: an entry here is a visible edit, and a new file
+#: does not get exempted by accident.
+_HISTORICAL_RECORD = {"docs/reference/pre-change-checklist.md"}
+
+
 def test_every_hm_command_named_in_the_plugin_surface_renders() -> None:
     docs = _plugin_command_docs()
     assert docs, "no plugin command markdown found — the scanner would be vacuous"
     registered = _rendered_hm_commands()
     bad: dict[str, list[str]] = {}
     for path in docs:
+        if str(path.relative_to(_ROOT)) in _HISTORICAL_RECORD:
+            continue
         text = path.read_text(encoding="utf-8")
         missing = sorted({w for w in _HM_SLASH.findall(text) if w not in registered})
         if missing:

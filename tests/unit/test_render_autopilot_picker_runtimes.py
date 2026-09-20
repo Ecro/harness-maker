@@ -34,9 +34,9 @@ def bodies() -> dict[str, str]:
     answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
     out = Path(tempfile.mkdtemp()) / "out"
     render(synthesize(profile, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
-    codex = (out / ".." / ".agents" / "skills" / "hm-plan" / "SKILL.md").resolve()
+    codex = (out / ".." / ".agents" / "skills" / "hm-spec" / "SKILL.md").resolve()
     return {
-        "claude": (out / "commands" / "hm" / "plan.md").read_text(encoding="utf-8"),
+        "claude": (out / "commands" / "hm" / "spec.md").read_text(encoding="utf-8"),
         "codex": codex.read_text(encoding="utf-8"),
     }
 

@@ -1,9 +1,9 @@
-"""plan-validator PIDA reconciliation flow (PLAN-crossmodel-codex-gaps ADR-004,
+"""spec-validator PIDA reconciliation flow (PLAN-crossmodel-codex-gaps ADR-004,
 generalized to multi-model by PLAN-second-opinion-multi-model).
 
 PLAN-codex-second-opinion-sandbox ADR-002/005: the exec recipe moved to the main
 loop; the *non-exec* reconciliation contract (PIDA debate flow + output envelope)
-was re-homed into the plan-validator agent BODY (it has no Bash and never runs
+was re-homed into the spec-validator agent BODY (it has no Bash and never runs
 any second-opinion CLI — it reconciles the main-loop-injected findings). The output
 envelope is now the `second_opinion_results` array (one entry per enabled model),
 superseding the old scalar `codex_status`/`codex_reconciliation` fields.
@@ -29,7 +29,7 @@ from harness_maker.synthesize import synthesize
 
 
 def _render_plan_validator(tmp_path: Path, *, preset: Preset = Preset.PRODUCTION) -> str:
-    """Full synthesize -> render path; return the rendered plan-validator agent body."""
+    """Full synthesize -> render path; return the rendered spec-validator agent body."""
     blueprint = synthesize(
         ProjectProfile(),
         InterviewAnswers(
@@ -39,7 +39,7 @@ def _render_plan_validator(tmp_path: Path, *, preset: Preset = Preset.PRODUCTION
         ),
     )
     render(blueprint, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    return (tmp_path / "agents" / "plan-validator.md").read_text(encoding="utf-8")
+    return (tmp_path / "agents" / "spec-validator.md").read_text(encoding="utf-8")
 
 
 def test_unresolved_disposition_present(tmp_path: Path) -> None:
@@ -95,7 +95,7 @@ def test_reconcile_block_byte_zero_when_disabled(tmp_path: Path) -> None:
         ),
     )
     render(blueprint, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    body = (tmp_path / "agents" / "plan-validator.md").read_text(encoding="utf-8")
+    body = (tmp_path / "agents" / "spec-validator.md").read_text(encoding="utf-8")
     assert "@hm:second-opinion-reconcile" not in body
     assert "second_opinion_results" not in body
     assert "codex exec" not in body

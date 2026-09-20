@@ -32,7 +32,6 @@ from harness_maker.models import AtomicStage
 _PIPELINE = [
     AtomicStage.RESEARCH,
     AtomicStage.SPEC,
-    AtomicStage.PLAN,
     AtomicStage.EXECUTE,
     AtomicStage.REVIEW,
     AtomicStage.VERIFY,
@@ -43,7 +42,7 @@ _PIPELINE = [
 # "never auto-advance", and `boundary` was not checking it at all. The dedicated test below
 # pins the fail-closed behaviour instead.
 _ADVANCING_LEVELS = ("auto_safe", "auto_full")
-_JUDGMENT_STAGES = ("plan", "review")
+_JUDGMENT_STAGES = ("spec", "review")
 
 
 def _arm(root: Path, *, level: str, pipeline: list[AtomicStage] | None = None) -> None:
@@ -66,7 +65,13 @@ def _boundary(
 
 
 @pytest.mark.parametrize("level", list(_ADVANCING_LEVELS))
-@pytest.mark.parametrize("current", list(_JUDGMENT_STAGES))
+# `review` only, not `_JUDGMENT_STAGES`. `spec`'s boundary RE-DERIVES the verdict from the
+# SPEC's approval state and takes the more restrictive of (declared, derived), so a declared
+# `clear` that no approved SPEC supports is correctly overridden — this test's universal
+# claim does not hold there BY DESIGN. `plan` filled this slot until
+# SPEC-plan-stage-absorption removed it, and `plan` had no such re-derivation.
+# `tests/unit/test_autopilot_spec_gate.py` owns the spec arm.
+@pytest.mark.parametrize("current", ["review"])
 def test_clear_proceeds_at_every_level(
     tmp_path: Path, level: str, current: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -179,7 +184,7 @@ def test_the_auto_answer_leaves_a_row_of_its_own(
     advance on the ledger, and the directive telling the model to record it is the only
     trace — which is exactly what the code's own comment calls an unauditable skip."""
     _arm(tmp_path, level="auto_full")
-    _boundary(tmp_path, current="plan", gate="pending", capsys=capsys)
+    _boundary(tmp_path, current="spec", gate="pending", capsys=capsys)
     assert autopilot_ledger.count_events(tmp_path, "gate_auto_answered") == 1
 
 
@@ -234,7 +239,7 @@ def test_the_advanced_field_is_true_when_the_chain_moves(
     every advancing run.
     """
     _arm(tmp_path, level="auto_full")
-    res = _boundary(tmp_path, current="plan", gate="pending", capsys=capsys)
+    res = _boundary(tmp_path, current="spec", gate="pending", capsys=capsys)
     assert res["proceed"] is True
     raw = autopilot_ledger.ledger_path(tmp_path).read_text(encoding="utf-8")
     answered = [
@@ -262,7 +267,7 @@ def test_the_auto_answer_row_lands_even_when_the_chain_then_stops(
     _arm(
         tmp_path,
         level="auto_full",
-        pipeline=[AtomicStage.PLAN, AtomicStage.REVIEW, AtomicStage.WRAPUP],
+        pipeline=[AtomicStage.SPEC, AtomicStage.REVIEW, AtomicStage.WRAPUP],
     )
     res = _boundary(tmp_path, current="review", gate="pending", capsys=capsys)
     assert res["halt_kind"] == "merge_gate", res
@@ -300,9 +305,9 @@ def test_a_non_default_pipeline_still_gates_plan(
     _arm(
         tmp_path,
         level="auto_safe",
-        pipeline=[AtomicStage.PLAN, AtomicStage.REVIEW, AtomicStage.VERIFY, AtomicStage.WRAPUP],
+        pipeline=[AtomicStage.SPEC, AtomicStage.REVIEW, AtomicStage.VERIFY, AtomicStage.WRAPUP],
     )
-    res = _boundary(tmp_path, current="plan", gate="pending", capsys=capsys)
+    res = _boundary(tmp_path, current="spec", gate="pending", capsys=capsys)
     assert res["halt_kind"] == "judgment_gate"
 
 
@@ -321,7 +326,7 @@ def test_judgment_gate_records_a_row_and_preserves_the_marker(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _arm(tmp_path, level="auto_safe")
-    _boundary(tmp_path, current="plan", gate="pending", capsys=capsys)
+    _boundary(tmp_path, current="spec", gate="pending", capsys=capsys)
     assert autopilot.active_marker(tmp_path) is not None, (
         "the marker was cleared — copying merge_gate's behaviour ends the session at the "
         "first plan stage"

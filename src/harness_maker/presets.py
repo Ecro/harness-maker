@@ -64,7 +64,7 @@ def _spec(claude_alias: str, effort: _Effort) -> AgentModelSpec:
 
 
 # Production. **The axis is CALL VOLUME, not "reasoning vs structured"** — that older
-# description did not survive reading the map beside it. `plan-validator` (opus) and
+# description did not survive reading the map beside it. `spec-validator` (opus) and
 # `code-reviewer` (sonnet) both critique a draft; only the name differs. What actually predicts
 # a row is how often the agent runs: the eleven reviewers fire 7-at-a-time, twice per review
 # round, several rounds per task, so they dominate spend and sit on sonnet; the rest run once
@@ -87,7 +87,7 @@ def _spec(claude_alias: str, effort: _Effort) -> AgentModelSpec:
 _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
     # Low volume — opus is affordable here
     "autoloop-coder": _spec("opus", "high"),
-    "plan-validator": _spec("opus", "high"),
+    "spec-validator": _spec("opus", "high"),
     "stuck": _spec("opus", "high"),
     # Low volume, but PROCEDURAL — see the exception note above
     "stage-delegate": _spec("sonnet", "medium"),
@@ -112,7 +112,7 @@ _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
 _SIDE_MAP: dict[str, AgentModelSpec] = {
     # Reasoning agents (still need decent quality even in Side)
     "autoloop-coder": _spec("sonnet", "medium"),
-    "plan-validator": _spec("sonnet", "medium"),
+    "spec-validator": _spec("sonnet", "medium"),
     "stage-delegate": _spec("sonnet", "medium"),
     "stuck": _spec("sonnet", "medium"),
     # Reviewers downshift

@@ -1,3 +1,4 @@
+{% import "agents/_partials/dispatch.md.j2" as dsp -%}
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
 # Stage: spec
 
@@ -13,11 +14,11 @@
 ## Purpose
 
 Convert a task description into testable acceptance criteria so that:
-- `/hm:plan` can decompose into phases that each map back to a SPEC scenario.
+- `/hm:execute` Step 0 can decompose into phases that each map back to a SPEC scenario.
 - `/hm:execute` Phase A can author tests **directly from the SPEC**, not from planner intent.
 - `/hm:wrapup` Drift gate can compare actual diff against SPEC scope.
 
-The deep interview here is shorter than `/hm:plan`'s — SPEC concerns are **what** and **how to verify**, not **how to build**. Architecture decisions belong to `plan`.
+This is the **only** interview in the pipeline. It owns **what**, **why** and **how to verify**, plus the decisions that cannot be cheaply undone. *How to build* — phases, ordering, risk — is authored by `/hm:execute` Step 0 with no human gate.
 
 ## When to Run
 
@@ -61,6 +62,39 @@ Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml 
 ```
 {% endif %}
 
+### Step 0.5 — Objective context (intent layer — one line and continue when unused)
+
+> Relocated from `/hm:plan` by SPEC-plan-stage-absorption: the objective link is DRI lock-in,
+> which is what the SPEC owns. It runs before the interview so the answer is available to it.
+
+Read the intent state — LLM-free. (`/hm:loop` iterations inherit `objective:` from the master PLAN, so this is the one place a task acquires it.)
+
+{% if is_codex %}
+```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm world status --json")   # loads .claude/intent.yaml + .claude/world/assumptions.yaml
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm world status --json   # loads .claude/intent.yaml + .claude/world/assumptions.yaml
+```
+{% endif %}
+
+- `state: not_filled_in` / `invalid` → print `[intent] no objectives — skipping` and continue. That line is the whole cost for a project that does not use the layer.
+- Filled in but **no `active` and no `proposed` objective** (the first objective has not been written yet) → skip the pick and go straight to the consent question below: **"Draft an objective for this task?"**
+- Otherwise ask ONE closed question with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Which objective does this task serve?"** — one option per `active` / `proposed` objective (id + title) plus **"none"**. Step 3 writes the answer into the SPEC frontmatter as `objective: <id>` (omitted on "none").
+- On **"none"**, ask once, closed: **"Draft an objective for this task?"** Yes records consent only — Step 4.9 writes after the interview closes. No: write nothing and continue.
+- Then compare the work this SPEC scopes against each objective's `rejected[]` list (your judgment — read the records). For each matching objective:
+{% if is_codex %}
+  ```bash
+  Bash("uv run --with {{ harness_maker_src_path }} hm world objective revisit <objective-id> --json")
+  ```
+{% else %}
+  ```bash
+  !uv run --with {{ harness_maker_src_path }} hm world objective revisit <objective-id> --json
+  ```
+{% endif %}
+  Show its title, condition and last value. `candidate` = the revisit condition holds — surface it as a revisit *candidate* in the design brief; `not_met` / `unevaluable` = show and continue. This check never blocks.
+
 ### Step 1 — Knowledge retrieval
 
 Search prior work to ground the interview (token budget ≤3k):
@@ -82,9 +116,13 @@ Bash("uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic '<to
 
 Surface relevant prior-SPEC snippets at the top of the interview so the user can see what's been specified before.
 
-### Step 2 — Interview (default ON)
+### Step 2 — Interview (default ON; {% if config.interview.main_loop.max_rounds %}up to {{ config.interview.main_loop.max_rounds }} rounds{% else %}unlimited rounds{% endif %})
 
-Same UX rules as `/hm:plan`:
+> `interview.main_loop.max_rounds` used to bound `/hm:plan`'s loop and had no other
+> consumer. SPEC-plan-stage-absorption left this as the only interview in the pipeline, so
+> the knob applies here — a user who set it would otherwise find it silently inert.
+
+Interview UX rules:
 - **Live UI** in `{{ config.locale }}` (en→English, ko→Korean, others→English fallback).
 - **SPEC document on disk** always English. Translate user's free-form answers when archiving.
 - Use the configured locale for every live round preamble, decisions-so-far
@@ -106,7 +144,7 @@ Skip a category when sufficiently answered by prior research, prior SPEC, or ear
 1. **Intent (Why)** — motivation, business / technical trigger. Often answered by `/hm:research`; confirm if so.
 2. **Outcomes (What success looks like)** — observable end-state. Force the user to state "done" in observable terms, not implementation details.
 3. **In-Scope Scenarios** — generate 2-4 scenarios in **Given-When-Then** form covering normal / edge / failure paths. This is mandatory format; reject prose like "the system handles errors" — restate as G-W-T.
-4. **Non-Goals** — explicit out-of-scope list. Prevents scope creep in `plan`.
+4. **Non-Goals** — explicit out-of-scope list. Prevents scope creep when `/hm:execute` authors the PLAN.
 5. **Constraints** — HW, SW, security, performance, compatibility, **and test framework** (mandatory — pick `pytest` / `gtest` / `vitest` / `bats` / etc; `/hm:execute` Phase A uses this to write tests).
 6. **Verification Criteria** — per-scenario, how we'll prove it: unit / integration / manual. Each scenario MUST map to at least one verification mode.
 
@@ -163,7 +201,7 @@ list is valid and is written as `irreversible_decisions: []`.
 
 #### 2.2 Promotion rule
 
-SPEC's substantive decisions (e.g., "what counts as done for Scenario 2?", "fail-closed vs fail-open?") feed `/hm:plan`'s ADRs downstream — they live in the SPEC's `## ❓ Open Questions` section with the resolution. **SPEC does NOT have its own ADR section.** Promotion to ADR happens in `plan`.
+SPEC's substantive decisions (e.g., "what counts as done for Scenario 2?", "fail-closed vs fail-open?") live in the SPEC's `## ❓ Open Questions` section with the resolution, and the ones that cannot be cheaply undone go in `irreversible_decisions`. **SPEC has no ADR section.** `/hm:execute` Step 0 records the design ADRs it locks while authoring the PLAN.
 
 #### 2.3 Round preamble
 {% set _cd = (config.interview.get('comprehension') or {}).get('depth', 'standard') -%}
@@ -205,6 +243,8 @@ status: draft   # → approved when interview ends with no open questions
 created: {YYYY-MM-DD}
 tags: [{project}, spec, {tech-stack}, {2-5 domain tags}]
 test_framework: {pytest | gtest | vitest | bats | …}   # MANDATORY
+interview_rounds: {N}   # rounds this interview took; 0 when Step 0 skipped it
+objective: <id>   # ONLY when Step 0.5 picked one or Step 4.9 drafted one; omit on "none"
 research_doc: "[[RESEARCH-{slug}]]"   # OR omit when no research artifact
 summary: "{≤100 char one-line: what this SPEC is for}"
 ---
@@ -237,7 +277,7 @@ summary: "{≤100 char one-line: what this SPEC is for}"
    | S1 | unit | `test_s1_happy_path` |
    | S2 | integration | `test_s2_with_db` |
    | S3 | manual | "open settings, click X, confirm Y" |
-8. **❓ Open Questions** — items the user could not resolve in interview. These feed `/hm:plan`'s ADRs. Empty list = SPEC ready for plan.
+8. **❓ Open Questions** — items the user could not resolve in interview. These reach `/hm:execute` Step 0, which resolves them as design ADRs while authoring the PLAN. Empty list = SPEC ready to implement.
 9. **🔍 Refinement Decisions** — 1-line per round summarizing what was locked in (or "skipped — task is trivial: {reason}").
 
 ### Step 3.5 — Write SPEC.machine.yaml (ADR-006 dual-file)
@@ -368,6 +408,119 @@ Failure rationale always cites the exact `weak_dimensions` from the CLI
 output. Do not paraphrase — the user will rewrite those specific
 dimensions.
 
+### Step 4.6 — `spec-validator` (single pass, advisory)
+
+**Trigger.** Dispatch ONLY when this SPEC declares a non-empty `irreversible_decisions`, or the
+ACs **imply** a decision in one of the five categories, or Step 0's skip heuristic did not fire.
+A Step-0 skip-path SPEC with `irreversible_decisions: []` is **not** dispatched — a critic on a
+trivial SPEC re-imposes the ceremony a light SPEC exists to avoid. Say in one line which branch
+you took; a silent skip and a silent run are indistinguishable afterwards.
+
+**One pass. There is no re-validation.** The agent it relocates (`plan-validator`) returned
+`APPROVED` 0 times in 54 runs, so a second pass buys findings, not release.
+
+{% if config.second_opinion.models %}
+**Step 4.6 (pre) — main-loop cross-model second opinion (ADR-003/005/011).** The **main loop** (this stage prompt) runs each enabled
+model, decides invoked-vs-skipped and the skip reason, adapts the findings, and **injects** them
+into the `spec-validator` dispatch below. The agent has `Read, Grep, Glob` and no Bash — it
+reconciles what it is handed and echoes the per-model status; it never runs a CLI itself. This
+moved here from the removed plan stage with the work it belonged to; CLAUDE.md's mandatory
+matrix names the two judgment-gated stages, which are now `review` and `spec`.
+
+**Mandatory gate (applies uniformly to EVERY enabled model):**
+{% if config.preset == 'Production' -%}
+- Production preset → run **every** enabled model on **every** dispatch (no high-diff gate).
+{%- else -%}
+- Side preset → run **every** enabled model only on a **high-diff** change. Classify the SPEC's
+  blast radius first — note `HEAD` (staged work) and `--numstat` for the added-line count that
+  drives the `boundary` signal:
+  ```bash
+  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | cut -f1 | { s=0; while read -r n; do case "$n" in ""|*[!0-9]*) ;; *) s=$((s+n));; esac; done; echo "$s"; }); printf '%s\n' "$files" | uv run --with {{ harness_maker_src_path }} hm high_diff classify --added-lines "$added"
+  ```
+  Run each model when `is_high` (or `boundary` and your judgment says high). Otherwise skip all —
+  inject empty findings and a `skipped` entry per model in `second_opinion_results`.
+{%- endif %}
+
+{% set second_opinion_stage = "spec" %}{% include "agents/_partials/second_opinion_dispatch.md.j2" %}
+
+**Ownership contract (ADR-005/011).** Exactly one `second_opinion_results` entry per enabled
+model — success, skip and failure paths all produce one entry, never zero and never duplicated.
+A missing, unauthenticated or rate-limited CLI warns and proceeds; it never blocks the stage.
+{% endif %}
+
+{{ dsp.dispatch_intro(is_codex) }}
+
+```
+{{ dsp.dispatch(is_codex, "spec-validator", "Spec validator: {slug}", "<the full SPEC body + its .machine.yaml + the RESEARCH document when one exists>\n\nCritique the four categories you are accountable for: missing or contradictory ACs, circular oracles, irreversible decisions the ACs imply but `irreversible_decisions` does not list, and scope boundary.\n\nReturn ONLY the JSON output as specified in your instructions.") }}
+```
+
+**The verdict does not gate anything.** Record `overall_assessment` and the `critiques` under
+the SPEC's `## ❓ Open Questions` (or a `## 🔎 Spec Validation` section when the list is long),
+surface the `critical` findings in your turn output, and **continue to Step 5 regardless**. The
+DRI decides what to do with them; `MAJOR_REVISION` is a description of the findings, never an
+instruction to halt. Its discrimination is unmeasured, and an unproven gate must not hold a
+release while it is being measured.
+
+{% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) %}
+**Record the dispatch** so that discrimination becomes measurable from the first run. One row,
+always — including a dispatch that never launched:
+
+{% if is_codex %}
+```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent spec-validator --stage spec --slug '{slug}' --pass 1 --verdict '<APPROVED|NEEDS_REVISION|MAJOR_REVISION>' --terminal --duration-ms '<elapsed>' --barrier-index 1")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent spec-validator --stage spec --slug '{slug}' --pass 1 --verdict '<APPROVED|NEEDS_REVISION|MAJOR_REVISION>' --terminal --duration-ms '<elapsed>' --barrier-index 1
+```
+{% endif %}
+
+`--barrier-index` takes an **integer** — the ordinal of the serial segment this pass sat in.
+The CLI parses it with `type=int`, so `4.6`, `pass-1` or any other label is rejected outright.
+This dispatch is its own barrier, so `1`.
+
+**The cap is 1 pass.** ADR-004 allows exactly one dispatch per `/hm:spec` run, so `--pass 1` is
+the only value this stage emits. If a pass 2 happens anyway — the DRI asked for it, or the cap
+was overrun — **still record it**, and add `--reason '<why this pass exceeded the cap>'`. An
+unrecorded pass is a serial barrier the latency figures charge to nobody, and without the reason
+the ledger cannot tell an operator-requested extra pass from a stage ignoring its own limit.
+Those have opposite remedies. **Never drop the row to keep the data tidy.**
+
+**Exactly one row per `(agent, stage, slug, run-id)` may carry `--terminal`.** The run identity
+is all four, so another stage emitting its own terminal row for the same id is fine and must not
+make you drop yours. Two terminal rows in ONE group leave that run with no single ending, and
+any aggregation keyed on it then reads an arbitrary one. Check with
+`hm stage_agent_ledger coherence`; it exits non-zero on any incoherent run.
+
+If the agent fails to launch, emit `--verdict dispatch-failed --reason '<why>'` — **single
+quotes, and strip every apostrophe, backtick and `$` from the text first**; the launch error is
+output you did not author. Omit `--duration-ms` when you did not measure it; never pass `0`.
+A skipped dispatch (the trigger did not fire) writes no row — the trigger branch you stated in
+your turn output is that record.
+{% endif %}
+
+### Step 4.9 — Objective draft (consented at Step 0.5)
+
+Only when Step 0.5 recorded consent. Derive from the interview + RESEARCH: `<ID>` = `OBJ-` +
+the task slug upper-cased, `--title`, `--hypothesis`, one `--scope` per in-scope item,
+`--outcome` = the outcome the interview named (none fits → say so and skip). Show the
+arguments, run once:
+
+{% if is_codex %}
+```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm world objective new <ID> --title '<title>' --hypothesis '<hypothesis>' --scope '<item>' --outcome <outcome-id> --from-proposal --candidates 1")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm world objective new <ID> --title "<title>" --hypothesis "<hypothesis>" --scope "<item>" --outcome <outcome-id> --from-proposal --candidates 1
+```
+{% endif %}
+
+Carry `<ID>` into the SPEC frontmatter's `objective:`. If the verb refuses (id exists, unknown outcome):
+print the refusal and continue with no link — never retry with a mutated id. The record is
+`proposed`: the gate halts with `not_active` until a human runs `approve` + `activate`; an
+orphan is retired with `objective drop`.
+
 ### Step 5 — Status update
 
 If `## ❓ Open Questions` is empty: update frontmatter `status: approved`. Otherwise `status: draft`.
@@ -390,14 +543,14 @@ Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml 
 Otherwise leave the SPEC unstamped: autopilot stops at this stage, and `/hm:wrapup` asks again
 before landing. `status:` above is the document lifecycle; acceptance lives only in `approval`.
 
-**Stage terminal**: On success, output the SPEC path and its status (`draft` / `approved`), then **STOP**. Do not proceed to `/hm:plan` or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated. Exception: an auto-advance check below returning `proceed: true` supersedes this.
+**Stage terminal**: On success, output the SPEC path and its status (`draft` / `approved`), then **STOP**. Do not proceed to `/hm:execute` or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated. Exception: an auto-advance check below returning `proceed: true` supersedes this.
 
 {% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "spec" %}{% set gate0_pass = "SPEC written with valid frontmatter; status is `draft` or `approved`." %}{% set gate0_fail = "SPEC write failed validation or the dual-file cross-validate step returned errors." %}{% set gate0_standalone = true %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 
 ## Outputs
 
 - `{{ config.spec.dir }}SPEC-{slug}.md` — frontmatter + 9 sections above.
-- Status: `draft` (open questions remain) or `approved` (ready for `/hm:plan`).
+- Status: `draft` (open questions remain) or `approved` (ready for `/hm:execute`).
 
 ## Quality Bar
 
@@ -410,7 +563,7 @@ before landing. `status:` above is the document lifecycle; acceptance lives only
 
 {% set summary_done = "SPEC authored with observable acceptance criteria" -%}
 {% set summary_artifact = "specs/SPEC-{slug}.md" -%}
-{% set summary_next = "`/hm:plan {slug}` (STOP — user-initiated)" -%}
+{% set summary_next = "`/hm:execute {slug}` (STOP — user-initiated)" -%}
 {% set summary_stage = "spec" -%}
 {% set summary_autopilot_gate = "Read the SPEC's acceptance with `hm spec_machine approval-status --root . --slug <slug>`: pass --judgment-gate clear when state is approved or exempt, blocked when malformed, pending otherwise. The boundary re-derives the same verdict from the SPEC, so a clear the SPEC does not support never advances. At auto_full a pending is answered WITHOUT writing an approval — the land hold covers the SPEC's irreversible decisions." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}

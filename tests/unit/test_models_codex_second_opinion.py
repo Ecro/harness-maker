@@ -3,7 +3,7 @@
 PLAN-second-opinion-multi-model: supersedes the single-vendor
 CodexSecondOpinionConfig (Phase 1 of PLAN-codex-second-llm-integration). ADR-002
 defaults: models=[] (feature off), agents=[code-reviewer, consensus-arbiter,
-plan-validator]. ADR-003 failure policy. ADR-006 hermetic (now nested under
+spec-validator]. ADR-003 failure policy. ADR-006 hermetic (now nested under
 ``codex``). ADR-005 output_schema_path (now nested under ``codex``, filename
 renamed to second-opinion-finding.schema.json). Validator P0#3 fix:
 InterviewAnswers also extends (extra='forbid' would reject otherwise).
@@ -26,7 +26,7 @@ def test_second_opinion_config_defaults() -> None:
     cfg = SecondOpinionConfig()
     assert cfg.enabled is False
     assert cfg.models == []
-    assert cfg.agents == ["code-reviewer", "consensus-arbiter", "plan-validator"]
+    assert cfg.agents == ["code-reviewer", "consensus-arbiter", "spec-validator"]
     assert cfg.failure_policy == "warn-and-proceed"
     assert cfg.codex.hermetic is True
     assert cfg.codex.output_schema_path == ".claude/schemas/second-opinion-finding.schema.json"
@@ -49,7 +49,7 @@ def test_harness_config_round_trip_with_second_opinion() -> None:
     assert restored.second_opinion.agents == [
         "code-reviewer",
         "consensus-arbiter",
-        "plan-validator",
+        "spec-validator",
     ]
 
 

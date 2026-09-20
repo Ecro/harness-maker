@@ -228,50 +228,11 @@ def test_the_cli_diagnoses_a_malformed_input_instead_of_raising(
     assert "critiques" in capsys.readouterr().err
 
 
-# ── the rendered plan stage actually calls it ────────────────────────────────
-
-
-def _render_plan() -> dict[str, str]:
-    import tempfile
-
-    from harness_maker.interview import interview
-    from harness_maker.models import ProjectProfile, Target
-    from harness_maker.render import DEFAULT_FREEZE_TIME, render
-    from harness_maker.synthesize import synthesize
-
-    profile = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    answers = interview(profile, autoloop_mode=True)
-    answers.worktree["enabled"] = True
-    answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
-    out = Path(tempfile.mkdtemp())
-    render(synthesize(profile, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
-    return {
-        "claude": (out / "commands" / "hm" / "plan.md").read_text(encoding="utf-8"),
-        "codex": (out / ".." / ".agents" / "skills" / "hm-plan" / "SKILL.md")
-        .resolve()
-        .read_text(encoding="utf-8"),
-    }
-
-
-def test_the_rendered_plan_stage_plans_its_follow_up_rounds_by_cli() -> None:
-    """Arithmetic nothing calls decides nothing — this PLAN's own round-1 P0, again."""
-    for variant, body in _render_plan().items():
-        calls = [ln for ln in body.splitlines() if "hm plan_rounds plan " in ln]
-        assert len(calls) == 1, f"{variant}: expected one plan_rounds call, got {len(calls)}"
-        assert "--file" in calls[0]
-        outcome = [ln for ln in body.splitlines() if "hm plan_rounds outcome " in ln]
-        assert len(outcome) == 1, f"{variant}: the terminal pass records no outcome"
-
-
-def test_the_rendered_plan_stage_no_longer_runs_one_round_per_critique() -> None:
-    """The instruction being replaced is the unbounded cost; leaving it renders both."""
-    for variant, body in _render_plan().items():
-        assert "run follow-up rounds for each critical critique" not in body, variant
-        assert "one follow-up interview round per warning" not in body, variant
-        assert "none for any entry in `skipped`" in body, variant
-
-
-def test_the_rendered_plan_stage_states_that_an_unmeasured_ratio_runs_every_round() -> None:
-    """The absent case, in the render — a skipped measurement must not cancel the step."""
-    for variant, body in _render_plan().items():
-        assert "an unmeasured ratio runs every round" in body, variant
+# The three rendered-stage assertions that lived here were removed by
+# SPEC-plan-stage-absorption. They checked that the stage calls `hm plan_rounds plan`
+# once and `hm plan_rounds outcome` once — the follow-up-round planner for
+# `plan-validator`'s critiques. ADR-004 made the relocated critic SINGLE-PASS and
+# never-blocking, so there is no revision loop left to plan rounds for, and no template
+# calls the verb. The module's own tests above are untouched and still cover its
+# behaviour; retiring the CLI verb is a public-contract change and belongs to its own
+# task, filed rather than done here.

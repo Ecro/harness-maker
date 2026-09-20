@@ -262,7 +262,7 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
   (Cursor) / `AskUserQuestion` (Claude Code), then jump to Section 4.6:
 
   > A cross-model second opinion is available — {name the detected CLIs}. Enabled models cast
-  > a real consensus vote in `/hm:review` and are reconciled in `/hm:plan`.
+  > a real consensus vote in `/hm:review` and are reconciled in `/hm:spec`.
   >
   > **This sends the diff under review to that third-party CLI.** It is the only part of this
   > harness that transmits project content off your machine — everything else is local-only.
@@ -344,7 +344,7 @@ the harness. They map to `--second-opinion-models` and `--autonomy-level`.
    setup after install, including write-capable allowlisted folders.
 13. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Cross-model second opinion** —
    "Enable a second-opinion model (Codex and/or Antigravity) to cast a real k-of-N consensus
-   vote in /hm:review and reconcile in /hm:plan? A missing/unauthenticated/rate-limited CLI
+   vote in /hm:review and reconcile in /hm:spec? A missing/unauthenticated/rate-limited CLI
    degrades gracefully (warn + skip)." Multi-select: `codex`, `antigravity`, or none.
    Prereqs: `codex login` (codex), an authenticated `agy` (antigravity). Before dispatch,
    `shutil.which` each selected model's CLI (`codex` / `agy`) and warn (non-blocking) if

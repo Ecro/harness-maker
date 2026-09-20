@@ -99,7 +99,19 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 17 -> 18 on 2026-09-19 (PLAN-observed-harness-gaps-salvage Phase 3): the warm tier now
     # loads failure BODIES through `hm memory_retrieve` instead of a head-skim + slug `rg` — the
     # one stage that writes code was the only one still reading slugs without bodies.
-    "execute": 18,
+    # 18 -> 19 on 2026-09-20 (SPEC-plan-stage-absorption Phase 1, IRR-004): Step 0.1 calls
+    # `hm spec_need frontmatter-upsert` once. The verb exists because AC-002's oracle is a
+    # property over arbitrary prior frontmatter states and a prose instruction has no
+    # execution surface to quantify over; `verify.md.j2` Check 6 reads the key this writes
+    # and treats an absent one as PASS, so a write that silently no-ops is invisible.
+    # Declared in that PLAN's `surface_allowance.round_trips.execute: 1` and attributed in
+    # work-docs/BASELINE-DELTA-plan-stage-absorption.md.
+    # 19 -> 21 on 2026-09-20, same task: Step 0.1 also calls `spec_need prefilter` and
+    # `spec_need record` — the verdict is judged against candidates and its rationale is
+    # recorded, which is the evidence half the removed Step 1.7 gate left behind.
+    # 21 → 25 (same task, second fold): `worktree loop-mode-active` in Step 0.2 plus the
+    # is_codex-branched call sites ADR-011's counting rule includes.
+    "execute": 25,
     # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml
     # second_opinion.models` dropped `antigravity`, and `/hm:health` runs ONE per-model
     # positive smoke-test per enabled model, so its `second_opinion_invoke` smoke call for that
@@ -110,31 +122,11 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     "loop-p5-batch": 2,
     "make": 1,
     "metrics": 7,
-    # 15 → 14 (PLAN-workflow-time-token-savings A5): the `stage_agent_ledger emit` call is
-    # now behind the `instrumentation` axis, which defaults OFF for a fresh install. This
-    # repo's own harness has it ON, so the call still renders here — what dropped is the
-    # count measured from the DEFAULT fixture. No instruction was deleted.
-    # 14 → 18 (2026-08-16, review-loop transfer to the plan stage). Four calls, none removed:
-    #   +1  `hm plan_rounds plan` decides WHICH critiques earn a follow-up round. It replaces
-    #       "one round per critical critique", which was the stage's only unbounded cost — the
-    #       validator passes are capped at two and that cap holds.
-    #   +1  `hm plan_rounds outcome` records `no-progress` vs `progress` at the terminal pass.
-    #       A bare two-pass cap reports the same ending for both, hiding the one that means
-    #       the revision step is not working on this document.
-    #   +2  the two `hm review_churn pin` lines (the measure shares the post pin's line) that
-    #       feed the stale rule. OPTIONAL: an unmeasured ratio runs every round, so a stage
-    #       that skips them behaves exactly as it did before this change.
-    # 15 → 26 (2026-08-23, the `dev_mode: task-driven → spec-driven` correction). NOT this
-    # repo's feature work: the repo has 186 SPECs and 185 machine SPECs and had been rendering
-    # with the spec gate OFF, so flipping the config turned the spec-need gate on. The six new
-    # `!` lines are `spec_need marker-read`, `marker-fresh`, `prefilter`, `record`,
-    # `waiver-set`, and the `git diff --name-only $(git merge-base HEAD <base>)` that feeds
-    # them; the rest of the rise is the same gate's fenced call sites, which ADR-011's rule
-    # counts. Re-baselined here rather than absorbed, per this file's own instruction.
-    # 28 -> 29 (objective-gap-proposal, Phase 4): Step 4.9 adds the one
-    # `hm world objective new … --from-proposal --candidates 1` call after the interview
-    # (consented at Step 0.5). Attributed in BASELINE-DELTA-objective-gap-proposal.md §3.
-    "plan": 29,
+    # `plan` removed 2026-09-20 (SPEC-plan-stage-absorption IRR-001). Its 29 round trips did
+    # not move elsewhere wholesale: the `spec_need` re-entry marker and waiver calls were
+    # DROPPED with the gate (see tests/unit/test_render_execute_spec_need.py), while
+    # `prefilter` / `record` moved to execute Step 0.1 and the validator + cross-model
+    # calls to spec Step 4.6 — both accounted for in those rows above.
     "research": 8,
     # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
     #
@@ -220,7 +212,12 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # no longer renders the gate-first `autopilot_caps gate-blocked` line: +2 -1. Declared in
     # that PLAN's `surface_allowance.round_trips.spec` and attributed in
     # `work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md` §3.
-    "spec": 7,
+    # 7 -> 9 on 2026-09-20 (SPEC-plan-stage-absorption): Step 4.6 adds the `spec-validator`
+    # ledger emit and the cross-model `second_opinion_invoke`, both relocated from the
+    # removed plan stage. Attributed in work-docs/BASELINE-DELTA-plan-stage-absorption.md.
+    # 9 → 12 (same task, second fold): the relocated cross-model second-opinion main loop
+    # brings `second_opinion_invoke` and its fenced call sites with it.
+    "spec": 12,
     "uninstall": 3,
     # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.
     # 15 → 12: SPEC-ci-derived-verification-plan replaces the four EXAMPLE gate commands

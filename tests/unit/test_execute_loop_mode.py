@@ -36,54 +36,61 @@ def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return out
 
 
-# ── plan.md loop-mode branch ────────────────────────────────────────────────
+# ── execute.md loop-mode branch ────────────────────────────────────────────────
 
 
 @pytest.fixture(scope="module")
-def plan_md(rendered_root: Path) -> str:
-    return (rendered_root / "commands" / "hm" / "plan.md").read_text(encoding="utf-8")
+def execute_md(rendered_root: Path) -> str:
+    return (rendered_root / "commands" / "hm" / "execute.md").read_text(encoding="utf-8")
 
 
-def test_plan_template_detects_loop_active_marker(plan_md: str) -> None:
+def test_execute_template_detects_loop_active_marker(execute_md: str) -> None:
     """Step 1.5 (or equivalent) must detect .hm-loop-active marker."""
-    assert ".hm-loop-active" in plan_md, (
-        "plan.md must reference .hm-loop-active marker for loop-mode detection"
+    assert ".hm-loop-active" in execute_md, (
+        "execute.md must reference .hm-loop-active marker for loop-mode detection"
     )
 
 
-def test_plan_template_loop_mode_skips_interview(plan_md: str) -> None:
+def test_execute_template_loop_mode_does_not_reauthor_the_master_plan(execute_md: str) -> None:
     """When in loop mode, deep interview (Step 3) must be explicitly skipped."""
     # Anchor on the Step 1.5 heading specifically (Step 1 short-circuit mentions
     # the marker first but is just a redirect; the real skip prose is in Step 1.5).
-    step15_idx = plan_md.find("Step 1.5 — Loop-mode detection")
-    assert step15_idx > 0, "plan.md missing Step 1.5 loop-mode detection heading"
-    branch_section = plan_md[step15_idx : step15_idx + 2500]
-    # Prose must say to skip the interview / Step 3.
-    has_skip = (
-        "skip Step 2" in branch_section
-        or "skip Steps 2" in branch_section
-        or "skip Step 3" in branch_section
-        or "skip the interview" in branch_section
-        or "no deep interview" in branch_section
+    step15_idx = execute_md.find("Step 0.2 — Loop mode")
+    assert step15_idx > 0, "execute.md missing the Step 0.2 loop-mode heading"
+    branch_section = execute_md[step15_idx : step15_idx + 2500]
+    # The original assertion was "the loop-mode branch says it skips the interview". `/hm:plan`
+    # had an interview to skip; `/hm:execute` never did, so that phrasing has no referent here.
+    # The property that SURVIVED the move is the one that mattered: under a loop, the master
+    # PLAN is the source of truth and the iteration scopes a per-iter document rather than
+    # re-authoring it. Re-authoring per iteration would discard the phase status the loop
+    # driver reads.
+    # Normalised: the rendered prose hard-wraps, so "the master PLAN is the source\nof
+    # truth" would fail a newline-sensitive check for a property that is about content.
+    lowered = " ".join(branch_section.lower().split())
+    assert "master plan" in lowered, "the loop-mode branch never names the master PLAN"
+    assert "source of truth" in lowered, (
+        "the loop-mode branch does not say the master PLAN is authoritative"
     )
-    assert has_skip, "Loop-mode plan branch must explicitly state Step 2/3 (interview) is skipped"
+    assert "instead of re-authoring" in lowered or "rather than re-authoring" in lowered, (
+        "the loop-mode branch does not forbid re-authoring the master PLAN per iteration"
+    )
 
 
-def test_plan_template_writes_per_iter_file(plan_md: str) -> None:
-    """Loop-mode plan must write to <WT>/work-docs/PLAN-{slug}-iter{N}.md."""
+def test_execute_template_writes_per_iter_file(execute_md: str) -> None:
+    """Loop-mode execute must write to <WT>/work-docs/PLAN-{slug}-iter{N}.md."""
     # The literal path pattern must appear so the LLM driver knows where to write.
-    has_per_iter_path = "PLAN-{slug}-iter{N}.md" in plan_md or "PLAN-{slug}-iter" in plan_md
+    has_per_iter_path = "PLAN-{slug}-iter{N}.md" in execute_md or "PLAN-{slug}-iter" in execute_md
     assert has_per_iter_path, (
-        "plan.md loop-mode branch must specify the per-iter PLAN path "
+        "execute.md loop-mode branch must specify the per-iter PLAN path "
         "PLAN-{slug}-iter{N}.md (ADR-008)"
     )
 
 
-def test_plan_template_per_iter_frontmatter_documented(plan_md: str) -> None:
+def test_execute_template_per_iter_frontmatter_documented(execute_md: str) -> None:
     """ADR-008 frontmatter — derived_from + iter + phase — must be specified."""
-    step15_idx = plan_md.find("Step 1.5 — Loop-mode detection")
+    step15_idx = execute_md.find("Step 0.2 — Loop mode")
     assert step15_idx > 0
-    branch_section = plan_md[step15_idx : step15_idx + 2500]
+    branch_section = execute_md[step15_idx : step15_idx + 2500]
     # All three frontmatter keys must be mentioned in the loop-mode prose.
     assert "derived_from" in branch_section, "loop-mode frontmatter missing derived_from"
     assert "iter:" in branch_section or "iter " in branch_section, (
@@ -94,11 +101,11 @@ def test_plan_template_per_iter_frontmatter_documented(plan_md: str) -> None:
     )
 
 
-def test_plan_template_loop_mode_reads_current_iter(plan_md: str) -> None:
+def test_execute_template_loop_mode_reads_current_iter(execute_md: str) -> None:
     """Loop-mode must derive N from .current-iter (Phase 3 contract)."""
-    step15_idx = plan_md.find("Step 1.5 — Loop-mode detection")
+    step15_idx = execute_md.find("Step 0.2 — Loop mode")
     assert step15_idx > 0
-    branch_section = plan_md[step15_idx : step15_idx + 2500]
+    branch_section = execute_md[step15_idx : step15_idx + 2500]
     assert ".current-iter" in branch_section, (
         "Loop-mode plan must read iter N from <WT>/.claude/.hm-iter-receipts/.current-iter"
     )

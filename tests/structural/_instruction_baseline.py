@@ -68,7 +68,7 @@ from .test_command_size_budget import executable_lines, headings
 
 BASELINE_PATH = Path(__file__).resolve().parent / "instruction_baseline.json"
 
-ATOMIC_COMMANDS = ("execute", "plan", "research", "review", "spec", "verify", "wrapup")
+ATOMIC_COMMANDS = ("execute", "research", "review", "spec", "verify", "wrapup")
 
 # The config axis this snapshot is keyed by. Adding an axis means adding its arms here
 # and regenerating — see the module docstring for what is deliberately excluded.

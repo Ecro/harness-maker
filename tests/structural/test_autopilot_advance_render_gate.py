@@ -19,7 +19,7 @@ STAGES = TEMPLATES / "stages"
 # auto-advance block. execute/review have no such paragraph, and wrapup's STOPs are
 # AC-gate stops in a stage the chain is structurally forbidden to auto-enter
 # (`_HUMAN_GATED_STAGES`). The PLAN said "all 7"; the source says four.
-STAGES_WITH_TERMINAL_STOP = ("research", "spec", "plan", "verify")
+STAGES_WITH_TERMINAL_STOP = ("research", "spec", "verify")
 
 PRECEDENCE_MARKER = "auto-advance check below returning `proceed: true`"
 

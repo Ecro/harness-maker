@@ -77,15 +77,45 @@ class Target(str, Enum):  # noqa: UP042
 
 
 class AtomicStage(str, Enum):  # noqa: UP042
-    """Seven atomic stages composable into named workflows."""
+    """Six atomic stages composable into named workflows.
+
+    `PLAN` was retired by SPEC-plan-stage-absorption (IRR-002). The PLAN *document* survives —
+    `/hm:execute` Step 0 authors it — but there is no plan *stage*, so a pipeline entry naming
+    one would render to nothing. Existing `harness.yaml` files still carry it; the one-shot drop
+    lives in `interview._parse_autonomy`, and removing this member without that migration makes
+    the whole `autonomy:` block fail validation and silently reset the user's level and caps.
+    """
 
     RESEARCH = "research"
     SPEC = "spec"
-    PLAN = "plan"
     EXECUTE = "execute"
     REVIEW = "review"
     WRAPUP = "wrapup"
     VERIFY = "verify"
+
+
+#: Stage names that were removed but still appear in every harness.yaml rendered before the
+#: removal. Kept as DATA rather than as three separate `if stage == "plan"` branches: this list
+#: is the single reader of "which stage names are retired", and the failure it prevents has a
+#: name — `new-marker-content-field-must-update-every-reader` (count:3). Every consumer that
+#: turns a raw pipeline into `AtomicStage` members MUST filter through `drop_retired_stages`;
+#: `tests/structural/test_retired_stage_single_reader.py` fails if a new call site does not.
+RETIRED_STAGES: frozenset[str] = frozenset({"plan"})
+
+
+def drop_retired_stages(raw: list[object]) -> tuple[list[str], list[str]]:
+    """Split a raw `autonomy.pipeline` into (surviving names, retired names dropped).
+
+    WHY this is shared rather than inlined: `autopilot_autoarm` swallows a bad pipeline as a
+    silent no-op by design, so a retired name there does not raise — it stops autopilot from
+    arming at all, with no diagnostic. Three readers parse this list and all three must agree.
+    """
+    kept: list[str] = []
+    dropped: list[str] = []
+    for item in raw:
+        name = item if isinstance(item, str) else str(item)
+        (dropped if name in RETIRED_STAGES else kept).append(name)
+    return kept, dropped
 
 
 def _empty_install_enabled() -> dict[str, list[str]]:
@@ -518,7 +548,7 @@ class SecondOpinionConfig(BaseModel):
 
     models: list[Literal["codex", "antigravity", "claude"]] = Field(default_factory=list)
     agents: list[str] = Field(
-        default_factory=lambda: ["code-reviewer", "consensus-arbiter", "plan-validator"],
+        default_factory=lambda: ["code-reviewer", "consensus-arbiter", "spec-validator"],
     )
     failure_policy: Literal["warn-and-proceed"] = "warn-and-proceed"
     claude: SecondOpinionClaudeConfig = Field(default_factory=SecondOpinionClaudeConfig)
@@ -945,7 +975,6 @@ class AutonomyConfig(BaseModel):
         default_factory=lambda: [
             AtomicStage.RESEARCH,
             AtomicStage.SPEC,
-            AtomicStage.PLAN,
             AtomicStage.EXECUTE,
             AtomicStage.REVIEW,
             AtomicStage.VERIFY,

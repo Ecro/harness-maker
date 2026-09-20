@@ -37,6 +37,11 @@ def test_side_and_production_install_full_inventory() -> None:
 def test_side_file_count_in_range() -> None:
     # 17 atomic+stages+fixed + _ALL_AGENTS + 11 skills + harness/settings/CLAUDE/memory etc.
     # 60 → 61 (2026-09-19, SPEC-mission-context-loop): the `project-knowledge` skill.
+    # 61 → 62 → 61 (2026-09-20, SPEC-plan-stage-absorption): `spec-validator` replaced
+    # `plan-validator` one-for-one. The ceiling went to 62 for the length of Phase 2, when both
+    # were installed, and came back here in Phase 4 — ADR-007 found that `plan.md` stops
+    # rendering the moment `AtomicStage.PLAN` goes, so nothing dispatched the old agent and the
+    # transitional pair was unnecessary. A ratchet left loose stops ratcheting.
     assert 40 <= len(SIDE_FILES) <= 61
 
 
@@ -99,7 +104,10 @@ def test_synthesize_fused_workflow_command_count() -> None:
     # /hm:help added in 0.19.4 (PLAN-help-command).
     # /hm:loop-p5-batch extracted from /hm:loop body (PLAN-latency-worktree-step-preview ADR-006).
     # /hm:metrics always rendered in 0.35.0 (ADR-002 amended — stub when disabled).
-    expected = 7 + 8
+    # 7 → 6 atomic (2026-09-20, SPEC-plan-stage-absorption IRR-001): `/hm:plan` was removed.
+    # `AtomicStage` is the single source for which stages render (ADR-007), so the count
+    # follows the enum and there is no second place to forget.
+    expected = 6 + 8
     assert len(cmd_paths) == expected
 
 
@@ -343,19 +351,22 @@ def test_synthesize_ko_locale_propagates_into_atomic_command_body(tmp_path: Path
     bp = synthesize(p, a)
     render(bp, tmp_path)
 
-    plan_text = (tmp_path / "commands/hm/plan.md").read_text()
+    # `plan.md` used to carry the second half of this check via its "conduct in `ko`" line.
+    # SPEC-plan-stage-absorption removed the stage and that phrase existed nowhere else, so the
+    # coverage moves to the other two locale-bearing stage bodies rather than shrinking to one.
     spec_text = (tmp_path / "commands/hm/spec.md").read_text()
+    research_text = (tmp_path / "commands/hm/research.md").read_text()
 
-    # The "Live interview / Live UI" lines must reflect ko, not en.
-    assert "conduct in `ko`" in plan_text, "plan.md still bakes en into stage body"
     assert "Live UI** in `ko`" in spec_text, "spec.md still bakes en into stage body"
+    assert "`ko`" in research_text, "research.md still bakes en into stage body"
 
     # No bare `en` directive should leak through for ko-locale renders. We
     # whitelist the legend text that lists the mapping (`en→English, ...`).
-    en_directives = [
-        line for line in plan_text.splitlines() if "`en`" in line and "en→English" not in line
-    ]
-    assert not en_directives, f"unexpected en directives in plan.md: {en_directives}"
+    for name, text in (("spec.md", spec_text), ("research.md", research_text)):
+        en_directives = [
+            line for line in text.splitlines() if "`en`" in line and "en→English" not in line
+        ]
+        assert not en_directives, f"unexpected en directives in {name}: {en_directives}"
 
 
 def test_localized_template_files_exist_on_disk() -> None:
@@ -435,8 +446,11 @@ def test_atomic_command_fallback_pins_spec_driven(monkeypatch: pytest.MonkeyPatc
     from harness_maker.synthesize import _atomic_command_files
 
     files = _atomic_command_files()  # no config_dump → fallback path
-    plan_body = next(ctx["stage_body"] for (_tpl, dest, ctx) in files if dest.endswith("plan.md"))
-    assert "spec_need" in plan_body  # only true because the pin passes dev_mode=SPEC_DRIVEN
+    # Was `plan.md`, which owned `spec_need` until SPEC-plan-stage-absorption moved the write to
+    # `/hm:execute` Step 0.1 (IRR-003). Reading it from the current producer is what this test
+    # meant all along — the pin is load-bearing wherever the spec-driven branch lives.
+    body = next(ctx["stage_body"] for (_tpl, dest, ctx) in files if dest.endswith("execute.md"))
+    assert "spec_need" in body  # only true because the pin passes dev_mode=SPEC_DRIVEN
 
 
 def test_hooks_json_not_a_blueprint_filespec() -> None:

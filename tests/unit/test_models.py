@@ -68,7 +68,6 @@ def test_atomic_stage_members() -> None:
     assert {m.value for m in AtomicStage} == {
         "research",
         "spec",
-        "plan",
         "execute",
         "review",
         "wrapup",

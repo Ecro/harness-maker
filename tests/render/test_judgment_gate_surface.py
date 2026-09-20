@@ -21,7 +21,7 @@ from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Targe
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
-_ALL_STAGES = ("research", "spec", "plan", "execute", "review", "verify", "wrapup")
+_ALL_STAGES = ("research", "spec", "execute", "review", "verify", "wrapup")
 
 
 @pytest.fixture(scope="module")
@@ -95,18 +95,11 @@ def test_the_review_judgment_half_routes_to_the_boundary(commands: Path) -> None
     )
 
 
-def test_plan_records_its_auto_answer(commands: Path) -> None:
-    assert "Interview Transcript" in _text(commands, "plan")
-
-
-def test_the_plan_threshold_half_is_named_by_plans_own_gate(commands: Path) -> None:
-    """The mirror of the review assertion, and for the same reason.
-
-    plan's gate string mapped *every* unresolved round to `pending`, so a plan the validator
-    twice called critically flawed was auto-answered at `auto_full` — the plan-stage analogue
-    of the review P0. Assert the plan-SPECIFIC sentence: the shared partial lists all three
-    values in every stage, so a bare `"blocked" in text` passes with this sentence deleted.
-    """
-    text = _text(commands, "plan")
-    assert "MAJOR_REVISION on its SECOND pass" in text
-    assert "No level clears it, auto_full included" in text
+# `test_plan_records_its_auto_answer` and `test_the_plan_threshold_half_is_named_by_plans_own_gate`
+# were removed by SPEC-plan-stage-absorption (IRR-001). Both asserted sentences inside the plan
+# stage's own judgment gate — the auto-answer record and the "MAJOR_REVISION on its SECOND pass"
+# threshold half — and the stage no longer renders, so neither has a subject. Their shared
+# concern (a stage mapping every unresolved case to `pending`, which `auto_full` then clears)
+# still has a live guard in the review half above; `plan-validator`'s two-pass threshold, the
+# thing the second test named, went with the stage. The spec stage's replacement critic is
+# never-blocking by ADR-004, so it has no threshold half to guard.

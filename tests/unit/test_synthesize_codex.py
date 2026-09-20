@@ -71,7 +71,10 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     # total. `[fail:test] enumeration-tests-not-updated-with-new-rendered-artifact`.
     # 11 → 12 base skills (2026-09-16, SPEC-intent-world-model-objective-layer S13: `intent-layer`).
     # 12 → 13 (2026-09-19, SPEC-mission-context-loop: `project-knowledge`).
-    expected = 13 + 7 + 1 + 1 + 1
+    # 7 → 6 STAGE skills (2026-09-20, SPEC-plan-stage-absorption IRR-001): `@hm-plan` went
+    # with the stage. The base-skill count is unchanged — `spec-validator` replaced
+    # `plan-validator` one-for-one and agents are not skills.
+    expected = 13 + 6 + 1 + 1 + 1
     assert len(skill_paths) == expected, (
         f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
     )

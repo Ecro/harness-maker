@@ -1,6 +1,6 @@
 """ADR-011 — harness-maker's own telemetry is a config axis, not an unconditional tax.
 
-The `stage_agent_ledger emit` rows in plan/execute and the `persist-payload` capture in
+The `stage_agent_ledger emit` rows in spec/execute and the `persist-payload` capture in
 review answer *harness-maker's* questions. Shipping them into every third-party harness
 charges that project's context budget for a question it never asked.
 
@@ -68,9 +68,10 @@ def test_on_render_still_ships_both(tmp_path: Path) -> None:
     joined = "\n".join(hits)
     assert "stage_agent_ledger emit" in joined
     assert "persist-payload" in joined
-    # Named files, not just a count: a gate that collapsed plan into execute would keep
-    # the count and lose a stage.
-    assert any("plan.md" in h and "emit" in h for h in hits), hits
+    # Named files, not just a count: a gate that collapsed two stages into one would keep
+    # the count and lose a stage. The validator emitter moved `plan` -> `spec`
+    # (SPEC-plan-stage-absorption ADR-004).
+    assert any("spec.md" in h and "emit" in h for h in hits), hits
     assert any("execute.md" in h and "emit" in h for h in hits), hits
     assert any("review.md" in h and "persist-payload" in h for h in hits), hits
 

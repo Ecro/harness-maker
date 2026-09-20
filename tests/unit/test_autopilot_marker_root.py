@@ -14,7 +14,7 @@ from pathlib import Path
 from harness_maker import autopilot
 from harness_maker.models import AtomicStage
 
-_PIPE = [AtomicStage("research"), AtomicStage("plan")]
+_PIPE = [AtomicStage("research"), AtomicStage("execute")]
 
 
 def _make_project(tmp_path: Path) -> Path:

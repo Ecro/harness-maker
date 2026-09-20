@@ -27,6 +27,52 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-20, rebase of `plan-stage-absorption` onto `main` (fifth re-capture)** — `wrapup`
+  moved in all four arms, identically in `auto_safe` and `ask`. Command set unchanged. **Not this
+  task's movement**: `697036be fix(intent): the withdrawal criterion counts a quiet window` edits
+  `wrapup.md.j2`, and it landed on `main` while this branch was in flight. The re-capture happens
+  here only because the rebase is where the two met — the third-party case the rule above names.
+  Verified before re-capturing that `wrapup` is the ONLY moved command in every arm and that
+  nothing was added or removed.
+
+- **2026-09-20, `plan-stage-absorption` (fourth re-capture, review round 2)** — `execute` and
+  `spec` moved in all four arms, identically in `auto_safe` and `ask`. Command set unchanged.
+  The review's consensus-passed fixes: `execute.md.j2` moved `Step 0.3` after `Step 0.2` (it
+  verified `spec_need_verdict` before `Step 0.1` judged it), dropped the SPEC-need pair from
+  Step 0's authored frontmatter (declaring it forced an unjudged guess the preserving writer
+  then kept forever), and single-quoted every model-filled placeholder in the Step 0.1 recipes;
+  `spec.md.j2` lost a stale backticked `plan` reference. Both arms move because the Step 0.3
+  relocation and the `spec.md.j2` line sit outside every `dev_mode` gate. Verified before
+  re-capturing that no command was added or removed in any arm.
+
+- **2026-09-20, `plan-stage-absorption` (third re-capture)** — `spec` alone moved, in all four
+  arms, identically in `auto_safe` and `ask`. Command set unchanged from the second re-capture.
+  The cross-model second-opinion main loop moved into `/hm:spec` Step 4.6 from the removed plan
+  stage, which CLAUDE.md's mandatory matrix requires over the judgment-gated stages. Verified
+  before re-capturing that nothing was added or removed in any arm.
+
+- **2026-09-20, `plan-stage-absorption` (second re-capture, supersedes the Phase-1 entry below
+  in scope)** — `plan` was REMOVED from every arm, and eight to nine other commands moved in each
+  (`execute`, `spec`, `help`, `loop`, `research`, `review`, `verify`, `wrapup`, plus `health` in
+  the `auto_safe` arms). Verified before re-capturing that the only command-set change is the
+  removal of `plan` and that nothing was ADDED in any arm. The breadth is explained, not
+  alarming: `step_manifest.md.j2` interpolates `config.autonomy.pipeline` into every stage's
+  autopilot picker, so dropping `plan` from the pipeline moves that one line everywhere;
+  `execute` and `spec` moved for their own reasons (Steps 0–0.3 and Step 4.6). The autopilot
+  advance block itself is untouched — the same bytes move identically in `auto_safe` and `ask`,
+  which is the signal that this is not an arm-differential defect. Attributed in
+  `work-docs/BASELINE-DELTA-plan-stage-absorption.md`.
+
+- **2026-09-20, `plan-stage-absorption` Phase 1** — `execute` moved in all four arms, identically
+  in `auto_safe` and `ask`. `/hm:execute` gained `Step 0` / `0.1` / `0.2`: the removed `/hm:plan`
+  stage's Step 5, 1.7 and 1.5 relocated, so execute now authors the PLAN document, writes the
+  SPEC-need pair through `hm spec_need frontmatter-upsert`, and scopes the loop per-iter PLAN.
+  Verified BEFORE re-capturing that `execute` is the ONLY moved command in every arm and that no
+  command was added or removed in any arm. The autopilot advance block is untouched — this task
+  is a third party to this guard's subject, which is the case the rule above says to re-capture
+  and record. Attributed in `work-docs/BASELINE-DELTA-plan-stage-absorption.md`; the character
+  and round-trip ratchets are handled there and in that PLAN's `surface_allowance`.
+
 - **2026-09-13, release 0.56.0** — ALL FIFTEEN commands moved in all four arms, which looks
   alarming and is not: the only differing line per command is the frontmatter
   `harness_maker_version:` key. Verified before re-capturing — 15 lines across 15/15 commands,

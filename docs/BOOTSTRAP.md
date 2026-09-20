@@ -167,7 +167,7 @@ or, from a shell:
 harness-maker make .
 ```
 
-Subsequent stage commands (`/hm:plan`, `/hm:execute`, `/hm:review`, ...) become
+Subsequent stage commands (`/hm:spec`, `/hm:execute`, `/hm:review`, ...) become
 available after the make completes.
 
 ---

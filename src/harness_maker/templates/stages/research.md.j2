@@ -14,7 +14,7 @@
 
 Gather sufficient context before committing to a plan. Surface unknowns, prior art, library docs, and architectural alternatives so that downstream stages (`spec`, `plan`, `execute`) can proceed without rework.
 
-**Role separation vs `/hm:plan`:**
+**Role separation vs `/hm:spec`:**
 - `research` = exploratory. Multiple approaches surface; user decides direction informally.
 - `plan` = decisive. Architecture locked via formal interview + ADRs.
 
@@ -200,7 +200,7 @@ Then synthesize:
 
 ### Phase 3 — Write RESEARCH document
 
-Write to `{{ WTR }}/{{ config.work_docs.dir }}RESEARCH-{slug}.md`. `/hm:plan` Step 2 reads this file via PLAN frontmatter `research_doc:` and skips its own retrieval — this is the single biggest token saver in the workflow.
+Write to `{{ WTR }}/{{ config.work_docs.dir }}RESEARCH-{slug}.md`. `/hm:spec` Step 1 reads this file and `/hm:execute` Step 0 reads it via PLAN frontmatter `research_doc:`, and both skip their own retrieval — this is the single biggest token saver in the workflow.
 
 **Required frontmatter:**
 
@@ -225,7 +225,7 @@ summary: "{≤100 char one-line: recommended direction}"
 2. **🔍 Refinement Decisions** — when `--deep` ran, summarize Phase 0 answers; when Phase 0.75 selected discovery lenses, record `Discovery lens: ...`; otherwise omit.
 3. **🛠️ Approaches Found** — 2-3 alternatives, each with the analysis table fields above.
 4. **⚠️ Pitfalls** — concrete failure modes others hit on this topic, with citations.
-5. **❓ Open Questions** — items `/hm:plan` will need to lock down via interview.
+5. **❓ Open Questions** — items `/hm:spec` will need to lock down via interview.
 6. **📚 Sources** — bullet list of every external citation (web URLs, doc URLs, library IDs).
 7. **🔗 Related Internal Docs** — `[[wiki-links]]` to prior PLANs / SESSIONS / REVIEWs found in Phase 1.
 
@@ -242,13 +242,13 @@ Stop and validate with the user. Surface this prompt:
 **Open questions for plan:** {N}
 
 **Ready to proceed?** {Y/N}
-- Y → run `/hm:plan {slug}` (will read RESEARCH-{slug}.md via frontmatter)
+- Y → run `/hm:spec {slug}` (will read RESEARCH-{slug}.md via frontmatter)
 - N → tell me which approach to dig deeper into, or which open question to answer first
 ```
 
 If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one approach in focus). Re-write the RESEARCH document; do NOT create a second file.
 
-**Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec`, `/hm:plan`, or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated. Exception: an auto-advance check below returning `proceed: true` supersedes this.
+**Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec` or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated. Exception: an auto-advance check below returning `proceed: true` supersedes this.
 
 {% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "research" %}{% set gate0_pass = "RESEARCH document written with all 7 required sections and at least the discovery lens recorded." %}{% set gate0_fail = "RESEARCH write failed, or the document is missing required sections (Recommended Direction, Approaches, Pitfalls, Open Questions, Sources, Related Docs)." %}{% set gate0_standalone = true %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 
@@ -268,11 +268,11 @@ If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one 
 - Every claim is grounded in a cited source (internal or external) or labeled as inference.
 - Open questions are explicit, not hidden as assumptions.
 - The Recommended Direction is informational — never written as an architectural commitment (that's `plan`'s job).
-- File is reusable: `/hm:plan` can read it without contacting the user for re-clarification on settled facts.
+- File is reusable: `/hm:spec` can read it without contacting the user for re-clarification on settled facts.
 
 {% set summary_done = "Research complete — recommended direction + open questions surfaced" -%}
 {% set summary_artifact = "work-docs/RESEARCH-{slug}.md" -%}
-{% set summary_next = "`/hm:plan {slug}` to lock the architecture, or dig deeper into one approach" -%}
+{% set summary_next = "`/hm:spec {slug}` to lock acceptance and the irreversible decisions, or dig deeper into one approach" -%}
 {% set summary_stage = "research" -%}
 {% set summary_autopilot_gate = "No mandatory gate — research may auto-advance." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}

@@ -68,7 +68,6 @@ review of the branch or a PR — explicitly *not* launchable by me), a per-proje
 |---|---|---|---|---|
 | `hm:research` | `none` — `WebSearch`/`WebFetch` are retrieval primitives; the staged RESEARCH document, `mtime_warn_days` cache contract and downstream `research_doc:` binding are ours | loss | loss | **keep** |
 | `hm:spec` | `none` — no native acceptance-criteria elicitation; the oracle axis (`oracle_source`/`oracle_evidence`) has no host equivalent | loss | loss | **keep** |
-| `hm:plan` | ⚠️ **partial** — `EnterPlanMode`/`ExitPlanMode` ✅ cover *interactive planning with an approval gate*. They do **not** produce a persisted PLAN with ADRs, phases, `depends_on`, or a validator pass | loss | loss | **merge** — see §Merge candidates |
 | `hm:execute` | `none` — native has no TDD phase machine, no RED gate, no PLAN-phase exit criteria | loss | loss | **keep** |
 | `hm:review` | ⚠️ **partial** — `/code-review ultra` ✅ exists and is a multi-agent branch/PR review. It is **user-triggered and billed, and cannot be launched by the model**, so it cannot serve an automated loop | loss | loss | **keep** (see note) |
 | `hm:verify` | `none` observed | loss | loss | **keep** |
@@ -105,7 +104,7 @@ it is the substrate. The question for each row is whether the *role definition* 
 | `test-reviewer` | `none` | loss | loss | **keep** — but its *barrier* is what P3's ledger is measuring; retirement would be an evidence decision, not a redundancy one |
 | `code-verifier` | `none` | loss | loss | **keep** — mode A's dispatch was removed in P1; mode B (cross-model PIDA) has no native analogue |
 | `consensus-arbiter` | ⚠️ `Workflow`'s adversarial-verify / judge-panel patterns ✅ are documented in the host tool description and cover the same shape | loss | loss | **merge** |
-| `plan-validator` | `none` observed | loss | loss | **keep** — same caveat as `test-reviewer`: P3 is gathering the evidence |
+| `spec-validator` | `none` observed | loss | loss | **keep** — relocated from `plan-validator` (SPEC-plan-stage-absorption ADR-004); single-pass and never-blocking, and its discrimination is still the thing P3 is gathering evidence on |
 | `stuck` | `none` | loss | loss | **keep** |
 | `executor` | ⚠️ overlaps the generic native `general-purpose` / `claude` agent types ✅ | loss | loss | **merge** |
 | `autoloop-coder` | ⚠️ same overlap as `executor`, plus `Workflow`'s own subagent default | loss | loss | **merge** |
@@ -155,8 +154,11 @@ native primitive that does not know about any of it is how a fourth happens.
 **`consensus-arbiter`, `executor`, `autoloop-coder`.** Real overlap, low stakes, and the
 merge is mostly deletion of our own wrapper. These are the cheapest three.
 
-**`hm:plan`.** `EnterPlanMode` should probably *front* our plan stage rather than replace
-it — native approval UX, our persisted artifact.
+**`hm:plan` — resolved by removal (2026-09-20).** The merge candidate this paragraph
+proposed is moot: SPEC-plan-stage-absorption deleted the stage. `EnterPlanMode` does not
+need to front it, because the PLAN is now authored by `/hm:execute` Step 0 with no
+approval gate at all, and the DRI lock-in it used to collect lives in the SPEC's
+`irreversible_decisions`.
 
 ## What this matrix does not establish
 
@@ -192,26 +194,14 @@ inherited with no RESEARCH row, or researched and none found (30 of 85). TUNE ev
 | spec | Step 3.5 | INV | unsourced |
 | spec | Step 4 | INV | ** |
 | spec | Step 4.5 | INV | unsourced |
+| spec | Step 0.5 | INV | unsourced |
+| spec | Step 4.9 | INV | unsourced |
+| spec | Step 4.6 | TUNE | * |
 | spec | Step 5 | INV | unsourced |
-| plan | Step 0 | INV | unsourced |
-| plan | Step 0.5 | INV | ** |
-| plan | Step 1 | HOST | * |
-| plan | Step 1.5 | INV | * |
-| plan | Step 1.7 | INV | * |
-| plan | Step 2 | INV | * |
-| plan | Step 3 | INV | ** |
-| plan | Step 3.0 | INV | * |
-| plan | Step 4 | TUNE | ** |
-| plan | Step 4.4 | INV | * |
-| plan | Step 4.5 | COMP | ** |
-| plan | Step 4.9 | INV | * |
-| plan | Step 5 | INV | * |
-| plan | Step 6 | INV | unsourced |
-| plan | Step A | COMP | unsourced |
-| plan | Step B | INV | * |
-| plan | Step C | INV | * |
-| plan | Step D | INV | * |
-| plan | Step E | COMP | * |
+| execute | Step 0 | INV | unsourced |
+| execute | Step 0.1 | INV | unsourced |
+| execute | Step 0.2 | INV | unsourced |
+| execute | Step 0.3 | INV | unsourced |
 | execute | Step 1 | INV | unsourced |
 | execute | Step 1.5 | HOST | unsourced |
 | execute | Step 2 | INV | unsourced |

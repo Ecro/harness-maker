@@ -28,7 +28,7 @@ from harness_maker.synthesize import synthesize
 
 RESIDUE = ("5-Term Inequality Gate", "5-term", "EIG", "CLARITI")
 CAP_SENTENCE = "open-ended question(s) per turn for locale"
-SURFACES = ("research", "spec", "plan", "loop")
+SURFACES = ("research", "spec", "loop")
 ARMS = [(p, d) for p in Preset for d in DevMode]
 
 
@@ -69,6 +69,6 @@ def test_comprehension_block_no_longer_points_at_the_gate(tmp_path: Path) -> Non
     at eight include sites; the reworded sentence names the cap instead. The block is gated on
     `interview.comprehension.depth == 'deep'` (default `standard`), so the fixture forces it."""
     rendered = _render(tmp_path, Preset.PRODUCTION, DevMode.SPEC_DRIVEN, depth="deep")
-    for surface in ("plan", "spec"):
+    for surface in ("spec",):
         assert "the 5-term gate still governs which get asked" not in rendered[surface]
         assert "the open-ended cap still governs how many get asked" in rendered[surface]

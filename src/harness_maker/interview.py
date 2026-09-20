@@ -64,6 +64,7 @@ from harness_maker.models import (
     SecondOpinionConfig,
     Target,
     ToolchainConfig,
+    drop_retired_stages,
     interview_comprehension_defaults,
     interview_deep_gate_defaults,
 )
@@ -654,7 +655,7 @@ def _ask_instrumentation() -> InstrumentationConfig:
     second pass" (0/3) while the four-project pool said keep it (2/9).
     """
     print("\nharness-maker development telemetry (stage_agent_ledger).")
-    print("  Records one local row per plan-validator / test-reviewer dispatch and keeps")
+    print("  Records one local row per spec-validator / test-reviewer dispatch and keeps")
     print("  each review round's finding payload, so harness-maker can tell whether its")
     print("  own gates earn their latency. 100% local — nothing is transmitted.")
     print("  Declining removes this project from that cross-project measurement, and the")
@@ -1552,6 +1553,31 @@ def _parse_autonomy(value: object) -> AutonomyConfig:
     # the user's level / caps / pipeline to defaults on re-render (retired-key migration).
     if "guard_when" in value:
         value = {k: val for k, val in value.items() if k != "guard_when"}
+    # `plan` was RETIRED as a stage (SPEC-plan-stage-absorption IRR-002). Every harness.yaml
+    # rendered before that change names it in `autonomy.pipeline`, and `AtomicStage` no longer
+    # admits it — so without this drop `model_validate` rejects the WHOLE block and the tolerant
+    # fallback below silently resets the user's level, caps AND pipeline to defaults. Same shape
+    # as the `guard_when` drop above and the `codex_second_opinion` → `second_opinion` migration:
+    # one advisory on the load that migrates, silence on every load after, because a warning
+    # that fires forever is one users learn to ignore.
+    raw_pipeline = value.get("pipeline")
+    if isinstance(raw_pipeline, list):
+        # `drop_retired_stages`, never a literal. This reader is invisible to the AST gate in
+        # `tests/structural/test_retired_stage_single_reader.py` — pydantic builds the
+        # `AtomicStage` members inside `model_validate` below, so there is no `AtomicStage(...)`
+        # call for the walker to find. A hand-written `!= "plan"` here therefore passes the gate
+        # green while silently admitting the NEXT retired name, which is the same
+        # `new-marker-content-field-must-update-every-reader` (count:3) defect the gate exists
+        # to close, one layer down.
+        kept, dropped = drop_retired_stages(raw_pipeline)
+        if dropped:
+            logger.warning(
+                "harness.yaml autonomy.pipeline names retired stage(s) %s → dropped. The PLAN "
+                "document is now written by /hm:execute Step 0; re-render via "
+                "/harness-maker:make to persist the new pipeline.",
+                ", ".join(sorted(set(dropped))),
+            )
+            value = {**value, "pipeline": kept}
     raw_level = value.get("level")
     if isinstance(raw_level, str) and raw_level in LEGACY_LEVEL_ALIASES:
         # The `--update` advisory. The re-render WRITES the new spelling, so without a line

@@ -77,11 +77,13 @@ def single_reviewer_review_render() -> str:
     return _command(Preset.SIDE, "review.md")
 
 
-def rendered_plan_command() -> str:
-    """Was `plan-exec-rev.md`; re-pointed to the atomic plan command when the fused axis
-    was deleted (PLAN-harness-diet ADR-001). The fused body inlined this same stage, so
-    the validator-invocation invariance it guards is unchanged."""
-    return _command(Preset.PRODUCTION, "plan.md")
+def rendered_validator_command() -> str:
+    """Was `plan-exec-rev.md`, then the atomic `plan.md` when the fused axis was deleted
+    (PLAN-harness-diet ADR-001), and now `spec.md`: SPEC-plan-stage-absorption removed the
+    plan stage and relocated the validator dispatch to `/hm:spec` Step 4.6. Each move kept
+    the same subject — the command that dispatches the validator — so the
+    validator-invocation invariance this guards is unchanged across all three."""
+    return _command(Preset.PRODUCTION, "spec.md")
 
 
 def reviewer_renders() -> tuple[str, ...]:
@@ -326,7 +328,14 @@ def second_opinion_invocation_points(render_text: str) -> tuple[str, ...]:
     return tuple(sorted(_SECOND_OPINION_DISPATCH.findall(review_stage_slice(render_text))))
 
 
-_VALIDATOR_DISPATCH = re.compile(r'subagent_type="plan-validator"|`plan-validator`')
+# Both names on purpose. The LIVE render dispatches `spec-validator`
+# (SPEC-plan-stage-absorption relocated the agent), but `golden_atomic()` is a FROZEN
+# 0.43.3 capture that still contains `plan-validator` — renaming only the live spelling
+# made the extractor return () on the golden, which reads as "no dispatch here" rather
+# than "a historical spelling". A frozen artifact does not get retro-edited.
+_VALIDATOR_DISPATCH = re.compile(
+    r'subagent_type="(?:spec|plan)-validator"|`(?:spec|plan)-validator`'
+)
 
 
 def validator_invocation_points(render_text: str) -> tuple[str, ...]:
@@ -335,7 +344,7 @@ def validator_invocation_points(render_text: str) -> tuple[str, ...]:
     An earlier draft returned raw character offsets. That made the conjunct fail on any
     edit that changed the render's length before the matches, and Phase 4 hoists shared
     partials out of the plan and execute stages — both of which precede every
-    `plan-validator` match in the plan-bearing golden. AC-009 would have gone red in
+    `spec-validator` match in the spec-bearing golden. AC-009 would have gone red in
     Phase 4 for a length change rather than for a deleted dispatch, breaking ADR-011's
     "must stay green through Phase 4". Headings still move when a dispatch is deleted or
     relocated to a different step, which is the sensitivity the offsets were bought for.
@@ -525,9 +534,23 @@ def test_the_reviewer_set_grew_by_exactly_the_mandatory_lens_agents() -> None:
             "the reviewer set moved by something other than the mandatory-lens agents: "
             f"{sorted(enabled_reviewer_set(after) - before)}"
         )
-    after_validator = validator_invocation_points(rendered_plan_command())
+    # RE-PINNED, not relaxed (SPEC-plan-stage-absorption). This used to assert equality with
+    # the frozen golden's headings. `validator_invocation_points`' own docstring says a heading
+    # moves when a dispatch is "relocated to a different step" — and that is exactly what this
+    # task did, on purpose: `/hm:plan` Step 4 became `/hm:spec` Step 4.6. Equality with a
+    # pre-migration golden can no longer hold, so the expectation is written out instead. Any
+    # FURTHER relocation, or a deleted dispatch, still fails — which is the sensitivity the
+    # equality was bought for.
+    after_validator = validator_invocation_points(rendered_validator_command())
+    assert after_validator == (
+        "### Step 4.6 —",
+        "### Step 4.6 — `spec-validator` (single pass, advisory)",
+        "### Step 4.6 — `spec-validator` (single pass, advisory)",
+        "#### Second opinion — model: `antigravity`",
+    ), f"the validator dispatch moved again: {after_validator}"
+    # The golden arm keeps the half that survives a rename: it must still witness a dispatch,
+    # so a golden that silently stopped containing one is still caught.
     golden_validator = validator_invocation_points(golden_plan_bearing_fused())
-    assert after_validator == golden_validator
     assert len(golden_validator) >= 1
 
 
@@ -547,7 +570,7 @@ def test_the_invariance_guards_are_not_vacuous() -> None:
         assert second_opinion_invocation_points(golden)
     assert validator_invocation_points(golden_plan_bearing_fused())
     assert not validator_invocation_points(golden_atomic()), (
-        "a review render containing a plan-validator dispatch would mean the third "
+        "a review render containing a spec-validator dispatch would mean the third "
         "golden is no longer the only witness, and H3's rationale needs re-checking"
     )
 
@@ -600,7 +623,7 @@ def test_each_invariance_extractor_detects_its_own_deletion(
 def test_the_validator_extractor_detects_its_own_deletion() -> None:
     """Separate from the parametrized cases because it needs the THIRD golden.
 
-    `golden_atomic()` contains no `plan-validator` dispatch at all (asserted in
+    `golden_atomic()` contains no `spec-validator` dispatch at all (asserted in
     `test_the_invariance_guards_are_not_vacuous`), so a mutation case pointed at it
     would compare () to () and prove nothing — the ∅ == ∅ shape validator-3 H3 caught
     in the AC itself, reproduced in the test that is supposed to guard it.

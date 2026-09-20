@@ -20,7 +20,7 @@ import pytest
 from harness_maker import autopilot, autopilot_caps
 from harness_maker.models import AtomicStage
 
-_PIPELINE = [AtomicStage.PLAN, AtomicStage.EXECUTE, AtomicStage.REVIEW]
+_PIPELINE = [AtomicStage.SPEC, AtomicStage.EXECUTE, AtomicStage.REVIEW]
 _SID = "session-aaa"
 
 
@@ -176,8 +176,8 @@ def test_set_task_slug_persists_only_when_wired(tmp_path: Path) -> None:
     naming a slug that in fact passed validation."""
     _arm(tmp_path, claude_session_id=_SID)
 
-    assert autopilot.set_task_slug(tmp_path, slug="my-task", stage="plan") is False
-    assert autopilot.set_task_slug(tmp_path, slug="my-task", stage="plan", session_id=_SID) is True
+    assert autopilot.set_task_slug(tmp_path, slug="my-task", stage="spec") is False
+    assert autopilot.set_task_slug(tmp_path, slug="my-task", stage="spec", session_id=_SID) is True
 
     marker = autopilot.active_marker(tmp_path, session_id=_SID)
     assert marker is not None
@@ -219,13 +219,16 @@ def test_the_boundary_cli_proceeds_end_to_end_with_a_stamped_marker(
             "--root",
             str(tmp_path),
             "--current",
-            "plan",
+            "execute",
             "--slug",
             "my-task",
             "--session-id",
             _SID,
-            # B3 made the flag fail-closed and `plan` owns a judgment gate; this test is
-            # about session-id wiring, so the gate is declared clear.
+            # B3 made the flag fail-closed, so a verdict is always declared. `execute` is used
+            # rather than a judgment-gated stage because `spec`'s boundary RE-DERIVES the
+            # verdict from the SPEC's approval state and takes the more restrictive of the two
+            # (autopilot_caps.py:482) — a `clear` this tmp harness cannot support would be
+            # overridden, and this test is about session-id wiring, not the gate.
             "--judgment-gate",
             "clear",
         ]
@@ -261,7 +264,7 @@ def test_the_gate_blocked_cli_records_with_a_stamped_marker(tmp_path: Path) -> N
     assert autopilot.touch(tmp_path, now=stale, session_id=_SID) is True
 
     rc = autopilot_caps.main(
-        ["gate-blocked", "--root", str(tmp_path), "--stage", "plan", "--session-id", _SID]
+        ["gate-blocked", "--root", str(tmp_path), "--stage", "spec", "--session-id", _SID]
     )
     assert rc == 0
 

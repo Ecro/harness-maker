@@ -19,7 +19,7 @@ from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Targe
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
-_STAGES = ("research", "spec", "plan", "execute", "review", "verify", "wrapup")
+_STAGES = ("research", "spec", "execute", "review", "verify", "wrapup")
 
 
 def _render(tmp_path: Path, *, enabled: bool, targets: list[Target] | None = None) -> Path:
@@ -197,13 +197,15 @@ def test_on_loop_marker_stays_session_scoped(tmp_path: Path) -> None:
 _DELIVERABLE_DIRS = {
     "spec": "specs/",
     "research": "work-docs/",
-    "plan": "work-docs/",
+    # The PLAN deliverable changed owner, not existence: `/hm:execute` Step 0 writes it now
+    # (SPEC-plan-stage-absorption IRR-001). The rooting requirement travels with the write.
+    "execute": "work-docs/",
     "review": "work-docs/",
 }
 _DELIVERABLE_WRITES = {
     "spec": "SPEC-{slug}.md",
     "research": "RESEARCH-{slug}.md",
-    "plan": "PLAN-{slug}.md",
+    "execute": "PLAN-{slug}.md",
     "review": "REVIEW-{slug}-{date}.md",
 }
 

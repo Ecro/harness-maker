@@ -365,7 +365,21 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # irreversible decision the SPEC does not list (five categories, the narrowing questions,
     # append-then-invalidate, interactive re-approve). Attributed in
     # work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md §3.1.
-    "execute": 50383,
+    # 50383 → 59260 (2026-09-20, SPEC-plan-stage-absorption). +8877, and this is the ratchet
+    # that must be folded HERE rather than declared: `/hm:plan` was deleted, so
+    # `surface_baseline.json` had to be re-frozen (a vanished command has no allowance
+    # escape — `assert not missing`), and once it is re-frozen a declared headroom would
+    # double-count. Both ratchets fold in this commit, which is the ADR-010 rule that
+    # exists because 43234d0e folded one and not the other. What the characters buy:
+    # Step 0 (PLAN authorship + required sections + the seven per-phase fields),
+    # Step 0.1 (prefilter / record / preserving frontmatter write), Step 0.2 (loop
+    # per-iter PLAN), Step 0.3 (write verification incl. contract-boundaries grammar).
+    # The shipped AGGREGATE fell 10.9% in the same change — `plan` was 62,703 chars.
+    # Attributed in work-docs/BASELINE-DELTA-plan-stage-absorption.md.
+    # 59260 → 60725 (same task, second fold): Step 0.1 gained `spec_need prefilter` +
+    # `record` (the evidence half of the removed Step 1.7 gate) and Step 0.2 gained the
+    # session-scoped `worktree loop-mode-active` call it had replaced with prose.
+    "execute": 60725,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -386,38 +400,9 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # 48595 → 51130 (+2535, Phase 6 / AC-010): Step 4.5, terminal whole-document re-validation.
     # Zero new round-trips — it re-uses the pass the two-pass cap already allows.
     #
-    # The characters carry a measurement and a prohibition, and both are load-bearing. The
-    # measurement: 12 recorded plan-validator episodes, none ever clean, and one PLAN records
-    # that pass 2's criticals were CREATED by the pass-1 fixes — which is the argument for
-    # re-reading the whole document rather than the revised sections. The prohibition: this
-    # pass is terminal and the cap is not raised, because the same data shows a third pass buys
-    # findings rather than release. Without the numbers the instruction reads as bureaucracy
-    # and the executing model treats it as optional; that is the failure mode this repo records
-    # for costly mandatory steps. Attributed in
-    # work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
-    # 51130 → 53564 (+2434, 2026-08-16). The review loop's two transferable mechanisms, and
-    # the paragraph that says WHY the churn half is inverted here: in `/hm:review` a LOW ratio
-    # skips work, and copying that shape would mean "small edit, skip re-validation" — the
-    # reading this stage's own measurement refutes (12 validator episodes, none ever clean;
-    # one PLAN whose pass-2 criticals were created by the pass-1 fixes). Attributed in
-    # work-docs/BASELINE-DELTA-plan-validator-transfer.md.
-    # 53564 → 55322 (ai-work-boundaries, folded 2026-08-19 at close-out). +1758, matching that
-    # PLAN's declared `surface_allowance.commands.plan`. Buys required section #7
-    # `## 🚧 Contract Boundaries` (one list, `### Do not change`, a closed three-form grammar
-    # that names globs among its exclusions), the renumbering of 7-10 → 8-11, and two Step 6
-    # verification bullets. An intermediate round measured 4212 against a 4,200 ceiling and
-    # ~126 chars were CUT rather than the ceiling raised. Attributed in
-    # work-docs/BASELINE-DELTA-ai-work-boundaries.md.
-    # RE-DERIVED 2026-09-08 (PLAN-token-efficiency-autopilot-ux-speed ADR-011, AC-013).
-    # The ratchet fixtures were models-OFF, so both ceilings were set for a document without
-    # the second-opinion dispatch recipes — prose that this repo's own harness renders, and
-    # that no band had ever seen. `_render` now passes `_RATCHET_MODELS`; measured through the
-    # same pinned fixture, only these two entries moved outside their bands (the other five
-    # atomic commands do not include the partial and are byte-identical), which is exactly the
-    # carve-out ADR-011 authorises. This is the SINGLE re-derivation that decision permits:
-    # re-deriving again to absorb a later edit is `ratchet-rebaselined-by-its-own-subject`.
-    #   plan: 55322 -> 62703 (+7381, models-on)
-    "plan": 62703,
+    # `plan` removed 2026-09-20 (SPEC-plan-stage-absorption IRR-001) — the command no longer
+    # renders, so a ceiling for it would guard nothing. Its 62,703 chars are the single
+    # largest reason the shipped aggregate FELL 12.2% in this change.
     # 26673 -> 27248 (+575, 0.52.1). The autopilot picker renders into EVERY stage, so a
     # four-word correction there costs a little on all of them. It is the fix that
     # unblocks autopilot on Codex entirely: the block was headed "(Claude Code only)",
@@ -572,7 +557,16 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # share), plus the approve/exempt stamps, the irreversible-decision rule, the 🔒 section and
     # the v3 schema note.
     # Attributed in work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md §3.1.
-    "spec": 34664,
+    # 34664 → 43957 (2026-09-20, same task). +9293: Step 4.6 — the `spec-validator`
+    # dispatch with its ledger row and the pass-cap / over-cap / one-terminal contracts,
+    # the mandatory-matrix gate, and the cross-model second-opinion main loop, all
+    # relocated from the removed plan stage — plus `interview_rounds` in the frontmatter
+    # contract. Same fold-both-ratchets note as `execute` above.
+    # 43957 → 45248 (same task, second fold): the cross-model second-opinion MAIN LOOP moved
+    # here from the removed plan stage — CLAUDE.md documents that matrix as a Production
+    # guarantee over the judgment-gated stages, which are now `review` and `spec`. Also the
+    # ledger pass-cap / over-cap / one-terminal contracts and the barrier-index integer note.
+    "spec": 45248,
     # 23796 → 24935 (+1139, 2026-08-16, cross-runtime test-execution recipe). One paragraph,
     # in the stage that owns the whole-suite pass, saying: ask `hm test_runners plan` for THIS
     # runner rather than pasting a parallel flag. The flag is not portable advice — `cargo`,
@@ -814,7 +808,7 @@ def test_ac_013_the_ratchet_render_carries_second_opinion(flag_on: dict[str, str
     """
     assert _RATCHET_MODELS, "the ratchet is back to a models-off render; the ceilings do not apply"
 
-    for name in ("review", "plan"):
+    for name in ("review", "spec"):
         assert "second_opinion_invoke" in flag_on[name], (
             f"the ratchet's {name} fixture has no second-opinion dispatch, so its ceiling was "
             "derived against a document this repo's harness does not render"
@@ -828,14 +822,14 @@ def test_ac_013_the_models_delta_is_produced_by_configuration(
 
     Same answers, `models` off, and the two stages that include the shared partial must shrink while
     the other five stay byte-identical. That is what makes ADR-011's carve-out ("only `review` and
-    `plan`") a measurement rather than an assumption — and it fails loudly if the partial ever gets
+    `spec`") a measurement rather than an assumption — and it fails loudly if the partial ever gets
     included somewhere else, which is precisely when the other five ceilings would go stale.
     """
     off = _render(feature_branch_workflow=True, tmp=tmp_path, second_opinion_models=None)
 
     assert set(off) == set(flag_on), "the two configurations rendered different command sets"
 
-    for name in ("review", "plan"):
+    for name in ("review", "spec"):
         assert len(off[name]) < len(flag_on[name]), (
             f"{name} did not grow when second-opinion models were enabled, so the flag renders "
             "nothing and the re-derivation had no subject"
@@ -844,7 +838,7 @@ def test_ac_013_the_models_delta_is_produced_by_configuration(
             f"{name} names the invoker with models off — the partial is not byte-zero when disabled"
         )
 
-    unchanged = sorted(set(_ATOMIC_RATCHET) - {"review", "plan"})
+    unchanged = sorted(set(_ATOMIC_RATCHET) - {"review", "spec"})
     moved = [n for n in unchanged if off[n] != flag_on[n]]
     assert moved == [], (
         f"enabling second-opinion models moved {moved}, whose ceilings were NOT re-derived — "
@@ -960,7 +954,7 @@ def test_atomic_renders_keep_their_own_copy(flag_on: dict[str, str]) -> None:
     drift remedy fingerprinted as intact; the mutation receipt's M10 survived on
     exactly that, and nothing else in this file measures atomic size.
     """
-    for stage in ("execute", "review", "wrapup", "verify", "plan", "spec", "research"):
+    for stage in ("execute", "review", "wrapup", "verify", "spec", "research"):
         text = flag_on[stage]
         assert shared_prose_fingerprints(text, "worktree_preflight") == 1, stage
         assert shared_prose_fingerprints(text, "gate0_receipt") == 1, stage

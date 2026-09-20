@@ -74,7 +74,7 @@ def test_codex_stage_skills_context_has_stage_body() -> None:
         ("execute", "worktree"),
         ("research", "sources"),
         ("spec", "scenario"),
-        ("plan", "phase"),
+        ("execute", "phase"),
         ("review", "grade"),
         ("verify", "criterion"),
         ("wrapup", "commit"),
@@ -237,9 +237,9 @@ def test_loop_codex_render_keeps_marker_on_non_convergence() -> None:
 
 # ── AskUserQuestion absent in all Codex renders; request_user_input present ───
 
-_ALL_STAGES = ["execute", "research", "spec", "plan", "review", "wrapup", "verify"]
+_ALL_STAGES = ["execute", "research", "spec", "review", "wrapup", "verify"]
 
-_STAGES_WITH_INTERVIEW = ["research", "spec", "plan", "verify"]
+_STAGES_WITH_INTERVIEW = ["research", "spec", "verify"]
 
 
 @pytest.mark.parametrize("stage", _ALL_STAGES)
@@ -278,7 +278,9 @@ def test_claude_code_stage_render_non_empty(stage: str) -> None:
     ("stage", "terms"),
     [
         ("research", ["second_brain", "reference", "project"]),
-        ("plan", ["second_brain", "decision", "preference"]),
+        # `plan` carried this until SPEC-plan-stage-absorption; the block moved to
+        # `/hm:execute`, which now locks the design ADRs the notes exist to inform.
+        ("execute", ["second_brain", "decision", "preference"]),
         ("review", ["second_brain", "failure", "preference"]),
         ("wrapup", ["second_brain", "journal", "decision"]),
     ],

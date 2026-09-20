@@ -48,7 +48,7 @@ def _counts(out: str) -> dict[str, int]:
 def harness(tmp_path: Path) -> Path:
     """A project whose harness is fully rendered — sibling trees included."""
     dotclaude = tmp_path / ".claude"
-    for rel in ("commands/hm/plan.md", "agents/code-reviewer.md"):
+    for rel in ("commands/hm/spec.md", "agents/code-reviewer.md"):
         p = dotclaude / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("x", encoding="utf-8")
@@ -62,7 +62,7 @@ def harness(tmp_path: Path) -> Path:
 
 
 _ALL = [
-    "commands/hm/plan.md",
+    "commands/hm/spec.md",
     "agents/code-reviewer.md",
     ".cursor/hooks.json",
     ".codex/config.toml",

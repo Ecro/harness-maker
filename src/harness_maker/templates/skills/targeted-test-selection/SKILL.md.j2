@@ -107,7 +107,7 @@ The command prints JSON:
   succeeded, and a verify step that silently runs nothing reads exactly like a pass.
 
 Whichever mode you are in, run the command the recipe gave you — `parallel` when it is
-non-null, `full` otherwise. Two rules about that:
+non-null, `full` otherwise. Three rules about that:
 
 - **While iterating on a failure, run `rerun_failed` first** (when the recipe has one), then the
   targeted set, and only then the full suite. Re-running everything after each edit is where the
@@ -116,6 +116,26 @@ non-null, `full` otherwise. Two rules about that:
   parallel. A suite only ever run in parallel hides order- and isolation-dependent failures,
   which is also why the parallel flag belongs on the command line and **not** in the project's
   persistent config (`addopts` and its equivalents).
+- **When one change breaks tests across many files, iterate on the FAILING SET, not the suite.**
+  The rule above assumes a handful of failures from an edit you just made. A migration — a
+  removed stage, a renamed contract, a retired config key — breaks tests in dozens of files at
+  once, and `rerun_failed` is the wrong tool because the goal is not to re-check one failure but
+  to work through a population. The loop is:
+
+  1. **One** full run, to derive the population. Keep the output.
+  2. Extract the failing FILES from it (not the node ids — a file you fix usually fixes several
+     of its own tests, and node ids go stale the moment you edit).
+  3. Fix a group, then re-run **only those files**. Repeat until that set is clean.
+  4. Re-derive the set from a fresh full run only when step 3 is empty.
+
+  Measured on `SPEC-plan-stage-absorption`, which broke 155 tests across ~70 files: the full
+  suite cost ~10 minutes a pass and was run **six times** before the loop above was adopted;
+  the failing-set runs cost 1–2 minutes and took it 57 → 47 → 35 → 21 → 3 → 1. The rule above
+  was already in this skill and in `/hm:execute` Phase D, and it was followed for single edits
+  and ignored for the migration — which is the case worth naming explicitly.
+
+  **Never edit the tree while a suite is running.** The same task started a full run and kept
+  editing; the result was an uninterpretable mix of two states and had to be discarded.
 
 Lint and type checks stay **unconditional** — they are repo-wide, cheap, and have no
 selection concept. Use the project's own:

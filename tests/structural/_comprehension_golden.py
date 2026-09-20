@@ -39,8 +39,8 @@ GOLDEN_PATH = Path(__file__).resolve().parent / "comprehension_zero_cost_golden.
 
 #: The two commands the disclosure partial is included by, in both rendered variants.
 TRACKED_COMMANDS: dict[str, tuple[str, ...]] = {
-    CLAUDE_VARIANT: ("plan", "spec"),
-    CODEX_VARIANT: ("hm-plan", "hm-spec"),
+    CLAUDE_VARIANT: ("spec",),
+    CODEX_VARIANT: ("hm-spec",),
 }
 
 

@@ -131,7 +131,7 @@ def test_legacy_render_is_identical_to_an_explicit_standard_render(
     legacy_artifacts = _render_artifacts(legacy, tmp_path / "out-legacy")
     explicit_artifacts = _render_artifacts(explicit, tmp_path / "out-explicit")
     assert legacy_artifacts.keys() == explicit_artifacts.keys()
-    for name in ("plan", "spec", "harness.yaml"):
+    for name in ("spec", "harness.yaml"):
         assert legacy_artifacts[name] == explicit_artifacts[name], (
             f"{name} diverged between the absent path and the explicit-standard path"
         )

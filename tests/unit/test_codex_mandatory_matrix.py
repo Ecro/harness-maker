@@ -2,14 +2,14 @@
 generalized by PLAN-second-opinion-multi-model).
 
 ADR-002/003/005 moved the exec + mandatory gate into the plan STAGE main loop; the
-plan-validator AGENT keeps only the non-exec reconciliation envelope. The mandatory-matrix
+spec-validator AGENT keeps only the non-exec reconciliation envelope. The mandatory-matrix
 prose has since been generalized (rename mapping) from single-vendor "Codex" wording to
 "every enabled model":
 
   Production -> plan stage runs every enabled model on every validation (no high-diff gate).
   Side       -> plan stage runs every enabled model only on a high-diff change (high_diff
                 classify).
-  Both       -> plan-validator agent carries the second_opinion_results reconciliation
+  Both       -> spec-validator agent carries the second_opinion_results reconciliation
                 envelope (supersedes the old scalar codex_reconciliation).
   Reviewers (code-reviewer, consensus-arbiter) carry NO exec recipe / envelope.
   Ledger emit lives in the review + plan STAGES, not the agents.
@@ -48,7 +48,7 @@ def _render(tmp_path: Path, *, preset: Preset, enabled: bool) -> dict[str, str]:
 
 
 def _plan_stage(files: dict[str, str]) -> str:
-    return next(t for p, t in files.items() if p.endswith("stages/plan.md"))
+    return next(t for p, t in files.items() if p.endswith("stages/spec.md"))
 
 
 def _review_stage(files: dict[str, str]) -> str:
@@ -59,13 +59,13 @@ def _agent(files: dict[str, str], name: str) -> str:
     return files[f"agents/{name}.md"]
 
 
-def test_production_plan_stage_always_mandatory(tmp_path: Path) -> None:
+def test_production_spec_stage_always_mandatory(tmp_path: Path) -> None:
     files = _render(tmp_path, preset=Preset.PRODUCTION, enabled=True)
     plan = _plan_stage(files)
-    assert "run **every** enabled model on **every** plan validation" in plan
+    assert "run **every** enabled model on **every** dispatch" in plan
     assert "high_diff" not in plan  # Production = always; no high-diff gate
     # envelope still owned by the agent
-    assert "second_opinion_results" in _agent(files, "plan-validator")
+    assert "second_opinion_results" in _agent(files, "spec-validator")
 
 
 def test_side_plan_stage_is_high_diff_gated(tmp_path: Path) -> None:
@@ -73,7 +73,7 @@ def test_side_plan_stage_is_high_diff_gated(tmp_path: Path) -> None:
     plan = _plan_stage(files)
     assert "high_diff classify" in plan
     assert "high-diff" in plan.lower()
-    assert "second_opinion_results" in _agent(files, "plan-validator")
+    assert "second_opinion_results" in _agent(files, "spec-validator")
 
 
 def test_reviewers_carry_no_exec_or_envelope(tmp_path: Path) -> None:
@@ -92,7 +92,7 @@ def test_ledger_emit_lives_in_stages(tmp_path: Path) -> None:
     assert "second_opinion_invoke" in _plan_stage(files)
     assert "second_opinion_invoke" in _review_stage(files)
     # not in the agents anymore
-    for name in ("plan-validator", "code-reviewer", "consensus-arbiter"):
+    for name in ("spec-validator", "code-reviewer", "consensus-arbiter"):
         assert "codex_ledger emit" not in _agent(files, name), f"ledger emit leaked into {name}"
 
 
@@ -101,7 +101,7 @@ def test_disabled_is_byte_zero(tmp_path: Path) -> None:
     plan = _plan_stage(files)
     assert "Step 4 (pre)" not in plan
     assert "dangerouslyDisableSandbox" not in plan
-    pv = _agent(files, "plan-validator")
+    pv = _agent(files, "spec-validator")
     assert "@hm:second-opinion-reconcile" not in pv
     assert "second_opinion_results" not in pv
 

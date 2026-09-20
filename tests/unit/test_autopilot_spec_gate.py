@@ -26,7 +26,6 @@ _SLUG = "demo"
 _PIPELINE = [
     AtomicStage.RESEARCH,
     AtomicStage.SPEC,
-    AtomicStage.PLAN,
     AtomicStage.EXECUTE,
     AtomicStage.REVIEW,
     AtomicStage.VERIFY,

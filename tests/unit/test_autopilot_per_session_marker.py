@@ -24,7 +24,7 @@ from harness_maker import autopilot, worktree
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import AtomicStage
 
-PIPE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.PLAN]
+PIPE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.EXECUTE]
 SESS_A = "aaaa1111-2222-3333"
 SESS_B = "bbbb4444-5555-6666"
 

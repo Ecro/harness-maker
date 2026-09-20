@@ -32,6 +32,7 @@ from harness_maker.models import (
     LEGACY_LEVEL_ALIASES,
     AtomicStage,
     AutonomyConfig,
+    drop_retired_stages,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,8 @@ def arm_if_persistent(
     pipeline_raw = autonomy.get("pipeline")
     try:
         if isinstance(pipeline_raw, list) and pipeline_raw:
-            pipeline = [AtomicStage(stage) for stage in pipeline_raw]
+            kept, _dropped = drop_retired_stages(pipeline_raw)
+            pipeline = [AtomicStage(stage) for stage in kept]
         else:
             pipeline = list(AutonomyConfig().pipeline)
         autopilot.write(

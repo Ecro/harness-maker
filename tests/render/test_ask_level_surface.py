@@ -57,7 +57,7 @@ def test_no_rendered_command_passes_level_ask(rendered: Path) -> None:
 
 
 def test_the_picker_offers_the_three_operational_levels(rendered: Path) -> None:
-    text = (rendered / ".claude" / "commands" / "hm" / "plan.md").read_text(encoding="utf-8")
+    text = (rendered / ".claude" / "commands" / "hm" / "spec.md").read_text(encoding="utf-8")
     assert "ask-pending" in text, "the picker must branch on ask-pending explicitly"
     assert "auto_safe" in text
     assert "auto_full" in text

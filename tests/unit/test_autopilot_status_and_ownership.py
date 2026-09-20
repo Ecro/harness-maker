@@ -25,7 +25,7 @@ import pytest
 from harness_maker import autopilot
 from harness_maker.models import AtomicStage
 
-DEFAULT_PIPELINE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.PLAN]
+DEFAULT_PIPELINE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.EXECUTE]
 
 
 def _iso(delta_hours: float = 0.0) -> str:

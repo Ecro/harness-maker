@@ -2,55 +2,46 @@
 
 ## [Unreleased]
 
+### BREAKING
+
+- **`/hm:plan` is removed.** The stage, its interview and its auto-advance gate are gone from
+  every target; there is no stub. The **PLAN document survives** — `/hm:execute` Step 0 now
+  authors it (phases, file lists, order, risks, exit criteria) with no human gate, and every
+  later stage reads the same artifact with the same frontmatter contract. The decisions that
+  *were* worth a second interview — the ones that cannot be cheaply undone — live in the SPEC,
+  which already elicits them as `irreversible_decisions`.
+
+  **Why:** measured across the 21 task slugs in this repo that carry both an interviewed SPEC
+  and a PLAN, the two stages cost **9.70 interview rounds per task** (SPEC 4.65 + PLAN 5.05).
+  A merged single interview costs **6.55** — a 32 % reduction, stable across three different
+  absorption models. Of 194 classified PLAN interview entries, 52 % are questions the SPEC
+  interview already asks and 21 % are IC questions that should never have reached a human.
+
+  **What you need to do:** nothing, but re-render. An existing `harness.yaml` whose
+  `autonomy.pipeline` names `plan` keeps loading — the entry is dropped once, with one
+  advisory, and `/harness-maker:make --update` persists the new pipeline. `AtomicStage.PLAN`
+  is removed from the schema, so a script constructing that enum member by name must stop.
+
+- **`plan-validator` is replaced by `spec-validator`.** Same critic, relocated to `/hm:spec`
+  and re-scoped to what the DRI must decide: missing or contradictory ACs, circular oracles,
+  irreversible decisions the ACs imply but do not list, and scope boundary. It runs **once**,
+  only when the SPEC declares or implies an irreversible decision, and it **never blocks**
+  approval — the agent it replaces returned `APPROVED` 0 times in 54 runs, which is unmeasured
+  discrimination rather than proven findings, and an unproven gate should not hold a release
+  while it is being measured. Every dispatch now writes a `stage-agents.jsonl` row so that
+  measurement starts at run 1.
+
 ### Added
 
-- Codex-native `hm-make` and `hm-update` skills now run a bundled bootstrap, select
-  the matching stable engine, and regenerate Codex project assets while preserving
-  custom blocks. Plugin, engine and project observations are reported separately;
-  a failed command cannot report a complete update.
-- Claude is available as a second-opinion provider through the saved Claude CLI
-  authentication, with safe-mode, no tools, isolated working directory, bounded
-  input/output and process-group cleanup. Existing provider and ledger behavior
-  remains compatible.
+- **`hm spec_need frontmatter-upsert`** — writes `spec_need_verdict` / `spec_need_target` into
+  a PLAN's frontmatter **without overwriting a value already there**. `/hm:execute` Step 0.1
+  calls it. `/hm:verify` Check 6 reads those keys and treats an absent one as `PASS (N-A)`, so
+  a writer that silently no-ops turns that gate permanently green; the verb exists to give that
+  behaviour an execution surface a property test can quantify over.
 
-- Internal Codex bootstrap helpers validate plugin/engine version identity and track
-  plugin, engine and project update completion independently. A bounded Claude result
-  parser validates successful structured responses and reports fixed error codes.
-  The lifecycle and provider entrypoints above now connect these helpers to execution.
 
 ### Fixed
 
-- Land-hold tests now reference the accepted SPEC's current AC tables and preserve
-  explicit subject-cap boundary cases, restoring full-suite collection.
-- **The intent layer's withdrawal criterion can fire again.** `hm world gap --json`'s
-  `withdrawal` block judged a cumulative count — `objectives_observed == 0` — so a single
-  objective ever closed with an `observed:` verdict pinned `due` to false for the life of the
-  project. It now counts `hm:wrapup` events since the layer last did anything: a measurement
-  recorded, an objective created, approved or closed. The block reports
-  `{filled_at, last_signal_at, quiet_wrapups, revisit_candidates_now, due, reason}`;
-  `objectives_observed` and `wrapups_since_fill` are removed, which is a breaking change for any
-  out-of-repo consumer that parsed them. A stored instant ahead of `now` is skipped rather than
-  used, so a mistyped future date cannot suppress the criterion; the returned value is stripped,
-  closing a crash where a whitespace-padded YAML timestamp passed the producer's parser and
-  failed the consumer's. `filled_at` is now resolved only when nothing has ever signalled — it
-  is the fallback cutoff, and the `git` walk behind it was being paid on every read to fill a
-  field the verdict never consulted. `hm world status --json` is unchanged.
-
-- **The approval stamp names which field moved, not just that the hash mismatched.**
-  `spec_machine`'s approval stamp now carries a per-field digest map alongside the aggregate
-  content hash, so a hold reports the one field that changed instead of an undifferentiated
-  hash mismatch. The digest map lives inside the stamp, which the existing hash deny-list
-  already excludes, so adding it does not invalidate any prior approval. A pre-digest stamp
-  keeps its recorded verdict and says it cannot name fields, rather than failing closed.
-- **`spec_machine`'s three writers (`approve`, `mark-tested`, `mark-judged`) share one lock.**
-  `io_utils.rmw_lock` extracts the flock-based read-modify-write lock previously private to
-  `world.py` into a reusable helper, closing a race between concurrent writers to the same
-  machine SPEC. A malformed SPEC now reports the underlying pydantic validation error in its
-  detail (bounded, moved into the state constructor so no return branch can bypass the cap)
-  instead of a generic failure.
-- **`worktree.py`'s `DELIVERABLE_PREFIXES` gained `"MUTATION"`.** `.gitignore` had carried
-  `!work-docs/MUTATION-*.md` since `865e3ef5` without the matching source-of-truth entry,
-  leaving `tests/structural/test_deliverable_single_source.py` red on `main`.
 - **A mutant that breaks the module at import time is no longer counted as surviving.**
   `mutmut.tests_pass` is `return returncode != 1`, so every exit status except 1 reads as
   "the tests passed": pytest exits 2 on a collection error and pytest-xdist exits 2 when

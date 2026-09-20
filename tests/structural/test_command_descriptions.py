@@ -59,7 +59,8 @@ def _command_paths(root: Path) -> list[Path]:
 def test_every_rendered_command_has_a_non_empty_description(rendered: Path) -> None:
     paths = _command_paths(rendered)
     # Non-vacuity: a mistyped glob would make an all-pass loop over zero files.
-    assert len(paths) >= 15, [p.name for p in paths]
+    # 15 -> 14: `/hm:plan` was removed (SPEC-plan-stage-absorption IRR-001).
+    assert len(paths) >= 14, [p.name for p in paths]
     missing = [p.name for p in paths if not str(_frontmatter(p).get("description", "")).strip()]
     assert missing == []
 
@@ -96,5 +97,5 @@ def test_the_description_survives_into_a_side_preset_render(tmp_path: Path) -> N
     """The other preset renders a different command set; both must carry the field."""
     render(_blueprint(Preset.SIDE), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
     paths = _command_paths(tmp_path)
-    assert len(paths) >= 15
+    assert len(paths) >= 14
     assert all(str(_frontmatter(p).get("description", "")).strip() for p in paths)

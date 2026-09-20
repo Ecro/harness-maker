@@ -14,7 +14,7 @@
 3. [The 7 Atomic Workflow Stages](#3-the-7-atomic-workflow-stages)
    - 3.1 [/hm:research — Exploration](#31-hmresearch--exploration)
    - 3.2 [/hm:spec — Acceptance Criteria](#32-hmspec--acceptance-criteria)
-   - 3.3 [/hm:plan — Implementation Plan](#33-hmplan--implementation-plan)
+   - 3.3 [The plan stage was absorbed](#33-the-plan-stage-was-absorbed--where-its-content-went)
    - 3.4 [/hm:execute — TDD Implementation](#34-hmexecute--tdd-implementation)
    - 3.5 [/hm:review — Code Review](#35-hmreview--code-review)
    - 3.6 [/hm:verify — Completion Verification](#36-hmverify--completion-verification)
@@ -106,7 +106,7 @@ acceptance criteria and the live integration boundary.
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                     User Slash Command Invocation                    │
-│          /hm:research  /hm:spec  /hm:plan  /hm:execute  ...          │
+│          /hm:research  /hm:spec  /hm:execute  ...          │
 └─────────────────────────┬────────────────────────────────────────────┘
                           │
                           ▼
@@ -415,156 +415,28 @@ named by the task's slug. The SPEC directory search looks at the **base** repo's
 falls back to `specs/`. A SPEC's `spec_slug` is bound to its file name, so renaming the file
 without re-approving does not carry the approval with it.
 
-### 3.3 /hm:plan — Implementation Plan
+### 3.3 The plan stage was absorbed — where its content went
 
-**Purpose**: Decide "how to build it" before writing code. Finalize architecture decisions (ADRs) through a deep interview, and decompose implementation into stages.
+The plan stage no longer exists. `SPEC-plan-stage-absorption` removed the stage, its interview and
+its auto-advance gate; the **PLAN document survives** because it is state that outlives a
+context window and five later stages read it.
 
-#### Execution Procedure
+Content moved by owner:
 
-**Step 0 — Skip Heuristic (skip interview if all 4 criteria are met)**
+| What the plan stage held | Where it is now |
+|---|---|
+| Irreversible decisions (schema · public API/CLI · file format · migration · security boundary · new dependency) | **`/hm:spec`** — `irreversible_decisions`, which is also the land-hold criterion |
+| Objective link (Step 0.5) and the objective draft (Step 4.9) | **`/hm:spec`** Step 0.5 / 4.9, plus SPEC frontmatter `objective:` |
+| Phases, file lists, order, risks, exit criteria | **`/hm:execute` Step 0**, authored with no human gate |
+| SPEC-need verdict (`spec_need_verdict` / `spec_need_target`) | **`/hm:execute` Step 0.1** — `prefilter` + `record` + a presence-preserving write. The *halt* was dropped on purpose; `/hm:verify` Check 6 is the enforcement point |
+| Loop per-iter PLAN | **`/hm:execute` Step 0.2** |
+| `plan-validator` | **`spec-validator`**, relocated to `/hm:spec` Step 4.6 — one pass, conditional, and it never blocks approval |
 
-| Criterion | Skip Condition |
-|-----------|---------------|
-| Scope | Single file change, or configuration/documentation only |
-| Architecture | No component boundary changes, no new modules |
-| Contract | No API/IPC/DB schema/file format changes |
-| Risk | Rollback possible within 1 hour, no user impact |
-
-Proceed with interview if any one of the 4 applies.
-
-**Step 1 — Internal Draft (not shown to user)**
-
-Read the codebase and internally produce:
-- Tentative architecture (components, boundaries, data flow)
-- Candidate stage decomposition
-- List of ambiguities sorted by blast radius
-
-**Step 2 — SPEC Inheritance Check**
-
-If a SPEC file exists, read it and check status:
-
-- **Case A** — `status: approved` + no open questions: Skip interview, perform only Step 3.0 (light confirmation)
-- **Case B** — `status: draft`: Do not re-ask categories resolved in SPEC; interview only remaining questions
-- **Case C** — No SPEC: Full interview from scratch
-
-**Step 3.0 — Light Confirmation in Case A**
-
-Ask exactly one structured question (`AskQuestion` / `AskUserQuestion`):
-- "Proceed directly to stage decomposition" vs "There are architecture decisions first" vs "There are several architecture questions"
-
-**Step 3 — Interview Loop**
-
-> **Language rule**: The live interview UI is conducted in the `harness.yaml.locale` language (ko→Korean, en→English, unsupported languages→English fallback). However, **PLAN documents saved to disk are always in English**. Free-text user answers are translated to English in Step 5 for archiving.
-
-Unlimited rounds. Each round follows steps A through E:
-
-**A. Visualize Current Plan State** (when needed):
-- Default: prose/bullet format
-- For comparison: tables
-- For topology: ASCII boxes
-- Mermaid: only in the final PLAN document (renders as raw text in terminal)
-
-**B. Structured question** (in priority order):
-1. Scope boundaries (in/out, whether breaking compatibility)
-2. Architecture (component ownership, pattern selection)
-3. Contract shape (API signature, schema, file format)
-4. Risk tolerance (incremental vs big-bang, rollback strategy)
-5. Testing depth (unit/integration/manual)
-6. Implementation order (feature flags, dependencies)
-7. Dependencies (add library vs implement directly)
-8. Failure handling (retry policy, circuit breaker)
-9. Observability (log level, metric names)
-
-From round 2 onward, offer "Interview sufficient — end" option.
-
-**C. Record Answer as Interview Entry**
-
-| # | Topic | Category | Question | Choice | Notes | → ADR |
-
-**D. ADR Promotion Check**
-
-Create an official **ADR (Architecture Decision Record)** if any of the following apply:
-- Component boundary/ownership change
-- New contract (API, IPC, schema) introduced/changed
-- Reasonable alternative explicitly rejected
-- Decision with long-term impact
-- Future flexibility restricted (framework, library lock-in)
-
-ADR format:
-```markdown
-### ADR-{NNN}: {Title}
-**Status:** Accepted ({date}, via /hm:plan interview)
-**Context:** Why this decision was needed
-**Decision:** What was chosen
-**Consequences:**
-- ✅ Positive outcomes
-- ⚠️ Accepted trade-offs
-**Rejected alternatives:** Rejected alternatives and reasons
-**Source:** Interview #{N}
-```
-
-**E. Exit Check**
-
-End interview when user selects "sufficient — end" or all high-impact ambiguities are resolved.
-
-**Step 4 — Invoke plan-validator Agent**
-
-After the interview ends, pass the completed PLAN draft to the `plan-validator` agent:
-
-- `APPROVED` → Save PLAN as-is
-- `NEEDS_REVISION` / `MAJOR_REVISION` → **the follow-up rounds are planned by CLI, not one per
-  critique.** `hm plan_rounds plan` returns the critiques that earn a round and, for every one
-  that does not, the reason. Then re-validate **once** (the cap is two passes); if the second
-  pass is still `MAJOR_REVISION`, escalate to the user.
-
-Two rules do the cutting, and both are transfers from `/hm:review`'s loop:
-
-- **The progress invariant.** A critique the previous pass raised and this pass raises again is
-  `unresolved`, not `pending` again — the revision did not answer it, and asking a second time
-  is the round that produced nothing. Ids are computed from (section, title) rather than asked
-  of the model: an LLM-minted id changes every run, which turns merge-by-id into "everything is
-  new" and the invariant can then never fire.
-- **Churn, INVERTED.** In `/hm:review` a *low* churn ratio skips the re-review. Copying that
-  shape here would say "small edit, skip re-validation" — and this stage's own measurement
-  refutes exactly that: twelve recorded `plan-validator` episodes, **none ever clean**, and one
-  PLAN whose pass-2 criticals were *created by the pass-1 fixes*. What transfers is the other
-  direction: once a revision has rewritten more than half the PLAN, the critiques still queued
-  were raised against a document that no longer exists, so they go `stale` and cost no round.
-  Nothing is lost — Step 4.5's terminal pass re-derives whichever still hold. An **unmeasured**
-  ratio runs every round.
-
-The lens axis does **not** transfer: `plan-validator` is a single agent, not a fan-out.
-
-`hm plan_rounds outcome` then records `no-progress` separately from `cap-exhausted`. A bare
-two-pass limit reports the same ending for both, hiding the one that means the revision step is
-not working on this document at all.
-
-**Step 5 — Write PLAN Document**
-
-`work-docs/PLAN-{slug}.md` with 11 required sections:
-1. 🎯 Executive Summary
-2. 📚 Prior Work
-3. 🎙️ Interview Transcript
-4. 📐 Architecture Decision Records
-5. 🏗️ Technical Design
-6. 📝 Implementation Plan (each stage: scope / exit criterion / risk / rollback point)
-7. 🚧 Contract Boundaries (one `### Do not change` list; an empty list is written as an explicit `none`)
-8. 🧪 Testing Strategy
-9. ⚠️ Risks & Mitigation
-10. ✅ Success Criteria
-11. 🔍 Plan Validation
-
-Each implementation stage has **4 required fields**: scope, exit criterion (executable command), risk level (`low|medium|high`), rollback point.
-
-**Step 6 — Post-Save Validation**
-
-Read the file and verify: frontmatter present, Interview Transcript section exists, ADR count matches, all 4 fields present, and `## 🚧 Contract Boundaries` sits between 📝 Implementation Plan and 🧪 Testing Strategy with a non-empty `### Do not change` list.
-
-#### Outputs
-- `work-docs/PLAN-{slug}.md` (frontmatter + 11 sections)
-- ADR set (ADR-001, ADR-002, …)
-
----
+**Why.** Measured across the 21 task slugs in this repo carrying both an interviewed SPEC and a
+PLAN: 9.70 interview rounds per task (SPEC 4.65 + PLAN 5.05) became an estimated 6.55 merged —
+52 % of PLAN's classified interview entries were questions the SPEC interview already asked, and
+21 % were IC questions that should never have reached a human. The shipped prompt surface fell
+about 11 % in the same change.
 
 ### 3.4 /hm:execute — TDD Implementation
 
@@ -1599,7 +1471,7 @@ Re-confirming with a fresh `--locator` clears the report without rewriting histo
 catches drift in code the claim cites; it does not re-check claims about external tools.
 `add`, `observe` and `resolve` share one RMW lock per file (`.hm-world-<stem>.lock`).
 
-**Touchpoints in the atomic stages**: `/hm:plan` Step 0.5 loads status and asks one closed
+**Touchpoints in the atomic stages**: `/hm:spec` Step 0.5 loads status and asks one closed
 question when an objective needs a decision; `/hm:review` Step 3.3 checks the diff against the
 PLAN's linked objective (`scope_drift`, P2, main-loop — not an eighth lens); `/hm:wrapup` Step
 5.7 offers to log an assumption observation (stale ones first, from `gap`), record a new
@@ -1614,7 +1486,7 @@ It writes nothing. On request ("what should we do next", "where are the gaps") t
 that table into at most three unranked candidates, asks about each in turn, collects every
 answer, and only then runs `hm world objective new … --from-proposal --candidates N --declined
 "<title>"…` once per accepted candidate — the declined titles become the record's `rejected[]`
-and one `objective_proposed` row lands on the autopilot ledger at the base root. `/hm:plan`
+and one `objective_proposed` row lands on the autopilot ledger at the base root. `/hm:spec`
 offers the same consent at Step 0.5 on two branches — after "none" AND on the cold-start branch
 where the world is filled in but has zero currently-active objectives — and creates the record
 at Step 4.9, after the interview. The record is `proposed`; `approve` stays human, so the gate halts with
@@ -1828,7 +1700,7 @@ list (Write/Edit/Bash are granted without path restriction). See §11.16.
 
 ### 8.7 plan-validator
 
-**Role**: Independently critiques the quality of a PLAN draft in Step 4 of `/hm:plan`.
+**Role**: Independently critiques the SPEC in Step 4.6 of `/hm:spec` — one pass, advisory.
 
 **When invoked**: **Before** writing the PLAN file to disk — validates the draft while it's still temporary
 
@@ -1900,7 +1772,7 @@ list (Write/Edit/Bash are granted without path restriction). See §11.16.
 - `/hm:execute` Phase D: failure that cannot be resolved without PLAN scope change
 - `/hm:execute` ADR conflict: implementation can only proceed by violating an ADR
 - `/hm:review` consensus deadlock: 3 reviewers have conflicting CONCLUDE on the same issue
-- `/hm:plan` plan-validator: 2nd MAJOR_REVISION
+- `/hm:spec` spec-validator: an unresolved critical
 
 **Analysis process**:
 
@@ -2438,11 +2310,11 @@ Compare OBSERVE → INFER → CONCLUDE chains:
 
 **Typical workflow**: The person who can answer "why SQLite instead of Redis?" disappears from the team and the answer is forever lost. The next AI session proposes the already-rejected alternative again.
 
-harness-maker's `/hm:plan` formalizes all architecture decisions as ADRs (Architecture Decision Records):
+harness-maker formalizes architecture decisions as ADRs (Architecture Decision Records) — the DRI's irreversible ones in the SPEC, the rest recorded by `/hm:execute` Step 0:
 
 ```markdown
 ### ADR-001: Use SQLite instead of Redis
-**Status:** Accepted (2026-05-09, via /hm:plan interview)
+**Status:** Accepted (2026-05-09, via /hm:spec interview)
 **Context:** Single-instance deployment, requirement to minimize external service dependencies
 **Decision:** SQLite
 **Consequences:**
@@ -2718,7 +2590,7 @@ This data is reused for multiple purposes:
 
 **Before**: Most AI workflows receive only a task description and jump into implementation. Ambiguous requirements are discovered during implementation, and the cost of backtracking to fix them accumulates.
 
-**After**: `/hm:spec` and `/hm:plan` conduct deep interviews before implementation. Questions are not from a fixed script — the LLM reads the context and generates them dynamically.
+**After**: `/hm:spec` conducts a deep interview before implementation. Questions are not from a fixed script — the LLM reads the context and generates them dynamically.
 
 #### /hm:spec's 6-Category Interview
 
@@ -2733,9 +2605,9 @@ The SPEC interview covers **6 categories in order**:
 | Constraints | Technical and business constraints |
 | Verification | How to prove completion |
 
-A **completeness scorer** rates the 6-category coverage and scenario specificity on a 0–1 scale. If score falls short, asks additional questions about only the lacking categories. A completed SPEC is marked `status: approved` so subsequent `/hm:plan` skips re-asking (Case A — no duplicate interview).
+A **completeness scorer** rates the 6-category coverage and scenario specificity on a 0–1 scale. If score falls short, asks additional questions about only the lacking categories. A completed SPEC is marked `status: approved` so subsequent the plan stage skips re-asking (Case A — no duplicate interview).
 
-#### /hm:plan's 9-Category Priority Interview
+#### Where the plan stage's 9 categories went
 
 The PLAN interview decides "how to build it". Question categories proceed in **reverse order of impact**:
 
@@ -2751,7 +2623,7 @@ The PLAN interview decides "how to build it". Question categories proceed in **r
 
 #### What the Interview Shows You While It Asks — `interview.comprehension.depth`
 
-Both interviews build more than they show. `/hm:plan` Step 1 drafts the goal, a
+The interview builds more than it shows. `/hm:spec` drafts the goal, a
 component/data-flow sketch, a phase skeleton, and the ambiguities ranked by blast radius —
 under a heading that says *"NOT shown to user"* — and then asks its architecture questions
 without any of that on screen. `harness.yaml`'s `interview.comprehension.depth` decides how
@@ -2767,7 +2639,7 @@ Nothing new is generated: this re-routes output the stages already produce. Both
 include one shared partial, so the enabled block set cannot drift between them.
 
 **Existing projects are retrofitted.** A `harness.yaml` with no `comprehension` key acquires
-`standard` on its next `/harness-maker:make --update`, and its `/hm:plan` and `/hm:spec` grow
+`standard` on its next `/harness-maker:make --update`, and its `/hm:spec` grows
 accordingly. Opt out with `/hm:configure` → Interview comprehension → `minimal`
 (or `harness-maker make . --comprehension-depth minimal`), which restores the previous
 output exactly. An unrecognized value warns and is rewritten to `standard`.
@@ -2958,7 +2830,7 @@ Even when tests pass, the AI Readiness composite score can drop by 5 or more poi
 | Conditional Router | Unnecessary reviewers → token waste | conditional-router skill |
 | 2-pass redaction | Metadata anchoring | two_pass_review CLI (+47pp) |
 | Reasoning Alignment | False consensus → wrong fixes | consensus-arbiter agent |
-| ADR system | WHY of design decisions lost | /hm:plan interview / PLAN-*.md |
+| ADR system | WHY of design decisions lost | /hm:spec interview / PLAN-*.md |
 | Fingerprint + Block-merge | Upgrade overwrites customizations | content_hash / @hm:user:* markers |
 | Drift Gate | Scope drift goes undetected | wrapup Step 3 / pending-drift.md |
 | 2-tier refdocs search | Full load of large knowledge base | refdocs-search + relevance-filter |
