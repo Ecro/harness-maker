@@ -1139,55 +1139,55 @@ A genuinely blind cross-model classification needs three things beyond "call the
 ## [wiki:gotcha] spec-need-verdict-absent-vs-none | 2026-09-18
 `/hm:verify` Check 6 is the only deterministic guard that reads an in-flight PLAN's `spec_need_verdict` frontmatter field, and it PASSES an absent value rather than failing closed on it — so a PLAN that never went through the spec-need elicitation (no `spec_need_verdict` key at all, as opposed to an explicit `none`) is not caught by any machine check; the absent-case is silently treated the same as an explicit "no SPEC needed" decision. The only thing currently distinguishing the two is a model reading the PLAN and judging whether the field's absence is itself a miss — an LLM-executed check standing in for what should be a deterministic gate. Worth fixing forward: Check 6 (or an earlier stage) should distinguish "field absent" from "field present with value none" and fail closed on the former, per the project's own absent-case rule for optional-field-activated gates.
 ## [wiki:architecture] intent-layer-withdrawal-instrument | 2026-09-20
-`hm world gap --json` carries a `withdrawal` block that measures the intent layer's own kill
-criterion. **Corrected 2026-09-20 (SPEC-withdrawal-criterion-window).** The rule was originally
-"10 wrapups, no observed objective, no fired revisit → remove the layer", and that form **could
-not fire**: `objectives_observed` counted every objective that had *ever* carried `observed:`,
-so a single closed objective pinned `due` to false for the project's remaining life — this
-repository crossed that line on 2026-09-18 and the instrument reported green for the next four
-wrapups while the layer recorded nothing at all. The criterion is now window-scoped and the
-block reports `{filled_at, last_signal_at, quiet_wrapups, revisit_candidates_now, due, reason}`;
-`objectives_observed` and `wrapups_since_fill` are gone (an approved irreversible decision, so a
-consumer outside the repo that parsed them breaks with no shim).
+`hm world gap --json` carries a `withdrawal` block measuring the intent layer's own kill
+criterion. **Rewritten 2026-09-20 (SPEC-withdrawal-criterion-window).** The original rule —
+"10 wrapups, no observed objective, no fired revisit" — **could not fire**: `objectives_observed`
+counted every objective that had *ever* carried `observed:`, so one closed objective pinned `due`
+to false for the project's life. This repo crossed that line on 2026-09-18 and the instrument
+reported green for the next four wrapups while the layer recorded nothing.
 
-`last_signal_at` is the most recent instant the layer did anything — the maximum over every
-measurement's `observed_at` and every objective's `created_at`, `approval.approved_at` and
-`closed_at` — reported verbatim as stored, with any value that is not an aware ISO instant
-skipped rather than fatal. `quiet_wrapups` counts `hm:wrapup` **start** events in the base-root
-`stage-spans.jsonl` after that cutoff; `end` is written only by the Claude Code Stop hook and is
-missed whenever stages chain (dogfood measured 42 start vs 32 end), so `start` is the count that
-does not silently undercount. With no signal ever recorded the cutoff falls back to `filled_at`,
-the committer date of the oldest commit whose `.claude/intent.yaml` is filled in (a shallow
-clone forces `no_git` rather than fabricating a boundary date) — that fallback reproduces the
-retired rule for a layer filled in and then ignored, which is why the design needs no separate
-absent-case. The cutoff is **clamped to now**: an objective's timestamps are hand-authored YAML
-and one mistyped future date would otherwise pin `quiet_wrapups` at 0 forever, re-entering the
-same permanent suppression through the data instead of the logic.
+The block now reports `{filled_at, last_signal_at, quiet_wrapups, revisit_candidates_now, due,
+reason}`; `objectives_observed` and `wrapups_since_fill` are gone (an approved irreversible
+decision — a consumer outside this repo that parsed them breaks with no shim).
 
-Two invariants survived the change and must keep surviving. A count that cannot be taken is
-`null` with a `reason` (`not_filled_in` / `no_git` / `fill_uncommitted` / `no_stage_spans` /
-`no_wrapup_spans`) — **never a disguised `0`**, which would read as "quiet" and retire a layer
-blind. And `not_filled_in` outranks every other reason: `world.objectives` loads independently
-of `intent.outcomes`, so a never-installed layer carrying one stray objective record is
-reachable, and hoisting the signal computation above that guard hands it a retirement notice.
-The block lives in `gap` only — `status --json` stays byte-frozen. Wrapup 5.7 prints the line
-exactly once when `due` is true, reading the same `gap --json` call the outcome-measure question
-already makes.
+`last_signal_at` is the max over every measurement's `observed_at` and every objective's
+`created_at`, `approval.approved_at` and `closed_at`, **returned `.strip()`ed** and skipping any
+value that is not an aware ISO instant **or that is ahead of `now`**. Both skips matter and both
+were learned the hard way:
 
-**Testing this class of change needs a renamed-only control, not HEAD.** Because the key set
-changed, every test in the module goes red against HEAD whether or not it binds the window
-dimension, so a red sweep carries zero bits. The module holds the retired logic emitting the new
-key names behind `HM_WITHDRAWAL_CONTROL=1`; only six of its twenty-five tests can fail against
-it, and that is correct rather than a gap — the SPEC deliberately preserves the reason enum, the
-absent-case invariant, the `not_filled_in` precedence and the never-signalled fallback, so
-demanding those fail would demand the SPEC be violated. Each non-screened test names its reason
-in `_NOT_IN_THE_SCREEN`, and a derived-population test keeps the two lists exhaustive.
+- **A future instant is dropped, NOT clamped.** The first attempt clamped the cutoff to `now`
+  and claimed that bounded the suppression at ten wrapups. It did not: `now` advances on every
+  call, so the cutoff advanced with it, and a real ledger only holds events in the *past* of
+  `now` — `quiet_wrapups` sat at 0 until the mistyped date arrived. Unbounded in calendar time,
+  which is the defect the rewrite exists to remove, re-entered through the data.
+- **The strip is load-bearing.** `_aware_instant` validates the *stripped* text; `_count_wrapups`
+  parses without stripping and without catching `ValueError`. Returning the padded original made
+  one whitespace typo in one YAML field crash every `gap`.
 
-The same task also shortened measured evidence from the full argv to
-`auto: measure#<definition_hash[:12]> @ <sha> exit=0 cwd=<base|checkout>` — the hash still pins
-which measure definition produced the number by equality, and the argv is recoverable only when
-`.claude/intent.yaml` was committed and clean at that sha. Old argv-format rows are never
-rewritten.
+`quiet_wrapups` counts `hm:wrapup` **start** events in the base-root `stage-spans.jsonl` after
+that cutoff (`end` is Stop-hook-only and is missed when stages chain). With no signal ever, the
+cutoff falls back to `filled_at` — which reproduces the retired rule for a layer filled in and
+then ignored, so the design needs no separate absent-case. **`_filled_at` is resolved only on
+that fallback branch**: it is a `rev-parse`, a `log`, and a `show` per historical commit, each
+under a 10 s timeout, and paying it to fill a field the verdict never consulted was reversed by
+the DRI on review evidence. `filled_at` stays in the payload and is `null` otherwise; three
+things produce that null and the payload distinguishes all three (a non-null `last_signal_at` =
+never asked; `reason: not_filled_in` = never reached; anything else = asked and `reason` says
+why).
+
+Two invariants survived and must keep surviving: a count that cannot be taken is `null` with a
+`reason`, **never a disguised `0`**; and `not_filled_in` outranks every other reason, because
+`world.objectives` loads independently of `intent.outcomes` so a never-installed layer carrying
+one stray objective record is reachable. The block lives in `gap` only — `status --json` is
+byte-frozen. `due` is advisory: grepped, it has no consumer beyond the report dict.
+
+**Testing a rename needs a renamed-only control, not HEAD.** Because the key set changed, every
+test in the module goes red against HEAD whether or not it binds the behaviour, so a red sweep
+carries zero bits. The module holds the retired logic emitting the new key names behind
+`HM_WITHDRAWAL_CONTROL=1`; only 8 of its 17 test functions can fail against it, and that is
+correct — the SPEC deliberately preserves the reason enum, the absent-case invariant, the
+`not_filled_in` precedence and the never-signalled fallback. Each non-screened test names its
+reason in `_NOT_IN_THE_SCREEN` and a derived-population test keeps the two lists exhaustive.
 ## [wiki:architecture] locator-is-content-fingerprint-not-sha | 2026-09-18
 `evidence_locator.py` (assumption-entry-and-evidence-locator) makes staleness a pure function of CONTENT, never of a commit SHA: a stored locator is `{path, lines A-B, fingerprint}`, where `fingerprint` is a sha256 over whitespace-normalised text of a span capped at 40 lines, plus `k` (a small window count used for relocation). Classification (`fresh | moved | changed | missing`) re-slides a window of the same size across the current file at `gap` time and compares fingerprints — never against git history. The reason a commit SHA was rejected outright (see RESEARCH): wrapup Step 5.7 records the assumption BEFORE the Step 6 commit, and `task-land` squashes the branch, so any SHA captured at record time is guaranteed stale the moment it lands — there is no commit yet to point at, and the one that eventually exists is not the one you'd have named. A content fingerprint has no such window: it is valid from the instant it's written because it doesn't refer to VCS state at all. Two more properties worth carrying: staleness derivation is confined to `gap` — `status` and the autopilot gate never do the cited-file I/O, so a stale citation cannot silently gate anything it never mediated (ADR-007); and a malformed or stamp-less stored locator is reported via `broken_references`, never fatal — one bad line must not turn the whole assumption record unloadable (ADR-008).
 ## [wiki:architecture] stage-delegate-output-is-write-only | 2026-09-19

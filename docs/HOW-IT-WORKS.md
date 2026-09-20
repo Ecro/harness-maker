@@ -1536,19 +1536,32 @@ carry `measure: true|false`; the skill's "measure first" step runs the dry run a
 record call, and wrapup 5.7's third answer-gated question, "Measure outcomes now?", runs `--all`
 once on "yes".
 
-**Withdrawal (intent-layer-ops)**: `hm world gap --json` also carries a `withdrawal` block —
-`{filled_at, wrapups_since_fill, objectives_observed, revisit_candidates_now, due, reason}` —
-that measures the layer's own kill criterion ("10 wrapups, no observed objective, no fired
-revisit → remove the layer") instead of leaving it an uncounted comment. `filled_at` is the
-committer date of the oldest commit whose `.claude/intent.yaml` is filled in (`no_git` on a
-shallow clone or a failed git call); `wrapups_since_fill` counts `hm:wrapup` **start** events in
-the base-root `stage-spans.jsonl` after that date (`end` is written only by the Claude Code Stop
-hook and is missed when stages chain, so `start` is the count that does not undercount). A count
-that cannot be taken is `null` with a `reason` (`not_filled_in`, `no_git`, `fill_uncommitted`,
-`no_stage_spans`, `no_wrapup_spans`), never a disguised `0`; `due` is only `true` when every count
-is real, `wrapups_since_fill >= 10`, and both `objectives_observed` and `revisit_candidates_now`
-are zero. `status --json` is unaffected — the block lives in `gap` only. Wrapup 5.7 prints the
-criterion once when `due` is true, after the outcome-measure question, and nothing otherwise.
+**Withdrawal (withdrawal-criterion-window)**: `hm world gap --json` also carries a `withdrawal`
+block — `{filled_at, last_signal_at, quiet_wrapups, revisit_candidates_now, due, reason}` — that
+measures the layer's own kill criterion ("10 wrapups with no signal and no fired revisit →
+remove the layer") instead of leaving it an uncounted comment. `last_signal_at` is the most
+recent instant at which the layer did anything: the maximum over every measurement's
+`observed_at` and every objective's `created_at`, `approved_at` and `closed_at`, taken verbatim
+as stored and skipping any value that is not an aware ISO instant. `quiet_wrapups` counts
+`hm:wrapup` **start** events in the base-root `stage-spans.jsonl` after that cutoff (`end` is
+written only by the Claude Code Stop hook and is missed when stages chain, so `start` is the
+count that does not undercount). When nothing has ever signalled, the count runs from
+`filled_at` — the committer date of the oldest commit whose `.claude/intent.yaml` is filled in —
+which reproduces the behaviour of the retired rule for a layer that was filled in and then
+ignored. **`filled_at` is resolved only on that fallback branch**, since that is the only one
+that consumes it; it stays in the payload and is `null` when a signal supplied the cutoff. A
+stored instant ahead of `now` is **skipped**, not clamped: these four fields are hand-authored
+YAML, and a timestamp in the future is bad data rather than a record of something that happened.
+Clamping the cutoff to `now` was tried first and did not bound anything — `now` advances on every
+call, so the cutoff advanced with it while a real ledger only holds events in its past, leaving
+the count at zero until the mistyped date arrived. A count that cannot be taken is `null` with a
+`reason` (`not_filled_in`, `no_git`, `fill_uncommitted`, `no_stage_spans`, `no_wrapup_spans`),
+never a disguised `0`, and `not_filled_in` outranks every other reason; `due` is only `true` when
+`quiet_wrapups >= 10` and `revisit_candidates_now` is zero. **It no longer reads how many
+objectives have ever carried `observed:`** — that was the retired rule, and it was absorbing: one
+objective closed anywhere in history pinned `due` to false for the project's remaining life.
+`status --json` is unaffected — the block lives in `gap` only. Wrapup 5.7 prints the criterion
+once when `due` is true, after the outcome-measure question, and nothing otherwise.
 
 **Assumptions and cited code (assumption-entry-and-evidence-locator)**: `hm world assume add <id>
 --claim --status <known|assumed|unknown> [--text --observed-at] [--locator <path:A-B>]` is the

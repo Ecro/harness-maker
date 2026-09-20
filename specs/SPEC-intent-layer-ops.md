@@ -131,11 +131,17 @@ For any measure command that exits 0 and prints a number, the appended row's `ev
 ### AC-002: gap reports the withdrawal block
 On a committed skeleton→filled history with `hm:wrapup` `start` events either side of the fill commit, `gap_report(root)["withdrawal"]` has exactly the keys `filled_at, wrapups_since_fill, objectives_observed, revisit_candidates_now, due, reason` with the hand-computed values and `reason == "ok"`, and `"withdrawal" not in status_report(root)`.
 
+> **Superseded by [[SPEC-withdrawal-criterion-window]] (2026-09-20).** The cumulative rule this criterion accepted could not fire once any objective had ever carried `observed:`; it was replaced by a trailing quiet-window rule. The text above is kept verbatim as the record of what this task delivered — it is not a description of current behaviour. Its binding was removed (`test_ids: []`), and `superseded_by` in the machine file, not `pending_test`, is what marks it retired.
+
 ### AC-003: due is the criterion exactly
 `due` is true iff `wrapups_since_fill >= 10 and objectives_observed == 0 and revisit_candidates_now == 0`, and false whenever `wrapups_since_fill` is `None`.
 
+> **Superseded by [[SPEC-withdrawal-criterion-window]] (2026-09-20).** The cumulative rule this criterion accepted could not fire once any objective had ever carried `observed:`; it was replaced by a trailing quiet-window rule. The text above is kept verbatim as the record of what this task delivered — it is not a description of current behaviour. Its binding was removed (`test_ids: []`), and `superseded_by` in the machine file, not `pending_test`, is what marks it retired.
+
 ### AC-004: unmeasurable counts are null with reason
 `not_filled_in`, `no_git` (incl. shallow), `fill_uncommitted`, `no_stage_spans` (incl. a directory at the path) and `no_wrapup_spans` worlds each exit 0 with the unmeasurable fields `None`, `due` false and the matching `reason` (first applicable in that order); a deleting history commit is skipped; an invalid world returns the `state: invalid` payload without `withdrawal`.
+
+> **Superseded by [[SPEC-withdrawal-criterion-window]] (2026-09-20).** The cumulative rule this criterion accepted could not fire once any objective had ever carried `observed:`; it was replaced by a trailing quiet-window rule. The text above is kept verbatim as the record of what this task delivered — it is not a description of current behaviour. Its binding was removed (`test_ids: []`), and `superseded_by` in the machine file, not `pending_test`, is what marks it retired.
 
 ### AC-005: wrapup prints withdrawal line when due
 Both wrapup renders contain, inside Step 5.7, exactly one instruction keyed on `withdrawal.due` that prints `[intent] withdrawal criterion met`, and `intent.SKELETON` names `hm world gap` and `withdrawal.due`.
@@ -148,7 +154,7 @@ plan/review/help hashes equal the pre-change pin per arm; wrapup growth ≤ the 
 | Test file | ACs |
 |---|---|
 | `tests/unit/test_world_evidence_ref.py` | AC-001 |
-| `tests/unit/test_world_withdrawal.py` | AC-002, AC-003, AC-004 |
+| — | ~~AC-002, AC-003, AC-004~~ — superseded 2026-09-20 by [[SPEC-withdrawal-criterion-window]]; the test functions that bound them were **deleted, not repurposed**, so this row names no file. `tests/unit/test_world_withdrawal.py` still exists and now binds the successor SPEC's ACs instead |
 | `tests/unit/test_render_intent_layer.py` | AC-005 |
 | `tests/structural/test_intent_layer_ops_invariance.py` | AC-006 |
 

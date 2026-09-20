@@ -878,11 +878,58 @@ _INTENT_REL = ".claude/intent.yaml"
 _GIT_TIMEOUT_S = 10
 
 
-def withdrawal_due(wrapups: int | None, observed: int, candidates: int) -> bool:
-    """An uncounted wrapup total never reads as "unused" — that would retire a layer blind."""
-    return (
-        wrapups is not None and wrapups >= WITHDRAWAL_WRAPUPS and observed == 0 and candidates == 0
-    )
+def withdrawal_due(quiet_wrapups: int | None, candidates: int) -> bool:
+    """An uncounted wrapup total never reads as "quiet" — that would retire a layer blind.
+
+    Deliberately NOT a function of how many objectives have ever carried `observed`. That was
+    the retired rule, and it was absorbing: one objective closed anywhere in history pinned this
+    to false for the project's remaining life.
+    """
+    return quiet_wrapups is not None and quiet_wrapups >= WITHDRAWAL_WRAPUPS and candidates == 0
+
+
+def last_signal_at(world: World, *, now: datetime | None = None) -> str | None:
+    """The most recent instant at which the layer did anything, as stored.
+
+    Four sources, because those are the four things that count as the layer being used: a
+    measurement was recorded, an objective was created, one was approved, one was closed. A
+    stored value that is not an aware ISO instant is skipped rather than fatal — a history typo
+    must not break every `gap` call.
+
+    **An instant ahead of `now` is skipped too**, on the same grounds: a timestamp in the future
+    is not a record of something that happened, it is bad data. These four fields are
+    hand-authored YAML. An earlier attempt clamped the cutoff to `now` instead of dropping the
+    value, and that was worse than the defect it replaced: `now` advances on every call, so the
+    cutoff advanced with it, and a real ledger only ever holds events in the past of `now` —
+    `quiet_wrapups` therefore sat at 0 until the mistyped date actually arrived. The suppression
+    was unbounded, not bounded at ten wrapups as that attempt claimed.
+
+    The returned string is `.strip()`ed. `_aware_instant` validates the *stripped* text but the
+    value travels on to `_count_wrapups`, whose `fromisoformat` does not strip and does not
+    catch `ValueError` — so returning the padded original made a whitespace typo in one YAML
+    field crash every `hm world gap`, in the same file whose contract says a typo must not.
+    """
+    # `Any`, not `str | None`: these are hand-authored YAML values, so a source may hold an int,
+    # a date object or a nested map. `_aware_instant` is the single place that decides.
+    stored: list[Any] = []
+    for row in world.values:
+        stored.append(row.get("observed_at"))
+    for rec in world.objectives.values():
+        stored.append(rec.get("created_at"))
+        approval = rec.get("approval")
+        if isinstance(approval, dict):
+            stored.append(approval.get("approved_at"))
+        stored.append(rec.get("closed_at"))
+    ceiling = now if now is not None else datetime.now(UTC)
+    best: str | None = None
+    best_ts: datetime | None = None
+    for raw in stored:
+        ts = _aware_instant(raw)
+        if ts is None or ts > ceiling:
+            continue
+        if best_ts is None or ts > best_ts:
+            best, best_ts = raw.strip(), ts
+    return best
 
 
 def _git_out(args: list[str], cwd: Path) -> str | None:
@@ -961,24 +1008,63 @@ def _count_wrapups(base: Path, since: str) -> tuple[int | None, str | None]:
     return count, None
 
 
-def withdrawal_report(world: World, root: Path, fired: list[str]) -> dict[str, Any]:
-    """The layer's own retirement instrument; a count it cannot take is None with its reason."""
-    observed = sum(1 for rec in world.objectives.values() if rec.get("observed") is not None)
+def withdrawal_report(
+    world: World, root: Path, fired: list[str], *, now: datetime | None = None
+) -> dict[str, Any]:
+    """The layer's own retirement instrument; a count it cannot take is None with its reason.
+
+    Reason precedence is fixed and first-match-wins, and `not_filled_in` stays at the top:
+    `world.objectives` loads independently of `intent.outcomes`, so a never-installed layer
+    carrying one stray objective record is reachable, and hoisting the signal computation above
+    that guard would hand it a retirement notice.
+
+    `filled_at` is the **fallback** cutoff, used only when nothing has ever signalled — so a
+    repository whose git history cannot date the fill still gets a count, where the retired
+    implementation stopped at `no_git`. It is therefore resolved **only on that branch**. The
+    `git` work behind it is a `rev-parse`, a `log`, and a `show` per historical commit that
+    touched the file, each under a 10 s timeout, against an object store shared with every
+    concurrent worktree; paying that on every `gap` to fill a field the verdict did not consult
+    was the cost ADR-004 first accepted and then, on review evidence, reversed.
+
+    **The key stays in the payload** — dropping it would change the key set IRR-001 fixed — so
+    `filled_at` is `null` whenever a signal supplied the cutoff. Three things produce that null
+    and the payload distinguishes all three: a non-null `last_signal_at` means the date was never
+    asked for; `reason: not_filled_in` means the layer is uninstalled and the question was never
+    reached; anything else means it was asked and `reason` names what went wrong.
+
+    **Scope.** `filled_at` and `quiet_wrapups` are both resolved against the **base** repo,
+    because both are facts about the project rather than about a branch. The signal sources are
+    not: they come from the caller's `world`, which in a `/hm:` stage is the task worktree's
+    checkout. A worktree whose branch predates a peer's landed measurement therefore sees an
+    older `last_signal_at` than the project has, while the wrapup ledger it counts against is
+    shared — so a stale branch can report a `due` the project as a whole would not. Accepted,
+    not fixed: closing it means a second `load_world` on every `gap` read, and `due` prints an
+    advisory line rather than gating anything. `root == base` on the ordinary path.
+    """
+    now = now or datetime.now(UTC)
+    base = resolve_base_root(root)
     candidates = len(fired)
     filled: str | None = None
-    wrapups: int | None = None
+    signal: str | None = None
+    quiet: int | None = None
+    reason: str | None = None
     if intent_mod.is_not_filled_in(world.intent):
-        reason: str | None = "not_filled_in"
+        reason = "not_filled_in"
     else:
-        filled, reason = _filled_at(root)
-        if reason is None and filled is not None:
-            wrapups, reason = _count_wrapups(resolve_base_root(root), filled)
+        signal = last_signal_at(world, now=now)
+        since = signal
+        if since is None:
+            # Only here is the git work worth paying for — this is the branch that consumes it.
+            filled, reason = _filled_at(base)
+            since = filled
+        if since is not None:
+            quiet, reason = _count_wrapups(base, since)
     return {
         "filled_at": filled,
-        "wrapups_since_fill": wrapups,
-        "objectives_observed": observed,
+        "last_signal_at": signal,
+        "quiet_wrapups": quiet,
         "revisit_candidates_now": candidates,
-        "due": withdrawal_due(wrapups, observed, candidates),
+        "due": withdrawal_due(quiet, candidates),
         "reason": reason or "ok",
     }
 

@@ -15,7 +15,7 @@
    "spec": "f5ee20ab59a67a2cf713eac4df1d4e2dcedbab35b6566fbbfc326a0dd19cecf6",
    "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
    "verify": "bd3b9b24078ee84992efcb345ed28bc218065b15233d9615f8272bda9d66105d",
-   "wrapup": "feb7b97f0957f1c3109e4dc4795e58260e1e22a2839d41c963656b1358486667"
+   "wrapup": "026bed65eefcb13bd82e0b8de6d78987882168a669898c678c288806ae3bbf80"
   },
   "auto_safe@spec-driven": {
    "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
@@ -32,7 +32,7 @@
    "spec": "4e03ca5c5f27ba74dbbd7b61ce0ac08ae66cef1a4ebb28686c27cce248589aeb",
    "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
    "verify": "6563cef1ca86e9b887540aa38e5d1b1861285c2ccb2a02ba1bb21724b3c2fadc",
-   "wrapup": "d147b87716854fc33c2f6cbbcfe6b2d318c741f750d6f960b0cba0bafa7195ed"
+   "wrapup": "78d71893f0683ad3b599a7dc879dbea18597461c8d701ae338f0a55f5e4a669a"
   },
   "ask@flag_on": {
    "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
@@ -49,7 +49,7 @@
    "spec": "f93f6a41d0728567361f5cc6e50e39e72ec5595dfdc979783ce6bb826fd54ff8",
    "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
    "verify": "26d8ab91904089292a38bc3667741e7f565477015379cc2fd5092b4de81b8e07",
-   "wrapup": "c98aec8ef91f3123440f71011fbc6a03b3ee288a6413b24386546c6c9a4bc956"
+   "wrapup": "6b1ae2ce78c8717fe4977f36c068fa5e9ec324183341babf3b5a471673637693"
   },
   "ask@flag_off": {
    "configure": "d537eb73126bf90c32302ad9fb6765aa787183d7f8f1dc7577c8821c5d3d69e6",
@@ -66,7 +66,7 @@
    "spec": "461cb932985551de63e2e8125b8e942b0548825cd477a056bb3951654fc65e7b",
    "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
    "verify": "0831a6b0b782343df6180a05f98933825f957209e3d1caf38a7cb310392978b6",
-   "wrapup": "48cb204c106f9fa73e8aba7e6ce72eb4b6ac8e08ab1b3d6c133649501d4cb9e8"
+   "wrapup": "c6d390f2299f9c08ba5c5427bb9a9b03b948dd2e3d25468c530294c223f95bc5"
   }
  },
  "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture — a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
@@ -199,6 +199,14 @@
    "phase": "4",
    "reason": "wrapup 5.1 gained the 5.1.0 fact-safe search-before-write blockquote (one `hm memory_retrieve` call; never reuse a [wiki:fact] slug) and the slug bullet names the reused non-fact slug; help gained the `project-knowledge` skill row. Verified before re-capture that help and wrapup are the ONLY moved commands in every arm and the command set did not drift. Re-captured again after the review's Codex P1 fixes (2026-09-19): 5.1.0 gained the exact-slug Grep check (+187 per variant, zero new calls); wrapup the ONLY moved command in every arm. Re-captured a third time after the re-review's P1 fix (exact-slug Grep states the base path, two levels above <WT>); wrapup the ONLY moved command. Re-captured a fourth time at /hm:verify: the 5.1.0 base-path note no longer names `<WT>` (it leaked into the worktree-OFF render; test_worktree_surface_gating); wrapup the ONLY moved command. Re-captured once more at wrapup after rebasing onto observed-harness-gaps-salvage (its wrapup Steps 6 -> 7.6 paragraph and this task's 5.1.0 are disjoint); wrapup and help the ONLY moved commands relative to that landed golden.",
    "task": "mission-context-loop"
+  },
+  {
+   "commands": [
+    "wrapup"
+   ],
+   "phase": "3",
+   "reason": "The withdrawal notice in wrapup Step 5.7 now quotes `quiet_wrapups` and `last_signal_at` and no longer asserts 'no observed objective' - the replacement rule never evaluates how many objectives carry `observed:`, so the old sentence told the operator the criterion checked something it did not. Verified before re-capture that `wrapup` is the ONLY moved command in EVERY one of the four arms and that no command was added or removed. The notice is a net 10 characters SHORTER than the one it replaces, so no `surface_allowance` was declared: an allowance would have had to be retired at wrapup, and the recorded failure mode of that mechanism is that nothing folds the growth and main goes red by the declared delta after the task lands.",
+   "task": "withdrawal-criterion-window"
   }
  ]
 }

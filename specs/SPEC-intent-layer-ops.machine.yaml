@@ -50,15 +50,14 @@ ac:
 - id: AC-002
   title: gap reports the withdrawal block
   type: mechanical
-  test_ids:
-  - tests/unit/test_world_withdrawal.py::test_ac_002_gap_reports_the_withdrawal_block
+  test_ids: []
   executable_predicate: set(w) == {'filled_at', 'wrapups_since_fill', 'objectives_observed',
     'revisit_candidates_now', 'due', 'reason'} and w['filled_at'] == fill_commit_iso and
     w['wrapups_since_fill'] == 3 and w['reason'] == 'ok' and 'withdrawal' not in status
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: false
+  pending_test: true
   oracle_source: golden
   oracle_evidence: The fixture builds a tmp git repo with two commits at pinned committer
     dates (GIT_COMMITTER_DATE, isolated git config) and a stage-spans file with 2 hm:wrapup
@@ -76,11 +75,17 @@ ac:
   judgment_evidence: null
   judgment_subject_paths: []
   judgment_subject_hash: null
+  superseded_by: SPEC-withdrawal-criterion-window
+  superseded_reason: >-
+    The cumulative withdrawal rule this AC accepted was replaced by a trailing quiet-window
+    rule; its key set and predicate describe behaviour the project no longer ships. The AC
+    and its golden table are kept verbatim as the record of what intent-layer-ops delivered.
+    `test_ids` is empty and `pending_test` is true because the schema admits no third state -
+    `superseded_by` is the field that means retired, and nothing else does.
 - id: AC-003
   title: due is the criterion exactly
   type: parametric
-  test_ids:
-  - tests/unit/test_world_withdrawal.py::test_ac_003_due_is_the_criterion_exactly
+  test_ids: []
   executable_predicate: null
   golden_table:
   - input:
@@ -127,7 +132,7 @@ ac:
     note: an unmeasured count never reads as unused
   rubric_id: null
   note: ''
-  pending_test: false
+  pending_test: true
   oracle_source: golden
   oracle_evidence: The table is the criterion sentence of SPEC-intent-world-model-objective-layer
     (Constraints, withdrawal row) evaluated by hand at each boundary; it was written
@@ -144,11 +149,17 @@ ac:
   judgment_evidence: null
   judgment_subject_paths: []
   judgment_subject_hash: null
+  superseded_by: SPEC-withdrawal-criterion-window
+  superseded_reason: >-
+    The cumulative withdrawal rule this AC accepted was replaced by a trailing quiet-window
+    rule; its key set and predicate describe behaviour the project no longer ships. The AC
+    and its golden table are kept verbatim as the record of what intent-layer-ops delivered.
+    `test_ids` is empty and `pending_test` is true because the schema admits no third state -
+    `superseded_by` is the field that means retired, and nothing else does.
 - id: AC-004
   title: unmeasurable counts are null with reason
   type: parametric
-  test_ids:
-  - tests/unit/test_world_withdrawal.py::test_ac_004_unmeasurable_counts_are_null_with_reason
+  test_ids: []
   executable_predicate: null
   golden_table:
   - input:
@@ -203,7 +214,7 @@ ac:
     note: ''
   rubric_id: null
   note: ''
-  pending_test: false
+  pending_test: true
   oracle_source: golden
   oracle_evidence: Each row is a fixture shape with the expected reason named in S4's
     precedence order; the no_git rows are forced by patching subprocess.run to raise
@@ -220,6 +231,13 @@ ac:
   judgment_evidence: null
   judgment_subject_paths: []
   judgment_subject_hash: null
+  superseded_by: SPEC-withdrawal-criterion-window
+  superseded_reason: >-
+    The cumulative withdrawal rule this AC accepted was replaced by a trailing quiet-window
+    rule; its key set and predicate describe behaviour the project no longer ships. The AC
+    and its golden table are kept verbatim as the record of what intent-layer-ops delivered.
+    `test_ids` is empty and `pending_test` is true because the schema admits no third state -
+    `superseded_by` is the field that means retired, and nothing else does.
 - id: AC-005
   title: wrapup prints withdrawal line when due
   type: mechanical

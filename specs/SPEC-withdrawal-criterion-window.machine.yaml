@@ -1,0 +1,353 @@
+schema_version: 3
+spec_slug: withdrawal-criterion-window
+parent_spec: null
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: mutmut mutates whole files. world.py is 1911 lines,
+  of which this change touches roughly sixty; a whole-file score would report the
+  repo's history rather than this task's tests, and a tier floor computed from it
+  would gate on code the task never saw. Tier 3 records a measurement without gating
+  on a number that does not mean what it appears to mean.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/world.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: An event older than the window cannot change the verdict
+  type: property
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_001_a_signal_older_than_the_cutoff_changes_nothing
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: A rule that reads a bounded window must be blind to everything
+    outside it; the relation holds for any correct windowed implementation regardless
+    of how it is written, and it is exactly what the retired cumulative rule violated
+    - one closed objective from 2026-09-18 pinned `due` to false for the project's
+    remaining life.
+  oracle_independence_waiver: null
+  input_domain: a non-empty signal history (aware UTC instants), a wrapup start timeline,
+    and one extra signal instant strictly earlier than the history's maximum
+  transformation: append the extra signal to the history and recompute the withdrawal
+    report
+  expected_relation: report.last_signal_at, report.quiet_wrapups and report.due are
+    all unchanged
+  preconditions:
+  - the signal history is non-empty
+  - the extra instant is strictly earlier than max(history)
+  observable_output: the withdrawal report mapping
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: The due state is reachable from every non-vetoed state
+  type: property
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_002_due_is_reachable_from_every_filled_revisit_free_state
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Reachability of the `due` state is the defining difference from
+    the retired rule, which was absorbing - once any objective carried `observed`,
+    no extension of the history could make `due` true again. The relation is stated
+    over all histories, so it cannot be satisfied by reading the implementation's
+    branches.
+  oracle_independence_waiver: null
+  input_domain: any world state whose revisit_candidates_now is 0
+  transformation: append WITHDRAWAL_WRAPUPS wrapup start events dated after the last
+    signal, adding no new signal of any kind
+  expected_relation: report.due is True
+  preconditions:
+  - revisit_candidates_now == 0
+  - the wrapup timeline is countable (reason would be ok)
+  observable_output: the withdrawal report's `due` field
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: last_signal_at is the maximum over the four timestamp sources
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_003_last_signal_at_is_the_max_over_the_four_sources
+  executable_predicate: last_signal_at(world) == max(signal_instants(world), default=None)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected maximum is read off a hand-built fixture whose four
+    sources carry known, deliberately unordered instants plus one unparseable string;
+    the expected value is chosen before the code runs, from the fixture, not from
+    the function's output.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: An uncountable value is absent with a reason, never zero
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_004_an_uncountable_count_is_absent_with_a_reason_never_zero
+  executable_predicate: report['quiet_wrapups'] is not None or (report['reason'] !=
+    'ok' and report['due'] is False)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the existing contract of the same block, already
+    enforced for `wrapups_since_fill` by tests/unit/test_world_withdrawal.py - an
+    uncountable value is None with a named reason, never a disguised 0. The new key
+    inherits the assertion its predecessor already had to pass.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: A recorded signal makes the verdict independent of git
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_005_a_shallow_clone_with_a_signal_still_counts
+  executable_predicate: isinstance(report['quiet_wrapups'], int) and report['reason']
+    == 'ok'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fixture is a shallow clone, which `_filled_at` already refuses
+    by contract, plus one measurement row. The expected outcome is fixed by the rule
+    being specified - the count runs from the signal - and the retired implementation
+    demonstrably produces `no_git` on the same fixture, so the two are distinguishable.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: The reason enum is unchanged and each value has one cause
+  type: parametric
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_006_each_reason_has_exactly_one_producing_condition
+  executable_predicate: null
+  golden_table:
+  - input:
+      filled: false
+      signal: false
+      git: ok
+      spans: ok
+    expected: not_filled_in
+    edge: false
+    note: the layer was never filled in
+  - input:
+      filled: true
+      signal: false
+      git: shallow
+      spans: ok
+    expected: no_git
+    edge: true
+    note: no signal to count from and git refuses to date the fill
+  - input:
+      filled: true
+      signal: false
+      git: no_filled_commit
+      spans: ok
+    expected: fill_uncommitted
+    edge: false
+    note: filled on disk, never committed, and nothing has signalled yet
+  - input:
+      filled: true
+      signal: true
+      git: ok
+      spans: missing
+    expected: no_stage_spans
+    edge: false
+    note: a signal exists but the wrapup timeline is absent
+  - input:
+      filled: true
+      signal: true
+      git: ok
+      spans: no_wrapup
+    expected: no_wrapup_spans
+    edge: true
+    note: the ledger exists but carries no hm wrapup event
+  - input:
+      filled: true
+      signal: true
+      git: ok
+      spans: ok
+    expected: ok
+    edge: false
+    note: every count is real
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The six values are the enum the retired implementation already
+    shipped and the instrument's wiki entry already documents; the table pins which
+    condition produces each one, so a replacement that quietly widens or narrows the
+    enum fails a row rather than passing silently.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: The wrapup notice names the signal the count runs from
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_layer.py::test_ac_007_wrapup_notice_names_the_signal_the_count_runs_from
+  executable_predicate: '''quiet_wrapups'' in rendered_wrapup and ''last_signal_at''
+    in rendered_wrapup and ''no observed objective'' not in rendered_wrapup'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the payload the same rendered command reads. The
+    notice and the producer must name the same keys; the negative half is anchored
+    on a phrase the retired rule evaluated and the new one does not, so it fails against
+    today's template before the change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: The withdrawal block key set is exactly the six declared keys
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_withdrawal.py::test_ac_008_the_withdrawal_block_key_set_is_exactly_six
+  executable_predicate: set(withdrawal_report(world, root, []).keys()) == {'filled_at',
+    'last_signal_at', 'quiet_wrapups', 'revisit_candidates_now', 'due', 'reason'}
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The six keys are IRR-001's declared observable, fixed in this SPEC
+    before the code is written. Equality against the whole set, not membership, is
+    what makes a surviving removed key fail - the defect this AC exists to catch.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Both registration sites carry the succession
+  type: mechanical
+  test_ids:
+  - tests/unit/test_withdrawal_succession.py::test_ac_009_the_original_registration_names_its_successor
+  executable_predicate: '''SPEC-withdrawal-criterion-window'' in read_constraints_row(''specs/SPEC-intent-world-model-objective-layer.md'')'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected pointer text and its location - the Withdrawal criterion
+    row of that SPEC's Constraints table - are fixed here, before the edit. The row
+    exists today without the pointer, so the assertion fails against the unchanged
+    file.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: The `withdrawal` block of `hm world gap --json` drops `objectives_observed`
+    and `wrapups_since_fill` and gains `last_signal_at` and `quiet_wrapups`.
+  category: public API/CLI contract
+  rationale: '`gap --json` is a documented machine-readable output. A consumer outside
+    this repository that reads the removed keys breaks, and no in-repo shim can reach
+    it. Retaining the old names over new meanings was rejected: a name that makes
+    a reader believe something false about behaviour is the defect, not the fix.'
+  source: spec
+approval:
+  kind: human
+  content_hash: dc3c97f3409e146ee95ed963f9bee326f36c3e7f2a9d455edb9dbe59c9bb3111
+  approved_by: Ecro
+  approved_at: '2026-09-20T04:56:39Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: f995062ebfbfe62f56b6fdf039e2432e6e64d0ca8b2b512e175e4f400477641a
+    verification_tier: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    mutation_threshold_rationale: b95ebe51e808917e761c405adc9065e7b8032560510f6d2acff551f28c5b1e32
+    paths_to_mutate: 1923a0dc10e52751799bbcec723241fbfe7e284e996edd67d4bc61c98b72ac00
+    irreversible_decisions: b5b7a9bd1d4288adf79f24da73df584af88bfe346cf250ef5a3adc95ddd3c6eb
+    AC-001: a714b0a8ae4fd9520c16cd8c19d3ddf3b619d5d402bfa1241c1d677f25d1e7b6
+    AC-002: 816e7e2f60b54659862b6bee1ed3269c58085e18fa21969f1fec41415dc8c95a
+    AC-003: c38a7bb0dc66591af1a05000ba0ccccbd1ab720a90d53e57f51abafa5d0e6817
+    AC-004: 03370dd8f127feeb5ee9b054a790736d22b8e3e1f18f1f852db5b3a567bcfbc2
+    AC-005: 1a8c6b56d92cf877e86683c376a5cc12ed9300d209cf65ffd7b22547b4ab34f1
+    AC-006: ed77a76263af15dd2e3af34635d8b10cd5a4d525ed8f671d19abedd1cc1642e8
+    AC-007: 262efcf696e05f9f9e1606d9d83af2697b8d6ef5a81c7cfb260acf6da48e9db9
+    AC-008: 7fbe89426ff6c9d9299ee8102be955595b8692a0ad0c8cb717ee6544ed68ef65
+    AC-009: 2590535c368924aa09cac584266990bc466c0114942a8c984c2bae7f1b56073e
+    ac_order: 164396d6c2494dc69325356de9d2f12b5629b3c0c73cb6ef656e4acf0aad5ff4

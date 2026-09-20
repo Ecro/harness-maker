@@ -375,3 +375,24 @@ def test_ac_005_wrapup_prints_withdrawal_line_when_due(
     assert wrapup.count("[intent] withdrawal criterion met") == 1
     assert "hm world gap" in intent.SKELETON
     assert "withdrawal.due" in intent.SKELETON
+
+
+@pytest.mark.parametrize("target", ["claude", "codex"])
+def test_ac_007_wrapup_notice_names_the_signal_the_count_runs_from(
+    surface: dict[str, dict[str, str]], target: str
+) -> None:
+    """AC-007 of SPEC-withdrawal-criterion-window — the notice and the payload name one thing.
+
+    The negative half is anchored on a phrase the RETIRED rule evaluated and the replacement
+    does not, so it fails against the template as it shipped before this change. The positive
+    half is the pair of keys the producer now emits: a notice quoting `wrapups_since_fill`
+    would be quoting a key that no longer exists.
+    """
+    step = _step57(_command(surface, target, "wrapup"))
+    assert "quiet_wrapups" in step, step
+    assert "last_signal_at" in step, step
+    assert "no observed objective" not in step, (
+        "the replacement never evaluates how many objectives carry `observed:`; a notice that "
+        "still says so tells the operator the criterion checked something it did not"
+    )
+    assert "wrapups_since_fill" not in step, step

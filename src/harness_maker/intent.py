@@ -49,9 +49,11 @@ SKELETON = """\
 # Fill `mission` first. Until `mission` and `outcomes` are both filled, `hm world status`
 # reports `not_filled_in`. A file with outcomes but no mission is a validation error.
 #
-# Withdrawal criterion (SPEC): if after 10 wrapups no objective carries `observed:` and no
-# `revisit_when` has evaluated `candidate`, this layer is unused and is removed.
-# `hm world gap --json` measures it: `withdrawal.due` is true when the criterion holds.
+# Withdrawal criterion (SPEC-withdrawal-criterion-window): if 10 wrapups land with no signal
+# from this layer — nothing measured, no objective created, approved or closed — and no
+# `revisit_when` currently reads `candidate`, this layer is unused and is removed. The count
+# runs from the last signal, or from the day the file was filled in when there has never been
+# one. `hm world gap --json` measures it: `withdrawal.due` is true when the criterion holds.
 schema_version: 1
 mission: ""
 vision: ""

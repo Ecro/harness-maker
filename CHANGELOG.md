@@ -13,6 +13,19 @@
 
 - Land-hold tests now reference the accepted SPEC's current AC tables and preserve
   explicit subject-cap boundary cases, restoring full-suite collection.
+- **The intent layer's withdrawal criterion can fire again.** `hm world gap --json`'s
+  `withdrawal` block judged a cumulative count — `objectives_observed == 0` — so a single
+  objective ever closed with an `observed:` verdict pinned `due` to false for the life of the
+  project. It now counts `hm:wrapup` events since the layer last did anything: a measurement
+  recorded, an objective created, approved or closed. The block reports
+  `{filled_at, last_signal_at, quiet_wrapups, revisit_candidates_now, due, reason}`;
+  `objectives_observed` and `wrapups_since_fill` are removed, which is a breaking change for any
+  out-of-repo consumer that parsed them. A stored instant ahead of `now` is skipped rather than
+  used, so a mistyped future date cannot suppress the criterion; the returned value is stripped,
+  closing a crash where a whitespace-padded YAML timestamp passed the producer's parser and
+  failed the consumer's. `filled_at` is now resolved only when nothing has ever signalled — it
+  is the fallback cutoff, and the `git` walk behind it was being paid on every read to fill a
+  field the verdict never consulted. `hm world status --json` is unchanged.
 
 - **The approval stamp names which field moved, not just that the hash mismatched.**
   `spec_machine`'s approval stamp now carries a per-field digest map alongside the aggregate

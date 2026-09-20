@@ -100,6 +100,14 @@ Re-captures (append; never silently overwrite):
 - **2026-09-20, release 0.58.0** — same per-release case: 60 lines, all the frontmatter
   `harness_maker_version:` key, and substituting `0.58.0` back to `0.57.1` reproduces every
   previous hash.
+- **2026-09-20, withdrawal-criterion-window Phase 3** — the withdrawal notice in wrapup Step 5.7
+  now quotes `quiet_wrapups` and `last_signal_at`, and no longer asserts "no observed objective":
+  the replacement criterion never evaluates how many objectives carry `observed:`, so the old
+  sentence told the operator the criterion checked something it did not. Verified before
+  re-capture that `wrapup` is the ONLY moved command in EVERY one of the four arms, and that no
+  command was added or removed — not only in the arm this test stops at. The replacement notice
+  is a net 10 characters SHORTER, so no `surface_allowance` was declared; the absent-signal case
+  rides in the placeholder (`<last_signal_at or filled_at>`) rather than a second sentence.
 """
 
 from __future__ import annotations
