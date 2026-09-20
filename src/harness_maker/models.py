@@ -412,7 +412,7 @@ class FeedbackConfig(BaseModel):
     enabled: bool = False
 
 
-SECOND_OPINION_MODELS = ("codex", "antigravity")
+SECOND_OPINION_MODELS = ("codex", "antigravity", "claude")
 
 
 class SecondOpinionCodexConfig(BaseModel):
@@ -490,6 +490,14 @@ class SecondOpinionAntigravityConfig(BaseModel):
         return v
 
 
+class SecondOpinionClaudeConfig(BaseModel):
+    """Existing Claude login; context-only transport with a bounded deadline."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+    model: str | None = None
+    timeout: float = Field(default=300.0, gt=0, allow_inf_nan=False)
+
+
 class SecondOpinionConfig(BaseModel):
     """Multi-vendor cross-model second-opinion routing (PLAN-second-opinion-multi-model).
 
@@ -508,11 +516,12 @@ class SecondOpinionConfig(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    models: list[Literal["codex", "antigravity"]] = Field(default_factory=list)
+    models: list[Literal["codex", "antigravity", "claude"]] = Field(default_factory=list)
     agents: list[str] = Field(
         default_factory=lambda: ["code-reviewer", "consensus-arbiter", "plan-validator"],
     )
     failure_policy: Literal["warn-and-proceed"] = "warn-and-proceed"
+    claude: SecondOpinionClaudeConfig = Field(default_factory=SecondOpinionClaudeConfig)
     codex: SecondOpinionCodexConfig = Field(default_factory=SecondOpinionCodexConfig)
     antigravity: SecondOpinionAntigravityConfig = Field(
         default_factory=SecondOpinionAntigravityConfig

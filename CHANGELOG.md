@@ -4,10 +4,19 @@
 
 ### Added
 
+- Codex-native `hm-make` and `hm-update` skills now run a bundled bootstrap, select
+  the matching stable engine, and regenerate Codex project assets while preserving
+  custom blocks. Plugin, engine and project observations are reported separately;
+  a failed command cannot report a complete update.
+- Claude is available as a second-opinion provider through the saved Claude CLI
+  authentication, with safe-mode, no tools, isolated working directory, bounded
+  input/output and process-group cleanup. Existing provider and ledger behavior
+  remains compatible.
+
 - Internal Codex bootstrap helpers validate plugin/engine version identity and track
   plugin, engine and project update completion independently. A bounded Claude result
   parser validates successful structured responses and reports fixed error codes.
-  These pure helpers do not yet install plugins or invoke Claude as a second opinion.
+  The lifecycle and provider entrypoints above now connect these helpers to execution.
 
 ### Fixed
 

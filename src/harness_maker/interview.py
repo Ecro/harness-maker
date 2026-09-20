@@ -506,17 +506,18 @@ def _ask_second_opinion() -> SecondOpinionConfig:
     """
     from harness_maker.tool_detect import _BINARIES, INSTALLED_MEANS, detect_tools
 
-    print("\nCross-model second opinion (Codex / Antigravity).")
+    print("\nCross-model second opinion (Codex / Antigravity / Claude).")
     print("  Enabled models cast a real k-of-N consensus vote in /hm:review and are")
     print("  reconciled in /hm:plan. A missing/unauthenticated CLI degrades gracefully")
     print("  (warn + skip). Prereqs: `codex login` (codex), authenticated `agy` (antigravity).")
+    print("  Claude requires an authenticated `claude` CLI supporting --safe-mode.")
     found = detect_tools()
     print("  Detected on this machine:")
     for name in SECOND_OPINION_MODELS:
         state = "installed" if found.get(name, {}).get("installed") else "not installed"
         print(f"    {name:<12} ({_BINARIES[name]}) — {state}")
     print(f"  ('installed' = {INSTALLED_MEANS}.)")
-    print("    1) codex    2) antigravity    3) both    4) none")
+    print("    1) codex    2) antigravity    3) both    4) none    5) claude")
     models = _read_second_opinion_models()
     if not models:
         return SecondOpinionConfig()
@@ -545,6 +546,7 @@ _NUMBERED_SECOND_OPINION: dict[str, list[str]] = {
     "2": ["antigravity"],
     "3": ["codex", "antigravity"],
     "4": [],
+    "5": ["claude"],
 }
 
 
@@ -555,7 +557,7 @@ def _read_second_opinion_models() -> list[str]:
     user never sees — a swallowed typo is indistinguishable from declining. Bounded, so an
     unattended stdin terminates at the safe default rather than spinning.
     """
-    prompt = "  Enable which models? [1-4, or a comma list like 'codex,antigravity'] (none): "
+    prompt = "  Enable which models? [1-5, or a comma list like 'codex,antigravity'] (none): "
     for attempt in range(1, _MAX_SECOND_OPINION_ATTEMPTS + 1):
         raw = _input_or_empty(prompt).strip().lower()
         if not raw or raw == "none":
@@ -567,7 +569,7 @@ def _read_second_opinion_models() -> list[str]:
         if selected and not unknown:
             return selected
         if attempt < _MAX_SECOND_OPINION_ATTEMPTS:
-            print(f"  not recognised: {', '.join(unknown) or raw!r} — pick 1-4 or a model name.")
+            print(f"  not recognised: {', '.join(unknown) or raw!r} — pick 1-5 or a model name.")
     print("  no valid selection after 3 tries — leaving the second opinion off.")
     return []
 
@@ -855,7 +857,7 @@ def _second_opinion_from_new_key(raw: dict[str, Any]) -> SecondOpinionConfig | N
     fp_raw = raw.get("failure_policy")
     if isinstance(fp_raw, str):
         clean["failure_policy"] = fp_raw
-    for sub_key in ("codex", "antigravity"):
+    for sub_key in ("codex", "antigravity", "claude"):
         sub_raw = raw.get(sub_key)
         if isinstance(sub_raw, dict):
             # Sub-block validation happens inside SecondOpinionConfig.model_validate.

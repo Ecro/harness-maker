@@ -41,7 +41,9 @@ _BACKGROUND = "run_in_background: true"
 _REFUSAL = "Do NOT background the invoker at this stage"
 
 
-def _render_commands(tmp: Path, *, models: list[Literal["codex", "antigravity"]]) -> dict[str, str]:
+def _render_commands(
+    tmp: Path, *, models: list[Literal["codex", "antigravity", "claude"]]
+) -> dict[str, str]:
     render(
         synthesize(
             ProjectProfile(),

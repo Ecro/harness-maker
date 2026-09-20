@@ -8,6 +8,7 @@ import shutil
 # They differ for antigravity (`agy`), which is exactly the mapping a reader gets wrong.
 _BINARIES: dict[str, str] = {
     "codex": "codex",
+    "claude": "claude",
     "antigravity": "agy",
     "cursor": "cursor",
 }

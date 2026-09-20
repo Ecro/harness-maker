@@ -44,7 +44,7 @@ def _offset(pattern: re.Pattern[str], text: str) -> int | None:
     return None if m is None else m.start()
 
 
-def _render(*, models: list[Literal["codex", "antigravity"]]) -> Path:
+def _render(*, models: list[Literal["codex", "antigravity", "claude"]]) -> Path:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
     answers.targets = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]

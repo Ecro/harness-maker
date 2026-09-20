@@ -1,0 +1,272 @@
+schema_version: 3
+spec_slug: codex-claude-integration
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: Transport and lifecycle classification must detect failure
+  as distinct from clean success.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/claude_response.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Discover setup and update skills from the installed Codex plugin
+  type: mechanical
+  test_ids:
+  - tests/unit/test_codex_setup.py::test_ac_001_entrypoint_resolves_copied_install_without_claude_cache
+  executable_predicate: set(required_skills) <= set(discovered_skills)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Official package layout plus a fresh fixture containing no Claude
+    cache; expected management skill names are declared before implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Use the matching Python engine for Codex project generation
+  type: mechanical
+  test_ids:
+  - tests/unit/test_codex_setup.py::test_ac_002_engine_reuses_generator_and_preserves_user_blocks
+  executable_predicate: engine_version == expected_release and codex_assets_exist
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The plugin manifest release and the existing generator target contract
+    fix the expected engine identity and output paths independently of the setup implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Report plugin engine and project update outcomes independently
+  type: mechanical
+  test_ids:
+  - tests/unit/test_codex_setup.py::test_ac_003_failed_engine_preserves_existing_custom_files
+  - tests/unit/test_codex_setup.py::test_ac_003_nonzero_engine_preserves_observed_layers
+  executable_predicate: status.state == expected_state and user_blocks_after == user_blocks_before
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The shipped three-layer truth table and sentinel custom blocks
+    are the oracle; inject a failure at each operation boundary and compare actual
+    filesystem content.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Invoke Claude with supplied context and disabled ambient tools
+  type: mechanical
+  test_ids:
+  - tests/unit/test_claude_transport.py::test_context_only_argv_stdin_and_isolated_cwd
+  - tests/integration/test_codex_claude_live.py::test_ac_008_native_install_update_and_live_opinion
+  executable_predicate: captured_stdin == prompt and requested_tools == [] and shell
+    is False
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Captured process argv/stdin and an adversarial temporary fixture
+    with hook and write sentinels independently establish the no-tools permission
+    boundary; a real synthetic probe supplements stubs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Normalize actual Claude framing before strict finding validation
+  type: mechanical
+  test_ids:
+  - tests/unit/test_claude_transport.py::test_result_object_and_event_array
+  executable_predicate: outcome.status == expected_status and outcome.findings ==
+    expected_findings
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Claude 2.1.278 authenticated probe produced an event array with
+    one final result; hardcoded object and event fixtures plus conflicting duplicate
+    records define the contract before code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Bound process lifetime output and failure diagnostics
+  type: mechanical
+  test_ids:
+  - tests/unit/test_claude_transport.py::test_external_caller_cancellation_cleans_owned_processes
+  - tests/unit/test_claude_transport.py::test_flood_is_bounded_before_deadline
+  executable_predicate: failure.code == expected_code and not child_alive and secret
+    not in diagnostic
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Independent fake executables deliberately hang spawn children flood
+    pipes and echo a sentinel; OS process liveness and fixed error codes decide success.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Route Claude through the existing opinion workflow and ledger
+  type: mechanical
+  test_ids:
+  - tests/unit/test_claude_provider_integration.py::test_ac_007_real_transport_to_provider_and_ledger
+  executable_predicate: record.model == "claude" and record.status == expected_status
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Frozen provider fixtures and the existing ledger reader are the
+    oracle; preserve old model/stage fixtures and add successful/failed Claude review/spec
+    cases after absorption reconciliation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Prove the user reachable installation update and opinion path
+  type: mechanical
+  test_ids:
+  - tests/integration/test_codex_claude_live.py::test_ac_008_native_install_update_and_live_opinion
+  executable_predicate: workflow_completed and user_blocks_after == user_blocks_before
+    and live_result_valid
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Real CLI installation/discovery and a synthetic authenticated Claude
+    invocation are required evidence; deterministic subprocess fixtures cover failures
+    and do not replace the real smoke path.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Add claude to second_opinion.models and provider telemetry; preserve existing
+    provider identities and historical plan records.
+  category: schema/file format/storage layout
+  rationale: Independently authored configs and ledger consumers must agree on the
+    persisted provider identity.
+  source: spec
+- id: IRR-002
+  decision: Use existing Claude CLI authentication in capability-checked safe-mode,
+    context on stdin and no ambient tools/customizations; never fall back to permission
+    bypass or bare API-key-only mode.
+  category: security/permission boundary
+  rationale: This defines what user data and execution powers a secondary model receives;
+    changing it silently would violate caller expectations.
+  source: spec
+- id: IRR-003
+  decision: Expose bundled hm-make and hm-update skills using native Codex plugin
+    add/marketplace upgrade and a matching stable Python engine; complete means plugin
+    engine and generated project all match.
+  category: public API/CLI contract
+  rationale: Users automate these entry points and rely on update completion meaning
+    all three layers rather than marketplace refresh alone.
+  source: spec
+approval:
+  kind: human
+  content_hash: 742e8ce0820bf193a2ac1d119db17192b63c0765eae3626627fdde5f524f9a89
+  approved_by: Ecro
+  approved_at: '2026-09-20T08:49:25Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: ac766941c5f356a569230370d6c2166e40d276f6cef7101b1437e0403b231a3a
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: 406cd7a043f9c6060dc91ec4b3e537ae5921f9751d8aa8e452b17d090e4335e8
+    paths_to_mutate: ac66571069157415e4811e7e52629a11a6afcc9548a620f856fd5349a606dc2e
+    irreversible_decisions: 8d76a47d058e39ed4560ace709d335a6ee28bc8a1224c47227de5510f6c7b3a9
+    AC-001: fa223b31070fe69311ef43a268e16a244d1f69f94f41c839f528f8e9e847e444
+    AC-002: 4f74fc329b06031268405763df60865b9b93e7db9529bfac82c33123d47365f0
+    AC-003: b53b4f1bde9a14f28c4a39f478ba74b765f38df3b179ff7077a1405493daa4fa
+    AC-004: 4530dcfb6d2d10cb6496046b987515d0a8a83def64f8e4499db85bed00e67d0e
+    AC-005: 415f84ff370511df0f1885a4398f857e9cb71ae272fd9be80bccbb70155fa747
+    AC-006: fddc1d9b8c77ca6057ae94551cf7a09278e223919c326e33a502792803d9eebc
+    AC-007: a788aef5c6cbb201885185de28b7024f86f20347e3f71a5ac22b1ee3a98f8345
+    AC-008: 3b0fc87ca14661c8133e8fd8e6397151172947fa7d1f1de3df9eadcd19f2b11b
+    ac_order: b62ad8faf895c4ebdf45f3fce97982d2bcc0a3fa6daa1e45993897fb730655c6

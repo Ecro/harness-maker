@@ -29,7 +29,8 @@
     "model": {
       "enum": [
         "codex",
-        "antigravity"
+        "antigravity",
+        "claude"
       ],
       "type": "string"
     },
@@ -52,7 +53,8 @@
       "enum": [
         "review",
         "plan",
-        "health"
+        "health",
+        "spec"
       ],
       "type": "string"
     },

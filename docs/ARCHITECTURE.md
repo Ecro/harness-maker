@@ -12,6 +12,23 @@ Three design commitments shape every decision below:
 2. **Two presets, deep override.** `Side` (1 reviewer, lean) and `Production` (5 reviewers, verify-required) cover ~90% of cases. The remaining 10% comes from 10+ override dimensions surfaced in the interview.
 3. **Brownfield-safe.** harness-maker never silently overwrites user edits. Provenance frontmatter (M13) and the Reconciler (M2) form a hash-based ours/theirs decision system.
 
+### Codex-native setup and independent Claude review
+
+The Codex package exposes `skills/hm-make` and `skills/hm-update`. Its bundled
+`scripts/codex_setup.py` delegates to `harness_maker.codex_setup`, which observes the
+native installed plugin identity and launches `scripts/codex_engine.py` under the
+matching stable engine. The generator runs in the target project directory. A
+single owned process group covers the engine and its generator descendants;
+completion requires a successful command and verified plugin, engine and project
+observations. An engine failure preserves independently verified observations.
+
+`second_opinion_invoke` routes the `claude` provider to `claude_transport` and then
+the strict response parser and shared finding adapter. The transport retains saved
+CLI authentication while excluding ambient project instructions, hooks and tools
+through safe-mode and an isolated working directory. It bounds the deadline and
+stream sizes and returns fixed failure codes without exposing stderr contents.
+Historical stage identities and existing providers remain supported.
+
 ## 2. Data Flow
 
 ```

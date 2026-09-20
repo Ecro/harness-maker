@@ -121,7 +121,10 @@ second_opinion:
     output_schema_path: {{ (config.second_opinion.codex.output_schema_path if config.second_opinion else ".claude/schemas/second-opinion-finding.schema.json") | tojson }}
   antigravity:
     model: {{ (config.second_opinion.antigravity.model if config.second_opinion else "Gemini 3.6 Flash (High)") | tojson }}
-delivery_metrics:
+{% if config.second_opinion and ('claude' in config.second_opinion.models or config.second_opinion.get('claude', {}).get('model') or config.second_opinion.get('claude', {}).get('timeout', 300) != 300) %}  claude:
+    model: {{ config.second_opinion.claude.model | tojson }}
+    timeout: {{ config.second_opinion.claude.timeout | tojson }}
+{% endif %}delivery_metrics:
   tag_pattern: {{ (config.delivery_metrics.tag_pattern if config.delivery_metrics else "v*") | tojson }}
   default_branch: {{ (config.delivery_metrics.default_branch if config.delivery_metrics else none) | tojson }}
   cfr_window_days: {{ (config.delivery_metrics.cfr_window_days if config.delivery_metrics else 28) }}

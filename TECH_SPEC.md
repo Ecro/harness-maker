@@ -3,6 +3,20 @@
 > **Status:** v2.4 (0.9.3 target + autoloop refresh) · **Written:** 2026-05-03 · **Language:** English
 > Claude Code / Cursor / Codex harness generator — generates and updates project-specific runtime assets with a single `/harness-maker:make` command. Structured for autonomous builds via autoloop.
 
+## Codex lifecycle and Claude provider (2026-09-20)
+
+The Codex plugin bundles `hm-make` and `hm-update` skills plus an installed-root
+bootstrap in `scripts/codex_setup.py`. Setup selects the engine release matching
+the installed plugin and verifies generated Codex assets. Update upgrades the
+Git-backed marketplace before refreshing the plugin; plugin, engine and project
+observations remain independent, and command failure prevents completion.
+
+`second_opinion.models` accepts `claude`, with optional `second_opinion.claude.model`
+and a positive finite `timeout`. The authenticated CLI transport uses a
+fresh working directory, safe-mode, empty tools, stdin context and bounded streams.
+It validates one terminal result, maps findings into the shared ledger contract,
+and cleans up the owned process group on success, failure or cancellation.
+
 ## 0. Loop Configuration
 
 ```json

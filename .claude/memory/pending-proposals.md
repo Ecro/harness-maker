@@ -523,3 +523,8 @@ any `templates/`-touching phase's exit criterion) has still not been implemented
 **Triggered by:** REVIEW-observed-harness-gaps-salvage finding `10f04873` (concurrency P2), not a `[fail:*]` recurrence.
 **Proposed mechanism:** add an `hm memory_md upsert-proposal` verb that owns the same flock + atomic write + slug dedup as `upsert-wiki`/`upsert-failure`, and change Step 5.3 to call it instead of a raw Edit/Write of `.claude/memory/pending-proposals.md`.
 **Rationale:** 5.1/5.2 were moved to the locked CLI after concurrent fleet wrapups lost 5 wiki entries (2026-05-17); Step 5.3 still does the raw read-modify-write on a base-tier file those same sessions share. The file now has a reader (`hm proposals`, and wrapup's main-loop backlog line), so a lost update is no longer invisible — it under-counts the warning. Pre-existing, out of PLAN-observed-harness-gaps-salvage's scope (ADR-004).
+
+## Proposal: provider-enumeration-contract-pair (2026-09-20)
+**Triggered by:** [fail:test] enumeration-tests-not-updated-with-new-rendered-artifact (count: 3)
+**Proposed mechanism:** test-selection rule selecting detector CLI and unit exact-key suites together when adding provider keys.
+**Rationale:** a new Claude detector key left both exact-set expectations stale; exercising both consumer contracts before the full suite prevents this recurring omission.

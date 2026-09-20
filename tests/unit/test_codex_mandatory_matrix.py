@@ -114,7 +114,7 @@ def test_non_codex_agent_has_no_reconcile_block(tmp_path: Path) -> None:
 
 
 def _render_models(
-    tmp_path: Path, *, models: list[Literal["codex", "antigravity"]]
+    tmp_path: Path, *, models: list[Literal["codex", "antigravity", "claude"]]
 ) -> dict[str, str]:
     blueprint = synthesize(
         ProjectProfile(),

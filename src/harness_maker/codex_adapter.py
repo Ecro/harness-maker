@@ -135,6 +135,17 @@ def adapt_antigravity_finding_list(payload: dict[str, Any] | list[Any]) -> list[
     return _disambiguate([adapt_antigravity_finding(f) for f in findings])
 
 
+def adapt_claude_finding_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Adapt strictly validated Claude findings with independent voter identities."""
+    adapted = []
+    for finding in payload["findings"]:
+        row = adapt_codex_finding(finding)
+        row["source"] = "claude"
+        row["id"] = finding_id("claude", row["file"], row["line"], row["summary"])
+        adapted.append(row)
+    return _disambiguate(adapted)
+
+
 _SENTINEL: Any = object()
 
 

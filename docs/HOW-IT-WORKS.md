@@ -82,6 +82,25 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 
 ---
 
+### Codex setup, updates and Claude second opinions
+
+Use the native Codex marketplace/plugin commands in the [Quickstart](../README.md)
+then invoke the installed `hm-make` skill. Its bundled bootstrap chooses a stable
+engine matching the plugin and generates the project's Codex configuration, agents
+and workflow skills. Invoke `hm-update` for the Git-backed marketplace upgrade,
+plugin refresh and project regeneration. A local-path marketplace cannot perform a
+Git upgrade. Check all three reported layers (plugin, engine, project) before
+calling an update complete; custom blocks and saved preferences are preserved.
+Start a new Codex thread when needed to discover newly installed skills.
+
+To use Claude as a second opinion, enable `claude` in `second_opinion.models` and
+sign in with the Claude CLI. Optional `second_opinion.claude.model` and
+`timeout` control the call. The shared invoker runs Claude in safe-mode
+without tools or session persistence, using an isolated directory and stdin context.
+Validated findings and invocation outcomes follow the existing review ledger path.
+See [SPEC-codex-claude-integration](../specs/SPEC-codex-claude-integration.md) for
+acceptance criteria and the live integration boundary.
+
 ## 2. Overall Architecture
 
 ```

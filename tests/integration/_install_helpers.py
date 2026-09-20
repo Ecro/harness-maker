@@ -32,6 +32,8 @@ EXPECTED_README_INSTALL_COMMANDS: frozenset[str] = frozenset(
         # Cursor local-clone install (community pattern)
         "git clone --depth 1 https://github.com/Ecro/harness-maker.git "
         "~/.cursor/plugins/local/harness-maker",
+        "codex plugin marketplace add Ecro/harness-maker",
+        "codex plugin add harness-maker@harness-maker",
         # Codex CLI PyPI fallback (when `claude` CLI is not present)
         "uv tool install harness-maker",
         # Codex CLI first-run Skill-tool fallback (ADR-001 / install-cmd-cifence)

@@ -58,7 +58,7 @@
 {%- endif %}
 {% for _m in _models %}
 #### Second opinion — model: `{{ _m }}`
-{% if _m == 'codex' %}{% include "agents/_partials/second_opinion_codex.md.j2" %}{% elif _m == 'antigravity' %}{% include "agents/_partials/second_opinion_antigravity.md.j2" %}{% endif %}
+{% if _m == 'codex' %}{% include "agents/_partials/second_opinion_codex.md.j2" %}{% elif _m == 'antigravity' %}{% include "agents/_partials/second_opinion_antigravity.md.j2" %}{% elif _m == 'claude' %}{% include "agents/_partials/second_opinion_claude.md.j2" %}{% endif %}
 {% endfor %}
 > **Per-model result contract.** Each enabled model above produces exactly one outcome:
 > `status: invoked` (findings adapted + folded in) or `status: skipped`/`failed` (graceful

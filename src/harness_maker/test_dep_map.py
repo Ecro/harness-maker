@@ -604,6 +604,8 @@ CONFIG_SUITES: tuple[str, ...] = (
     "tests/unit/test_profile.py",
     # Reads the real `pyproject.toml` through `REPO_ROOT` for the five-file version sync.
     "tests/unit/test_version_sync.py",
+    # Installed bootstrap checks the actual package manifest and engine release.
+    "tests/unit/test_codex_setup.py",
     # Asserts on the presence and role of `.github/workflows/` among other structural facts.
     "tests/structural",
     # Reads THIS repo's `.github/workflows/ci.yml` and asserts the derived gate commands equal

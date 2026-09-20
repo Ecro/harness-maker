@@ -50,7 +50,9 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from harness_maker import intent as intent_mod
 from harness_maker import world
+from harness_maker.second_opinion_invoke import resolve_base_root
 from harness_maker.spec_machine import GoldenRow, load_golden_table
 from tests.unit import world_fixture as fx
 
@@ -214,12 +216,12 @@ def _renamed_only_control(
     candidates = len(fired)
     filled: str | None = None
     wrapups: int | None = None
-    if world.intent_mod.is_not_filled_in(loaded.intent):
+    if intent_mod.is_not_filled_in(loaded.intent):
         reason: str | None = "not_filled_in"
     else:
         filled, reason = world._filled_at(root)
         if reason is None and filled is not None:
-            wrapups, reason = world._count_wrapups(world.resolve_base_root(root), filled)
+            wrapups, reason = world._count_wrapups(resolve_base_root(root), filled)
     due = (
         wrapups is not None
         and wrapups >= world.WITHDRAWAL_WRAPUPS

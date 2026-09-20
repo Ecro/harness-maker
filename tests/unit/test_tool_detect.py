@@ -27,12 +27,13 @@ def _fake_which(present: set[str]) -> object:
 def test_every_tool_reports_installed_when_its_binary_is_on_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(shutil, "which", _fake_which({"codex", "agy", "cursor"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"codex", "agy", "cursor", "claude"}))
     result = tool_detect.detect_tools()
     assert result == {
         "codex": {"installed": True},
         "antigravity": {"installed": True},
         "cursor": {"installed": True},
+        "claude": {"installed": True},
     }
 
 
@@ -45,6 +46,7 @@ def test_every_tool_reports_absent_when_nothing_is_on_path(
         "codex": {"installed": False},
         "antigravity": {"installed": False},
         "cursor": {"installed": False},
+        "claude": {"installed": False},
     }
 
 

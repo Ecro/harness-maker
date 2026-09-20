@@ -48,6 +48,7 @@ def test_stdout_is_exactly_one_json_object(monkeypatch: pytest.MonkeyPatch) -> N
         "codex": {"installed": True},
         "antigravity": {"installed": False},
         "cursor": {"installed": False},
+        "claude": {"installed": False},
     }
 
 

@@ -215,6 +215,7 @@ def load_config(base_root: Path) -> dict[str, Any]:
     agy_cfg.setdefault("model", DEFAULT_ANTIGRAVITY_MODEL)
     cfg["codex"] = codex_cfg
     cfg["antigravity"] = agy_cfg
+    cfg["claude"] = dict(cfg.get("claude") or {})
     return cfg
 
 
@@ -506,6 +507,25 @@ def invoke(
         except Exception as exc:
             return done("skipped", _clip(f"config load failed: {type(exc).__name__}: {exc}"))
 
+        if model == "claude":
+            from harness_maker.claude_transport import ClaudeTransportError, invoke_claude
+            from harness_maker.models import SecondOpinionClaudeConfig
+
+            try:
+                claude_cfg = SecondOpinionClaudeConfig.model_validate(cfg["claude"])
+            except ValueError:
+                return done("skipped", "claude_config_invalid")
+            try:
+                claude_payload = invoke_claude(
+                    prompt, model=claude_cfg.model, timeout=claude_cfg.timeout
+                )
+            except ClaudeTransportError as exc:
+                skipped = {"cli_not_found", "unsupported_cli", "timeout", "process_failed"}
+                return done("skipped" if exc.code in skipped else "failed", exc.code)
+            except Exception:
+                return done("failed", "claude_transport_failed")
+            return done("invoked", None, codex_adapter.adapt_claude_finding_list(claude_payload))
+
         out_path: Path | None = None
         agy_schema_path: Path | None = None
         if model == "codex":
@@ -787,12 +807,12 @@ def invoke(
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="second_opinion_invoke")
-    p.add_argument("--model", required=True, choices=("codex", "antigravity"))
+    p.add_argument("--model", required=True, choices=("codex", "antigravity", "claude"))
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--prompt-file", type=Path)
     src.add_argument("--smoke", action="store_true")
     p.add_argument("--slug", required=True)
-    p.add_argument("--stage", required=True, choices=("review", "plan", "health"))
+    p.add_argument("--stage", required=True, choices=("review", "spec", "plan", "health"))
     # No default: `--root .` from inside a worktree would resolve to the worktree and
     # reinstate the cwd-relative bug this module exists to remove.
     p.add_argument("--root", type=Path, default=None)
@@ -812,7 +832,7 @@ def _build_disposition_parser() -> argparse.ArgumentParser:
     p.add_argument("--record-disposition", action="store_true", required=True)
     p.add_argument("--disposition-file", type=Path, required=True)
     p.add_argument("--slug", required=True)
-    p.add_argument("--stage", required=True, choices=("review", "plan", "health"))
+    p.add_argument("--stage", required=True, choices=("review", "spec", "plan", "health"))
     p.add_argument("--root", type=Path, default=None)
     return p
 
