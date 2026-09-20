@@ -40,6 +40,21 @@
   behaviour an execution surface a property test can quantify over.
 
 
+
+- Codex-native `hm-make` and `hm-update` skills now run a bundled bootstrap, select
+  the matching stable engine, and regenerate Codex project assets while preserving
+  custom blocks. Plugin, engine and project observations are reported separately;
+  a failed command cannot report a complete update.
+- Claude is available as a second-opinion provider through the saved Claude CLI
+  authentication, with safe-mode, no tools, isolated working directory, bounded
+  input/output and process-group cleanup. Existing provider and ledger behavior
+  remains compatible.
+
+- Internal Codex bootstrap helpers validate plugin/engine version identity and track
+  plugin, engine and project update completion independently. A bounded Claude result
+  parser validates successful structured responses and reports fixed error codes.
+  The lifecycle and provider entrypoints above now connect these helpers to execution.
+
 ### Fixed
 
 - **Preserve Codex/Claude integration after PLAN-stage retirement.** Legacy
@@ -50,6 +65,53 @@
   an absent PLAN for Step 0 to create; concurrent SPEC-decision writes now lock the
   entire read-modify-write operation so the first recorded decision survives.
 
+- **A mutant that breaks the module at import time is no longer counted as surviving.**
+  `mutmut.tests_pass` is `return returncode != 1`, so every exit status except 1 reads as
+  "the tests passed": pytest exits 2 on a collection error and pytest-xdist exits 2 when
+  `-x` stops the session. Measured 2026-09-20 — mutating `ACType = Literal["mechanical", …]`
+  fails 8 tests at collection and mutmut recorded it as survived. `measure_baseline` now
+  wraps the SPEC's runner in `harness_maker.mutation_runner`, which maps every non-zero exit
+  to 1 (mutmut runs the runner through `shlex.split` with no shell, so `|| exit 1` is not
+  available). Every mutation score this project has reported was deflated by its own
+  import-breaking mutants.
+- **`.mutmut-cache` is untracked and ignored.** `mutmut run` re-runs every untested mutant in
+  the cache, not only the ones under `--paths-to-mutate`; the tracked copy carried 52
+  `cache.py` mutants from 0.18.0, so a run aimed at two other modules mutated `cache.py`.
+  This is the most plausible cause of the execute-stage gate reporting zero mutants for a
+  SPEC that named real paths.
+
+
+- Land-hold tests now reference the accepted SPEC's current AC tables and preserve
+  explicit subject-cap boundary cases, restoring full-suite collection.
+- **The intent layer's withdrawal criterion can fire again.** `hm world gap --json`'s
+  `withdrawal` block judged a cumulative count — `objectives_observed == 0` — so a single
+  objective ever closed with an `observed:` verdict pinned `due` to false for the life of the
+  project. It now counts `hm:wrapup` events since the layer last did anything: a measurement
+  recorded, an objective created, approved or closed. The block reports
+  `{filled_at, last_signal_at, quiet_wrapups, revisit_candidates_now, due, reason}`;
+  `objectives_observed` and `wrapups_since_fill` are removed, which is a breaking change for any
+  out-of-repo consumer that parsed them. A stored instant ahead of `now` is skipped rather than
+  used, so a mistyped future date cannot suppress the criterion; the returned value is stripped,
+  closing a crash where a whitespace-padded YAML timestamp passed the producer's parser and
+  failed the consumer's. `filled_at` is now resolved only when nothing has ever signalled — it
+  is the fallback cutoff, and the `git` walk behind it was being paid on every read to fill a
+  field the verdict never consulted. `hm world status --json` is unchanged.
+
+- **The approval stamp names which field moved, not just that the hash mismatched.**
+  `spec_machine`'s approval stamp now carries a per-field digest map alongside the aggregate
+  content hash, so a hold reports the one field that changed instead of an undifferentiated
+  hash mismatch. The digest map lives inside the stamp, which the existing hash deny-list
+  already excludes, so adding it does not invalidate any prior approval. A pre-digest stamp
+  keeps its recorded verdict and says it cannot name fields, rather than failing closed.
+- **`spec_machine`'s three writers (`approve`, `mark-tested`, `mark-judged`) share one lock.**
+  `io_utils.rmw_lock` extracts the flock-based read-modify-write lock previously private to
+  `world.py` into a reusable helper, closing a race between concurrent writers to the same
+  machine SPEC. A malformed SPEC now reports the underlying pydantic validation error in its
+  detail (bounded, moved into the state constructor so no return branch can bypass the cap)
+  instead of a generic failure.
+- **`worktree.py`'s `DELIVERABLE_PREFIXES` gained `"MUTATION"`.** `.gitignore` had carried
+  `!work-docs/MUTATION-*.md` since `865e3ef5` without the matching source-of-truth entry,
+  leaving `tests/structural/test_deliverable_single_source.py` red on `main`.
 - **A mutant that breaks the module at import time is no longer counted as surviving.**
   `mutmut.tests_pass` is `return returncode != 1`, so every exit status except 1 reads as
   "the tests passed": pytest exits 2 on a collection error and pytest-xdist exits 2 when
