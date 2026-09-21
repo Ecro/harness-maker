@@ -14,15 +14,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _unreleased_breaking() -> str:
+def _changelog_breaking() -> str:
     text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    unreleased = text.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
-    breaking = unreleased.split("### BREAKING", 1)
-    return breaking[1].split("\n### ", 1)[0] if len(breaking) == 2 else ""
+    # Announcements remain valid after they move into archived release sections.
+    sections = text.split("## [Unreleased]", 1)[1].split("\n## [")
+    blocks = []
+    for section in sections:
+        breaking = section.split("### BREAKING", 1)
+        blocks.append(breaking[1].split("\n### ", 1)[0] if len(breaking) == 2 else "")
+    return "\n".join(blocks)
 
 
 def changelog_breaking_entries(term: str) -> int:
-    entries = re.split(r"\n(?=- \*\*)", _unreleased_breaking())
+    entries = re.split(r"\n(?=- \*\*)", _changelog_breaking())
     return sum(1 for e in entries if term in e)
 
 

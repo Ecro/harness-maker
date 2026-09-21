@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from harness_maker import __version__
 from harness_maker.codex_setup import setup
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -160,7 +161,7 @@ def test_ac_002_engine_reuses_generator_and_preserves_user_blocks(tmp_path: Path
         str(ROOT / "scripts/codex_engine.py"),
         str(project),
         "--expected",
-        "0.58.0",
+        __version__,
         "--preset",
         "Side",
         "--locale",
@@ -169,8 +170,8 @@ def test_ac_002_engine_reuses_generator_and_preserves_user_blocks(tmp_path: Path
     first = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=120, check=True)
     assert first.returncode == 0, first.stderr
     assert json.loads(first.stdout) == {
-        "engine": "0.58.0",
-        "project": "0.58.0",
+        "engine": __version__,
+        "project": __version__,
         "codex_assets": True,
     }
     assert (project / ".codex/config.toml").is_file()
@@ -217,7 +218,7 @@ def test_ac_001_entrypoint_resolves_copied_install_without_claude_cache(tmp_path
     uv.write_text(
         f"#!{sys.executable}\nimport sys,json\n"
         f"json.dump(sys.argv[1:],open({str(capture)!r},'w'))\n"
-        "print(json.dumps({'engine':'0.58.0','project':'0.58.0','codex_assets':True}))\n"
+        f"print(json.dumps({{'engine':{__version__!r},'project':{__version__!r},'codex_assets':True}}))\n"
     )
     uv.chmod(0o700)
     home = tmp_path / "clean-home"

@@ -80,7 +80,7 @@ uv run mypy --strict src
 uv run pytest -q
 
 # Artifact regression test
-uv run pytest tests/unit/test_package_artifacts.py -v
+INTEGRATION=1 uv run pytest tests/integration/test_package_artifacts.py -v
 
 # End-to-end smoke (build + venv install + CLI exercise)
 uv run python scripts/release_smoke.py
