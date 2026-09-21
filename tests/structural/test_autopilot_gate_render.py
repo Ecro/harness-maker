@@ -28,6 +28,10 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-21, release 0.59.0** — same per-release case: 56 lines (14 commands × 4 arms), all the
+  frontmatter `harness_maker_version:` key, and substituting `0.59.0` back to `0.58.0` reproduces
+  every previous hash — checked across every arm, so no content moved.
+
 - **2026-09-21, `intent-vocabulary-and-owners`** — execute, review, spec, wrapup and
   help adopt canonical intent vocabulary and preserve legacy PLAN link reads. All four
   arms have identical moved command sets; no commands added or removed. Autonomy
