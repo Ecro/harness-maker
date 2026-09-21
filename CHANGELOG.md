@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-09-21
+
 ### Intent vocabulary and owners
 
 - Add canonical `hm intent` commands, role-aware advisory approvals, and explicit

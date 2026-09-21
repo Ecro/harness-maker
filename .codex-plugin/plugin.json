@@ -1,6 +1,6 @@
 {
   "name": "harness-maker",
-  "version": "0.58.0",
+  "version": "0.59.0",
   "description": "Per-project AI coding harness for Claude Code, Cursor, and Codex. Bundled hm-make and hm-update skills connect native Codex plugins to a matching Python engine and project generation.",
   "author": {
     "name": "noel"

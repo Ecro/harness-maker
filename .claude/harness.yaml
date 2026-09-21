@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.57.1
+harness_maker_version: 0.58.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 11f4976b8d63da98d6b4afd7e009f83155ec307d964796c92792504f42345706
+content_hash: 34fb50afb5da4181121ce154100c371afb909818c1d38a661827827e314d8e75
 ---
 preset: Production
 locale: ko
@@ -119,6 +119,7 @@ skills:
     - second-opinion-gate
     - intent-layer
     - targeted-test-selection
+    - project-knowledge
   enabled:
     - verify-before-completion
     - autoloop-driver
