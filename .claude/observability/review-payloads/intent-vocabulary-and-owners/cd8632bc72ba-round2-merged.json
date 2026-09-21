@@ -1,0 +1,108 @@
+[
+  {
+    "severity": "P1",
+    "file": "src/harness_maker/world.py",
+    "line": 1246,
+    "summary": "Question writes invalidate accepted documents retaining legacy unknowns",
+    "suggestion": "Before writing questions, reject documents retaining unknowns and require explicit migration; apply the guard to legacy aliases too and add an observe/resolve regression.",
+    "evidence": "I/O-mocked world.observe: _validate_raw initially []; _canonical_project True; observe succeeds; subsequent validation conflict for question q_17ce4aba1d6039ec.",
+    "lens": "robustness",
+    "reasoning": {
+      "observe": "Read intent_cli.py, intent_vocabulary.py and intent_migrate.py fully; escalated world.py to question loaders/writers/validators. _dump_assumptions updates open_questions while retaining unknowns.",
+      "trace": "Canonical purpose plus legacy unknowns is accepted and allows mutation; observe appends evidence and persists without removing unknowns.",
+      "infer": "Next read regenerates the same legacy question ID with empty evidence/history/open status, conflicting with the updated canonical record.",
+      "conclude": "Successful mutation makes valid compatible input unreadable, and migration also refuses it."
+    },
+    "pass": 2,
+    "disposition": "accepted",
+    "status": "resolved",
+    "caused_by": null,
+    "voices": [
+      {
+        "source": "robustness",
+        "kind": "lens"
+      }
+    ],
+    "id": "5472a8d9b9b43d42",
+    "resolution": "Round 2 repair and 1272 selected tests plus deterministic reproductions passed; functionality re-review clear."
+  },
+  {
+    "severity": "P1",
+    "file": "src/harness_maker/intent_migrate.py",
+    "line": 136,
+    "summary": "Migration can delete successfully recorded concurrent measurements",
+    "suggestion": "Serialize migration and all intent writers with a shared project lock acquired before path selection; hold it through source retirement. Add an interleaved migration/record regression test.",
+    "evidence": "for path, content in writes.items(): atomic_write(path, content); for path in retired: path.unlink()",
+    "lens": "concurrency",
+    "reasoning": {
+      "observe": "Read migration/CLI fully; escalated world.py writer/CLI and io_utils.py locking. Migration reads legacy metrics and retires them without writer locks.",
+      "trace": "Legacy record_value selects old path and appends under its per-file RMW lock while migration runs without that lock.",
+      "infer": "Concurrent append returns success after snapshot read; migration publishes older snapshot and deletes the source.",
+      "conclude": "Successful concurrent measurements are permanently lost; coordinate before path selection through retirement."
+    },
+    "pass": 2,
+    "disposition": "accepted",
+    "status": "resolved",
+    "caused_by": null,
+    "voices": [
+      {
+        "source": "concurrency",
+        "kind": "lens"
+      },
+      {
+        "source": "codex",
+        "kind": "cross-model"
+      }
+    ],
+    "cross_model_ids": [
+      "38850a7dd782ef7a"
+    ],
+    "id": "dea465ec4a4aa4d9",
+    "resolution": "Round 2 repair and 1272 selected tests plus deterministic reproductions passed; functionality re-review clear."
+  },
+  {
+    "severity": "P2",
+    "file": "tests/unit/test_intent_vocabulary.py",
+    "line": 264,
+    "summary": "Malformed destination fixture masks missing conflict protection",
+    "suggestion": "Create a valid canonical destination with all required fields and change only its statement or body; retain nonzero exit and full filesystem equality assertions.",
+    "evidence": "test_s4_conflict writes only id and statement. Migration's later independent destination validator rejects this incomplete record even if collision comparison is removed.",
+    "lens": "tests",
+    "reasoning": {
+      "observe": "Read all test_intent_vocabulary.py including beyond initial 400 lines; escalated into intent_migrate.py:21-143.",
+      "trace": "Missing destination collision check still reaches existing canonical validation before any writes; incomplete fixture is rejected there.",
+      "infer": "Implementation overwriting conflicting valid destination still passes this test.",
+      "conclude": "S4 requires two valid conflicting records to distinguish conflict refusal from malformed-record rejection."
+    },
+    "pass": 2,
+    "disposition": "accepted",
+    "status": "pending",
+    "caused_by": null,
+    "voices": [
+      {
+        "source": "tests",
+        "kind": "lens"
+      }
+    ],
+    "id": "11175f90347e8125"
+  },
+  {
+    "id": "7124033e9a0203a8",
+    "severity": "P2",
+    "file": "src/harness_maker/world.py",
+    "line": 145,
+    "summary": "`purpose` \ud0a4 \uc874\uc7ac\ub9cc\uc73c\ub85c \ub9c8\uc774\uadf8\ub808\uc774\uc158 \uc644\ub8cc\ub97c \ud310\ub2e8\ud569\ub2c8\ub2e4. \uc0ac\uc6a9\uc790\uac00 \ud504\ub85c\uc81d\ud2b8 \uc815\uc758\ub9cc \uc0c8 \ud615\uc2dd\uc73c\ub85c \ubc14\uafb8\uace0 \uae30\uc874 ledger\ub97c \ub0a8\uaca8\ub450\uba74 \uc9c8\ubb38\uacfc \uce21\uc815\uac12\uc774 \uc9c4\ub2e8 \uc5c6\uc774 \uc0ac\ub77c\uc9c0\uba70 canonical \uc4f0\uae30\ub3c4 \ud5c8\uc6a9\ub429\ub2c8\ub2e4. \uc774\ud6c4 metric \uae30\ub85d\uc740 \ubcc4\ub3c4 \uc800\uc7a5\uc18c\ub97c \ub9cc\ub4e4\uc5b4 \uba85\uc2dc\uc801 migrate\uae4c\uc9c0 \ucda9\ub3cc\ub85c \uc2e4\ud328\ud558\uac8c \ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4. \uae30\uc874 \uc800\uc7a5\uc18c\ub97c \uc77d\uac70\ub098 \ubbf8\uc644\ub8cc \ub9c8\uc774\uadf8\ub808\uc774\uc158\uc744 \uc9c4\ub2e8\ud558\uace0, \uc4f0\uae30\ub294 \uc644\ub8cc \uc804 \uac70\ubd80\ud574\uc57c \ud569\ub2c8\ub2e4.",
+    "evidence": "canonical \ud504\ub85c\uc81d\ud2b8 \uc815\uc758\uc640 \uae30\uc874 .claude/world/{assumptions,outcomes}.yaml\uc744 \ud568\uaed8 \uc81c\uacf5\ud55c \uc7ac\ud604\uc5d0\uc11c load_world\ub294 assumptions={}, values=[], errors=[]\ub97c \ubc18\ud658\ud588\uace0, _canonical_project\ub294 True\uc600\uc2b5\ub2c8\ub2e4.",
+    "source": "codex",
+    "needs_relaxation": false,
+    "disposition": "accepted",
+    "status": "pending",
+    "caused_by": null,
+    "voices": [
+      {
+        "source": "codex",
+        "kind": "cross-model"
+      }
+    ]
+  }
+]
