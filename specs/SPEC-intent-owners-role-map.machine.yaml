@@ -1,0 +1,165 @@
+schema_version: 3
+spec_slug: intent-owners-role-map
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: Compatible schema and advisory behavior; targeted mutation
+  deferred at T2.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/intent.py
+- src/harness_maker/world.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Role shapes
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_owners.py::test_s1
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: DRI handoff sections 2 and 9 define role shapes; test values are
+    chosen independently of implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Role validation
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_owners.py::test_s2
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: DRI handoff sections 2 and 9 define role validation; test values
+    are chosen independently of implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Advisory approval
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_owners.py::test_s3
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: DRI handoff sections 2 and 9 define advisory approval; test values
+    are chosen independently of implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Silent solo approval
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_owners.py::test_s4
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: DRI handoff sections 2 and 9 define silent solo approval; test
+    values are chosen independently of implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Rendered guidance
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_owners.py::test_s5
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: DRI handoff sections 2 and 9 define rendered guidance; test values
+    are chosen independently of implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: owners map has owner/dri/team strings; legacy lists join into team
+  category: schema/file format/storage layout
+  rationale: Durable hand-edited format
+  source: spec
+approval:
+  kind: human
+  content_hash: 1efa78bbf22d7855c6a60f7f3134a3a10e706b64a6e92c1c39b0a825712f17ff
+  approved_by: Ecro
+  approved_at: '2026-09-21T04:29:57Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 1540199dc7429fb8b1f91d817fdb16d8d24de5f5834d1edf34e75858231a1fa8
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: 3c8b4b06c269a123bbb6b0c2529a0ac4280f5536bcc9b1857790ca7c4809ad6a
+    paths_to_mutate: e5ed578021164e3d686e0fc72e8f10ae1109470b5006edc807c68e31b98b9659
+    irreversible_decisions: 2a7b8854440c5b33800d11b0b7406f745c1e03c7f5841881890ae714e264139a
+    AC-001: 22a01d9d4eb5413d131a9d42b9d37e3a4e1dc341683e9f39969c1f73a032e847
+    AC-002: ba3efafbb787c8e9e2e4ec3fa5731f7a07f6eb0f6cd1ada3ec359298cbb74308
+    AC-003: f513b1347b8b9bdadd0cf52127bed028d96a3c1f6b099d1b11ceee2d952324f3
+    AC-004: 69623d02586b5f98bb07309350d63e4fe3c89e61b722a6017821d8b436fa1a28
+    AC-005: 49157cc5e854ad631dc0cb11658333cbef32bf3d158c0c07f0ca9b5deec60704
+    ac_order: cfc9fb435de75930cafd810096796d10be9ac4c71f34dd372a974dea553fb9bd

@@ -10,6 +10,12 @@ research_doc: "[[RESEARCH-outcome-measure]]"
 summary: "Optional `measure: {cmd, select, cwd}` on an outcome + `hm world outcome measure` that runs, selects one number and records it with auto-evidence; manual stays the fallback"
 ---
 
+> Vocabulary and storage layout are superseded by [[SPEC-intent-vocabulary-rename]];
+> owners shape and advisory approval guidance by [[SPEC-intent-owners-role-map]].
+> This historical SPEC and its machine companion retain their original ACs and test bindings
+> as compatibility evidence. Unchanged behavioral guarantees still apply.
+
+
 # SPEC — Outcome measure: the harness records the number, the human never types it
 
 ## 🎯 Intent

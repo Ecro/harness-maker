@@ -9,6 +9,7 @@ imported here — `hm world status` is the deterministic, free read path.
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
 import math
@@ -18,12 +19,14 @@ import shlex
 import signal
 import subprocess
 import sys
-from collections.abc import Iterator, Mapping, Sequence
+import time
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -140,16 +143,98 @@ def checkout_root(cwd: Path) -> Path:
     return Path(proc.stdout.strip())
 
 
+def _canonical_project(root: Path) -> bool:
+    raw, _ = _read_yaml(intent_path(root))
+    return isinstance(raw, dict) and "purpose" in raw
+
+
+@contextmanager
+def _mutation_lock(root: Path) -> Iterator[None]:
+    """Lock the stable checkout directory before selecting any migrating storage path.
+
+    A directory inode survives every migration replacement. Locking it creates no files,
+    preserving the refusal/no-write contract. Order: checkout lock, then existing file lock.
+    As with io_utils.rmw_lock, platforms without flock retain the existing unlocked fallback.
+    """
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover - same non-POSIX policy as rmw_lock
+        yield
+        return
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    deadline = time.monotonic() + _APPEND_LOCK_TIMEOUT_S
+    try:
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as exc:
+                if exc.errno not in (errno.EAGAIN, errno.EACCES):
+                    raise
+                if time.monotonic() >= deadline:
+                    raise WorldError("lock", "intent storage is locked by another writer") from exc
+                time.sleep(0.05)
+        yield
+    finally:
+        os.close(fd)
+
+
+def _require_writable_layout(root: Path) -> None:
+    """Keep interrupted migration destinations retryable until source retirement finishes."""
+    raw, _ = _read_yaml(intent_path(root))
+    if isinstance(raw, dict) and "purpose" in raw:
+        incomplete = (
+            bool(
+                set(raw)
+                & {"mission", "vision", "outcomes", "non_negotiables", "non_scope", "unknowns"}
+            )
+            or (root / ".claude/world/assumptions.yaml").exists()
+            or (root / ".claude/world/outcomes.yaml").exists()
+            or any((root / "work-docs").glob("INTENT-*.md"))
+        )
+    else:
+        incomplete = (root / ".claude/intent/metrics.yaml").exists() or any(
+            (root / "intent").glob("*.md")
+        )
+    if incomplete:
+        raise WorldError(
+            "migration", "run hm intent migrate before writing partially migrated storage"
+        )
+
+
+def _serialized_write[**P, T](
+    operation: Callable[P, T],
+) -> Callable[P, T]:
+    """Serialize leaf writers, not delegating wrappers or measurement subprocesses."""
+
+    @wraps(operation)
+    def guarded(*args: P.args, **kwargs: P.kwargs) -> T:
+        root = cast(Path, args[0] if args else kwargs["root"])
+        with _mutation_lock(root):
+            _require_writable_layout(root)
+            return operation(*args, **kwargs)
+
+    return guarded
+
+
 def intent_path(root: Path) -> Path:
     return root / ".claude" / "intent.yaml"
 
 
 def assumptions_path(root: Path) -> Path:
-    return root / ".claude" / "world" / "assumptions.yaml"
+    return (
+        intent_path(root)
+        if _canonical_project(root)
+        else root / ".claude" / "world" / "assumptions.yaml"
+    )
 
 
 def outcomes_path(root: Path) -> Path:
-    return root / ".claude" / "world" / "outcomes.yaml"
+    return (
+        root / ".claude" / "intent" / "metrics.yaml"
+        if _canonical_project(root)
+        else root / ".claude" / "world" / "outcomes.yaml"
+    )
 
 
 def legacy_objectives_dir(root: Path) -> Path:
@@ -163,12 +248,19 @@ def intents_dir(root: Path) -> Path:
 
 def objective_doc_path(root: Path, objective_id: str) -> Path:
     """`work-docs/INTENT-<ID>.md` — the record IS the deliverable (ADR-001)."""
-    return intents_dir(root) / f"{_INTENT_PREFIX}{objective_id}.md"
+    canonical = root / "intent" / f"{objective_id}.md"
+    return (
+        canonical
+        if canonical.exists() or _canonical_project(root)
+        else intents_dir(root) / f"{_INTENT_PREFIX}{objective_id}.md"
+    )
 
 
 def _id_from_stem(path: Path) -> str | None:
     """The one id-extraction rule (ADR-003): the stem after `INTENT-`, else not a record."""
     stem = path.stem
+    if path.parent.name == "intent":
+        return stem
     if not stem.startswith(_INTENT_PREFIX):
         return None
     return stem[len(_INTENT_PREFIX) :]
@@ -210,6 +302,9 @@ def outcome_definition_hash(outcome: Outcome) -> str:
 
 
 def approval_hash(record: dict[str, Any], target: int | float) -> str:
+    from harness_maker.intent_vocabulary import RECORD_ALIASES, translate
+
+    record = translate(record, RECORD_ALIASES, canonical=False)
     return _sha256(
         canonical_json(
             {
@@ -257,12 +352,35 @@ def _read_yaml(path: Path) -> tuple[Any, IntentError | None]:
     except OSError as exc:
         return None, IntentError("file", f"{path}: {exc}")
     try:
-        return yaml.safe_load(text), None
-    except yaml.YAMLError as exc:
+        raw = yaml.safe_load(text)
+        if (
+            path.name == "metrics.yaml"
+            and isinstance(raw, dict)
+            and isinstance(raw.get("values"), list)
+        ):
+            from harness_maker.intent_vocabulary import translate
+
+            raw["values"] = [
+                translate(row, {"metric_id": "outcome_id"}, canonical=False)
+                if isinstance(row, dict)
+                else row
+                for row in raw["values"]
+            ]
+        return raw, None
+    except (yaml.YAMLError, ValueError) as exc:
         return None, IntentError("file", f"{path}: not valid YAML: {exc}")
 
 
 def _dump_yaml(path: Path, doc: dict[str, Any]) -> None:
+    if path.name == "metrics.yaml":
+        from harness_maker.intent_vocabulary import translate
+
+        doc = {
+            **doc,
+            "values": [
+                translate(row, {"metric_id": "outcome_id"}, canonical=True) for row in doc["values"]
+            ],
+        }
     atomic_write(path, yaml.safe_dump(doc, sort_keys=False, allow_unicode=True))
 
 
@@ -276,7 +394,13 @@ def _read_intent(path: Path) -> tuple[dict[str, Any], bytes, IntentError | None]
     split = split_frontmatter(data)
     if split.status != "ok" or split.mapping is None:
         return {}, data, IntentError("file", f"{path}: {split.error}")
-    return split.mapping, split.body, None
+    from harness_maker.intent_vocabulary import RECORD_ALIASES, translate
+
+    try:
+        record = translate(split.mapping, RECORD_ALIASES, canonical=False)
+    except ValueError as exc:
+        return {}, split.body, IntentError("file", str(exc))
+    return record, split.body, None
 
 
 def _dump_intent(path: Path, record: dict[str, Any], body: bytes) -> None:
@@ -289,6 +413,10 @@ def _dump_intent(path: Path, record: dict[str, Any], body: bytes) -> None:
     if unknown:
         raise WorldError(unknown[0], "not an objective field; refusing to write")
     ordered = {k: record[k] for k in (*_OBJECTIVE_REQUIRED, *_OBJECTIVE_OPTIONAL) if k in record}
+    if path.parent.name == "intent":
+        from harness_maker.intent_vocabulary import RECORD_ALIASES, translate
+
+        ordered = translate(ordered, RECORD_ALIASES, canonical=True)
     fm = yaml.safe_dump(ordered, sort_keys=False, allow_unicode=True).encode("utf-8")
     atomic_write(path, b"---\n" + fm + b"---\n" + body)
 
@@ -576,7 +704,12 @@ def load_world(root: Path) -> World:
     world = World(root=root, intent=loaded_intent)
     outcomes = world.outcome_by_id
     apath = assumptions_path(root)
-    if apath.exists():
+    if apath == intent_path(root):
+        from harness_maker.intent_vocabulary import legacy_question
+
+        world.assumptions = {q["id"]: legacy_question(q) for q in loaded_intent.open_questions}
+        world.errors.extend(_locator_problems(apath.name, list(world.assumptions.values())))
+    elif apath.exists():
         a_errors = validate_assumptions(apath)
         if a_errors:
             world.errors.extend(IntentError(f"{apath.name}:{e.field}", e.message) for e in a_errors)
@@ -605,8 +738,11 @@ def load_world(root: Path) -> World:
                 if i not in refused and isinstance(v, dict) and v.get("outcome_id") in outcomes
             ]
     idir = intents_dir(root)
-    if idir.is_dir():
-        for p in sorted(idir.glob(f"{_INTENT_PREFIX}*.md")):
+    record_paths = sorted(idir.glob(f"{_INTENT_PREFIX}*.md")) + sorted(
+        (root / "intent").glob("*.md")
+    )
+    if record_paths:
+        for p in record_paths:
             oid = _id_from_stem(p)
             if not oid:
                 continue
@@ -619,6 +755,10 @@ def load_world(root: Path) -> World:
             )
             if errs:
                 world.broken[oid] = errs
+                continue
+            if oid in world.objectives:
+                world.broken[oid] = [IntentError("id", f"conflict: duplicate intent {oid}")]
+                world.objectives.pop(oid, None)
                 continue
             world.objectives[oid] = raw
             world.bodies[oid] = body
@@ -1098,6 +1238,11 @@ def gap_report(root: Path) -> dict[str, Any]:
         world = load_world(root)
     except IntentInvalidError as exc:
         return _invalid_payload(exc)
+    return _gap_payload(world, root)
+
+
+def _gap_payload(world: World, root: Path) -> dict[str, Any]:
+    """Gap and withdrawal fields from the caller's already-loaded snapshot."""
     status = _status_payload(world)
     report: dict[str, Any] = {
         "state": status["state"],
@@ -1145,6 +1290,14 @@ def gap_report(root: Path) -> dict[str, Any]:
 
 def _load_assumptions_doc(root: Path) -> dict[str, Any]:
     path = assumptions_path(root)
+    if path == intent_path(root):
+        from harness_maker.intent_vocabulary import legacy_question
+
+        loaded = intent_mod.load_intent(path)
+        return {
+            "schema_version": loaded.schema_version,
+            "assumptions": [legacy_question(q) for q in loaded.open_questions],
+        }
     if not path.exists():
         return {"schema_version": KNOWN_MAJOR, "assumptions": []}
     errors = validate_assumptions(path)
@@ -1154,6 +1307,20 @@ def _load_assumptions_doc(root: Path) -> dict[str, Any]:
     return raw  # type: ignore[no-any-return]
 
 
+def _dump_assumptions(root: Path, doc: dict[str, Any]) -> None:
+    path = assumptions_path(root)
+    if path == intent_path(root):
+        from harness_maker.intent_vocabulary import canonical_question
+
+        raw, err = _read_yaml(path)
+        if err is not None:
+            raise WorldError(err.field, err.message)
+        raw["open_questions"] = [canonical_question(q) for q in doc["assumptions"]]
+        _dump_yaml(path, raw)
+    else:
+        _dump_yaml(path, doc)
+
+
 def _find(doc: dict[str, Any], aid: str) -> dict[str, Any]:
     for rec in doc["assumptions"]:
         if rec["id"] == aid:
@@ -1161,6 +1328,7 @@ def _find(doc: dict[str, Any], aid: str) -> dict[str, Any]:
     raise WorldError("id", f"no assumption {aid!r}")
 
 
+@_serialized_write
 def observe(
     root: Path,
     assumption_id: str,
@@ -1189,10 +1357,11 @@ def observe(
         elif relation == "supersedes":
             rec.setdefault("history", []).append(rec["claim"])
             rec["claim"] = claim
-        _dump_yaml(assumptions_path(root), doc)
+        _dump_assumptions(root, doc)
     return rec
 
 
+@_serialized_write
 def resolve(root: Path, assumption_id: str, *, status: str, claim: str) -> dict[str, Any]:
     """The only exit from `conflict`; refused from any other status or to `conflict`."""
     if status not in RESOLVE_TARGETS:
@@ -1209,10 +1378,11 @@ def resolve(root: Path, assumption_id: str, *, status: str, claim: str) -> dict[
         rec.setdefault("history", []).append(rec["claim"])
         rec["claim"] = claim
         rec["status"] = status
-        _dump_yaml(assumptions_path(root), doc)
+        _dump_assumptions(root, doc)
     return rec
 
 
+@_serialized_write
 def add_assumption(
     root: Path,
     assumption_id: str,
@@ -1228,7 +1398,8 @@ def add_assumption(
         raise WorldError("id", "must match [a-z0-9_]+")
     if not isinstance(claim, str) or not claim.strip():
         raise WorldError("claim", "must be a non-empty string")
-    if status not in RESOLVE_TARGETS:
+    allowed = STATUSES if _canonical_project(root) else RESOLVE_TARGETS
+    if status not in allowed:
         raise WorldError(
             "status", f"must be one of {RESOLVE_TARGETS} (conflict comes only from contradicts)"
         )
@@ -1262,7 +1433,7 @@ def add_assumption(
         if any(r.get("id") == assumption_id for r in doc["assumptions"]):
             raise WorldError("id", f"assumption {assumption_id!r} already exists; use observe")
         doc["assumptions"].append(rec)
-        _dump_yaml(assumptions_path(root), doc)
+        _dump_assumptions(root, doc)
     return rec
 
 
@@ -1307,7 +1478,8 @@ def _rmw_lock(path: Path) -> Iterator[None]:
     lock never shows as user dirt in a tracked directory (confirm-1 finding). Keyed by the
     guarded file's stem, so outcomes keep `.hm-world-outcomes.lock` byte-for-byte.
     """
-    lock_path = path.parent.parent / "observability" / f".hm-world-{path.stem}.lock"
+    lock_base = path.parent if path.name == "intent.yaml" else path.parent.parent
+    lock_path = lock_base / "observability" / f".hm-world-{path.stem}.lock"
     try:
         with rmw_lock(lock_path, timeout=_APPEND_LOCK_TIMEOUT_S):
             yield
@@ -1315,6 +1487,7 @@ def _rmw_lock(path: Path) -> Iterator[None]:
         raise WorldError("lock", f"{path.name} is locked by another writer ({lock_path})") from exc
 
 
+@_serialized_write
 def _append_value(
     root: Path, loaded: Intent, outcome: Outcome, *, value: Any, observed_at: Any, evidence: Any
 ) -> dict[str, Any]:
@@ -1546,6 +1719,7 @@ def _git_user_name(root: Path) -> str:
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
+@_serialized_write
 def approve(root: Path, objective_id: str) -> dict[str, Any]:
     """Bind an approval to the canonical payload with git provenance; terminal records refuse."""
     world, rec = _load_objective(root, objective_id)
@@ -1566,9 +1740,18 @@ def approve(root: Path, objective_id: str) -> dict[str, Any]:
         "approved_target": target,
     }
     _write_record(world, root, objective_id, rec)
+    identities = {person.strip() for person in world.intent.owners.values() if person.strip()}
+    if len(identities) > 1:
+        print(
+            "[intent] advisory: owners roles differ; seek an independent approver. "
+            "approved_by is an unverified git config string; real separation requires "
+            "CODEOWNERS + branch protection. Approval recorded; this is never a block.",
+            file=sys.stderr,
+        )
     return rec
 
 
+@_serialized_write
 def transition(
     root: Path,
     objective_id: str,
@@ -1627,6 +1810,7 @@ def close(
     return transition(root, objective_id, "closed", observed=observed, note=note)
 
 
+@_serialized_write
 def edit_objective(root: Path, objective_id: str, **fields: Any) -> dict[str, Any]:
     """Edit non-state fields of a proposed/active record; terminal records refuse every edit."""
     world, rec = _load_objective(root, objective_id)
@@ -1667,6 +1851,7 @@ PLAYBOOK_BODY = """\
 """
 
 
+@_serialized_write
 def new_objective(
     root: Path,
     objective_id: str,
@@ -1877,6 +2062,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    print("hm world is deprecated; use hm intent", file=sys.stderr)
     # Registry-driven misroute guard (PLAN-command-surface-registry ADR-004), as every
     # subparser module carries: `hm world on` → the module that owns `on`, not a traceback.
     guard = command_registry.guard_or_none("world", argv)

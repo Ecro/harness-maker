@@ -5,16 +5,16 @@
 | model | calls | invoked | skipped | failed | loss_rate |
 |---|---|---|---|---|---|
 | antigravity | 101 | 49 | 25 | 27 | 0.5148514851485149 |
-| codex | 140 | 136 | 4 | 0 | 0.02857142857142857 |
+| codex | 141 | 137 | 4 | 0 | 0.028368794326241134 |
 
 ## Per stage
 
 | stage | calls |
 |---|---|
 | plan | 93 |
-| review | 148 |
+| review | 149 |
 
-Invocation rows counted: 241.
+Invocation rows counted: 242.
 
 ## Exclusions applied
 

@@ -586,34 +586,34 @@ Bash("uv run --with {{ harness_maker_src_path }} hm second_brain promote --type 
 
 **Receipt (ADR-006):** end this step by printing exactly one line — `promotion evaluated: <N> candidates, <M> promoted`. **`N` = the number of distinct local entries you wrote or touched in 5.1–5.4 that map to a promotable note_type** (every `failures.md` entry, every PLAN ADR, every confirmed preference) — it is NOT 0 if you wrote any such entry this unit. `M` = how many of those `N` you judged cross-project-durable and promoted. When `M < N`, add a one-line reason per skipped candidate. This is what makes silent under-promotion visible — do not collapse `N` to 0 to avoid the work.
 
-#### 5.7 World state — three questions, answer-gated (intent layer)
+#### 5.7 Intent state — three questions, answer-gated (intent layer)
 
-Print `[intent] not in use` and skip this step when `.claude/intent.yaml` is absent or `hm world status --json` reports `state: not_filled_in`. Otherwise, in order — and **never write without the answer**:
+Print `[intent] not in use` and skip this step when `.claude/intent.yaml` is absent or `hm intent status --json` reports `state: not_filled_in`. Otherwise, in order — and **never write without the answer**:
 
 <!-- @hm:answer-gated:assumption -->
-Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Did this task confirm, supersede or contradict a recorded assumption — or show one worth recording?"** — four options at most: at most two assumption ids from `hm world gap --json`'s `assumptions`, those in its `stale_evidence` first and labelled **"(cited code changed)"**; **"new — record an assumption"**; **"no"**. Name any other ids in the question text for the operator to type via Other.
+Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Did this task confirm, supersede or contradict a recorded question — or show one worth recording?"** — four options at most: at most two question ids from `hm intent status --json`'s `open_questions`, those in its `stale_evidence` first and labelled **"(cited code changed)"**; **"new — record a question"**; **"no"**. Name any other ids in the question text for the operator to type via Other.
 If the answer is "yes": (an id was named, or "new") run ONCE, with the arguments the operator confirmed — for an id:
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text '<what was observed>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim '<new claim>' — required when the relation is supersedes]"){% else %}!uv run --with {{ harness_maker_src_path }} hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text "<what was observed>" --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim "<new claim>" — required when the relation is supersedes]{% endif %}
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text '<what was observed>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim '<new claim>' — required when the relation is supersedes]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text "<what was observed>" --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim "<new claim>" — required when the relation is supersedes]{% endif %}
 — for "new": first show the exact `add` arguments you propose (id, claim, status; `--text`/`--observed-at`, and `--locator` citing ≤ 40 lines of the code the claim rests on) and ask once more with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}; run only on "yes", otherwise write nothing:
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm world assume add <id> --claim '<claim>' --status <known|assumed|unknown> [--text '<why>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]"){% else %}!uv run --with {{ harness_maker_src_path }} hm world assume add <id> --claim "<claim>" --status <known|assumed|unknown> [--text "<why>" --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]{% endif %}
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim '<claim>' --status <open|confirmed|wrong> [--text '<why>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim "<claim>" --status <open|confirmed|wrong> [--text "<why>" --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]{% endif %}
 Otherwise: write nothing.
 <!-- /@hm:answer-gated -->
 
 <!-- @hm:answer-gated:objective-close -->
-Only when the PLAN frontmatter carries `objective: <id>`. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Close objective <id> now?"** — options: **"yes — met"**, **"yes — missed"**, **"yes — no_data"**, **"no, keep it open"**.
+Only when the PLAN frontmatter carries `intent: <id>` (or legacy `objective: <id>`; reject conflicts). Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Close intent <id> now?"** — options: **"yes — met"**, **"yes — missed"**, **"yes — no_data"**, **"no, keep it open"**.
 If the answer is "yes": run ONCE, with the observed value chosen and a one-line note from the operator:
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm world objective close <id> --observed <met|missed|no_data> --note '<operator note>'"){% else %}!uv run --with {{ harness_maker_src_path }} hm world objective close <id> --observed <met|missed|no_data> --note "<operator note>"{% endif %}
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent close <id> --observed <met|missed|no_data> --note '<operator note>'"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent close <id> --observed <met|missed|no_data> --note "<operator note>"{% endif %}
 Otherwise: write nothing.
 <!-- /@hm:answer-gated -->
 
 <!-- @hm:answer-gated:outcome-measure -->
-Only when `hm world gap --json` lists an outcome with `measure: true`. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Measure outcomes now?"** — list each measurable outcome with its `last` value and `observed_at` age from that output; options: **"yes — measure all"**, **"no"**.
-If the answer is "yes": run ONCE (it records every measurable outcome that succeeds and reports the rest; a non-zero exit means one failed, never that nothing was written):
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm world outcome measure --all"){% else %}!uv run --with {{ harness_maker_src_path }} hm world outcome measure --all{% endif %}
+Only when `hm intent status --json` lists a metric with `measure: true`. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Measure metrics now?"** — list each measurable metric with its `last` value and `observed_at` age from that output; options: **"yes — measure all"**, **"no"**.
+If the answer is "yes": run ONCE (it records every measurable metric that succeeds and reports the rest; a non-zero exit means one failed, never that nothing was written):
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent metric measure --all"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent metric measure --all{% endif %}
 Otherwise: write nothing.
 <!-- /@hm:answer-gated -->
 
-Withdrawal: when the `hm world gap --json` output of the outcome-measure check above reports `withdrawal.due: true`, print once `[intent] withdrawal criterion met — <quiet_wrapups> wrapups since <last_signal_at or filled_at>, no fired revisit; removing the layer is the operator's call`. Otherwise print nothing.
+Withdrawal: when the `hm intent status --json` output of the outcome-measure check above reports `withdrawal.due: true`, print once `[intent] withdrawal criterion met — <quiet_wrapups> wrapups since <last_signal_at or filled_at>, no fired revisit; removing the layer is the operator's call`. Otherwise print nothing.
 
 ### Steps 6 → 7.6 — Stage, commit, pop, drain (ONE call)
 

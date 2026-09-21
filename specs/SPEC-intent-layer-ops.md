@@ -9,6 +9,12 @@ test_framework: pytest
 summary: "Measured evidence names its definition by hash, not argv; `hm world gap` measures the layer's own withdrawal criterion"
 ---
 
+> Vocabulary and storage layout are superseded by [[SPEC-intent-vocabulary-rename]];
+> owners shape and advisory approval guidance by [[SPEC-intent-owners-role-map]].
+> This historical SPEC and its machine companion retain their original ACs and test bindings
+> as compatibility evidence. Unchanged behavioral guarantees still apply.
+
+
 # SPEC — Intent layer operations: short evidence, a withdrawal criterion someone counts
 
 ## 🎯 Intent

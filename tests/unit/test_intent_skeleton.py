@@ -15,9 +15,9 @@ import yaml
 
 from harness_maker import intent
 
-REQUIRED = {"schema_version", "mission", "outcomes"}
-OPTIONAL = {"vision", "non_negotiables", "non_scope", "unknowns", "owners"}
-LIST_FIELDS = {"outcomes", "non_negotiables", "non_scope", "unknowns", "owners"}
+REQUIRED = {"schema_version", "purpose", "metrics"}
+OPTIONAL = {"rules", "out_of_scope", "open_questions", "owners"}
+LIST_FIELDS = {"metrics", "rules", "out_of_scope", "open_questions"}
 KNOWN_MAJOR = 1
 
 
@@ -28,9 +28,9 @@ def test_ac_002_skeleton_is_typed_empty_and_loads_under_the_strict_validator(
     assert intent.write_skeleton_if_absent(made) is True
     raw = yaml.safe_load(made.read_text(encoding="utf-8"))
     assert set(raw) == REQUIRED | OPTIONAL
-    assert raw["mission"] == ""
-    assert raw["vision"] == ""
+    assert raw["purpose"] == {"statement": "", "vision": ""}
     assert all(raw[k] == [] for k in LIST_FIELDS)
+    assert raw["owners"] == {}
     assert raw["schema_version"] == KNOWN_MAJOR
     assert intent.validate_intent(made) == []
     assert intent.is_not_filled_in(intent.load_intent(made)) is True
@@ -51,8 +51,8 @@ def test_ac_002_skeleton_carries_no_generated_prose_only_comments_and_empties(
         if not line.strip():
             continue
         key, _, value = line.partition(":")
-        assert key.strip() in REQUIRED | OPTIONAL, line
-        assert value.strip() in {"", '""', "[]", str(KNOWN_MAJOR)}, line
+        assert key.strip() in REQUIRED | OPTIONAL | {"statement", "vision"}, line
+        assert value.strip() in {"", '""', "[]", "{}", str(KNOWN_MAJOR)}, line
 
 
 def test_ac_002_half_filled_file_is_an_error_naming_mission_not_a_skeleton(tmp_path: Path) -> None:

@@ -3,6 +3,23 @@
 > **Status:** v2.4 (0.9.3 target + autoloop refresh) · **Written:** 2026-05-03 · **Language:** English
 > Claude Code / Cursor / Codex harness generator — generates and updates project-specific runtime assets with a single `/harness-maker:make` command. Structured for autonomous builds via autoloop.
 
+## Intent vocabulary and ownership (2026-09-21)
+
+The canonical CLI is `hm intent`, with direct record lifecycle verbs and
+`question`, `metric`, `status`, and `migrate` commands. Legacy `hm world` and
+legacy files remain compatible; explicit migration changes persistence.
+`.claude/intent.yaml` owns purpose, metric definitions, rules, out-of-scope items
+and question records; `.claude/intent/metrics.yaml` owns measurement history;
+`intent/<ID>.md` owns work commitments spanning one or more SPECs.
+
+Optional `owners` accepts owner/dri/team strings or legacy name lists. Distinct
+nonblank role identities produce approval advice, never authenticated separation.
+Migration preserves frozen approval payload keys, body bytes and historical
+withdrawal timing. A stable checkout lock precedes writer storage selection;
+partial publication or retirement blocks subsequent writes until migration
+completes. Governing contracts are SPEC-intent-owners-role-map and
+SPEC-intent-vocabulary-rename.
+
 ## Codex lifecycle and Claude provider (2026-09-20)
 
 The Codex plugin bundles `hm-make` and `hm-update` skills plus an installed-root

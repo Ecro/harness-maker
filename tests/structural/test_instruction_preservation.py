@@ -245,6 +245,69 @@ _REVIEW_R2_SPEC_NEED_UNQUOTED = [
 
 
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    # Vocabulary replacement only; canonical calls retain the same answer gates.
+    "intent-vocabulary-and-owners": {
+        "review@block": [
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world objective "
+            "show <id> --json",
+            "### Step 3.3 — Objective drift (main loop, P2 — intent layer)",
+        ],
+        "review@warn": [
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world objective "
+            "show <id> --json",
+            "### Step 3.3 — Objective drift (main loop, P2 — intent layer)",
+        ],
+        "spec@block": [
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world objective "
+            'new <ID> --title "<title>" --hypothesis "<hypothesis>" --scope "<item>" '
+            "--outcome <outcome-id> --from-proposal --candidates 1",
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world objective "
+            "revisit <objective-id> --json",
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world status "
+            "--json   # loads .claude/intent.yaml + .claude/world/assumptions.yaml",
+            "### Step 0.5 — Objective context (intent layer — one line and continue when unused)",
+            "### Step 4.9 — Objective draft (consented at Step 0.5)",
+        ],
+        "spec@warn": [
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world objective "
+            'new <ID> --title "<title>" --hypothesis "<hypothesis>" --scope "<item>" '
+            "--outcome <outcome-id> --from-proposal --candidates 1",
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world objective "
+            "revisit <objective-id> --json",
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world status "
+            "--json   # loads .claude/intent.yaml + .claude/world/assumptions.yaml",
+            "### Step 0.5 — Objective context (intent layer — one line and continue when unused)",
+            "### Step 4.9 — Objective draft (consented at Step 0.5)",
+        ],
+        "wrapup@block": [
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world assume "
+            'add <id> --claim "<claim>" --status <known|assumed|unknown> [--text '
+            '"<why>" --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]',
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world assume "
+            'observe <id> --relation <confirms|supersedes|contradicts> --text "<what '
+            'was observed>" --observed-at <ISO-8601 UTC> [--locator <path:A-B>] '
+            '[--claim "<new claim>" — required when the relation is supersedes]',
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world objective "
+            'close <id> --observed <met|missed|no_data> --note "<operator note>"',
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world outcome "
+            "measure --all",
+            "#### 5.7 World state — three questions, answer-gated (intent layer)",
+        ],
+        "wrapup@warn": [
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world assume add "
+            '<id> --claim "<claim>" --status <known|assumed|unknown> [--text "<why>" '
+            "--observed-at <ISO-8601 UTC> [--locator <path:A-B>]]",
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world assume "
+            'observe <id> --relation <confirms|supersedes|contradicts> --text "<what was '
+            'observed>" --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim '
+            '"<new claim>" — required when the relation is supersedes]',
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world objective "
+            'close <id> --observed <met|missed|no_data> --note "<operator note>"',
+            "!uv run --with $HOME/harness-maker python -m harness_maker.world outcome "
+            "measure --all",
+            "#### 5.7 World state — three questions, answer-gated (intent layer)",
+        ],
+    },
     "plan-stage-absorption": {
         "execute@block": list(_REVIEW_R2_SPEC_NEED_UNQUOTED),
     },

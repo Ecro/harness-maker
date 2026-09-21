@@ -32,13 +32,13 @@ MANDATED_CALL_PREFIXES = {
 }
 ASK_TOKEN = {"claude": "AskUserQuestion", "codex": "request_user_input"}
 VERB_ARGUMENT_FORMS = (
-    "hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text"
+    "hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text"
     " --observed-at",
-    "hm world assume resolve <id> --status --claim",
-    "hm world outcome record <id> --value --observed-at --evidence",
-    "hm world objective new <id> --title --hypothesis --scope --outcome",
-    "hm world objective <approve|activate|drop|reopen> <id>",
-    "hm world objective close <id> --observed <met|missed|no_data> --note",
+    "hm intent question resolve <id> --status --claim",
+    "hm intent metric record <id> --value --observed-at --evidence",
+    "hm intent new <id> --title --statement --scope --metric",
+    "hm intent <approve|activate|drop|reopen> <id>",
+    "hm intent close <id> --observed <met|missed|no_data> --note",
 )
 TRIGGER_PHRASES = ("observed", "close", "approve", "drop", "record", "where")
 ORDERED_RULE = (
@@ -84,13 +84,13 @@ def test_ac_011_spec_loads_state_matches_rejected_and_loops_the_revisit_before_s
     plan = _command(surface, target, "spec")
     before = plan[: plan.index("Step 1 — Knowledge retrieval")]
     lines = _mandated_lines(before, target)
-    assert any("intent.yaml" in ln and "assumptions.yaml" in ln for ln in lines), lines
+    assert any("hm intent status --json" in ln and "intent.yaml" in ln for ln in lines), lines
     assert "rejected" in before
-    assert "For each matching objective:" in before
-    assert any("world objective revisit <objective-id>" in ln for ln in lines), lines
-    assert before.index("rejected") < before.index("For each matching objective:")
-    assert before.index("For each matching objective:") < before.index(
-        "world objective revisit <objective-id>"
+    assert "For each matching intent:" in before
+    assert "revisits[id]" in before
+    assert before.index("rejected") < before.index("For each matching intent:")
+    assert before.index("For each matching intent:") < before.index(
+        "hm intent status --json", before.index("For each matching intent:")
     )
 
 
@@ -107,8 +107,8 @@ def _block(text: str, open_marker: str) -> str:
 @pytest.mark.parametrize(
     ("marker", "cmd"),
     [
-        ("<!-- @hm:answer-gated:assumption -->", "hm world assume"),
-        ("<!-- @hm:answer-gated:objective-close -->", "hm world objective close"),
+        ("<!-- @hm:answer-gated:assumption -->", "hm intent question"),
+        ("<!-- @hm:answer-gated:objective-close -->", "hm intent close"),
     ],
     ids=["assumption", "objective-close"],
 )
@@ -196,7 +196,7 @@ def test_ac_007_wrapup_supersedes_carries_claim(
     wrapup = _command(surface, target, "wrapup")
     block = _block(wrapup, "<!-- @hm:answer-gated:assumption -->")
     observe_lines = [
-        ln for ln in block.splitlines() if "hm world assume observe <id> --relation" in ln
+        ln for ln in block.splitlines() if "hm intent question observe <id> --relation" in ln
     ]
     assert len(observe_lines) == 1, block
     # On the CALL line itself — a `--claim` mentioned in prose beside the command still leaves
@@ -215,14 +215,14 @@ def test_ac_007_wrapup_supersedes_carries_claim(
 # emitting whatever the template happens to say.
 
 GAP_SKILL_PHRASES_BOTH = (
-    "hm world gap --json",
+    "hm intent status --json",
     "at most three",
     "overlaps-with",
     "ask about each candidate in turn",
     "answer every candidate before the first write",
 )
 GAP_SKILL_PHRASES_CLAUDE = (
-    "evidence: none — hypothesis only",
+    "evidence: none — statement only",
     "measure first",
     "never runs `approve`",
     "--from-proposal --candidates",
@@ -270,8 +270,8 @@ def test_ac_005_spec_offers_draft_after_none_and_creates_at_step_4_9(
     surface: dict[str, dict[str, str]], target: str
 ) -> None:
     plan = _command(surface, target, "spec")
-    q_pick = plan.index("Which objective does this task serve?")
-    q_draft = plan.index("Draft an objective for this task?", q_pick)  # the "none" bullet
+    q_pick = plan.index("Which intent does this task serve?")
+    q_draft = plan.index("Draft an intent for this task?", q_pick)  # the "none" bullet
     step_49 = plan.index("Step 4.9")
     call = plan.index("--from-proposal --candidates 1")
     step_5 = plan.index("Step 5 —")
@@ -280,10 +280,10 @@ def test_ac_005_spec_offers_draft_after_none_and_creates_at_step_4_9(
     assert q_draft < plan.index("Step 1 —")
     # cold start: a filled-in intent with zero objectives skips the pick, not the consent
     step_05 = plan[plan.index("Step 0.5") : plan.index("Step 1 —")]
-    assert "no `active` and no `proposed` objective" in step_05
-    assert step_05.count("Draft an objective for this task?") == 2
-    assert step_05.index("no `active` and no `proposed` objective") < step_05.index(
-        "Draft an objective for this task?"
+    assert "no `active` and no `proposed` intent" in step_05
+    assert step_05.count("Draft an intent for this task?") == 2
+    assert step_05.index("no `active` and no `proposed` intent") < step_05.index(
+        "Draft an intent for this task?"
     )
     after_draft = plan[q_draft:]
     assert "write nothing" in after_draft
@@ -309,16 +309,16 @@ def test_ac_007_skill_and_wrapup_call_the_verb(
         "@hm:answer-gated:objective-close"
     )
     measure_block = _block(wrapup, "<!-- @hm:answer-gated:outcome-measure -->")
-    assert "Measure outcomes now?" in measure_block
-    record_calls = re.findall(r"hm world outcome measure --all(?! --dry-run)", measure_block)
+    assert "Measure metrics now?" in measure_block
+    record_calls = re.findall(r"hm intent metric measure --all(?! --dry-run)", measure_block)
     assert len(record_calls) == 1, "exactly one bare record call (never the --dry-run preview)"
     assert "--dry-run" not in measure_block
     assert "write nothing" in measure_block
-    assert "hm world gap --json" in measure_block, "the listing source (ADR-006)"
+    assert "hm intent status --json" in measure_block, "the listing source (ADR-006)"
     yes = measure_block.index('If the answer is "yes":')
-    assert _in_order(measure_block[:yes], [ASK_TOKEN[target], "Measure outcomes now?"])
+    assert _in_order(measure_block[:yes], [ASK_TOKEN[target], "Measure metrics now?"])
     assert _in_order(
-        measure_block[yes:], ["hm world outcome measure --all", "Otherwise: write nothing"]
+        measure_block[yes:], ["hm intent metric measure --all", "Otherwise: write nothing"]
     ), measure_block
     assert "three questions" in wrapup
     assert "two questions, answer-gated" not in wrapup
@@ -340,10 +340,10 @@ def test_ac_007_the_skill_measure_first_step_runs_the_verb(target: Target, path:
     anchor = "**measure first**"
     assert body.count(anchor) == 1, "the measure-first step must stay a single block"
     step = body[body.index(anchor) :]
-    call = step.index("hm world outcome measure --all --dry-run")
+    call = step.index("hm intent metric measure --all --dry-run")
     end = re.search(r"\n(?:\d+\. |#)", step[call:])
     item = step[: call + (end.start() if end else len(step) - call)]
-    assert re.search(r"hm world outcome measure --all(?! --dry-run)", item), (
+    assert re.search(r"hm intent metric measure --all(?! --dry-run)", item), (
         "the record call (without --dry-run) is missing from the measure-first step"
     )
     assert "The rule for every write" in item, "the ask is deferred to the shared write rule"
@@ -353,7 +353,7 @@ def test_ac_007_the_skill_measure_first_step_runs_the_verb(target: Target, path:
 
 
 def _step57(wrapup: str) -> str:
-    start = wrapup.index("#### 5.7 World state")
+    start = wrapup.index("#### 5.7 Intent state")
     end = wrapup.index("\n### ", start)
     return wrapup[start:end]
 
@@ -373,7 +373,7 @@ def test_ac_005_wrapup_prints_withdrawal_line_when_due(
     # V-10: the sentence reads the gap output the outcome-measure check already obtained.
     assert line_at > step.index("<!-- @hm:answer-gated:outcome-measure -->")
     assert wrapup.count("[intent] withdrawal criterion met") == 1
-    assert "hm world gap" in intent.SKELETON
+    assert "hm intent status" in intent.SKELETON
     assert "withdrawal.due" in intent.SKELETON
 
 

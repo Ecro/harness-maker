@@ -4,16 +4,16 @@ rubrics:
   - id: drift_is_detected_when_present
     description: >
       For each of the three drifted fixtures — a PLAN that adds work outside
-      the objective's `scope` which `non_scope` does not name, a PLAN that adds
-      an item inside `non_scope`, and a PLAN that omits the subject of the
-      `hypothesis` — does the review output contain a `scope_drift` finding?
+      the objective's `scope` which `out_of_scope` does not name, a PLAN that adds
+      an item inside `out_of_scope`, and a PLAN that omits the subject of the
+      `statement` — does the review output contain a `scope_drift` finding?
       Silence on any of the three is the failure this lens exists to catch;
       the first case is the common one, because non_scope is never complete.
     severity: P0
     action: >
-      Make the lens read `objective: <id>` from the PLAN frontmatter, load the
+      Make the lens read `intent: <id>` (or legacy `objective: <id>`) from the PLAN frontmatter, load the
       objective record, and compare PLAN scope items against `scope` (as the
-      positive boundary), `non_scope` and `hypothesis` before emitting findings.
+      positive boundary), `out_of_scope` and `statement` before emitting findings.
   - id: no_drift_no_finding
     description: >
       For the in-scope fixture, does the review output contain no

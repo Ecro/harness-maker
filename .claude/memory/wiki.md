@@ -1229,4 +1229,6 @@ this removal actually singular rather than merely renamed. Cross-ref:
 `[wiki:architecture] single-reader-single-writer-config-axis`,
 `[fail:design] template-literal-shadows-config-key`,
 `[wiki:architecture] harness-diet-phases-2-6`.
+## [wiki:architecture] intent-vocabulary-and-owners | 2026-09-21
+Use hm intent for canonical verbs and explicit migrate for legacy data; hm world remains deprecated compatibility. Role-map owner/dri/team identities drive advisory approval text, never authentication. Persist questions in .claude/intent.yaml, values in .claude/intent/metrics.yaml, records in intent/<ID>.md; preserve frozen approval keys, history, body bytes, and withdrawal clock. Serialize writes before choosing storage, and finish interrupted migration before allowing another writer.
 <!-- @hm:/user:entries -->

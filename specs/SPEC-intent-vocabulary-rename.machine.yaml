@@ -1,0 +1,235 @@
+schema_version: 3
+spec_slug: intent-vocabulary-rename
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: Migration and compatibility at T2; historical fixtures
+  supply independent oracles.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/intent.py
+- src/harness_maker/world.py
+- src/harness_maker/intent_cli.py
+- src/harness_maker/intent_migrate.py
+- src/harness_maker/intent_vocabulary.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Compatible project schema
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_vocabulary.py::test_s1
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Handoff hazards H1-H4 and acceptance section 9; fixed legacy bytes
+    and independent expected values for compatible project schema.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Stable approvals and measurements
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_vocabulary.py::test_s2
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Handoff hazards H1-H4 and acceptance section 9; fixed legacy bytes
+    and independent expected values for stable approvals and measurements.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Historical withdrawal clock
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_vocabulary.py::test_s3
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Handoff hazards H1-H4 and acceptance section 9; fixed legacy bytes
+    and independent expected values for historical withdrawal clock.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Safe repeatable migration
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_vocabulary.py::test_s4
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Handoff hazards H1-H4 and acceptance section 9; fixed legacy bytes
+    and independent expected values for safe repeatable migration.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: One question store
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_vocabulary.py::test_s5
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Handoff hazards H1-H4 and acceptance section 9; fixed legacy bytes
+    and independent expected values for one question store.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Canonical CLI and compatibility alias
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_vocabulary.py::test_s6
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Handoff hazards H1-H4 and acceptance section 9; fixed legacy bytes
+    and independent expected values for canonical cli and compatibility alias.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Installed and land consumers
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_vocabulary.py::test_s7
+  executable_predicate: result == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Handoff hazards H1-H4 and acceptance section 9; fixed legacy bytes
+    and independent expected values for installed and land consumers.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: purpose={statement,vision}, metrics, rules, out_of_scope
+  category: schema/file format/storage layout
+  rationale: Durable contract explicitly selected from the handoff
+  source: spec
+- id: IRR-002
+  decision: intent/<ID>.md; statement/metric_id/out_of_scope; 1:N cardinality
+  category: data migration
+  rationale: Durable contract explicitly selected from the handoff
+  source: spec
+- id: IRR-003
+  decision: hm intent direct record verbs plus metric/question; hm world deprecated
+  category: public API/CLI contract
+  rationale: Durable contract explicitly selected from the handoff
+  source: spec
+- id: IRR-004
+  decision: One open questions store with lossless evidence/history and status mapping
+  category: data migration
+  rationale: Durable contract explicitly selected from the handoff
+  source: spec
+approval:
+  kind: human
+  content_hash: 69182f4b7b4ae10c4b6182cde241595fd8f3acf1812e531f49942ea8a1f2f421
+  approved_by: Ecro
+  approved_at: '2026-09-21T04:29:57Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 994541398fb37fff2a16af614c1c585fe8cc397f58350536f02229e90ed3421a
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: e6a044603d61051ab204c9b0aa7b9bf151b865d6c26bbfba0ab05b33331bc34a
+    paths_to_mutate: 0e6afcb7e3844f70767642ba20fdbbe23c0d921fb421121f5109d9c3e0c3237b
+    irreversible_decisions: 9d9b6cf2b907182df5ad13b70e16479a097b0f02f9143186f4acbcdbd60b00c2
+    AC-001: 9fcbce7211b9af41c7b4334a6c91018459bdc6f5eac585ada88fecaf2d4794a5
+    AC-002: 81cba90fe4174b70380db1bf527a4687dd17cf80ec5899b3f30c77de4bb2f755
+    AC-003: d41c73772e9a8041f075b36ae597be00427d081a25dc2f7c48fdd72eee007a4b
+    AC-004: 0c541c80c9e20fcccab3d9c6e036afef161119f9584c613d227bc2f6dbb254f5
+    AC-005: 7b2aa56fd613bd9a9ce2197b659eade4b80d9ee7912353e44847dadfe78c8081
+    AC-006: beb2d15a26f5780494a8e5d72e25206466878894ab72ff3b907586be797dc5e5
+    AC-007: 95533bcd4b61a6c37bca8523d0eef782d9a2793665e2fbd53f1af1f919a8c9a3
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c

@@ -28,6 +28,11 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-21, `intent-vocabulary-and-owners`** — execute, review, spec, wrapup and
+  help adopt canonical intent vocabulary and preserve legacy PLAN link reads. All four
+  arms have identical moved command sets; no commands added or removed. Autonomy
+  conditions and answer gates are unchanged.
+
 - **2026-09-21, `dev-mode-removal`** — the methodology axis folded into `spec.strictness`, and the
   two `auto_safe` arms re-spelled 1:1 (`@task-driven`→`@warn`, `@spec-driven`→`@block`, content
   unchanged) before comparing. `configure`, `execute`, `make`, `review`, `spec` and `verify`

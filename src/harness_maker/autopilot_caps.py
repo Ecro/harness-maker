@@ -289,6 +289,10 @@ def _plan_link(checkout: Path, slug: str) -> tuple[bool, Any, bool] | None:
         return (True, None, True)
     if not isinstance(meta, dict):
         return (True, None, True)
+    if "intent" in meta:
+        if "objective" in meta and meta["objective"] != meta["intent"]:
+            return (True, None, True)
+        return (True, meta["intent"], False)
     if "objective" not in meta:
         return None
     return (True, meta["objective"], False)

@@ -2,70 +2,70 @@
   "arms": {
     "ask@flag_off": {
       "configure": "4bfb636d9c388cfb6c997544f6fee142acd9af33f45c5fee8b84ee804a0f05b6",
-      "execute": "484e403a9dadc309a51ba4d6c2036fc03d087c90907471c120fa76b1dcde39fa",
+      "execute": "663e4b4f84a42b2ef36b0048ba2213a48b56fd2f68d546a9eb44b3fa39689de8",
       "health": "0c439915f82c5779445201c41b493ab26e97ecacf1091fefbe2be0dd9c210194",
-      "help": "39428efdf44e3f598ba8604e691ffa231989d60981072e169f383318c79c761a",
+      "help": "fa2d1435aded8922e18b2456cdb20cf77fd38e428d43f4408743dd092f155add",
       "loop": "d662d5864eeeb374b0d486bb0a8cb88dfacea60f92f4dbad6d6afcc3f577a404",
       "loop-p5-batch": "d4d7044b1a58f643330dacce632f2c491c5437127fff7c62e77acd8d80e2cdfb",
       "make": "7a992c5c8bef78e636d02570e5097b3209bd7dfefbc3b06191b8ea6793b0832f",
       "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
       "research": "13220eb5be2b19192707aa6b8725a16a7e5c6b77e3e894fee48295ff48665285",
-      "review": "11d1dde9c42d136e00a1e227970762722d4a5d5db6f3f45ef19b4de26f0a49d7",
-      "spec": "08e2f25461c7282b7f6f2d0990cea5f35def60967c4bda849ae683b623c08b7f",
+      "review": "866b9048bacee4bf858e1be03de44b4aafacfebd13b158618c3999785700eb80",
+      "spec": "cfd8da6d03ad4b12074a7b9ca6c7f20637d2ea1dcdcde2351d689713f435b296",
       "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
       "verify": "692633351894856c26579d25d9387b6c1b5b07b8b0c1f28c1098181716011698",
-      "wrapup": "20df6100f876e64af07075793725747926905c82bb1a7f1c061dfaf0de34e96e"
+      "wrapup": "d6ce20308efdd4c32595d9bb90577412a17e6f2916a5ccf9ee6833f4826eb70d"
     },
     "ask@flag_on": {
       "configure": "4bfb636d9c388cfb6c997544f6fee142acd9af33f45c5fee8b84ee804a0f05b6",
-      "execute": "f4102f778be00051721d6431268074fb8482ad72fa8610701d54195685e3b5f3",
+      "execute": "49eb1dcf8f6986dd4a8bbc5c357bebdf26a15afea77951586688c4dc558af318",
       "health": "0c439915f82c5779445201c41b493ab26e97ecacf1091fefbe2be0dd9c210194",
-      "help": "39428efdf44e3f598ba8604e691ffa231989d60981072e169f383318c79c761a",
+      "help": "fa2d1435aded8922e18b2456cdb20cf77fd38e428d43f4408743dd092f155add",
       "loop": "a8f44bbffb41a839edeb052b7f8547b7106f5d6631aa155a566f30f86fc31890",
       "loop-p5-batch": "2429f826943fffcb8f8205dff25d3530d3471d4f15051adc9d8c1538231a38cc",
       "make": "7a992c5c8bef78e636d02570e5097b3209bd7dfefbc3b06191b8ea6793b0832f",
       "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
       "research": "c51eb536c4e38c52e3903081faf296ed2f10545cdfcf8649fdd17ac06b7e971f",
-      "review": "41d1bf5cc9a062de654fafc5c1c3a608bd934e8cf684f90182be40699ec5e2ec",
-      "spec": "5fa533549ff6ed2b42ca7a388543f14fa2cc41dc16056a5f60a85ff667125a0d",
+      "review": "45c3708ff3ebc966f6531f4083d02872ea8751773e4e2ab5b1de12464ec45d09",
+      "spec": "2ab5992f651f3942f551554c5b71602b4a503c9ea06d94e1ef0acc9ff2817214",
       "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
       "verify": "e827b10c9503d8157c3433140088e4348c8155f9667104175048b9a6fb845a3c",
-      "wrapup": "3de67c098d6e63506551291f3bd4606a79536d1f07bc5d9fb0dcc7578ef44df4"
+      "wrapup": "4c012fa619a423bbfd740909629b9c8a286c8e828bd25ca24b7e97ad96450888"
     },
     "auto_safe@block": {
       "configure": "4bfb636d9c388cfb6c997544f6fee142acd9af33f45c5fee8b84ee804a0f05b6",
-      "execute": "064d4bb39948bdba1f0baa9fa9ac558dcfebc6181366471ddd09faedaa5b878d",
+      "execute": "7ca1f1d5e9cb6c4368e25cafe25f3d1066ce38b29e291dd0e16b4109c0f9579c",
       "health": "564609a25b9071d8c79bce1d5102727922f6434953b3aa6ce4455a2ae3153ca9",
-      "help": "62a59c34a71450bbd0de578c098e9cd59797c2de2e3e4fa884794901096408c8",
+      "help": "a74af2d890525db55e4b1e91f7c3dd5cd2dd2ed8bf708484ebccc8c95e0ad720",
       "loop": "4b71d6fe6c7b9f0cee5d6afe9e57d0ba0b8e9289d8abf4d936f582b4fcc22caa",
       "loop-p5-batch": "2429f826943fffcb8f8205dff25d3530d3471d4f15051adc9d8c1538231a38cc",
       "make": "7a992c5c8bef78e636d02570e5097b3209bd7dfefbc3b06191b8ea6793b0832f",
       "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
       "research": "4324bb7b871fb2e6444f024d84b7a2d13f19b7e883b3d35fe554a3439c0f15ab",
-      "review": "2e33b95e2ea408b8947202823335b15ac81ce866125db58ba39fc6e6a062a175",
-      "spec": "7a734dfa2de8ae0588b364cf4864280be0a439441eae73b9004ea8f519652a8c",
+      "review": "8687d391fbc328bee242d1d83dcb50bf31c66bda6760181597126e69f29f5621",
+      "spec": "97567448b114f068391d560ac8b1dc4f72f6dae1bb4d33e45e1a3d12dbe15394",
       "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
       "verify": "f63ab357d7a2d7590adcdf825ac2fe1cb40a1071a854999567d6b04d506e570b",
-      "wrapup": "068cc835650d48d59fed7f7918be381136dd3bb2d80effea99b0e20cf6d616cc"
+      "wrapup": "1b0c9c20a7750c245f76fe1a794cbb7d879fefcca6371f7e98e8d04ab0dfaf86"
     },
     "auto_safe@warn": {
       "configure": "4bfb636d9c388cfb6c997544f6fee142acd9af33f45c5fee8b84ee804a0f05b6",
-      "execute": "2a802434b3efac4522754fda82858f3cc43593af767c587f4a19936285f5d109",
+      "execute": "c019324262e9aa37ab717b2214207bb50a635125e97ef3d9527593486b2e0265",
       "health": "564609a25b9071d8c79bce1d5102727922f6434953b3aa6ce4455a2ae3153ca9",
-      "help": "62a59c34a71450bbd0de578c098e9cd59797c2de2e3e4fa884794901096408c8",
+      "help": "a74af2d890525db55e4b1e91f7c3dd5cd2dd2ed8bf708484ebccc8c95e0ad720",
       "loop": "4b71d6fe6c7b9f0cee5d6afe9e57d0ba0b8e9289d8abf4d936f582b4fcc22caa",
       "loop-p5-batch": "2429f826943fffcb8f8205dff25d3530d3471d4f15051adc9d8c1538231a38cc",
       "make": "7a992c5c8bef78e636d02570e5097b3209bd7dfefbc3b06191b8ea6793b0832f",
       "metrics": "1d379bc45dfb2edac1886aee7ee85e69054c0410c0c9535554eb150136447cf9",
       "research": "4324bb7b871fb2e6444f024d84b7a2d13f19b7e883b3d35fe554a3439c0f15ab",
-      "review": "2e33b95e2ea408b8947202823335b15ac81ce866125db58ba39fc6e6a062a175",
-      "spec": "f24ee2b91ff408257aa18eda025ba066621fb7dd8753220811f123e8d80bf625",
+      "review": "8687d391fbc328bee242d1d83dcb50bf31c66bda6760181597126e69f29f5621",
+      "spec": "6757cae1c6265ba8ad4a055ab895562267e9b603e9e55f87a79b4ad729dbef23",
       "uninstall": "f63b25e8833734d05ebc8486212fbaf1272186166e22ceb7ea7b97dab8e1dffd",
       "verify": "6105f1d690f08f0b8813b09aa2a1ad5494ee9e77d3d8d8b4aa8072ff4319419e",
-      "wrapup": "2d3ad480afc40971c487a080f4abeb3cd1d0a9178840722bd07423e4423906f8"
+      "wrapup": "182ccf8cf9963b42a12ced258f2581408462903e9db3c814f233fe2dfceb413c"
     }
   },
-  "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
+  "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture — a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
   "rebases": [
     {
       "aggregate_delta_chars": 1456,
@@ -77,7 +77,7 @@
       "aggregate_delta_chars": -54,
       "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
       "phase": 5,
-      "reason": "Phase 5 SHRINKS the rendered surface by 54 chars, in two attributed edits: review.md.j2 drops the `- Start from `harness.yaml.reviewers.enabled`.` bullet (-47, AC-015 \u2014 the list is not an input to lens_dispatch, so the instruction was a lever that does not exist), and step_manifest.md.j2's disclosed default for autopilot_persistent goes `false` -> `true` (-1 x 7 commands, AC-007 \u2014 the class default is True). No autopilot advance or picker block moved; the Phase 3 byte-neutrality claim is unaffected because both edits are outside the advance block."
+      "reason": "Phase 5 SHRINKS the rendered surface by 54 chars, in two attributed edits: review.md.j2 drops the `- Start from `harness.yaml.reviewers.enabled`.` bullet (-47, AC-015 — the list is not an input to lens_dispatch, so the instruction was a lever that does not exist), and step_manifest.md.j2's disclosed default for autopilot_persistent goes `false` -> `true` (-1 x 7 commands, AC-007 — the class default is True). No autopilot advance or picker block moved; the Phase 3 byte-neutrality claim is unaffected because both edits are outside the advance block."
     },
     {
       "aggregate_delta_chars": 416,
@@ -169,7 +169,7 @@
         "wrapup"
       ],
       "phase": "4",
-      "reason": "wrapup 5.7's assumption block gained the 'new \u2014 record an assumption' option (one `hm world assume add` call), the four-option cap with stale-first ids from `hm world gap --json`, and `[--locator <path:A-B>]` on the observe line. Re-captured on top of intent-layer-ops (rebased). Verified before re-capture that wrapup is the ONLY moved command in every arm and the command set did not drift. Re-captured again after the post-review fix: the 5.7 'new' branch now shows the exact add arguments and asks once more before running (codex dbc13952); wrapup the ONLY moved command.",
+      "reason": "wrapup 5.7's assumption block gained the 'new — record an assumption' option (one `hm world assume add` call), the four-option cap with stale-first ids from `hm world gap --json`, and `[--locator <path:A-B>]` on the observe line. Re-captured on top of intent-layer-ops (rebased). Verified before re-capture that wrapup is the ONLY moved command in every arm and the command set did not drift. Re-captured again after the post-review fix: the 5.7 'new' branch now shows the exact add arguments and asks once more before running (codex dbc13952); wrapup the ONLY moved command.",
       "task": "assumption-entry-and-evidence-locator"
     },
     {

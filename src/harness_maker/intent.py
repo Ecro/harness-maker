@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
 import re
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -22,9 +23,8 @@ OPTIONAL_FIELDS: frozenset[str] = frozenset(
     {"vision", "non_negotiables", "non_scope", "unknowns", "owners"}
 )
 RECOGNISED_FIELDS: frozenset[str] = REQUIRED_FIELDS | OPTIONAL_FIELDS
-LIST_FIELDS: frozenset[str] = frozenset(
-    {"outcomes", "non_negotiables", "non_scope", "unknowns", "owners"}
-)
+LIST_FIELDS: frozenset[str] = frozenset({"outcomes", "non_negotiables", "non_scope", "unknowns"})
+OWNER_ROLES = frozenset({"owner", "dri", "team"})
 STRING_FIELDS: frozenset[str] = frozenset({"mission", "vision"})
 OUTCOME_FIELDS: tuple[str, ...] = (
     "id",
@@ -46,33 +46,35 @@ _ID_RE = re.compile(r"^[a-z0-9_]+$")
 SKELETON = """\
 # .claude/intent.yaml — why this project exists. Human-written; nothing here is generated.
 #
-# Fill `mission` first. Until `mission` and `outcomes` are both filled, `hm world status`
-# reports `not_filled_in`. A file with outcomes but no mission is a validation error.
+# Fill `purpose.statement` first. Until it and `metrics` are both filled,
+# `hm intent status`
+# reports `not_filled_in`. A file with metrics but no purpose statement is a validation error.
 #
 # Withdrawal criterion (SPEC-withdrawal-criterion-window): if 10 wrapups land with no signal
-# from this layer — nothing measured, no objective created, approved or closed — and no
+# from this layer — nothing measured, no intent created, approved or closed — and no
 # `revisit_when` currently reads `candidate`, this layer is unused and is removed. The count
 # runs from the last signal, or from the day the file was filled in when there has never been
-# one. `hm world gap --json` measures it: `withdrawal.due` is true when the criterion holds.
+# one. `hm intent status --json` measures it: `withdrawal.due` is true when the criterion holds.
 schema_version: 1
-mission: ""
-vision: ""
-# outcomes:
+purpose:
+  statement: ""
+  vision: ""
+# metrics:
 #   - id: dead_rendered_bytes          # [a-z0-9_]+, unique
 #     description: share of rendered command bytes with zero recorded invocations
 #     target: 10                       # a number; compared to the last recorded value
 #     higher_is_better: false
 #     how_measured: "hm economics stages + metrics invocation counts"
-#     measure:                         # optional — lets `hm world outcome measure` record it
+#     measure:                         # optional — lets `hm intent metric measure` record it
 #       cmd: "uv run hm economics report --root ."   # argv (shlex), never a shell
 #       select: "json:report.carry_ratio"  # json:<dotted.path> | regex:<one group> | last-number
 #       cwd: base                        # base (default; observability lives there) | checkout
 #       timeout_s: 300                   # optional, positive
-outcomes: []
-non_negotiables: []
-non_scope: []
-unknowns: []
-owners: []
+metrics: []
+rules: []
+out_of_scope: []
+open_questions: []
+owners: {}
 """
 
 
@@ -122,7 +124,24 @@ class Intent:
     non_negotiables: tuple[str, ...]
     non_scope: tuple[str, ...]
     unknowns: tuple[str, ...]
-    owners: tuple[str, ...]
+    owners: dict[str, str]
+    open_questions: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+
+    @property
+    def purpose(self) -> dict[str, str]:
+        return {"statement": self.mission, "vision": self.vision}
+
+    @property
+    def metrics(self) -> tuple[Outcome, ...]:
+        return self.outcomes
+
+    @property
+    def rules(self) -> tuple[str, ...]:
+        return self.non_negotiables
+
+    @property
+    def out_of_scope(self) -> tuple[str, ...]:
+        return self.non_scope
 
 
 def skeleton_text() -> str:
@@ -276,6 +295,12 @@ def _validate_raw(path: Path, raw: Any) -> list[IntentError]:
     errors: list[IntentError] = []
     if not isinstance(raw, dict):
         return [IntentError("file", f"{path}: top level must be a mapping")]
+    from harness_maker.intent_vocabulary import legacy_project
+
+    try:
+        raw = legacy_project(raw)
+    except ValueError as exc:
+        return [IntentError("file", str(exc))]
     sv = schema_version_error(path, raw)
     if sv is not None:
         errors.append(sv)
@@ -288,6 +313,20 @@ def _validate_raw(path: Path, raw: Any) -> list[IntentError]:
     for key in STRING_FIELDS:
         if key in raw and not isinstance(raw[key], str):
             errors.append(IntentError(key, "must be a string"))
+    if "owners" in raw:
+        owners = raw["owners"]
+        if isinstance(owners, dict):
+            for role, person in owners.items():
+                if role not in OWNER_ROLES:
+                    errors.append(IntentError(f"owners.{role}", "unknown role"))
+                elif not isinstance(person, str):
+                    errors.append(IntentError(f"owners.{role}", "must be a string"))
+        elif isinstance(owners, list):
+            for j, person in enumerate(owners):
+                if not isinstance(person, str):
+                    errors.append(IntentError(f"owners[{j}]", "must be a string"))
+        else:
+            errors.append(IntentError("owners", "must be a role map or legacy list of strings"))
     for key in LIST_FIELDS:
         if key in raw and not isinstance(raw[key], list):
             errors.append(IntentError(key, "must be a list"))
@@ -343,10 +382,15 @@ def intent_from_raw(path: Path, raw: Any) -> Intent:
     if errors:
         raise IntentInvalidError(path, errors)
     assert isinstance(raw, dict)
+    from harness_maker.intent_vocabulary import legacy_project, project_questions
+
+    questions = project_questions(raw)
+    raw = legacy_project(raw)
     major = _major_of(raw["schema_version"])
     assert major is not None  # validated above
     return Intent(
         schema_version=major,
+        open_questions=tuple(questions),
         mission=raw["mission"],
         vision=raw.get("vision") or "",
         outcomes=tuple(
@@ -363,7 +407,13 @@ def intent_from_raw(path: Path, raw: Any) -> Intent:
         non_negotiables=_strs(raw, "non_negotiables"),
         non_scope=_strs(raw, "non_scope"),
         unknowns=_strs(raw, "unknowns"),
-        owners=_strs(raw, "owners"),
+        owners=(
+            dict(raw["owners"])
+            if isinstance(raw.get("owners"), dict)
+            else {"team": ", ".join(raw["owners"])}
+            if raw.get("owners")
+            else {}
+        ),
     )
 
 
@@ -381,3 +431,100 @@ def _measure_of(raw: Any) -> Measure | None:
 def is_not_filled_in(intent: Intent) -> bool:
     """The skeleton state: mission empty AND no outcomes — the one state where that is legal."""
     return not intent.mission.strip() and not intent.outcomes
+
+
+def _parser() -> argparse.ArgumentParser:
+    from harness_maker import world
+
+    parser = argparse.ArgumentParser(prog="hm intent")
+    parser.add_argument("--root", default=None, help="checkout root (default: git toplevel of cwd)")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    s = sub.add_parser("status")
+    s.add_argument("--json", action="store_true")
+    mg = sub.add_parser("migrate")
+    mg.add_argument("--json", action="store_true")
+
+    a = sub.add_parser("question")
+    asub = a.add_subparsers(dest="verb", required=True)
+    ob = asub.add_parser("observe")
+    ob.add_argument("id")
+    ob.add_argument("--relation", required=True, choices=world.RELATIONS)
+    ob.add_argument("--text", required=True)
+    ob.add_argument("--observed-at", required=True, dest="observed_at")
+    ob.add_argument("--claim", default=None)
+    ob.add_argument("--locator", default=None)
+    ob.add_argument("--json", action="store_true")
+    ad = asub.add_parser("add")
+    ad.add_argument("id")
+    ad.add_argument("--claim", required=True)
+    ad.add_argument("--status", required=True, choices=("open", "confirmed", "wrong"))
+    ad.add_argument("--text", default=None)
+    ad.add_argument("--observed-at", default=None, dest="observed_at")
+    ad.add_argument("--locator", default=None)
+    ad.add_argument("--json", action="store_true")
+    rs = asub.add_parser("resolve")
+    rs.add_argument("id")
+    rs.add_argument("--status", required=True, choices=("open", "confirmed", "wrong"))
+    rs.add_argument("--claim", required=True)
+    rs.add_argument("--json", action="store_true")
+
+    o = sub.add_parser("metric")
+    osub = o.add_subparsers(dest="verb", required=True)
+    rc = osub.add_parser("record")
+    rc.add_argument("id")
+    rc.add_argument("--value", required=True, type=float)
+    rc.add_argument("--observed-at", required=True, dest="observed_at")
+    rc.add_argument("--evidence", required=True)
+    rc.add_argument("--json", action="store_true")
+    ms = osub.add_parser("measure")
+    ms.add_argument("id", nargs="?", default=None)
+    ms.add_argument("--all", action="store_true", dest="all_outcomes")
+    ms.add_argument("--dry-run", action="store_true", dest="dry_run")
+    ms.add_argument("--json", action="store_true")
+
+    jsub = sub
+    # Literal `add_parser` names on purpose: the command-surface gate reads them by AST and
+    # the registry must list every one, so a loop over a tuple would hide six verbs from it.
+    nw = jsub.add_parser("new")
+    nw.add_argument("id")
+    nw.add_argument("--title", required=True)
+    nw.add_argument("--statement", required=True, dest="hypothesis")
+    nw.add_argument("--scope", action="append", required=True)
+    nw.add_argument("--metric", required=True, dest="outcome_id")
+    nw.add_argument("--out-of-scope", action="append", default=None, dest="non_scope")
+    nw.add_argument("--from-proposal", action="store_true", dest="from_proposal")
+    nw.add_argument("--candidates", type=int, default=None)
+    nw.add_argument("--declined", action="append", default=None)
+    nw.add_argument("--json", action="store_true")
+    ap = jsub.add_parser("approve")
+    ac = jsub.add_parser("activate")
+    ac.add_argument("--cap", type=int, default=1)
+    dr = jsub.add_parser("drop")
+    ro = jsub.add_parser("reopen")
+    sh = jsub.add_parser("show")
+    for p in (ap, ac, dr, ro, sh):
+        p.add_argument("id")
+        p.add_argument("--json", action="store_true")
+    cl = jsub.add_parser("close")
+    cl.add_argument("id")
+    cl.add_argument("--observed", required=True, choices=world.OBSERVED_VALUES)
+    cl.add_argument("--note", required=True)
+    cl.add_argument("--json", action="store_true")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Lazy bridge: execution as __main__ must use the imported schema exception class."""
+    from harness_maker import command_registry
+    from harness_maker.intent_cli import main as cli_main
+
+    guard = command_registry.guard_or_none("intent", argv)
+    if guard is not None:
+        return guard
+
+    return cli_main(argv)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

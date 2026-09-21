@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Intent vocabulary and owners
+
+- Add canonical `hm intent` commands, role-aware advisory approvals, and explicit
+  legacy migration. Project purpose, metrics, rules and open questions share the
+  canonical vocabulary; intent records remain a 1:N grouping of SPECs.
+- Preserve approvals, timestamps, history and record bodies when migrating to
+  `intent/<ID>.md` and `.claude/intent/metrics.yaml`. Serialize migration with
+  writers and require interrupted migration to finish before writes resume.
+  `hm world` remains a deprecated compatibility alias for one release.
+
 ### BREAKING
 
 - **`dev_mode` is removed; `spec.strictness: block | warn` replaces it.** The axis existed

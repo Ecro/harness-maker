@@ -10,6 +10,12 @@ research_doc: "[[RESEARCH-objective-gap-proposal]]"
 summary: "Read-only `hm world gap` table + on-demand LLM objective candidates (skill + plan Step 0.5); writes only via `objective new`, approve stays human"
 ---
 
+> Vocabulary and storage layout are superseded by [[SPEC-intent-vocabulary-rename]];
+> owners shape and advisory approval guidance by [[SPEC-intent-owners-role-map]].
+> This historical SPEC and its machine companion retain their original ACs and test bindings
+> as compatibility evidence. Unchanged behavioral guarantees still apply.
+
+
 # SPEC — Objective gap & proposal: from a written mission to a proposed objective
 
 ## 🎯 Intent

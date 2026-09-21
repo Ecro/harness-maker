@@ -206,6 +206,8 @@ DELIVERABLE_PREFIXES: tuple[str, ...] = (
 #: asserts they agree. A trailing `/` means "every `<id>.yaml` directly inside".
 DELIVERABLE_STATE_PATHS: tuple[str, ...] = (
     ".claude/intent.yaml",
+    ".claude/intent/metrics.yaml",
+    "intent/*.md",
     ".claude/world/assumptions.yaml",
     ".claude/world/outcomes.yaml",
     # `.claude/world/objectives/` left this tuple with SPEC-playbook-alignment ADR-006/007: the
@@ -217,7 +219,9 @@ DELIVERABLE_STATE_PATHS: tuple[str, ...] = (
 def _state_path_regex() -> str:
     parts = []
     for p in DELIVERABLE_STATE_PATHS:
-        if p.endswith("/"):
+        if p == "intent/*.md":
+            parts.append(r"intent/[^/]+\.md")
+        elif p.endswith("/"):
             parts.append(re.escape(p) + r"[^/]+\.yaml")
         else:
             parts.append(re.escape(p))

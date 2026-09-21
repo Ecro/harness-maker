@@ -10,6 +10,12 @@ research_doc: "[[RESEARCH-cell-dev-future-and-intent-layer-fit]]"
 summary: "State-only intent layer: intent.yaml + assumptions ledger + human-picked objective bound to an approval hash, read by hm status and the autopilot boundary; validity and revalidation are derived at read time, never stored; scope drift of the work itself is an LLM review judgment"
 ---
 
+> Vocabulary and storage layout are superseded by [[SPEC-intent-vocabulary-rename]];
+> owners shape and advisory approval guidance by [[SPEC-intent-owners-role-map]].
+> This historical SPEC and its machine companion retain their original ACs and test bindings
+> as compatibility evidence. Unchanged behavioral guarantees still apply.
+
+
 # SPEC — Intent / Assumptions / Objective layer (state-only slice)
 
 > **Revision 6.1 (2026-09-16, during `/hm:plan`).** Prose corrections only, each traced to a

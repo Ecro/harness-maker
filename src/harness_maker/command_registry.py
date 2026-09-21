@@ -51,6 +51,27 @@ MODULES: dict[str, ModuleSpec] = {
     "mutation_runner": ModuleSpec("flagonly"),
     # SPEC-intent-world-model-objective-layer ADR-001: one module, four verbs; `assume`,
     # `outcome` and `objective` carry their own sub-verbs (add/observe/resolve, record, approve…).
+    "intent": ModuleSpec(
+        "subparser",
+        _s(
+            "status",
+            "migrate",
+            "metric",
+            "question",
+            "record",
+            "measure",
+            "add",
+            "observe",
+            "resolve",
+            "new",
+            "approve",
+            "activate",
+            "drop",
+            "reopen",
+            "close",
+            "show",
+        ),
+    ),
     "world": ModuleSpec(
         "subparser",
         _s(

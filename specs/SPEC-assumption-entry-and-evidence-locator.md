@@ -10,6 +10,12 @@ research_doc: "[[RESEARCH-assumption-entry-and-evidence-locator]]"
 summary: "`hm world assume add` + optional content-fingerprint `locator` on evidence; `gap` derives staleness"
 ---
 
+> Vocabulary and storage layout are superseded by [[SPEC-intent-vocabulary-rename]];
+> owners shape and advisory approval guidance by [[SPEC-intent-owners-role-map]].
+> This historical SPEC and its machine companion retain their original ACs and test bindings
+> as compatibility evidence. Unchanged behavioral guarantees still apply.
+
+
 # SPEC — Assumption entry point + evidence locator
 
 ## 🎯 Intent

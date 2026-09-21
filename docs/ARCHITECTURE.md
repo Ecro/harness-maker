@@ -493,6 +493,22 @@ The runner reuses the `rubric_loader` pattern from `ai_readiness.py` so the v0 c
 
 **Key files**: `src/harness_maker/personalization_audit.py`, `src/harness_maker/rubrics/personalization.yaml`, `src/harness_maker/templates/commands/hm/personalization-audit.md.j2`.
 
+### Intent storage and migration (2026-09-21)
+
+`intent.py` validates canonical and legacy project definitions; `world.py` keeps
+compatible lifecycle and ledger behavior; `intent_cli.py` exposes canonical
+`hm intent` verbs. `intent_vocabulary.py` translates field names and
+`intent_migrate.py` preflights, publishes and retires legacy storage.
+
+Project questions have one store in `.claude/intent.yaml`, measurements live in
+`.claude/intent/metrics.yaml`, and intent records live in `intent/<ID>.md`. The
+record folder identifies type rather than lifecycle state. On POSIX, migration
+and leaf writers share a checkout-directory lock acquired before storage-path
+selection. Per-file atomic replacement does not imply a multi-file transaction:
+a failed publication leaves sources available, and the layout guard refuses
+writes until explicit migration retry finishes. Frozen approval payload keys
+keep historical approvals valid across the vocabulary change.
+
 ## 4. Preset Comparison
 
 The two presets bracket the design space. Most projects pick one and tune 1-3 dimensions.

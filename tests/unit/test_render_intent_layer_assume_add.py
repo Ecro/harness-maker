@@ -24,20 +24,20 @@ sys.path.insert(0, str(_REPO / "tests" / "structural"))
 from _surface_baseline import render_surface  # noqa: E402
 
 STALE_LABEL = "(cited code changed)"
-NEW_LABEL = "new — record an assumption"
-ADD_CMD = "hm world assume add <id> --claim"
+NEW_LABEL = "new — record a question"
+ADD_CMD = "hm intent question add <id> --claim"
 OBSERVE_LOCATOR = "[--locator <path:A-B>]"
-OPTION_CAP = "at most two assumption ids"
+OPTION_CAP = "at most two question ids"
 CONFIRM_NEW = "show the exact `add` arguments"
-GAP_SOURCE = "`hm world gap --json`"
+GAP_SOURCE = "`hm intent status --json`"
 ASK_TOKEN = {"claude": "AskUserQuestion", "codex": "request_user_input"}
 MANDATED = {"claude": ("!uv run", "!python -m", "!hm "), "codex": ('Bash("uv run', 'Bash("hm ')}
 SKILL_ADD_FORM = (
-    "hm world assume add <id> --claim --status <known|assumed|unknown>"
+    "hm intent question add <id> --claim --status <open|confirmed|wrong>"
     " [--text --observed-at [--locator <path:A-B>]]"
 )
 SKILL_OBSERVE_FORM = (
-    "hm world assume observe <id> --relation <confirms|supersedes|contradicts> --text"
+    "hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text"
     " --observed-at [--claim] [--locator <path:A-B>]"
 )
 
@@ -77,7 +77,7 @@ def test_ac_010_wrapup_offers_add_and_lists_stale_first(
     assert _after(block, NEW_LABEL, CONFIRM_NEW, ASK_TOKEN[target], ADD_CMD), block
     calls = [ln for ln in block.splitlines() if ln.strip().startswith(MANDATED[target])]
     assert sum(ADD_CMD in ln for ln in calls) == 1, calls
-    observe = [ln for ln in calls if "hm world assume observe" in ln]
+    observe = [ln for ln in calls if "hm intent question observe" in ln]
     assert len(observe) == 1, calls
     assert OBSERVE_LOCATOR in observe[0], calls
 

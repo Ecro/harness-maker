@@ -10,6 +10,12 @@ research_doc: "[[RESEARCH-observed-harness-gaps-salvage]]"
 summary: "Salvage observed-harness-gaps onto main; backlog warning moves to the wrapup main loop"
 ---
 
+> Vocabulary and storage layout are superseded by [[SPEC-intent-vocabulary-rename]];
+> owners shape and advisory approval guidance by [[SPEC-intent-owners-role-map]].
+> This historical SPEC and its machine companion retain their original ACs and test bindings
+> as compatibility evidence. Unchanged behavioral guarantees still apply.
+
+
 # SPEC — Observed harness-maker gaps, salvaged onto main (memory loop + contract mismatches)
 
 > **Provenance.** This SPEC is derived from `SPEC-observed-harness-gaps` (2026-08-14, in the

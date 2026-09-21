@@ -10,6 +10,12 @@ research_doc: "[[RESEARCH-playbook-alignment]]"
 summary: "INTENT-<ID>.md is the objective record: frontmatter = machine fields + hash payload, body = Playbook sections; plus three P2 fixes"
 ---
 
+> Vocabulary and storage layout are superseded by [[SPEC-intent-vocabulary-rename]];
+> owners shape and advisory approval guidance by [[SPEC-intent-owners-role-map]].
+> This historical SPEC and its machine companion retain their original ACs and test bindings
+> as compatibility evidence. Unchanged behavioral guarantees still apply.
+
+
 # SPEC — Playbook alignment: the objective record becomes `work-docs/INTENT-<ID>.md`
 
 ## 🎯 Intent

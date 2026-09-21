@@ -1,3 +1,5 @@
+# Historical contract: vocabulary/storage superseded by SPEC-intent-vocabulary-rename;
+# owners shape by SPEC-intent-owners-role-map. Authored ACs and approval hash are unchanged.
 schema_version: 3
 spec_slug: withdrawal-criterion-window
 parent_spec: null

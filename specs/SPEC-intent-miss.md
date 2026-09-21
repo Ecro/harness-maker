@@ -14,6 +14,12 @@ parent_spec: SPEC-observability
 summary: Auto-generated skeleton SPEC for python feature intent-miss.
 ---
 
+> Vocabulary and storage layout are superseded by [[SPEC-intent-vocabulary-rename]];
+> owners shape and advisory approval guidance by [[SPEC-intent-owners-role-map]].
+> This historical SPEC and its machine companion retain their original ACs and test bindings
+> as compatibility evidence. Unchanged behavioral guarantees still apply.
+
+
 ## 🎯 Intent
 
 `src/harness_maker/observability/intent_miss.py` provides the **intent-miss** python feature. This skeleton SPEC seeds AC slots for refinement via `/hm:spec` in a follow-up batch.

@@ -62,38 +62,38 @@ Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml 
 ```
 {% endif %}
 
-### Step 0.5 — Objective context (intent layer — one line and continue when unused)
+### Step 0.5 — Intent context (intent layer — one line and continue when unused)
 
-> Relocated from `/hm:plan` by SPEC-plan-stage-absorption: the objective link is DRI lock-in,
+> Relocated from `/hm:plan` by SPEC-plan-stage-absorption: the intent link is DRI lock-in,
 > which is what the SPEC owns. It runs before the interview so the answer is available to it.
 
-Read the intent state — LLM-free. (`/hm:loop` iterations inherit `objective:` from the master PLAN, so this is the one place a task acquires it.)
+Read the intent state — LLM-free. (`/hm:loop` iterations inherit `intent:` from the master PLAN, so this is the one place a task acquires it.)
 
 {% if is_codex %}
 ```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm world status --json")   # loads .claude/intent.yaml + .claude/world/assumptions.yaml
+Bash("uv run --with {{ harness_maker_src_path }} hm intent status --json")   # loads .claude/intent.yaml
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm world status --json   # loads .claude/intent.yaml + .claude/world/assumptions.yaml
+!uv run --with {{ harness_maker_src_path }} hm intent status --json   # loads .claude/intent.yaml
 ```
 {% endif %}
 
-- `state: not_filled_in` / `invalid` → print `[intent] no objectives — skipping` and continue. That line is the whole cost for a project that does not use the layer.
-- Filled in but **no `active` and no `proposed` objective** (the first objective has not been written yet) → skip the pick and go straight to the consent question below: **"Draft an objective for this task?"**
-- Otherwise ask ONE closed question with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Which objective does this task serve?"** — one option per `active` / `proposed` objective (id + title) plus **"none"**. Step 3 writes the answer into the SPEC frontmatter as `objective: <id>` (omitted on "none").
-- On **"none"**, ask once, closed: **"Draft an objective for this task?"** Yes records consent only — Step 4.9 writes after the interview closes. No: write nothing and continue.
-- Then compare the work this SPEC scopes against each objective's `rejected[]` list (your judgment — read the records). For each matching objective:
+- `state: not_filled_in` / `invalid` → print `[intent] no intents — skipping` and continue. That line is the whole cost for a project that does not use the layer.
+- Filled in but **no `active` and no `proposed` intent** (the first intent has not been written yet) → skip the pick and go straight to the consent question below: **"Draft an intent for this task?"**
+- Otherwise ask ONE closed question with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Which intent does this task serve?"** — one option per `active` / `proposed` intent (id + title) plus **"none"**. Step 3 writes the answer into the SPEC frontmatter as `intent: <id>` (omitted on "none").
+- On **"none"**, ask once, closed: **"Draft an intent for this task?"** Yes records consent only — Step 4.9 writes after the interview closes. No: write nothing and continue.
+- Then compare the work this SPEC scopes against each intent's `rejected[]` list (your judgment — read the records). For each matching intent:
 {% if is_codex %}
   ```bash
-  Bash("uv run --with {{ harness_maker_src_path }} hm world objective revisit <objective-id> --json")
+  Bash("uv run --with {{ harness_maker_src_path }} hm intent status --json")
   ```
 {% else %}
   ```bash
-  !uv run --with {{ harness_maker_src_path }} hm world objective revisit <objective-id> --json
+  !uv run --with {{ harness_maker_src_path }} hm intent status --json
   ```
 {% endif %}
-  Show its title, condition and last value. `candidate` = the revisit condition holds — surface it as a revisit *candidate* in the design brief; `not_met` / `unevaluable` = show and continue. This check never blocks.
+  Read `revisits[id]` for its title, condition and last value. `candidate` = the revisit condition holds — surface it as a revisit *candidate* in the design brief; `not_met` / `unevaluable` = show and continue. This check never blocks.
 
 ### Step 1 — Knowledge retrieval
 
@@ -244,7 +244,7 @@ created: {YYYY-MM-DD}
 tags: [{project}, spec, {tech-stack}, {2-5 domain tags}]
 test_framework: {pytest | gtest | vitest | bats | …}   # MANDATORY
 interview_rounds: {N}   # rounds this interview took; 0 when Step 0 skipped it
-objective: <id>   # ONLY when Step 0.5 picked one or Step 4.9 drafted one; omit on "none"
+intent: <id>   # ONLY when Step 0.5 picked one or Step 4.9 drafted one; omit on "none"
 research_doc: "[[RESEARCH-{slug}]]"   # OR omit when no research artifact
 summary: "{≤100 char one-line: what this SPEC is for}"
 ---
@@ -499,27 +499,27 @@ A skipped dispatch (the trigger did not fire) writes no row — the trigger bran
 your turn output is that record.
 {% endif %}
 
-### Step 4.9 — Objective draft (consented at Step 0.5)
+### Step 4.9 — Intent draft (consented at Step 0.5)
 
 Only when Step 0.5 recorded consent. Derive from the interview + RESEARCH: `<ID>` = `OBJ-` +
-the task slug upper-cased, `--title`, `--hypothesis`, one `--scope` per in-scope item,
-`--outcome` = the outcome the interview named (none fits → say so and skip). Show the
+the task slug upper-cased, `--title`, `--statement`, one `--scope` per in-scope item,
+`--metric` = the metric the interview named (none fits → say so and skip). Show the
 arguments, run once:
 
 {% if is_codex %}
 ```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm world objective new <ID> --title '<title>' --hypothesis '<hypothesis>' --scope '<item>' --outcome <outcome-id> --from-proposal --candidates 1")
+Bash("uv run --with {{ harness_maker_src_path }} hm intent new <ID> --title '<title>' --statement '<statement>' --scope '<item>' --metric <outcome-id> --from-proposal --candidates 1")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm world objective new <ID> --title "<title>" --hypothesis "<hypothesis>" --scope "<item>" --outcome <outcome-id> --from-proposal --candidates 1
+!uv run --with {{ harness_maker_src_path }} hm intent new <ID> --title "<title>" --statement "<statement>" --scope "<item>" --metric <outcome-id> --from-proposal --candidates 1
 ```
 {% endif %}
 
-Carry `<ID>` into the SPEC frontmatter's `objective:`. If the verb refuses (id exists, unknown outcome):
+Carry `<ID>` into the SPEC frontmatter's `intent:`. If the verb refuses (id exists, unknown metric):
 print the refusal and continue with no link — never retry with a mutated id. The record is
 `proposed`: the gate halts with `not_active` until a human runs `approve` + `activate`; an
-orphan is retired with `objective drop`.
+orphan is retired with `intent drop`.
 
 ### Step 5 — Status update
 

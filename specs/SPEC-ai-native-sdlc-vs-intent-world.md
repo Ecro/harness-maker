@@ -10,6 +10,12 @@ research_doc: "[[RESEARCH-ai-native-sdlc-vs-intent-world]]"
 summary: "DRI acceptance slice: hash-bound SPEC approval, autopilot stops at spec, irreversible-decision list, land hold at every land path"
 ---
 
+> Vocabulary and storage layout are superseded by [[SPEC-intent-vocabulary-rename]];
+> owners shape and advisory approval guidance by [[SPEC-intent-owners-role-map]].
+> This historical SPEC and its machine companion retain their original ACs and test bindings
+> as compatibility evidence. Unchanged behavioral guarantees still apply.
+
+
 # SPEC — DRI acceptance: SPEC approval, irreversible decisions, land hold
 
 ## 🎯 Intent

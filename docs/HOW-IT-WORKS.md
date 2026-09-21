@@ -1403,103 +1403,115 @@ worktree:
 
 ### 7.13 intent-layer
 
-**Role**: Mention-triggered skill (`@intent-layer` on Codex, natural discovery on Claude
-Code/Cursor) so the operator never has to remember the `hm world` verb by name.
+Mention-triggered skill (`@intent-layer` on Codex, natural discovery on Claude Code/Cursor)
+for `hm intent`. It connects project purpose, measured metrics and explicit work commitments.
+An **intent serves one or more SPECs (1:N)**; this is broader than Playbook's 1:1 usage.
 
-**Backs**: `.claude/intent.yaml` (mission/hypothesis/scope, a human-written skeleton committed
-at `make`), `.claude/world/{assumptions,outcomes}.yaml`, and `work-docs/INTENT-<ID>.md` — the
-objective record is that file's YAML frontmatter, not a separate `.claude/world/objectives/`
-YAML file (that path is retired; a file still there is diagnosed, never loaded). The markdown
-body carries the Playbook's five sections and is opaque bytes to every writer. All of it is read
-and written through `hm world {status|assume|outcome|objective}`. Nothing is written without an
-explicit human answer — the skill surfaces the current status and runs the write the operator
-confirms, never a background one; the one machine-produced value is the measured outcome below,
-and even that runs only when asked.
+The project definition and question records live in `.claude/intent.yaml`:
 
-**Measured outcomes (outcome-measure)**: an outcome may carry `measure: {cmd, select, cwd?,
-timeout_s?}` next to its human `how_measured`. `cmd` is an argv string (split with `shlex`,
-never a shell), `select` picks exactly one number out of stdout — `json:<dotted.path>` (integer
-segments index lists), `regex:<pattern with one group>` or `last-number` (the last float in
-stdout; `1e-3` and `.672` parse) — and `cwd` is `base` (default: `.claude/observability/` lives
-at the base root, which a task worktree does not have) or `checkout`. `hm world outcome measure
-<id>` and `--all` run the command under `timeout_s` (default 300), refuse a bool or non-finite
-result, and append a value row whose evidence is `auto: measure#<definition_hash[:12]> @ <short
-sha> exit=0 cwd=<base|checkout>` (intent-layer-ops) — the hash (not the argv) pins which measure
-block produced the number, and the argv is recoverable from `git show <sha>:.claude/intent.yaml`
-only when `intent.yaml` was committed and clean at that sha; rows written before this change
-still carry the full argv and are never rewritten. stdout is never stored and stderr reaches the
-diagnostic redacted and truncated. `--dry-run` runs and reports but the harness writes nothing. A
-non-zero exit, no number, a timeout or a manual outcome writes nothing and names the cause. The
-block joins `definition_hash` (an outcome without one hashes exactly as before), so editing
-`cmd`/`select`/`cwd`/`timeout_s` makes every earlier row `stale_definition`. `hm world gap` rows
-carry `measure: true|false`; the skill's "measure first" step runs the dry run and names the
-record call, and wrapup 5.7's third answer-gated question, "Measure outcomes now?", runs `--all`
-once on "yes".
+```yaml
+schema_version: 1
+purpose:
+  statement: "Why this project exists"
+  vision: "What success would look like"
+metrics:
+  - id: latency
+    description: "Request latency"
+    target: 10
+    higher_is_better: false
+    how_measured: "Latency benchmark"
+rules: []
+out_of_scope: []
+open_questions: []
+owners:
+  owner: "Accountable person"
+  dri: "Person driving delivery"
+  team: "Delivery team"
+```
 
-**Withdrawal (withdrawal-criterion-window)**: `hm world gap --json` also carries a `withdrawal`
-block — `{filled_at, last_signal_at, quiet_wrapups, revisit_candidates_now, due, reason}` — that
-measures the layer's own kill criterion ("10 wrapups with no signal and no fired revisit →
-remove the layer") instead of leaving it an uncounted comment. `last_signal_at` is the most
-recent instant at which the layer did anything: the maximum over every measurement's
-`observed_at` and every objective's `created_at`, `approved_at` and `closed_at`, taken verbatim
-as stored and skipping any value that is not an aware ISO instant. `quiet_wrapups` counts
-`hm:wrapup` **start** events in the base-root `stage-spans.jsonl` after that cutoff (`end` is
-written only by the Claude Code Stop hook and is missed when stages chain, so `start` is the
-count that does not undercount). When nothing has ever signalled, the count runs from
-`filled_at` — the committer date of the oldest commit whose `.claude/intent.yaml` is filled in —
-which reproduces the behaviour of the retired rule for a layer that was filled in and then
-ignored. **`filled_at` is resolved only on that fallback branch**, since that is the only one
-that consumes it; it stays in the payload and is `null` when a signal supplied the cutoff. A
-stored instant ahead of `now` is **skipped**, not clamped: these four fields are hand-authored
-YAML, and a timestamp in the future is bad data rather than a record of something that happened.
-Clamping the cutoff to `now` was tried first and did not bound anything — `now` advances on every
-call, so the cutoff advanced with it while a real ledger only holds events in its past, leaving
-the count at zero until the mistyped date arrived. A count that cannot be taken is `null` with a
-`reason` (`not_filled_in`, `no_git`, `fill_uncommitted`, `no_stage_spans`, `no_wrapup_spans`),
-never a disguised `0`, and `not_filled_in` outranks every other reason; `due` is only `true` when
-`quiet_wrapups >= 10` and `revisit_candidates_now` is zero. **It no longer reads how many
-objectives have ever carried `observed:`** — that was the retired rule, and it was absorbing: one
-objective closed anywhere in history pinned `due` to false for the project's remaining life.
-`status --json` is unaffected — the block lives in `gap` only. Wrapup 5.7 prints the criterion
-once when `due` is true, after the outcome-measure question, and nothing otherwise.
+Each `open_questions` record has an `id`, `claim`, `status` (`open`, `confirmed`, `wrong`),
+`evidence`, and `history`; optional `revisit_when` conditions survive migration.
+Measurements are appended to `.claude/intent/metrics.yaml`. Work commitments live in
+`intent/<ID>.md`: YAML frontmatter carries `statement`, `metric_id`, `scope`,
+`out_of_scope`, approval and lifecycle state; markdown body bytes are preserved by writers.
+The folder denotes type, never state. Moving `proposed → active → closed` edits frontmatter.
 
-**Assumptions and cited code (assumption-entry-and-evidence-locator)**: `hm world assume add <id>
---claim --status <known|assumed|unknown> [--text --observed-at] [--locator <path:A-B>]` is the
-only way into `assumptions.yaml` — it refuses an existing id (never upserts) and `conflict`, which
-only a `contradicts` observation produces. `--locator` (also on `observe`) cites at most 40 lines
-of the current checkout and stores `{path, lines, fingerprint, k}`: a sha256 of the span with
-whitespace normalised away, never a commit SHA — wrapup records before its commit and `task-land`
-squashes the task branch, so a SHA would be stale on arrival. A missing path, `..`, an absolute
-path, a span past the end or an all-blank span is refused when recorded. `hm world gap --json`
-then lists every assumption and, from each one's latest locator-bearing evidence (compared as
-instants, not strings), reports `stale_evidence` (`changed` / `missing`), `moved_evidence` (same
-text, new start line) and `needs_revalidation` for non-terminal objectives that `depends_on` a
-stale one. `status` is untouched and never reads a cited file, nor does the autopilot gate; a
-malformed stored locator is listed in `broken_references` and never breaks a dependent objective.
-Re-confirming with a fresh `--locator` clears the report without rewriting history. A locator
-catches drift in code the claim cites; it does not re-check claims about external tools.
-`add`, `observe` and `resolve` share one RMW lock per file (`.hm-world-<stem>.lock`).
+`owners` accepts any subset of `owner`, `dri`, `team` string values, plus legacy string lists
+(joined into `team`). Empty/absent roles and a single distinct nonblank identity stay silent.
+Distinct identities produce an advisory when approving, never a block: `approved_by` comes
+from unverified `git config user.name`. Real separation needs CODEOWNERS + branch protection.
 
-**Touchpoints in the atomic stages**: `/hm:spec` Step 0.5 loads status and asks one closed
-question when an objective needs a decision; `/hm:review` Step 3.3 checks the diff against the
-PLAN's linked objective (`scope_drift`, P2, main-loop — not an eighth lens); `/hm:wrapup` Step
-5.7 offers to log an assumption observation (stale ones first, from `gap`), record a new
-assumption, or close an objective, each answer-gated. A fourth
-autopilot gate, `objective_gate`, runs after every existing check in `autopilot_caps.py` and can
-only replace an `advance` with a halt — a PLAN with no `objective:` link is unaffected.
+**Read and write commands**:
 
-**Gap and proposal (objective-gap-proposal)**: `hm world gap --json` is the proposer's read —
-`status` plus what `status` deliberately omits: every objective in every state with its
-`rejected[]`, and *why* an outcome cannot be judged (`never_measured` vs `stale_definition`).
-It writes nothing. On request ("what should we do next", "where are the gaps") the skill turns
-that table into at most three unranked candidates, asks about each in turn, collects every
-answer, and only then runs `hm world objective new … --from-proposal --candidates N --declined
-"<title>"…` once per accepted candidate — the declined titles become the record's `rejected[]`
-and one `objective_proposed` row lands on the autopilot ledger at the base root. `/hm:spec`
-offers the same consent at Step 0.5 on two branches — after "none" AND on the cold-start branch
-where the world is filled in but has zero currently-active objectives — and creates the record
-at Step 4.9, after the interview. The record is `proposed`; `approve` stays human, so the gate halts with
-`not_active` until it is approved and activated.
+```text
+hm intent status --json
+hm intent new <ID> --title <title> --statement <statement> --scope <scope> --metric <metric-id>
+hm intent approve <ID>
+hm intent activate <ID>
+hm intent show <ID> --json
+hm intent close <ID> --observed <met|missed|no_data> --note <note>
+hm intent drop <ID>
+hm intent reopen <ID>
+hm intent question add <id> --claim <claim> --status <open|confirmed|wrong>
+hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text <text> --observed-at <timestamp>
+hm intent question resolve <id> --status <open|confirmed|wrong> --claim <claim>
+hm intent metric record <id> --value <number> --observed-at <timestamp> --evidence <evidence>
+hm intent metric measure <id>
+hm intent metric measure --all --dry-run
+hm intent migrate --json
+```
+
+The skill reads freely and writes only after the operator answers with the exact arguments.
+`status` combines metrics/gaps, all intents (including rejected work), open questions, revisit
+results, cited-code staleness, and withdrawal. It is read-only and LLM-free. Proposals are at
+most three unranked candidates; collect all answers before `new --from-proposal --candidates N
+--declined <title>`, so each accepted record retains declined alternatives in `rejected[]`.
+The proposer does not approve its own proposal. The historical adoption ledger event remains
+`objective_proposed`; its spelling is an internal compatibility contract.
+
+**Measurement**: a metric may add `measure: {cmd, select, cwd?, timeout_s?}`. Commands use
+argv splitting, never a shell. Selectors are `json:<dotted.path>`, `regex:<one capturing group>`,
+or `last-number`; `cwd` is `base` (default) or `checkout`, timeout defaults to 300 seconds.
+Only a finite number is recorded. Failure reports its cause and writes no measurement; stderr
+is redacted/truncated, stdout is not stored. `--dry-run` executes without recording. Evidence
+uses `auto: measure#<definition_hash[:12]> @ <sha> exit=0 cwd=<mode>`, not the full command.
+Changing the measurement definition makes prior values `stale_definition`.
+
+**Questions and evidence**: `add` refuses duplicate IDs; `observe` appends evidence and
+`contradicts` marks a question `wrong`. `resolve` records the revised claim and status without
+losing history. `--locator <path:A-B>` on add/observe fingerprints at most 40 checkout lines.
+Status reports changed/missing/moved evidence, and dependent active intents may need
+revalidation. Invalid locators are diagnosed; approval checks do not inspect cited files.
+Read-modify-write operations use a file lock.
+
+**Withdrawal**: `status.withdrawal` contains `filled_at`, `last_signal_at`, `quiet_wrapups`,
+`revisit_candidates_now`, `due`, `reason`. After ten wrapup start events without a measurement
+or intent creation/approval/closure, and no current revisit candidate, it reports `due: true`.
+The fallback clock starts at the oldest filled project commit, including legacy-key history.
+Future or invalid signal timestamps are ignored. Missing/shallow history is unevaluable,
+never a disguised zero; no automatic deletion follows the advisory.
+
+**Compatibility and migration**: `hm world` remains a deprecated alias for one release and
+writes its notice to stderr, preserving JSON stdout. Legacy Python APIs and frozen test
+fixtures remain as adapters. Legacy `mission/vision`, `outcomes`, `non_negotiables`,
+`non_scope`, `unknowns`, question ledgers and `work-docs/INTENT-*.md` load without writes.
+Canonical writes require this explicit migration first; reads accept legacy files without writing.
+`hm intent migrate` merges questions into the single project store, moves measurements and
+records, and preserves record body bytes, timestamps and approvals. Conflicting destinations
+are rejected before writes; rerunning a completed migration changes no bytes. Hash payload
+key strings remain frozen, so renaming a display/schema key does not invalidate approvals.
+Migration and supported writers share a checkout lock before selecting storage.
+If publication or source retirement is interrupted, writes refuse the partial
+layout and ask you to rerun `hm intent migrate`; complete that retry before
+recording further changes. Avoid manually converting only the project definition:
+reads can omit legacy ledgers in that mixed layout (tracked review P2).
+
+**Stage integration**: SPEC chooses an `intent:` link; execute carries it to the PLAN;
+review checks scope drift; wrapup offers answer-gated observations, closure and measurement.
+The approval gate also accepts the legacy `objective:` link. A missing link stays ungated;
+an invalid or conflicting link is diagnosed. Existing historical SPECs describe their original
+contracts and point to the vocabulary and owners specifications for the new surfaces.
+
 
 ---
 
