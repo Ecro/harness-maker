@@ -1,0 +1,411 @@
+schema_version: 3
+spec_slug: dev-mode-removal
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: 'Tier-1: the migration rewrites a user configuration
+  file in place and the key it reads is destroyed in the same pass, so a surviving
+  mutant in the translation silently relaxes or tightens every gate a project has.
+  A surviving mutant in the absent-case resolver picks the wrong preset default for
+  readers that never crash but disagree; one in the fail-closed oracle exception opens
+  the circular-oracle path the exception exists to hold shut; one in the malformed-value
+  guard falls through to a default the malformed value was trying to override.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/io_utils.py
+- src/harness_maker/models.py
+- src/harness_maker/gates/spec_gate.py
+- src/harness_maker/spec_need.py
+- src/harness_maker/spec_quality.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: strictness has exactly one reader and one writer
+  type: property
+  test_ids:
+  - tests/structural/test_strictness_reader_singleton.py::test_exactly_one_strictness_reader
+  - tests/structural/test_strictness_reader_singleton.py::test_exactly_one_strictness_writer
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Readers are DISCOVERED by AST traversal of every module that imports
+    the config loader, never enumerated by hand: the relation "the discovered set
+    has cardinality one" holds regardless of how the resolver is written, and it is
+    the only form that survives a new module being added. Every hand-maintained reader
+    list in this repository has been wrong at least once (failures.md new-marker-content-field-must-update-every-reader,
+    count:3), which is why the list itself cannot be the oracle.'
+  oracle_independence_waiver: null
+  input_domain: every module in src/harness_maker that imports the harness.yaml loader
+  transformation: AST-walk each module for a function that resolves spec.strictness
+    and for a function that assigns it
+  expected_relation: len(discovered_readers) == 1 and len(discovered_writers) == 1
+  preconditions: []
+  observable_output: the set of qualified function names found
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the migration maps every cross and never moves the preset
+  type: parametric
+  test_ids:
+  - tests/unit/test_dev_mode_migration.py::test_ac_002_migration_maps_every_cross
+  executable_predicate: null
+  golden_table:
+  - input:
+      preset: Production
+      dev_mode: spec-driven
+    expected:
+      preset: Production
+      strictness: block
+    edge: false
+    note: the cross whose strictness already matches its preset default
+  - input:
+      preset: Production
+      dev_mode: task-driven
+    expected:
+      preset: Production
+      strictness: warn
+    edge: true
+    note: the row RESEARCH named as must-not-be-demoted — preset stays Production
+  - input:
+      preset: Side
+      dev_mode: spec-driven
+    expected:
+      preset: Side
+      strictness: block
+    edge: true
+    note: strictness disagrees with the preset default and must be written explicitly
+  - input:
+      preset: Side
+      dev_mode: task-driven
+    expected:
+      preset: Side
+      strictness: warn
+    edge: false
+    note: the other agreeing cross
+  - input:
+      preset: Production
+      dev_mode: null
+    expected:
+      preset: Production
+      strictness: block
+    edge: true
+    note: no key at all — preset-derived, no advisory about a translation that did
+      not happen
+  - input:
+      preset: Side
+      dev_mode: nonsense
+    expected:
+      preset: Side
+      strictness: block
+    edge: true
+    note: a dev_mode value outside the retired enum fails closed rather than being
+      read as task-driven
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The six rows are the DRI's Round-1 and Round-2 answers transcribed,
+    not values read back from the implementation — the mapping was decided before
+    any migration code existed, and the preset column is fixed by the interview's
+    explicit "preset is never rewritten" constraint rather than by observing what
+    the code does.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: an absent key resolves from the preset, with one named exception
+  type: property
+  test_ids:
+  - tests/unit/test_strictness_absent_case.py::test_ac_003_absent_key_resolves_from_preset
+  - tests/unit/test_strictness_absent_case.py::test_ac_003_malformed_strictness_fails_closed
+  - tests/unit/test_strictness_absent_case.py::test_ac_003_oracle_gate_stays_fail_closed
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Quantified over the DISCOVERED reader set of AC-001 rather than
+    a listed one, so the relation cannot be satisfied by a reader the test forgot:
+    for every discovered reader r and every preset p, r(config-without-the-key, p)
+    equals the preset-derived value, with a single membership exception that the test
+    names and asserts is a set of size one. The exception is what models.py:1172-1182
+    already documents as deliberate ("do NOT align it to this relaxed default"), so
+    its provenance predates this change.'
+  oracle_independence_waiver: null
+  input_domain: every discovered strictness reader crossed with {Production, Side}
+    and with configs whose strictness is absent, malformed, or a non-string
+  transformation: resolve strictness through the reader
+  expected_relation: every reader outside the one-element exception set returns the
+    preset-derived value for an absent key and block for a malformed one; the exception
+    enforces regardless
+  preconditions:
+  - the config carries no spec.strictness and no dev_mode
+  observable_output: the resolved strictness, and for the exception whether the gate
+    enforces
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: no reference to the retired axis survives
+  type: property
+  test_ids:
+  - tests/structural/test_dev_mode_retired.py::test_ac_004_no_dev_mode_reference_survives
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Absence quantified over the whole source and template tree rather
+    than sampled at the sites this change happened to edit: the relation "no file
+    outside the allowlisted migration site contains the token" is decided by the tree,
+    not by the implementation, so a reference the author forgot still fails it. A
+    sampled check would pass on exactly the files the author remembered.'
+  oracle_independence_waiver: null
+  input_domain: every file under src/ and src/harness_maker/templates/
+  transformation: scan for the tokens dev_mode, DevMode, spec-driven, task-driven
+  expected_relation: the set of matching files equals the declared migration-site
+    allowlist
+  preconditions: []
+  observable_output: the set of files containing a match
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: the render matrix loses its second axis
+  type: mechanical
+  test_ids:
+  - tests/structural/test_dev_mode_retired.py::test_ac_005_snapshot_arms_halve
+  executable_predicate: len(snapshot_arms()) == 4 and not any("@" in k and k.split("@")[1]
+    in {"spec-driven", "task-driven"} for k in instruction_baseline_keys())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The target count 4 is fixed by construction — one arm per preset
+    per project profile, with the second axis gone — and is read off the fixture directory
+    and the frozen baseline file, both of which are inputs to the renderer rather
+    than outputs of the code under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: warn renders the SPEC machinery and blocks nothing; block renders the hook
+  type: parametric
+  test_ids:
+  - tests/unit/test_render_strictness_surface.py::test_ac_006_warn_renders_the_checks_and_blocks_nothing
+  - tests/unit/test_render_strictness_surface.py::test_ac_006_block_renders_the_spec_gate_hook
+  executable_predicate: null
+  golden_table:
+  - input:
+      strictness: warn
+      surface: verify Check 6
+    expected:
+      rendered: true
+      blocks: false
+    edge: false
+    note: the check a task-driven harness does not have today
+  - input:
+      strictness: block
+      surface: verify Check 6
+    expected:
+      rendered: true
+      blocks: true
+    edge: false
+    note: unchanged from spec-driven today
+  - input:
+      strictness: warn
+      surface: execute SPEC-need detection
+    expected:
+      rendered: true
+      blocks: false
+    edge: false
+    note: moved here from the deleted plan stage
+  - input:
+      strictness: warn
+      surface: review finalize --spec flag
+    expected:
+      rendered: true
+      blocks: false
+    edge: false
+    note: a flag cannot block; rendering it is the whole assertion
+  - input:
+      strictness: warn
+      surface: spec_gate PreToolUse hook
+    expected:
+      rendered: false
+      blocks: false
+    edge: true
+    note: the derived consequence — blocking is the hook's only function, so warn
+      does not render it
+  - input:
+      strictness: block
+      surface: spec_gate PreToolUse hook
+    expected:
+      rendered: true
+      blocks: true
+    edge: true
+    note: the hook's own runtime guard must test spec.strictness, not the removed
+      key
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: 'The reference implementation is this repository rendered at the
+    pre-change commit with dev_mode set to task-driven: it is the authoritative statement
+    of what a relaxed harness is allowed to stop on, and it was produced before this
+    change existed, so the new warn render cannot be tuned to agree with it after
+    the fact. The block column is differential against the same commit rendered spec-driven.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: the CLI flag is gone from every entry point
+  type: mechanical
+  test_ids:
+  - tests/unit/test_dev_mode_cli_flag_removed.py::test_ac_007_flag_absent_from_every_parser
+  executable_predicate: all("--dev-mode" not in parser_option_strings(p) for p in
+    (spec_machine_check_parser(), spec_machine_waiver_parser(), make_parser(), codex_setup_parser()))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The four entry points are enumerated from the pre-change tree (spec_machine.py:2061
+    and :2095, cli.py:131, codex_setup.py:170) — a list produced by grepping the code
+    this change removes, not by asking the post-change code which parsers exist, so
+    a parser that quietly keeps the flag is still checked.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: the removal is announced and the reversal is recorded
+  type: mechanical
+  test_ids:
+  - tests/unit/test_dev_mode_retired_docs.py::test_ac_008_removal_is_announced
+  executable_predicate: changelog_breaking_entries("dev_mode") >= 1 and plan_adr_mentions("dev_mode",
+    "reversal")
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The announcement form is the existing PLAN-harness-diet ADR-009
+    convention (CHANGELOG BREAKING, no stub), and the requirement to record a reversal
+    comes from the standing user lock-in stored in memory project_dev_mode_axis —
+    both written before this task and neither derived from the code under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: onboarding asks no strictness question
+  type: mechanical
+  test_ids:
+  - tests/unit/test_interview_strictness_absent.py::test_ac_009_onboarding_asks_no_strictness_question
+  executable_predicate: not any(q.mentions("strictness") or q.mentions("dev_mode")
+    for q in interview_questions()) and "spec.strictness" in configure_editable_keys()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected value is the DRI's Round-3 answer ("do not ask — preset-derived,
+    /hm:configure only"), recorded in the SPEC before the interview code was touched;
+    the /hm:configure half is pinned against the existing configure entry list, which
+    already carries second_opinion, autonomy and locale.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: harness.yaml schema 4 to 5 — dev_mode is translated into spec.strictness
+    and the key is dropped at load
+  category: schema/file format/storage layout
+  rationale: The user's configuration file is rewritten in place on the next --update;
+    once the key is gone the original choice cannot be recovered from the file, so
+    the translation has to be right the first time.
+  source: spec
+- id: IRR-002
+  decision: --dev-mode is removed from all four CLI entry points with no deprecation
+    alias
+  category: public API/CLI contract
+  rationale: A published flag. Any external caller that passes it gets an argument
+    error rather than a warning, and there is no window in which both spellings work.
+  source: spec
+approval:
+  kind: human
+  content_hash: d6811382680406366740689118cad62c1e0e7954e4251a08657dcf6d4f344528
+  approved_by: Ecro
+  approved_at: '2026-09-20T14:58:58Z'
+  field_hashes: null

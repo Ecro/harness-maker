@@ -18,7 +18,7 @@ from typer.testing import CliRunner
 
 from harness_maker.cli import app
 from harness_maker.interview import _build_answers
-from harness_maker.models import DevMode, Preset, Target
+from harness_maker.models import Preset, Target
 
 runner = CliRunner()
 
@@ -43,7 +43,7 @@ def _answers(*, preset: Preset, worktree: dict[str, Any]):  # type: ignore[no-un
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=preset,
-        dev_mode=DevMode.TASK_DRIVEN,
+        strictness="warn",
     )
     # Simulate the answers_from_harness_yaml round-trip result (the on-disk worktree).
     return base.model_copy(update={"worktree": dict(worktree)})

@@ -34,8 +34,8 @@ Given a feature input, when render runs, then the rendered text includes a conte
 
 
 def test_backward_compat_two_arg_signature_still_works() -> None:
-    """Existing callsites pass (spec_text, dev_mode) — must not regress (Risk R12)."""
-    result = evaluate_spec(MINIMAL_GOOD_SPEC, "task-driven")
+    """Existing callsites pass (spec_text, strictness) — must not regress (Risk R12)."""
+    result = evaluate_spec(MINIMAL_GOOD_SPEC, "warn")
     # Result has the original 5 dims.
     for dim in RUBRIC_DIMENSIONS:
         assert dim in result.scores
@@ -43,7 +43,7 @@ def test_backward_compat_two_arg_signature_still_works() -> None:
 
 def test_backward_compat_one_arg_signature_still_works() -> None:
     result = evaluate_spec(MINIMAL_GOOD_SPEC)
-    assert result.dev_mode == "task-driven"
+    assert result.strictness == "warn"
     for dim in RUBRIC_DIMENSIONS:
         assert dim in result.scores
 

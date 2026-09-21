@@ -28,12 +28,12 @@ set. `tests/structural/test_playbook_alignment_invariance.py` parses the fenced 
    "review": "4a2bb22c66535fd481e699ada2122c9f4a6b89e38bc5542868d60cc6822a542d",
    "help": "0d1b6929d1b1bd55262d811ce71dfcce01a5eb0d68503ff1b19532effda415f7"
   },
-  "auto_safe@spec-driven": {
+  "auto_safe@block": {
    "plan": "f67a2231c896bb8e5cdc36b62fb7b875bf01931128f3c3ea71afc9a52f232d0b",
    "review": "8d25ba69e1dfc332e117f2fb487dbae8af8237b7540c2fded27ea947c513f27e",
    "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52"
   },
-  "auto_safe@task-driven": {
+  "auto_safe@warn": {
    "plan": "7a7587853d74471463855637d31cd3884aa1503562fa635d3054b27124d02c92",
    "review": "8530386955e0a9cb25c83141c181d8b647271f67cadad7209716012edc81ef22",
    "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52"
@@ -43,8 +43,8 @@ set. `tests/structural/test_playbook_alignment_invariance.py` parses the fenced 
  "golden_wrapup_sha": {
   "ask@flag_off": "cab8bd7f2bc9e529c4c593a0a76ddbc4bd792d5ca34bbdd7a613fbaef954b353",
   "ask@flag_on": "1348f8b9d087803596ff3175df8db5681300d5a251c24c8de693f43e232405f6",
-  "auto_safe@spec-driven": "ba49690a7f78296b8f55b4852bfb4de74a921c21aefefaff2c3f4107be62f584",
-  "auto_safe@task-driven": "56566955888ea04a52f462a1a617d5ccd8028ead477af1dccc20a1f2954c1404"
+  "auto_safe@block": "ba49690a7f78296b8f55b4852bfb4de74a921c21aefefaff2c3f4107be62f584",
+  "auto_safe@warn": "56566955888ea04a52f462a1a617d5ccd8028ead477af1dccc20a1f2954c1404"
  },
  "harness_maker_version": "0.56.0"
 }
@@ -104,7 +104,7 @@ PLAN is this one, which declared its allowance after this freeze — section 3).
 ## 3. Measured delta of this task (Phase 4, after the freeze above)
 
 Moved set per arm against the pre-change golden, verified before re-capture: `{wrapup}` in all
-four arms (`ask@flag_off`, `ask@flag_on`, `auto_safe@spec-driven`, `auto_safe@task-driven`).
+four arms (`ask@flag_off`, `ask@flag_on`, `auto_safe@block`, `auto_safe@warn`).
 
 | command | chars | round_trips |
 |---|---|---|

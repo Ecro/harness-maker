@@ -14,7 +14,7 @@ benefit, trade-off, re-render impact, and preservation note.
 ### 1. Show current settings
 
 Read `.claude/harness.yaml` body (skip frontmatter) and surface:
-- preset, locale, dev_mode
+- preset, locale, spec.strictness
 - enabled reviewers, grade_threshold, auto_fix
 - mechanical_checks (if any)
 - domains (if any)
@@ -37,8 +37,7 @@ Options (multi-select):
   reviewers improve coverage and can increase review time.
 - **Grade threshold** — A / B / C. Trade-off: stricter thresholds catch more
   issues and can require more re-review.
-- **Dev mode** — task-driven ↔ spec-driven. Trade-off: spec-driven adds a
-  gate before implementation; task-driven is faster for small work.
+- **SPEC strictness** — `block` stops on a failed SPEC check; `warn` reports it and continues.
 - **IDE targets** — claude-code, cursor, codex, or combinations. Trade-off:
   extra targets render extra roots and dropping a target does not delete old
   target-specific files.
@@ -188,7 +187,7 @@ Append when changed: `--comprehension-depth "$COMPREHENSION_DEPTH"` (one of `min
 `standard` / `deep` — an out-of-set value exits non-zero rather than being corrected, so
 pass the literal the user chose, quoted); `--locale "$LOCALE"`; `--second-opinion-models "$SO_MODELS"` (comma
 list, `""` disables — per-model sub-blocks like `codex.hermetic` survive either way);
-`--autonomy-level "$AUTONOMY"` (`gated` turns auto-advance off while preserving persistence
+`--strictness "$STRICTNESS"`; `--autonomy-level "$AUTONOMY"` (`gated` turns auto-advance off while preserving persistence
 and caps) plus `--autonomy-persistent` / `--no-autonomy-persistent` only on an explicit
 choice.
 

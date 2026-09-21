@@ -111,7 +111,6 @@ action items).
 | 차원 | 선택지 | 영향 |
 |---|---|---|
 | **Preset** | `Side` · `Production` | Reviewer 개수 (1 vs 5), 워크플로 stage 수, 보안 게이트 깊이, verify-required 플래그 |
-| **Dev mode** | `task-driven` · `spec-driven` | SPEC stage가 필수인지 여부; plan stage가 execute로 chain 되는지 |
 | **Targets** | `claude-code` · `cursor` · `codex` (다중 선택) | 어떤 IDE-native 자산 트리가 렌더되나 |
 | **Locale** | `en` · `ko` · 임의 태그 | 인터뷰 텍스트 + 사용자 대면 에러 메시지 |
 | **Reviewers / skills** | Preset default + 오버라이드 | 어떤 reviewer가 활성화되고 agent model tier가 어떻게 되나 (agent·skill 전량은 항상 설치) |
@@ -390,7 +389,7 @@ harness-maker는 `0.x` 단계이며 1.0 약속이 정직해질 만큼의 의존 
 **고정 표면(Frozen surfaces)** — deprecation cycle 없이는 어떤 0.x.minor에서도 깨지지 않습니다:
 
 - **슬래시 명령 이름**: `/hm:make`, `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/harness-maker:make`.
-- **`harness.yaml` 최상위 키**: `targets`, `preset`, `dev_mode`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
+- **`harness.yaml` 최상위 키**: `targets`, `preset`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
 - **Plugin manifest 스키마**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — 각 marketplace 공식 spec에 포함된 필드들.
 - **로컬 전용 telemetry 보장** — [`PRIVACY.md`](PRIVACY.md) 참조. 문서-vs-실제 불일치는 P0 버그로 취급합니다.
 

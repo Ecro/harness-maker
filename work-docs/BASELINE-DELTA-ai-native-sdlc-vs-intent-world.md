@@ -42,7 +42,7 @@ commit 7009771d (base `main` fb8bfaca) with the recipe of
    "spec": "dd1aebd8a211b62a0124658b0548a754ca7f6075e7be4a43cc3b7a7482ea3c8b",
    "wrapup": "be472377d74bc6545359b02f3ac75da55abff216b354bd37dc13dfaef2130702"
   },
-  "auto_safe@spec-driven": {
+  "auto_safe@block": {
    "execute": "e1deab7bfa969339a356ac40122d344d7b5beb3b6eee579aec6e35e39fd926e5",
    "loop": "e7afd6205c75ab81ec6874fc0cadc0a93677906d6a807819f13935fd16afc059",
    "plan": "4df698bdecbb917cc5192f1e421b79cee7647351464a8adcb9ee510711746131",
@@ -50,7 +50,7 @@ commit 7009771d (base `main` fb8bfaca) with the recipe of
    "spec": "adfe119f457a5eb89ca5c8dad08f21298cae15aa76121a6248b073d68c04738d",
    "wrapup": "5b6045f7c7615beaab16b6d5a8c261b225356d9274d80b375a409c595cfb18c1"
   },
-  "auto_safe@task-driven": {
+  "auto_safe@warn": {
    "execute": "e1deab7bfa969339a356ac40122d344d7b5beb3b6eee579aec6e35e39fd926e5",
    "loop": "e7afd6205c75ab81ec6874fc0cadc0a93677906d6a807819f13935fd16afc059",
    "plan": "e879ede63d1b4e4b83f971f826256d81d6b45791fb6fe50fe47e9d597fe17284",
@@ -73,13 +73,13 @@ commit 7009771d (base `main` fb8bfaca) with the recipe of
    "spec": 34664,
    "wrapup": 49316
   },
-  "auto_safe@spec-driven": {
+  "auto_safe@block": {
    "execute": 51627,
    "loop": 51265,
    "spec": 35251,
    "wrapup": 52551
   },
-  "auto_safe@task-driven": {
+  "auto_safe@warn": {
    "execute": 51627,
    "loop": 51265,
    "spec": 35251,

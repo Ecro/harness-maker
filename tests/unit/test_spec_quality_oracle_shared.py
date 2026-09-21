@@ -21,7 +21,7 @@ _SPEC_TEXT = (
 )
 
 
-def _dim(ac: dict[str, Any], dev_mode: str = "task-driven") -> int:
+def _dim(ac: dict[str, Any], strictness: str = "warn") -> int:
     m = yaml.safe_dump(
         {
             "schema_version": 2,
@@ -32,7 +32,7 @@ def _dim(ac: dict[str, Any], dev_mode: str = "task-driven") -> int:
             "ac": [ac],
         }
     )
-    return evaluate_spec(_SPEC_TEXT, dev_mode, machine_yaml=m).scores["oracle_independence"]
+    return evaluate_spec(_SPEC_TEXT, strictness, machine_yaml=m).scores["oracle_independence"]
 
 
 def test_value_matrix_single_ac() -> None:
@@ -53,10 +53,10 @@ def test_value_matrix_waiver_and_mode() -> None:
         "oracle_evidence": "",
         "oracle_independence_waiver": "accepted: prototype",
     }
-    # task-driven: waiver lifts to 100
-    assert _dim(weak_waived, "task-driven") == 100
-    # spec-driven: waiver IGNORED → raw evidence score (empty → 20)
-    assert _dim(weak_waived, "spec-driven") == 20
+    # warn: waiver lifts to 100
+    assert _dim(weak_waived, "warn") == 100
+    # block: waiver IGNORED → raw evidence score (empty → 20)
+    assert _dim(weak_waived, "block") == 20
 
 
 def test_value_matrix_legacy_retained_in_denominator() -> None:
@@ -78,17 +78,12 @@ def test_value_matrix_legacy_retained_in_denominator() -> None:
         }
     )
     # round((0 + 85) / 2) == 42 — NOT 85 (legacy is not skipped)
-    assert (
-        evaluate_spec(_SPEC_TEXT, "task-driven", machine_yaml=m).scores["oracle_independence"] == 42
-    )
+    assert evaluate_spec(_SPEC_TEXT, "warn", machine_yaml=m).scores["oracle_independence"] == 42
 
 
 def test_empty_ac_list_scores_100() -> None:
     m = yaml.safe_dump({"schema_version": 2, "spec_slug": "x", "verification_tier": 1, "ac": []})
-    assert (
-        evaluate_spec(_SPEC_TEXT, "task-driven", machine_yaml=m).scores["oracle_independence"]
-        == 100
-    )
+    assert evaluate_spec(_SPEC_TEXT, "warn", machine_yaml=m).scores["oracle_independence"] == 100
 
 
 # --- static dup-guard (producer-gate, cf. test_owned_uuids_render_gate) -----

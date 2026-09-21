@@ -1,7 +1,8 @@
 """Step-sensitivity registry gates (PLAN-workflow-steps-vs-model-capability, SPEC S1/S2/S3/S7).
 
-Every rendered `Step | Phase | Check` heading across `ARMS` (preset × dev_mode) must map to one
-`step_sensitivity.REGISTRY` entry with a class in {COMP, HOST, INV, TUNE}; an unclassified
+Every rendered `Step | Phase | Check` heading across `ARMS` (one per preset, at its default
+strictness) must map to one `step_sensitivity.REGISTRY` entry with a class in
+{COMP, HOST, INV, TUNE}; an unclassified
 heading fails by name; the Side preset's knob defaults are never more aggressive than
 Production's under each entry's declared ordering; and the docs carry the four classes.
 
@@ -22,7 +23,6 @@ import pytest
 from harness_maker import step_sensitivity as ss
 from harness_maker.interview import _build_answers
 from harness_maker.models import (
-    DevMode,
     HarnessConfig,
     InterviewAnswers,
     Preset,
@@ -39,17 +39,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 STAGES = ("research", "spec", "execute", "review", "verify", "wrapup")
 
 
-def _answers(preset: Preset, dev_mode: DevMode) -> InterviewAnswers:
-    return _build_answers(
-        locale="en", targets=[Target.CLAUDE_CODE], preset=preset, dev_mode=dev_mode
-    )
+def _answers(preset: Preset) -> InterviewAnswers:
+    return _build_answers(locale="en", targets=[Target.CLAUDE_CODE], preset=preset)
 
 
-def _render_arm(preset: Preset, dev_mode: DevMode, tmp: Path) -> dict[str, str]:
+def _render_arm(preset: Preset, tmp: Path) -> dict[str, str]:
     with pytest.MonkeyPatch.context() as mp:
         pin_install_ref(mp)
         render(
-            synthesize(ProjectProfile(), _answers(preset, dev_mode), preset=preset),
+            synthesize(ProjectProfile(), _answers(preset), preset=preset),
             tmp,
             freeze_time=DEFAULT_FREEZE_TIME,
         )
@@ -60,16 +58,13 @@ def _render_arm(preset: Preset, dev_mode: DevMode, tmp: Path) -> dict[str, str]:
 @pytest.fixture(scope="module")
 def rendered_arms(
     tmp_path_factory: pytest.TempPathFactory,
-) -> dict[tuple[Preset, DevMode], dict[str, str]]:
-    return {
-        arm: _render_arm(arm[0], arm[1], tmp_path_factory.mktemp(f"{arm[0].value}-{arm[1].value}"))
-        for arm in ss.ARMS
-    }
+) -> dict[Preset, dict[str, str]]:
+    return {arm: _render_arm(arm, tmp_path_factory.mktemp(arm.value)) for arm in ss.ARMS}
 
 
 @pytest.fixture(scope="module")
 def ordinals_by_stage(
-    rendered_arms: dict[tuple[Preset, DevMode], dict[str, str]],
+    rendered_arms: dict[Preset, dict[str, str]],
 ) -> dict[str, set[str]]:
     union: dict[str, set[str]] = {s: set() for s in STAGES}
     for arm, texts in rendered_arms.items():
@@ -86,15 +81,12 @@ def ordinals_by_stage(
 # ── S1 / AC-001 ──────────────────────────────────────────────────────────────
 
 
-def test_arms_is_preset_times_dev_mode() -> None:
-    """Hand-enumerated, not recomputed from the enums — a filtered or third-axis ARMS must
-    fail here independently of the production expression."""
-    assert set(ss.ARMS) == {
-        (Preset.SIDE, DevMode.SPEC_DRIVEN),
-        (Preset.SIDE, DevMode.TASK_DRIVEN),
-        (Preset.PRODUCTION, DevMode.SPEC_DRIVEN),
-        (Preset.PRODUCTION, DevMode.TASK_DRIVEN),
-    }
+def test_arms_is_one_per_preset() -> None:
+    """Hand-enumerated, not recomputed from the enum — a filtered or second-axis ARMS must
+    fail here independently of the production expression. One arm per preset suffices because
+    the two presets default to opposite strictness values (SPEC-dev-mode-removal), so a heading
+    that renders at only one strictness is still reached."""
+    assert set(ss.ARMS) == {Preset.SIDE, Preset.PRODUCTION}
 
 
 def test_every_rendered_heading_is_classified(ordinals_by_stage: dict[str, set[str]]) -> None:
@@ -165,11 +157,11 @@ def test_registry_validates() -> None:
 
 
 def test_extractor_matches_headings_helper(
-    rendered_arms: dict[tuple[Preset, DevMode], dict[str, str]],
+    rendered_arms: dict[Preset, dict[str, str]],
 ) -> None:
     """Every `Step|Phase|Check` heading `headings()` sees yields exactly one ordinal, and a
     level-2 heading is not skipped (the `#{3,5}` regex a first draft proposed would miss it)."""
-    text = rendered_arms[(Preset.PRODUCTION, DevMode.SPEC_DRIVEN)]["execute"]
+    text = rendered_arms[Preset.PRODUCTION]["execute"]
     hs = headings(text)
     expected = sorted(
         " ".join(h.lstrip("# ").split(" ")[:2]).rstrip(" —-")
@@ -196,11 +188,9 @@ def test_unclassified_heading_fails(ordinals_by_stage: dict[str, set[str]]) -> N
 
 
 def _configs() -> tuple[HarnessConfig, HarnessConfig]:
-    side = synthesize(
-        ProjectProfile(), _answers(Preset.SIDE, DevMode.SPEC_DRIVEN), preset=Preset.SIDE
-    ).config
+    side = synthesize(ProjectProfile(), _answers(Preset.SIDE), preset=Preset.SIDE).config
     prod = synthesize(
-        ProjectProfile(), _answers(Preset.PRODUCTION, DevMode.SPEC_DRIVEN), preset=Preset.PRODUCTION
+        ProjectProfile(), _answers(Preset.PRODUCTION), preset=Preset.PRODUCTION
     ).config
     return side, prod
 
@@ -224,9 +214,7 @@ def test_side_consistency_is_not_vacuous() -> None:
 
 def test_side_more_aggressive_fails() -> None:
     """Negative control mutates the Side ANSWERS object, not a fixture string."""
-    side_answers = _answers(Preset.SIDE, DevMode.SPEC_DRIVEN).model_copy(
-        update={"max_review_rounds": 4}
-    )
+    side_answers = _answers(Preset.SIDE).model_copy(update={"max_review_rounds": 4})
     side = synthesize(ProjectProfile(), side_answers, preset=Preset.SIDE).config
     _, prod = _configs()
     violations = ss.side_ordering_violations(side, prod, ss.REGISTRY)

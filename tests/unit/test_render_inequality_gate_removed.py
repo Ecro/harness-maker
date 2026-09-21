@@ -16,7 +16,6 @@ from pathlib import Path
 import pytest
 
 from harness_maker.models import (
-    DevMode,
     InterviewAnswers,
     Preset,
     ProjectProfile,
@@ -24,18 +23,19 @@ from harness_maker.models import (
     interview_deep_gate_defaults,
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.strictness import Strictness
 from harness_maker.synthesize import synthesize
 
 RESIDUE = ("5-Term Inequality Gate", "5-term", "EIG", "CLARITI")
 CAP_SENTENCE = "open-ended question(s) per turn for locale"
 SURFACES = ("research", "spec", "loop")
-ARMS = [(p, d) for p in Preset for d in DevMode]
+ARMS = [(p, d) for p in Preset for d in ("warn", "block")]
 
 
 def _render(
-    tmp: Path, preset: Preset, dev_mode: DevMode, *, depth: str | None = None
+    tmp: Path, preset: Preset, strictness: Strictness, *, depth: str | None = None
 ) -> dict[str, str]:
-    answers = InterviewAnswers(preset=preset, dev_mode=dev_mode, targets=[Target.CLAUDE_CODE])
+    answers = InterviewAnswers(preset=preset, strictness=strictness, targets=[Target.CLAUDE_CODE])
     if depth is not None:
         interview = {**answers.interview, "comprehension": {"depth": depth}}
         answers = answers.model_copy(update={"interview": interview})
@@ -46,13 +46,11 @@ def _render(
     return {s: (root / f"{s}.md").read_text(encoding="utf-8") for s in SURFACES}
 
 
-@pytest.mark.parametrize(
-    ("preset", "dev_mode"), ARMS, ids=[f"{p.value}-{d.value}" for p, d in ARMS]
-)
+@pytest.mark.parametrize(("preset", "strictness"), ARMS, ids=[f"{p.value}-{d}" for p, d in ARMS])
 def test_five_term_ceremony_absent_cap_retained(
-    tmp_path: Path, preset: Preset, dev_mode: DevMode
+    tmp_path: Path, preset: Preset, strictness: Strictness
 ) -> None:
-    rendered = _render(tmp_path, preset, dev_mode)
+    rendered = _render(tmp_path, preset, strictness)
     for surface, text in rendered.items():
         for token in RESIDUE:
             assert token not in text, f"{surface}: residue {token!r} survived the deletion"
@@ -68,7 +66,7 @@ def test_comprehension_block_no_longer_points_at_the_gate(tmp_path: Path) -> Non
     """`comprehension_block.md.j2` used to say 'the 5-term gate still governs which get asked'
     at eight include sites; the reworded sentence names the cap instead. The block is gated on
     `interview.comprehension.depth == 'deep'` (default `standard`), so the fixture forces it."""
-    rendered = _render(tmp_path, Preset.PRODUCTION, DevMode.SPEC_DRIVEN, depth="deep")
+    rendered = _render(tmp_path, Preset.PRODUCTION, "block", depth="deep")
     for surface in ("spec",):
         assert "the 5-term gate still governs which get asked" not in rendered[surface]
         assert "the open-ended cap still governs how many get asked" in rendered[surface]

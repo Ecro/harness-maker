@@ -250,7 +250,12 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # "Before landing — the DRI's acceptance of the SPEC" block ahead of the roll-up: the fenced
 # `hm spec_machine approval-status` call, the ok/hold/no-answer bullets. Attributed in
 # work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md §3.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 769), ("Production", 802)])
+# 769/802 → 800/802 (dev-mode-removal, 2026-09-21): Side only, +31. The delegate-OFF wrapup
+# renders Step 3.6 (the oracle-waiver advisory) at `warn` strictness, and a default-answers Side
+# harness now DERIVES `warn` from its preset. It used to inherit the model's `spec-driven`
+# default and skip the step. Production still derives `block` and is unchanged, which is why
+# only one arm moved.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 800), ("Production", 802)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

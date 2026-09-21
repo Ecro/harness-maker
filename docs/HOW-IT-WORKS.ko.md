@@ -94,7 +94,7 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
                           ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │                      harness.yaml (단일 진실 원천)                    │
-│   locale, preset (Side/Production), dev_mode, targets (claude/cursor) │
+│   locale, preset (Side/Production), targets (claude/cursor)         │
 │   worktree.enabled, max_review_rounds, preferred_model, ...         │
 └──────────┬───────────────────────────────────────┬───────────────────┘
            │                                       │
@@ -1677,8 +1677,9 @@ targets:
 # 프리셋 (컨텍스트 크기/권한 엄격도)
 preset: Side             # Side | Production
 
-# 개발 모드 (spec-driven vs task-driven)
-dev_mode: spec-driven    # spec-driven | task-driven
+# SPEC 게이트 엄격도 — 없으면 preset 기본값 (Production block, Side warn)
+spec:
+  strictness: block      # block | warn
 
 # 워크트리 격리
 worktree:

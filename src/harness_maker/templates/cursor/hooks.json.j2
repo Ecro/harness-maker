@@ -37,7 +37,7 @@
       {
         "matcher": "Write|Edit|MultiEdit",
         "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.worktree_gate"
-      }{% if config.dev_mode == "spec-driven" %},
+      }{% if strictness_of(config) == "block" %},
       {
         "matcher": "Write|Edit|MultiEdit",
         "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.spec_gate"

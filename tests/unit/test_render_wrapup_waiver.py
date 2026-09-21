@@ -9,29 +9,32 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from harness_maker.models import DevMode, InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.strictness import Strictness
 from harness_maker.synthesize import synthesize
 
 
-def _wrapup(tmp_path: Path, dev_mode: DevMode) -> str:
+def _wrapup(tmp_path: Path, strictness: Strictness) -> str:
     bp = synthesize(
         ProjectProfile(),
-        InterviewAnswers(preset=Preset.PRODUCTION, targets=[Target.CLAUDE_CODE], dev_mode=dev_mode),
+        InterviewAnswers(
+            preset=Preset.PRODUCTION, targets=[Target.CLAUDE_CODE], strictness=strictness
+        ),
     )
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
     return next(f.read_text(encoding="utf-8") for f in tmp_path.rglob("stages/wrapup.md"))
 
 
 def test_task_driven_renders_waiver_advisory(tmp_path: Path) -> None:
-    body = _wrapup(tmp_path, DevMode.TASK_DRIVEN)
+    body = _wrapup(tmp_path, "warn")
     assert "waiver-check" in body
     assert "Step 3.6" in body
-    # Advisory, never a STOP.
-    assert "NEVER a STOP" in body
+    # Advisory: it never halts wrapup.
+    assert "never halts wrapup" in body
 
 
 def test_spec_driven_omits_waiver_advisory(tmp_path: Path) -> None:
-    body = _wrapup(tmp_path, DevMode.SPEC_DRIVEN)
+    body = _wrapup(tmp_path, "block")
     assert "waiver-check" not in body
     assert "Step 3.6" not in body

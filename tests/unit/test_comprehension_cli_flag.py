@@ -162,13 +162,13 @@ def test_reinterview_does_not_clobber_an_explicit_depth_flag(tmp_path: Path) -> 
     """
     _write_harness_yaml(tmp_path)  # on-disk depth: deep
     from harness_maker.interview import _build_answers
-    from harness_maker.models import DevMode, Preset, Target
+    from harness_maker.models import Preset, Target
 
     fresh = _build_answers(
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=Preset.PRODUCTION,
-        dev_mode=DevMode.TASK_DRIVEN,
+        strictness="warn",
     )
     captured: dict[str, object] = {}
 
@@ -228,13 +228,13 @@ def test_reinterview_preserves_an_explicit_on_disk_depth(tmp_path: Path) -> None
         "interview:\n  comprehension:\n    depth: minimal\n",
     )
     from harness_maker.interview import _build_answers
-    from harness_maker.models import DevMode, Preset, Target
+    from harness_maker.models import Preset, Target
 
     fresh = _build_answers(
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=Preset.PRODUCTION,
-        dev_mode=DevMode.TASK_DRIVEN,
+        strictness="warn",
     )
     assert fresh.interview["comprehension"]["depth"] == "standard", (
         "fixture precondition: a fresh interview must NOT already carry the disk value, "
@@ -290,13 +290,13 @@ def test_reinterview_and_a_preset_switch_together(
     """
     _write_harness_yaml(tmp_path)  # on-disk depth: deep, preset Production
     from harness_maker.interview import _build_answers, _preset_extras
-    from harness_maker.models import DevMode, Preset, Target
+    from harness_maker.models import Preset, Target
 
     fresh = _build_answers(
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=Preset.PRODUCTION,
-        dev_mode=DevMode.TASK_DRIVEN,
+        strictness="warn",
     )
     captured: dict[str, object] = {}
 

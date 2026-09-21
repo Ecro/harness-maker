@@ -6,7 +6,7 @@ same rules at the PreToolUse boundary so an interactive Bash call gets the same
 treatment as a hooks.json command. One source of truth — adding a pattern in
 secscan.hook_injection auto-flows here.
 
-Installed for every preset/dev_mode combo; the rules are defensive defaults
+Installed for every preset and strictness; the rules are defensive defaults
 that no project should need to opt out of.
 """
 

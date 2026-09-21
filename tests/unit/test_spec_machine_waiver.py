@@ -65,7 +65,7 @@ def _run(
     tmp_path: Path, yaml_path: Path, mode: str, capsys: pytest.CaptureFixture[str]
 ) -> tuple[int, dict[str, Any]]:
     rc = main(
-        ["waiver-check", "--yaml", str(yaml_path), "--dev-mode", mode, "--root", str(tmp_path)]
+        ["waiver-check", "--yaml", str(yaml_path), "--strictness", mode, "--root", str(tmp_path)]
     )
     out = capsys.readouterr().out
     # The CLI prints a single JSON status line.
@@ -88,7 +88,7 @@ def test_waiver_check_flags_weak_unwaived_task_driven(
         "flag",
         [{"id": "AC-001", "title": "t", "oracle_source": "golden", "oracle_evidence": ""}],
     )
-    rc, status = _run(tmp_path, y, "task-driven", capsys)
+    rc, status = _run(tmp_path, y, "warn", capsys)
     assert rc == 0
     assert status["status"] == "flagged"
     assert "AC-001" in status["flagged_acs"]
@@ -110,7 +110,7 @@ def test_waiver_check_waived_not_flagged(
             }
         ],
     )
-    rc, status = _run(tmp_path, y, "task-driven", capsys)
+    rc, status = _run(tmp_path, y, "warn", capsys)
     assert rc == 0
     assert status["status"] == "ok"
     assert status["flagged_acs"] == []
@@ -124,9 +124,9 @@ def test_waiver_check_spec_driven_is_ok_noop(
         "spec",
         [{"id": "AC-001", "title": "t", "oracle_source": "golden", "oracle_evidence": ""}],
     )
-    rc, status = _run(tmp_path, y, "spec-driven", capsys)
+    rc, status = _run(tmp_path, y, "block", capsys)
     assert rc == 0
-    assert status["status"] == "ok"  # spec-driven already blocks at authoring
+    assert status["status"] == "ok"  # block already blocks at authoring
 
 
 def test_waiver_check_malformed_yaml_is_check_error(
@@ -134,7 +134,7 @@ def test_waiver_check_malformed_yaml_is_check_error(
 ) -> None:
     bad = tmp_path / "SPEC-bad.machine.yaml"
     bad.write_text(":bad: : yaml :", encoding="utf-8")
-    rc, status = _run(tmp_path, bad, "task-driven", capsys)
+    rc, status = _run(tmp_path, bad, "warn", capsys)
     assert rc == 0  # exit 0 ALWAYS (ADR-002)
     assert status["status"] == "check_error"  # NOT a clean pass
 
@@ -144,7 +144,7 @@ def test_waiver_check_non_list_ac_is_check_error(
 ) -> None:
     p = tmp_path / "SPEC-nonlist.machine.yaml"
     p.write_text(yaml.safe_dump({"schema_version": 2, "spec_slug": "x", "ac": "oops"}), "utf-8")
-    rc, status = _run(tmp_path, p, "task-driven", capsys)
+    rc, status = _run(tmp_path, p, "warn", capsys)
     assert rc == 0
     assert status["status"] == "check_error"
 
@@ -152,7 +152,7 @@ def test_waiver_check_non_list_ac_is_check_error(
 def test_waiver_check_missing_file_is_check_error(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    rc, status = _run(tmp_path, tmp_path / "nope.yaml", "task-driven", capsys)
+    rc, status = _run(tmp_path, tmp_path / "nope.yaml", "warn", capsys)
     assert rc == 0
     assert status["status"] == "check_error"
 
@@ -165,7 +165,7 @@ def test_waiver_check_writes_receipt_under_root(
         "rcpt",
         [{"id": "AC-001", "title": "t", "oracle_source": "golden", "oracle_evidence": ""}],
     )
-    _run(tmp_path, y, "task-driven", capsys)
+    _run(tmp_path, y, "warn", capsys)
     receipt = _receipt(tmp_path, "rcpt")
     assert receipt.exists()
     # Receipt stays under root (never escapes via a crafted slug/path).
@@ -185,7 +185,7 @@ def test_non_str_oracle_evidence_is_check_error(
         "nonstr",
         [{"id": "AC-001", "title": "t", "oracle_source": "golden", "oracle_evidence": [1, 2]}],
     )
-    rc, status = _run(tmp_path, y, "task-driven", capsys)
+    rc, status = _run(tmp_path, y, "warn", capsys)
     assert rc == 0
     assert status["status"] == "check_error"  # NOT a crash, NOT a clean ok
 
@@ -203,7 +203,7 @@ def test_non_str_waiver_is_check_error(tmp_path: Path, capsys: pytest.CaptureFix
             }
         ],
     )
-    rc, status = _run(tmp_path, y, "task-driven", capsys)
+    rc, status = _run(tmp_path, y, "warn", capsys)
     assert rc == 0
     assert status["status"] == "check_error"
 
@@ -213,7 +213,7 @@ def test_non_dict_ac_entry_is_check_error(
 ) -> None:
     p = tmp_path / "SPEC-nondict.machine.yaml"
     p.write_text(yaml.safe_dump({"schema_version": 2, "spec_slug": "x", "ac": [123]}), "utf-8")
-    rc, status = _run(tmp_path, p, "task-driven", capsys)
+    rc, status = _run(tmp_path, p, "warn", capsys)
     assert rc == 0
     assert status["status"] == "check_error"  # not silently "ok"
 
@@ -221,7 +221,7 @@ def test_non_dict_ac_entry_is_check_error(
 def test_non_utf8_file_is_check_error(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     bad = tmp_path / "SPEC-binary.machine.yaml"
     bad.write_bytes(b"\xff\xfe\x00bad")
-    rc, status = _run(tmp_path, bad, "task-driven", capsys)
+    rc, status = _run(tmp_path, bad, "warn", capsys)
     assert rc == 0  # UnicodeDecodeError must become check_error, not a crash
     assert status["status"] == "check_error"
 
@@ -238,9 +238,7 @@ def test_receipt_write_failure_still_exits_zero(
     # which the CLI swallows (receipt is best-effort telemetry).
     root_file = tmp_path / "rootfile"
     root_file.write_text("x", "utf-8")
-    rc = main(
-        ["waiver-check", "--yaml", str(y), "--dev-mode", "task-driven", "--root", str(root_file)]
-    )
+    rc = main(["waiver-check", "--yaml", str(y), "--strictness", "warn", "--root", str(root_file)])
     assert rc == 0
     out = capsys.readouterr().out
     assert '"flagged"' in out
@@ -254,7 +252,7 @@ def test_large_flagged_list_receipt_is_truncated(
         for i in range(500)
     ]
     y = _write_yaml(tmp_path, "big", acs)
-    _run(tmp_path, y, "task-driven", capsys)
+    _run(tmp_path, y, "warn", capsys)
     last = json.loads(_receipt(tmp_path, "big").read_text(encoding="utf-8").splitlines()[-1])
     # The receipt line stays within the atomic-append bound via truncation.
     assert last.get("truncated") is True

@@ -17,7 +17,6 @@ from typing import Any
 
 from harness_maker.models import (
     Confidence,
-    DevMode,
     Preset,
     ProjectProfile,
     Recommendation,
@@ -220,14 +219,13 @@ def recommend_mcp_servers(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Phase 8 migrated recommenders — preset / dev_mode / mechanical_checks / second_brain
+# Phase 8 migrated recommenders — preset / mechanical_checks / second_brain
 #
 # Confidence assignments (PLAN validator W3 backward-compat):
 #   preset            → MEDIUM (today the interview always asks; silent flip
 #                       would surprise 0.11.x users on upgrade — Phase 8 stays
 #                       conservative; tighten in follow-up release once
 #                       telemetry shows zero override pattern)
-#   dev_mode          → MEDIUM (same reasoning)
 #   mechanical_checks → HIGH   (already silent today via mechanical_checks
 #                       template — behavior parity with current)
 #   second_brain      → HIGH   (vault_member detection is identity — the
@@ -261,32 +259,6 @@ def recommend_preset(
             confidence=Confidence.MEDIUM,
         ),
         signal=signal,
-    )
-
-
-@register("dev_mode")
-def recommend_dev_mode(
-    profile: ProjectProfile,
-    project_dir: Path,
-) -> Recommendation:
-    """Side → task-driven (lighter); Production → spec-driven.
-
-    MEDIUM confidence: dev_mode is derived from preset, which is itself an
-    inference. Bucket parity with preset keeps the UX consistent.
-    """
-    preset_rec = recommend_preset(profile, project_dir)
-    preset_value: Preset = preset_rec.value if preset_rec is not None else Preset.SIDE
-    value = DevMode.SPEC_DRIVEN if preset_value == Preset.PRODUCTION else DevMode.TASK_DRIVEN
-    return Recommendation(
-        axis="dev_mode",
-        value=value,
-        confidence=Confidence.MEDIUM,
-        evidence=RecommendationEvidence(
-            n_observations=1,
-            top_3_signals=[f"preset:{preset_value.value}"],
-            confidence=Confidence.MEDIUM,
-        ),
-        signal=f"preset={preset_value.value}",
     )
 
 

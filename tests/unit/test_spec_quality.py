@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from harness_maker.models import DevMode
 from harness_maker.spec_quality import evaluate_spec
 
 STRONG_SPEC = """\
@@ -53,18 +52,18 @@ def test_weak_spec_low_score() -> None:
 
 
 def test_spec_driven_blocks_weak_spec() -> None:
-    result = evaluate_spec(WEAK_SPEC, dev_mode=DevMode.SPEC_DRIVEN)
+    result = evaluate_spec(WEAK_SPEC, strictness="block")
     assert result.blocked is True
 
 
 def test_task_driven_does_not_block_weak_spec() -> None:
-    result = evaluate_spec(WEAK_SPEC, dev_mode=DevMode.TASK_DRIVEN)
+    result = evaluate_spec(WEAK_SPEC, strictness="warn")
     assert result.blocked is False
     assert result.is_weak
 
 
 def test_spec_driven_allows_strong_spec() -> None:
-    result = evaluate_spec(STRONG_SPEC, dev_mode=DevMode.SPEC_DRIVEN)
+    result = evaluate_spec(STRONG_SPEC, strictness="block")
     assert result.blocked is False
 
 
@@ -77,14 +76,16 @@ def test_scores_have_all_dimensions() -> None:
     assert "scope_boundary" in result.scores
 
 
-def test_dev_mode_string_accepted() -> None:
-    result = evaluate_spec(MODERATE_SPEC, dev_mode="task-driven")
-    assert result.dev_mode == "task-driven"
+def test_strictness_string_accepted() -> None:
+    result = evaluate_spec(MODERATE_SPEC, strictness="warn")
+    assert result.strictness == "warn"
 
 
-def test_unknown_dev_mode_defaults_to_task_driven() -> None:
-    result = evaluate_spec(MODERATE_SPEC, dev_mode="unknown-mode")
-    assert result.dev_mode == "task-driven"
+def test_unknown_strictness_is_read_as_warn() -> None:
+    """A function argument, not a config read: anything but an exact `block` is the relaxed
+    reading an omitted flag always had."""
+    result = evaluate_spec(MODERATE_SPEC, strictness="unknown-mode")
+    assert result.strictness == "warn"
     assert result.blocked is False
 
 

@@ -17,13 +17,13 @@ runner = CliRunner()
 
 def _minimal_answers() -> InterviewAnswers:
     from harness_maker.interview import _build_answers
-    from harness_maker.models import DevMode, Preset, Target
+    from harness_maker.models import Preset, Target
 
     return _build_answers(
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=Preset.SIDE,
-        dev_mode=DevMode.TASK_DRIVEN,
+        strictness="warn",
     )
 
 

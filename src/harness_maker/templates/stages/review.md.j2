@@ -533,9 +533,9 @@ plus `reasoning_diverges: true` when Step 4b found matching OBSERVE with divergi
 the `disposition`/`authority` that Step 4e describes. Write the array to a temp path, then:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %} | tee <FINALIZE-r{N}>")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N> --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml | tee <FINALIZE-r{N}>")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %} | tee <FINALIZE-r{N}>
+!{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N> --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml | tee <FINALIZE-r{N}>
 ```{% endif %}
 
 It **reads only** and prints one payload: `{"findings": [...with `tag`...], "grade": …,
@@ -606,7 +606,7 @@ them — a docstring is not independent of the thing under review the way a SPEC
 disposition is **not** a lifecycle transition: the `pending`/`resolved`/`stale` lattice in
 `second-opinion-gate` §5 is orthogonal and unaffected.
 
-> On a task-driven harness with no SPEC there are no AC ids, so **no rejection can clear the
+> On a task with no machine SPEC there are no AC ids, so **no rejection can clear the
 > grade** and every false positive lands on `human_review_needed`. That is the acknowledged cost
 > of the solo-lens vote in the SPEC-less case, not a bug to route around.
 {%- if config.second_opinion and config.second_opinion.models %}
@@ -672,13 +672,12 @@ whenever `errors` is non-empty** — an untagged finding, or a rejection citing 
 SPEC does not declare. Both mean the letter is not trustworthy: fix the listed entries and re-run
 rather than carrying the number forward. `--spec` is what makes an AC citation *verified*; without
 it no AC-cited rejection clears the grade, because `AC-999` parses exactly like `AC-004`.
-{% if config.dev_mode == 'spec-driven' %}
+
 > **Drop the `--spec` argument if `{{ config.spec.dir }}SPEC-{slug}.machine.yaml` does not exist**
 > — a slug whose SPEC stage recorded `none` has no machine SPEC, and the grade is then computed
 > with no AC citation able to clear it, which is the intended fail-closed outcome. The CLI already
 > degrades that way on its own; omitting the flag just keeps a routine run from reporting an error
 > every round, which is what would teach a reader to ignore the exit code the other checks rely on.
-{%- endif %}
 
 The rule it applies — stated here so a mismatch is visible, not so you can compute it yourself:
 

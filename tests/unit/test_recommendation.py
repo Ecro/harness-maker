@@ -65,8 +65,8 @@ def test_registry_contains_phase_4_and_8_axes() -> None:
     """Production-clean registry exposes the Phase 4 + Phase 8 axes.
 
     Phase 4 shipped ``wrapup_docs`` + ``mcp_servers``; Phase 8 migrated the
-    existing 4 transitive recommends (``preset``, ``dev_mode``,
-    ``mechanical_checks``, ``second_brain``) into the registry. Updating
+    existing transitive recommends (``preset``, ``mechanical_checks``, ``second_brain``) into
+    the registry; the methodology recommender left with its axis (SPEC-dev-mode-removal). Updating
     this assertion is the intended forcing function so we notice
     unintentional registrations.
     """
@@ -76,7 +76,6 @@ def test_registry_contains_phase_4_and_8_axes() -> None:
                 "wrapup_docs",
                 "mcp_servers",
                 "preset",
-                "dev_mode",
                 "mechanical_checks",
                 "second_brain",
             },
@@ -225,8 +224,8 @@ def test_recommend_all_collects_non_none_results(tmp_path: Path) -> None:
             evidence=_ev(),
         )
 
-    @register("dev_mode")
-    def _dev_mode(_p: ProjectProfile, _d: Path) -> Recommendation | None:
+    @register("locale")
+    def _locale(_p: ProjectProfile, _d: Path) -> Recommendation | None:
         return None  # insufficient signal — must be skipped
 
     @register("targets")

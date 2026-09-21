@@ -187,7 +187,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     # PATH that could not exist. Step 5 now returns the note inline. Found by four review lenses
     # independently, none of which was looking at this file. Body change outside the codex
     # conditional. Pre-bump hash in git history.
-    "stuck": "46db889587156f0024083ee4fd6e96a6fdc5ae36235347bfae535f1e64e1bb65",
+    "stuck": "8bc2df773b8785717e392b39cdf56ca4e11dc6fcc633a3e57c2149cee4cd0945",
     # test-reviewer re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 2). Two
     # rules changed, both because Phase A.5 now runs three lens-scoped instances of this agent:
     # (a) `passing_tests[]` was declared FROZEN, which conflicted with the caller's merge rule —

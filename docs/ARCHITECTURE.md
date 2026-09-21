@@ -215,7 +215,7 @@ Every rendered Step/Phase/Check heading across the seven stages is classified in
 shrinks as the vendor harness natively absorbs the behavior), **INV** (invariant regardless of
 either axis), and **TUNE** (not a deletion candidate — a numeric threshold with a `remeasure_on`
 trigger and `measure_cmd`). `tests/structural/test_step_sensitivity_registry.py` gates that no
-rendered heading across the `ARMS` (preset × dev_mode) matrix goes unclassified.
+rendered heading across the `ARMS` (one per preset, at its default strictness) goes unclassified.
 
 ### M4 — Anti-rot Pipeline
 

@@ -14,12 +14,12 @@ MESSAGES: dict[str, dict[str, str]] = {
         "error_no_yaml": ".claude/harness.yaml not found.",
         "spec_gate_missing_warn": (
             "spec-gate (warn): no SPEC referencing {test_path} found in "
-            "{spec_dir}/. Add a SPEC-*.md or switch dev_mode=task-driven."
+            "{spec_dir}/. Add a SPEC-*.md or set spec.strictness: warn."
         ),
         "spec_gate_missing_block": (
             "spec-gate (block): refusing test write — no SPEC referencing "
-            "{test_path} found in {spec_dir}/. Add a SPEC-*.md or switch "
-            "dev_mode=task-driven in .claude/harness.yaml."
+            "{test_path} found in {spec_dir}/. Add a SPEC-*.md or set "
+            "spec.strictness: warn in .claude/harness.yaml."
         ),
         "permission_gate_blocked": (
             "permission-gate: command rejected — matched dangerous pattern "
@@ -32,12 +32,12 @@ MESSAGES: dict[str, dict[str, str]] = {
         "error_no_yaml": ".claude/harness.yaml 파일을 찾을 수 없습니다.",
         "spec_gate_missing_warn": (
             "spec-gate (warn): {test_path} 를 참조하는 SPEC 가 {spec_dir}/ 에 "
-            "없습니다. SPEC-*.md 추가 혹은 dev_mode=task-driven 전환을 검토하세요."
+            "없습니다. SPEC-*.md 추가 혹은 spec.strictness: warn 전환을 검토하세요."
         ),
         "spec_gate_missing_block": (
             "spec-gate (block): 테스트 쓰기 차단 — {test_path} 를 참조하는 "
             "SPEC 가 {spec_dir}/ 에 없습니다. SPEC-*.md 추가 혹은 "
-            ".claude/harness.yaml 의 dev_mode 를 task-driven 으로."
+            ".claude/harness.yaml 의 spec.strictness 를 warn 으로."
         ),
         "permission_gate_blocked": (
             "permission-gate: 명령 차단 — 위험 패턴 {pattern!r} 매칭. "

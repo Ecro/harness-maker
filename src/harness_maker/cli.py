@@ -126,10 +126,11 @@ def make(
         help="Override locale tag (e.g., 'ko', 'en', 'ja'). Free-text; "
         "unknown locales fall back to English at runtime.",
     ),
-    dev_mode_override: str | None = typer.Option(
+    strictness_override: str | None = typer.Option(
         None,
-        "--dev-mode",
-        help="Override dev_mode: 'spec-driven' or 'task-driven'.",
+        "--strictness",
+        help="Override SPEC gate strictness: 'block' or 'warn'. Default derives from "
+        "the preset (Production=block, Side=warn).",
     ),
     targets_override: str | None = typer.Option(
         None,
@@ -345,7 +346,7 @@ def make(
         raise typer.Exit(code=1)
     p = profile(target)
     # Re-render path: silently reuse prior interview answers from harness.yaml
-    # so locale / dev_mode / custom workflows / reviewer-enablement survive
+    # so locale / strictness / custom workflows / reviewer-enablement survive
     # without re-prompting. --reinterview forces fresh prompts; --autoloop
     # only kicks in for first-time installs (no harness.yaml yet).
     # Defined on BOTH branches: the `--reinterview` autonomy re-apply below reads it, and a
@@ -382,7 +383,7 @@ def make(
         a,
         preset_override=preset_override,
         locale_override=locale_override,
-        dev_mode_override=dev_mode_override,
+        strictness_override=strictness_override,
         targets_override=targets_override,
         grade_threshold_override=grade_threshold_override,
         domains_override=domains_override,
@@ -1306,7 +1307,7 @@ def _apply_dimension_overrides(
     *,
     preset_override: str | None,
     locale_override: str | None,
-    dev_mode_override: str | None,
+    strictness_override: str | None,
     targets_override: str | None,
     grade_threshold_override: str | None = None,
     domains_override: str | None = None,
@@ -1336,7 +1337,7 @@ def _apply_dimension_overrides(
     (grade_threshold, domains, etc.) are re-applied AFTER the rebuild.
     """
     from harness_maker.interview import _build_answers, _focus_to_additional_reviewers
-    from harness_maker.models import DevMode, Preset, Target
+    from harness_maker.models import Preset, Target
 
     update: dict[str, object] = {}
     # PLAN-worktree-side-defaults ADR-002/007. Only the explicit flag is seeded here;
@@ -1349,12 +1350,11 @@ def _apply_dimension_overrides(
         update["worktree"] = {"enabled": worktree_override}
     if locale_override:
         update["locale"] = locale_override
-    if dev_mode_override:
-        try:
-            update["dev_mode"] = DevMode(dev_mode_override)
-        except ValueError as e:
-            typer.echo(f"--dev-mode invalid: {dev_mode_override}", err=True)
-            raise typer.Exit(code=1) from e
+    if strictness_override:
+        if strictness_override not in ("block", "warn"):
+            typer.echo(f"--strictness invalid: {strictness_override} (block|warn)", err=True)
+            raise typer.Exit(code=1)
+        update["strictness"] = strictness_override
     if targets_override:
         raw = [t.strip() for t in targets_override.split(",") if t.strip()]
         if not raw:
@@ -1503,7 +1503,7 @@ def _apply_dimension_overrides(
                 locale=answers.locale,
                 targets=list(answers.targets),
                 preset=new_preset,
-                dev_mode=answers.dev_mode,
+                strictness=answers.strictness,
                 consensus=answers.consensus,
                 caching=answers.caching,
                 autonomy=answers.autonomy,

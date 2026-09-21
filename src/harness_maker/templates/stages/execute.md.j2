@@ -150,11 +150,10 @@ summary: "{≤100 char one-line TL;DR}"
 objective: <id>                  # ONLY when the SPEC names one; omit otherwise
 ---
 ```
-{% if config.dev_mode == 'spec-driven' %}
+
 `spec_need_verdict` / `spec_need_target` are deliberately **not** in that list. Step 0.1 judges
 them from evidence and writes them, and the writer preserves whatever is already there — so a
 value guessed here, before the evidence is gathered, would be the one that survives.
-{% endif %}
 
 `validator_outcome: NOT_RUN` is deliberate and is not one of the four values the removed stage
 documented. Nothing parses this field, so an honest value costs no reader — and borrowing
@@ -184,8 +183,7 @@ documented. Nothing parses this field, so an honest value costs no reader — an
 8. **⚠️ Risks & Mitigation** — a risk register table.
 9. **✅ Success Criteria** — a checklist mirroring the SPEC's verification criteria.
 
-{% if config.dev_mode == 'spec-driven' %}
-#### Step 0.1 — SPEC-need fields (spec-driven)
+#### Step 0.1 — SPEC-need fields
 
 **Judge with evidence, then record, then write.** The old `/hm:plan` Step 1.7 also *halted*
 here to make you author the SPEC first. That gate is gone with the stage — this step reports,
@@ -210,7 +208,10 @@ Read the candidates and the scope, then judge a verdict — `add` / `change` / `
 contract whose regression could *silently* break something downstream, AND that contract is
 AC-expressible. `none` requires a confident positive assertion; an empty or low-overlap
 candidate set does NOT justify it. `not-evaluated` is the fail-closed default for an ambiguous
-scope, and it is an explicit FAIL signal to `/hm:verify` Check 6 later — not an absence.
+{% if strictness_of(config) == 'block' %}scope, and it is an explicit FAIL signal to `/hm:verify` Check 6 later — not an absence.
+{%- else %}scope, and `/hm:verify` Check 6 reports it later as a `WARN` (this harness runs at `warn`
+strictness) — it is a signal, not an absence.
+{%- endif %}
 
 Record the verdict with its rationale:
 
@@ -252,7 +253,6 @@ Then **assert the key is there**. Read the frontmatter back; if `spec_need_verdi
 retry the call once, and if it is still absent surface the path and the error and stop. This is
 not ceremony: `/hm:verify` Check 6 reads that key and treats an absent one as `PASS (N-A)`, so a
 write that silently did nothing turns the gate permanently green instead of red.
-{% endif %}
 
 #### Step 0.2 — Loop mode: the per-iter PLAN
 
@@ -317,9 +317,9 @@ Read the file back and assert:
   triggers the retry rule below, because a consumer cannot act on an undecidable entry and will
   silently drop it. A `none` bullet coexisting with others: **delete the `none`**, never a path
   or `Advisory:` bullet.
-{% if config.dev_mode == 'spec-driven' %}- The frontmatter contains `spec_need_verdict` with a valid value. A missing key closes the
+- The frontmatter contains `spec_need_verdict` with a valid value. A missing key closes the
   absent-case fail-open that defeats `/hm:verify` Check 6.
-{% endif %}
+
 If verification fails, retry the write **once**. If it still fails, surface the path and the
 error and stop — do not proceed to Step 1 with a PLAN later stages cannot read.
 
@@ -403,7 +403,7 @@ expression (the contract `hm spec_machine validate` enforces).
 Call this set the **bindable mechanical ACs** — Phase A authors a real
 predicate-bound test for each, and `/hm:wrapup` records the binding back. When
 the file is absent or has zero bindable mechanical ACs, Phase A uses the scenario
-path unchanged (silent fallback — task-driven / `--no-tdd` / trivial SPECs).
+path unchanged (silent fallback — no machine SPEC / `--no-tdd` / trivial SPECs).
 
 If `research_doc:` resolves to an existing file with mtime < `mtime_warn_days` (frontmatter, default 7):
 - Read it; reuse `libs_fetched`, `sources` to skip duplicate context-fetching.
@@ -675,7 +675,7 @@ an artefact:
    self-induced regression, which is the whole reason this step exists.
 
 **Declare all three unprompted** — what a repair will change and what it will leave alone are
-properties of the repair itself, so they exist in every `dev_mode`, with or without a SPEC,
+properties of the repair itself, so they exist at every strictness, with or without a SPEC,
 **with or without TDD** — C.0 is not one of the phases `--no-tdd` skips.
 **Then cite the `Do not change` list loaded at Step 1** where item 3 overlaps it, naming the
 entries your declared scope comes near. If you cannot restate it, re-Read that

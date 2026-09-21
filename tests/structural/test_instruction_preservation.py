@@ -246,42 +246,42 @@ _REVIEW_R2_SPEC_NEED_UNQUOTED = [
 
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
     "plan-stage-absorption": {
-        "execute@spec-driven": list(_REVIEW_R2_SPEC_NEED_UNQUOTED),
+        "execute@block": list(_REVIEW_R2_SPEC_NEED_UNQUOTED),
     },
     # SPEC-ai-native-sdlc-vs-intent-world IRR-003: `spec` became a judgment-gated stage, so the
     # shared end-of-stage partial renders the classify-then-boundary branch instead of the
     # gate-first `gate-blocked` call — the same shape plan and review already have.
     "ai-native-sdlc-vs-intent-world": {
-        "spec@task-driven": list(_SPEC_GATE_FIRST_LINE),
-        "spec@spec-driven": list(_SPEC_GATE_FIRST_LINE),
+        "spec@warn": list(_SPEC_GATE_FIRST_LINE),
+        "spec@block": list(_SPEC_GATE_FIRST_LINE),
     },
     "assumption-entry-and-evidence-locator": {
-        "wrapup@task-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_LOCATOR),
-        "wrapup@spec-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_LOCATOR),
+        "wrapup@warn": list(_WRAPUP_57_OBSERVE_LINE_PRE_LOCATOR),
+        "wrapup@block": list(_WRAPUP_57_OBSERVE_LINE_PRE_LOCATOR),
     },
     "outcome-measure": {
-        "wrapup@task-driven": list(_WRAPUP_57_TWO_QUESTIONS_HEADING),
-        "wrapup@spec-driven": list(_WRAPUP_57_TWO_QUESTIONS_HEADING),
+        "wrapup@warn": list(_WRAPUP_57_TWO_QUESTIONS_HEADING),
+        "wrapup@block": list(_WRAPUP_57_TWO_QUESTIONS_HEADING),
     },
     "playbook-alignment": {
-        "wrapup@task-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_CLAIM),
-        "wrapup@spec-driven": list(_WRAPUP_57_OBSERVE_LINE_PRE_CLAIM),
+        "wrapup@warn": list(_WRAPUP_57_OBSERVE_LINE_PRE_CLAIM),
+        "wrapup@block": list(_WRAPUP_57_OBSERVE_LINE_PRE_CLAIM),
     },
     "reviewer-lens-fanout-merge": {
-        "review@task-driven": list(_STEP_C2_PRE_MERGE_HEADING),
-        "review@spec-driven": list(_STEP_C2_PRE_MERGE_HEADING),
+        "review@warn": list(_STEP_C2_PRE_MERGE_HEADING),
+        "review@block": list(_STEP_C2_PRE_MERGE_HEADING),
     },
     "config-second-opinion-antigravity-off": {
-        "review@task-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
-        "review@spec-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
+        "review@warn": list(_ANTIGRAVITY_RECIPE_HEADING),
+        "review@block": list(_ANTIGRAVITY_RECIPE_HEADING),
     },
     "plan-interview-comprehension": {
-        "spec@task-driven": list(_COMPREHENSION_SPEC_HEADING),
-        "spec@spec-driven": list(_COMPREHENSION_SPEC_HEADING),
+        "spec@warn": list(_COMPREHENSION_SPEC_HEADING),
+        "spec@block": list(_COMPREHENSION_SPEC_HEADING),
     },
     "execute-step5-model-mismatch": {
-        "execute@task-driven": list(_STEP5_SCOPED_HEADING),
-        "execute@spec-driven": list(_STEP5_SCOPED_HEADING),
+        "execute@warn": list(_STEP5_SCOPED_HEADING),
+        "execute@block": list(_STEP5_SCOPED_HEADING),
     },
     "phase-2-sessionid-env-propagation": _PHASE_2_SESSIONID,
     "phase-5-sessionid-span": _PHASE_5_SPAN_SESSIONID,
@@ -289,22 +289,22 @@ _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
     # check call. Listed against BOTH arms: Phase D is outside every `dev_mode` gate, so
     # a cut that hit only one arm would be the bug this key shape exists to expose.
     "phase-4-execute-phase-d": {
-        "execute@task-driven": list(_PHASE_4_EXECUTE_CHECKS),
-        "execute@spec-driven": list(_PHASE_4_EXECUTE_CHECKS),
+        "execute@warn": list(_PHASE_4_EXECUTE_CHECKS),
+        "execute@block": list(_PHASE_4_EXECUTE_CHECKS),
     },
     # Steps 4 and 4.5 merge into one `spec_machine check --all` call under a combined
     # heading. Their three fenced commands were never `!` lines, so the CALL saving here
     # is real but invisible to the round-trip arm — only the headings move.
     "phase-3-spec-check-all": {
-        "spec@task-driven": list(_PHASE_3_SPEC_HEADINGS),
-        "spec@spec-driven": list(_PHASE_3_SPEC_HEADINGS),
+        "spec@warn": list(_PHASE_3_SPEC_HEADINGS),
+        "spec@block": list(_PHASE_3_SPEC_HEADINGS),
     },
     # Steps 6 → 7.6 become one `wrapup_land` call. Step 7.7 `task-land` and
     # `commit-base-memory` are deliberately NOT here: ADR-006 keeps the only work-losing
     # step as its own visible invocation, and their absence from this list is the check.
     "phase-2-wrapup-land": {
-        "wrapup@task-driven": [*_PHASE_2_WRAPUP_HEADINGS, *_PHASE_2_WRAPUP_CALLS],
-        "wrapup@spec-driven": [*_PHASE_2_WRAPUP_HEADINGS, *_PHASE_2_WRAPUP_CALLS],
+        "wrapup@warn": [*_PHASE_2_WRAPUP_HEADINGS, *_PHASE_2_WRAPUP_CALLS],
+        "wrapup@block": [*_PHASE_2_WRAPUP_HEADINGS, *_PHASE_2_WRAPUP_CALLS],
     },
     # ADR-001 of PLAN-workflow-loop-efficiency deletes the Pass 1.5 `code-verifier`
     # dispatch — a full serialized agent round-trip on the critical path of every review
@@ -317,18 +317,18 @@ _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
     # Listed against BOTH arms because the Pass 1.5 block sits outside every `dev_mode`
     # gate — a cut that reached only one arm would be the bug this key shape exposes.
     "phase-1-workflow-loop-efficiency-pass15": {
-        "review@task-driven": list(_PHASE_1_PASS15_HEADINGS),
-        "review@spec-driven": list(_PHASE_1_PASS15_HEADINGS),
+        "review@warn": list(_PHASE_1_PASS15_HEADINGS),
+        "review@block": list(_PHASE_1_PASS15_HEADINGS),
     },
     # SPEC-ci-derived-verification-plan: the shipped example gate commands are replaced by
     # `hm verification_plan commands --root .`, which reads the project's CI. Listed against
     # BOTH arms because neither block sat behind a `dev_mode` gate — a cut reaching only one
     # arm would be the bug this key shape exposes.
     "ci-derived-verification-plan": {
-        "verify@task-driven": list(_CI_DERIVED_VERIFY_EXAMPLES),
-        "verify@spec-driven": list(_CI_DERIVED_VERIFY_EXAMPLES),
-        "wrapup@task-driven": list(_CI_DERIVED_WRAPUP_EXAMPLES),
-        "wrapup@spec-driven": list(_CI_DERIVED_WRAPUP_EXAMPLES),
+        "verify@warn": list(_CI_DERIVED_VERIFY_EXAMPLES),
+        "verify@block": list(_CI_DERIVED_VERIFY_EXAMPLES),
+        "wrapup@warn": list(_CI_DERIVED_WRAPUP_EXAMPLES),
+        "wrapup@block": list(_CI_DERIVED_WRAPUP_EXAMPLES),
     },
     # PLAN-workflow-steps-vs-model-capability Phase 4 (ADR-003): verify Check 1 keeps its
     # mechanical drift-verdict read and drops the LLM PLAN/SPEC coverage judgement ("1b"), so
@@ -341,14 +341,35 @@ _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
     # research and spec carried a HEADING for it (plan's lives under Step E, which stays;
     # loop is not an atomic command). Both arms: the ceremony sat outside every dev_mode gate.
     "workflow-steps-vs-model-capability-phase-3-five-term-ceremony": {
-        "research@task-driven": list(_WSVMC_PHASE_3_RESEARCH_HEADINGS),
-        "research@spec-driven": list(_WSVMC_PHASE_3_RESEARCH_HEADINGS),
-        "spec@task-driven": list(_WSVMC_PHASE_3_SPEC_HEADINGS),
-        "spec@spec-driven": list(_WSVMC_PHASE_3_SPEC_HEADINGS),
+        "research@warn": list(_WSVMC_PHASE_3_RESEARCH_HEADINGS),
+        "research@block": list(_WSVMC_PHASE_3_RESEARCH_HEADINGS),
+        "spec@warn": list(_WSVMC_PHASE_3_SPEC_HEADINGS),
+        "spec@block": list(_WSVMC_PHASE_3_SPEC_HEADINGS),
     },
     "workflow-steps-vs-model-capability-phase-4-verify-check1b": {
-        "verify@task-driven": list(_WSVMC_PHASE_4_VERIFY_HEADINGS),
-        "verify@spec-driven": list(_WSVMC_PHASE_4_VERIFY_HEADINGS),
+        "verify@warn": list(_WSVMC_PHASE_4_VERIFY_HEADINGS),
+        "verify@block": list(_WSVMC_PHASE_4_VERIFY_HEADINGS),
+    },
+    # SPEC-dev-mode-removal: every entry is a RETITLE or a re-spelled flag, not a lost
+    # instruction. Headings drop the retired axis name; `warn` now renders six checks (Check 6
+    # reports without stopping, ADR-005), so its old "5 Checks" header is replaced; the warn
+    # `finalize` call gains `--spec` (it was only rendered on the strict arm); the waiver
+    # advisory's flag is re-spelled `--strictness warn`. Each arm listed separately — the two
+    # renders changed differently.
+    "dev-mode-removal": {
+        "execute@block": ["#### Step 0.1 — SPEC-need fields (spec-driven)"],
+        "verify@warn": ["## The 5 Checks (run in order; STOP on first FAIL unless `--force`)"],
+        "verify@block": ["### Check 6 — SPEC requirement (spec-driven)"],
+        "wrapup@warn": [
+            "### Step 3.6 — Oracle-waiver advisory (task-driven — PLAN-wrapup-waiver-enforcement)",
+            "!uv run --with $HOME/harness-maker python -m harness_maker.spec_machine waiver-check "
+            "--yaml specs/SPEC-{slug}.machine.yaml --dev-mode task-driven --root .",
+        ],
+        "review@warn": [
+            "!cd <WT> && set -o pipefail; uv run --with $HOME/harness-maker python -m "
+            "harness_maker.review_consensus finalize --file <the literal temp path> --slug {slug} "
+            "--round <N> | tee <FINALIZE-r{N}>",
+        ],
     },
 }
 
@@ -390,7 +411,7 @@ def test_the_frozen_baseline_is_real(frozen: dict[str, dict[str, list[str]]]) ->
         assert len(sets["headings"]) >= 10, f"{key}: only {len(sets['headings'])} headings"
     # `wrapup` is the largest surface in the pipeline; if it froze small the snapshot was
     # taken against something other than the shipped render.
-    assert len(frozen["wrapup@task-driven"]["executables"]) >= 20
+    assert len(frozen["wrapup@warn"]["executables"]) >= 20
 
 
 def test_the_snapshot_actually_distinguishes_the_config_arms(
@@ -403,8 +424,8 @@ def test_the_snapshot_actually_distinguishes_the_config_arms(
     concretely rather than by count: `verify`'s Check 6 body is the specific pair the
     task-driven render omits.
     """
-    task = set(frozen["verify@task-driven"]["executables"])
-    spec = set(frozen["verify@spec-driven"]["executables"])
+    task = set(frozen["verify@warn"]["executables"])
+    spec = set(frozen["verify@block"]["executables"])
     only_spec = spec - task
     assert only_spec, "the two dev_mode arms froze identical executables for verify"
     assert any("spec_need" in x for x in only_spec), sorted(only_spec)
@@ -492,7 +513,7 @@ def test_every_allowlist_entry_names_a_known_entry_key() -> None:
 # ── negative controls — the gate can fail, and the allowlist can excuse ────────
 
 
-@pytest.mark.parametrize("key", ["verify@spec-driven", "execute@task-driven"])
+@pytest.mark.parametrize("key", ["verify@block", "execute@warn"])
 def test_the_gate_flags_a_deleted_instruction(
     frozen: dict[str, dict[str, list[str]]],
     current: dict[str, dict[str, list[str]]],
@@ -528,7 +549,7 @@ def test_an_allowlisted_removal_is_excused(
     """The branch every phase from 1 onward actually exercises, and which nothing else
     covers: an allowlist entry must genuinely suppress the failure, or a cutting phase
     can never go green and the gate becomes something to delete rather than to use."""
-    key = "verify@spec-driven"
+    key = "verify@block"
     victim = sorted(frozen[key]["executables"])[0]
     mutated = {
         k: {kd: [x for x in v[kd] if x != victim] for kd in _KINDS} for k, v in current.items()
@@ -550,6 +571,6 @@ def test_a_missing_entry_key_is_not_silently_forgiven(
 ) -> None:
     """A render that stops emitting a whole command must read as "everything removed",
     not as "nothing to compare" — `.get(key, {})` returning empty is fail-closed."""
-    key = "verify@spec-driven"
+    key = "verify@block"
     flagged = unlisted_removals(frozen, {}, key, "executables", set())
     assert flagged == set(frozen[key]["executables"])

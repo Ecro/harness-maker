@@ -56,7 +56,6 @@ from pathlib import Path
 import pytest
 
 from harness_maker.models import (
-    DevMode,
     InstrumentationConfig,
     InterviewAnswers,
     Preset,
@@ -89,7 +88,7 @@ def _surfaces(ledger: bool = False) -> dict[str, str]:
                     InterviewAnswers(
                         preset=Preset.PRODUCTION,
                         targets=list(_ALL_TARGETS),
-                        dev_mode=DevMode.TASK_DRIVEN,
+                        strictness="warn",
                         worktree={"enabled": True},
                         instrumentation=InstrumentationConfig(stage_agent_ledger=ledger),
                     ),

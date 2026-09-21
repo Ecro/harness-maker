@@ -30,7 +30,7 @@ _REPO = Path(__file__).resolve().parents[2]
 _DELTA = _REPO / "work-docs" / "BASELINE-DELTA-assumption-entry-and-evidence-locator.md"
 _PLAN = _REPO / "work-docs" / "PLAN-assumption-entry-and-evidence-locator.md"
 _PINNED_UNCHANGED = ("plan", "review", "help")
-_ARMS = {"ask@flag_off", "ask@flag_on", "auto_safe@spec-driven", "auto_safe@task-driven"}
+_ARMS = {"ask@flag_off", "ask@flag_on", "auto_safe@block", "auto_safe@warn"}
 _FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
 
 
@@ -61,8 +61,8 @@ def _live_arms(tmp_path: Path) -> dict[str, dict[str, str]]:
         }
         live[name]["wrapup_len"] = str(len(rendered["wrapup"]))
 
-    for dev_mode in AXES:
-        take(f"auto_safe@{dev_mode.value}", _render_atomic(dev_mode))
+    for strictness in AXES:
+        take(f"auto_safe@{strictness}", _render_atomic(strictness))
     for flag, name in ((True, "ask@flag_on"), (False, "ask@flag_off")):
         take(name, _render(feature_branch_workflow=flag, tmp=tmp_path / name))
     return live

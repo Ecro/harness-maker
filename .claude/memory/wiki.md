@@ -1201,4 +1201,32 @@ The DRI acceptance mechanism binds SPEC approval to content, not a checkbox. `sp
 The codex-main-runtime worktree delivers only independent foundations: codex_bootstrap resolves stable engine requirements and observes plugin/engine/project identities; claude_response validates bounded Claude JSON result envelopes. Plugin install/update execution, authenticated Claude subprocess invocation and shared provider/workflow wiring remain follow-up work pending plan-stage absorption. Full CI verification: 9065 passed, 100 skipped, 3 xfailed. No integration capability is implied by these pure helpers.
 ## [wiki:gotcha] codex-plan-integration-repair | 2026-09-20
 After plan-stage retirement, SecondOpinionConfig migrates the exact saved plan-validator alias to spec-validator before either YAML reader renders its consumer; custom allowlists and explicit opt-outs stay intact. Validator result models come from enabled providers, including Claude. Test upgrades through YAML -> rendered critic -> serialized reload, not the default model alone; preserve Codex native bootstrap sections during parallel workflow merges. PLAN authoring belongs to execute Step 0; the entry prerequisite cannot require its output. Frontmatter decision writes use a stable separate lock for the full read/modify/write/readback transaction, not atomic replacement alone.
+## [wiki:architecture] retiring-config-axis-is-three-promises | 2026-09-21
+Retiring a config axis is really three separate promises, and dropping any one reopens the
+axis under a different name. harness-maker's `dev_mode` (`spec-driven`/`task-driven`) removal
+collapsed it into one preset-derived knob, `spec.strictness: block | warn`, and needed all
+three: (1) **the axis needs exactly one reader and one writer** — already the established
+lesson (`single-reader-single-writer-config-axis`), reconfirmed here by an AST-discovered
+reader/writer singleton test rather than a hand-enumerated one; (2) **a SECOND key deciding
+half of the same behaviour silently defangs the first** — `gates/spec_gate.py`'s severity was
+computed from `security.gates.spec_gate` in `harness.yaml`, a value the Side preset template
+wrote as a hardcoded literal (the exact `template-literal-shadows-config-key` shape, but a
+NEW instance: a different config path shadowing a different reader), so a project with an
+explicit `spec.strictness: block` still ran the gate at `warn` severity until review round 1
+caught it as a P1 (`spec_gate.py:143-158`: severity is derived from `resolve_strictness(cfg)`
+now, the second key deleted as a read path entirely — not just overridden); (3) **a migration
+that lives in the renderer only reaches users who re-render** — `dev_mode` had to be added to
+`RETIRED_TOP_LEVEL_KEYS` and translated inside `io_utils.strip_retired_keys` (which calls
+`migrate_dev_mode` BEFORE stripping, so no caller can strip without translating first), because
+`render._preserve_yaml_user_keys` re-appends any on-disk key the new render doesn't emit as a
+"user addition" — a renderer-only migration would have resurrected the retired key on every
+un-re-rendered project (this generalises the load-vs-render split already recorded in
+`harness-diet-phases-2-6`, applied to a case where the OLD value also needed a value
+TRANSLATION, not just deletion). None of the three checks subsumes the others: (1) without (2)
+still ships a single official reader that a second unofficial one can outvote; (2) without (3)
+still leaves stale keys resurrecting themselves on old projects; doing all three is what made
+this removal actually singular rather than merely renamed. Cross-ref:
+`[wiki:architecture] single-reader-single-writer-config-axis`,
+`[fail:design] template-literal-shadows-config-key`,
+`[wiki:architecture] harness-diet-phases-2-6`.
 <!-- @hm:/user:entries -->

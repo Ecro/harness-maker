@@ -1,8 +1,9 @@
 """Sensitivity registry: which rendered `/hm:` steps shrink as models/hosts improve, which do not.
 
-Every `Step | Phase | Check` heading rendered by the seven stage commands over ``ARMS`` (preset ×
-dev_mode) maps to one ``StepEntry`` carrying a class, an evidence grade, a source, and — for
-TUNE — the trigger and command that re-measure it. Nothing at runtime reads this module: it is
+Every `Step | Phase | Check` heading rendered by the seven stage commands over ``ARMS`` (one per
+preset, each at its default strictness) maps to one ``StepEntry`` carrying a class, an evidence
+grade, a source, and — for TUNE — the trigger and command that re-measure it. Nothing at
+runtime reads this module: it is
 consumed by ``tests/structural/test_step_sensitivity_registry.py`` (coverage, orphan, Side
 consistency) and by the MATRIX/CLAUDE.md docs (``matrix_rows`` / ``unsourced_count``), so the
 class is a precondition of adding a step rather than a prose argument after the fact
@@ -34,7 +35,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, get_args
 
-from harness_maker.models import DevMode, Preset
+from harness_maker.models import Preset
 
 Class = Literal["COMP", "HOST", "INV", "TUNE"]
 Grade = Literal["***", "**", "*", "unsourced"]
@@ -48,8 +49,10 @@ GRADES: tuple[str, ...] = get_args(Grade)
 STAGES: tuple[str, ...] = ("research", "spec", "execute", "review", "verify", "wrapup")
 
 #: The render matrix the coverage gate is a union over (ADR-007). Targets are deliberately
-#: absent: commands render to one file family regardless of target.
-ARMS: tuple[tuple[Preset, DevMode], ...] = tuple((p, d) for p in Preset for d in DevMode)
+#: absent: commands render to one file family regardless of target. One arm per preset, each at
+#: its default strictness (Production=block, Side=warn): a heading that renders only at one
+#: strictness is still reached, because the two presets default to opposite values.
+ARMS: tuple[Preset, ...] = tuple(Preset)
 
 #: Ordinal token: the `Step|Phase|Check` keyword plus its identifier, up to the first space.
 ORDINAL_RE = re.compile(r"^(?:Step|Phase|Check)\s+[A-Z0-9][A-Za-z0-9.]*")
@@ -175,7 +178,6 @@ REGISTRY: tuple[StepEntry, ...] = (
         "INV",
         "plan Step 1.7",
         note="SPEC-need pair; verify Check 6 is the deterministic oracle that reads it",
-        renders_when="dev_mode == spec-driven",
     ),
     _u(
         "execute",
@@ -370,7 +372,7 @@ REGISTRY: tuple[StepEntry, ...] = (
     _e("verify", "Check 3", "INV", "**", _R),
     _e("verify", "Check 4", "INV", "**", _R),
     _e("verify", "Check 5", "INV", "**", _R),
-    _e("verify", "Check 6", "INV", "**", f"{_R}; spec-driven arm only"),
+    _e("verify", "Check 6", "INV", "**", f"{_R}; renders at every strictness, blocks at block"),
     _e(
         "verify",
         "Step 0.5",
@@ -389,7 +391,7 @@ REGISTRY: tuple[StepEntry, ...] = (
         "Step 3.6",
         "INV",
         "wrapup Step 3.5",
-        note="oracle-waiver advisory; task-driven arm",
+        note="oracle-waiver advisory; warn strictness only (reached on the Side arm)",
     ),
     _u("wrapup", "Step 4", "INV", "spec Step 5", note="PLAN status write"),
     _e(

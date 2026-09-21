@@ -23,8 +23,9 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.models import DevMode, InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.strictness import Strictness
 from harness_maker.synthesize import synthesize
 
 from .conftest import pin_install_ref
@@ -72,9 +73,7 @@ def _hm_call_sequence(block: str) -> tuple[str, ...]:
 
 
 @cache
-def _commands(
-    targets: tuple[Target, ...], dev_mode: DevMode = DevMode.TASK_DRIVEN
-) -> dict[str, str]:
+def _commands(targets: tuple[Target, ...], strictness: Strictness = "warn") -> dict[str, str]:
     """The `.claude/commands/hm/*.md` bodies — what Claude Code AND Cursor both read."""
     with tempfile.TemporaryDirectory() as td:
         out = Path(td) / ".claude"
@@ -87,7 +86,7 @@ def _commands(
                     InterviewAnswers(
                         preset=Preset.PRODUCTION,
                         targets=list(targets),
-                        dev_mode=dev_mode,
+                        strictness=strictness,
                         worktree={"feature_branch_workflow": True},
                     ),
                 ),
@@ -136,18 +135,18 @@ def test_the_render_helper_produces_the_seven_atomic_commands() -> None:
 # ── Phase 4 — execute Phase C per-file + Phase D select-then-one-call ───────────
 
 
-@pytest.mark.parametrize("dev_mode", [DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN])
-def test_phase_c_checks_per_file_not_per_edit(dev_mode: DevMode) -> None:
-    body = _commands(_CLAUDE_ONLY, dev_mode)["execute"]
+@pytest.mark.parametrize("strictness", ["warn", "block"])
+def test_phase_c_checks_per_file_not_per_edit(strictness: Strictness) -> None:
+    body = _commands(_CLAUDE_ONLY, strictness)["execute"]
     assert "Type-check once per FILE" in body
     assert "Compile / type-check after each edit" not in body, (
         "the per-edit rule survived — that is the cost being cut"
     )
 
 
-@pytest.mark.parametrize("dev_mode", [DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN])
-def test_phase_d_issues_one_combined_check_call(dev_mode: DevMode) -> None:
-    body = _commands(_CLAUDE_ONLY, dev_mode)["execute"]
+@pytest.mark.parametrize("strictness", ["warn", "block"])
+def test_phase_d_issues_one_combined_check_call(strictness: Strictness) -> None:
+    body = _commands(_CLAUDE_ONLY, strictness)["execute"]
     assert "hm test_dep_map --root ." in body
     assert "<lint> && <type> && <test>" in body
     for gone in ("!cd <WT> && <lint command>", "!cd <WT> && <type command>"):

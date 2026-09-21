@@ -30,6 +30,7 @@ from harness_maker.models import (
     ProjectProfile,
     Target,
 )
+from harness_maker.strictness import write_strictness
 
 logger = logging.getLogger(__name__)
 
@@ -315,15 +316,11 @@ def _atomic_command_files(
     PRODUCTION_FILES constants and for any test paths that don't have answers.
     """
     out: list[FileSpec] = []
-    from harness_maker.models import DevMode, HarnessConfig  # local import: avoid cycle
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     env = _make_env()
     if config_dump is None:
-        # ADR-002: pin dev_mode explicitly so the fallback render does not depend
-        # on the HarnessConfig class default (a future default flip must not
-        # silently drop Step 1.7 / Check 6 from these fallback renders).
-        config_dump = HarnessConfig(dev_mode=DevMode.SPEC_DRIVEN).model_dump(mode="json")
+        config_dump = _strict_fallback_dump()
     install_ref = _compute_install_ref()
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
@@ -642,6 +639,18 @@ def _schema_files(second_opinion_enabled: bool) -> list[FileSpec]:
     ]
 
 
+def _strict_fallback_dump() -> dict[str, Any]:
+    """Config for the legacy no-answers render paths, pinned to `block`.
+
+    WHY pinned rather than defaulted: the class default preset is Side, which derives `warn`.
+    These fallbacks used to pin the strict methodology explicitly so a future default flip
+    could not silently change what they render; pinning `block` keeps that promise.
+    """
+    holder: dict[str, Any] = {"spec": HarnessConfig().spec}
+    write_strictness(holder, "block")
+    return HarnessConfig(spec=holder["spec"]).model_dump(mode="json")
+
+
 def _base_files(
     preset: Preset,
     locale: str = "en",
@@ -762,10 +771,7 @@ def _codex_target_files(
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     if config_dump is None:
-        from harness_maker.models import DevMode, HarnessConfig  # local import: avoid cycle
-
-        # ADR-002: pin dev_mode — do not depend on the class default (see above).
-        config_dump = HarnessConfig(dev_mode=DevMode.SPEC_DRIVEN).model_dump(mode="json")
+        config_dump = _strict_fallback_dump()
     env = _make_env()
     install_ref = _compute_install_ref()
     loop_body = env.get_template("commands/hm/loop.md.j2").render(
@@ -861,10 +867,7 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     if config_dump is None:
-        from harness_maker.models import DevMode, HarnessConfig  # local import: avoid cycle
-
-        # ADR-002: pin dev_mode — do not depend on the class default (see above).
-        config_dump = HarnessConfig(dev_mode=DevMode.SPEC_DRIVEN).model_dump(mode="json")
+        config_dump = _strict_fallback_dump()
     env = _make_env()
     install_ref = _compute_install_ref()
     out: list[FileSpec] = []
@@ -929,7 +932,6 @@ def synthesize(
         default_model=answers.default_model,
         agent_models=dict(answers.agent_models),
         preset=effective_preset,
-        dev_mode=answers.dev_mode,
         caching=answers.caching,
         autoloop=answers.autoloop,
         memory=answers.memory,
@@ -983,6 +985,11 @@ def synthesize(
         # default, so `--update` silently disarms the delegation rollback switch.
         delegation=answers.delegation,
     )
+    if answers.strictness is not None:
+        # Written, not derived, so an explicit choice survives a later `--preset` switch.
+        holder: dict[str, Any] = {"spec": config.spec}
+        write_strictness(holder, answers.strictness)
+        config.spec = holder["spec"]
     config_dump = config.model_dump(mode="json")
 
     base_specs = _base_files(

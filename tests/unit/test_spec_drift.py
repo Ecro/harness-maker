@@ -19,15 +19,16 @@ from harness_maker.observability.spec_drift import (
 )
 
 
-def test_dev_mode_task_driven_skips() -> None:
-    report = scan(Path("/nonexistent"), dev_mode="task-driven")
-    assert report.skipped_reason is not None
-    assert "task-driven" in report.skipped_reason
-    assert not report.has_findings
+def test_scan_has_no_strictness_gate() -> None:
+    """SPEC-dev-mode-removal: the report is advisory, so it runs at every strictness — there is
+    no parameter left that could skip it."""
+    import inspect
+
+    assert list(inspect.signature(scan).parameters) == ["specs_dir"]
 
 
-def test_dev_mode_spec_driven_runs_even_without_dir(tmp_path: Path) -> None:
-    report = scan(tmp_path / "missing", dev_mode="spec-driven")
+def test_scan_runs_even_without_dir(tmp_path: Path) -> None:
+    report = scan(tmp_path / "missing")
     assert report.skipped_reason is not None
     assert "no specs/" in report.skipped_reason
 
@@ -86,7 +87,7 @@ def test_scan_finds_coverage_gap(tmp_path: Path) -> None:
             }
         ],
     )
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert "x::AC-001" in report.coverage_gaps
 
 
@@ -106,7 +107,7 @@ def test_scan_pending_test_does_not_flag_coverage_gap(tmp_path: Path) -> None:
             }
         ],
     )
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert report.coverage_gaps == []
 
 
@@ -114,7 +115,7 @@ def test_scan_stale_mutation_t1(tmp_path: Path) -> None:
     old = (date.today() - timedelta(days=14)).isoformat()
     specs = tmp_path / "specs"
     _seed_spec(specs, "x", tier=1, last_mutation_run=old)
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert "x" in report.stale_mutations
 
 
@@ -122,14 +123,14 @@ def test_scan_fresh_mutation_t1(tmp_path: Path) -> None:
     today = date.today().isoformat()
     specs = tmp_path / "specs"
     _seed_spec(specs, "x", tier=1, last_mutation_run=today)
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert report.stale_mutations == []
 
 
 def test_scan_no_last_mutation_run_not_stale(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     _seed_spec(specs, "x", tier=1, last_mutation_run=None)
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert report.stale_mutations == []
 
 
@@ -145,7 +146,7 @@ def test_count_open_questions_counts_headings() -> None:
 def test_scan_oq_overflow(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     _seed_spec(specs, "x", oqs=OQ_PER_SPEC_CAP + 1)
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert any("x" in s for s in report.oq_overflow)
 
 
@@ -153,7 +154,7 @@ def test_scan_oq_aggregate(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     _seed_spec(specs, "a", oqs=2)
     _seed_spec(specs, "b", oqs=3)
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert report.aggregate_oq_count == 5
 
 
@@ -191,7 +192,7 @@ def test_scan_flags_resolved_but_pending(tmp_path: Path, monkeypatch: pytest.Mon
         ],
     )
     monkeypatch.setattr(sd, "unresolved_test_ids", lambda ids, cwd: [])  # all resolve
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert "x::AC-001" in report.resolved_but_pending
     assert report.has_findings
 
@@ -218,7 +219,7 @@ def test_scan_pending_with_unresolved_test_not_flagged(
         ],
     )
     monkeypatch.setattr(sd, "unresolved_test_ids", lambda ids, cwd: list(ids))  # none resolve
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert report.resolved_but_pending == []
 
 
@@ -250,7 +251,7 @@ def test_scan_pending_without_test_ids_skips_collect(
         ],
     )
     monkeypatch.setattr(sd, "unresolved_test_ids", _spy)
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert report.resolved_but_pending == []
     assert called["n"] == 0  # no candidates → no collect
 
@@ -277,5 +278,5 @@ def test_scan_resolved_but_pending_skipped_when_pytest_absent(
     )
     monkeypatch.setattr(shutil, "which", lambda name: None)  # pytest "absent"
     # If the guard were missing, unresolved_test_ids would degrade to [] and flag this AC.
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert report.resolved_but_pending == []

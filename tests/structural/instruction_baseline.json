@@ -1,10 +1,10 @@
 {
   "axes": [
-    "task-driven",
-    "spec-driven"
+    "warn",
+    "block"
   ],
   "commands": {
-    "execute@spec-driven": {
+    "execute@block": {
       "executables": [
         "!HM_OWNED_SESSION_UUIDS=\"$(uv run --with $HOME/harness-maker python -m harness_maker.worktree owned-crumb-read \"$(pwd)\" <slug>)\" uv run --with $HOME/harness-maker python -m harness_maker.worktree post-commit-pop \"$(pwd)\"",
         "!cd <WT> && <lint> && <type> && <test> <nodes-or-empty>",
@@ -63,7 +63,7 @@
         "#### Step 0.3 \u2014 Verify the PLAN write"
       ]
     },
-    "execute@task-driven": {
+    "execute@warn": {
       "executables": [
         "!HM_OWNED_SESSION_UUIDS=\"$(uv run --with $HOME/harness-maker python -m harness_maker.worktree owned-crumb-read \"$(pwd)\" <slug>)\" uv run --with $HOME/harness-maker python -m harness_maker.worktree post-commit-pop \"$(pwd)\"",
         "!cd <WT> && <lint> && <type> && <test> <nodes-or-empty>",
@@ -118,7 +118,7 @@
         "#### Step 0.3 \u2014 Verify the PLAN write"
       ]
     },
-    "research@spec-driven": {
+    "research@block": {
       "executables": [
         "!if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then \\",
         "!uv run --with $HOME/harness-maker python -m harness_maker.autopilot_caps boundary --root . --current research --session-id \"$HM_SESSION_ID\" --step-cap 20 --time-cap-min 300",
@@ -153,7 +153,7 @@
         "### Task worktree preflight (feature-branch workflow)"
       ]
     },
-    "research@task-driven": {
+    "research@warn": {
       "executables": [
         "!if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then \\",
         "!uv run --with $HOME/harness-maker python -m harness_maker.autopilot_caps boundary --root . --current research --session-id \"$HM_SESSION_ID\" --step-cap 20 --time-cap-min 300",
@@ -188,7 +188,7 @@
         "### Task worktree preflight (feature-branch workflow)"
       ]
     },
-    "review@spec-driven": {
+    "review@block": {
       "executables": [
         "!cd <WT> && set -o pipefail; uv run --with $HOME/harness-maker python -m harness_maker.review_churn pin --slug {slug} --label r{N}-post && uv run --with $HOME/harness-maker python -m harness_maker.review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>",
         "!cd <WT> && set -o pipefail; uv run --with $HOME/harness-maker python -m harness_maker.review_consensus finalize --file <the literal temp path> --slug {slug} --round <N> --spec specs/SPEC-{slug}.machine.yaml | tee <FINALIZE-r{N}>",
@@ -266,7 +266,7 @@
         "#### Step 4e \u2014 Assign a disposition to EVERY finding (ADR-002)"
       ]
     },
-    "review@task-driven": {
+    "review@warn": {
       "executables": [
         "!cd <WT> && set -o pipefail; uv run --with $HOME/harness-maker python -m harness_maker.review_churn pin --slug {slug} --label r{N}-post && uv run --with $HOME/harness-maker python -m harness_maker.review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>",
         "!cd <WT> && set -o pipefail; uv run --with $HOME/harness-maker python -m harness_maker.review_consensus finalize --file <the literal temp path> --slug {slug} --round <N> | tee <FINALIZE-r{N}>",
@@ -344,7 +344,7 @@
         "#### Step 4e \u2014 Assign a disposition to EVERY finding (ADR-002)"
       ]
     },
-    "spec@spec-driven": {
+    "spec@block": {
       "executables": [
         "!if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then \\",
         "!uv run --with $HOME/harness-maker python -m harness_maker.autopilot_caps boundary --root . --current spec --session-id \"$HM_SESSION_ID\" --step-cap 20 --time-cap-min 300",
@@ -390,7 +390,7 @@
         "#### Second opinion \u2014 model: `codex`"
       ]
     },
-    "spec@task-driven": {
+    "spec@warn": {
       "executables": [
         "!if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then \\",
         "!uv run --with $HOME/harness-maker python -m harness_maker.autopilot_caps boundary --root . --current spec --session-id \"$HM_SESSION_ID\" --step-cap 20 --time-cap-min 300",
@@ -436,7 +436,7 @@
         "#### Second opinion \u2014 model: `codex`"
       ]
     },
-    "verify@spec-driven": {
+    "verify@block": {
       "executables": [
         "!git diff --check  # detects whitespace conflicts",
         "!git status",
@@ -477,7 +477,7 @@
         "### Text (stdout, for humans)"
       ]
     },
-    "verify@task-driven": {
+    "verify@warn": {
       "executables": [
         "!git diff --check  # detects whitespace conflicts",
         "!git status",
@@ -515,7 +515,7 @@
         "### Text (stdout, for humans)"
       ]
     },
-    "wrapup@spec-driven": {
+    "wrapup@block": {
       "executables": [
         "!git push",
         "!if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then \\",
@@ -584,7 +584,7 @@
         "#### Judgment AC binding \u2014 independent rubric verdict (PLAN-judgment-ac-binding ADR-006)"
       ]
     },
-    "wrapup@task-driven": {
+    "wrapup@warn": {
       "executables": [
         "!git push",
         "!if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then \\",
@@ -657,7 +657,7 @@
     }
   },
   "generated_by": "tests/structural/_instruction_baseline.py",
-  "payload_digest": "8fa7a8c6e021f381f04326f6d1644d7911fa55398ace1bb23faca694f0e4c404",
+  "payload_digest": "85cf57ef6cbd98064ff212c9e4179f9952f983762c9d83115601c77e50aa4588",
   "render_sha": "865e3ef578f5954da05c06b2d5264d76fe4d63bb",
   "schema_version": 2
 }

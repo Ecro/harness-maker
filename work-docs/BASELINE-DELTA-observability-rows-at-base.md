@@ -6,8 +6,8 @@ block moved.
 
 | command | arm | delta (chars) | edit |
 |---|---|---|---|
-| verify | ask@flag_off, ask@flag_on, auto_safe@spec-driven | -1484 | retire the hand-written `verify-<date>.jsonl` record |
-| verify | auto_safe@task-driven | -1420 | same (5-check JSON example) |
+| verify | ask@flag_off, ask@flag_on, auto_safe@block | -1484 | retire the hand-written `verify-<date>.jsonl` record |
+| verify | auto_safe@warn | -1420 | same (5-check JSON example) |
 | wrapup | every arm | +21 (+1 body line) | name the `invalid choice: 'rollup'` failure and skip visibly (paragraph compacted to stay inside the wrapup ratchet) |
 
 Why the verify ledger goes rather than gains a CLI writer: nothing reads

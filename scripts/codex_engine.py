@@ -19,7 +19,6 @@ def main() -> int:
     parser.add_argument("--update", action="store_true")
     parser.add_argument("--preset", choices=["Side", "Production"])
     parser.add_argument("--locale")
-    parser.add_argument("--dev-mode", choices=["spec-driven", "task-driven"])
     args = parser.parse_args()
     engine = None
     try:
@@ -45,7 +44,7 @@ def main() -> int:
         ]
         if args.update:
             cmd.append("--update")
-        for key in ("preset", "locale", "dev_mode"):
+        for key in ("preset", "locale"):
             value = getattr(args, key)
             if value is not None:
                 cmd.extend(["--" + key.replace("_", "-"), value])

@@ -26,7 +26,7 @@ from typing import Any
 
 import pytest
 
-from harness_maker.models import DevMode, HarnessConfig
+from harness_maker.models import HarnessConfig
 from harness_maker.render import (
     _CODEX_HOOKS_ALLOWED_TOP_LEVEL,
     _HARNESS_RETIRED_HOOK_INVOCATIONS,
@@ -84,6 +84,9 @@ _BLOCKING_GATE_MODULES = (
 
 
 def _render(template: str, **cfg: Any) -> dict[str, Any]:
+    strictness = cfg.pop("strictness", None)
+    if strictness is not None:
+        cfg["spec"] = {"dir": "specs/", "strictness": strictness}
     config = HarnessConfig(**cfg).model_dump(mode="json")
     out = (
         _make_env()
@@ -130,20 +133,20 @@ def test_settings_hooks_carry_shipped_modules(template: str) -> None:
 
 
 @pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
-@pytest.mark.parametrize("dev_mode", [DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN])
-def test_settings_stage3_gates_wired_both_dev_modes(template: str, dev_mode: DevMode) -> None:
+@pytest.mark.parametrize("strictness", ["warn", "block"])
+def test_settings_stage3_gates_wired_both_dev_modes(template: str, strictness: str) -> None:
     """Phase 3 redo: the Stage-3 PreToolUse blocking gates are wired, both dev_modes.
 
     The parked attempt's ABSENCE assertion is inverted — permission_gate + worktree_gate
     must now be present on PreToolUse in BOTH task-driven and spec-driven.
     """
-    settings = _render(template, dev_mode=dev_mode)
+    settings = _render(template, strictness=strictness)
     assert json.dumps(settings)  # valid JSON in this dev_mode (mirrors production shape)
     pre = settings["hooks"].get("PreToolUse")
-    assert pre, f"{template} ({dev_mode.value}): no PreToolUse — Stage 3 not wired"
+    assert pre, f"{template} ({strictness}): no PreToolUse — Stage 3 not wired"
     cmds = " ".join(_commands(settings))
     for mod in sorted(STAGE3_MODULES):
-        assert mod in cmds, f"{template} ({dev_mode.value}): Stage-3 gate {mod} missing"
+        assert mod in cmds, f"{template} ({strictness}): Stage-3 gate {mod} missing"
 
 
 @pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
@@ -154,7 +157,7 @@ def test_settings_spec_gate_matcher_is_write_edit_multiedit(template: str) -> No
     EVERY command, so spec_gate's group coexists with the worktree_gate group under the
     SAME matcher. spec_gate is spec-driven ONLY; task-driven must omit it entirely.
     """
-    spec = _render(template, dev_mode=DevMode.SPEC_DRIVEN)
+    spec = _render(template, strictness="block")
     matchers = [
         e["matcher"]
         for e in spec["hooks"]["PreToolUse"]
@@ -165,7 +168,7 @@ def test_settings_spec_gate_matcher_is_write_edit_multiedit(template: str) -> No
         f"{template}: spec_gate matcher must be Write|Edit|MultiEdit, got {matchers}"
     )
 
-    task = _render(template, dev_mode=DevMode.TASK_DRIVEN)
+    task = _render(template, strictness="warn")
     task_cmds = " ".join(_commands(task))
     assert SPEC_DRIVEN_ONLY_MODULE not in task_cmds, (
         f"{template}: spec_gate leaked into task-driven mode"
@@ -173,17 +176,17 @@ def test_settings_spec_gate_matcher_is_write_edit_multiedit(template: str) -> No
 
 
 @pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
-@pytest.mark.parametrize("dev_mode", [DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN])
-def test_settings_stage3_blocking_gates_carry_timeout(template: str, dev_mode: DevMode) -> None:
+@pytest.mark.parametrize("strictness", ["warn", "block"])
+def test_settings_stage3_blocking_gates_carry_timeout(template: str, strictness: str) -> None:
     """P2 (also-open): the newly-wired blocking gates must carry `"timeout": 10`, like
     their loop_gate / autopilot_guard siblings. The parked code shipped them without one.
     """
-    pre = _render(template, dev_mode=dev_mode)["hooks"]["PreToolUse"]
+    pre = _render(template, strictness=strictness)["hooks"]["PreToolUse"]
     for entry in pre:
         for h in entry["hooks"]:
             if any(mod in h["command"] for mod in _BLOCKING_GATE_MODULES):
                 assert h.get("timeout") == 10, (
-                    f"{template} ({dev_mode.value}): {h['command']} missing timeout: 10"
+                    f"{template} ({strictness}): {h['command']} missing timeout: 10"
                 )
 
 
@@ -526,12 +529,12 @@ def test_retired_invocations_absent_from_current_templates(template: str) -> Non
     it needs no check here. Every retired invocation must be absent from every current
     nested hook template's rendered output — in BOTH dev_modes.
     """
-    for dev_mode in (DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN):
-        cmds = " ".join(_commands(_render(template, dev_mode=dev_mode)))
+    for strictness in ("warn", "block"):
+        cmds = " ".join(_commands(_render(template, strictness=strictness)))
         for retired in _HARNESS_RETIRED_HOOK_INVOCATIONS:
             invocation = retired.removeprefix("<HM>:")
             assert f"python -m {invocation}" not in cmds, (
-                f"{template} ({dev_mode.value}) still ships a RETIRED invocation: {invocation}"
+                f"{template} ({strictness}) still ships a RETIRED invocation: {invocation}"
             )
 
 
@@ -1033,6 +1036,9 @@ def test_the_merge_converges_after_one_render() -> None:
 
 def _gate_matchers(template: str, module: str, event: str, **cfg: Any) -> list[str]:
     """Matchers a template registers `module` under, for one event, either schema."""
+    strictness = cfg.pop("strictness", None)
+    if strictness is not None:
+        cfg["spec"] = {"dir": "specs/", "strictness": strictness}
     config = HarnessConfig(**cfg).model_dump(mode="json")
     rendered = json.loads(
         _make_env()
@@ -1059,12 +1065,8 @@ def test_cursor_and_claude_agree_on_every_blocking_gate_matcher(module: str) -> 
     deliberate per-IDE policy — it is one side not being updated with the other. Claude's
     `PreToolUse` and Cursor's `preToolUse` are the same stage under each IDE's own schema.
     """
-    claude = _gate_matchers(
-        "settings/Production.json.j2", module, "PreToolUse", dev_mode=DevMode.SPEC_DRIVEN
-    )
-    cursor = _gate_matchers(
-        "cursor/hooks.json.j2", module, "preToolUse", dev_mode=DevMode.SPEC_DRIVEN
-    )
+    claude = _gate_matchers("settings/Production.json.j2", module, "PreToolUse", strictness="block")
+    cursor = _gate_matchers("cursor/hooks.json.j2", module, "preToolUse", strictness="block")
     if not claude or not cursor:
         pytest.skip(f"{module} is not wired on both IDEs — coverage parity is a separate claim")
     assert set(claude) == set(cursor), (

@@ -38,9 +38,9 @@ def _pin() -> dict[str, object]:
 
 def _live_arms(tmp_path: Path) -> dict[str, dict[str, str]]:
     live: dict[str, dict[str, str]] = {}
-    for dev_mode in AXES:
-        rendered = _render_atomic(dev_mode)
-        live[f"auto_safe@{dev_mode.value}"] = {
+    for strictness in AXES:
+        rendered = _render_atomic(strictness)
+        live[f"auto_safe@{strictness}"] = {
             k: hashlib.sha256(v.encode()).hexdigest() for k, v in rendered.items() if k in _PINNED
         }
     for flag, name in ((True, "ask@flag_on"), (False, "ask@flag_off")):
@@ -76,7 +76,7 @@ def test_ac_005_the_pin_names_every_arm_and_command_it_claims_to_cover() -> None
     pin = _pin()
     arms = pin["arms"]
     assert isinstance(arms, dict)
-    expected = {"ask@flag_off", "ask@flag_on", "auto_safe@spec-driven", "auto_safe@task-driven"}
+    expected = {"ask@flag_off", "ask@flag_on", "auto_safe@block", "auto_safe@warn"}
     assert set(arms) == expected
     for arm, shas in arms.items():
         assert set(shas) == set(_PINNED), arm

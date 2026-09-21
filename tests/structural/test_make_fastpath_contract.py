@@ -38,7 +38,6 @@ _DISCLOSED_AXES: frozenset[str] = frozenset(
         "instrumentation",
         "worktree",
         "targets",
-        "dev_mode",
         "ref_folders",
         "sibling_repos",
         "second_brain",

@@ -301,7 +301,7 @@ def _load_preset_defaults(preset_name: str) -> dict[str, Any]:
         _build_answers,
         _consensus_for,
     )
-    from harness_maker.models import DevMode, Preset, Target
+    from harness_maker.models import Preset, Target
     from harness_maker.render import TEMPLATE_DIR
     from harness_maker.synthesize import synthesize
 
@@ -321,7 +321,7 @@ def _load_preset_defaults(preset_name: str) -> dict[str, Any]:
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=preset,
-        dev_mode=DevMode.SPEC_DRIVEN,
+        strictness="block",
         consensus=_consensus_for(preset),
     )
     blueprint = synthesize(ProjectProfile(), answers, preset)

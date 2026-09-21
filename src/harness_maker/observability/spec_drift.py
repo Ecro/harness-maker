@@ -1,4 +1,4 @@
-"""SPEC drift detector for /hm:health (P6, ADR-013 dev_mode-gated).
+"""SPEC drift detector for /hm:health (P6, ADR-013).
 
 Scans `specs/` for SPEC.md + SPEC.machine.yaml pairs and reports:
 - orphan tests (test files with no AC reference in any machine.yaml)
@@ -7,9 +7,8 @@ Scans `specs/` for SPEC.md + SPEC.machine.yaml pairs and reports:
 - per-SPEC Open Question overflow (> 3 → CI lint fail)
 - aggregate OQ count vs cap (30)
 
-Only runs when ``dev_mode == "spec-driven"``. In task-driven mode the
-function returns ``None`` so the /hm:health template can skip the layer
-entirely.
+Runs at every strictness: the report is advisory and blocks nothing, which is exactly what
+`warn` means (SPEC-dev-mode-removal ADR-005). It used to be skipped for relaxed harnesses.
 """
 
 from __future__ import annotations
@@ -104,16 +103,9 @@ def _is_stale(last_run_iso: str | None, tier: int) -> bool:
     return (date.today() - last).days > threshold
 
 
-def scan(specs_dir: Path, *, dev_mode: str = "task-driven") -> SpecDriftReport:
-    """Walk ``specs/`` and produce a drift report.
-
-    Returns an empty report (with ``skipped_reason`` set) when
-    ``dev_mode != "spec-driven"`` — per ADR-013.
-    """
+def scan(specs_dir: Path) -> SpecDriftReport:
+    """Walk ``specs/`` and produce a drift report (empty, with a reason, when there is none)."""
     report = SpecDriftReport()
-    if dev_mode != "spec-driven":
-        report.skipped_reason = f"dev_mode={dev_mode} (spec_drift gates only on spec-driven)"
-        return report
     if not specs_dir.exists():
         report.skipped_reason = f"no specs/ at {specs_dir}"
         return report

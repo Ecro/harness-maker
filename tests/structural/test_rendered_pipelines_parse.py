@@ -22,7 +22,6 @@ from pathlib import Path
 import pytest
 
 from harness_maker.interview import interview
-from harness_maker.models import DevMode
 from harness_maker.profile import profile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
@@ -37,14 +36,14 @@ _PRODUCERS = ("review_consensus finalize", "review_churn measure")
 _FIXTURE = Path(__file__).parent.parent / "fixtures" / "prod-firmware"
 
 
-def _rendered_review(tmp_path: Path, dev_mode: DevMode) -> str:
+def _rendered_review(tmp_path: Path, strictness: str) -> str:
     """The review command as a harness of this dev_mode actually receives it.
 
     Rendered to disk rather than read off the blueprint: the blueprint carries body hashes, and a
     hash is what let the snapshot fixtures bless this defect after regeneration.
     """
     prof = profile(_FIXTURE)
-    answers = interview(prof, autoloop_mode=True).model_copy(update={"dev_mode": dev_mode})
+    answers = interview(prof, autoloop_mode=True).model_copy(update={"strictness": strictness})
     render(synthesize(prof, answers), tmp_path, dry_run=False, freeze_time=DEFAULT_FREEZE_TIME)
     return (tmp_path / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
 
@@ -70,9 +69,9 @@ def _pipeline_lines(body: str) -> list[str]:
 
 
 @pytest.mark.skipif(_BASH is None, reason="bash is the consumer under test")
-@pytest.mark.parametrize("dev_mode", [DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN])
-def test_producer_pipelines_are_syntactically_valid(tmp_path: Path, dev_mode: DevMode) -> None:
-    body = _rendered_review(tmp_path, dev_mode)
+@pytest.mark.parametrize("strictness", ["warn", "block"])
+def test_producer_pipelines_are_syntactically_valid(tmp_path: Path, strictness: str) -> None:
+    body = _rendered_review(tmp_path, strictness)
     lines = _pipeline_lines(body)
     assert lines, "no producer pipeline rendered — the probe stopped matching"
     for line in lines:
@@ -83,15 +82,15 @@ def test_producer_pipelines_are_syntactically_valid(tmp_path: Path, dev_mode: De
         assert result.returncode == 0, f"bash cannot parse:\n  {script}\n{result.stderr}"
 
 
-@pytest.mark.parametrize("dev_mode", [DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN])
-def test_every_flag_reaches_the_producer_not_the_pipe(tmp_path: Path, dev_mode: DevMode) -> None:
+@pytest.mark.parametrize("strictness", ["warn", "block"])
+def test_every_flag_reaches_the_producer_not_the_pipe(tmp_path: Path, strictness: str) -> None:
     """Nothing may sit between `|` and the end of the line except `tee` and its file.
 
     This is the exact defect: `--spec <path>` rendered after `| tee <file>` and became `tee`'s
     argv. Asserting on the text alone is what missed it, so assert on the STRUCTURE the shell
     sees — the segment after the pipe.
     """
-    body = _rendered_review(tmp_path, dev_mode)
+    body = _rendered_review(tmp_path, strictness)
     for line in _pipeline_lines(body):
         after_pipe = line.split("|", 1)[1].strip()
         assert after_pipe.startswith("tee "), f"unexpected pipe target: {after_pipe}"
@@ -102,9 +101,9 @@ def test_every_flag_reaches_the_producer_not_the_pipe(tmp_path: Path, dev_mode: 
         )
 
 
-@pytest.mark.parametrize("dev_mode", [DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN])
+@pytest.mark.parametrize("strictness", ["warn", "block"])
 def test_producer_pipelines_do_not_mask_the_producer_exit_status(
-    tmp_path: Path, dev_mode: DevMode
+    tmp_path: Path, strictness: str
 ) -> None:
     """`a | tee f` reports `tee`'s status. The stage gates trust on the producer's exit 1.
 
@@ -113,7 +112,7 @@ def test_producer_pipelines_do_not_mask_the_producer_exit_status(
     — indistinguishable on disk from a harness version that never measured churn, which is the
     one distinction the schema's null-vs-zero design exists to preserve.
     """
-    body = _rendered_review(tmp_path, dev_mode)
+    body = _rendered_review(tmp_path, strictness)
     for line in _pipeline_lines(body):
         assert "set -o pipefail" in line, f"pipeline without pipefail:\n  {line}"
 

@@ -29,7 +29,7 @@ harness-maker 는 Claude Code + Cursor 양쪽 IDE 의 플러그인으로, **LLM 
 
 ## Targets 정책
 
-`harness.yaml.targets: list[Target]` — 사용자 하네스가 어느 IDE 에서 작동할지 결정하는 축. preset / dev_mode 와 직교.
+`harness.yaml.targets: list[Target]` — 사용자 하네스가 어느 IDE 에서 작동할지 결정하는 축. preset 과 직교.
 
 - **값**: `claude-code` | `cursor` | `codex` (multi-select)
 - **인터뷰 정책**: 명시 multi-select 강제. **auto-detect 금지** (`.cursor/` 디렉토리 존재 여부 등으로 추론하지 않음). 사용자 의도 확인 필수.
@@ -267,8 +267,8 @@ oracle, 사람의 lock-in, 이종 모델. **TUNE** = 모델마다 값이 뒤집�
 plan-validator, fan-out) — `remeasure_on`/`measure_cmd` 필드가 재측정 트리거를 들고 있고, 측정
 전엔 새 모델로 전이하지 않는다 (harness-bench "reversed between models").
 
-- **강제**: `tests/structural/test_step_sensitivity_registry.py` — `ARMS` = preset × dev_mode
-  렌더의 모든 헤딩이 레지스트리에 있어야 하고(무분류 헤딩 = 테스트 실패), Side 기본값은 knob 을
+- **강제**: `tests/structural/test_step_sensitivity_registry.py` — `ARMS` = preset 당 1개(기본
+  strictness) 렌더의 모든 헤딩이 레지스트리에 있어야 하고(무분류 헤딩 = 테스트 실패), Side 기본값은 knob 을
   가진 어떤 엔트리(HOST 포함)에서도 Production 보다 공격적일 수 없다 (`knob`/`ordering`, 비공허 바닥 ≥3).
   렌더는 레지스트리를 읽지 않는다 — 검사이지 파생이 아니다 (ADR-005).
 - **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 33` 는 기준을 충족하는 근거가

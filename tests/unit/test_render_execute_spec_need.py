@@ -1,4 +1,4 @@
-"""The SPEC-need block is spec-driven-only, and it reports rather than gates.
+"""The SPEC-need block renders at every strictness, and it reports rather than gates.
 
 Replaces `test_render_plan_spec_need.py` (SPEC-plan-stage-absorption). That file asserted the
 whole of `/hm:plan` Step 1.7 — detection, the re-entry marker (`marker-write` / `marker-read` /
@@ -13,9 +13,11 @@ put back exactly what it took out. Enforcement did not disappear; it moved downs
 `marker-*` consequently has no caller in any rendered template. That is a known orphan, filed
 rather than hidden: retiring those verbs is a public-CLI change and belongs to its own task.
 
-The dev_mode gating is what stays load-bearing here. A task-driven harness must not carry one
-byte of this block — it is the "byte-unchanged path for task-driven users" contract the
-original file existed to hold, and that contract survived the move intact.
+It used to be gated to the strict methodology arm, with a relaxed harness carrying none of it.
+SPEC-dev-mode-removal ADR-005 reverses that: every task now enters through a SPEC, so the block
+renders at both strictness values and only its stop language differs — at `warn` a
+`not-evaluated` verdict is reported downstream as a WARN rather than as a FAIL signal. Every
+evidence-and-write assertion below therefore runs on both arms.
 """
 
 from __future__ import annotations
@@ -24,19 +26,20 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.models import DevMode, InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.strictness import Strictness
 from harness_maker.synthesize import synthesize
 
 
-def _execute(tmp_path: Path, dev_mode: DevMode, target: Target = Target.CLAUDE_CODE) -> str:
+def _execute(tmp_path: Path, strictness: Strictness, target: Target = Target.CLAUDE_CODE) -> str:
     """Render a full harness and return the execute stage command body."""
     bp = synthesize(
         ProjectProfile(),
         InterviewAnswers(
             preset=Preset.PRODUCTION,
             targets=[target],
-            dev_mode=dev_mode,
+            strictness=strictness,
         ),
     )
     render(bp, tmp_path / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
@@ -46,35 +49,21 @@ def _execute(tmp_path: Path, dev_mode: DevMode, target: Target = Target.CLAUDE_C
     return files[0].read_text(encoding="utf-8")
 
 
-@pytest.fixture(scope="module")
-def task_driven(tmp_path_factory: pytest.TempPathFactory) -> str:
-    return _execute(tmp_path_factory.mktemp("task"), DevMode.TASK_DRIVEN)
+@pytest.fixture(scope="module", params=["warn", "block"])
+def spec_driven(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory) -> str:
+    """Named for the arm that used to be the only one; parametrized over both now."""
+    return _execute(tmp_path_factory.mktemp(request.param), request.param)
 
 
-@pytest.fixture(scope="module")
-def spec_driven(tmp_path_factory: pytest.TempPathFactory) -> str:
-    return _execute(tmp_path_factory.mktemp("spec"), DevMode.SPEC_DRIVEN)
+# ── (a) the arms differ only in stop language ────────────────────────────────
 
 
-# ── (a) task-driven: the whole block is ABSENT ───────────────────────────────
-
-
-def test_task_driven_omits_the_step_0_1_heading(task_driven: str) -> None:
-    assert "Step 0.1" not in task_driven, (
-        "task-driven execute.md must NOT contain Step 0.1 — SPEC-need is spec-driven-only"
-    )
-
-
-def test_task_driven_omits_every_spec_need_call(task_driven: str) -> None:
-    assert "spec_need" not in task_driven, (
-        "task-driven execute.md must not reference the spec_need CLI at all; a single leaked "
-        "call is a task-driven user being asked to run a spec-driven gate"
-    )
-
-
-def test_task_driven_frontmatter_omits_the_verdict_keys(task_driven: str) -> None:
-    for key in ("spec_need_verdict", "spec_need_target"):
-        assert key not in task_driven, f"task-driven PLAN frontmatter must not declare {key}"
+def test_not_evaluated_is_a_fail_signal_only_at_block(tmp_path: Path) -> None:
+    strict = _execute(tmp_path / "block", "block")
+    relaxed = _execute(tmp_path / "warn", "warn")
+    assert "explicit FAIL signal to `/hm:verify` Check 6" in strict
+    assert "explicit FAIL signal" not in relaxed
+    assert "reports it later as a `WARN`" in relaxed
 
 
 # ── (b) spec-driven: evidence, then the write ────────────────────────────────
@@ -123,7 +112,7 @@ def test_spec_driven_asserts_the_key_is_present_after_the_write(spec_driven: str
 def test_execute_inputs_allow_step_zero_to_author_missing_plan(
     tmp_path: Path, target: Target
 ) -> None:
-    text = _execute(tmp_path, DevMode.SPEC_DRIVEN, target)
+    text = _execute(tmp_path, "block", target)
     inputs = text.split("## Inputs", 1)[1].split("## Session Context Loading", 1)[0]
     plan_input = next(line for line in inputs.splitlines() if "PLAN-{slug}.md" in line)
     assert "reuse" in plan_input

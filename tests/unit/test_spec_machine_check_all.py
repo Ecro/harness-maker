@@ -62,7 +62,7 @@ def _pair(
 
 
 def _run(
-    tmp_path: Path, yaml_path: Path, md_path: Path, mode: str = "task-driven"
+    tmp_path: Path, yaml_path: Path, md_path: Path, mode: str = "warn"
 ) -> tuple[int, dict[str, Any]]:
     import contextlib
     import io
@@ -77,7 +77,7 @@ def _run(
                 str(yaml_path),
                 "--md",
                 str(md_path),
-                "--dev-mode",
+                "--strictness",
                 mode,
             ]
         )
@@ -125,10 +125,10 @@ def test_an_untagged_cross_error_lands_in_unattributed_not_nowhere(tmp_path: Pat
 
 
 def test_task_driven_does_not_block_on_a_weak_score(tmp_path: Path) -> None:
-    """`blocked` is spec-driven-only — task-driven must keep exiting 0 on a weak spec."""
+    """`blocked` is block-only — warn must keep exiting 0 on a weak spec."""
     yaml_path, md_path = _pair(tmp_path)
     md_path.write_text("---\ntier: 1\n---\n\n### AC-001: render emits content_hash\n", "utf-8")
-    rc, payload = _run(tmp_path, yaml_path, md_path, mode="task-driven")
+    rc, payload = _run(tmp_path, yaml_path, md_path, mode="warn")
     assert payload["quality"]["blocked"] is False
     assert rc == 0 or payload["cross_validate"]["ok"] is False
 

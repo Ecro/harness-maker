@@ -11,17 +11,17 @@ Phase 0.5's exit criterion is that "a deliberate deletion of a runtime instructi
 any atomic command fails it", and this file is the mechanism.
 
 **Config axes, and why the snapshot is keyed by one of them.** A stage template does not
-have *a* rendering — it has one per config that gates runtime instructions. `dev_mode` is
-such an axis: `verify.md.j2:153` opens `{% if config.dev_mode == 'spec-driven' %}` around
-Check 6, whose body carries two real `!` calls (`spec_need op-check`, `spec_need
-waiver-check`), and `plan.md.j2` gates further arms the same way. This repo's
-`.claude/harness.yaml` is `dev_mode: task-driven`, so a snapshot of that render alone
-would not contain those instructions **and could never report them as removed** — while
-`test_command_size_budget.py`'s fixture renders the *other* arm (`InterviewAnswers`
-defaults to `DevMode.SPEC_DRIVEN`, `models.py:948`) with a 20% floor that cannot see two
-deleted lines. Complementary blind spots, on the exact file Phase 1 edits.
+have *a* rendering — it has one per config that gates runtime instructions. `spec.strictness`
+is such an axis: `verify.md.j2` renders Check 6's stop conditions only at `block` and a
+report-and-continue variant at `warn`, `wrapup.md.j2` renders Step 3.6 only at `warn`, and
+the settings templates render the spec-gate hook only at `block`. A snapshot of one
+strictness alone could never report the other's instructions as removed.
 
-Entries are therefore keyed `<command>@<dev_mode>`, **not** unioned. A union would be
+(History: this axis was spelled `dev_mode` with arms `task-driven` / `spec-driven` until
+SPEC-dev-mode-removal folded it into strictness. The arms map 1:1 — `task-driven`→`warn`,
+`spec-driven`→`block` — and the committed keys were re-spelled accordingly, content unchanged.)
+
+Entries are therefore keyed `<command>@<strictness>`, **not** unioned. A union would be
 worse than useless here: a line deleted from one arm but still present in the other
 would remain in the union and read as intact.
 
@@ -54,7 +54,7 @@ from typing import Any
 from harness_maker.hm import _DISPATCHABLE
 from harness_maker.interview import answers_from_harness_yaml
 from harness_maker.io_utils import atomic_write
-from harness_maker.models import DevMode, ProjectProfile
+from harness_maker.models import ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -72,14 +72,14 @@ ATOMIC_COMMANDS = ("execute", "research", "review", "spec", "verify", "wrapup")
 
 # The config axis this snapshot is keyed by. Adding an axis means adding its arms here
 # and regenerating — see the module docstring for what is deliberately excluded.
-AXES: tuple[DevMode, ...] = (DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN)
+AXES: tuple[str, ...] = ("warn", "block")
 
 _GENERATED_BY = "tests/structural/_instruction_baseline.py"
 _SCHEMA_VERSION = 2
 
 
-def entry_key(command: str, dev_mode: DevMode) -> str:
-    return f"{command}@{dev_mode.value}"
+def entry_key(command: str, strictness: str) -> str:
+    return f"{command}@{strictness}"
 
 
 _HM_SHORTHAND = re.compile(r"(?<![\w./-])hm ([a-z][\w.]*)")
@@ -111,10 +111,10 @@ def instruction_set(text: str) -> dict[str, list[str]]:
     }
 
 
-def _render_atomic(dev_mode: DevMode) -> dict[str, str]:
+def _render_atomic(strictness: str) -> dict[str, str]:
     parsed = answers_from_harness_yaml(HARNESS_YAML)
     assert parsed is not None, f"{HARNESS_YAML} did not parse into answers"
-    answers = parsed.model_copy(update={"dev_mode": dev_mode})
+    answers = parsed.model_copy(update={"strictness": strictness})
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         with pinned_install_ref():
@@ -131,13 +131,13 @@ def _render_atomic(dev_mode: DevMode) -> dict[str, str]:
 
 def measure_instructions() -> dict[str, dict[str, list[str]]]:
     out: dict[str, dict[str, list[str]]] = {}
-    for dev_mode in AXES:
-        rendered = _render_atomic(dev_mode)
+    for strictness in AXES:
+        rendered = _render_atomic(strictness)
         missing = [c for c in ATOMIC_COMMANDS if c not in rendered]
         if missing:
-            raise RuntimeError(f"{dev_mode.value} render is missing: {missing}")
+            raise RuntimeError(f"{strictness} render is missing: {missing}")
         for command in ATOMIC_COMMANDS:
-            out[entry_key(command, dev_mode)] = instruction_set(rendered[command])
+            out[entry_key(command, strictness)] = instruction_set(rendered[command])
     return out
 
 
@@ -158,7 +158,7 @@ def build_baseline() -> dict[str, Any]:
         "schema_version": _SCHEMA_VERSION,
         "generated_by": _GENERATED_BY,
         "render_sha": head_sha(),
-        "axes": [m.value for m in AXES],
+        "axes": list(AXES),
         "payload_digest": payload_digest(commands),
         "commands": commands,
     }

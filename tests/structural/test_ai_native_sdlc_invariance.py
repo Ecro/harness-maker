@@ -65,8 +65,8 @@ def _live() -> dict[str, dict[str, str]]:
         for k in _BOUNDED:
             live[name][f"{k}_len"] = str(len(rendered[k]))
 
-    for dev_mode in AXES:
-        take(f"auto_safe@{dev_mode.value}", _render_atomic(dev_mode))
+    for strictness in AXES:
+        take(f"auto_safe@{strictness}", _render_atomic(strictness))
     tmp = Path(tempfile.mkdtemp())
     for flag, name in ((True, "ask@flag_on"), (False, "ask@flag_off")):
         take(name, _render(feature_branch_workflow=flag, tmp=tmp / name))

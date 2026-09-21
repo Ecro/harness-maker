@@ -25,13 +25,13 @@ below: plan/review/help must stay byte-identical; wrapup may grow by at most the
 ```json
 {
  "arms": {
-  "auto_safe@task-driven": {
+  "auto_safe@warn": {
    "help": "4983a54b81ac0de0489b07c281091e37dd9551cc3d38deffa56392b1c23e9e21",
    "plan": "f8a86fbb23fcd4ef739a26a4ce7155316f213a76ec687550cf4f7fe3cdb19524",
    "review": "66f5301260799c8339b25b2093edd5f503d40a8c7898ea5e648d2cc04225eb9e",
    "wrapup": "8d69b92a2cb3b88216c67017b0753fbd94f8ec891801f40dd9b21effcf8baa8b"
   },
-  "auto_safe@spec-driven": {
+  "auto_safe@block": {
    "help": "4983a54b81ac0de0489b07c281091e37dd9551cc3d38deffa56392b1c23e9e21",
    "plan": "bec83e17fcba482b2d46d15df70ad29caa3189f414264406ce76dfc6c1c6a5c2",
    "review": "3463592060b67803ffd4ec8b4e5e5208af9af5871cd78726fa233ecb6b30f8e5",
@@ -51,8 +51,8 @@ below: plan/review/help must stay byte-identical; wrapup may grow by at most the
   }
  },
  "wrapup_len": {
-  "auto_safe@task-driven": 50435,
-  "auto_safe@spec-driven": 48881,
+  "auto_safe@warn": 50435,
+  "auto_safe@block": 48881,
   "ask@flag_on": 45646,
   "ask@flag_off": 40297
  },
@@ -68,7 +68,7 @@ below: plan/review/help must stay byte-identical; wrapup may grow by at most the
 ## 3. Measured delta of this task (Phase 3) and its retirement (Phase 4)
 
 Moved set per arm against the section 1 pin, verified before any re-capture: `{wrapup}` in all
-four arms (`ask@flag_off`, `ask@flag_on`, `auto_safe@spec-driven`, `auto_safe@task-driven`),
+four arms (`ask@flag_off`, `ask@flag_on`, `auto_safe@block`, `auto_safe@warn`),
 identically in `auto_safe` and `ask`. `plan`, `review` and `help` are byte-identical to the pin.
 
 | command | chars (per arm) | round_trips |

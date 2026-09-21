@@ -35,12 +35,12 @@ block below: review/help must stay byte-identical; plan may grow by at most the 
    "review": "4a2bb22c66535fd481e699ada2122c9f4a6b89e38bc5542868d60cc6822a542d",
    "help": "0d1b6929d1b1bd55262d811ce71dfcce01a5eb0d68503ff1b19532effda415f7"
   },
-  "auto_safe@spec-driven": {
+  "auto_safe@block": {
    "plan": "f67a2231c896bb8e5cdc36b62fb7b875bf01931128f3c3ea71afc9a52f232d0b",
    "review": "8d25ba69e1dfc332e117f2fb487dbae8af8237b7540c2fded27ea947c513f27e",
    "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52"
   },
-  "auto_safe@task-driven": {
+  "auto_safe@warn": {
    "plan": "7a7587853d74471463855637d31cd3884aa1503562fa635d3054b27124d02c92",
    "review": "8530386955e0a9cb25c83141c181d8b647271f67cadad7209716012edc81ef22",
    "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52"
@@ -49,8 +49,8 @@ block below: review/help must stay byte-identical; plan may grow by at most the 
  "plan_len": {
   "ask@flag_off": 54188,
   "ask@flag_on": 55592,
-  "auto_safe@spec-driven": 66436,
-  "auto_safe@task-driven": 57115
+  "auto_safe@block": 66436,
+  "auto_safe@warn": 57115
  },
  "harness_maker_version": "0.56.0"
 }
@@ -100,7 +100,7 @@ only, which section 2 does not touch.
 ## 3. Measured delta of this task (Phase 4) and its retirement (Phase 6)
 
 Moved set per arm against the section 1 pin, verified before any re-capture: `{plan}` in all
-four arms (`ask@flag_off`, `ask@flag_on`, `auto_safe@spec-driven`, `auto_safe@task-driven`),
+four arms (`ask@flag_off`, `ask@flag_on`, `auto_safe@block`, `auto_safe@warn`),
 identically in `auto_safe` and `ask`. `review` and `help` are byte-identical to the pin.
 
 | command | chars (per arm) | round_trips |

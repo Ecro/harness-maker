@@ -29,7 +29,7 @@
         "hooks": [
           {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.permission_gate"}
         ]
-      }{% if config.dev_mode == "spec-driven" %},
+      }{% if strictness_of(config) == "block" %},
       {
         "matcher": "apply_patch",
         "hooks": [

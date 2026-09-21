@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from harness_maker.interview import answers_from_harness_yaml
-from harness_maker.models import DevMode, Preset, Target
+from harness_maker.models import Preset, Target
 
 
 def _write_yaml(tmp_path: Path, body: str) -> Path:
@@ -120,7 +120,7 @@ def test_returns_none_when_yaml_invalid(tmp_path: Path) -> None:
     assert answers_from_harness_yaml(target) is None
 
 
-def test_preserves_locale_and_dev_mode(tmp_path: Path) -> None:
+def test_preserves_locale_and_translated_strictness(tmp_path: Path) -> None:
     target = _write_yaml(
         tmp_path,
         "preset: Side\nlocale: ko\ndev_mode: task-driven\ncaching: agent-aware\n",
@@ -128,7 +128,7 @@ def test_preserves_locale_and_dev_mode(tmp_path: Path) -> None:
     answers = answers_from_harness_yaml(target)
     assert answers is not None
     assert answers.locale == "ko"
-    assert answers.dev_mode == DevMode.TASK_DRIVEN
+    assert answers.strictness == "warn"  # the legacy key, translated
     assert answers.preset == Preset.SIDE
 
 

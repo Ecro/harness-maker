@@ -1,7 +1,7 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
 # Stage: verify
 
-> Atomic stage. Pre-completion verification gate — {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}-check stop sign before `wrapup`. Failures block by default; `--force` overrides explicitly.
+> Atomic stage. Pre-completion verification gate — 6-check stop sign before `wrapup`. Failures block by default; `--force` overrides explicitly.
 
 ## Communication Protocol
 
@@ -12,7 +12,7 @@
 
 ## Purpose
 
-Block silent regressions and partial completions. Run a rigid {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}-check rubric that any work unit MUST pass before being declared done. This is the machine-checkable stop sign before `/hm:wrapup`.
+Block silent regressions and partial completions. Run a rigid 6-check rubric that any work unit MUST pass before being declared done. This is the machine-checkable stop sign before `/hm:wrapup`.
 
 ## When to Run
 
@@ -33,11 +33,11 @@ Block silent regressions and partial completions. Run a rigid {% if config.dev_m
 
 - Current working tree state (staged + unstaged).
 - `{{ config.work_docs.dir }}REVIEW-{slug}.md` frontmatter — drives Check 1 (drift verdict).
-- `{{ config.work_docs.dir }}PLAN-{slug}.md` and `{{ config.spec.dir }}SPEC-{slug}.md` (when present) — {% if config.dev_mode == 'spec-driven' %}drive Check 6 and {% endif %}inform the `--force` rationale.
+- `{{ config.work_docs.dir }}PLAN-{slug}.md` and `{{ config.spec.dir }}SPEC-{slug}.md` (when present) — drive Check 6 and inform the `--force` rationale.
 - Most recent Health snapshot at `.claude/observability/dashboard.md` (2-section schema: `Structural` / `Personalization`; pre-0.13.0 single-`Health:` scalar is intentionally unreadable here). ADR-0007 removed the former `External risks` section in 0.22.3.
 - Most recent security findings at `.claude/observability/security/findings-*.jsonl`.
 
-## The {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %} Checks (run in order; STOP on first FAIL unless `--force`)
+## The 6 Checks (run in order; STOP on first FAIL unless `--force`)
 
 ### Check 1 — Drift verdict (REVIEW present)
 
@@ -52,9 +52,9 @@ and Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (
 TUNE-class gate graded `**` — Side-preset evidence only, no ground-truth arm; see the
 step-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC
 (`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or
-manual-checklist exit criterion has **no** automated re-check at this stage{% if config.dev_mode == 'spec-driven' %}, and Check 6 gates the SPEC operation, not scenario coverage{% endif %}.
+manual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.
 **`--no-tdd` path:** `/hm:execute --no-tdd` skips Phase A/A.5, and this stage does not
-re-derive scenario coverage.{% if config.dev_mode == 'spec-driven' %}{% if config.preset == 'Production' %} The mechanical backstop is `/hm:wrapup` Step 3.5's
+re-derive scenario coverage.{% if strictness_of(config) == 'block' %}{% if config.preset == 'Production' %} The mechanical backstop is `/hm:wrapup` Step 3.5's
 `spec_machine find-unbound` gate (fail-closed, STOP on this preset): a closed-type AC still `pending_test`
 after the write-back cannot be committed, whichever way execute ran.{% else %} `/hm:wrapup` Step 3.5's
 `spec_machine find-unbound` scan runs on this preset too but is **advisory only** (Side never STOPs),
@@ -153,8 +153,8 @@ When worktree isolation was engaged (`.worktrees/execute-*` exists or did exist)
 FAIL when: there are unmerged paths, conflict markers, or unresolved merge state.
 
 PASS when: working tree is clean OR has only the staged changes from `/hm:execute` Step 5 `stage-only`.
-{% if config.dev_mode == 'spec-driven' %}
-### Check 6 — SPEC requirement (spec-driven)
+### Check 6 — SPEC requirement
+{% if strictness_of(config) == 'block' %}
 
 Read the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
 
@@ -203,12 +203,34 @@ a fresh, non-empty-rationale waiver with:
     --changed-file <f1> …
 Note: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.
 ```
+{% else %}
+> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never
+> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.
+
+Read `spec_need_verdict` / `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
+No PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run
+`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …
+```
+{% endif %}
+
+Either exiting 0 → `PASS`. Both exiting 1 → report
+`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via
+`/hm:spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.
 
 {% endif %}
 ## Advisory probes (non-blocking)
 
 These do **NOT** gate completion. They surface latent footguns and continue
-with `exit 0` regardless of outcome. They sit OUTSIDE the {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}-check contract
+with `exit 0` regardless of outcome. They sit OUTSIDE the 6-check contract
 of `verify-before-completion` — adding new gating checks means changing
 that SKILL; adding new advisory probes means appending here.
 
@@ -230,7 +252,6 @@ exit 0
 
 ### Text (stdout, for humans)
 
-{% if config.dev_mode == 'spec-driven' %}
 ```
 === /hm:verify ===
 
@@ -248,24 +269,6 @@ exit 0
 RESULT: FAIL — 1 of 6 checks failed.
 Override: --force --reason="<text>"
 ```
-{% else %}
-```
-=== /hm:verify ===
-
-[1/5] Drift verdict (REVIEW present) ✅ PASS
-[2/5] Regression smoke             ✅ PASS
-[3/5] Structural delta             ✅ PASS  (structural 87 → 89, +2)
-[4/5] Security high findings       ❌ FAIL
-        1 unresolved high finding:
-        - CVE-2026-12345 in dependency `httpx` (severity=high, no rationale).
-        Resolve or record accepted-risk-with-rationale.
-
-[5/5] (skipped — stopped at first FAIL)
-
-RESULT: FAIL — 1 of 5 checks failed.
-Override: --force --reason="<text>"
-```
-{% endif %}
 
 ## Procedure
 {%- if config.worktree is defined and config.worktree.get('enabled') %}
@@ -348,7 +351,7 @@ Run the checks yourself, below, **only** when Step 0.5 sent you here.
 
 1. Read inputs (PLAN, SPEC, dashboard, security findings).
 2. Run Check 1. If PASS, continue. If FAIL: emit the text summary + STOP (unless `--force`).
-3. Repeat for Checks 2-{% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}.
+3. Repeat for Checks 2-6.
 4. Emit the final RESULT line (text summary only — there is no JSONL ledger, see Outputs).
 5. When `--force` is set with FAILing checks: emit the text summary with the override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
 6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was dispatched by `/hm:loop`, which owns the transition to the next stage. Exception: an auto-advance check below returning `proceed: true` supersedes this.

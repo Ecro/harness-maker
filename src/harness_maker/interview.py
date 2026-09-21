@@ -4,10 +4,11 @@ Question order:
 
     1. locale (free-text, default ``en``; ``en``/``ko`` ship with built-in i18n).
     2. preset (Side / Production) — recommended based on profile.
-    3. dev_mode (spec-driven / task-driven) — independent of preset; default
-       per preset (Side→task-driven, Production→spec-driven). Any cross OK.
-    4. worktree isolation, ref_folders, sibling_repos, Second Brain,
+    3. worktree isolation, ref_folders, sibling_repos, Second Brain,
        cross-model second opinion, autopilot.
+
+SPEC gate strictness is NOT asked (SPEC-dev-mode-removal ADR-007): the preset derives it
+(Production→block, Side→warn), and `/hm:configure` / `make --strictness` override it.
 
 ``consensus`` and ``caching`` are NOT asked (ADR-003 of PLAN-onboarding-interview-ux):
 neither value is read by any code path or stage template, so the question was friction
@@ -48,7 +49,6 @@ from harness_maker.models import (
     Confidence,
     DelegationConfig,
     DeliveryMetricsConfig,
-    DevMode,
     EconomicsConfig,
     FeedbackConfig,
     InstrumentationConfig,
@@ -68,6 +68,7 @@ from harness_maker.models import (
     interview_comprehension_defaults,
     interview_deep_gate_defaults,
 )
+from harness_maker.strictness import Strictness, explicit_strictness
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,6 @@ def interview(
             locale=_DEFAULT_LOCALE,
             targets=[Target.CLAUDE_CODE],
             preset=recommended,
-            dev_mode=_recommend_dev_mode(recommended),
         )
 
     print(
@@ -203,7 +203,6 @@ def interview(
     locale = _ask_locale()
     targets = _ask_targets()
     preset = _ask_preset(recommended)
-    dev_mode = _ask_dev_mode(preset)
     worktree_enabled = _ask_worktree(preset)
     # ADR-003 of PLAN-onboarding-interview-ux: `consensus` / `caching` were asked here with
     # no explanation of their valid values, and neither changes any behaviour — nothing in
@@ -221,7 +220,6 @@ def interview(
         locale=locale,
         targets=targets,
         preset=preset,
-        dev_mode=dev_mode,
         consensus=consensus,
         caching=caching,
         ref_folders=ref_folders,
@@ -271,7 +269,7 @@ def _ask_locale() -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Targets (multi-select; preset/dev_mode 와 직교한 IDE 타깃 축)
+# Targets (multi-select; preset 과 직교한 IDE 타깃 축)
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -302,53 +300,6 @@ def _ask_targets() -> list[Target]:
         except ValueError:
             logger.warning("unknown target %r — skipped", s)
     return out or [Target.CLAUDE_CODE]
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Dev mode (independent axis; recommended per preset, any cross allowed)
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def _recommend_dev_mode(preset: Preset) -> DevMode:
-    """Side defaults to task-driven (lighter), Production defaults to spec-driven.
-
-    Phase 8: behavior delegated to ``recommendation.recommend_dev_mode`` so the
-    registry is the single source of truth for the heuristic. Thin wrapper
-    kept because callers pass a preset directly (not a full profile); we map
-    preset → minimal ProjectProfile so the registry call works.
-    """
-    # Map preset back to the profile signals that produce it (kept in lockstep
-    # with recommend_preset). If the registry recommender returns None for any
-    # reason, fall back to the same heuristic locally.
-    from harness_maker.recommendation import recommend_dev_mode
-
-    proxy_profile = (
-        ProjectProfile(scale="small", lifecycle="dormant")
-        if preset == Preset.SIDE
-        else ProjectProfile(scale="medium", lifecycle="active")
-    )
-    rec = recommend_dev_mode(proxy_profile, Path("."))
-    if rec is None:
-        return DevMode.TASK_DRIVEN if preset == Preset.SIDE else DevMode.SPEC_DRIVEN
-    value = rec.value
-    if not isinstance(value, DevMode):
-        return DevMode.TASK_DRIVEN if preset == Preset.SIDE else DevMode.SPEC_DRIVEN
-    return value
-
-
-def _ask_dev_mode(preset: Preset) -> DevMode:
-    recommended = _recommend_dev_mode(preset)
-    other = DevMode.SPEC_DRIVEN if recommended == DevMode.TASK_DRIVEN else DevMode.TASK_DRIVEN
-    label = f"dev_mode [{recommended.value} / {other.value}]"
-    raw = _input_or_empty(f"{label} ({recommended.value}): ")
-    cleaned = raw.strip().lower()
-    if not cleaned:
-        return recommended
-    if cleaned.startswith(("s", "spec")):
-        return DevMode.SPEC_DRIVEN
-    if cleaned.startswith(("t", "task")):
-        return DevMode.TASK_DRIVEN
-    return recommended
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -784,7 +735,7 @@ def _build_answers(
     locale: str,
     targets: list[Target],
     preset: Preset,
-    dev_mode: DevMode,
+    strictness: Strictness | None = None,
     consensus: str | None = None,
     caching: str | None = None,
     second_brain: SecondBrainConfig | None = None,
@@ -796,7 +747,7 @@ def _build_answers(
     worktree_enabled: bool | None = None,
     toolchains: list[ToolchainConfig] | None = None,
     comprehension_depth: str | None = None,
-    schema_version: int = 4,
+    schema_version: int = 5,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
     extras = _preset_extras(preset, schema_version=schema_version)
@@ -815,7 +766,7 @@ def _build_answers(
         locale=locale,
         targets=list(targets),
         preset=preset,
-        dev_mode=dev_mode,
+        strictness=strictness,
         ref_folders=list(ref_folders) if ref_folders else [],
         sibling_repos=list(sibling_repos) if sibling_repos else [],
         second_brain=second_brain if second_brain is not None else SecondBrainConfig(),
@@ -926,7 +877,7 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     """Reconstruct InterviewAnswers from a previously-rendered harness.yaml.
 
     Used by ``/harness-maker:make`` to silently reuse a project's prior
-    choices on re-render — preserving locale, dev_mode, custom workflows,
+    choices on re-render — preserving locale, strictness, custom workflows,
     enabled reviewers/skills, and the v0.3.0+ review-stage knobs (auto_fix /
     grade_threshold / max_review_rounds) without re-prompting the user.
 
@@ -952,13 +903,10 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         preset = Preset(data.get("preset", "Side"))
     except ValueError:
         return None
-    try:
-        # ADR-002: an ABSENT dev_mode key resolves to task-driven (relaxed) — the
-        # intentional asymmetry vs the models.py default (SPEC_DRIVEN for bare
-        # construction). A config that lost its key must never surprise-force SPEC.
-        dev_mode = DevMode(data.get("dev_mode", "task-driven"))
-    except ValueError:
-        dev_mode = DevMode.SPEC_DRIVEN if preset == Preset.PRODUCTION else DevMode.TASK_DRIVEN
+    # SPEC-dev-mode-removal: only an EXPLICIT strictness round-trips. A defaulted one stays
+    # None so a later `--preset` switch re-derives it instead of freezing the old preset's
+    # value. The loader already translated any legacy key into `spec.strictness`.
+    strictness = explicit_strictness(data)
 
     targets = _parse_targets(data.get("targets"))
 
@@ -993,7 +941,7 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         locale=_string_or(data.get("locale"), "en"),
         targets=targets,
         preset=preset,
-        dev_mode=dev_mode,
+        strictness=strictness,
         consensus=_string_or(_dig(data, "reviewers", "consensus"), None),
         caching=_string_or(data.get("caching"), None),
         schema_version=schema_version,

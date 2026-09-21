@@ -421,36 +421,25 @@ def test_codex_agent_toml_omits_model_field(name: str) -> None:
     )
 
 
-def test_atomic_command_fallback_pins_spec_driven(monkeypatch: pytest.MonkeyPatch) -> None:
-    """ADR-002 (PLAN-spec-optional-task-driven): the no-config fallback in
-    _atomic_command_files must render spec-driven (Step 1.7 / spec_need present)
-    INDEPENDENT of the HarnessConfig class default.
+def test_atomic_command_fallback_pins_block_strictness() -> None:
+    """The no-config fallback in _atomic_command_files renders at `block` INDEPENDENT of the
+    HarnessConfig class default (ADR-002 of PLAN-spec-optional-task-driven, re-keyed by
+    SPEC-dev-mode-removal).
 
-    To prove the explicit pin (synthesize.py `HarnessConfig(dev_mode=SPEC_DRIVEN)`)
-    is load-bearing — not coincidentally matching the class default — we flip the
-    class default to TASK_DRIVEN for this test. The fallback must STILL render
-    spec-driven; removing the pin (bare `HarnessConfig()`) would then yield
-    task-driven and drop `spec_need`, turning this test RED.
+    The pin is load-bearing by construction now: the class default preset is Side, which derives
+    `warn`, so a bare `HarnessConfig()` fallback would render the relaxed stop language. The
+    marker is block-ONLY — the SPEC-need step itself renders at both strictness values, so
+    `spec_need` alone could no longer tell the arms apart.
     """
-    import harness_maker.models as models_mod
-    from harness_maker.models import DevMode, HarnessConfig
-
-    class _TaskDefaultConfig(HarnessConfig):
-        dev_mode: DevMode = DevMode.TASK_DRIVEN
-
-    # _atomic_command_files does a call-time `from harness_maker.models import
-    # HarnessConfig`, so patching the module attribute rebinds its local import.
-    monkeypatch.setattr(models_mod, "HarnessConfig", _TaskDefaultConfig)
-    assert _TaskDefaultConfig().dev_mode == DevMode.TASK_DRIVEN  # sanity: default flipped
-
+    from harness_maker.models import HarnessConfig
+    from harness_maker.strictness import resolve_strictness
     from harness_maker.synthesize import _atomic_command_files
 
+    assert resolve_strictness(HarnessConfig()) == "warn"  # sanity: the default would NOT pin
+
     files = _atomic_command_files()  # no config_dump → fallback path
-    # Was `plan.md`, which owned `spec_need` until SPEC-plan-stage-absorption moved the write to
-    # `/hm:execute` Step 0.1 (IRR-003). Reading it from the current producer is what this test
-    # meant all along — the pin is load-bearing wherever the spec-driven branch lives.
     body = next(ctx["stage_body"] for (_tpl, dest, ctx) in files if dest.endswith("execute.md"))
-    assert "spec_need" in body  # only true because the pin passes dev_mode=SPEC_DRIVEN
+    assert "explicit FAIL signal to `/hm:verify` Check 6" in body
 
 
 def test_hooks_json_not_a_blueprint_filespec() -> None:

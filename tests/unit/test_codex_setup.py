@@ -165,8 +165,6 @@ def test_ac_002_engine_reuses_generator_and_preserves_user_blocks(tmp_path: Path
         "Side",
         "--locale",
         "en",
-        "--dev-mode",
-        "task-driven",
     ]
     first = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=120, check=True)
     assert first.returncode == 0, first.stderr

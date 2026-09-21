@@ -41,13 +41,13 @@ below: plan/review/help must stay byte-identical; wrapup may grow by at most the
    "review": "1aaedd851167c589cd9ccf3218015f1a8104e1a8ec05967555c86d9791bb6f69",
    "wrapup": "3cf04bb5e5ae46785d5cd5db2f1985ecb92684ac28ff5deee37a9d90648552ba"
   },
-  "auto_safe@spec-driven": {
+  "auto_safe@block": {
    "help": "4983a54b81ac0de0489b07c281091e37dd9551cc3d38deffa56392b1c23e9e21",
    "plan": "bec83e17fcba482b2d46d15df70ad29caa3189f414264406ce76dfc6c1c6a5c2",
    "review": "3463592060b67803ffd4ec8b4e5e5208af9af5871cd78726fa233ecb6b30f8e5",
    "wrapup": "fb5f5a25db8e0e82827b39164c64f1ee5f827c7175a04456867c5d717f8d205c"
   },
-  "auto_safe@task-driven": {
+  "auto_safe@warn": {
    "help": "4983a54b81ac0de0489b07c281091e37dd9551cc3d38deffa56392b1c23e9e21",
    "plan": "f8a86fbb23fcd4ef739a26a4ce7155316f213a76ec687550cf4f7fe3cdb19524",
    "review": "66f5301260799c8339b25b2093edd5f503d40a8c7898ea5e648d2cc04225eb9e",
@@ -58,8 +58,8 @@ below: plan/review/help must stay byte-identical; wrapup may grow by at most the
  "wrapup_len": {
   "ask@flag_off": 41010,
   "ask@flag_on": 46359,
-  "auto_safe@spec-driven": 49594,
-  "auto_safe@task-driven": 51148
+  "auto_safe@block": 49594,
+  "auto_safe@warn": 51148
  }
 }
 ```

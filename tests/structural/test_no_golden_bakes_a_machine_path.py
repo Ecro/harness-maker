@@ -113,7 +113,7 @@ def test_the_golden_population_is_not_empty() -> None:
     """
     found = {p.relative_to(REPO_ROOT).as_posix() for p in _committed_goldens()}
     assert found, f"no committed goldens matched {_GOLDEN_GLOBS}"
-    assert "tests/snapshot/prod-firmware-spec.expected.yaml" in found
+    assert "tests/snapshot/prod-firmware.expected.yaml" in found
     assert "tests/structural/surface_baseline.json" in found
     # The instance-13 artifact class. Named explicitly so a glob that stops matching it
     # fails here instead of leaving the guard green over the leak it exists to stop.

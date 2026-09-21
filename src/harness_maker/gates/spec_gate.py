@@ -1,13 +1,13 @@
 """spec_gate hook — refuse test writes that lack a SPEC reference.
 
-Why: spec-driven mode requires every test to trace to acceptance criteria in a
-SPEC document; spec_gate enforces that contract at the PreToolUse boundary so
-divergence is caught before the test is even written. Severity is configurable
-per project (Side=warn, Production=block by default).
+Why: at `block` strictness every test must trace to acceptance criteria in a SPEC
+document; spec_gate enforces that contract at the PreToolUse boundary so divergence is
+caught before the test is even written. Severity is configurable per project
+(Side=warn, Production=block by default).
 
-Activation is gated upstream by ``dev_mode == "spec-driven"`` in the rendered
-``.claude/hooks/hooks.json``; if invoked under task-driven (defense in depth)
-this module exits 0 silently.
+Activation is gated upstream: the hook is rendered only at `spec.strictness == block`
+(SPEC-dev-mode-removal ADR-005). If invoked at `warn` anyway (a stale render — defense in
+depth) this module exits 0 silently.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ import yaml
 
 from harness_maker.i18n import t
 from harness_maker.io_utils import load_harness_yaml
+from harness_maker.strictness import resolve_strictness
 
 # Test-path heuristics — first match wins. Order matters: most-common forms first.
 _TEST_PATTERNS: tuple[re.Pattern[str], ...] = (
@@ -86,8 +87,8 @@ def _load_yaml_keys(project_dir: Path) -> dict[str, Any]:
     yaml_path = project_dir / ".claude" / "harness.yaml"
     # Why load_harness_yaml (not yaml.safe_load): the rendered harness.yaml is a
     # multi-document stream (provenance frontmatter + body). A bare safe_load
-    # raises ComposerError → caught here → {} → dev_mode never reads as
-    # 'spec-driven' → the entire spec-TDD gate silently disables on every real
+    # raises ComposerError → caught here → {} → strictness never reads as
+    # 'block' → the entire spec-TDD gate silently disables on every real
     # install. See io_utils.load_harness_yaml and CLAUDE.md checklist #2.
     try:
         return load_harness_yaml(yaml_path)
@@ -108,9 +109,12 @@ def evaluate(
         return GateDecision(allow=True, severity=Severity.WARN, message="")
 
     cfg = _load_yaml_keys(project_dir)
-    if str(cfg.get("dev_mode") or "") != "spec-driven":
-        # Defense in depth: hooks.json shouldn't register us under task-driven,
-        # but if something invokes us anyway, stay out of the way.
+    # An unreadable config stands aside: this gate is advisory-first, and blocking every test
+    # write because a YAML file broke would punish the user for an unrelated error. A
+    # READABLE config goes through the one resolver, so an absent key derives from the preset.
+    if not cfg or resolve_strictness(cfg) != "block":
+        # Defense in depth: settings.json shouldn't register us at warn, but if something
+        # invokes us anyway, stay out of the way.
         return GateDecision(allow=True, severity=Severity.WARN, message="")
 
     spec_section = cfg.get("spec") if isinstance(cfg.get("spec"), dict) else {}
@@ -136,12 +140,22 @@ def evaluate(
 
 
 def _resolve_severity(cfg: dict[str, Any]) -> Severity:
-    sec = cfg.get("security") if isinstance(cfg.get("security"), dict) else {}
-    gates = sec.get("gates") if isinstance(sec, dict) else None
-    raw = gates.get("spec_gate") if isinstance(gates, dict) else None
-    if raw == "block":
-        return Severity.BLOCK
-    return Severity.WARN
+    """Severity IS the strictness — `block` means this gate stops, which is the knob's name.
+
+    WHY it no longer reads `security.gates.spec_gate` (review round 1, consensus P1 from the
+    core lens and the cross-model voter, seconded by the security lens): that key is written by
+    the preset template as a LITERAL, so a project that set `spec.strictness: block` on the Side
+    preset registered the hook and then allowed the write anyway — the explicit choice silently
+    downgraded to advisory at exactly the moment the user asked for blocking. Two keys deciding
+    halves of one behaviour is the second-source-of-truth shape
+    (`[fail:design] template-literal-shadows-config-key`). The templates now render
+    `security.gates.spec_gate` FROM strictness, so a reader of harness.yaml still sees the value
+    and it can no longer disagree with what the gate does.
+
+    Reached only at `block` via `evaluate` (its guard returns earlier otherwise); the `warn`
+    branch is what a direct caller gets, and what the message table's warn wording is for.
+    """
+    return Severity.BLOCK if resolve_strictness(cfg) == "block" else Severity.WARN
 
 
 def main() -> int:

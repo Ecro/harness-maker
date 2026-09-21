@@ -10,15 +10,18 @@ You (Claude) act as the orchestrator. Follow these steps:
 ### 0. CI / test mode detection
 
 If the prompt text contains `--ci`, extract inline params and skip all
-`AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) calls. Parse `preset=`, `locale=`, `dev_mode=`,
-`targets=` from the prompt; use defaults `Side` / `en` / `task` /
-`claude-code` for any that are absent. Skip the live locale question and
+`AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) calls. Parse `preset=`, `locale=`,
+`targets=` and the optional `strictness=` (`block` / `warn`) from the prompt; use defaults
+`Side` / `en` / `claude-code` for any that are absent. Export the parsed value as
+`$STRICTNESS` (empty when absent) — every dispatch below passes
+`${STRICTNESS:+--strictness "$STRICTNESS"}`, which forwards it when set and omits the flag
+entirely when it is not, so an unset strictness leaves the preset to derive it. Skip the live locale question and
 jump directly to section 5 (Dispatch → Fresh install or Update,
 depending on whether `.claude/harness.yaml` exists).
 
 Example invocation:
 ```
-/harness-maker:make --ci preset=Side locale=en dev_mode=task targets=claude-code,cursor,codex
+/harness-maker:make --ci preset=Side locale=en targets=claude-code,cursor,codex
 ```
 
 ### 0.5. `--reinterview` shortcut
@@ -30,13 +33,13 @@ falls back to autoloop defaults in the slash-command context (no TTY).
 Instead, skip the menu in section 3 and jump straight to the **Full
 reconfigure** branch in section 5, which drives `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) here in
 the slash command and dispatches with collected `--preset / --locale /
---dev-mode / --targets` flags.
+--targets` flags.
 
 ### 1. Choose live locale
 
 Default is `en`, but the first interactive decision must be the user's live
 onboarding language. Ask this before profile detection, preset selection,
-dev_mode, targets, or any setup confirmation. All subsequent live onboarding prose,
+targets, or any setup confirmation. All subsequent live onboarding prose,
 question text, option labels, trade-off explanations, and decision
 summaries must use the selected locale. Persisted generated documents may still
 follow their own template rules; this section controls the live setup
@@ -102,7 +105,7 @@ determines the dispatch shape in section 5.
 ### 3. If `STATE=re-render` — show current settings + ask intent
 
 Read `.claude/harness.yaml` body (skip frontmatter) and surface to the user:
-- preset, locale, dev_mode
+- preset, locale, spec.strictness
 - harness_maker_version (so they see how stale)
 - count of enabled reviewers/skills
 
@@ -127,7 +130,7 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
   defaults (security gates, worktree scope, default reviewer set). Trade-off:
   Production increases review coverage and strictness; Side is lighter.
 - **Switch locale** — change the `locale` tag (en/ko/ja/...).
-- **Switch dev_mode** — spec-driven ↔ task-driven.
+- **Switch SPEC strictness** — `block` stops on a failed SPEC check; `warn` reports it and continues.
 - **Add a component** — install one extra reviewer / skill / domain pack.
 - **Remove a component** — uninstall one reviewer / skill.
 - **Manage ref_folders** — add, remove, or clear reference document folders
@@ -141,7 +144,7 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
   than writing arbitrary vault files; deeper writable-folder setup continues in
   `/hm:configure`.
 - **Full reconfigure** — drive a fresh interview here in the slash command
-  (locale → preset → dev_mode → targets → ref_folders → sibling_repos →
+  (locale → preset → targets → ref_folders → sibling_repos →
   second_brain) and dispatch with all flags. No TTY required — works in
   slash-command context.
   (`--reinterview` typed directly in the prompt also routes here; see section 0.5.)
@@ -187,7 +190,7 @@ Based on the profile, derive:
 - **detected_checks**: from profile scan (may be empty)
 - **grade_threshold**: `A` if Production, else `B`
 - **locale**: `$LOCALE` from section 1 (`en` when the user accepted the default)
-- **dev_mode**: `spec-driven` if Production, else `task-driven`
+- **spec.strictness**: not asked — `block` if Production, else `warn` (the preset derives it)
 - **targets**: `claude-code` (default)
 
 #### 4.3 Structured question: Smart defaults confirm screen
@@ -221,7 +224,7 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 > | Axis | Value here | Change it later with |
 > |---|---|---|
 > | `targets` | {targets} | Adjust / `/hm:configure` |
-> | `dev_mode` | {dev_mode} — from the preset | Adjust / `/hm:configure` |
+> | `spec.strictness` | {block for Production, warn for Side} — from the preset | Adjust / `/hm:configure` |
 > | `worktree.enabled` | {true for Production, false for Side} — decides whether every `/hm:` stage runs in `.worktrees/<slug>/` on branch `hm/<slug>` | `/hm:configure` |
 > | `second_opinion.models` | {[] unless the question below is answered} | Adjust / `/hm:configure` |
 > | `autonomy.level` / persistence | **`ask` / persistent `true`** — the level is decided per session: at the first stage of each session the picker offers `auto_safe` (advance the two-way doors), `auto_full` (also answer the plan interview and an APPROVED review's `human_review_needed`), or gated. A CHANGES_REQUESTED review and the wrapup land stop at **every** level. | Adjust / `/hm:configure` |
@@ -250,7 +253,7 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 > - **Looks right** — install with these settings. Asks nothing further, *except* one
 >   question when a second-opinion CLI was detected above.
 > - **Adjust a few things** — change specific dimensions
-> - **Full setup** — answer all questions (locale, preset, dev_mode, targets, focus, grade, domains, model, wrapup docs, ref_folders, sibling_repos)
+> - **Full setup** — answer all questions (locale, preset, targets, focus, grade, domains, model, wrapup docs, ref_folders, sibling_repos)
 
 #### 4.4 Branch on confirm response
 
@@ -285,7 +288,7 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
   few things".
 
 **"Adjust a few things"** → Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) to ask which dimension(s)
-to change (multi-select: preset, locale, dev_mode, targets, grade_threshold,
+to change (multi-select: preset, locale, strictness, targets, grade_threshold,
 mechanical_checks, wrapup_docs, ref_folders, sibling_repos, second_brain, second_opinion,
 autonomy). For each selected
 dimension, show an `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) with the current smart default,
@@ -301,39 +304,38 @@ the harness. They map to `--second-opinion-models` and `--autonomy-level`.
    This must remain first if the user enters Full setup directly.
 2. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **preset** — `Side` or `Production` (show smart default
    and trade-off: Side is lighter; Production increases review coverage and strictness)
-3. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **dev_mode** — `task-driven` or `spec-driven`
-4. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **targets** — `claude-code`, `cursor`, `codex`, or any combination (multi-select)
-5. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **review focus** — "What's your primary work on this project?"
+3. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **targets** — `claude-code`, `cursor`, `codex`, or any combination (multi-select)
+4. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **review focus** — "What's your primary work on this project?"
    Options: `feature` (code + UX review), `bugfix` (code + test review),
    `security` (code + security + auditor), `performance` (code + perf review),
    `refactoring` (code + concurrency review). Maps to `--focus` flag.
-6. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **mechanical_checks** — "Pre-review shell commands to
+5. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **mechanical_checks** — "Pre-review shell commands to
    run before LLM reviewers." Show detected_checks as suggestion. User can
    accept, edit, or clear. Semicolon-separated. Maps to `--mechanical-checks`.
-7. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **grade_threshold** — `A` (strict, zero P0/P1), `B`
+6. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **grade_threshold** — `A` (strict, zero P0/P1), `B`
    (moderate, up to 2 P1), or `C` (relaxed). Maps to `--grade-threshold`.
-8. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **domains + model** — comma-separated domain packs
+7. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **domains + model** — comma-separated domain packs
    (python, react, tauri, ...) and preferred Claude model (opus/sonnet/haiku).
    Maps to `--domains` and `--recommended-model`.
-9. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **wrapup documents** — "Additional documents that
+8. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **wrapup documents** — "Additional documents that
    `/hm:wrapup` should update after each work unit (e.g. CHANGELOG.md,
    TODO.md, docs/decisions/index.md)." Semicolon-separated paths relative
    to project root, or "none". Maps to `--wrapup-docs`.
-10. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **ref_folders** — "Reference documentation folders
+9. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **ref_folders** — "Reference documentation folders
    that the `refdocs-search` skill will index for skill-driven search."
    Show detected sibling dirs (`../docs`, `../specs`, etc.) from `ls ..`
    as suggestions. Format: `::` separates multiple entries, `;` separates
    path from glob within an entry (e.g. `../docs::../specs;**/*.pdf`).
    Default glob: `**/*.{md,txt,pdf}`. DOCX unsupported. "none" to skip.
    Maps to `--ref-folders`.
-11. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **sibling_repos** — "Other repositories that form
+10. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **sibling_repos** — "Other repositories that form
    one logical project with this one (e.g. backend + frontend monorepo
    split). Entering them lets research and review agents cross-reference
    related code."
    Suggest sibling dirs visible via `ls ..` that look like git repos.
    Semicolon-separated relative paths (e.g. `../backend;../mobile`).
    "none" to skip. Maps to `--sibling-repos`.
-12. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Second Brain** — "Connect an Obsidian vault for
+11. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Second Brain** — "Connect an Obsidian vault for
    stage-aware memory? This first setup is read-first: stages read typed notes
    (decision, preference, failure, reference, project) instead of loading the
    whole vault or configuring writable folders now."
@@ -342,14 +344,14 @@ the harness. They map to `--second-opinion-models` and `--autonomy-level`.
    Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
    Tell the user that `/hm:configure` can continue with deeper Second Brain
    setup after install, including write-capable allowlisted folders.
-13. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Cross-model second opinion** —
+12. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Cross-model second opinion** —
    "Enable a second-opinion model (Codex and/or Antigravity) to cast a real k-of-N consensus
    vote in /hm:review and reconcile in /hm:spec? A missing/unauthenticated/rate-limited CLI
    degrades gracefully (warn + skip)." Multi-select: `codex`, `antigravity`, or none.
    Prereqs: `codex login` (codex), an authenticated `agy` (antigravity). Before dispatch,
    `shutil.which` each selected model's CLI (`codex` / `agy`) and warn (non-blocking) if
    absent. Maps to `--second-opinion-models` (comma-separated; empty disables).
-14. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — "Auto-advance
+13. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — "Auto-advance
    the stage pipeline this session (stages advance past two-way-door boundaries but always
    stop at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge)?" Options:
    `gated` (off) / `ask` (**the default a fresh install renders** — the session picker decides,
@@ -443,13 +445,13 @@ enables broader review and stricter gates; Side is lighter.
 !harness-maker make "$(pwd)" --locale ko
 ```
 
-#### Switch dev_mode
+#### Switch SPEC strictness
 
 ```bash
 # claude-code / cursor:
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --dev-mode spec-driven
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --strictness block
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)" --dev-mode spec-driven
+!harness-maker make "$(pwd)" --strictness block
 ```
 
 #### Switch runtime targets
@@ -529,40 +531,38 @@ in turn, then dispatch with all collected flags:
    or change it before asking any other setup question.
 2. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **preset** — `Side` (1 reviewer, lean) or
    `Production` (5 reviewers, verify-required).
-3. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **dev_mode** — `task-driven` (no spec gate) or
-   `spec-driven` (spec_gate hook enforced).
-4. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **targets** — `claude-code`, `cursor`, `codex`, or any combination
+3. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **targets** — `claude-code`, `cursor`, `codex`, or any combination
    (multi-select; `claude-code,cursor,codex` for all three).
-5. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **review focus** — `feature` | `bugfix` | `security` |
+4. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **review focus** — `feature` | `bugfix` | `security` |
    `performance` | `refactoring`. Maps to `--focus`.
-6. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **mechanical_checks** — semicolon-separated commands.
+5. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **mechanical_checks** — semicolon-separated commands.
    Show detected_checks from `profile --json` as suggestion. Maps to
    `--mechanical-checks`.
-7. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **grade_threshold** — `A` | `B` | `C`. Maps to
+6. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **grade_threshold** — `A` | `B` | `C`. Maps to
    `--grade-threshold`.
-8. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **domains + model** — comma-separated domain packs
+7. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **domains + model** — comma-separated domain packs
    and preferred Claude model. Maps to `--domains` and `--recommended-model`.
-9. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **wrapup documents** — semicolon-separated paths to
+8. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **wrapup documents** — semicolon-separated paths to
    docs that `/hm:wrapup` should update (e.g. `CHANGELOG.md;TODO.md`), or
    "none". Maps to `--wrapup-docs`.
-10. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **ref_folders** — reference doc folders for the
+9. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **ref_folders** — reference doc folders for the
    `refdocs-search` skill. Show sibling git repos visible via `ls ..` as
    suggestions. `::` separates entries, `;` separates path from glob within
    an entry (e.g. `../docs::../specs;**/*.pdf`). "none" to skip.
    Maps to `--ref-folders`.
-11. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **sibling_repos** — other repos forming one logical
+10. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **sibling_repos** — other repos forming one logical
    project (e.g. `../backend;../mobile`). Show sibling git dirs as
    suggestions. Semicolon-separated relative paths, or "none".
    Maps to `--sibling-repos`.
-12. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Second Brain** — "Connect an Obsidian vault for
+11. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Second Brain** — "Connect an Obsidian vault for
    stage-aware memory?" Ask for vault path (absolute or `~`-relative), or
    "none" to skip. If given: ask project_id (kebab-case, e.g. `my-app`).
    Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
-13. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Cross-model second opinion** —
+12. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Cross-model second opinion** —
    multi-select `codex`, `antigravity`, or none. Graceful warn+skip on a missing/
    unauthenticated/rate-limited CLI. `shutil.which` each selected CLI (`codex` / `agy`) and
    warn (non-blocking) if absent. Maps to `--second-opinion-models` (comma-separated).
-14. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — `gated` (off) /
+13. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — `gated` (off) /
    `ask` (default) / `auto_safe` / `auto_full`; if enabled, ask whether to persist across
    sessions. Maps to
    `--autonomy-level` and `--autonomy-persistent` / `--no-autonomy-persistent`.
@@ -572,7 +572,8 @@ Then dispatch with the collected values:
 ```bash
 # claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
-  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
+  --preset "$PRESET" --locale "$LOCALE" --targets "$TARGETS" \
+  ${STRICTNESS:+--strictness "$STRICTNESS"} \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
@@ -580,7 +581,8 @@ Then dispatch with the collected values:
   --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL"
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" \
-  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
+  --preset "$PRESET" --locale "$LOCALE" --targets "$TARGETS" \
+  ${STRICTNESS:+--strictness "$STRICTNESS"} \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
@@ -639,7 +641,8 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
 ```bash
 # claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
-  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
+  --preset "$PRESET" --locale "$LOCALE" --targets "$TARGETS" \
+  ${STRICTNESS:+--strictness "$STRICTNESS"} \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
@@ -648,7 +651,8 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
   --autoloop
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" \
-  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
+  --preset "$PRESET" --locale "$LOCALE" --targets "$TARGETS" \
+  ${STRICTNESS:+--strictness "$STRICTNESS"} \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
@@ -755,9 +759,9 @@ Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
   `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) here. `--reinterview` from a real terminal still
   works for users who want the full interactive interview that re-asks
   every dimension (workflows, reviewer enablement, anti-rot, etc.) —
-  the slash-command Full reconfigure covers preset / locale / dev_mode /
+  the slash-command Full reconfigure covers preset / locale /
   targets / ref_folders / sibling_repos (not workflows or reviewer enablement).
-- `--preset / --locale / --dev-mode / --targets` are the in-band override
+- `--preset / --locale / --strictness / --targets` are the in-band override
   flags; prefer these for slash-command-driven reconfiguration since they
   don't need a TTY.
 - `@hm:user:*` block markers preserve user content during re-render —

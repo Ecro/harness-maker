@@ -130,7 +130,6 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | Dimension | Choices | What it changes |
 |---|---|---|
 | **Preset** | `Side` · `Production` | Reviewer count (1 vs 5), workflow stage count, security gate depth, verify-required flag |
-| **Dev mode** | `task-driven` · `spec-driven` | Whether SPEC stage is mandatory; whether plan stages chain into execute |
 | **Targets** | `claude-code` · `cursor` · `codex` (multi-select) | Which IDE-native asset trees are rendered |
 | **Locale** | `en` · `ko` · any tag | Interview text + user-facing error messages |
 | **Reviewers / skills** | Preset defaults + overrides | Which reviewers are active + agent model tiers (the full agent/skill set always installs) |
@@ -580,7 +579,8 @@ The interview writes answers to `.claude/harness.yaml`. Key dimensions:
 ```yaml
 preset: Production           # Side | Production
 locale: en                   # en | ko | <any — unknown falls back to en>
-dev_mode: spec-driven        # spec-driven | task-driven
+spec:
+  strictness: block          # block | warn — absent = preset default (Production block, Side warn)
 targets:                     # which runtimes to drive
   - claude-code
   - cursor
@@ -831,7 +831,7 @@ harness-maker is on `0.x` and stays there until enough projects depend on it tha
 **Frozen surfaces** — these will not break in any 0.x.minor without a deprecation cycle:
 
 - **Slash command names**: `/hm:make`, `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/harness-maker:make`.
-- **`harness.yaml` top-level keys**: `targets`, `preset`, `dev_mode`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
+- **`harness.yaml` top-level keys**: `targets`, `preset`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
 - **Plugin manifest schemas**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — fields covered by each marketplace's published spec.
 - **Local-only telemetry guarantee** — see [`PRIVACY.md`](PRIVACY.md). A documented-vs-actual mismatch is treated as a P0 bug.
 
@@ -942,7 +942,7 @@ All adaptive features run **100% locally** — no network calls
 - `.hm-meta.yaml` sidecar for Cursor assets — enable hash-tracking of `.cursor/rules/*.mdc` without polluting Cursor frontmatter.
 - User-configurable anti-rot repo list — `harness.yaml.anti_rot.github_repos` to track additional Claude Code ecosystem repos beyond the default.
 - Demo screencast — record a first-install + `/hm:loop` session.
-- `Enterprise` preset — stricter security gates, mandatory spec-driven dev mode.
+- `Enterprise` preset — stricter security gates, `block` SPEC strictness that cannot be overridden.
 
 ---
 

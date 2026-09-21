@@ -348,28 +348,28 @@ in the per-type report, never a STOP. Run
 `hm spec_machine find-unjudged --yaml …` to list them.
 {% endif %}
 
-{% if config.dev_mode == 'task-driven' %}
-### Step 3.6 — Oracle-waiver advisory (task-driven — PLAN-wrapup-waiver-enforcement)
+{% if strictness_of(config) == 'warn' %}
+### Step 3.6 — Oracle-waiver advisory (`warn` strictness — PLAN-wrapup-waiver-enforcement)
 
 **Skip** when `{{ config.spec.dir }}SPEC-{slug}.machine.yaml` does not exist — no
 machine SPEC means no per-AC oracle to check (same skip-when-absent contract as
-Step 3.5; a task-driven unit with no machine SPEC is out of scope by design).
+Step 3.5; a unit with no machine SPEC is out of scope by design).
 
-This is **advisory, NEVER a STOP** (ADR-002): a task-driven AC with weak oracle
-evidence and no waiver is *surfaced and recorded*, not blocked — visibility over
+This is **advisory and never halts wrapup** (ADR-002): at `warn` strictness an AC with weak
+oracle evidence and no waiver is *surfaced and recorded*, not blocked — visibility over
 friction. Run the tri-state check (it always exits 0):
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --strictness warn --root .")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .
+!uv run --with {{ harness_maker_src_path }} hm spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --strictness warn --root .
 ```
 {% endif %}
 
-Read the single JSON line's `status` and act — but **do NOT STOP** in any case:
+Read the single JSON line's `status` and act — but **never stop wrapup** in any case:
 - `ok` → nothing to surface; continue to Step 4.
 - `flagged` → **loud-warn** each `flagged_acs` entry: a v2 AC with weak oracle
   evidence and NO `oracle_independence_waiver`. Tell the user to either strengthen

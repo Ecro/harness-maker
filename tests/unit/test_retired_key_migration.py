@@ -172,4 +172,6 @@ def test_the_render_drop_list_is_the_same_object_as_the_loader_one() -> None:
     from harness_maker import render
 
     assert render._RETIRED_TOP_LEVEL_KEYS is RETIRED_TOP_LEVEL_KEYS
-    assert set(RETIRED_TOP_LEVEL_KEYS) == {"workflows", "default_workflow"}
+    # `dev_mode` joined in SPEC-dev-mode-removal — translated into `spec.strictness` BEFORE
+    # the strip, and listed here so `render._preserve_yaml_user_keys` never re-appends it.
+    assert set(RETIRED_TOP_LEVEL_KEYS) == {"workflows", "default_workflow", "dev_mode"}

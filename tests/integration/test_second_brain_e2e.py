@@ -18,7 +18,6 @@ import pytest
 
 from harness_maker.interview import _build_answers
 from harness_maker.models import (
-    DevMode,
     InterviewAnswers,
     Preset,
     SecondBrainConfig,
@@ -43,7 +42,7 @@ def _baseline_answers(vault_path: Path, project_id: str = "harness-maker") -> In
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=Preset.SIDE,
-        dev_mode=DevMode.TASK_DRIVEN,
+        strictness="warn",
         second_brain=SecondBrainConfig(
             enabled=True,
             project_id=project_id,

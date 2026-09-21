@@ -77,8 +77,8 @@ post-land step per ADR-010 (only the closing freeze may touch `aggregate_chars` 
 `payload_digest` / `render_sha` / `frozen_at_sha`, and only from base).
 
 `tests/structural/autopilot_gate_golden.json` (the byte-identity golden for the non-gated autonomy
-arms) was re-based with a `rebases` row pointing here — per-arm deltas `auto_safe@spec-driven`
--8 222, `auto_safe@task-driven` -8 360, `ask@flag_on` -8 234, `ask@flag_off` -8 234 — because every
+arms) was re-based with a `rebases` row pointing here — per-arm deltas `auto_safe@block`
+-8 222, `auto_safe@warn` -8 360, `ask@flag_on` -8 234, `ask@flag_off` -8 234 — because every
 moved command is one of the six this task edits and none of the moves touches the advance or
 picker blocks.
 

@@ -83,7 +83,14 @@ def rmw_lock(lock_path: Path, *, timeout: float = _DEFAULT_LOCK_TIMEOUT_S) -> It
 #   2. `render._preserve_yaml_user_keys` filters them again, because it classifies
 #      "present in the existing file, absent from the new render" as a user addition and
 #      would otherwise re-append the key under a banner claiming it is the user's.
-RETIRED_TOP_LEVEL_KEYS: frozenset[str] = frozenset({"workflows", "default_workflow"})
+RETIRED_TOP_LEVEL_KEYS: frozenset[str] = frozenset({"workflows", "default_workflow", "dev_mode"})
+
+# `dev_mode` is retired but not dropped blind: `strip_retired_keys` translates it into
+# `spec.strictness` BEFORE stripping (SPEC-dev-mode-removal IRR-001). It still belongs in the
+# set above for layer 2 — without it `render._preserve_yaml_user_keys` would re-append the old
+# key to every re-render as a "user addition".
+_DEV_MODE_TO_STRICTNESS: dict[str, str] = {"spec-driven": "block", "task-driven": "warn"}
+_ADVISED_DEV_MODE_PATHS: set[str] = set()
 
 # Projects already advised about their retired keys, keyed by resolved path.
 # The advisory is per-project rather than per-load because a single CLI invocation reads
@@ -235,6 +242,7 @@ def strip_retired_keys(data: dict[str, Any], *, source: Path | None = None) -> d
     Returns the input unchanged (same object) when no retired key is present, so the
     common path allocates nothing.
     """
+    data = migrate_dev_mode(data, source=source)
     present = sorted(k for k in data if k in RETIRED_TOP_LEVEL_KEYS)
     if not present:
         return data
@@ -253,6 +261,44 @@ def strip_retired_keys(data: dict[str, Any], *, source: Path | None = None) -> d
             ", ".join(present),
         )
     return {k: v for k, v in data.items() if k not in RETIRED_TOP_LEVEL_KEYS}
+
+
+def migrate_dev_mode(data: dict[str, Any], *, source: Path | None = None) -> dict[str, Any]:
+    """Translate the retired `dev_mode` key into `spec.strictness`, then drop it.
+
+    WHY translate-then-drop rather than join the plain strip: dropping first destroys the
+    user's choice instead of moving it, and once the key is gone nothing on disk can recover
+    it. The preset is never touched — a Production harness that chose the relaxed gates keeps
+    both. A value outside the old enum fails closed to `block`; an explicit `spec.strictness`
+    already present wins, because a file carrying both was hand-edited to the new key.
+
+    Returns the input unchanged (same object) when there is no `dev_mode` key.
+    """
+    if "dev_mode" not in data:
+        return data
+    from harness_maker.strictness import write_strictness
+
+    raw = data.get("dev_mode")
+    out = {k: v for k, v in data.items() if k != "dev_mode"}
+    spec = out.get("spec")
+    kept = isinstance(spec, dict) and "strictness" in spec
+    outcome = "an explicit spec.strictness is kept"
+    if not kept:
+        value = _DEV_MODE_TO_STRICTNESS.get(raw, "block") if isinstance(raw, str) else "block"
+        write_strictness(out, value)  # type: ignore[arg-type]
+        outcome = f"read as spec.strictness={value}"
+    key = str(source.resolve()) if source is not None else ""
+    if key not in _ADVISED_DEV_MODE_PATHS:
+        _ADVISED_DEV_MODE_PATHS.add(key)
+        # WARNING for the same reason as the retired-key advisory below: INFO never reaches
+        # a user because nothing in this package configures logging.
+        logger.warning(
+            "harness.yaml carries retired key dev_mode=%r — %s (the preset is unchanged). "
+            "Re-render via /harness-maker:make to persist it.",
+            raw,
+            outcome,
+        )
+    return out
 
 
 def append_atomic_line(path: Path, line: str) -> None:

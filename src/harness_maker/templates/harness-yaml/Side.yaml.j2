@@ -2,7 +2,6 @@ preset: {{ config.preset }}
 locale: {{ config.locale }}
 targets: [{{ config.targets | join(', ') }}]
 default_model: {{ config.default_model }}
-dev_mode: {{ config.dev_mode }}
 caching: {{ config.caching }}
 schema_version: {{ config.schema_version }}
 interview:
@@ -29,7 +28,8 @@ project:
   domains: [{{ config.project.domains | join(", ") }}]
 spec:
   dir: {{ config.spec.dir }}
-work_docs:
+{% if explicit_strictness(config) %}  strictness: {{ explicit_strictness(config) }}
+{% endif %}work_docs:
   dir: {{ config.work_docs.dir }}
 ref_folders:
 {% for f in config.ref_folders %}  - path: {{ f.path | tojson }}
@@ -109,7 +109,7 @@ security:
     high: warn
     medium: log
   gates:
-    spec_gate: warn
+    spec_gate: {{ strictness_of(config) }}  # derived — the gate reads spec.strictness
 feedback:
   enabled: {{ (config.feedback.enabled if config.feedback else false) | string | lower }}
 second_opinion:

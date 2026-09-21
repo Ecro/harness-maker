@@ -885,82 +885,46 @@ def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> Dime
                     )
                 )
 
-    # Render-drift guard (PLAN-wrapup-waiver-enforcement ADR-004/C5): the
-    # task-driven oracle-waiver advisory (wrapup Step 3.6) is baked at render time
-    # on the dev_mode branch. If harness.yaml's dev_mode was flipped without
-    # re-rendering, the rendered wrapup either silently LACKS the advisory
-    # (task-driven) or mis-fires it (spec-driven). N-A (no signal) when the wrapup
-    # command or a recognizable dev_mode is absent.
+    # Render-drift guard (PLAN-wrapup-waiver-enforcement ADR-004/C5): the oracle-waiver
+    # advisory (wrapup Step 3.6) is baked at render time and renders only at `warn`
+    # strictness. If harness.yaml's strictness changed without re-rendering, the rendered
+    # wrapup either silently LACKS the advisory (warn) or mis-fires it (block). N-A (no
+    # signal) when the wrapup command or a readable harness.yaml is absent.
     wrapup_cmd = claude / "commands" / "hm" / "wrapup.md"
-    _dev_mode: str | None = None
+    _strictness: str | None = None
     _hy_path = claude / "harness.yaml"
     if _hy_path.is_file():
         try:
             from harness_maker.io_utils import load_harness_yaml as _lhy
+            from harness_maker.strictness import resolve_strictness
 
             _hy2 = _lhy(_hy_path)
-            _dm = _hy2.get("dev_mode") if isinstance(_hy2, dict) else None
-            _dev_mode = _dm if isinstance(_dm, str) else None
+            _strictness = resolve_strictness(_hy2) if isinstance(_hy2, dict) and _hy2 else None
         except Exception:  # noqa: BLE001 — degrade to N-A, never crash readiness
-            _dev_mode = None
+            _strictness = None
     _has_advisory: bool | None = None
-    if wrapup_cmd.is_file() and _dev_mode in ("task-driven", "spec-driven"):
+    if wrapup_cmd.is_file() and _strictness is not None:
         try:
             _has_advisory = "waiver-check" in wrapup_cmd.read_text(encoding="utf-8")
         except (OSError, ValueError):
             _has_advisory = None  # unreadable render → N-A, never crash /hm:health
-    if _has_advisory is not None and _dev_mode in ("task-driven", "spec-driven"):
-        _matched = _has_advisory == (_dev_mode == "task-driven")
+    if _has_advisory is not None and _strictness is not None:
+        _matched = _has_advisory == (_strictness == "warn")
         signals.append(
             _signal(
-                "wrapup_oracle_waiver_dev_mode_match",
+                "wrapup_oracle_waiver_strictness_match",
                 _matched,
                 15,
-                "rendered wrapup oracle-waiver advisory matches harness.yaml dev_mode"
+                "rendered wrapup oracle-waiver advisory matches harness.yaml strictness"
                 if _matched
-                else f"rendered wrapup advisory MISMATCHES dev_mode={_dev_mode} "
+                else f"rendered wrapup advisory MISMATCHES strictness={_strictness} "
                 f"(advisory {'present' if _has_advisory else 'absent'}) — stale render",
                 None
                 if _matched
                 else "Re-render with /harness-maker:make --update so wrapup Step 3.6 "
-                "matches the current dev_mode (oracle-waiver advisory render-drift)",
+                "matches the current strictness (oracle-waiver advisory render-drift)",
             )
         )
-
-    # Render-drift guard (PLAN-spec-optional-task-driven ADR-003): plan Step 1.7
-    # and verify Check 6 are render-gated on dev_mode == spec-driven. spec_need's
-    # runtime guard backstops verify at execution time, but plan-side enforcement
-    # is LLM-prose (unreachable at runtime), so a stale render (dev_mode flipped
-    # without re-render) is surfaced HERE. Mirrors wrapup_oracle_waiver_dev_mode_match.
-    # Marker = the spec-driven-only `spec_need` CLI calls both stages render.
-    # N-A when either command file is absent/unreadable or dev_mode is unrecognized.
-    plan_cmd = claude / "commands" / "hm" / "plan.md"
-    verify_cmd = claude / "commands" / "hm" / "verify.md"
-    if _dev_mode in ("task-driven", "spec-driven") and plan_cmd.is_file() and verify_cmd.is_file():
-        try:
-            _plan_gated = "spec_need" in plan_cmd.read_text(encoding="utf-8")
-            _verify_gated = "spec_need" in verify_cmd.read_text(encoding="utf-8")
-        except (OSError, ValueError):
-            pass  # unreadable render → N-A, never crash /hm:health
-        else:
-            _is_spec = _dev_mode == "spec-driven"
-            _pv_matched = (_plan_gated == _is_spec) and (_verify_gated == _is_spec)
-            signals.append(
-                _signal(
-                    "plan_verify_dev_mode_match",
-                    _pv_matched,
-                    15,
-                    "rendered plan Step 1.7 + verify Check 6 match harness.yaml dev_mode"
-                    if _pv_matched
-                    else f"rendered plan/verify spec-need gating MISMATCHES dev_mode={_dev_mode} "
-                    f"(plan Step 1.7 {'present' if _plan_gated else 'absent'}, "
-                    f"verify Check 6 {'present' if _verify_gated else 'absent'}) — stale render",
-                    None
-                    if _pv_matched
-                    else "Re-render with /harness-maker:make --update so plan Step 1.7 + "
-                    "verify Check 6 match the current dev_mode (spec-need render-drift)",
-                )
-            )
 
     # Advisory — stale judgment-AC verdicts (PLAN-judgment-stale-health-display).
     # weight=0 AND hard_gate=False so it surfaces in /hm:health WITHOUT docking the

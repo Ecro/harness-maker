@@ -4,6 +4,34 @@
 
 ### BREAKING
 
+- **`dev_mode` is removed; `spec.strictness: block | warn` replaces it.** The axis existed
+  because it decided which stages a harness had. Since `/hm:plan` was absorbed every task enters
+  through a SPEC, so it only decided how strictly the SPEC gates fire — a preset default, not a
+  second axis. `Production` now derives `block`, `Side` derives `warn`, and
+  `/hm:configure` / `harness-maker make --strictness` override it. **This reverses the earlier
+  decision that `dev_mode` was orthogonal to `preset` with all four crosses allowed** — every
+  cross is still expressible, as a preset plus an explicit strictness.
+
+  **What changes at `warn`:** the gates this axis owns render and block on none. `/hm:verify`
+  has six checks at every strictness (Check 6 reports a missing SPEC operation as a `WARN`),
+  `/hm:execute` records its SPEC-need verdict, and `/hm:review` passes the machine SPEC to the
+  grade. Only the `spec_gate` hook — whose one job is to block — renders at `block` alone, and
+  it now takes its severity from strictness instead of the preset-written
+  `security.gates.spec_gate` literal, which used to defang an explicit `block` on a Side project.
+  **Two gates are deliberately NOT on this axis:** `/hm:wrapup` Step 3.5's `find-unbound` and the
+  judgment-AC binding gate still follow `preset`, because that is preset depth and this change
+  does not move it.
+
+  **What you need to do:** nothing, and re-render when convenient. The loader translates an
+  existing `dev_mode` once, with one advisory — `spec-driven`→`block`, `task-driven`→`warn`,
+  anything else→`block` — and **never touches your preset**, so a Production harness that chose
+  the relaxed gates keeps both. A config with no strictness at all now derives it from the preset
+  (a Production harness that lost its key is strict; it used to relax). `spec_need`'s verify
+  oracle is the one exception and still enforces unless `warn` is written explicitly.
+  `--dev-mode` is gone from `harness-maker make`, `spec_machine check` / `waiver-check` and the
+  Codex bootstrap, with no alias; a harness rendered earlier keeps calling the plugin version it
+  was rendered with, which still accepts it. Onboarding asks one question fewer.
+
 - **`/hm:plan` is removed.** The stage, its interview and its auto-advance gate are gone from
   every target; there is no stub. The **PLAN document survives** — `/hm:execute` Step 0 now
   authors it (phases, file lists, order, risks, exit criteria) with no human gate, and every

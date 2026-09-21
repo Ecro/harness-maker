@@ -10,7 +10,6 @@ import pytest
 from harness_maker.interview import _ask_second_brain, answers_from_harness_yaml, interview
 from harness_maker.models import (
     Confidence,
-    DevMode,
     InterviewAnswers,
     Preset,
     ProjectProfile,
@@ -19,6 +18,7 @@ from harness_maker.models import (
     SecondBrainFolder,
     Target,
 )
+from harness_maker.strictness import resolve_strictness
 
 
 def _profile(scale: str = "small", lifecycle: str = "dormant") -> ProjectProfile:
@@ -50,15 +50,21 @@ def test_interview_autoloop_returns_typed_answers() -> None:
     assert "enabled" in result.reviewers
 
 
-def test_interview_autoloop_recommends_task_driven_for_side() -> None:
-    """Side preset gets task-driven by default — lighter, no SPEC enforcement."""
+def test_interview_autoloop_leaves_strictness_to_the_side_preset() -> None:
+    """No strictness is recorded — Side derives `warn` at resolve time (ADR-007)."""
+    from harness_maker.strictness import resolve_strictness
+
     result = interview(_profile(), autoloop_mode=True)
-    assert result.dev_mode == DevMode.TASK_DRIVEN
+    assert result.strictness is None
+    assert resolve_strictness({"preset": result.preset.value}) == "warn"
 
 
-def test_interview_autoloop_recommends_spec_driven_for_production() -> None:
+def test_interview_autoloop_leaves_strictness_to_the_production_preset() -> None:
+    from harness_maker.strictness import resolve_strictness
+
     result = interview(_profile(scale="medium", lifecycle="active"), autoloop_mode=True)
-    assert result.dev_mode == DevMode.SPEC_DRIVEN
+    assert result.strictness is None
+    assert resolve_strictness({"preset": result.preset.value}) == "block"
 
 
 def test_interview_recommends_side_for_experiment_small() -> None:
@@ -99,8 +105,8 @@ def test_interview_installs_all_reviewers_and_skills() -> None:
 
 
 def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Empty answers ⇒ accept recommended locale/preset/dev_mode/starter/defaults."""
-    # locale, targets, preset, dev_mode, worktree,
+    """Empty answers ⇒ accept recommended locale/preset/starter/defaults."""
+    # locale, targets, preset, worktree,
     # ref_folders (blank=skip), sibling_repos (blank=skip),
     # vault_path (blank=skip), second_opinion (blank=skip/default N).
     # next(inputs, "") fallback handles extra prompts gracefully.
@@ -110,7 +116,7 @@ def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPat
     assert result.locale == "en"
     assert result.targets == [Target.CLAUDE_CODE]
     assert result.preset == Preset.SIDE
-    assert result.dev_mode == DevMode.TASK_DRIVEN  # Side default
+    assert result.strictness is None  # derived from the Side preset
     assert result.ref_folders == []
 
 
@@ -122,30 +128,6 @@ def test_interview_locale_first_question_accepts_arbitrary_tag(
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.locale == "ja"
-
-
-def test_interview_dev_mode_explicit_override_to_spec_driven(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Side+spec-driven cross is allowed (independent of preset)."""
-    # locale, targets, preset, dev_mode=spec, worktree,
-    # ref_folders, sibling_repos, vault_path
-    inputs: Iterator[str] = iter(["", "", "", "spec", "", "", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
-    result = interview(_profile(), autoloop_mode=False)
-    assert result.preset == Preset.SIDE
-    assert result.dev_mode == DevMode.SPEC_DRIVEN
-
-
-def test_interview_dev_mode_explicit_override_to_task_on_production(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Production+task-driven cross is allowed."""
-    inputs: Iterator[str] = iter(["", "", "Production", "task", "", "", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
-    result = interview(_profile(), autoloop_mode=False)
-    assert result.preset == Preset.PRODUCTION
-    assert result.dev_mode == DevMode.TASK_DRIVEN
 
 
 def test_interview_preset_override_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -160,11 +142,12 @@ def test_interview_ref_folders_multiple_with_glob_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """User registers two folders, one with a custom glob."""
-    # locale, targets, preset, dev_mode, worktree, ref_folder #1, ref_folder #2 (path;glob),
-    # blank=stop, sibling_repos, vault_path. Two fewer leading blanks than before: ADR-003
-    # of PLAN-onboarding-interview-ux removed the consensus and caching questions.
+    # locale, targets, preset, worktree, ref_folder #1, ref_folder #2 (path;glob),
+    # blank=stop, sibling_repos, vault_path. Three fewer leading blanks than originally: ADR-003
+    # of PLAN-onboarding-interview-ux removed consensus and caching, and SPEC-dev-mode-removal
+    # ADR-007 removed the methodology question.
     inputs: Iterator[str] = iter(
-        ["", "", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
+        ["", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
@@ -498,11 +481,13 @@ def test_emit_yaml_comment_omits_signal_when_blank() -> None:
 def test_load_0_11_x_harness_yaml_zero_diff_on_legacy_axes(
     tmp_path: pathlib.Path,
 ) -> None:
-    """0.11.x harness.yaml round-trips with zero diff on preset/dev_mode/checks/vault.
+    """0.11.x harness.yaml round-trips with zero diff on preset/strictness/checks/vault.
 
-    Validator W3: existing-user upgrade must NOT silently flip preset or
-    dev_mode to a different default. The four legacy axes (preset, dev_mode,
-    mechanical_checks, second_brain) are assigned MEDIUM (preset/dev_mode) or
+    Validator W3: existing-user upgrade must NOT silently flip preset or its SPEC
+    strictness to a different default. The legacy file spells strictness as the retired
+    methodology key; the loader translates it (SPEC-dev-mode-removal), so this test is also
+    the end-to-end proof that the translation survives into answers AND the synthesized
+    config. The four legacy axes are assigned MEDIUM (preset) or
     HIGH (mechanical_checks/second_brain) confidence in Phase 8 — but
     re-render of an existing 0.11.x yaml must preserve the on-disk values
     exactly, regardless of how the recommendation framework would score them.
@@ -536,7 +521,7 @@ def test_load_0_11_x_harness_yaml_zero_diff_on_legacy_axes(
     assert answers is not None
     # Direct round-trip preservation on the 4 axes.
     assert answers.preset == Preset.SIDE
-    assert answers.dev_mode == DevMode.TASK_DRIVEN
+    assert answers.strictness == "warn"  # translated, and explicit
     assert answers.mechanical_checks == [
         "ruff check .",
         "uv run pytest tests/unit -x -q",
@@ -552,7 +537,7 @@ def test_load_0_11_x_harness_yaml_zero_diff_on_legacy_axes(
     bp = synthesize(profile, answers)
     cfg = bp.config
     assert cfg.preset == Preset.SIDE
-    assert cfg.dev_mode == DevMode.TASK_DRIVEN
+    assert resolve_strictness(cfg) == "warn"
     assert cfg.reviewers["mechanical_checks"] == [
         "ruff check .",
         "uv run pytest tests/unit -x -q",
@@ -585,7 +570,7 @@ def test_load_0_11_x_production_yaml_zero_diff_on_legacy_axes(
     answers = answers_from_harness_yaml(p)
     assert answers is not None
     assert answers.preset == Preset.PRODUCTION
-    assert answers.dev_mode == DevMode.SPEC_DRIVEN
+    assert answers.strictness == "block"
     # second_brain absent → default disabled
     assert answers.second_brain.enabled is False
     # mechanical_checks absent → empty list
@@ -670,13 +655,17 @@ def test_ask_second_brain_accepts_custom_folder_path(
     assert cfg.folders[0].path == "Projects/my-proj/notes"
 
 
-def test_absent_dev_mode_key_reverse_maps_to_task_driven(tmp_path: pathlib.Path) -> None:
-    """ADR-002 (PLAN-spec-optional-task-driven): a harness.yaml MISSING the
-    dev_mode key reverse-maps to task-driven — even for a Production preset — so a
-    config that lost its key never surprise-forces SPEC. Locks interview.py:940.
+def test_absent_strictness_key_derives_from_the_preset(tmp_path: pathlib.Path) -> None:
+    """SPEC-dev-mode-removal ADR-004 REVERSES the old rule here. A file with no strictness used
+    to reverse-map to the relaxed arm even for Production; it now stays unset (None) and the
+    resolver derives it from the preset, so a Production harness that lost its key is strict.
     """
+    from harness_maker.strictness import resolve_strictness
+    from harness_maker.synthesize import synthesize
+
     harness_yaml = tmp_path / "harness.yaml"
     harness_yaml.write_text("locale: en\npreset: Production\ntargets:\n  - claude-code\n")
     result = answers_from_harness_yaml(harness_yaml)
     assert result is not None
-    assert result.dev_mode == DevMode.TASK_DRIVEN
+    assert result.strictness is None
+    assert resolve_strictness(synthesize(_profile(), result).config) == "block"

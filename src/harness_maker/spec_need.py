@@ -2,19 +2,14 @@
 
 ADR-001/002/008/009 from PLAN-spec-requirement-gate.
 
-Task-driven runtime guard (PLAN-spec-optional-task-driven ADR-001): the CLI is
-invoked ONLY from spec-driven-rendered plan Step 1.7 / verify Check 6. If a
-harness flips ``dev_mode`` to task-driven WITHOUT re-rendering, those stale prose
-blocks still call this CLI. To keep task-driven from forcing SPEC, the
-verify-ORACLE commands (``op-check``, ``waiver-check``) short-circuit to
-satisfied/valid on a CONFIDENT ``dev_mode == "task-driven"`` read — verify Check 6
-reads the exit code, so this fully backstops verify. The relax is fail-CLOSED
-(only a confident task-driven read; missing/unreadable/malformed → enforce), the
-INVERSE of ``spec_gate.py``'s advisory fail-open, because this module IS the
-verify oracle. All marker/record commands stay pass-through so the ADR-009
-anti-loop machinery is untouched. plan Step 1.7's §1.7.2 enforcement is LLM-prose,
-unreachable at runtime — surfaced instead by the ``plan_verify_dev_mode_match``
-/hm:health signal (ADR-003); re-render is the real fix for stale plan prose.
+Relaxed-strictness runtime guard (PLAN-spec-optional-task-driven ADR-001, re-keyed by
+SPEC-dev-mode-removal ADR-004): the verify-ORACLE commands (``op-check``, ``waiver-check``)
+short-circuit to satisfied/valid on a CONFIDENT ``spec.strictness == "warn"`` read — verify
+Check 6 reads the exit code, so this fully backstops verify. The relax is fail-CLOSED (only an
+explicit, valid ``warn``; missing/unreadable/malformed → enforce), the INVERSE of every other
+reader, which derives an absent key from the preset. This module IS the verify oracle, so it
+is the one named exception (``strictness.STRICTNESS_EXEMPT``). All marker/record commands stay
+pass-through so the ADR-009 anti-loop machinery is untouched.
 """
 
 from __future__ import annotations
@@ -591,27 +586,28 @@ def _cli_validate_slug(value: str, field: str = "slug") -> int:
         return 1
 
 
-def _read_dev_mode(root: Path) -> str | None:
-    """Return harness.yaml ``dev_mode``, or None when absent/unreadable.
+def _read_strictness(root: Path) -> str | None:
+    """Return harness.yaml ``spec.strictness`` exactly as written, or None when absent/unreadable.
 
-    WHY fail-closed (PLAN-spec-optional-task-driven ADR-001): spec_need is the
-    verify Check 6 *oracle*, so only a confident ``task-driven`` read may relax
-    the verify-oracle commands. A missing/unreadable/malformed config returns
-    None → the caller does NOT relax (enforce). This is the deliberate INVERSE
-    of ``spec_gate.py``'s advisory fail-OPEN, where relax-on-unreadable is safe.
+    WHY this reads the raw key instead of calling ``strictness.resolve_strictness``: the
+    resolver derives an ABSENT key from the preset, so a Side project with no key would read
+    as ``warn`` and relax the oracle. spec_need is the verify Check 6 *oracle* — only a
+    confident explicit ``warn`` may relax it (SPEC-dev-mode-removal ADR-004). A legacy config
+    is already translated by the loader, so the old relaxed setting still arrives as ``warn``.
     """
     yaml_path = root / ".claude" / "harness.yaml"
     try:
         cfg = load_harness_yaml(yaml_path)
     except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return None
-    dev_mode = cfg.get("dev_mode") if isinstance(cfg, dict) else None
-    return dev_mode if isinstance(dev_mode, str) else None
+    spec = cfg.get("spec") if isinstance(cfg, dict) else None
+    value = spec.get("strictness") if isinstance(spec, dict) else None
+    return value if isinstance(value, str) else None
 
 
-def _relax_for_task_driven(root: Path) -> bool:
-    """True iff a confident ``dev_mode == "task-driven"`` read (verify-oracle relax)."""
-    return _read_dev_mode(root) == "task-driven"
+def _relax_for_warn(root: Path) -> bool:
+    """True iff a confident explicit ``spec.strictness == "warn"`` read (verify-oracle relax)."""
+    return _read_strictness(root) == "warn"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -651,8 +647,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "op-check":
-        if _relax_for_task_driven(args.root):
-            # ADR-001: task-driven never requires a SPEC operation → satisfied.
+        if _relax_for_warn(args.root):
+            # ADR-001: a relaxed harness never requires a SPEC operation → satisfied.
             # verify Check 6 reads the exit code, so exit 0 makes it PASS.
             print(json.dumps({"satisfied": True}))
             return 0
@@ -685,8 +681,8 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     if args.cmd == "waiver-check":
-        if _relax_for_task_driven(args.root):
-            # ADR-001: task-driven needs no waiver — the verify gate is relaxed.
+        if _relax_for_warn(args.root):
+            # ADR-001: a relaxed harness needs no waiver — the verify gate is relaxed.
             print(json.dumps({"valid": True}))
             return 0
         if rc := _cli_validate_slug(args.slug, "slug"):

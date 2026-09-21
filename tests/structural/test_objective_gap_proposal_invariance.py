@@ -60,14 +60,14 @@ def _plan_allowance() -> int:
 
 def _live_arms(tmp_path: Path) -> dict[str, dict[str, str]]:
     live: dict[str, dict[str, str]] = {}
-    for dev_mode in AXES:
-        rendered = _render_atomic(dev_mode)
-        live[f"auto_safe@{dev_mode.value}"] = {
+    for strictness in AXES:
+        rendered = _render_atomic(strictness)
+        live[f"auto_safe@{strictness}"] = {
             k: hashlib.sha256(v.encode()).hexdigest()
             for k, v in rendered.items()
             if k in ("plan", "review", "help")
         }
-        live[f"auto_safe@{dev_mode.value}"]["plan_len"] = str(len(rendered["plan"]))
+        live[f"auto_safe@{strictness}"]["plan_len"] = str(len(rendered["plan"]))
     for flag, name in ((True, "ask@flag_on"), (False, "ask@flag_off")):
         rendered = _render(feature_branch_workflow=flag, tmp=tmp_path / name)
         live[name] = {
@@ -115,7 +115,7 @@ def test_ac_007_the_pin_names_every_arm_and_command_it_claims_to_cover() -> None
     plan_len = pin["plan_len"]
     assert isinstance(arms, dict)
     assert isinstance(plan_len, dict)
-    expected = {"ask@flag_off", "ask@flag_on", "auto_safe@spec-driven", "auto_safe@task-driven"}
+    expected = {"ask@flag_off", "ask@flag_on", "auto_safe@block", "auto_safe@warn"}
     assert set(arms) == expected == set(plan_len)
     for arm, shas in arms.items():
         assert set(shas) == {"plan", "review", "help"}, arm

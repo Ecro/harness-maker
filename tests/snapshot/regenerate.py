@@ -1,9 +1,10 @@
-"""Regenerate expected.yaml files for all preset×dev_mode fixture combinations.
+"""Regenerate expected.yaml files, one per fixture project profile.
 
-Why 8 = 4 fixtures × 2 dev_modes: preset (Side/Production) and dev_mode
-(spec-driven/task-driven) are orthogonal axes per the PLAN; each fixture
-project profile recommends one default, but the cross combos are explicitly
-allowed and worth pinning so a regression in either axis is caught.
+Why 4, not 8: the second axis these snapshots used to cross (spec-driven / task-driven) was
+folded into `spec.strictness`, which derives from the preset (SPEC-dev-mode-removal). Each
+fixture now renders at its recommended preset's default strictness, so every rendered artifact
+is a function of the profile alone. The strictness-specific render differences are pinned by
+`tests/unit/test_render_strictness_surface.py` instead.
 
 Run from harness-maker repo root:
     uv run python tests/snapshot/regenerate.py
@@ -22,9 +23,9 @@ from unittest.mock import patch
 import yaml
 
 from harness_maker.interview import interview
-from harness_maker.models import DevMode
 from harness_maker.profile import profile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.strictness import resolve_strictness
 from harness_maker.synthesize import synthesize
 
 EXCLUSIONS_FILE = Path(__file__).parent / "EXCLUSIONS.md"
@@ -63,28 +64,24 @@ def is_excluded(path: str, exclusions: list[str]) -> bool:
 
 
 FIXTURES = ["side-python-cli", "side-tauri-app", "prod-tauri-app", "prod-firmware"]
-DEV_MODES: tuple[tuple[str, DevMode], ...] = (
-    ("task", DevMode.TASK_DRIVEN),
-    ("spec", DevMode.SPEC_DRIVEN),
-)
 
 
-def regen_one(fixture_name: str, mode_label: str, mode: DevMode) -> None:
+def regen_one(fixture_name: str) -> None:
     fix_dir = Path("tests/fixtures") / fixture_name
     p = profile(fix_dir)
     # model_copy keeps validators in play and matches the convention used in
     # cli.py / tests; direct attribute mutation works today but would skip any
     # future @model_validator on InterviewAnswers.
-    a = interview(p, autoloop_mode=True).model_copy(update={"dev_mode": mode})
+    a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a)
-    target = fix_dir / f".claude.regen-tmp-{mode_label}"
+    target = fix_dir / ".claude.regen-tmp"
     target.mkdir(exist_ok=True)
     render(bp, target, dry_run=False, freeze_time=DEFAULT_FREEZE_TIME)
     exclusions = load_exclusions()
     filtered = [f for f in bp.files if not is_excluded(str(f.path), exclusions)]
     snap = {
         "preset": bp.config.preset.value,
-        "dev_mode": bp.config.dev_mode.value,
+        "strictness": resolve_strictness(bp.config),
         "file_count": len(filtered),
         "files": sorted(
             [
@@ -94,7 +91,7 @@ def regen_one(fixture_name: str, mode_label: str, mode: DevMode) -> None:
             key=lambda x: x["path"] or "",
         ),
     }
-    out = Path("tests/snapshot") / f"{fixture_name}-{mode_label}.expected.yaml"
+    out = Path("tests/snapshot") / f"{fixture_name}.expected.yaml"
     out.write_text(yaml.safe_dump(snap, sort_keys=False, default_flow_style=False))
     shutil.rmtree(target)
 
@@ -127,6 +124,5 @@ if __name__ == "__main__":
         os.environ["HOME"] = fake_home
         with patch.object(Path, "home", lambda: Path(fake_home)):
             for fixture in FIXTURES:
-                for label, mode in DEV_MODES:
-                    regen_one(fixture, label, mode)
-                    print(f"Regenerated {fixture}-{label}")
+                regen_one(fixture)
+                print(f"Regenerated {fixture}")

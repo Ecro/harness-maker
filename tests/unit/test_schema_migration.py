@@ -56,7 +56,7 @@ def test_side_defaults_new_fields_schema_v4(tmp_path: Path) -> None:
 
     docs = list(yaml.safe_load_all((out / "harness.yaml").read_text(encoding="utf-8")))
     hy = [d for d in docs if d and isinstance(d, dict) and "preset" in d][0]
-    assert hy["schema_version"] == 4
+    assert hy["schema_version"] == 5
     dg = hy["interview"]["deep_gate"]
     assert dg["eig_epsilon"] == 0.5
     assert dg["confidence_tau"] == 0.7
@@ -119,11 +119,11 @@ def test_schema_version_field_present_in_models() -> None:
     """
     hc = HarnessConfig()
     assert hasattr(hc, "schema_version")
-    assert hc.schema_version == 4
+    assert hc.schema_version == 5
 
     ia = InterviewAnswers()
     assert hasattr(ia, "schema_version")
-    assert ia.schema_version == 4
+    assert ia.schema_version == 5
 
 
 def test_stage_template_reads_config_not_hardcoded(tmp_path: Path) -> None:

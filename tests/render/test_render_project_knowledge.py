@@ -110,6 +110,7 @@ def test_skill_description_names_the_triggers() -> None:
 # ── AC-005 ───────────────────────────────────────────────────────────────────
 
 from harness_maker.spec_machine import GoldenRow, load_golden_table  # noqa: E402
+from harness_maker.strictness import Strictness  # noqa: E402
 
 _SPEC_YAML = Path(__file__).parents[2] / "specs" / "SPEC-mission-context-loop.machine.yaml"
 _AC005_ROWS = load_golden_table(_SPEC_YAML, "AC-005")
@@ -147,7 +148,6 @@ def test_ac_005_pointer_present_and_bounded(row: GoldenRow) -> None:
 
 # ── AC-006 ───────────────────────────────────────────────────────────────────
 
-from harness_maker.models import DevMode  # noqa: E402
 
 _WRAPUP_PATHS = {
     "claude": ".claude/commands/hm/wrapup.md",
@@ -161,14 +161,14 @@ def _section_51(wrapup: str) -> str:
 
 
 @pytest.mark.parametrize("preset", [Preset.PRODUCTION, Preset.SIDE], ids=["production", "side"])
-@pytest.mark.parametrize("dev_mode", list(DevMode), ids=lambda d: d.value)
+@pytest.mark.parametrize("strictness", ["block", "warn"])
 @pytest.mark.parametrize("variant", sorted(_WRAPUP_PATHS))
 def test_ac_006_wrapup_51_searches_before_write(
-    preset: Preset, dev_mode: DevMode, variant: str
+    preset: Preset, strictness: Strictness, variant: str
 ) -> None:
     blueprint = synthesize(
         ProjectProfile(),
-        InterviewAnswers(preset=preset, targets=TARGET_SETS["all"], dev_mode=dev_mode),
+        InterviewAnswers(preset=preset, targets=TARGET_SETS["all"], strictness=strictness),
     )
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

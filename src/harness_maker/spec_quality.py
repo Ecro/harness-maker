@@ -1,7 +1,7 @@
 """Spec strength rubric — LLM-based spec quality evaluation (Phase 9, ADR-006).
 
-Evaluates spec quality on 5 dimensions. In spec-driven mode, weak specs
-are blocked; in task-driven mode, only warned.
+Evaluates spec quality on 5 dimensions. At `block` strictness weak specs are blocked; at
+`warn` they are only warned.
 """
 
 from __future__ import annotations
@@ -11,7 +11,6 @@ import logging
 from typing import Any
 
 from harness_maker import command_registry
-from harness_maker.models import DevMode
 from harness_maker.spec_machine import score_ac_oracle_evidence
 
 logger = logging.getLogger(__name__)
@@ -27,13 +26,13 @@ class SpecQualityResult:
         overall: int,
         weak_dimensions: list[str],
         blocked: bool,
-        dev_mode: str,
+        strictness: str,
     ) -> None:
         self.scores = scores
         self.overall = overall
         self.weak_dimensions = weak_dimensions
         self.blocked = blocked
-        self.dev_mode = dev_mode
+        self.strictness = strictness
 
     @property
     def is_weak(self) -> bool:
@@ -69,9 +68,18 @@ RUBRIC_DIMENSIONS_MACHINE: dict[str, str] = {
 _WEAK_THRESHOLD = 40
 
 
+def _normalize(strictness: str) -> str:
+    """Anything but an exact `block` is `warn` — the relaxed reading an omitted flag always had.
+
+    This is a function argument, not a config read: callers resolve the project's strictness
+    through `strictness.resolve_strictness` (or receive it rendered) and pass it here.
+    """
+    return "block" if strictness == "block" else "warn"
+
+
 def evaluate_spec(
     spec_text: str,
-    dev_mode: DevMode | str = DevMode.TASK_DRIVEN,
+    strictness: str = "warn",
     *,
     judge: Any = None,
     machine_yaml: str | None = None,
@@ -84,29 +92,22 @@ def evaluate_spec(
     non_python_intent_alignment) are scored from the parsed yaml structure
     so the LLM judge does not have to redo work the schema already encodes.
     """
-    if isinstance(dev_mode, str):
-        try:
-            dev_mode_enum = DevMode(dev_mode)
-        except ValueError:
-            dev_mode_enum = DevMode.TASK_DRIVEN
-    else:
-        dev_mode_enum = dev_mode
-
+    mode = _normalize(strictness)
     scores = _judge_with_llm(spec_text, judge) if judge is not None else _heuristic_score(spec_text)
 
     if machine_yaml is not None:
-        scores.update(_score_machine_dims(machine_yaml, judge=judge, dev_mode=dev_mode_enum))
+        scores.update(_score_machine_dims(machine_yaml, judge=judge, strictness=mode))
 
     weak_dims = [dim for dim, score in scores.items() if score < _WEAK_THRESHOLD]
     overall = sum(scores.values()) // max(len(scores), 1)
-    blocked = dev_mode_enum == DevMode.SPEC_DRIVEN and (overall < 60 or len(weak_dims) > 0)
+    blocked = mode == "block" and (overall < 60 or len(weak_dims) > 0)
 
     return SpecQualityResult(
         scores=scores,
         overall=overall,
         weak_dimensions=weak_dims,
         blocked=blocked,
-        dev_mode=dev_mode_enum.value,
+        strictness=mode,
     )
 
 
@@ -120,7 +121,7 @@ _ALWAYS_ON_MACHINE_DIMS: tuple[str, ...] = (
 
 
 def _score_machine_dims(
-    machine_yaml: str, *, judge: Any = None, dev_mode: DevMode | str = DevMode.TASK_DRIVEN
+    machine_yaml: str, *, judge: Any = None, strictness: str = "warn"
 ) -> dict[str, int]:
     """Heuristic + optional LLM scoring for the 3 ADR-006/009 dims + v2 oracle dim.
 
@@ -186,36 +187,27 @@ def _score_machine_dims(
     except (ValueError, TypeError):
         schema_version = 1
     if schema_version >= 2:
-        out["oracle_independence"] = _score_oracle_independence(ac, dev_mode)
+        out["oracle_independence"] = _score_oracle_independence(ac, strictness)
 
     return out
 
 
-def _score_oracle_independence(
-    ac_list: list[dict[str, Any]], dev_mode: DevMode | str = DevMode.TASK_DRIVEN
-) -> int:
+def _score_oracle_independence(ac_list: list[dict[str, Any]], strictness: str = "warn") -> int:
     """Average per-AC evidence-quality score (ADR-007). Scores EVIDENCE, not the label.
 
     A declared high-trust ``oracle_source`` with no evidence cannot pass (C2
-    anti-gaming). A durable ``oracle_independence_waiver`` is a **task-driven
-    only** auditable override (C9, ADR-003): in spec-driven mode a low-evidence
-    oracle blocks REGARDLESS of a waiver (you cannot waive the spec-driven
-    gate — you must fix it), so the waiver is ignored there (REVIEW Codex-M).
+    anti-gaming). A durable ``oracle_independence_waiver`` is a **`warn`-only**
+    auditable override (C9, ADR-003): at `block` a low-evidence oracle blocks REGARDLESS of a
+    waiver (you cannot waive the strict gate — you must fix it), so the waiver is ignored
+    there (REVIEW Codex-M).
     """
-    if isinstance(dev_mode, str):
-        try:
-            mode = DevMode(dev_mode)
-        except ValueError:
-            mode = DevMode.TASK_DRIVEN
-    else:
-        mode = dev_mode
-    waiver_active = mode != DevMode.SPEC_DRIVEN
+    waiver_active = _normalize(strictness) != "block"
     if not ac_list:
         return 100
     total = 0
     for a in ac_list:
         if waiver_active and (a.get("oracle_independence_waiver") or "").strip():
-            total += 100  # waiver lift is the wrapper's job (task-driven only)
+            total += 100  # waiver lift is the wrapper's job (warn only)
             continue
         # The raw evidence ladder is the shared spec_machine scorer (ADR-001);
         # legacy-unspecified → 0, denominator-retained (len counts it below).
@@ -309,7 +301,7 @@ def _judge_with_llm(spec_text: str, judge: Any) -> dict[str, int]:
     except Exception as exc:  # noqa: BLE001 — surface the cause then degrade
         logger.warning(
             "spec_quality LLM scoring failed (%s); falling back to heuristic. "
-            "In spec-driven mode this means a weak spec might pass the gate "
+            "At block strictness this means a weak spec might pass the gate "
             "due to LLM unavailability rather than because it is well-formed.",
             exc,
         )
@@ -319,7 +311,7 @@ def _judge_with_llm(spec_text: str, judge: Any) -> dict[str, int]:
 def main() -> int:
     """CLI entry: `python -m harness_maker.spec_quality eval`.
 
-    Reads ``{"spec_text": "...", "dev_mode": "spec-driven|task-driven",
+    Reads ``{"spec_text": "...", "strictness": "block|warn",
     "machine_yaml": "..."}`` from stdin and prints ``{"overall": N,
     "scores": {...}, "blocked": bool, "weak_dimensions": [...]}`` to
     stdout. ``machine_yaml`` is optional — when provided, the ADR-006/009
@@ -344,13 +336,13 @@ def main() -> int:
         sys.stderr.write("spec_quality: stdin must be a JSON object\n")
         return 1
     spec_text = data.get("spec_text", "")
-    dev_mode = data.get("dev_mode", "task-driven")
+    strictness = data.get("strictness", "warn")
     machine_yaml = data.get("machine_yaml")
     if not isinstance(spec_text, str):
         sys.stderr.write("spec_quality: spec_text must be a string\n")
         return 1
-    if not isinstance(dev_mode, str):
-        dev_mode = "task-driven"
+    if not isinstance(strictness, str):
+        strictness = "warn"
     if machine_yaml is not None and not isinstance(machine_yaml, str):
         machine_yaml = None
 
@@ -367,13 +359,13 @@ def main() -> int:
         except (ImportError, Exception):  # noqa: BLE001 — degrade silently to heuristic
             judge_client = None
 
-    result = evaluate_spec(spec_text, dev_mode, judge=judge_client, machine_yaml=machine_yaml)
+    result = evaluate_spec(spec_text, strictness, judge=judge_client, machine_yaml=machine_yaml)
     payload = {
         "overall": result.overall,
         "scores": result.scores,
         "weak_dimensions": result.weak_dimensions,
         "blocked": result.blocked,
-        "dev_mode": result.dev_mode,
+        "strictness": result.strictness,
     }
     sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
     return 0

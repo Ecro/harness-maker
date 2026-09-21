@@ -46,13 +46,13 @@ Per-arm sha256 of the rendered `plan`, `review`, `help` and `wrapup` commands, p
    "review": "487f9494974bb2484c4a63f5214db68d3105b31e0f66cb825225b4cd7b054b91",
    "wrapup": "37ebf84119fee30eaea9420d4a8978ea19039e45dc9fa1b4c9ffcb921c2bc68f"
   },
-  "auto_safe@spec-driven": {
+  "auto_safe@block": {
    "help": "51af72e02aeeb566b28994279a1d771a69a71df892d8efe08b47d39954c256c9",
    "plan": "4df698bdecbb917cc5192f1e421b79cee7647351464a8adcb9ee510711746131",
    "review": "4a6bf81db83003f7a5b9362b9842ad01372c3d93bbd399dfd6df8ac28d83ac53",
    "wrapup": "934fdc25a5edd2d2dd0d4e6369e0940e919c40027be760da1fc8f61612af6e7c"
   },
-  "auto_safe@task-driven": {
+  "auto_safe@warn": {
    "help": "51af72e02aeeb566b28994279a1d771a69a71df892d8efe08b47d39954c256c9",
    "plan": "e879ede63d1b4e4b83f971f826256d81d6b45791fb6fe50fe47e9d597fe17284",
    "review": "4497f48460432496f9234ce4632f2e179d4bfb0e757fcad9d17edae9c9c747c2",
@@ -63,14 +63,14 @@ Per-arm sha256 of the rendered `plan`, `review`, `help` and `wrapup` commands, p
  "help_len": {
   "ask@flag_off": 2439,
   "ask@flag_on": 2439,
-  "auto_safe@spec-driven": 2097,
-  "auto_safe@task-driven": 2097
+  "auto_safe@block": 2097,
+  "auto_safe@warn": 2097
  },
  "wrapup_len": {
   "ask@flag_off": 43039,
   "ask@flag_on": 48388,
-  "auto_safe@spec-driven": 51623,
-  "auto_safe@task-driven": 53177
+  "auto_safe@block": 51623,
+  "auto_safe@warn": 53177
  }
 }
 ```

@@ -42,17 +42,6 @@ class Preset(str, Enum):  # noqa: UP042
     PRODUCTION = "Production"
 
 
-class DevMode(str, Enum):  # noqa: UP042
-    """Development methodology — independent of preset depth.
-
-    spec-driven enforces SPEC + tests via spec-gate hook; task-driven omits the
-    spec-gate hook entirely. Any preset×dev_mode cross is allowed.
-    """
-
-    SPEC_DRIVEN = "spec-driven"
-    TASK_DRIVEN = "task-driven"
-
-
 class ModelTier(str, Enum):  # noqa: UP042
     """Claude model tiers referenced by config."""
 
@@ -66,7 +55,7 @@ class Target(str, Enum):  # noqa: UP042
 
     Drives whether ``.cursor/rules/harness.mdc``, ``.cursor/hooks.json``,
     ``.cursor/mcp.json`` are rendered alongside the shared ``.claude/`` assets
-    (Cursor reads ``.claude/commands/hm/`` natively — no ``.cursor/commands/``). preset/dev_mode 와
+    (Cursor reads ``.claude/commands/hm/`` natively — no ``.cursor/commands/``). preset 과
     직교; 인터뷰에서 명시 multi-select 강제. 옛 yaml fallback 은
     ``HarnessConfig._targets_schema_gap_fallback`` validator 가 처리.
     """
@@ -1183,16 +1172,8 @@ class HarnessConfig(BaseModel):
             return "en"
         return v
 
-    # Intentional asymmetry (ADR-002): the model default is the conservative
-    # SPEC_DRIVEN for bare construction, but the reverse mapper
-    # (interview.answers_from_harness_yaml) and the ADVISORY runtime gates
-    # (spec_gate/spec_drift/spec_quality) resolve an ABSENT/unknown dev_mode to
-    # task-driven, so a public-plugin config that loses its key never
-    # surprise-forces SPEC. Deliberate exception: the spec_need verify ORACLE gate
-    # is fail-CLOSED (absent/unreadable → enforce, never relaxed) — do NOT "align"
-    # it to this relaxed default. Render fallbacks that relied on this default now
-    # pin dev_mode explicitly (synthesize/workflow_fuse).
-    dev_mode: DevMode = DevMode.SPEC_DRIVEN
+    # SPEC gate strictness lives in `spec.strictness` (below) and is resolved ONLY by
+    # `strictness.resolve_strictness` — never read the key here or anywhere else.
     execution: dict[str, Any] = Field(default_factory=dict)
     reviewers: dict[str, Any] = Field(default_factory=dict)
     caching: str = "agent-aware"
@@ -1264,10 +1245,12 @@ class HarnessConfig(BaseModel):
     # rename. PLAN-second-opinion-multi-model ADR-001: bumped 2 → 3 for the
     # codex_second_opinion → second_opinion rename (silent migration in interview.py).
     # PLAN-harness-diet ADR-002/012: bumped 3 -> 4 for the retired fused-workflow axis
-    # (`workflows` / `default_workflow`). This records WHEN a file was written; it does
-    # not gate the migration -- `io_utils.strip_retired_keys` keys on key PRESENCE, so a
-    # hand-edited file with no version, or one left at 3, still migrates.
-    schema_version: int = 4
+    # (`workflows` / `default_workflow`). SPEC-dev-mode-removal IRR-001: bumped 4 -> 5 when
+    # the development-methodology axis was folded into `spec.strictness`. This records WHEN
+    # a file was written; it does not gate the migration -- `io_utils.strip_retired_keys`
+    # keys on key PRESENCE, so a hand-edited file with no version, or one left at 3, still
+    # migrates.
+    schema_version: int = 5
     # 0.16.0: deep_gate redesigned as 5-term inequality (PLAN-deep-interview-question-criteria).
     # Default literal lives in `interview_deep_gate_defaults()` at module bottom —
     # also consumed by `harness_maker.interview._preset_extras` to avoid 3-way drift.
@@ -1322,7 +1305,7 @@ class InterviewAnswers(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid", populate_by_name=True)
 
     locale: str = "en"
-    # IDE target multi-select (preset/dev_mode 와 직교). 빈 list 거부 (min_length=1).
+    # IDE target multi-select (preset 과 직교). 빈 list 거부 (min_length=1).
     # 인터뷰 default 는 [claude-code]; cursor 는 명시 multi-select.
     targets: list[Target] = Field(
         default_factory=lambda: [Target.CLAUDE_CODE],
@@ -1376,16 +1359,10 @@ class InterviewAnswers(BaseModel):
             return "en"
         return v
 
-    # Intentional asymmetry (ADR-002): the model default is the conservative
-    # SPEC_DRIVEN for bare construction, but the reverse mapper
-    # (interview.answers_from_harness_yaml) and the ADVISORY runtime gates
-    # (spec_gate/spec_drift/spec_quality) resolve an ABSENT/unknown dev_mode to
-    # task-driven, so a public-plugin config that loses its key never
-    # surprise-forces SPEC. Deliberate exception: the spec_need verify ORACLE gate
-    # is fail-CLOSED (absent/unreadable → enforce, never relaxed) — do NOT "align"
-    # it to this relaxed default. Render fallbacks that relied on this default now
-    # pin dev_mode explicitly (synthesize/workflow_fuse).
-    dev_mode: DevMode = DevMode.SPEC_DRIVEN
+    # SPEC gate strictness override (SPEC-dev-mode-removal). None = derive from `preset`
+    # at resolve time; a value is written to `spec.strictness` by synthesize, so an explicit
+    # choice survives a later `--preset` switch while a defaulted one follows it.
+    strictness: Literal["block", "warn"] | None = None
     domains: list[str] = Field(default_factory=list)
     ref_folders: list[RefFolder] = Field(default_factory=list)
     second_brain: SecondBrainConfig = Field(default_factory=SecondBrainConfig)
@@ -1443,7 +1420,7 @@ class InterviewAnswers(BaseModel):
             "comprehension": interview_comprehension_defaults(),
         }
     )
-    schema_version: int = 4
+    schema_version: int = 5
     sibling_repos: list[str] = Field(default_factory=list)
     # Paths to additional documents that wrapup should update/manage.
     # User specifies via --wrapup-docs or /hm:configure. Examples:

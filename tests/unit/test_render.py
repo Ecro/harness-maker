@@ -443,9 +443,9 @@ def test_render_cursor_hooks_json_camelcase_with_path_wrap(tmp_path: Path) -> No
 def test_render_cursor_hooks_json_omits_spec_gate_when_task_driven(
     tmp_path: Path,
 ) -> None:
-    """dev_mode=task-driven 이면 .cursor/hooks.json 의 preToolUse 에는 spec_gate
+    """strictness=warn 이면 .cursor/hooks.json 의 preToolUse 에는 spec_gate
     가 포함되지 않음 (.claude/hooks/hooks.json 과 동일 규칙)."""
-    from harness_maker.models import DevMode, Target
+    from harness_maker.models import Target
 
     project_root = tmp_path
     target_dir = project_root / ".claude"
@@ -453,7 +453,7 @@ def test_render_cursor_hooks_json_omits_spec_gate_when_task_driven(
 
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CURSOR], "dev_mode": DevMode.TASK_DRIVEN},
+        update={"targets": [Target.CURSOR], "strictness": "warn"},
     )
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
@@ -463,28 +463,28 @@ def test_render_cursor_hooks_json_omits_spec_gate_when_task_driven(
     assert "permission_gate" in text  # always-on
 
 
-@pytest.mark.parametrize("dev_mode_label", ["task", "spec"])
-def test_render_hooks_json_valid_in_both_dev_modes(
+@pytest.mark.parametrize("strictness_label", ["warn", "block"])
+def test_render_hooks_json_valid_at_both_strictness_values(
     tmp_path: Path,
-    dev_mode_label: str,
+    strictness_label: str,
 ) -> None:
     """Round H GRADE-B 5: both Claude Code and Cursor hooks templates must
-    render valid JSON in both dev_modes. The Jinja conditional for
+    render valid JSON at both strictness values. The Jinja conditional for
     spec_gate uses inline `{% if %}` glued to commas (`}{% if ... %},`) —
     fragile under future maintainer reorderings. Lock both renderings via
     json.loads() validation."""
     import json as _json
 
-    from harness_maker.models import DevMode, Target
+    from harness_maker.models import Target
 
     project_root = tmp_path
     target_dir = project_root / ".claude"
     target_dir.mkdir()
 
-    dev_mode = DevMode.SPEC_DRIVEN if dev_mode_label == "spec" else DevMode.TASK_DRIVEN
+    strictness = "block" if strictness_label == "block" else "warn"
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR], "dev_mode": dev_mode},
+        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR], "strictness": strictness},
     )
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
@@ -493,14 +493,14 @@ def test_render_hooks_json_valid_in_both_dev_modes(
     # it is no longer rendered. settings.json is the file Claude Code actually loads, and
     # it now carries the fragile `}{% if %},` spec_gate branch (Stage 3) this test locks:
     # a broken branch there costs the `permissions` block too. json.loads() raises on
-    # invalid JSON in either dev_mode.
+    # invalid JSON at either strictness.
     settings = _json.loads((target_dir / "settings.json").read_text(encoding="utf-8"))
     assert "permissions" in settings, "a broken hooks branch must not take permissions with it"
     assert "PreToolUse" in settings["hooks"], (
-        "Stage-3 PreToolUse gates (incl. the dev_mode-conditional spec_gate branch) "
-        "must render in both dev_modes"
+        "Stage-3 PreToolUse gates (incl. the strictness-conditional spec_gate branch) "
+        "must render at both strictness values"
     )
-    assert "Stop" in settings["hooks"], "Stage-2 Stop hook must render in both dev_modes"
+    assert "Stop" in settings["hooks"], "Stage-2 Stop hook must render at both strictness values"
     assert not (target_dir / "hooks" / "hooks.json").exists(), (
         "the retired .claude/hooks/hooks.json must no longer be rendered"
     )
@@ -514,7 +514,7 @@ def test_render_hooks_json_valid_in_both_dev_modes(
 def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
     tmp_path: Path,
 ) -> None:
-    """Symmetric to the task-driven test: dev_mode=spec-driven includes spec_gate in
+    """Symmetric to the warn test: strictness=block includes spec_gate in
     the cursor preToolUse list, under `Write|Edit|MultiEdit`. Both gates receive the
     PATH wrap from the template.
 
@@ -529,7 +529,7 @@ def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
     """
     import json as _json
 
-    from harness_maker.models import DevMode, Target
+    from harness_maker.models import Target
 
     project_root = tmp_path
     target_dir = project_root / ".claude"
@@ -537,7 +537,7 @@ def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
 
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CURSOR], "dev_mode": DevMode.SPEC_DRIVEN},
+        update={"targets": [Target.CURSOR], "strictness": "block"},
     )
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
@@ -1725,7 +1725,7 @@ def test_rendered_hooks_template_has_unique_identity_per_event(tmp_path: Path) -
                 context={
                     "harness_maker_src_path": "/dummy",
                     "preset": "Production",
-                    "config": SimpleNamespace(dev_mode="spec-driven"),
+                    "config": SimpleNamespace(preset="Production", spec={"strictness": "block"}),
                 },
                 frontmatter={},
             ),
@@ -1787,7 +1787,7 @@ def test_render_hooks_json_merged_manifest_records_merged_hash(tmp_path: Path) -
                 context={
                     "harness_maker_src_path": "/dummy",
                     "preset": "Side",
-                    "config": SimpleNamespace(dev_mode="task-driven"),
+                    "config": SimpleNamespace(preset="Side", spec={"strictness": "warn"}),
                 },
                 frontmatter={},
             ),

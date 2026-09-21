@@ -1462,7 +1462,8 @@ def _merge_hooks_json(
             # silently deleted. The staged rollout itself creates that population.
             # The rule also bought nothing here: retirement only matters once a
             # template STOPS shipping something, which no current template does.
-            # When it does (a dev_mode flip retiring spec_gate), gate it on positive
+            # When it does (a block→warn strictness change retiring spec_gate — whose own
+            # runtime guard is what keeps the stale entry harmless meanwhile), gate it on positive
             # provenance — a prior-render manifest — not on a forgeable prefix.
             #
             # A MIXED group (our command(s) + the user's) is theirs — preserve it.
@@ -1502,7 +1503,7 @@ def _merge_hooks_json(
             # bought nothing. That is the sentence this PLAN was opened with.
             #
             # Safe because no single event ships one module twice with different arguments
-            # (verified across both settings templates × both dev_modes and cursor's), so
+            # (verified across both settings templates × both strictness values and cursor's), so
             # module and identity coincide on the template side today.
             user_scoped: dict[str, set[str]] = {}
             for e in user_entries:

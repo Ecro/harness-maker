@@ -21,7 +21,7 @@ harness-maker's output is a pure function of `(profile, harness.yaml)`. Two inde
 | Axis | What it changes | Between these two projects |
 |---|---|---|
 | **`targets`** (`claude-code` / `cursor` / `codex`) | The **file set** — which IDE-native assets get rendered | spoton adds the whole `codex` surface; log_agent stays `claude-code`-only |
-| **`preset`** (`Side` / `Production`) | The **content and behavior** of the *same* files — model tiers, dev_mode default, reviewer depth, gates, worktree model, context budgets | identical file *names*, different *values* inside them |
+| **`preset`** (`Side` / `Production`) | The **content and behavior** of the *same* files — model tiers, SPEC strictness default, reviewer depth, gates, worktree model, context budgets | identical file *names*, different *values* inside them |
 
 The key correction over earlier drafts of this page: **preset does not add or remove agent/skill files.** `synthesize.py:101` is explicit — *"Every preset installs the full reviewer/skill inventory; activation is data, not file presence."* Both presets render the **identical 14-agent set**. The file-set diff you see below comes almost entirely from `targets`, not `preset`.
 
@@ -74,7 +74,7 @@ This is where `Side` vs `Production` lives — inside the identical files:
 
 | Dimension | Side · log_agent | Production · spoton | Source |
 |---|---|---|---|
-| `dev_mode` default | `task-driven` | `spec-driven` (SPEC gate + plan-validator engage) | preset default |
+| `spec.strictness` default | `warn` | `block` (the SPEC gate stops on a failed check) | preset default |
 | Agent **model tier** | all `sonnet` | reasoning agents (`autoloop-coder`, `plan-validator`, `stuck`) → `opus/high`; reviewers → `sonnet/medium` | `presets.py` `_SIDE_MAP` / `_PRODUCTION_MAP` |
 | Reviewers enabled | `[code-reviewer]` (1) | `[code, security, performance, ux, concurrency]` (5) | `reviewers.enabled` |
 | Grade threshold | `B` | `A` | `reviewers.grade_threshold` |
@@ -95,7 +95,7 @@ The single source of truth that drives every render (real excerpts):
 ```yaml
 preset: Side
 locale: ko
-dev_mode: task-driven        # no SPEC gate
+# spec.strictness absent → warn (SPEC checks report, never stop)
 targets:
   - claude-code              # one IDE → no .codex/, no AGENTS.md
 reviewers:
@@ -112,7 +112,7 @@ worktree:
 ```yaml
 preset: Production
 locale: ko
-dev_mode: spec-driven        # SPEC gate + plan-validator engage
+# spec.strictness absent → block (SPEC gate stops on a failed check)
 targets:
   - claude-code
   - codex                    # → 14 .codex/agents/*.toml + AGENTS.md + .agents/skills/*

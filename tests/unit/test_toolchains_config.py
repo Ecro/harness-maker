@@ -129,7 +129,7 @@ def test_toolchains_survive_preset_switch() -> None:
         answers,
         preset_override="Production",
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
     )
     assert result.preset is Preset.PRODUCTION
@@ -146,7 +146,7 @@ def test_toolchains_survive_second_opinion_models_override() -> None:
         answers,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
         second_opinion_models_override="codex",
     )

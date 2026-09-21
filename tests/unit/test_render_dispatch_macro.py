@@ -268,6 +268,11 @@ _REMOVED_COMMANDS = {
 }
 
 _COLLAPSED_MULTILINE = {
+    # SPEC-dev-mode-removal (2026-09-21): `/hm:make`'s pointer sentence listed the axes the
+    # slash command asks for. The methodology axis is gone, so the sentence says the same thing
+    # with one fewer word. Nothing dispatch-related was lost — the question that WAS removed is
+    # pinned as removed by `tests/unit/test_interview_strictness_absent.py`.
+    "it asks locale first, then drives the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) for preset, dev_mode, targets, and",  # noqa: E501 — exact baseline string
     # SPEC-plan-stage-absorption (2026-09-20): `plan` left `autonomy.pipeline`, and
     # `step_manifest.md.j2` interpolates that list into EVERY stage's autopilot picker. So the
     # one picker line below is the frozen spelling; the current render says the same sentence

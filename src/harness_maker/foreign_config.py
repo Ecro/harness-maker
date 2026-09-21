@@ -31,6 +31,7 @@ from harness_maker.block_merge import (
 )
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import Confidence, HarnessConfig
+from harness_maker.strictness import resolve_strictness
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -178,7 +179,7 @@ def _build_map_system_prompt() -> str:
         "harness-maker's harness.yaml axes.\n\n"
         "Axes available (only suggest mappings for axes you have evidence for):\n"
         "  - preset: 'Side' or 'Production'\n"
-        "  - dev_mode: 'spec-driven' or 'task-driven'\n"
+        "  - strictness: 'block' or 'warn' (SPEC gate strictness)\n"
         "  - locale: language tag like 'en' or 'ko'\n"
         "  - targets: list of 'claude-code'|'cursor'|'codex'\n"
         "  - default_model: free-text model id\n"
@@ -476,7 +477,7 @@ def _build_render_context(
         "foreign_type": foreign_config.type,
         "foreign_path": foreign_config.path,
         "preset": harness_config.preset.value,
-        "dev_mode": harness_config.dev_mode.value,
+        "strictness": resolve_strictness(harness_config),
         "locale": harness_config.locale,
         "targets": [t.value for t in harness_config.targets],
         # aider/Continue need a concrete Anthropic id (ADR-006) — resolve the

@@ -117,7 +117,7 @@ acceptance criteria and the live integration boundary.
                           ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │                  harness.yaml (Single Source of Truth)               │
-│   locale, preset (Side/Production), dev_mode, targets (claude/cursor/codex) │
+│   locale, preset (Side/Production), targets (claude/cursor/codex)   │
 │   worktree.enabled, max_review_rounds, preferred_model, ...         │
 └──────────┬───────────────────────────────────────┬───────────────────┘
            │                                       │
@@ -2021,8 +2021,9 @@ targets:
 # Preset (context size/permission strictness)
 preset: Side             # Side | Production
 
-# Development mode (spec-driven vs task-driven)
-dev_mode: spec-driven    # spec-driven | task-driven
+# SPEC gate strictness — absent = preset default (Production block, Side warn)
+spec:
+  strictness: block      # block | warn
 
 # Worktree isolation
 worktree:

@@ -122,7 +122,7 @@ def test_preset_switch_preserves_explicit_disk_value(tmp_path: Path) -> None:
         answers,
         preset_override="Production",
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
     )
     assert switched.worktree == {"enabled": True}
@@ -135,7 +135,7 @@ def test_preset_switch_preserves_explicit_disk_value(tmp_path: Path) -> None:
         answers_off,
         preset_override="Side",
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
     )
     assert switched_off.worktree == {"enabled": False}
@@ -151,7 +151,7 @@ def test_cli_flag_beats_disk(tmp_path: Path) -> None:
         answers,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
         worktree_override=True,
     )
@@ -161,7 +161,7 @@ def test_cli_flag_beats_disk(tmp_path: Path) -> None:
         forced_on,
         preset_override="Production",
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
         worktree_override=False,
     )

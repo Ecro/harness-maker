@@ -7,7 +7,7 @@ import typer
 
 from harness_maker.cli import _apply_dimension_overrides
 from harness_maker.interview import _build_answers
-from harness_maker.models import DevMode, InterviewAnswers, Preset, Target
+from harness_maker.models import InterviewAnswers, Preset, Target
 
 
 def _baseline_side() -> InterviewAnswers:
@@ -15,7 +15,7 @@ def _baseline_side() -> InterviewAnswers:
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=Preset.SIDE,
-        dev_mode=DevMode.TASK_DRIVEN,
+        strictness="warn",
     )
 
 
@@ -25,7 +25,7 @@ def test_no_overrides_returns_input_unchanged() -> None:
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
     )
     assert out is a  # short-circuit when nothing to apply
@@ -37,33 +37,33 @@ def test_locale_override_sets_locale() -> None:
         a,
         preset_override=None,
         locale_override="ko",
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
     )
     assert out.locale == "ko"
     assert out.preset == Preset.SIDE  # untouched
 
 
-def test_dev_mode_override_sets_dev_mode() -> None:
+def test_strictness_override_sets_strictness() -> None:
     a = _baseline_side()
     out = _apply_dimension_overrides(
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override="spec-driven",
+        strictness_override="block",
         targets_override=None,
     )
-    assert out.dev_mode == DevMode.SPEC_DRIVEN
+    assert out.strictness == "block"
 
 
-def test_dev_mode_override_invalid_aborts() -> None:
+def test_strictness_override_invalid_aborts() -> None:
     a = _baseline_side()
     with pytest.raises(typer.Exit):
         _apply_dimension_overrides(
             a,
             preset_override=None,
             locale_override=None,
-            dev_mode_override="bogus",
+            strictness_override="bogus",
             targets_override=None,
         )
 
@@ -76,7 +76,7 @@ def test_preset_override_rederives_extras() -> None:
         a,
         preset_override="Production",
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
     )
     assert out.preset == Preset.PRODUCTION
@@ -85,7 +85,7 @@ def test_preset_override_rederives_extras() -> None:
     assert out.context_lint.get("enabled") is True
     # carry-overs
     assert out.locale == "en"
-    assert out.dev_mode == DevMode.TASK_DRIVEN
+    assert out.strictness == "warn"  # explicit choice survives
     assert out.consensus == a.consensus
 
 
@@ -96,7 +96,7 @@ def test_preset_override_invalid_aborts() -> None:
             a,
             preset_override="Experimental",
             locale_override=None,
-            dev_mode_override=None,
+            strictness_override=None,
             targets_override=None,
         )
 
@@ -108,12 +108,29 @@ def test_preset_override_same_preset_is_noop() -> None:
         a,
         preset_override="Side",
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
     )
     assert out.preset == Preset.SIDE
     # Internals (anti_rot etc.) carry through untouched
     assert out.anti_rot == a.anti_rot
+
+
+def test_preset_switch_rederives_a_defaulted_strictness() -> None:
+    """None means "derive from the preset" — it must stay None across a switch, so the new
+    preset's default applies instead of freezing the old preset's value."""
+    from harness_maker.strictness import resolve_strictness
+
+    a = _baseline_side().model_copy(update={"strictness": None})
+    out = _apply_dimension_overrides(
+        a,
+        preset_override="Production",
+        locale_override=None,
+        strictness_override=None,
+        targets_override=None,
+    )
+    assert out.strictness is None
+    assert resolve_strictness({"preset": out.preset.value}) == "block"
 
 
 def test_combined_overrides_apply_all() -> None:
@@ -122,12 +139,12 @@ def test_combined_overrides_apply_all() -> None:
         a,
         preset_override="Production",
         locale_override="ko",
-        dev_mode_override="spec-driven",
+        strictness_override="block",
         targets_override="claude-code,cursor",
     )
     assert out.preset == Preset.PRODUCTION
     assert out.locale == "ko"
-    assert out.dev_mode == DevMode.SPEC_DRIVEN
+    assert out.strictness == "block"
     assert out.targets == [Target.CLAUDE_CODE, Target.CURSOR]
 
 
@@ -138,7 +155,7 @@ def test_targets_override_single_cursor() -> None:
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override="cursor",
     )
     assert out.targets == [Target.CURSOR]
@@ -150,7 +167,7 @@ def test_targets_override_both_preserves_order() -> None:
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override="cursor,claude-code",
     )
     # input order preserved
@@ -163,7 +180,7 @@ def test_targets_override_dedupes() -> None:
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override="cursor,cursor,claude-code",
     )
     assert out.targets == [Target.CURSOR, Target.CLAUDE_CODE]
@@ -175,7 +192,7 @@ def test_targets_override_whitespace_tolerant() -> None:
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=" claude-code , cursor ",
     )
     assert out.targets == [Target.CLAUDE_CODE, Target.CURSOR]
@@ -188,7 +205,7 @@ def test_targets_override_invalid_aborts() -> None:
             a,
             preset_override=None,
             locale_override=None,
-            dev_mode_override=None,
+            strictness_override=None,
             targets_override="vscode",
         )
 
@@ -201,7 +218,7 @@ def test_targets_override_empty_aborts() -> None:
             a,
             preset_override=None,
             locale_override=None,
-            dev_mode_override=None,
+            strictness_override=None,
             targets_override=" , , ",
         )
 
@@ -213,7 +230,7 @@ def test_targets_override_with_preset_switch() -> None:
         a,
         preset_override="Production",
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override="claude-code,cursor",
     )
     assert out.preset == Preset.PRODUCTION
@@ -234,7 +251,7 @@ def test_empty_list_overrides_clear_configurable_lists() -> None:
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
         domains_override="",
         mechanical_checks_override="",
@@ -255,7 +272,7 @@ def test_empty_ref_folders_override_clears_ref_folders() -> None:
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
         ref_folders_override="",
     )
@@ -272,7 +289,7 @@ def test_ref_folders_override_denormalizes_home_to_tilde(monkeypatch: pytest.Mon
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
         ref_folders_override="/home/alice/edge_bsp_foundation",
     )
@@ -290,7 +307,7 @@ def test_ref_folders_override_leaves_non_home_paths_alone(
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
         ref_folders_override="/opt/docs::../shared",
     )
@@ -308,7 +325,7 @@ def test_second_brain_vault_path_denormalizes_home_to_tilde(
         a,
         preset_override=None,
         locale_override=None,
-        dev_mode_override=None,
+        strictness_override=None,
         targets_override=None,
         second_brain_vault_path="/home/alice/Obsidian/Main",
     )

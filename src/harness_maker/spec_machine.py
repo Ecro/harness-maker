@@ -80,7 +80,7 @@ ORACLE_EVIDENCE_SPECIFICITY_MARKERS: tuple[str, ...] = (
     "invariant",
 )
 
-#: A per-AC evidence score below this is "weak" (needs a waiver in task-driven).
+#: A per-AC evidence score below this is "weak" (needs a waiver at `warn` strictness).
 ORACLE_EVIDENCE_WEAK_THRESHOLD: int = 40
 
 
@@ -143,9 +143,9 @@ class AcceptanceCriterion(BaseModel):
     #: Independence evidence the spec_quality gate scores (ADR-007). Required
     #: (non-empty) at v2 — what (partially) earns the independence claim.
     oracle_evidence: str | None = None
-    #: Durable task-driven override (ADR-003/C9): when set, a low-independence
+    #: Durable `warn`-strictness override (ADR-003/C9): when set, a low-independence
     #: oracle is a recorded, auditable decision rather than an ephemeral warning.
-    #: spec-driven mode blocks regardless; task-driven requires this before wrapup.
+    #: `block` strictness blocks regardless; `warn` requires this before wrapup.
     oracle_independence_waiver: str | None = None
     # --- structured property AC fields (ADR-001, type == "property") -------
     input_domain: str | None = None
@@ -1252,15 +1252,15 @@ def _waiver_error(slug: str, reason: str) -> dict[str, Any]:
     return {"status": "check_error", "reason": reason, "slug": slug, "flagged_acs": []}
 
 
-def waiver_check(yaml_path: Path, dev_mode: str) -> dict[str, Any]:
+def waiver_check(yaml_path: Path, strictness: str) -> dict[str, Any]:
     """Tri-state oracle-waiver advisory (ADR-002/004). NEVER raises.
 
     Returns ``{status, slug, flagged_acs, ...}`` where status is:
     - ``check_error`` — the yaml could not be read/parsed / ``ac`` is not a list
       (the check could NOT run — must not look like a clean pass).
-    - ``ok`` — no task-driven AC needs a waiver (incl. dev_mode != task-driven,
-      which spec_quality already hard-blocks at authoring, ADR-003).
-    - ``flagged`` — ≥1 task-driven AC has weak evidence + no waiver.
+    - ``ok`` — no AC needs a waiver (incl. strictness != warn, which spec_quality
+      already hard-blocks at authoring, ADR-003).
+    - ``flagged`` — ≥1 AC has weak evidence + no waiver at `warn` strictness.
     """
     slug = _slug_from_machine_path(yaml_path)
     try:
@@ -1277,8 +1277,8 @@ def waiver_check(yaml_path: Path, dev_mode: str) -> dict[str, Any]:
     if not isinstance(ac, list):
         return _waiver_error(slug, "ac is not a list")
 
-    if dev_mode != "task-driven":
-        return {"status": "ok", "slug": slug, "flagged_acs": [], "dev_mode": dev_mode}
+    if strictness != "warn":
+        return {"status": "ok", "slug": slug, "flagged_acs": [], "strictness": strictness}
 
     # A malformed AC (non-dict entry, or a non-str field where a string is
     # expected) means the check could NOT run for that AC → check_error, NEVER a
@@ -1302,7 +1302,7 @@ def waiver_check(yaml_path: Path, dev_mode: str) -> dict[str, Any]:
         "status": "flagged" if flagged else "ok",
         "slug": slug,
         "flagged_acs": flagged,
-        "dev_mode": dev_mode,
+        "strictness": strictness,
     }
 
 
@@ -1344,7 +1344,7 @@ def _run_waiver_check(args: argparse.Namespace) -> int:
     escapes as a non-zero exit + traceback (REVIEW consensus P1/P2).
     """
     try:
-        result = waiver_check(args.yaml_path, args.dev_mode)
+        result = waiver_check(args.yaml_path, args.strictness)
     except Exception as e:  # noqa: BLE001 — the never-raises contract floor
         result = _waiver_error(_slug_from_machine_path(args.yaml_path), f"{type(e).__name__}: {e}")
     # receipt is advisory telemetry — its failure must not break exit-0
@@ -1459,7 +1459,7 @@ def _run_check_all(args: argparse.Namespace) -> int:
     payload: dict[str, Any] = {
         "yaml_path": str(args.yaml_path),
         "md_path": str(args.md_path),
-        "dev_mode": args.dev_mode,
+        "strictness": args.strictness,
     }
 
     try:
@@ -1478,7 +1478,7 @@ def _run_check_all(args: argparse.Namespace) -> int:
     try:
         quality = evaluate_spec(
             args.md_path.read_text(encoding="utf-8"),
-            args.dev_mode,
+            args.strictness,
             machine_yaml=args.yaml_path.read_text(encoding="utf-8")
             if args.yaml_path.exists()
             else None,
@@ -1492,7 +1492,7 @@ def _run_check_all(args: argparse.Namespace) -> int:
             "scores": quality.scores,
             "weak_dimensions": quality.weak_dimensions,
             "blocked": quality.blocked,
-            "dev_mode": quality.dev_mode,
+            "strictness": quality.strictness,
         }
         quality_blocked = quality.blocked
 
@@ -2055,10 +2055,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p_waiver = sub.add_parser(
         "waiver-check",
-        help="tri-state task-driven oracle-waiver advisory (never blocks; exits 0)",
+        help="tri-state oracle-waiver advisory at warn strictness (never blocks; exits 0)",
     )
     p_waiver.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
-    p_waiver.add_argument("--dev-mode", dest="dev_mode", default="task-driven")
+    p_waiver.add_argument("--strictness", choices=("block", "warn"), default="warn")
     p_waiver.add_argument("--root", dest="root", type=Path, default=Path.cwd())
 
     p_unbound = sub.add_parser(
@@ -2092,7 +2092,7 @@ def main(argv: list[str] | None = None) -> int:
     p_check.add_argument("--all", dest="all_", action="store_true", required=True)
     p_check.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
     p_check.add_argument("--md", dest="md_path", type=Path, required=True)
-    p_check.add_argument("--dev-mode", dest="dev_mode", default="task-driven")
+    p_check.add_argument("--strictness", choices=("block", "warn"), default="warn")
 
     p_approve = sub.add_parser("approve", help="stamp the SPEC as accepted (content-hash bound)")
     p_approve.add_argument("--yaml", dest="yaml_path", type=Path, required=True)

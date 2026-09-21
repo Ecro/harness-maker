@@ -26,13 +26,13 @@ Phase 5.
 ```json
 {
  "arms": {
-  "auto_safe@task-driven": {
+  "auto_safe@warn": {
    "plan": "7a7587853d74471463855637d31cd3884aa1503562fa635d3054b27124d02c92",
    "review": "8530386955e0a9cb25c83141c181d8b647271f67cadad7209716012edc81ef22",
    "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52",
    "wrapup": "1eca66e4e2c5ed6aa5041f1683907c48ed739db8cfc36c8236169304fe686d93"
   },
-  "auto_safe@spec-driven": {
+  "auto_safe@block": {
    "plan": "f67a2231c896bb8e5cdc36b62fb7b875bf01931128f3c3ea71afc9a52f232d0b",
    "review": "8d25ba69e1dfc332e117f2fb487dbae8af8237b7540c2fded27ea947c513f27e",
    "help": "8b9d9aadf7b0ae5337cb12ca8e5343cc6efb3355b6f0196adc56f59a05a2af52",
@@ -52,8 +52,8 @@ Phase 5.
   }
  },
  "wrapup_len": {
-  "auto_safe@task-driven": 50111,
-  "auto_safe@spec-driven": 48557,
+  "auto_safe@warn": 50111,
+  "auto_safe@block": 48557,
   "ask@flag_on": 45322,
   "ask@flag_off": 39973
  },
@@ -72,7 +72,7 @@ this task makes.
 ## 3. Measured delta of this task (Phase 3) and its retirement (Phase 5)
 
 Moved set per arm against the section 1 pin, verified before any re-capture: `{wrapup}` in all
-four arms (`ask@flag_off`, `ask@flag_on`, `auto_safe@spec-driven`, `auto_safe@task-driven`),
+four arms (`ask@flag_off`, `ask@flag_on`, `auto_safe@block`, `auto_safe@warn`),
 identically in `auto_safe` and `ask`. `plan`, `review` and `help` are byte-identical to the pin.
 
 | command | chars (per arm) | round_trips |

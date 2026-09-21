@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from harness_maker import conditional_router, review_churn
+from harness_maker import conditional_router, review_churn, strictness
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle only matters at type-check time
     from jinja2 import Environment
@@ -58,6 +58,12 @@ TEMPLATE_GLOBALS: dict[str, object] = {
     "default_churn_ratio": review_churn.default_churn_ratio,
     # Rendered vocabulary, not content: `/hm:execute` is uncallable on Codex.
     "stage_invocation": stage_invocation,
+    # SPEC-dev-mode-removal AC-001: templates never read `spec.strictness` themselves. Every
+    # environment resolves through the one reader, so a config dump from ANY render path —
+    # synthesize, personalization_audit, a test's bare `HarnessConfig().model_dump()` — gets
+    # the same absent-case answer.
+    "strictness_of": strictness.resolve_strictness,
+    "explicit_strictness": strictness.explicit_strictness,
 }
 
 

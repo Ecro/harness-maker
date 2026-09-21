@@ -108,6 +108,13 @@ def _write_harness_yaml(project_dir: Path, body: str) -> None:
 
 
 def _spec_driven_yaml(severity: str = "warn", *, locale: str = "en") -> str:
+    """A harness at `block` strictness, carrying the LEGACY severity key as written.
+
+    `severity` no longer decides anything — SPEC-dev-mode-removal made the gate's severity the
+    strictness itself, because the preset template wrote this key as a literal and it silently
+    defanged an explicit `block`. The parameter is kept so the callers below still prove the
+    legacy key cannot change the outcome in either direction.
+    """
     return (
         f"locale: {locale}\n"
         "dev_mode: spec-driven\n"
@@ -117,6 +124,10 @@ def _spec_driven_yaml(severity: str = "warn", *, locale: str = "en") -> str:
         "  gates:\n"
         f"    spec_gate: {severity}\n"
     )
+
+
+def _warn_yaml(*, locale: str = "en") -> str:
+    return f"locale: {locale}\nspec:\n  dir: specs/\n  strictness: warn\n"
 
 
 def test_evaluate_non_test_path_is_noop(tmp_path: Path) -> None:
@@ -162,17 +173,34 @@ def test_evaluate_spec_present_is_allow(tmp_path: Path) -> None:
     assert decision.message == ""
 
 
-def test_evaluate_spec_missing_warn_allows_with_message(tmp_path: Path) -> None:
+def test_evaluate_blocks_even_when_the_legacy_severity_key_says_warn(tmp_path: Path) -> None:
+    """The legacy key cannot downgrade a `block` strictness (round-1 consensus P1)."""
     _write_harness_yaml(tmp_path, _spec_driven_yaml("warn"))
     decision = evaluate(
         "Write",
         {"file_path": "tests/unit/test_foo.py"},
         tmp_path,
     )
-    assert decision.allow is True
-    assert decision.severity == Severity.WARN
+    assert decision.allow is False
+    assert decision.severity == Severity.BLOCK
     assert "test_foo.py" in decision.message
     assert "specs/" in decision.message
+
+
+def test_evaluate_warn_strictness_stands_aside(tmp_path: Path) -> None:
+    """At `warn` the gate does not run at all — no message, nothing refused."""
+    _write_harness_yaml(tmp_path, _warn_yaml())
+    decision = evaluate("Write", {"file_path": "tests/unit/test_foo.py"}, tmp_path)
+    assert decision.allow is True
+    assert decision.message == ""
+
+
+def test_resolve_severity_is_total_over_both_strictness_values() -> None:
+    """`evaluate` can only reach the BLOCK arm, so pin the function's other arm directly."""
+    from harness_maker.gates.spec_gate import _resolve_severity
+
+    assert _resolve_severity({"spec": {"strictness": "block"}}) is Severity.BLOCK
+    assert _resolve_severity({"spec": {"strictness": "warn"}}) is Severity.WARN
 
 
 def test_evaluate_spec_missing_block_denies(tmp_path: Path) -> None:
@@ -263,14 +291,16 @@ def test_main_block_exits_2_on_missing_spec(tmp_path: Path) -> None:
     assert "test_x.py" in proc.stderr
 
 
-def test_main_warn_exits_0_with_stderr(tmp_path: Path) -> None:
-    _write_harness_yaml(tmp_path, _spec_driven_yaml("warn"))
+def test_main_warn_strictness_exits_0_silently(tmp_path: Path) -> None:
+    """A relaxed harness never registers the hook; invoked anyway (a stale render), it stands
+    aside."""
+    _write_harness_yaml(tmp_path, _warn_yaml())
     proc = _run_gate(
         {"tool_name": "Write", "tool_input": {"file_path": "tests/unit/test_x.py"}},
         tmp_path,
     )
     assert proc.returncode == 0
-    assert "test_x.py" in proc.stderr
+    assert proc.stderr.strip() == ""
 
 
 def test_main_malformed_stdin_is_silent_allow(tmp_path: Path) -> None:

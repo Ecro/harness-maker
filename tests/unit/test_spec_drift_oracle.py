@@ -25,7 +25,7 @@ def test_legacy_ac_flagged_as_missing_oracle_source(tmp_path: Path) -> None:
         "legacy",
         {"id": "AC-001", "title": "t", "type": "mechanical", "pending_test": True},
     )
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert "legacy::AC-001" in report.missing_oracle_source
     assert report.has_findings is True
     assert "missing_oracle_source" in report.to_dict()
@@ -45,5 +45,5 @@ def test_v2_ac_with_oracle_source_not_flagged(tmp_path: Path) -> None:
             "oracle_evidence": "reference impl golden",
         },
     )
-    report = scan(specs, dev_mode="spec-driven")
+    report = scan(specs)
     assert report.missing_oracle_source == []

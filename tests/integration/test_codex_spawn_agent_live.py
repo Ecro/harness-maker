@@ -30,7 +30,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.models import DevMode, InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -54,7 +54,7 @@ def _render_fixture(root: Path) -> None:
         InterviewAnswers(
             preset=Preset.PRODUCTION,
             targets=[Target.CLAUDE_CODE, Target.CODEX],
-            dev_mode=DevMode.SPEC_DRIVEN,
+            strictness="block",
         ),
     )
     render(blueprint, root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)

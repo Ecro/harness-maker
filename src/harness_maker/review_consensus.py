@@ -514,7 +514,7 @@ def _known_ac_ids(spec_path: str | None) -> tuple[frozenset[str] | None, list[st
         raw = yaml.safe_load(Path(spec_path).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
         # DEGRADE, do not abort. Raising made the whole verb exit 2 with no payload on every
-        # harness that has no machine SPEC — a first-class `dev_mode` — so the review's sole
+        # harness that has no machine SPEC — a first-class configuration — so the review's sole
         # grade producer was unrunnable there and the gate had no letter to branch on. Worse, the
         # `known is None` branch below exists precisely for the absent case and was unreachable
         # from the only call site that ships. `None` is already the fail-closed value: nothing

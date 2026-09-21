@@ -62,7 +62,6 @@ def setup(
     runner: Callable[..., subprocess.CompletedProcess[str]] = _run_command,
     preset: str | None = None,
     locale: str | None = None,
-    dev_mode: str | None = None,
 ) -> dict[str, Any]:
     """Install the pinned engine and report each independently observed layer."""
     observed: dict[str, Any] = {"plugin": None, "engine": None, "project": None}
@@ -137,7 +136,7 @@ def setup(
         ]
         if action == "update":
             argv.append("--update")
-        for flag, value in (("--preset", preset), ("--locale", locale), ("--dev-mode", dev_mode)):
+        for flag, value in (("--preset", preset), ("--locale", locale)):
             if value is not None:
                 argv.extend([flag, value])
         engine = run(argv, engine_receipt=True)
@@ -167,7 +166,6 @@ def main(plugin_root: Path) -> int:
     parser.add_argument("--marketplace", default="harness-maker")
     parser.add_argument("--preset", choices=["Side", "Production"])
     parser.add_argument("--locale")
-    parser.add_argument("--dev-mode", choices=["task-driven", "spec-driven"])
     args = vars(parser.parse_args())
     result = setup(plugin_root=plugin_root, **args)
     print(json.dumps(result))

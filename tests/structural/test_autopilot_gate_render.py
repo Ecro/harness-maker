@@ -4,11 +4,12 @@
 the advance block is not gated on `autonomy.level`, so a `gated` harness ships ~24.9 kB of prose
 whose only possible output is `kill_switch`. This guards removing the dead name and adding the gate.
 
-**Why the guard lives here and not in `_instruction_baseline.AXES`.** `AXES` is
-`tuple[DevMode, ...]` and `entry_key` is `command@dev_mode.value`, so an `autonomy.level` member
-fails `mypy --strict`, has no `.value`, and forces a second axis plus a new key grammar — which
-collides with the `<command>@<dev_mode>` grammar the PLAN's Contract Boundary pins and drags
-`_SCHEMA_VERSION` 2→3 behind it. The PLAN's carried risk named this alternative explicitly.
+**Why the guard lives here and not in `_instruction_baseline.AXES`.** `AXES` holds the arms of
+ONE config axis (spec strictness — it was the retired methodology axis until
+SPEC-dev-mode-removal re-spelled the arms 1:1) and `entry_key` is `command@<arm>`, so adding
+`autonomy.level` there forces a second axis plus a new key grammar — which collides with the
+`<command>@<arm>` grammar the PLAN's Contract Boundary pins and drags `_SCHEMA_VERSION` 2→3
+behind it. The PLAN's carried risk named this alternative explicitly.
 
 **The goldens in `autopilot_gate_golden.json` were captured BEFORE the template edit.** A snapshot
 taken afterwards records whatever the edited template produces, so it would freeze an
@@ -26,6 +27,16 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+
+- **2026-09-21, `dev-mode-removal`** — the methodology axis folded into `spec.strictness`, and the
+  two `auto_safe` arms re-spelled 1:1 (`@task-driven`→`@warn`, `@spec-driven`→`@block`, content
+  unchanged) before comparing. `configure`, `execute`, `make`, `review`, `spec` and `verify`
+  moved in all four arms; `wrapup` moved in `auto_safe@warn` only, because Step 3.6 renders at
+  `warn` alone. Causes, one per command: `/hm:configure` gains the `spec.strictness` entry;
+  execute's SPEC-need Step 0.1 renders at every strictness; `make.md` drops a `dev_mode` word;
+  review's `finalize --spec` is unconditional; spec passes `--strictness` and its gate table is
+  re-spelled; verify renders six checks everywhere. Autonomy gating untouched. Verified each
+  arm's moved set and that no command was added or removed before re-capturing.
 
 - **2026-09-21, `codex-plan-integration-repair`** — only `execute` moved in all four
   arms; command sets are unchanged. Inputs now reuse a PLAN or let Step 0 create it,
@@ -172,7 +183,6 @@ import pytest
 
 from harness_maker.models import (
     AutonomyConfig,
-    DevMode,
     InterviewAnswers,
     Preset,
     ProjectProfile,
@@ -360,10 +370,10 @@ def test_ac_005_the_non_gated_arms_are_byte_identical_to_the_pre_change_golden(
     """
     golden = json.loads(_GOLDEN.read_text(encoding="utf-8"))["arms"]
     live: dict[str, dict[str, str]] = {}
-    for dev_mode in AXES:
-        live[f"auto_safe@{dev_mode.value}"] = {
+    for strictness in AXES:
+        live[f"auto_safe@{strictness}"] = {
             k: hashlib.sha256(v.encode()).hexdigest()
-            for k, v in sorted(_render_atomic(dev_mode).items())
+            for k, v in sorted(_render_atomic(strictness).items())
         }
     live["ask@flag_on"] = {
         k: hashlib.sha256(v.encode()).hexdigest()
@@ -407,11 +417,12 @@ def test_ac_005_the_picker_block_is_untouched(gated: dict[str, str], armed: dict
     assert armed_pickers, "the armed arm lost its picker — the restructure reached too far"
 
 
-def test_dev_mode_axes_is_still_the_only_instruction_baseline_axis() -> None:
+def test_strictness_is_still_the_only_instruction_baseline_axis() -> None:
     """Records WHY the gated guard lives in this file, and fails if that reason stops holding.
 
-    If `AXES` ever becomes something other than a `DevMode` tuple, the migration this phase
+    If `AXES` ever grows a second axis (an `autonomy.level` arm, say), the migration this phase
     deliberately avoided has happened anyway — and then this file's dedicated guard is redundant
-    rather than necessary. A comment would rot; this notices.
+    rather than necessary. A comment would rot; this notices. Pinned to the exact arms so a
+    third member cannot slip in as "still strings".
     """
-    assert all(isinstance(member, DevMode) for member in AXES), AXES
+    assert AXES == ("warn", "block"), AXES

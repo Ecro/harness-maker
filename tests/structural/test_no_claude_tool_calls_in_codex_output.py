@@ -39,7 +39,6 @@ import pytest
 
 from harness_maker.conditional_router import lens_dispatch, lens_dispatch_groups
 from harness_maker.models import (
-    DevMode,
     InterviewAnswers,
     Preset,
     ProjectProfile,
@@ -47,6 +46,7 @@ from harness_maker.models import (
     Target,
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.strictness import Strictness
 from harness_maker.synthesize import _is_codex_output, synthesize
 
 #: Claude-Code-only tool names. Mostly call forms, not bare words: `Skill(` rather than
@@ -82,13 +82,13 @@ _TWO_REVIEWERS = {
 }
 
 _MATRIX = [
-    pytest.param(preset, targets, dev_mode, models, reviewers, id=id_)
-    for preset, targets, dev_mode, models, reviewers, id_ in [
+    pytest.param(preset, targets, strictness, models, reviewers, id=id_)
+    for preset, targets, strictness, models, reviewers, id_ in [
         *(
-            (p, t, d, [], None, f"{p.value}-{len(t)}t-{d.value}")
+            (p, t, d, [], None, f"{p.value}-{len(t)}t-{d}")
             for p in (Preset.SIDE, Preset.PRODUCTION)
             for t in ([Target.CODEX], [Target.CLAUDE_CODE, Target.CODEX])
-            for d in (DevMode.SPEC_DRIVEN, DevMode.TASK_DRIVEN)
+            for d in ("block", "warn")
         ),
         # `second_opinion.models` gates a whole block of `plan.md.j2` (and the per-model
         # partials). It defaults to `[]`, so the cross-product above never renders that block —
@@ -100,7 +100,7 @@ _MATRIX = [
         (
             Preset.PRODUCTION,
             [Target.CLAUDE_CODE, Target.CODEX],
-            DevMode.SPEC_DRIVEN,
+            "block",
             ["codex"],
             None,
             "Production-2t-spec-driven-so-codex",
@@ -108,7 +108,7 @@ _MATRIX = [
         (
             Preset.SIDE,
             [Target.CODEX],
-            DevMode.TASK_DRIVEN,
+            "warn",
             ["codex", "antigravity"],
             None,
             "Side-1t-task-driven-so-both",
@@ -116,7 +116,7 @@ _MATRIX = [
         (
             Preset.PRODUCTION,
             [Target.CLAUDE_CODE, Target.CODEX],
-            DevMode.SPEC_DRIVEN,
+            "block",
             ["codex"],
             _TWO_REVIEWERS,
             "Production-2t-spec-driven-two-reviewers",
@@ -128,7 +128,7 @@ _MATRIX = [
 def _codex_bodies(
     preset: Preset,
     targets: list[Target],
-    dev_mode: DevMode,
+    strictness: Strictness,
     models: list[str] | None = None,
     reviewers: dict[str, list[str]] | None = None,
 ) -> dict[str, str]:
@@ -136,7 +136,7 @@ def _codex_bodies(
     answers = InterviewAnswers(
         preset=preset,
         targets=targets,
-        dev_mode=dev_mode,
+        strictness=strictness,
         second_opinion=SecondOpinionConfig(models=models or []),  # type: ignore[arg-type]
     )
     if reviewers is not None:
@@ -181,15 +181,15 @@ def _violations(bodies: dict[str, str]) -> list[str]:
     return found
 
 
-@pytest.mark.parametrize(("preset", "targets", "dev_mode", "models", "reviewers"), _MATRIX)
+@pytest.mark.parametrize(("preset", "targets", "strictness", "models", "reviewers"), _MATRIX)
 def test_no_claude_only_tool_reaches_codex_output(
     preset: Preset,
     targets: list[Target],
-    dev_mode: DevMode,
+    strictness: Strictness,
     models: list[str],
     reviewers: dict[str, list[str]] | None,
 ) -> None:
-    bodies = _codex_bodies(preset, targets, dev_mode, models, reviewers)
+    bodies = _codex_bodies(preset, targets, strictness, models, reviewers)
     assert bodies, (
         "no Codex output in this blueprint — the gate would pass vacuously. Either `targets` "
         "stopped producing Codex files or `_is_codex_output` stopped recognising them."
@@ -210,9 +210,7 @@ def test_every_allowlist_entry_is_still_reached() -> None:
 
     Left in place it silently widens the gate for whatever text happens to match it next.
     """
-    bodies = _codex_bodies(
-        Preset.PRODUCTION, [Target.CLAUDE_CODE, Target.CODEX], DevMode.SPEC_DRIVEN
-    )
+    bodies = _codex_bodies(Preset.PRODUCTION, [Target.CLAUDE_CODE, Target.CODEX], "block")
     corpus = "\n".join(bodies.values())
     for allowed, reason in _ALLOWLIST.items():
         assert allowed in corpus, (
@@ -242,7 +240,7 @@ def test_the_gate_fails_on_an_injected_regression() -> None:
         f"detector nothing exercises: {set(_CLAUDE_ONLY) ^ set(payloads)}"
     )
 
-    bodies = _codex_bodies(Preset.SIDE, [Target.CODEX], DevMode.TASK_DRIVEN)
+    bodies = _codex_bodies(Preset.SIDE, [Target.CODEX], "warn")
     assert not _violations(bodies)
     target = sorted(bodies)[0]
     for tool, injected in payloads.items():
@@ -259,7 +257,7 @@ def test_the_gate_refuses_an_empty_surface() -> None:
     A Claude-only render produces no Codex files at all; the precondition must fire there, or
     the gate would report "clean" for a configuration it never looked at.
     """
-    bodies = _codex_bodies(Preset.SIDE, [Target.CLAUDE_CODE], DevMode.TASK_DRIVEN)
+    bodies = _codex_bodies(Preset.SIDE, [Target.CLAUDE_CODE], "warn")
     assert not bodies, "a claude-code-only render produced Codex output — the axis moved"
 
 
@@ -284,7 +282,7 @@ def test_the_codex_arm_actually_renders_its_dispatches(preset: Preset) -> None:
     notice a group that quietly dropped a member — which is the same blind spot this test exists
     to close, one level down — so the lens SET carried by the groups is asserted beside it.
     """
-    bodies = _codex_bodies(preset, [Target.CLAUDE_CODE, Target.CODEX], DevMode.SPEC_DRIVEN)
+    bodies = _codex_bodies(preset, [Target.CLAUDE_CODE, Target.CODEX], "block")
     review = bodies[".agents/skills/hm-review/SKILL.md"]
     groups = lens_dispatch_groups(preset.value)
     expected = 2 * len(groups)

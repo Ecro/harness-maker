@@ -22,7 +22,6 @@ from harness_maker.foreign_config import (
 )
 from harness_maker.models import (
     Confidence,
-    DevMode,
     HarnessConfig,
     Preset,
     Target,
@@ -261,7 +260,7 @@ def test_llm_map_subset_match_assertion(tmp_path: Path) -> None:
 def test_llm_map_caches_result_keyed_by_content_sha256(tmp_path: Path) -> None:
     fc = _seed_foreign_file(tmp_path, "codex_agents")
     stub = _StubMapClient(
-        _stub_payload([{"axis": "dev_mode", "value": "spec-driven", "confidence": "high"}])
+        _stub_payload([{"axis": "strictness", "value": "block", "confidence": "high"}])
     )
     first = llm_map(fc, tmp_path, client=stub, now=1_000_000.0)
     second = llm_map(fc, tmp_path, client=stub, now=1_000_010.0)
@@ -355,7 +354,6 @@ def _build_harness_config() -> HarnessConfig:
     return HarnessConfig(
         locale="en",
         preset=Preset.PRODUCTION,
-        dev_mode=DevMode.SPEC_DRIVEN,
         targets=[Target.CLAUDE_CODE, Target.CURSOR],
         # Legacy validation alias for `default_model` (AliasChoices) — valid at runtime,
         # invisible to mypy, which only sees the canonical field name.

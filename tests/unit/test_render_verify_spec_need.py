@@ -1,10 +1,10 @@
 """Phase 3 render tests for PLAN-spec-requirement-gate — verify.md.j2 Check 6.
 
 Asserts that:
-(a) task-driven render = 5 checks: no Check 6, no spec_need reference, and
-    all count phrasing says "5" (no stray "5-check"/"5 Checks" count phrasing
-    is implicitly guaranteed by the render being 5-check).
-(b) spec-driven render = 6 checks: Check 6 PRESENT, count phrasing says "6",
+(a) EVERY strictness renders 6 checks — Check 6, both spec_need calls and "6" count phrasing,
+    with no stray "5" count phrasing (SPEC-dev-mode-removal ADR-005: `warn` renders Check 6 and
+    reports without stopping; it used to omit the check and count to 5).
+(b) the strict render = 6 checks: Check 6 PRESENT, count phrasing says "6",
     and NO stray "5-check"/"5 Checks" count phrasing remains.
 (c) seam: spec-driven prose contains both `hm spec_need op-check`
     and `hm spec_need waiver-check` CLI calls.
@@ -23,19 +23,20 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.models import DevMode, InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.strictness import Strictness
 from harness_maker.synthesize import synthesize
 
 
-def _verify(tmp_path: Path, dev_mode: DevMode) -> str:
+def _verify(tmp_path: Path, strictness: Strictness) -> str:
     """Render a full harness and return the verify stage body."""
     bp = synthesize(
         ProjectProfile(),
         InterviewAnswers(
             preset=Preset.PRODUCTION,
             targets=[Target.CLAUDE_CODE],
-            dev_mode=dev_mode,
+            strictness=strictness,
         ),
     )
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
@@ -48,68 +49,55 @@ def _verify(tmp_path: Path, dev_mode: DevMode) -> str:
 
 
 @pytest.fixture(scope="module")
-def task_driven_verify(tmp_path_factory: pytest.TempPathFactory) -> str:
-    out = tmp_path_factory.mktemp("verify-task")
-    return _verify(out, DevMode.TASK_DRIVEN)
-
-
-@pytest.fixture(scope="module")
 def spec_driven_verify(tmp_path_factory: pytest.TempPathFactory) -> str:
     out = tmp_path_factory.mktemp("verify-spec")
-    return _verify(out, DevMode.SPEC_DRIVEN)
+    return _verify(out, "block")
 
 
-# ── (a) task-driven: 5 checks, no Check 6, no spec_need ref ─────────────────
+# ── (a) every strictness: 6 checks, Check 6 present, spec_need called ────────
 
 
-def test_task_driven_no_check_6_heading(task_driven_verify: str) -> None:
-    """(a) Task-driven render must NOT contain the Check 6 heading."""
-    assert "Check 6" not in task_driven_verify, (
-        "task-driven verify must not contain 'Check 6' — spec-need gate is spec-driven only"
+@pytest.fixture(scope="module", params=["warn", "block"])
+def any_verify(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory) -> str:
+    return _verify(tmp_path_factory.mktemp(f"verify-{request.param}"), request.param)
+
+
+def test_every_strictness_renders_check_6(any_verify: str) -> None:
+    assert "### Check 6 — SPEC requirement" in any_verify
+
+
+def test_every_strictness_calls_spec_need(any_verify: str) -> None:
+    assert "hm spec_need op-check" in any_verify
+    assert "hm spec_need waiver-check" in any_verify
+
+
+def test_every_strictness_counts_six(any_verify: str) -> None:
+    for phrase in (
+        "The 6 Checks",
+        "6-check stop sign",
+        "6-check rubric",
+        "1 of 6 checks failed",
+        "OUTSIDE the 6-check contract",
+    ):
+        assert phrase in any_verify, phrase
+
+
+def test_no_strictness_keeps_a_five_count(any_verify: str) -> None:
+    for stray in ("5-check", "The 5 Checks", "5 Checks", "1 of 5 checks"):
+        assert stray not in any_verify, stray
+
+
+def test_no_plan_command_survives_to_drift_against_check_6(tmp_path: Path) -> None:
+    """The deleted `plan_verify_dev_mode_match` readiness signal compared TWO renders. Check 6 is
+    now unconditional (above), and the other half cannot drift because the plan command is not
+    rendered at all — proven here rather than assumed (round-1 review, tests lens)."""
+    bp = synthesize(
+        ProjectProfile(),
+        InterviewAnswers(preset=Preset.PRODUCTION, targets=[Target.CLAUDE_CODE]),
     )
-
-
-def test_task_driven_no_spec_need_reference(task_driven_verify: str) -> None:
-    """(a) Task-driven render must NOT reference hm spec_need."""
-    assert "hm spec_need" not in task_driven_verify, (
-        "task-driven verify must not reference hm spec_need"
-    )
-
-
-def test_task_driven_count_says_5(task_driven_verify: str) -> None:
-    """(a) Task-driven render must say '5 Checks' / '5-check' in count context."""
-    # The heading uses 'The 5 Checks'
-    assert "The 5 Checks" in task_driven_verify, (
-        "task-driven verify heading must say 'The 5 Checks'"
-    )
-
-
-def test_task_driven_stop_sign_says_5(task_driven_verify: str) -> None:
-    """(a) Task-driven render intro must say '5-check stop sign'."""
-    assert "5-check stop sign" in task_driven_verify, (
-        "task-driven verify intro must say '5-check stop sign'"
-    )
-
-
-def test_task_driven_rubric_says_5(task_driven_verify: str) -> None:
-    """(a) Task-driven Purpose paragraph must say '5-check rubric'."""
-    assert "5-check rubric" in task_driven_verify, (
-        "task-driven verify Purpose section must say '5-check rubric'"
-    )
-
-
-def test_task_driven_result_line_says_5(task_driven_verify: str) -> None:
-    """(a) Task-driven result example must say '1 of 5 checks failed'."""
-    assert "1 of 5 checks failed" in task_driven_verify, (
-        "task-driven verify output example must say '1 of 5 checks failed'"
-    )
-
-
-def test_task_driven_outside_contract_says_5(task_driven_verify: str) -> None:
-    """(a) Advisory probes section must say 'OUTSIDE the 5-check contract'."""
-    assert "OUTSIDE the 5-check contract" in task_driven_verify, (
-        "task-driven advisory probes section must say 'OUTSIDE the 5-check contract'"
-    )
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    assert list(tmp_path.rglob("commands/hm/plan.md")) == []
+    assert list(tmp_path.rglob("stages/plan.md")) == []
 
 
 # ── (b) spec-driven: 6 checks, Check 6 present, no stray 5-count ────────────
@@ -117,8 +105,8 @@ def test_task_driven_outside_contract_says_5(task_driven_verify: str) -> None:
 
 def test_spec_driven_check_6_heading_present(spec_driven_verify: str) -> None:
     """(b) Spec-driven render must contain the Check 6 heading."""
-    assert "### Check 6 — SPEC requirement (spec-driven)" in spec_driven_verify, (
-        "spec-driven verify must contain '### Check 6 — SPEC requirement (spec-driven)'"
+    assert "### Check 6 — SPEC requirement" in spec_driven_verify, (
+        "the strict verify must contain '### Check 6 — SPEC requirement'"
     )
 
 
@@ -304,17 +292,6 @@ def test_spec_driven_check6_uses_root_wt(spec_driven_verify: str) -> None:
     )
 
 
-# ── regression: task-driven must not get 6-count phrasing either ────────────
-
-
-def test_task_driven_no_6_count_phrases(task_driven_verify: str) -> None:
-    """Sanity: task-driven render must not accidentally contain '6 Checks' or '6-check'."""
-    for pattern in ("The 6 Checks", "6-check", "6-check stop sign", "6-check rubric"):
-        assert pattern not in task_driven_verify, (
-            f"task-driven verify must not contain spec-driven count phrasing '{pattern}'"
-        )
-
-
 # ── snapshot-level: verify SKILL still has exactly 5 numbered checks ─────────
 
 
@@ -335,7 +312,7 @@ def test_verify_skill_still_5_checks_task_driven(
         InterviewAnswers(
             preset=Preset.PRODUCTION,
             targets=[Target.CLAUDE_CODE],
-            dev_mode=DevMode.TASK_DRIVEN,
+            strictness="warn",
         ),
     )
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
