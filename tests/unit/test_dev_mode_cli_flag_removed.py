@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -66,10 +67,13 @@ def test_ac_007_codex_engine_no_longer_forwards_the_flag(
     )
 
 
-def test_ac_007_make_takes_a_strictness_override(tmp_path: Path) -> None:
+@pytest.mark.parametrize("color", [False, True], ids=["plain", "color"])
+def test_ac_007_make_takes_a_strictness_override(color: bool) -> None:
     """`/hm:configure` is the only path to change strictness (ADR-007) and it drives `make`,
     so removing `--dev-mode` without a replacement would leave the knob unreachable."""
     from harness_maker.cli import app
 
-    result = CliRunner().invoke(app, ["make", "--help"])
-    assert "--strictness" in result.output
+    result = CliRunner().invoke(app, ["make", "--help"], color=color, env={"FORCE_COLOR": "1"})
+    assert result.exit_code == 0, result.output
+    # Rich may insert ANSI sequences between the two option-prefix hyphens.
+    assert "--strictness" in unstyle(result.output)
