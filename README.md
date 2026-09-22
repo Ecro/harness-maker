@@ -14,6 +14,30 @@
 
 > **A different harness for every project — built from yours, never generic.**
 
+> **Version**: 0.59.0
+>
+> Current release contract (validated from source):
+>
+> <!-- hm-doc-contract:pipeline:start -->
+> **Current pipeline:** `research` → `spec` → `execute` → `review` → `verify` → `wrapup`
+> <!-- hm-doc-contract:pipeline:end -->
+>
+> <!-- hm-doc-contract:agents:start -->
+> **Current agents:** `autoloop-coder`, `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `executor`, `judgment-reviewer`, `performance-reviewer`, `security-auditor`, `security-reviewer`, `spec-validator`, `stage-delegate`, `stuck`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
+> <!-- hm-doc-contract:agents:end -->
+>
+> <!-- hm-doc-contract:skills:start -->
+> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`
+> <!-- hm-doc-contract:skills:end -->
+>
+> <!-- hm-doc-contract:mechanisms:start -->
+> **Current mechanisms:** M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, M17, M18, M19
+> <!-- hm-doc-contract:mechanisms:end -->
+>
+> <!-- hm-doc-contract:version-files:start -->
+> **Release version files:** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
+> <!-- hm-doc-contract:version-files:end -->
+
 > Other harnesses give everyone the same starting point. harness-maker reads YOUR repo and builds YOUR harness.
 >
 > 📸 **[See it on two real projects →](docs/assets/showcase-diff.md)** — same maintainer, same Python base: the `codex` target adds +42 IDE-native files, while the `Side`→`Production` preset reshapes model tiers, reviewers, and gates across the *same* 14-agent set.
@@ -460,7 +484,7 @@ flowchart TD
     J --> K["Weekly /hm:health (Step 2)\n4-source anti-rot crawl\n→ manual confirm"]
 ```
 
-**14 mechanisms** (M1-M14) back every feature. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full breakdown including the privilege-separation model, security gate triggers, and reconcile invariants.
+**19 mechanisms** (M1-M19) back every feature. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full breakdown including the privilege-separation model, security gate triggers, and reconcile invariants.
 
 Since 0.12.0 the synthesis pipeline also threads through a typed `Recommendation` registry: every `recommend_<axis>(profile, project_dir)` function declares per-detection confidence (ADR-007), and the `interview.py` dispatcher routes by bucket. Detection results land in `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime + 24h-ceiling invalidation. Foreign AI config files detected at `/hm:configure` time can be imported into `harness.yaml` and re-rendered single-source with `@hm:harness:*` inverted block markers (ADR-009).
 
@@ -481,7 +505,7 @@ After install, the rendered harness exposes commands under `/hm:*`:
 | `/hm:wrapup` | Clean, document, commit |
 | `/hm:verify` | 6-check gate before completion |
 
-> **Recommended:** for any non-trivial change, follow the full 6-stage sequence in order — `/hm:research` → `/hm:spec` → `/hm:execute` → `/hm:review` → `/hm:wrapup` → `/hm:verify`. Each stage's output feeds the next; jumping straight to `/hm:execute` forfeits the SPEC gate, consensus review, and verify checks that make the harness trustworthy. To chain stages without a hand-off between each, use `/hm:loop` (bounded autoloop) or arm autopilot.
+> **Recommended:** for any non-trivial change, follow the full 6-stage sequence in order — `/hm:research` → `/hm:spec` → `/hm:execute` → `/hm:review` → `/hm:verify` → `/hm:wrapup`. Each stage's output feeds the next; jumping straight to `/hm:execute` forfeits the SPEC gate, consensus review, and verify checks that make the harness trustworthy. To chain stages without a hand-off between each, use `/hm:loop` (bounded autoloop) or arm autopilot.
 
 ### Chaining stages
 
@@ -965,9 +989,9 @@ bash .claude-verify.sh all          # phase-by-phase exit criteria + final accep
 
 ## Contributing
 
-See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for adding skills/agents/presets, test patterns, and the PR checklist (including the 4-file version bump invariant).
+See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for adding skills/agents/presets, test patterns, and the PR checklist (including the 5-file version bump invariant).
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the 14 mechanisms (M1-M14) behind the system.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the 19 mechanisms (M1-M19) behind the system.
 
 ---
 

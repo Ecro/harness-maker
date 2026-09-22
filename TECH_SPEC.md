@@ -434,8 +434,7 @@ When exceeded, the renderer emits a warning (override: `harness.yaml.context_lin
         │  │   └── hm/                                          │
         │  │       ├── research.md ┐                            │
         │  │       ├── spec.md     │                            │
-        │  │       ├── plan.md     ├ atomic stages (always 7)  │
-        │  │       ├── execute.md  │   /hm:<stage>              │
+        │  │       ├── execute.md  ├ atomic stages (always 6)  │
         │  │       ├── review.md   │                            │
         │  │       ├── wrapup.md   │                            │
         │  │       ├── verify.md   ┘                            │
@@ -562,8 +561,8 @@ class ConflictItem(BaseModel):
 - Hash match = ours (safe to overwrite); hash absent/mismatch = user or third-party origin (preserve)
 - Backup → `.claude/.backup-<date>/` → ADD-only apply
 
-**(M3) Stage Engine — seven atomic stages (Phase 5; fusion retired in 0.47.0)**
-- 7 atomic stages → each automatically exposed as `/hm:<stage>`
+**(M3) Stage Engine — six atomic stages (the plan stage was absorbed in 0.59.0)**
+- 6 atomic stages → each automatically exposed as `/hm:<stage>`
 - Workflow = user-named stage sequence → Renderer synthesizes fragments → single `/hm:<name>` command
 - Defined under `harness.yaml.workflows` key; additional workflows can be added by re-running `/harness-maker:make` — **RETIRED in 0.47.0**: both keys are removed and `io_utils.load_harness_yaml` strips them at load; chain stages with `/hm:loop --per-iter-stages` or autopilot
 - `/hm:research` calibrates search lenses before gathering; broad trend and roadmap prompts must run the user-workflow/product opportunity lens before academic, benchmark, or architecture-only searches.
@@ -1000,7 +999,7 @@ uv run pytest tests/unit/crawler/ tests/unit/test_relevance.py -v \
 
 ### Phase 6: Workflow Engine + Conditional Router + Modular Installer
 
-**Objective (historical — the fused half was retired in 0.47.0):** 7 atomic stages + user-named fused workflows rendered into the user harness. Conditional Router selects reviewers based on the change area. `--add` / `--remove` modular installation working.
+**Objective (historical — superseded by the six-stage pipeline):** the original design rendered seven stage commands plus user-named fused workflows. Conditional Router selects reviewers based on the change area. `--add` / `--remove` modular installation working.
 
 **Research targets (autoloop Stage 1 auto-fetch):**
 - Claude Code skill spec (SKILL.md frontmatter): https://code.claude.com/docs/en/skills
@@ -1462,7 +1461,7 @@ uv run ruff check src/ tests/ \
 - [ ] **R1 Locale-first**: Invoking `cli make --interactive` in an empty sandbox, Q1 (Korean/English) must be the first question. The `locale` key is saved to `.claude/harness.yaml`.
 - [ ] **R2 Anti-rot**: All 4 source crawlers are callable. The relevance filter adaptive threshold operates correctly. `/hm:refresh` proceeds through the propose step and then waits for manual confirm (auto-apply absolutely prohibited).
 - [ ] **R3 Monitoring**: `/hm:ai-readiness` report shows all three metrics: efficiency%, Health, and fresh (days since refresh). `dashboard.md` includes a Health 6-dim section and an Agent quality drill-down (Platinum/Gold/Silver/Bronze) section. Zero external transmission of `metrics.jsonl`.
-- [ ] **R4 Stages**: 7 atomic stages (`/hm:research` ... `/hm:verify`) auto-exposed and operating correctly. ~~N user-named fused workflows callable as a single command~~ — **RETIRED in 0.47.0** (PLAN-harness-diet ADR-001/002); stage chaining is `/hm:loop --per-iter-stages` or autopilot.
+- [ ] **R4 Stages**: 6 atomic stages (`/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:review`, `/hm:verify`, `/hm:wrapup`) auto-exposed and operating correctly. ~~N user-named fused workflows callable as a single command~~ — **RETIRED in 0.47.0** (PLAN-harness-diet ADR-001/002); stage chaining is `/hm:loop --per-iter-stages` or autopilot.
 - [ ] **R5 Autoloop**: Invoking `/hm:loop "<goal>"` causes the driver to iterate autonomously with unlimited tokens, defaulting to 8h/30 iterations. Dry-run mode works. Iter-5 ping and 3-fail stop operate correctly.
 - [ ] **R6 Per-project preset**: 2 presets (Side/Production) interview flow → 10+ dimension overrides → saved to `harness.yaml`. All 4 fixtures match expected blueprints.
 
@@ -1470,7 +1469,7 @@ uv run ruff check src/ tests/ \
 
 - [ ] (M1) Profiler → Interviewer → Synthesizer → Renderer pipeline passes 4 fixtures
 - [ ] (M2) Reconciler performs hash-based automatic classification and creates a backup directory
-- [ ] (M3) Stage Engine renders the 7 atomic stage commands (fused rendering retired in 0.47.0)
+- [ ] (M3) Stage Engine renders the 6 atomic stage commands (fused rendering retired in 0.47.0; plan stage absorbed in 0.59.0)
 - [ ] (M4) Anti-rot 4 sources callable + adaptive threshold adapts
 - [ ] (M5) 3 real-time metrics + Health 6-dim + Agent quality drill-down
 - [ ] (M6) Conditional Router auto-selects reviewer based on `changed_files`
@@ -1523,7 +1522,7 @@ bash .claude-verify.sh all
 
 - **ADR-4: Workflow = Prompt Fusion (user-named)**
   - Context: Started as a spec/task methodology 2x2 matrix.
-  - Decision: Generalized — 7 atomic stages + N user-named fused workflows. Renderer synthesizes stage prompt fragments into a single command file.
+  - Historical decision: generalized to seven stage commands plus N user-named fused workflows. Superseded by the current six-stage pipeline and retired fused workflows.
   - Rationale: Minimizes human-in-the-loop (1 input → 1 turn). Users name domain-specific workflows.
 
 - **ADR-5: 100% local telemetry**
@@ -1697,7 +1696,7 @@ Detailed change history is absorbed into all ADR + Risk + Goal decisions in this
 | Anti-rot | Automatically keeps the harness current so it does not go stale over time (manual confirm required) |
 | Autoloop | One-line goal → autonomous iteration cycle until convergence (default: 8h/30 iterations) |
 | Efficiency / Health / fresh | 3 core metrics (cache hit% / readiness 0-100 / days since last refresh) |
-| Atomic stage | 7 built-in stages (`research`, `spec`, `plan`, `execute`, `review`, `wrapup`, `verify`), each as `/hm:<stage>` |
+| Atomic stage | 6 built-in stages (`research`, `spec`, `execute`, `review`, `verify`, `wrapup`), each as `/hm:<stage>` |
 | Workflow (fused) | **RETIRED 0.47.0.** Was: a user-named stage sequence synthesized into 1 command. Chaining is now `/hm:loop --per-iter-stages` or autopilot. |
 | Conditional Routing | Selects reviewer based on the region of changed files |
 | Verify-before-completion | Automatic gate immediately before `/hm:wrapup` |

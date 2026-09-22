@@ -36,6 +36,15 @@ def _claude_available() -> bool:
     return shutil.which("claude") is not None
 
 
+def _claude_unavailable_reason(cp: subprocess.CompletedProcess[str]) -> str | None:
+    """Classify explicit platform availability failures, never plugin failures."""
+
+    output = f"{cp.stdout}\n{cp.stderr}".lower()
+    if cp.returncode != 0 and "you've hit your weekly limit" in output:
+        return "Claude CLI weekly usage limit reached"
+    return None
+
+
 def _run_make(
     project: Path,
     *,
@@ -45,7 +54,7 @@ def _run_make(
     timeout: int = 180,
 ) -> subprocess.CompletedProcess[str]:
     prompt = f"/harness-maker:make --ci preset={preset} locale={locale} dev_mode={dev_mode}"
-    return subprocess.run(
+    cp = subprocess.run(
         [
             "claude",
             "-p",
@@ -64,6 +73,9 @@ def _run_make(
         text=True,
         timeout=timeout,
     )
+    if reason := _claude_unavailable_reason(cp):
+        pytest.skip(reason)
+    return cp
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +111,23 @@ def fresh_project(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 # tests
 # ---------------------------------------------------------------------------
+
+
+def test_weekly_limit_is_an_environment_unavailability() -> None:
+    cp = subprocess.CompletedProcess(
+        args=["claude"],
+        returncode=1,
+        stdout="You've hit your weekly limit · resets 10am (Asia/Seoul)\n",
+        stderr="",
+    )
+    assert _claude_unavailable_reason(cp) == "Claude CLI weekly usage limit reached"
+
+
+def test_plugin_failure_is_not_hidden_as_environment_unavailability() -> None:
+    cp = subprocess.CompletedProcess(
+        args=["claude"], returncode=1, stdout="plugin command failed\n", stderr="traceback"
+    )
+    assert _claude_unavailable_reason(cp) is None
 
 
 @pytest.mark.skipif(not _claude_available(), reason="claude binary not in PATH")

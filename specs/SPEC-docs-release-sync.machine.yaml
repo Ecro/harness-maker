@@ -1,0 +1,285 @@
+schema_version: 3
+spec_slug: docs-release-sync
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: Documentation contracts use explicit source-derived
+  negative controls rather than Python mutation coverage.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: living documentation matches source contracts
+  type: mechanical
+  test_ids:
+  - tests/structural/test_documentation_contract.py::test_ac_001_living_docs_match_source_contracts
+  executable_predicate: living_doc_contracts_match_source(living_docs, source_contracts)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Visible doc contracts are compared with independent runtime enums,
+    complete template inventories, five version files, and a provenance-backed M1-M19
+    golden because no code registry exists.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: representative drift mutations are rejected
+  type: property
+  test_ids:
+  - tests/structural/test_documentation_contract.py::test_ac_002_doc_contract_rejects_representative_mutations
+  - tests/structural/test_documentation_contract.py::test_ac_002_contract_and_mutation_inventories_are_nonempty
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: A valid corpus must flip from pass to fail after each historically
+    observed mismatch is injected independently.
+  oracle_independence_waiver: null
+  input_domain: A valid living-doc corpus and the finite set of observed drift mutations
+  transformation: Inject exactly one stage-count, retired-name, order, validator,
+    missing/extra agent, missing/extra skill, mechanism id/count, file-count, release-identity,
+    or detached-marker mismatch
+  expected_relation: contract_check(valid_corpus) passes and contract_check(mutated_corpus)
+    fails for every mutation
+  preconditions:
+  - The source and mutation inventories are nonempty
+  - Each mutation changes the targeted contract field
+  observable_output: Per-contract validation result with file and contract key
+  generator_hint: Parameterize one isolated temporary corpus per mutation
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: ordinary CI remains hermetic
+  type: mechanical
+  test_ids:
+  - tests/structural/test_documentation_contract.py::test_ac_003_branch_check_is_hermetic
+  - tests/unit/test_release_identity.py::test_s3_ac_003_prepublish_identity_imports_no_network_client
+  executable_predicate: branch_contract_check_uses_no_network(branch_check)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The project no-network policy and CI boundary define a fixed forbidden
+    dependency set for the branch checker.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: pre-publish identity is local and blocking
+  type: mechanical
+  test_ids:
+  - tests/unit/test_release_identity.py::test_s3_ac_004_prepublish_identity_is_local_and_blocking
+  - tests/unit/test_release_identity.py::test_s3_release_workflow_enforces_both_identity_boundaries
+  executable_predicate: prepublish_identity_matches(tag_version, source_versions,
+    visible_doc_version)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The immutable tag, five independently parsed source files, and
+    visible doc identity must be equal before any publish dependency can start.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: historical exclusions and living-doc discovery are both effective
+  type: property
+  test_ids:
+  - tests/structural/test_documentation_contract.py::test_ac_005_each_core_document_is_mandatory
+  - tests/structural/test_documentation_contract.py::test_ac_005_same_claim_fails_in_current_docs_but_not_history
+  - tests/structural/test_documentation_contract.py::test_ac_005_changelog_boundary_is_enforced_by_repository_validation
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The eight mandatory files, exact recursive docs exclusions, and
+    CHANGELOG two-section boundary are fixed by this SPEC and tested as path/section
+    properties.
+  oracle_independence_waiver: null
+  input_domain: Repository-shaped Markdown trees containing living and historical
+    paths
+  transformation: Add the same retired current-tense claim to each included and excluded
+    path class and to successive CHANGELOG sections
+  expected_relation: Every included/core path and the first two CHANGELOG sections
+    are checked; excluded paths and later release sections are unchanged
+  preconditions:
+  - Core files are README.md, README.ko.md, TECH_SPEC.md, ARCHITECTURE, both HOW-IT-WORKS
+    files, CONTRIBUTING, and release-checklist
+  - Excluded docs directories are adr, migration, observability, followups, assets;
+    reference/pre-change-checklist.md is the single explicit file exclusion
+  observable_output: Discovered living paths and per-path contract results
+  generator_hint: Use temporary path trees for every historical exclusion class
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: localized contract parity survives prose differences
+  type: property
+  test_ids:
+  - tests/structural/test_documentation_contract.py::test_ac_006_each_locale_must_match_the_complete_source_inventory
+  - tests/structural/test_documentation_contract.py::test_ac_006_localized_contracts_ignore_unrelated_prose
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Each locale catalog must equal the complete source-derived inventory;
+    parity alone cannot accept the same incomplete subset.
+  oracle_independence_waiver: null
+  input_domain: English/Korean README and HOW-IT-WORKS pairs with contract markers
+    and arbitrary surrounding prose
+  transformation: Normalize contract records, then modify only surrounding locale-specific
+    prose
+  expected_relation: Each locale equals the complete source inventory before and after
+    unrelated prose changes; missing/extra entries and contradictory visible prose
+    fail
+  preconditions:
+  - Both locale files expose the same required contract marker schema
+  observable_output: Normalized stage and inventory contract records per locale
+  generator_hint: Use paired temporary docs with different headings and paragraph
+    order
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: every preset fallback uses the canonical six-stage pipeline
+  type: mechanical
+  test_ids:
+  - tests/structural/test_documentation_contract.py::test_ac_007_preset_fallbacks_use_the_canonical_six_stage_pipeline
+  executable_predicate: all_preset_fallbacks_equal(preset_fallbacks, canonical_pipeline)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Every preset fallback is compared with the independently defined
+    canonical autonomy pipeline and live AtomicStage members.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: post-publication remote identity is required
+  type: parametric
+  test_ids:
+  - tests/unit/test_release_identity.py::test_s3_ac_008_remote_identity_classifies_golden_cases
+  - tests/unit/test_release_identity.py::test_s3_ac_008_remote_identity_rejects_malformed_payloads
+  - tests/unit/test_release_identity.py::test_s3_ac_008_remote_identity_classifies_request_failure_as_unavailable
+  - tests/unit/test_release_identity.py::test_s3_release_workflow_enforces_both_identity_boundaries
+  executable_predicate: null
+  golden_table:
+  - input:
+      github: 0.59.0
+      pypi: 0.59.0
+      tagged_source: 0.59.0
+    expected: match
+    edge: false
+    note: ''
+  - input:
+      github: 0.59.0
+      pypi: 0.58.0
+      tagged_source: 0.59.0
+    expected: mismatch
+    edge: false
+    note: ''
+  - input:
+      github: timeout
+      pypi: 0.59.0
+      tagged_source: 0.59.0
+    expected: unavailable
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Authoritative GitHub and PyPI identities must both equal the prevalidated
+    tag; mismatch and missing evidence cannot establish release completion.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 72deb68c7474654072a5ca7dfebee8c2a4ad19a95c377bef1d9895dd7e18bd30
+  approved_by: Ecro
+  approved_at: '2026-09-22T04:14:55Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 419eb0e9ed507c4391fca063e717017fccb5c7aaff3a02e72ff0ea122afe6000
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    mutation_threshold_rationale: 79b21f5079ca27d4e41a5db54e51490959c0ef28b9a7a17f01c1372b4a2c8c69
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: eb78645b4c83f8be4b77fa2844c4feab0f14505024c0503d1929109f330e7837
+    AC-002: 82c28aea433236f8d8f5a3053f3f4746d32743427fe89e1a37115a7dff03d38f
+    AC-003: 3a4d77b6a2b821318ac3e6e1ce60fd2b8c87fc3e6efd985becd11ab1ca3b5861
+    AC-004: 0dabb13f7d5cddf2d3f1ee676b5c8115ba79c9f6feffa532e37a168de9d73aa8
+    AC-005: 310bc28eb58f802720d20772375b8ce93eeebf7892f01899de7a14d6e0a17f45
+    AC-006: d9ff202ec9b4d23857cb328fda050dd0614561aca73044611ae40450b60fb0a6
+    AC-007: 132d7c3a1f6cf4251f726c5583ce51ffbb957d9e2130db68f3751ce4e043e847
+    AC-008: 46482714070f1cff6bd96bd39ab1acad1bdecb2ca7383d9fb7a044cbc0ef9d4e
+    ac_order: b62ad8faf895c4ebdf45f3fce97982d2bcc0a3fa6daa1e45993897fb730655c6

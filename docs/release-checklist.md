@@ -65,6 +65,8 @@ successful workflow run creates the project automatically.
 Run from `main` after the version-bump commit is merged.
 
 ```bash
+VERSION="$(uv run python -c 'from harness_maker import __version__; print(__version__)')"
+
 # 5-file version sync — every file must match
 grep -H 'version\|__version__' \
     pyproject.toml \
@@ -72,6 +74,9 @@ grep -H 'version\|__version__' \
     .claude-plugin/plugin.json \
     .cursor-plugin/plugin.json \
     .codex-plugin/plugin.json
+
+# Local tag/source/docs identity — no network access
+uv run python -m harness_maker.release_identity prepublish --tag "v${VERSION}" --root .
 
 # Full check suite
 uv run ruff check .
@@ -94,8 +99,7 @@ failure inside CI and waste time.
 ## Phase 2 — tag and push
 
 ```bash
-# Replace 0.14.0 with the actual version you are releasing
-VERSION=0.14.0
+VERSION="$(uv run python -c 'from harness_maker import __version__; print(__version__)')"
 git tag -a "v${VERSION}" -m "v${VERSION}"
 git push origin "v${VERSION}"
 ```
@@ -107,13 +111,14 @@ The `v*` tag push triggers `.github/workflows/release.yml`. Watch the run at
 
 ## Phase 3 — observe the workflow
 
-The workflow has five jobs that run in sequence:
+The workflow has six required release jobs in sequence, followed by the existing advisory job:
 
 1. **`quality-gate`** — ruff/mypy/pytest defense-in-depth for the tag event.
 2. **`build`** — `uv build` writes `dist/*.whl` + `dist/*.tar.gz` and uploads them as a workflow artifact.
 3. **`publish-testpypi`** (environment: `testpypi`) — `uv publish --trusted-publishing always` to TestPyPI, then installs the published package from `test.pypi.org` and runs `harness-maker --help`.
 4. **`publish-pypi`** (environment: `pypi`, `needs: publish-testpypi`) — same OIDC publish to production PyPI.
 5. **`github-release`** — creates the GitHub Release with `dist/*` assets and notes extracted from `CHANGELOG.md`.
+6. **`release-identity`** (`needs: github-release`) — requires GitHub Release and PyPI metadata to match the already validated tag; mismatch or unavailable evidence fails the workflow.
 
 If `pypi` has a required reviewer, the workflow pauses between TestPyPI smoke and PyPI publish for
 manual approval.

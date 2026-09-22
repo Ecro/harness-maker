@@ -44,6 +44,9 @@ jobs:
         run: uv python install 3.12
       - name: Sync dependencies
         run: uv sync --frozen
+      - name: Verify local release identity
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: uv run python -m harness_maker.release_identity prepublish --tag "$GITHUB_REF_NAME" --root .
       - name: Ruff check
         run: uv run ruff check .
       - name: Ruff format check
@@ -204,6 +207,26 @@ jobs:
           gh release create "$TAG" dist/* \
             --title "$TAG" \
             --notes-file "$NOTES_FILE"
+
+  release-identity:
+    needs: [github-release]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Verify published release identity
+        run: uv run python -m harness_maker.release_identity postpublish --tag "$GITHUB_REF_NAME" --repository "$GITHUB_REPOSITORY"
 
   # PLAN-test-fidelity-gap Layer 1 (ADR-004 v2):
   # Boundary-parse tests run as advisory after the Release exists, then

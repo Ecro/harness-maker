@@ -557,7 +557,7 @@ recurrence counts and leaves adoption to the user. No new mechanism is proposed.
 | [fail:test] enumeration-tests-not-updated-with-new-rendered-artifact | 4 | Existing proposal reviewed and retained |
 | [fail:design] green-module-dead-prose-wiring | 7 | Existing proposal reviewed and retained |
 | [fail:design] wrapup-memory-base-seam | 4 | Existing proposal reviewed and retained |
-| [fail:test] assertion-invariant-over-named-dimension | 20 | Existing proposal reviewed and retained |
+| [fail:test] assertion-invariant-over-named-dimension | 21 | Existing proposal reviewed and retained |
 | [fail:test] test-pins-retired-implementation-name | 4 | Existing proposal reviewed and retained |
 | [fail:design] verification-cache-key-nondeterministic | 3 | Existing proposal reviewed and retained |
 | [fail:lint] gate-exit-code-lost-through-pipe | 3 | Existing proposal reviewed and retained |
@@ -573,3 +573,10 @@ recurrence counts and leaves adoption to the user. No new mechanism is proposed.
 | [fail:design] handoff-assumes-a-skipped-step | 3 | Existing proposal reviewed and retained |
 | [fail:design] severity-tier-split-drops-unanimity | 3 | Existing proposal reviewed and retained |
 | [fail:design] per-round-step-runs-only-in-round-1 | 3 | Existing proposal reviewed and retained |
+
+## Recurrence audit — docs-release-sync (2026-09-22)
+
+All 28 current count≥3 failures were checked against the existing proposal set. The
+documentation-contract review raised `[fail:test] assertion-invariant-over-named-dimension`
+to count 21; its existing proposal remains the appropriate mechanism, so no new proposal
+was added.

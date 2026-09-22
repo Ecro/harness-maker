@@ -3,7 +3,31 @@
 # harness-maker 동작 원리 완전 가이드
 
 > **대상 독자**: harness-maker 를 처음 접하는 개발자, 또는 내부 동작을 깊이 이해하고 싶은 사용자.
-> **버전**: 0.7.1 기준. 코드 세부 구현이 아닌 **절차·흐름·책임** 중심 설명.
+> **Version**: 0.59.0
+>
+> 코드 세부 구현이 아닌 **절차·흐름·책임** 중심 설명.
+
+> 현재 릴리스 계약(소스에서 자동 검증):
+>
+> <!-- hm-doc-contract:pipeline:start -->
+> **현재 파이프라인:** `research` → `spec` → `execute` → `review` → `verify` → `wrapup`
+> <!-- hm-doc-contract:pipeline:end -->
+>
+> <!-- hm-doc-contract:agents:start -->
+> **현재 에이전트:** `autoloop-coder`, `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `executor`, `judgment-reviewer`, `performance-reviewer`, `security-auditor`, `security-reviewer`, `spec-validator`, `stage-delegate`, `stuck`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
+> <!-- hm-doc-contract:agents:end -->
+>
+> <!-- hm-doc-contract:skills:start -->
+> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`
+> <!-- hm-doc-contract:skills:end -->
+>
+> <!-- hm-doc-contract:mechanisms:start -->
+> **현재 메커니즘:** M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, M17, M18, M19
+> <!-- hm-doc-contract:mechanisms:end -->
+>
+> <!-- hm-doc-contract:version-files:start -->
+> **릴리스 버전 파일:** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
+> <!-- hm-doc-contract:version-files:end -->
 
 ---
 
@@ -11,7 +35,7 @@
 
 1. [harness-maker 란?](#1-harness-maker-란)
 2. [전체 아키텍처](#2-전체-아키텍처)
-3. [7단계 원자 워크플로우](#3-7단계-원자-워크플로우)
+3. [6단계 원자 워크플로우](#3-6단계-원자-워크플로우)
    - 3.1 [/hm:research — 탐색](#31-hmresearch--탐색)
    - 3.2 [/hm:spec — 인수 조건](#32-hmspec--인수-조건)
    - 3.3 [plan 스테이지는 흡수됐다](#33-plan-스테이지는-흡수됐다--내용물이-간-곳)
@@ -67,9 +91,9 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 
 | 범주 | 내용 |
 |------|------|
-| **명령(Commands)** | `/hm:` 슬래시 명령 15개 (원자 단계 7 + 루프 드라이버 2 + 유틸리티 6: `configure` `health` `help` `make` `metrics` `uninstall`) |
-| **스킬(Skills)** | 명령에서 호출하는 재사용 능력 모듈 11개 |
-| **에이전트(Agents)** | 특정 역할의 서브-에이전트 15개 |
+| **명령(Commands)** | `/hm:` 슬래시 명령 14개 (원자 단계 6 + 루프 드라이버 2 + 유틸리티 6: `configure` `health` `help` `make` `metrics` `uninstall`) |
+| **스킬(Skills)** | 명령에서 호출하는 재사용 능력 모듈 14개 |
+| **에이전트(Agents)** | 특정 역할의 서브-에이전트 16개 |
 | **훅(Hooks)** | 도구 호출 전후에 자동 실행되는 이벤트 핸들러 5종 |
 
 ### 설계 원칙
@@ -102,7 +126,7 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 ┌─────────────────────┐               ┌────────────────────────────────┐
 │   스킬 (11개)        │               │      에이전트 (12개)            │
 │  context-linter      │               │  code-reviewer                 │
-│  worktree-isolator   │               │  plan-validator                │
+│  worktree-isolator   │               │  spec-validator                │
 │  conditional-router  │◄──호출──────►│  test-reviewer                 │
 │  verify-before-      │               │  consensus-arbiter             │
 │    completion        │               │  stuck (에스컬레이션)           │
@@ -211,12 +235,12 @@ MERGE = `@hm:user:*` 블록이 새 템플릿에 block-merge됨)를 보여주고,
 
 ---
 
-## 3. 7단계 원자 워크플로우
+## 3. 6단계 원자 워크플로우
 
-7단계는 각각 독립된 슬래시 명령으로 호출 가능하다. 순서대로 실행하면 완전한 개발 사이클이 된다.
+6단계는 각각 독립된 슬래시 명령으로 호출 가능하다. 순서대로 실행하면 완전한 개발 사이클이 된다.
 
 ```
-research → spec → plan → execute → review → verify → wrapup
+research → spec → execute → review → verify → wrapup
 ```
 
 단계마다 **고유한 책임**이 있고, 이전 단계의 산출물을 입력으로 받는다.
@@ -1379,18 +1403,16 @@ Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 
 
 ---
 
-### 8.7 plan-validator
+### 8.7 spec-validator
 
-**역할**: `/hm:spec` Step 4.6 에서 SPEC 의 품질을 독립적으로 비판한다.
+**역할**: `/hm:spec` Step 4.6 에서 SPEC 의 품질을 독립적으로 비판한다. 단일 패스의 advisory다.
 
-**호출 시점**: PLAN 파일을 디스크에 쓰기 **전** — 아직 임시 상태인 초안을 검증
+**호출 시점**: SPEC과 machine companion 초안이 작성된 뒤, 사람의 승인 전에 조건부로 호출
 
-**판정 결과**:
-- `APPROVED`: 그대로 저장
-- `NEEDS_REVISION`: 경고 목록 포함. 각 경고에 대해 인터뷰 라운드 후 저장
-- `MAJOR_REVISION`: 심각한 문제. 추가 인터뷰 후 재검증. 두 번째도 MAJOR 이면 에스컬레이션
+**판정 결과**: `APPROVED`, `NEEDS_REVISION`, `MAJOR_REVISION`. 결과는 기록하고 사용자에게
+보이지만 승인을 자동 차단하지 않는다. 같은 SPEC 단계에서 두 번째 validator 패스는 없다.
 
-**검토 항목**: exit criterion 검증 가능성, ADR 수 일치, 단계별 4필드 완성도, Non-Goals 존재, 리스크 구체성
+**검토 항목**: 누락·모순 AC, 순환 oracle, 암시됐지만 기록되지 않은 비가역 결정, scope boundary
 
 **권한**: Read, Grep, Glob (읽기 전용)
 **모델**: opus
@@ -1766,7 +1788,7 @@ ref_folders:
 | executor | ✅ 전체 | ✅ .worktrees/** 만 | ✅ .worktrees/** 만 | uv/pytest/테스트 실행 |
 | autoloop-coder | ✅ 전체 | ✅ .worktrees/** 만 | ✅ .worktrees/** 만 | (executor 와 유사) |
 | consensus-arbiter | ✅ 전체 | ❌ | ❌ | ❌ |
-| plan-validator | ✅ 전체 | ❌ | ❌ | ❌ |
+| spec-validator | ✅ 전체 | ❌ | ❌ | ❌ |
 | test-reviewer | ✅ 전체 | ❌ | ❌ | ❌ |
 | stuck | ✅ 전체 | 에스컬레이션 노트만 | ❌ | ❌ |
 | security-auditor | ✅ 전체 | ❌ | ❌ | 스캔용 Bash |
@@ -2267,12 +2289,11 @@ PLAN 인터뷰는 "어떻게 만들 것인가"를 결정한다. 질문 카테고
 
 ADR 에는 `Context / Decision / Consequences / Rejected Alternatives` 가 기록된다. `/hm:execute` 는 이를 **바인딩 제약**으로 취급 — ADR 에 위배되는 구현이 필요하면 blocker 로 에스컬레이션하지 않음.
 
-#### plan-validator 에이전트 게이트
+#### spec-validator advisory
 
-인터뷰 종료 후 PLAN 을 디스크에 쓰기 전에 `plan-validator` 에이전트가 독립적으로 검토:
-- `APPROVED` → 바로 저장
-- `NEEDS_REVISION` → 경고별 1회 추가 인터뷰 후 저장
-- `MAJOR_REVISION` → 추가 인터뷰 → 재검증 1회. 두 번째도 통과 못 하면 사용자에게 에스컬레이션
+SPEC과 machine companion 초안이 작성되면 `spec-validator`가 조건부로 읽기 전용 비판을
+한 번 수행한다. `APPROVED`, `NEEDS_REVISION`, `MAJOR_REVISION`은 DRI가 판단할 근거이며
+자동 게이트가 아니다. 같은 SPEC 단계에서 재검증하지 않는다.
 
 #### "미결 결정 없음" 규칙
 
@@ -2375,7 +2396,6 @@ PLAN 저장 전, "Accept?", "OK?", "Verify?", "Should we?" 같은 표현을 스�
 | Phase D 수정 불가 | PLAN 범위 변경 없이는 해결 불가한 실패 |
 | ADR 충돌 | 구현이 ADR 을 위반해야만 진행 가능 |
 | 리뷰 교착 | 3개 리뷰어가 동일 이슈에 상충 CONCLUDE |
-| plan-validator 2차 MAJOR | 두 번의 검증에서 모두 심각한 문제 |
 
 #### 분석 방법
 
@@ -2441,7 +2461,7 @@ PLAN 이행 여부는 체크박스 체크만으로는 판정할 수 없다. PLAN
 | LLM 판단 우선 | regex/규칙의 false positive/negative | 전 시스템 |
 | 원자 파일 쓰기 | 인터럽트 시 파일 corruption | atomic_write 패턴 |
 | 100% 로컬 텔레메트리 | 외부 전송 우려 | PostToolUse hook / metrics.jsonl |
-| Deep Interview (spec/plan) | 추측으로 구현 → 나중에 재작업 | 6-카테고리/9-카테고리 + ADR 승격 + plan-validator |
+| Deep Interview (spec) | 추측으로 구현 → 나중에 재작업 | 적응형 인터뷰 + ADR 승격 + 단일 패스 spec-validator |
 | loop 적응형 인터뷰 + 수렴 루프 | 열린 요청이 발산하거나 맥락 유실 | autoloop-driver / autoloop-coder / stopping_criteria |
 | TDD Phase A.5 테스트 품질 게이트 | tautology 테스트가 false-GREEN 을 만들고 구현으로 진행 | test-reviewer / 8-banned-patterns / passing_tests[] freeze |
 | stuck 에스컬레이션 에이전트 | 블로킹 시 원인 파악과 해결 경로 탐색이 사용자 몫 | stuck / escalation-{slug}-{date}.md |
@@ -2449,4 +2469,4 @@ PLAN 이행 여부는 체크박스 체크만으로는 판정할 수 없다. PLAN
 
 ---
 
-*이 문서는 harness-maker 0.7.1 기준. 생성: `/hm:execute how-it-works-docs`*
+*이 문서는 harness-maker 0.59.0 기준. 생성: `/hm:execute how-it-works-docs`*

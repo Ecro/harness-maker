@@ -14,6 +14,30 @@
 
 > **프로젝트마다 다른 하네스 — 당신 프로젝트로부터 빚어지고, 절대 generic 하지 않습니다.**
 
+> **Version**: 0.59.0
+>
+> 현재 릴리스 계약(소스에서 자동 검증):
+>
+> <!-- hm-doc-contract:pipeline:start -->
+> **현재 파이프라인:** `research` → `spec` → `execute` → `review` → `verify` → `wrapup`
+> <!-- hm-doc-contract:pipeline:end -->
+>
+> <!-- hm-doc-contract:agents:start -->
+> **현재 에이전트:** `autoloop-coder`, `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `executor`, `judgment-reviewer`, `performance-reviewer`, `security-auditor`, `security-reviewer`, `spec-validator`, `stage-delegate`, `stuck`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
+> <!-- hm-doc-contract:agents:end -->
+>
+> <!-- hm-doc-contract:skills:start -->
+> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`
+> <!-- hm-doc-contract:skills:end -->
+>
+> <!-- hm-doc-contract:mechanisms:start -->
+> **현재 메커니즘:** M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, M17, M18, M19
+> <!-- hm-doc-contract:mechanisms:end -->
+>
+> <!-- hm-doc-contract:version-files:start -->
+> **릴리스 버전 파일:** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
+> <!-- hm-doc-contract:version-files:end -->
+
 **프로젝트별 개인화** · 등급 게이트 · 자가 진화 · 멀티 IDE
 
 [왜?](#왜-harness-maker) ·
@@ -374,7 +398,7 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 
 ### 🔁 워크플로 프리미티브 — *나머지 툴체인*
 
-- **권장 순서.** 사소하지 않은 변경은 6-stage 시퀀스를 순서대로 따르는 것을 권장합니다 — `/hm:research` → `/hm:spec` → `/hm:execute` → `/hm:review` → `/hm:wrapup` → `/hm:verify`. 각 stage의 출력이 다음 stage로 이어지며, `/hm:execute`로 바로 건너뛰면 SPEC 게이트·consensus 리뷰·verify 체크를 잃습니다. stage 사이 hand-off 없이 이어가려면 `/hm:loop`(경계 있는 autoloop) 또는 autopilot 을 사용하세요.
+- **권장 순서.** 사소하지 않은 변경은 6-stage 시퀀스를 순서대로 따르는 것을 권장합니다 — `/hm:research` → `/hm:spec` → `/hm:execute` → `/hm:review` → `/hm:verify` → `/hm:wrapup`. 각 stage의 출력이 다음 stage로 이어지며, `/hm:execute`로 바로 건너뛰면 SPEC 게이트·consensus 리뷰·verify 체크를 잃습니다. stage 사이 hand-off 없이 이어가려면 `/hm:loop`(경계 있는 autoloop) 또는 autopilot 을 사용하세요.
 - **구현 전 깊은 인터뷰.** `/hm:spec`이 6-카테고리 인터뷰 (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification)를 완전성 점수화하여 실행. 되돌리기 어려운 결정은 같은 인터뷰의 `irreversible_decisions` 로 잠기고, phase·순서·위험 같은 *how* 는 `/hm:execute` Step 0 이 사람 게이트 없이 직접 씁니다.
 - **적응형 인터뷰 + 4-게이트 수렴 autoloop.** `/hm:loop`이 time-and-iteration-bounded 루프 실행. `autoloop-driver`가 goal을 읽고 누락된 것만 질문, loop intensity + exit checklist lock, 그 후 mechanical check + LLM judgment + regression 비교 + 2-iter convergence streak가 완료 수락 전 모두 필요.
 - **3-tier 컨텍스트 로딩 + compaction 복구.** Hot tier (오늘 session) · Warm tier (failures + wiki 첫 60/40줄) · Cold tier (git log / PLAN on demand). `PreCompact` hook이 context compaction 전에 session flush; 다음 turn이 마커를 감지하고 마지막 in-progress phase에서 resume.

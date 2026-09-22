@@ -116,7 +116,7 @@ the final replacement.
         │  harness.yaml          ◀── single source of truth   │
         │  settings.json         ◀── permissions               │
         │  commands/hm/                                       │
-        │    research|spec|plan|execute|review|wrapup|verify  │
+        │    research|spec|execute|review|verify|wrapup       │
         │      ◀── M3 atomic stages                           │
         │    loop.md          ◀── M7 autoloop driver          │
         │    ai-readiness.md  ◀── M5 scored readiness report   │
@@ -217,9 +217,9 @@ When `.claude/` already exists, the Renderer doesn't write blindly. The `Reconci
 5. Backs up the entire `.claude/` to `.backup-<date>/` before applying anything.
 6. Apply is **ADD-only** — no in-place mutation, no deletes from disk (deletes happen via the backup-and-rewrite pattern).
 
-### M3 — Stage Engine (seven atomic stages)
+### M3 — Stage Engine (six atomic stages)
 
-There are exactly **7 atomic stages**: `research`, `spec`, `plan`, `execute`, `review`, `wrapup`, `verify`. Each is a Jinja2 fragment under `templates/stages/<stage>.md.j2` and is **always** exposed as `/hm:<stage>`.
+There are exactly **6 atomic stages**: `research`, `spec`, `execute`, `review`, `verify`, `wrapup`. Each is a Jinja2 fragment under `templates/stages/<stage>.md.j2` and is **always** exposed as `/hm:<stage>`. The PLAN document remains, but `/hm:execute` now authors it; there is no separate `plan` stage.
 
 The `research` fragment includes a discovery-lens calibration step so broad trend or roadmap prompts inspect user workflows and adjacent artifacts before narrowing into academic, benchmark, or implementation-only sources.
 
@@ -227,7 +227,7 @@ The `research` fragment includes a discovery-lens calibration step so broad tren
 
 Stages are chained instead by `/hm:loop --per-iter-stages execute,review` or by autopilot's `autonomy.pipeline`. `io_utils.load_harness_yaml` strips the two retired keys at LOAD time (one advisory per project), so an old config keeps working without a re-render.
 
-Every rendered Step/Phase/Check heading across the seven stages is classified in
+Every rendered Step/Phase/Check heading across the six stages is classified in
 `step_sensitivity.py` along two independent axes of "should this shrink": **COMP**
 (capability-compensation — shrinks as the underlying model improves), **HOST** (host-absorbed —
 shrinks as the vendor harness natively absorbs the behavior), **INV** (invariant regardless of

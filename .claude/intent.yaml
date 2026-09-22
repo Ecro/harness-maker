@@ -104,6 +104,7 @@ rules:
 - render 는 결정적이다 — render 중 shell-out 없음
 - Claude Code·Cursor·Codex 를 한 소스에서 렌더한다
 - Python only, 텔레메트리 100% 로컬, 사용자 요청 없는 push 금지
+- README를 포함한 사용자 대상 문서는 현재 최신 릴리스의 실제 동작과 항상 일치해야 한다. 각 릴리스에서 버전 표기, 설치법, 명령어와 옵션을 검증한다
 out_of_scope:
 - intent.yaml 내용의 LLM 자동 작성
 - 도메인 콘텐츠(프레임워크 표준 등) 큐레이션 — 사용자가 쓴다

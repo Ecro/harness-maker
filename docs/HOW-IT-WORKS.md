@@ -3,7 +3,31 @@
 # harness-maker: How It Works — Complete Guide
 
 > **Audience**: Developers new to harness-maker, or users who want a deep understanding of internal behavior.
-> **Version**: 0.9.3. Focus is on **procedures, flow, and responsibilities** — not implementation details.
+> **Version**: 0.59.0
+>
+> Focus is on **procedures, flow, and responsibilities** — not implementation details.
+
+> Current release contract (validated from source):
+>
+> <!-- hm-doc-contract:pipeline:start -->
+> **Current pipeline:** `research` → `spec` → `execute` → `review` → `verify` → `wrapup`
+> <!-- hm-doc-contract:pipeline:end -->
+>
+> <!-- hm-doc-contract:agents:start -->
+> **Current agents:** `autoloop-coder`, `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `executor`, `judgment-reviewer`, `performance-reviewer`, `security-auditor`, `security-reviewer`, `spec-validator`, `stage-delegate`, `stuck`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
+> <!-- hm-doc-contract:agents:end -->
+>
+> <!-- hm-doc-contract:skills:start -->
+> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`
+> <!-- hm-doc-contract:skills:end -->
+>
+> <!-- hm-doc-contract:mechanisms:start -->
+> **Current mechanisms:** M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, M17, M18, M19
+> <!-- hm-doc-contract:mechanisms:end -->
+>
+> <!-- hm-doc-contract:version-files:start -->
+> **Release version files:** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
+> <!-- hm-doc-contract:version-files:end -->
 
 ---
 
@@ -29,7 +53,7 @@ visible. Implementation completion and trial outcome are separate.
 
 1. [What is harness-maker?](#1-what-is-harness-maker)
 2. [Overall Architecture](#2-overall-architecture)
-3. [The 7 Atomic Workflow Stages](#3-the-7-atomic-workflow-stages)
+3. [The 6 Atomic Workflow Stages](#3-the-6-atomic-workflow-stages)
    - 3.1 [/hm:research — Exploration](#31-hmresearch--exploration)
    - 3.2 [/hm:spec — Acceptance Criteria](#32-hmspec--acceptance-criteria)
    - 3.3 [The plan stage was absorbed](#33-the-plan-stage-was-absorbed--where-its-content-went)
@@ -84,9 +108,9 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 
 | Category | Content |
 |----------|---------|
-| **Commands** | 15 `/hm:` slash commands (7 atomic stages + 2 loop drivers + 6 utility: `configure` `health` `help` `make` `metrics` `uninstall`) |
-| **Skills** | 11 reusable capability modules invoked by commands |
-| **Agents** | 15 sub-agents with specific roles |
+| **Commands** | 14 `/hm:` slash commands (6 atomic stages + 2 loop drivers + 6 utility: `configure` `health` `help` `make` `metrics` `uninstall`) |
+| **Skills** | 14 reusable capability modules invoked by commands |
+| **Agents** | 16 sub-agents with specific roles |
 | **Hooks** | 5 event handler types that run automatically before/after tool calls |
 
 ### Design principles
@@ -149,7 +173,7 @@ acceptance criteria and the live integration boundary.
 ┌─────────────────────┐               ┌────────────────────────────────┐
 │   Skills (11)        │               │      Agents (12)               │
 │  context-linter      │               │  code-reviewer                 │
-│  worktree-isolator   │               │  plan-validator                │
+│  worktree-isolator   │               │  spec-validator                │
 │  conditional-router  │◄──invokes───►│  test-reviewer                 │
 │  verify-before-      │               │  consensus-arbiter             │
 │    completion        │               │  stuck (escalation)            │
@@ -259,12 +283,12 @@ the write doesn't take effect, so the slash command can't falsely report success
 
 ---
 
-## 3. The 7 Atomic Workflow Stages
+## 3. The 6 Atomic Workflow Stages
 
-Each of the 7 stages can be invoked as an independent slash command. Executing them in order produces a complete development cycle.
+Each of the 6 stages can be invoked as an independent slash command. Executing them in order produces a complete development cycle.
 
 ```
-research → spec → plan → execute → review → verify → wrapup
+research → spec → execute → review → verify → wrapup
 ```
 
 Each stage has a **unique responsibility** and receives the output of the previous stage as input.
@@ -916,7 +940,7 @@ Commit types: `feat | fix | chore | ci | test | docs | refactor`
 
 ## 4. Chaining the Stages
 
-The seven atomic stages are separate commands on purpose — each one is a place you can stop,
+The six atomic stages are separate commands on purpose — each one is a place you can stop,
 read what it produced, and change direction. Two mechanisms chain them when you do not want to
 stop:
 
@@ -1556,7 +1580,7 @@ For every agent name the renderer asks `presets.resolve_agent_spec(name, config)
 1. **Tier 1** — `config.agent_models.get(name)` (your explicit override)
 2. **Tier 2** — `PRESET_AGENT_MODELS[config.preset].get(name)` (preset default
    for shipped agents — Production puts opus on `autoloop-coder`,
-   `plan-validator`, `stuck`; sonnet on the 11 reviewer/structured agents)
+   `spec-validator`, `stuck`; sonnet on the remaining reviewer/structured agents)
 3. **Tier 3** — `_spec_from_default_model(config.default_model)` (catch-all
    for user-authored custom agents — never KeyErrors)
 
@@ -1602,7 +1626,7 @@ Renders as:
   context emits `claude-4-5-haiku` in the cursor-side context variable.
 - `.codex/agents/autoloop-coder.toml` → `model_reasoning_effort = "minimal"`
 
-All other agents (`code-reviewer`, `plan-validator`, …) inherit
+All other agents (`code-reviewer`, `spec-validator`, …) inherit
 `PRESET_AGENT_MODELS[Preset.PRODUCTION]` defaults silently.
 
 ### Migration from `recommended_model:`
@@ -1743,18 +1767,17 @@ list (Write/Edit/Bash are granted without path restriction). See §11.16.
 
 ---
 
-### 8.7 plan-validator
+### 8.7 spec-validator
 
 **Role**: Independently critiques the SPEC in Step 4.6 of `/hm:spec` — one pass, advisory.
 
-**When invoked**: **Before** writing the PLAN file to disk — validates the draft while it's still temporary
+**When invoked**: Conditionally after the SPEC and machine companion are drafted, before human approval.
 
-**Judgment outcomes**:
-- `APPROVED`: Save as-is
-- `NEEDS_REVISION`: Includes list of warnings. Save after one interview round per warning
-- `MAJOR_REVISION`: Serious issues. Re-validate after additional interview. If second attempt is also MAJOR, escalate
+**Judgment outcomes**: `APPROVED`, `NEEDS_REVISION`, or `MAJOR_REVISION`. The result is recorded
+and surfaced, but never gates approval; the DRI decides which findings to accept. There is no
+second validator pass.
 
-**Review items**: Verifiability of exit criteria, ADR count match, 4-field completeness per stage, Non-Goals presence, risk specificity
+**Review items**: missing or contradictory ACs, circular oracles, implied-but-unlisted irreversible decisions, and scope boundaries.
 
 **Permissions**: Read, Grep, Glob (read-only)
 **Model**: opus
@@ -2161,7 +2184,7 @@ On failure (fail):
 | executor | ✅ all | ✅ .worktrees/** only | ✅ .worktrees/** only | uv/pytest/test execution |
 | autoloop-coder | ✅ all | ✅ .worktrees/** only | ✅ .worktrees/** only | (similar to executor) |
 | consensus-arbiter | ✅ all | ❌ | ❌ | ❌ |
-| plan-validator | ✅ all | ❌ | ❌ | ❌ |
+| spec-validator | ✅ all | ❌ | ❌ | ❌ |
 | test-reviewer | ✅ all | ❌ | ❌ | ❌ |
 | stuck | ✅ all | escalation note only | ❌ | ❌ |
 | security-auditor | ✅ all | ❌ | ❌ | Bash for scanning |
@@ -2701,12 +2724,11 @@ When an interview answer meets any of the following, that decision is automatica
 
 ADRs record `Context / Decision / Consequences / Rejected Alternatives`. `/hm:execute` treats these as **binding constraints** — if an implementation requires violating an ADR, it escalates as a blocker rather than silently proceeding.
 
-#### plan-validator Agent Gate
+#### spec-validator Advisory
 
-After the interview ends, before writing the PLAN to disk, the `plan-validator` agent independently reviews:
-- `APPROVED` → Save immediately
-- `NEEDS_REVISION` → Save after one additional interview round per warning
-- `MAJOR_REVISION` → Additional interview → re-validate once. If second attempt also fails, escalate to user
+After the SPEC and machine companion are drafted, `spec-validator` performs one conditional,
+read-only critique. Its `APPROVED`, `NEEDS_REVISION`, or `MAJOR_REVISION` result is evidence for
+the DRI, not an automatic gate, and it is never re-run in the same SPEC stage.
 
 #### "No Unresolved Decisions" Rule
 
@@ -2822,7 +2844,6 @@ dispatches). If 2 consecutive FAILing rounds, escalate to the `stuck` agent.
 | Phase D cannot be fixed | Failure that cannot be resolved without changing PLAN scope |
 | ADR conflict | Implementation can only proceed by violating an ADR |
 | Review deadlock | 3 reviewers have conflicting CONCLUDE on the same issue |
-| plan-validator 2nd MAJOR | Serious issues in both validation attempts |
 
 #### Analysis Method
 
@@ -2888,7 +2909,7 @@ Even when tests pass, the AI Readiness composite score can drop by 5 or more poi
 | LLM judgment first | regex/rules false positives/negatives | Entire system |
 | Atomic file writes | File corruption on interrupt | atomic_write pattern |
 | 100% local telemetry | Concerns about external transmission | PostToolUse hook / metrics.jsonl |
-| Deep Interview (spec/plan) | Implementation from assumptions → later rework | 6-category/9-category + ADR promotion + plan-validator |
+| Deep Interview (spec) | Implementation from assumptions → later rework | adaptive interview + ADR promotion + one-pass spec-validator |
 | loop adaptive interview + convergence | Open requests diverge or lose context | autoloop-driver / autoloop-coder / stopping_criteria |
 | TDD Phase A.5 test quality gate | Tautology tests create false-GREEN and proceed to implementation | test-reviewer ×3 lenses / 8-banned-patterns / merged blocking_issues[] |
 | stuck escalation agent | Cause identification and resolution path exploration is user's burden when blocked | stuck / escalation-{slug}-{date}.md |
@@ -2896,4 +2917,4 @@ Even when tests pass, the AI Readiness composite score can drop by 5 or more poi
 
 ---
 
-*This document is current as of harness-maker 0.9.3. Generated via: `/hm:execute how-it-works-docs`*
+*This document is current as of harness-maker 0.59.0. Generated via: `/hm:execute how-it-works-docs`*

@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Keep living workflow and release documentation synchronized with source-derived
+  structural checks, mutation controls, and blocking pre/post-publication identity gates.
 - Render Codex stage and shared-skill guidance with `$hm-*` / dollar skill
   mentions, including next-step and recovery messages. Preserve executable
   examples and user extensions, and avoid recommending unavailable Codex skills.
