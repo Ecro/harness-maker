@@ -1,6 +1,20 @@
 schema_version: 1
 owners: {}
 metrics:
+- id: intent_world_closed_loop_cycles
+  description: Consecutive real tasks whose feedback reaches the next decision without the user having to re-instruct the connection.
+  target: 3
+  higher_is_better: true
+  how_measured: >-
+    Review execution and conversation records for consecutive real tasks, tracing
+    observations through world-state updates to the next decision and, when work
+    remains within the agreed scope, the next execution. Count consecutive tasks
+    meeting this criterion without the user having to re-instruct that connection;
+    the target is three tasks, all successful. Normal approval or decision questions
+    and evidence-backed termination on completion or goal attainment are not failures.
+    The user makes the final assessment from the linked records. Record evidence
+    with each measurement; document the task unit and observation window in the
+    subsequent SPEC. The baseline is unmeasured; no result is asserted yet.
 - id: task_lead_time_hours
   description: 최근 완료된 10개 task 의 첫 stage 시작부터 wrapup 종료까지 시간, 중앙값
   target: 6

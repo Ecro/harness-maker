@@ -1,12 +1,13 @@
 ---
 name: {{ name }}
-description: When the operator observed something, wants to close, approve or drop an intent, record a value, asks where things stand, what to do next or where the gaps are — run hm intent verbs; ask first.
+description: Deep-interview the creator before creating intents; improve intent quality, record what was observed, close/approve/drop, or report where things stand, what to do next and gaps. Ask before writes.
 ---
 
 # {{ name }}
 
 The operator does not have to remember a verb. When a request in prose fits one of the
 situations in the description, translate it into exactly one of the `hm intent` verbs below.
+For creation, complete the deep interview and quality review below before choosing write arguments.
 {% if is_codex %}On Codex this skill starts only when the operator mentions `@intent-layer`.{% endif %}
 
 **Read freely, write only on an answer.** `hm intent status --json` is read-only, LLM-free and
@@ -50,6 +51,38 @@ reports `stale_evidence` when that text changed (approval checks never read cite
    `changed:` line.
 4. Otherwise — on any other answer or no answer — write nothing. Do not retry, rephrase or infer consent.
 
+## Creation: mandatory deep interview and quality review
+
+Apply to direct creation, accepted proposals, and drafts requested by another workflow stage.
+Interview the intent creator before `new`; a one-line request or candidate selection is not a completed interview.
+Reuse explicit answers from this conversation; ask the creator to correct the synthesis and probe remaining gaps.
+{% if is_codex %}Use `request_user_input_async` when available, or ask in chat and wait; use `request_user_input` only where allowed.{% else %}Use `AskUserQuestion`, or ask in chat and wait when it is unavailable.{% endif %}
+Ask one to three adaptive multiple-choice questions per round, with concrete, distinct proposals.
+Put the recommended option first, label it, and briefly explain why; always offer a final free-text Other path.
+Use the question tool's built-in Other input when present; otherwise add Other explicitly. Do not lead with free-text-only questions.
+Cover: problem and affected users; desired observable change and why now; evidence and assumptions;
+success measure, baseline, target and measurement method; scope, exclusions and tradeoffs;
+decision owner, feedback timing and what happens on success, failure or missing data.
+When artifacts or workflow are affected, cover discoverability, authoritative records, placement rationale,
+existing conventions and compatibility. Do not impose a folder migration on unrelated intents.
+Probe vague goals with a concrete success example and a counterexample that would not count as success.
+Separate creator answers, observed evidence and agent suggestions; never manufacture targets or claim a baseline.
+If no existing metric fits, discuss a suitable definition with the creator; never silently add one or use an unrelated metric.
+Stop asking when the creator has resolved the material gaps; preserve implementation questions for the SPEC.
+Without answers, keep a conversational draft and explain the missing decisions; do not run `new`.
+
+Before writing, proactively critique clarity, outcome relevance, measurability, scope coherence, evidence,
+decision/feedback ownership, and overlap with existing or rejected intents. Fix wording; interview for missing decisions.
+Show the proposed statement, scope/exclusions, metric and evidence, responsibilities, and remaining questions.
+Flag proxy metrics that can pass without the intended outcome; require complementary completion evidence where needed.
+Material gaps prevent creation until answered; implementation details may remain explicitly deferred.
+Obtain the creator's confirmation of this concrete draft under the write rule, then create it as `proposed`.
+Populate the Markdown body's Problem, Proposed outcome, Affected users and systems, Constraints and Open questions
+from the confirmed draft, preserving the CLI-owned frontmatter; do not leave unexplained empty sections.
+Read back the record and status, check references and consistency with the confirmed draft, and report any error.
+On quality-review requests or substantive revisions, apply this critique without waiting to be asked about each gap;
+reuse existing answers and interview only for changed or missing decisions. Never reopen or alter terminal records.
+
 ## Proposing intents (only when the operator asks what to do next / where the gaps are)
 
 1. Run `hm intent status --json` — read-only, LLM-free. On `state: invalid` print the error and stop;
@@ -70,7 +103,8 @@ reports `stale_evidence` when that text changed (approval checks never read cite
    record's `rejected[]`.
 5. Then, once per accepted candidate, show the exact arguments and run
    `hm intent new <ID> … --from-proposal --candidates <N> --declined "<title>"…`
-   (`N` = candidates shown; one `--declined` per no). Nothing else persists a candidate.
+   only after its deep interview and quality review (`N` = candidates shown; one `--declined` per no).
+   Nothing else persists a candidate.
 6. The record is `proposed`; the proposer never runs `approve` — that stamp is the operator's.
 
 What the harness guarantees is narrow: the record changes only through these verbs, a terminal

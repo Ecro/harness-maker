@@ -501,7 +501,10 @@ your turn output is that record.
 
 ### Step 4.9 — Intent draft (consented at Step 0.5)
 
-Only when Step 0.5 recorded consent. Derive from the interview + RESEARCH: `<ID>` = `OBJ-` +
+Only when Step 0.5 recorded consent. Read `{{ '.agents' if is_codex else '.claude' }}/skills/intent-layer/SKILL.md`
+and complete its mandatory deep interview and quality review with the creator; reuse this interview's
+answers, ask about remaining intent gaps, and confirm the concrete draft before writing. Without answers,
+leave the draft in conversation and continue with no intent link. Derive from the interview + RESEARCH: `<ID>` = `OBJ-` +
 the task slug upper-cased, `--title`, `--statement`, one `--scope` per in-scope item,
 `--metric` = the metric the interview named (none fits → say so and skip). Show the
 arguments, run once:
@@ -516,7 +519,8 @@ Bash("uv run --with {{ harness_maker_src_path }} hm intent new <ID> --title '<ti
 ```
 {% endif %}
 
-Carry `<ID>` into the SPEC frontmatter's `intent:`. If the verb refuses (id exists, unknown metric):
+On success, populate and read back the intent body under the skill's quality procedure, then carry `<ID>`
+into the SPEC frontmatter's `intent:`. If the verb refuses (id exists, unknown metric):
 print the refusal and continue with no link — never retry with a mutated id. The record is
 `proposed`: the gate halts with `not_active` until a human runs `approve` + `activate`; an
 orphan is retired with `intent drop`.
