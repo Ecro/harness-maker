@@ -1,13 +1,13 @@
-{%- set cmd = "@hm-" if is_codex else "/hm:" -%}
+{%- set cmd = "$hm-" if is_codex else "/hm:" -%}
 # {{ cmd }}help — harness-maker (en)
 
 > One-screen overview of every `{{ cmd }}*` command you can run, the recommended
 > workflow path, and your current harness settings. For per-command details,
-> open `.claude/commands/hm/<name>.md`.
+> open `{% if is_codex %}.agents/skills/hm-<name>/SKILL.md{% else %}.claude/commands/hm/<name>.md{% endif %}`.
 
 ## 📋 Available commands
 
-### Atomic stages (7)
+### Atomic stages (6)
 
 | Command | Purpose |
 |---|---|
@@ -22,13 +22,23 @@
 
 | Command | Purpose |
 |---|---|
+{% if not is_codex -%}
 | `{{ cmd }}make`      | Full re-render (interactive) |
+{% endif -%}
+{% if not is_codex -%}
 | `{{ cmd }}configure` | Targeted setting change (no full re-interview) |
+{% endif -%}
+{% if not is_codex -%}
 | `{{ cmd }}health`    | 3-layer audit (structural / external / personalization) |
+{% endif -%}
 | `{{ cmd }}loop`      | Bounded autoloop with safety rails |
+{% if not is_codex -%}
 | `{{ cmd }}uninstall` | Remove the harness |
+{% endif -%}
 | `{{ cmd }}help`      | (this command) |
+{% if not is_codex -%}
 | `{{ cmd }}metrics`   | Delivery metrics — CFR + churn trend, LLM interpretation (manual, read-only) |
+{% endif -%}
 ## 🔁 Recommended workflow
 
 ```
@@ -45,18 +55,22 @@ Stages are chained by `{{ cmd }}loop` or by autopilot — there is no fused work
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
 | autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, re-armed every session{% endif %} |
-| intent-layer | skill — say what you observed, close / approve / drop an intent, record a metric value, or ask where the project stands{% if is_codex %} (mention `@intent-layer`){% endif %} |
-| project-knowledge | skill — ask to remember a project fact the code does not show, or correct a recorded one; it lands in the shared wiki, not auto-memory{% if is_codex %} (mention `@project-knowledge`){% endif %} |
+| intent-layer | skill — say what you observed, close / approve / drop an intent, record a metric value, or ask where the project stands{% if is_codex %} (mention `$intent-layer`){% endif %} |
+| project-knowledge | skill — ask to remember a project fact the code does not show, or correct a recorded one; it lands in the shared wiki, not auto-memory{% if is_codex %} (mention `$project-knowledge`){% endif %} |
 
-{% if "cursor" in config.targets -%}
+{% if not is_codex and "cursor" in config.targets -%}
 > **Cursor:** `/hm:*` commands work identically. Subagents and skills are read from `.claude/`.
 {% endif -%}
 {% if "codex" in config.targets -%}
-> **Codex CLI:** invoke as `@hm-*` (e.g. `@hm-help`, `@hm-execute`). Skills live under `.agents/skills/`.
-{% endif %}
+> **Codex CLI:** invoke as `$hm-*` (e.g. `$hm-help`, `$hm-execute`). Skills live under `.agents/skills/`.
+{% endif -%}
 
 ## 💡 Next steps
 
 - New to this harness?  →  run `{{ cmd }}research`, then follow the stage order above
+{% if not is_codex -%}
 - Change a setting?     →  run `{{ cmd }}configure`
+{% endif -%}
+{% if not is_codex -%}
 - Audit harness health? →  run `{{ cmd }}health`
+{% endif -%}

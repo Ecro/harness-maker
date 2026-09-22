@@ -93,6 +93,12 @@ Git upgrade. Check all three reported layers (plugin, engine, project) before
 calling an update complete; custom blocks and saved preferences are preserved.
 Start a new Codex thread when needed to discover newly installed skills.
 
+Invoke generated stages with `$hm-research topic`, `$hm-spec task-slug` and
+`$hm-execute task-slug` in Codex. The remaining stages are `$hm-review`, `$hm-verify`
+and `$hm-wrapup`; research recommends spec, and execute writes the PLAN. There is
+no separate plan skill. Regenerate the project harness after updating to repair
+owned guidance while preserving user extension blocks.
+
 To use Claude as a second opinion, enable `claude` in `second_opinion.models` and
 sign in with the Claude CLI. Optional `second_opinion.claude.model` and
 `timeout` control the call. The shared invoker runs Claude in safe-mode
@@ -1403,7 +1409,7 @@ worktree:
 
 ### 7.13 intent-layer
 
-Mention-triggered skill (`@intent-layer` on Codex, natural discovery on Claude Code/Cursor)
+Mention-triggered skill (`$intent-layer` on Codex, natural discovery on Claude Code/Cursor)
 for `hm intent`. It connects project purpose, measured metrics and explicit work commitments.
 An **intent serves one or more SPECs (1:N)**; this is broader than Playbook's 1:1 usage.
 

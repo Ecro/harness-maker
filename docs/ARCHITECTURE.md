@@ -414,12 +414,19 @@ collapse the per-IDE files: Cursor silently stops firing hooks.
 - `.cursor/rules/harness.mdc` — always-on workflow rules rendered via `_render_cursor_mdc()`, which limits frontmatter to keys Cursor accepts (`description`, `globs`, `alwaysApply`). Our `content_hash` metadata is omitted from the frontmatter to avoid strict-reject. The `.mdc` line budget is a Cursor authoring guideline (≤500 lines; split recommended past ~200 per CLAUDE.md), **not** enforced by `context_lint.py` — its per-preset `THRESHOLDS` table covers only `CLAUDE.md`/`AGENTS.md`/`agent`/`skill`/`workflow`. Current rendered output is ~133 lines.
 - `.cursor/mcp.json` — pure JSON (no frontmatter), rendered via `_render_pure_text()`. Populated from `harness.yaml.mcp_servers` propagated through `HarnessConfig.mcp_servers` and the Jinja context (0.6.2 P5). Empty default `{"mcpServers": {}}` is valid; users add servers manually to their yaml. The `interview.answers_from_harness_yaml` reverse mapper preserves user-edited `mcp_servers` across re-renders, with type validation (`command: str` non-empty, `args: list[str]` optional, `env: dict[str, str]` optional) and a warning log when entries are dropped.
 
+**Codex invocation boundary:** `template_globals.stage_invocation` normalizes
+owned Markdown prose to `$hm-*` before `render.py` hashes it and merges user blocks.
+Executable examples, paths, stage IDs and preserved extensions retain their bytes;
+TOML/JSON and other runtime outputs bypass this normalization. Explicit formatting
+handles recovery prose inside mixed diagnostic/shell blocks. Recommendations must
+also reference emitted skills; a valid spelling alone does not establish availability.
+
 **Codex-only assets** (emitted only when `codex` ∈ targets):
 - `AGENTS.md` — Codex's top-level instruction file. It uses HTML metadata and `@hm:user:*` block markers instead of YAML frontmatter so Codex displays clean instructions and user additions survive re-renders.
 - `.codex/config.toml` — Codex config with agent registrations.
 - `.codex/agents/<name>.toml` — Codex-native agent definitions generated from the same reviewer/executor inventory.
 - `.codex/hooks.json` — Codex hook schema, including `PermissionRequest` handling and Codex file-edit tool matchers.
-- `.agents/skills/<name>/SKILL.md` — existing harness skills, seven atomic stage skills, and the loop skill in Codex's discovery layout.
+- `.agents/skills/<name>/SKILL.md` — existing harness skills, six atomic stage skills, and the loop skill in Codex's discovery layout.
 
 Codex TOML files intentionally carry no provenance frontmatter because TOML parsers reject markdown preambles. The Reconciler treats `.codex/*.toml` as replaceable generated config, while `AGENTS.md` is block-merge aware.
 

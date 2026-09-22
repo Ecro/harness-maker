@@ -1,12 +1,12 @@
-{%- set cmd = "@hm-" if is_codex else "/hm:" -%}
+{%- set cmd = "$hm-" if is_codex else "/hm:" -%}
 # {{ cmd }}help — harness-maker (ko)
 
 > 사용 가능한 모든 `{{ cmd }}*` 명령, 추천 워크플로 경로, 현재 하네스 설정을
-> 한 화면에 모아둔 도움말. 특정 명령의 상세는 `.claude/commands/hm/<name>.md` 참고.
+> 한 화면에 모아둔 도움말. 특정 명령의 상세는 `{% if is_codex %}.agents/skills/hm-<name>/SKILL.md{% else %}.claude/commands/hm/<name>.md{% endif %}` 참고.
 
 ## 📋 사용 가능한 명령
 
-### Atomic stages (7)
+### Atomic stages (6)
 
 | 명령 | 용도 |
 |---|---|
@@ -21,13 +21,23 @@
 
 | 명령 | 용도 |
 |---|---|
+{% if not is_codex -%}
 | `{{ cmd }}make`      | 전체 재렌더 (인터랙티브) |
+{% endif -%}
+{% if not is_codex -%}
 | `{{ cmd }}configure` | 개별 설정 변경 (재인터뷰 없이) |
+{% endif -%}
+{% if not is_codex -%}
 | `{{ cmd }}health`    | 3-layer 진단 (structural / external / personalization) |
+{% endif -%}
 | `{{ cmd }}loop`      | 안전 레일 있는 bounded autoloop |
+{% if not is_codex -%}
 | `{{ cmd }}uninstall` | 하네스 제거 |
+{% endif -%}
 | `{{ cmd }}help`      | (이 명령) |
+{% if not is_codex -%}
 | `{{ cmd }}metrics`   | Delivery metrics — CFR + churn 추이, LLM 해석 (수동, 읽기 전용) |
+{% endif -%}
 ## 🔁 추천 워크플로
 
 ```
@@ -44,18 +54,22 @@ stage 연결은 `{{ cmd }}loop` 또는 autopilot 이 담당합니다 — 융합 
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
 | autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, 매 세션 자동 재무장{% endif %} |
-| intent-layer | skill — 관찰한 것을 말하거나, intent 를 close / approve / drop 하거나, metric 값을 기록하거나, 어디까지 왔는지 물을 때{% if is_codex %} (`@intent-layer` 언급){% endif %} |
-| project-knowledge | skill — 코드에 없는 프로젝트 사실을 기억시키거나 기록된 사실을 정정할 때. auto-memory 가 아니라 공유 wiki 에 남는다{% if is_codex %} (`@project-knowledge` 언급){% endif %} |
+| intent-layer | skill — 관찰한 것을 말하거나, intent 를 close / approve / drop 하거나, metric 값을 기록하거나, 어디까지 왔는지 물을 때{% if is_codex %} (`$intent-layer` 언급){% endif %} |
+| project-knowledge | skill — 코드에 없는 프로젝트 사실을 기억시키거나 기록된 사실을 정정할 때. auto-memory 가 아니라 공유 wiki 에 남는다{% if is_codex %} (`$project-knowledge` 언급){% endif %} |
 
-{% if "cursor" in config.targets -%}
+{% if not is_codex and "cursor" in config.targets -%}
 > **Cursor:** `/hm:*` 명령이 동일하게 동작. Subagent · skill 은 `.claude/` 에서 공유.
 {% endif -%}
 {% if "codex" in config.targets -%}
-> **Codex CLI:** `@hm-*` 형식으로 호출 (예: `@hm-help`, `@hm-execute`). Skill 은 `.agents/skills/` 경로.
-{% endif %}
+> **Codex CLI:** `$hm-*` 형식으로 호출 (예: `$hm-help`, `$hm-execute`). Skill 은 `.agents/skills/` 경로.
+{% endif -%}
 
 ## 💡 다음 단계
 
 - 처음이라면      →  `{{ cmd }}research` 로 시작해 위 stage 순서를 따르세요
+{% if not is_codex -%}
 - 설정 변경       →  `{{ cmd }}configure`
+{% endif -%}
+{% if not is_codex -%}
 - 하네스 진단     →  `{{ cmd }}health`
+{% endif -%}

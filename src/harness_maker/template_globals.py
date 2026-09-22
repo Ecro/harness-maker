@@ -22,22 +22,69 @@ from harness_maker import conditional_router, review_churn, strictness
 if TYPE_CHECKING:  # pragma: no cover - import cycle only matters at type-check time
     from jinja2 import Environment
 
-_HM_SLASH_COMMAND = re.compile(r"/hm:([a-z0-9][a-z0-9-]*)")
+_HM_SLASH_COMMAND = re.compile(r"(?<![\w./])(?:/hm:|@hm-)([a-z0-9][a-z0-9-]*|\*)")
+_INLINE_CODE = re.compile(r"(`+)(.+?)\1")
+_FENCE = re.compile(r"^\s*(?:>\s*)?(`{3,}|~{3,})([^\n]*)")
+
+
+def _invocation_line(line: str) -> str:
+    """Convert prose and inline prompt examples, never inline executable payloads."""
+    parts: list[str] = []
+    start = 0
+    for match in _INLINE_CODE.finditer(line):
+        parts.append(_HM_SLASH_COMMAND.sub(r"$hm-\1", line[start : match.start()]))
+        code = match.group(2)
+        if re.match(r"(?:/hm:|@hm-)", code):
+            code = _HM_SLASH_COMMAND.sub(r"$hm-\1", code)
+        parts.append(match.group(1) + code + match.group(1))
+        start = match.end()
+    parts.append(_HM_SLASH_COMMAND.sub(r"$hm-\1", line[start:]))
+    return "".join(parts)
 
 
 def stage_invocation(text: str, is_codex: bool) -> str:
-    """Rewrite `/hm:<stage>` into the calling runtime's own invocation form.
+    """Format owned Markdown guidance using Codex's ``$skill-name`` syntax.
 
-    Codex has no slash command for a stage. A stage there is a skill under `.agents/skills/`,
-    and the only way to start one is to mention it — `@hm-execute` (live-probed against Codex
-    CLI 0.147.0: *"SKILL-running tools: none … invoked by mentioning its skill name"*). So a
-    `➡️ Next: /hm:execute` banner on that target names a call the runtime cannot make. Same
-    defect class as rendering `Task(` into a Codex skill: an instruction that reads fine and
-    cannot be followed.
+    Also used on complete Codex documents before user-block merge and hashing.
+    Executable fences and inline payloads stay literal: inserting dollar signs
+    inside a shell string would introduce variable expansion. Text/Markdown fences
+    contain prose; unlabelled fences convert only standalone invocation lines.
+    Internal ``hm:stage`` IDs, paths and user blocks retain their original bytes.
     """
     if not is_codex:
         return text
-    return _HM_SLASH_COMMAND.sub(r"@hm-\1", text)
+    result: list[str] = []
+    fence = ""
+    prompt_fence = False
+    prose_fence = False
+    user_block = False
+    for line in text.splitlines(keepends=True):
+        if "<!-- @hm:user:" in line:
+            user_block = True
+        if user_block:
+            result.append(line)
+            if "<!-- @hm:/user:" in line:
+                user_block = False
+            continue
+        marker = _FENCE.match(line)
+        if marker:
+            delimiter, info = marker.groups()
+            if not fence:
+                fence = delimiter
+                prompt_fence = not info.strip()
+                prose_fence = info.strip() in {"text", "markdown", "md"}
+            elif delimiter[0] == fence[0] and len(delimiter) >= len(fence) and not info.strip():
+                fence = ""
+            result.append(line)
+        elif fence:
+            if prose_fence:
+                line = _invocation_line(line)
+            elif prompt_fence and re.match(r"\s*(?:/hm:|@hm-)", line):
+                line = _HM_SLASH_COMMAND.sub(r"$hm-\1", line)
+            result.append(line)
+        else:
+            result.append(_invocation_line(line))
+    return "".join(result)
 
 
 #: Exported as a callable rather than baked into each template as a literal list. The rendered

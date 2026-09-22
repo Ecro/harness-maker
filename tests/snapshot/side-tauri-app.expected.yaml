@@ -61,7 +61,7 @@ files:
   body_sha256: b16b0c64191d45f0b5d01ffa6e3f68ff8f0cf46a6b361f0193fc57ad692db222
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: 099f16252d1da481449f33f2baf335d01cadefefdfa1a9e46fdd39587ee644b6
+  body_sha256: e75fa23c4755b9a301067420224c3c1fbd173cda974b480e4cf4b3d2684668e1
 - path: commands/hm/loop-p5-batch.md
   template: commands/hm/loop-p5-batch.md.j2
   body_sha256: 71d837717af12de134250b81385524e9694875dd510e51e5ed2915c345763951
@@ -82,7 +82,7 @@ files:
   body_sha256: 5334df0a3480db4867174f3e8db1f190bdb0c869c74b1f5edc44e04321d281d0
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: de0e5e2bea8f4953b102121d2bb3e2c92fa0811fb7ab45615eec0edf09619f0e
+  body_sha256: 3b91de0a824c9f9209cc74f17bc3c1ab4a238ed0b30abcf0999a5406decc8883
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: 86a9b22c2d05bb4c25d11d38a50fb331dda627fe91c0348f95acee03f3be15a1
@@ -139,7 +139,7 @@ files:
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 - path: skills/intent-layer/SKILL.md
   template: skills/intent-layer/SKILL.md.j2
-  body_sha256: 5e1bd89021cdc89de5d43747ce5eff2fa2fe0d5cced6554cdd1c65445b882ff8
+  body_sha256: 4a635398efcfa0b8cc4350757775f081de79853ddeef6acf15c4212c1a2260ea
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 3917bfb9902dad068aa9d267375e85eb27fe2724da184e71fbcc4c5966756210
@@ -172,7 +172,7 @@ files:
   body_sha256: cba3b9f9106349a498b098745e6eec2b0a172a567591bb27b3f7d1e1e407c42d
 - path: stages/spec.md
   template: stages/spec.md.j2
-  body_sha256: 4acfd810adca5ec2745414b262d6c35eecbe6ff9a085f6fb31d710ae7c351928
+  body_sha256: 5482b7e34dd62fc2965430c7e7d99895d23a30f1986110c819ce8614ce01d35a
 - path: stages/verify.md
   template: stages/verify.md.j2
   body_sha256: b94504275a33ddb79f03f33e4b9d5da8dcefa440deff2b27a7d6feffd74a7d15

@@ -209,7 +209,7 @@ def test_help_lists_project_knowledge(locale: str) -> None:
     assert "| project-knowledge |" in claude_help
     assert "@project-knowledge" not in claude_help
     assert "| project-knowledge |" in codex_help
-    assert "@project-knowledge" in codex_help
+    assert "$project-knowledge" in codex_help
 
 
 # ── Codex P1 19b3f7f1f0100b4f (REVIEW 2026-09-19): exact-slug check before a new slug ──

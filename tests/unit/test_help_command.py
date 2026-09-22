@@ -64,10 +64,10 @@ def test_e_codex_target_renders_skill_and_section(tmp_path: Path) -> None:
 
 
 def test_codex_skill_body_uses_at_hm_prefix(tmp_path: Path) -> None:
-    """Codex SKILL.md is pre-rendered with is_codex=True — must use @hm-* stubs."""
+    """Codex SKILL.md is pre-rendered with is_codex=True — must use $hm-* stubs."""
     ans = InterviewAnswers(locale="ko", targets=[Target.CLAUDE_CODE, Target.CODEX])
     bp = synthesize(profile(tmp_path), ans)
     skill = next(f for f in bp.files if str(f.path) == ".agents/skills/hm-help/SKILL.md")
     body = _make_env().get_template(skill.template).render(**skill.context)
-    assert "@hm-help" in body
+    assert "$hm-help" in body
     assert "/hm:help" not in body

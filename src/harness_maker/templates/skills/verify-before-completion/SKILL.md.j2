@@ -27,7 +27,7 @@ You are the judge for this check. Do NOT delegate to a subprocess.
 
 **1a. Drift verdict** (ADR-006): read `{{ config.work_docs.dir }}REVIEW-{slug}.md`
 frontmatter. If `drift_verdict` is absent OR `task_slug` does not match the
-current PLAN → `BLOCKED: check 1 (drift) — run /hm:review first` and stop.
+current PLAN → `{{ stage_invocation("BLOCKED: check 1 (drift) — run /hm:review first", is_codex | default(false)) }}` and stop.
 
 **1b. PLAN/SPEC coverage**:
 
@@ -71,8 +71,9 @@ FAIL on any non-zero exit.
 
 Read the prior `structural` score from the `score:` line under the
 `## Structural` section of `.claude/observability/dashboard.md` (0.22.3+
-2-section schema). Recompute the current structural score (or run `/hm:health`
-Step 1 — it scores against preset `{{ config.preset }}`). Compare ONLY
+2-section schema). Recompute the current structural score (or run {% if is_codex | default(false) %}`uv run --with {{ harness_maker_src_path }} hm cli health .`
+— it scores against preset `{{ config.preset }}`{% else %}`/hm:health`
+Step 1 — it scores against preset `{{ config.preset }}`{% endif %}). Compare ONLY
 structural values — never read `## Personalization` for pass/fail.
 
 **No-baseline PASS rule (ADR-004):** when `dashboard.md` is absent, lacks
@@ -115,7 +116,7 @@ First failing check halts the gate.
 Output: `BLOCKED: check <N> (<name>) — <reason>`.
 When blocked, the calling command must abort. Remediation hints:
 PLAN unclosed → list incomplete tasks; smoke fail → re-run failing test;
-structural drop → show `/hm:health` Structural breakdown; security high/P0 →
+structural drop → show {% if is_codex | default(false) %}the health CLI's{% else %}`/hm:health`{% endif %} Structural breakdown; security high/P0 →
 list findings; merge conflict → show conflicting paths.
 
 <!-- @hm:user:extensions -->

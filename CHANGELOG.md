@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Render Codex stage and shared-skill guidance with `$hm-*` / dollar skill
+  mentions, including next-step and recovery messages. Preserve executable
+  examples and user extensions, and avoid recommending unavailable Codex skills.
+- Clarify the six-stage workflow: research hands off to spec, and execute writes
+  the PLAN. Updating and regenerating an existing harness refreshes owned guidance.
+
 ## [0.59.0] - 2026-09-21
 
 ### Intent vocabulary and owners

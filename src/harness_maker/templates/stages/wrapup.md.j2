@@ -202,7 +202,7 @@ Read the most recent REVIEW report frontmatter for `drift_verdict`.
 2. **Validate**: check that `drift_verdict.task_slug` matches the current PLAN's `task_slug`.
 3. **Decide**:
    - `drift_verdict` present AND `task_slug` matches → log the verdict, continue.
-   - `drift_verdict` absent OR `task_slug` mismatch → **FAIL** with message: `BLOCKED: step 3 (drift) — run /hm:review first (no drift_verdict found for current task)`.
+   - `drift_verdict` absent OR `task_slug` mismatch → **FAIL** with message: `{{ stage_invocation("BLOCKED: step 3 (drift) — run /hm:review first (no drift_verdict found for current task)", is_codex | default(false)) }}`.
 
 > Advisory: if you made changes after `/hm:review`, re-run `/hm:review` to refresh the drift verdict.
 
@@ -542,8 +542,9 @@ Update rules:
 {% else %}
 
 No additional managed documents configured. To add documents that wrapup
-should update (e.g. CHANGELOG.md, TODO.md), run `/hm:configure` and select
-**Wrapup documents**.
+should update (e.g. CHANGELOG.md, TODO.md), {% if is_codex | default(false) %}set `wrapup_docs` in
+`.claude/harness.yaml` and regenerate the harness.{% else %}run `/hm:configure` and select
+**Wrapup documents**.{% endif %}
 {% endif %}
 
 #### 5.6 Second Brain promotion (cross-project durable knowledge)

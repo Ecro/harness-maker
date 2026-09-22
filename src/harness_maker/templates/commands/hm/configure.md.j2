@@ -91,7 +91,7 @@ Options (multi-select):
   shell *before* the CLI's allowlist ever sees it. An out-of-set value exits non-zero.
 - **Locale** — the `locale` tag (en / ko / …), for this conversation and the re-render.
   Unknown tags fall back to English.
-- **Delivery metrics tuning** — `{% if is_codex %}@hm-metrics{% else %}/hm:metrics{% endif %}`
+- **Delivery metrics tuning** — `{% if is_codex %}$hm-metrics{% else %}/hm:metrics{% endif %}`
   is manual and read-only (CFR + churn from local git, no network) with no on/off switch.
   This only adjusts its tuning knobs (`tag_pattern`, `default_branch`, `cfr_window_days`,
   `churn_maturation_days`, `churn_cohort_days`, `blame_file_cap`, `paths`). Defaults fit a

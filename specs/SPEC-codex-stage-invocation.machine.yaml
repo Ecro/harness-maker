@@ -1,0 +1,125 @@
+schema_version: 3
+spec_slug: codex-stage-invocation
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: Reversible generation guidance change; targeted render,
+  update, and shell-preservation regression tests.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/template_globals.py
+- src/harness_maker/render.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Codex invocation guidance uses dollar skill mentions
+  type: mechanical
+  test_ids:
+  - tests/unit/test_stage_invocation_syntax.py::test_codex_guidance_uses_dollar_mentions
+  executable_predicate: all(expected in codex_documents[path] for path, expected in
+    required_guidance)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: User-provided Codex dollar invocation and official OpenAI build-skills
+    documentation; frozen shell/path/user-block fixtures and generated stage inventory
+    independently determine expected outputs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Executable content and other runtimes retain their contracts
+  type: mechanical
+  test_ids:
+  - tests/unit/test_stage_invocation_syntax.py::test_preserves_executable_and_non_codex_content
+  executable_predicate: all(format_codex(text) == text for text in protected_examples)
+    and claude_guidance == baseline_claude_guidance
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: User-provided Codex dollar invocation and official OpenAI build-skills
+    documentation; frozen shell/path/user-block fixtures and generated stage inventory
+    independently determine expected outputs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Recommendations reference existing workflow stages
+  type: mechanical
+  test_ids:
+  - tests/unit/test_stage_invocation_syntax.py::test_recommendations_resolve_to_skills
+  executable_predicate: required_stage_names <= generated_skill_names and recommended_stage_names
+    <= generated_skill_names and research_next == "$hm-spec {slug}" and "hm-plan"
+    not in recommended_stage_names
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: User-provided Codex dollar invocation and official OpenAI build-skills
+    documentation; frozen shell/path/user-block fixtures and generated stage inventory
+    independently determine expected outputs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Update rendering repairs existing Codex guidance
+  type: mechanical
+  test_ids:
+  - tests/unit/test_stage_invocation_syntax.py::test_update_repairs_guidance
+  executable_predicate: first_update_owned == second_update_owned and updated_extension
+    == original_extension and "$hm-spec {slug}" in updated_research
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: User-provided Codex dollar invocation and official OpenAI build-skills
+    documentation; frozen shell/path/user-block fixtures and generated stage inventory
+    independently determine expected outputs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []

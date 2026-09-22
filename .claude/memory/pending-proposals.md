@@ -92,9 +92,15 @@ also names `ruff format --check` — cheap, byte-deterministic, and it fails lou
 time a new stage copies the four-gate list by hand and drops one.
 
 ## Proposal: a new gate must state its population, and a test must prove the population is complete (2026-08-05)
-**Triggered by:** [fail:test] gate-scoped-to-the-artifact-being-fixed (count: 3)
+**Triggered by:** [fail:test] gate-scoped-to-the-artifact-being-fixed (count: 4 as of 2026-09-22)
+
+2026-09-22 recurrence: Codex help/banner checks passed while shared-skill
+activation guidance and Production Check 6 recovery still used invalid syntax.
+Derive the checked population from all emitted guidance surfaces, including
+recovery prose in mixed diagnostic/shell blocks; retain preservation controls.
+The accepted P2 recovery-message regression assertion remains follow-up work.
 **Proposed mechanism:** review-stage checklist item + non-vacuity assertion convention
-**Rationale:** Three instances now, and the third recurred inside the very round whose
+**Rationale:** Four instances now, and the third recurred inside the very round whose
 CLAUDE.md text records the second. The shape is always the same: a guard is written while
 fixing artifact X, its collection step is shaped by X, and the identical defect survives in
 the sibling artifacts the collection never reached — most recently a documented-command gate

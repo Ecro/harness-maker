@@ -1,5 +1,5 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' %}{% set cdwt = 'cd <WT> && ' if wt_on else '' %}{% set WTP = '`<WT>`' if wt_on else 'the project root' -%}
-# {% if is_codex %}@hm-loop{% else %}/hm:loop{% endif %}
+# {% if is_codex %}$hm-loop{% else %}/hm:loop{% endif %}
 
 > Start a bounded autoloop. Claude conducts a coverage-driven adaptive
 > interview to establish full context, then iterates the configured workflow
@@ -42,7 +42,7 @@ worktree is reversible; converging-then-rolling-back costs less than asking.
 ## Usage
 
 {% if is_codex %}
-Invoke via `@hm-loop <goal>` or `@hm-loop [options]`.
+Invoke via `$hm-loop <goal>` or `$hm-loop [options]`.
 
 Parse from the user's natural-language input:
 - Main text → the free-form `<goal>`

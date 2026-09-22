@@ -737,7 +737,7 @@ def _render_agents_md(
     frontmatter path in ``_render_text_file``.
     """
     template = env.get_template(fe.template)
-    rendered = template.render(**fe.context)
+    rendered = template_globals.stage_invocation(template.render(**fe.context), True)
     body_text = rendered
 
     # Block-merge: splice OLD user blocks into fresh template body.
@@ -1758,6 +1758,10 @@ def _render_text_file(
         {**fe.context, "communication_variant": variant} if variant is not None else fe.context
     )
     rendered = template.render(**render_context)
+    # Format owned Codex Markdown before merging user blocks and computing provenance.
+    # Other file types can contain executable strings: do not run prose conversion there.
+    if fe.path.suffix == ".md" and fe.context.get("is_codex", False):
+        rendered = template_globals.stage_invocation(rendered, True)
     # If template authored its own frontmatter (e.g. SubAgent name/description/tools/model),
     # merge it into the single provenance frontmatter so Claude Code's loaders see one block.
     template_fm, body_text = _split_template_frontmatter(rendered)

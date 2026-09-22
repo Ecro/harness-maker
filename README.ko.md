@@ -144,6 +144,8 @@ action items).
 
 > **결과:** 사용하는 모든 IDE가 같은 agent, 같은 skill, 같은 워크플로를 native로 봄. 수동 포팅 0.
 
+Codex에서는 생성된 단계 스킬을 `$hm-research 주제`, `$hm-spec task-slug`, `$hm-execute task-slug`로 호출합니다. Claude Code와 Cursor에서는 `/hm:research`, `/hm:spec`, `/hm:execute`를 사용합니다. research 다음은 spec이며, execute가 구현 전에 PLAN을 작성합니다. 별도의 plan 단계는 제거되었습니다. 기존 프로젝트 안내를 갱신하려면 플러그인 업데이트 후 하네스를 재생성하세요.
+
 **실행 경험 — 끝까지 가이드.** `.claude/`가 이미 있으면 `/hm:make`는 dry-run **미리보기**(NEW / REPLACE / KEEP / MERGE — KEEP = 내 편집 보존)를 보여주고 덮어쓰기 전에 확인을 받습니다; 신규 설치는 바로 적용. **git worktree 안 씀** — backup + reconcile이 덮어쓰기 우려를 커버하므로 비-git 프로젝트도 작동. 적용 후 무엇이 바뀌었는지 사용자 언어로 **설명**(깨끗한 첫 설치는 조용히, 실제 P0/P1이 있으면 loud). 그리고 **마지막 한 걸음**: git 상태를 감지해 — *중립적으로, 권유 없이* — 하네스를 **commit**(clone하는 팀원이 받도록)할지 **gitignore**(로컬 전용)할지 묻습니다. churn과 `.backup-*`은 항상 gitignore되어 commit이 깨끗하고, 결정은 **git 상태에서 추론**되므로 재렌더가 다시 묻지 않습니다. 전체 흐름: [**docs/HOW-IT-WORKS.ko.md → 렌더 파이프라인**](docs/HOW-IT-WORKS.ko.md#렌더-파이프라인).
 
 ---

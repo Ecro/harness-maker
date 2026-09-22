@@ -5,25 +5,26 @@
 
 ## Workflow overview
 
-harness-maker provides 7 atomic stages.
-Invoke a stage by mentioning the skill name (e.g. `@hm-execute task-slug`).
+harness-maker provides 6 atomic stages.
+Invoke a stage by mentioning the skill name (e.g. `$hm-execute task-slug`).
+Use this Codex spelling in next-step and recovery guidance; recommend only available skills.
 
 ### Atomic stages
 
 | Skill | Purpose |
 |-------|---------|
-| `@hm-research` | Multi-source fact-gathering; writes RESEARCH doc |
-| `@hm-spec` | Acceptance criteria, irreversible decisions; writes SPEC doc |
-| `@hm-execute` | Writes the PLAN (phases, ADRs), then TDD implementation; no commits |
-| `@hm-review` | Deep code review; grades A–F; writes REVIEW doc |
-| `@hm-verify` | Full check suite: tests + lint + type |
-| `@hm-wrapup` | Final tests, drift gate, single commit |
+| `$hm-research` | Multi-source fact-gathering; writes RESEARCH doc |
+| `$hm-spec` | Acceptance criteria, irreversible decisions; writes SPEC doc |
+| `$hm-execute` | Writes the PLAN (phases, ADRs), then TDD implementation; no commits |
+| `$hm-review` | Deep code review; grades A–F; writes REVIEW doc |
+| `$hm-verify` | Full check suite: tests + lint + type |
+| `$hm-wrapup` | Final tests, drift gate, single commit |
 
 ### Autoloop
 
 | Skill | Purpose |
 |-------|---------|
-| `@hm-loop` | Bounded autoloop: interview → iterate the configured atomic stages → wrapup |
+| `$hm-loop` | Bounded autoloop: interview → iterate the configured atomic stages → wrapup |
 
 ## Configuration
 

@@ -1,4 +1,4 @@
-# {% if is_codex %}@hm-metrics{% else %}/hm:metrics{% endif %}
+# {% if is_codex %}$hm-metrics{% else %}/hm:metrics{% endif %}
 
 > Delivery-metrics trend + interpretation (PLAN-cfr-churn-metrics). Computes
 > CFR (rolling {{ config.delivery_metrics.cfr_window_days }}d change failure rate) and post-merge churn
@@ -105,7 +105,7 @@ specific releases/files found above — generic advice is noise.
 > `cfr_window_days` / `churn_maturation_days` / `churn_cohort_days` /
 > `blame_file_cap` / `paths` in `.claude/harness.yaml` adjust release detection,
 > windows, and monorepo path scoping. Defaults fit a single-package repo tagged
-> `v*`; edit them (or via {% if is_codex %}`@hm-configure`{% else %}`/hm:configure`{% endif %}) only when your repo differs.
+> `v*`; edit them (or via {% if is_codex %}`$hm-configure`{% else %}`/hm:configure`{% endif %}) only when your repo differs.
 
 ## Step 5 — Economics: where the tokens went
 

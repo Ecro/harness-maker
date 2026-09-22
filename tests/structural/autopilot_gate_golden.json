@@ -4,14 +4,14 @@
       "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
       "execute": "23ccf3d2bcc277548faeed1bc53280373ea41619a295631a1a7acac5200f3f37",
       "health": "11118caf94ce3a4be2e378fe26a4a377eb37c7af7074c3ff9b4ba8807e9b5c2c",
-      "help": "f76b9e2fc4b7e015d0146bf0b3f63ff26ee07f761c5b7bb934ea54a9a1a5644b",
+      "help": "e799ff8a8bfc9c2a3a9bd897fd403aa36c424eef8fa48fd60d278f49a2e04244",
       "loop": "17ac6273e0545cb1d156f8764288bbf484600f86d407e1e3ffc7cb873390aa0a",
       "loop-p5-batch": "bd4f581199118de381895e371f1fb1ddc141396f2985067c91ae7de135f09e0d",
       "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
       "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
       "research": "9243c749de8f9c071645b2c31703b2689b557d9775a98012f80b81b934974728",
       "review": "6b766f3b0162749702e31bb7655e3f113b7155af76f48429c04719bdb3de0543",
-      "spec": "b36c2f91111d1ca930a0abea95e56eb40ba426a79c9940fd8dc9c9f627fe49dd",
+      "spec": "b1ca85ee5ab53123b3dd57f24c97c984da45a9ca35f9639c3bb90e37b6df5b2e",
       "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
       "verify": "675b73c08cf139b7e3a3f8489520f9008b1451075341a61d3e7886c58fe5226f",
       "wrapup": "3753d2c65c982501e8e3e70beb9cdb794f52e056d04d2a44988512a35e06cc2a"
@@ -20,14 +20,14 @@
       "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
       "execute": "34800139d559bb0e56fe489e5eb6c5b72d6332438716e0960f5f93ab09458dab",
       "health": "11118caf94ce3a4be2e378fe26a4a377eb37c7af7074c3ff9b4ba8807e9b5c2c",
-      "help": "f76b9e2fc4b7e015d0146bf0b3f63ff26ee07f761c5b7bb934ea54a9a1a5644b",
+      "help": "e799ff8a8bfc9c2a3a9bd897fd403aa36c424eef8fa48fd60d278f49a2e04244",
       "loop": "17ac6273e0545cb1d156f8764288bbf484600f86d407e1e3ffc7cb873390aa0a",
       "loop-p5-batch": "bd4f581199118de381895e371f1fb1ddc141396f2985067c91ae7de135f09e0d",
       "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
       "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
       "research": "9243c749de8f9c071645b2c31703b2689b557d9775a98012f80b81b934974728",
       "review": "6b766f3b0162749702e31bb7655e3f113b7155af76f48429c04719bdb3de0543",
-      "spec": "32e3e5eacbf01c7e313f0159285d09d420827c6d5e4451a7941ccd287df5fb12",
+      "spec": "217c32b3e876405a023212a0978195dc79a6a8bcdbe212dde72cef571dabf1f1",
       "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
       "verify": "84ea0693ccc64a6a2e381160e980e59b3fcc8e665d74e49a75c22c92caa21a8f",
       "wrapup": "62c0a26969839a5d8145645aa6d3337dae700c0847ab30e9e11ec0b85e5d42ed"
@@ -36,14 +36,14 @@
       "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
       "execute": "cf1618fcf65124b5be3f9ff66b9f125e10d4d2612b9cf7f4cf17585c8085987d",
       "health": "460a5f320d9da1b2f82bce189b5c31da5c8e1659eb13b7b267ac2b2f65811d22",
-      "help": "1cbd247e7118a74d1c1e9af5092f5319c30374bc4b972cfed0b6846f6d1ac109",
+      "help": "0036f16bec1759cbcaa30852f7b534959b5b3844f485ce5f522cb3096a54858e",
       "loop": "f35ff45450f92c9b7f5ef11b58b693256d0990bb3a7f4eea0d3d00c7c23980f8",
       "loop-p5-batch": "bd4f581199118de381895e371f1fb1ddc141396f2985067c91ae7de135f09e0d",
       "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
       "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
       "research": "91bb7a937fd1c97bb3903771d0260d3fc81ee354860aad31efb1fdd4764d41e9",
       "review": "b12a5cce8a2b42b5d1372c9c05a55d2347184ff4b8baa56e47754912a2d643a0",
-      "spec": "7dbf22781002e0aa64c9fff66da6a3145acaf7143c147f241e2700680a1c0e52",
+      "spec": "ef5b01320ace897ad0ed49b6c95456c8678ab00d6fd57f3fbf413acbbfd724f8",
       "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
       "verify": "81157d7b45568b538d1cf00f9afc4866044bc824d1ef7cce0cf5e6947446082e",
       "wrapup": "c50b7a37b183039ef40dd2a207e22d44a2f3110ee97c6804e410de0a58a6aa34"
@@ -52,14 +52,14 @@
       "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
       "execute": "2eff2f2138f3c5f606a40d34afafa47d1cbfb0e4f802de03e47b31513ac9f4b3",
       "health": "460a5f320d9da1b2f82bce189b5c31da5c8e1659eb13b7b267ac2b2f65811d22",
-      "help": "1cbd247e7118a74d1c1e9af5092f5319c30374bc4b972cfed0b6846f6d1ac109",
+      "help": "0036f16bec1759cbcaa30852f7b534959b5b3844f485ce5f522cb3096a54858e",
       "loop": "231484b74cd81e7bdaf19d447a232bd92fd9c6cf04db1a2e6cd7197bb52e520c",
       "loop-p5-batch": "c278e46748b1cc544c2126dbbff4db8a492d378ac23ed31334a81f5a03ccd322",
       "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
       "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
       "research": "3927bcce749da0a066b4fb5e72463c97496d117e4985d996fdf04052e5ac364f",
       "review": "292b05222233e1b4d791eca3dd551e57616e3a2ecd2fa07b0a78c7a79414be9e",
-      "spec": "6514b6c852ae31a9f357c8062c12b042d084e17619667db9b55c58c14006b8ba",
+      "spec": "b0a9933af4367db6a46e12eefa4af41600f8d7c170945ce378dee1e44331726d",
       "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
       "verify": "053acf439215009df3a5793c1fefc64c93d551dde7f9b9c13ee120ef578803dd",
       "wrapup": "0f3737825cdb26e2f59fd89c25c1020188d9745ad9b7f81c22feefeedd554a42"
@@ -195,6 +195,15 @@
       "phase": "4",
       "reason": "wrapup 5.1 gained the 5.1.0 fact-safe search-before-write blockquote (one `hm memory_retrieve` call; never reuse a [wiki:fact] slug) and the slug bullet names the reused non-fact slug; help gained the `project-knowledge` skill row. Verified before re-capture that help and wrapup are the ONLY moved commands in every arm and the command set did not drift. Re-captured again after the review's Codex P1 fixes (2026-09-19): 5.1.0 gained the exact-slug Grep check (+187 per variant, zero new calls); wrapup the ONLY moved command in every arm. Re-captured a third time after the re-review's P1 fix (exact-slug Grep states the base path, two levels above <WT>); wrapup the ONLY moved command. Re-captured a fourth time at /hm:verify: the 5.1.0 base-path note no longer names `<WT>` (it leaked into the worktree-OFF render; test_worktree_surface_gating); wrapup the ONLY moved command. Re-captured once more at wrapup after rebasing onto observed-harness-gaps-salvage (its wrapup Steps 6 -> 7.6 paragraph and this task's 5.1.0 are disjoint); wrapup and help the ONLY moved commands relative to that landed golden.",
       "task": "mission-context-loop"
+    },
+    {
+      "date": "2026-09-22",
+      "task": "codex-stage-invocation",
+      "commands": [
+        "help",
+        "spec"
+      ],
+      "reason": "Help adopts runtime-correct Codex invocation examples and six-stage count; SPEC drift already reproduces with unmodified HEAD source (baseline probe), refreshed alongside stale snapshots. Autopilot gates and command sets unchanged."
     }
   ]
 }

@@ -1,4 +1,4 @@
-# {% if is_codex %}@hm-health{% else %}/hm:health{% endif %}
+# {% if is_codex %}$hm-health{% else %}/hm:health{% endif %}
 
 > Two-layer health audit (ADR-007 supersedes ADR-006; ADR-002 amended).
 > Layer 1 Structural · Layer 2 Personalization.
@@ -123,7 +123,7 @@ If the command is missing, exits non-zero, or its output does not parse: print n
 move on. This is advisory — `/hm:health` must never fail or block on it.
 
 If `codex` or `antigravity` reports `installed: true`, surface ONE Layer 1 advisory:
-the CLI is on PATH but casts no vote, and `{% if is_codex %}@hm-configure{% else %}/hm:configure{% endif %}`
+the CLI is on PATH but casts no vote, and `{% if is_codex %}$hm-configure{% else %}/hm:configure{% endif %}`
 → "Cross-model second opinion" enables it. Say `installed` means the binary resolves —
 authentication is not checked here. If neither is installed, print nothing: a user without
 these tools does not need to be told about them on every audit.
@@ -190,7 +190,7 @@ counts (+unit, or the `not_applicable` reason verbatim) and churn as
 baseline deltas. Narrative-only by design — the readiness score is never
 affected (Goodhart guard, SPEC Non-Goal 3). **Empty ledger (the feature has
 never been run here) → print nothing but a one-line suggestion to run
-{% if is_codex %}`@hm-metrics`{% else %}`/hm:metrics`{% endif %} once** — the narrative only appears once there is data.
+{% if is_codex %}`$hm-metrics`{% else %}`/hm:metrics`{% endif %} once** — the narrative only appears once there is data.
 <!-- @hm:/delivery-metrics -->
 ## Per-item structured question (ADR-001 hard rule)
 

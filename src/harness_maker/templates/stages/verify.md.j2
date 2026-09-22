@@ -43,7 +43,7 @@ Block silent regressions and partial completions. Run a rigid 6-check rubric tha
 
 **Drift verdict existence** (ADR-006): Read `{{ config.work_docs.dir }}REVIEW-{slug}.md` frontmatter.
 - `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.
-- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run /hm:review first`.
+- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `{{ stage_invocation("BLOCKED: check 1 (drift) — run /hm:review first", is_codex | default(false)) }}`.
 
 This check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here
 as "1b" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is
@@ -125,7 +125,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_c
 
 Read the prior `structural` score from `.claude/observability/dashboard.md` — specifically the `score:` line under the **`## Structural`** section of the 2-section dashboard (0.22.3+ schema). Do NOT average with `Personalization`; it is an orthogonal signal (deliberately) owned by no check at all.
 
-Recompute current structural score (or invoke `/hm:health` Step 1 if a fresh score is needed). Compare ONLY structural values.
+Recompute current structural score (or {% if is_codex | default(false) %}run `uv run --with {{ harness_maker_src_path }} hm cli health .`{% else %}invoke `/hm:health` Step 1{% endif %} if a fresh score is needed). Compare ONLY structural values.
 
 **No-baseline PASS rule (ADR-004):** when `dashboard.md` is absent OR exists but does NOT begin with `---\ngenerated_by: harness-maker\n` (pre-0.13.0 single-`Health:` scalar schema) OR is missing the `## Structural` section / `score:` line, emit a **PASS** for this check with a `reason` string `"no-baseline: <cause>"` (e.g. `"no-baseline: dashboard.md missing"`, `"no-baseline: pre-0.13.0 schema"`). Report both `prior` (null) and `current` (value or null) in the text summary.
 
@@ -195,8 +195,8 @@ The `waiver-check` command **recomputes** the content hash against the live diff
 ```
 BLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>
 The required SPEC operation was not performed and no valid waiver exists.
-To resolve: author the SPEC via /hm:spec <slug> (the
-resume-marker skips re-detection and routes directly to /hm:spec) or record
+{{ stage_invocation("To resolve: author the SPEC via /hm:spec <slug> (the", is_codex | default(false)) }}
+{{ stage_invocation("resume-marker skips re-detection and routes directly to /hm:spec) or record", is_codex | default(false)) }}
 a fresh, non-empty-rationale waiver with:
   uv run --with {{ harness_maker_src_path }} hm spec_need waiver-set --root {{ WTR }} --slug <slug> \
     --verdict <verdict> --target <target> --rationale "<reason>" \

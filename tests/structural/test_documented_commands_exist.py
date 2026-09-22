@@ -122,7 +122,8 @@ def _registered_commands() -> set[str]:
 # That is this file's own recorded failure class, repeated: a gate scoped to the artifact
 # being fixed lets the identical defect survive next door. So this arm reads the plugin's
 # live command surface and both spellings — `/hm:<name>` (Claude Code, Cursor) and
-# `@hm-<name>` (Codex), which the templates emit from one `{% if is_codex %}` branch.
+# `$hm-<name>` (Codex), plus legacy `@hm-<name>`. Templates select the active
+# spelling through their `{% if is_codex %}` branch.
 #
 # SCOPE, deliberate: `commands/**/*.md` only, NOT `_shipped_docs()`. Measured 2026-08-06,
 # the docs surface carries 12+ names that no longer render — the retired fused workflows
@@ -130,7 +131,7 @@ def _registered_commands() -> set[str]:
 # `trends`, `personalization-audit`. Gating those is a docs-cleanup project; folding it in
 # here would make this arm un-greenable for reasons unrelated to the surface that executes.
 # `commands/` is where an agent reads its instructions, which is why it is gated first.
-_HM_SLASH = re.compile(r"(?:/hm:|@hm-)([a-z][a-z0-9-]*)")
+_HM_SLASH = re.compile(r"(?:/hm:|@hm-|\$hm-)([a-z][a-z0-9-]*)")
 
 
 def _rendered_hm_commands() -> set[str]:
@@ -195,8 +196,10 @@ def test_the_slash_scanner_rejects_a_name_that_does_not_render() -> None:
     Without this, a scanner that silently found nothing would pass every real assertion.
     """
     registered = _rendered_hm_commands()
-    found = set(_HM_SLASH.findall("see `/hm:health` and `@hm-wrapup` and `/hm:does-not-exist`"))
-    assert {"health", "wrapup"} <= found, found
+    found = set(
+        _HM_SLASH.findall("see `/hm:health`, `@hm-wrapup`, `$hm-spec`, and `/hm:does-not-exist`")
+    )
+    assert {"health", "wrapup", "spec"} <= found, found
     assert sorted(w for w in found if w not in registered) == ["does-not-exist"]
 
 

@@ -20,6 +20,19 @@ partial publication or retirement blocks subsequent writes until migration
 completes. Governing contracts are SPEC-intent-owners-role-map and
 SPEC-intent-vocabulary-rename.
 
+## Codex invocation guidance (2026-09-22)
+
+Generated Codex guidance uses `$hm-<stage>` skill mentions for the six stages:
+research, spec, execute, review, verify and wrapup. Research recommends spec;
+execute authors the PLAN, so no separate plan skill is advertised. Codex help
+lists generated skills, and recovery guidance uses existing CLI/configuration
+paths where a Claude-only command has no generated Codex counterpart.
+
+`stage_invocation` normalizes owned Markdown before content hashing and user-block
+merging. It preserves executable fences, inline shell payloads, file paths,
+internal stage IDs and user extensions. Claude Code/Cursor invocation syntax and
+pure TOML/JSON outputs retain their existing contracts.
+
 ## Codex lifecycle and Claude provider (2026-09-20)
 
 The Codex plugin bundles `hm-make` and `hm-update` skills plus an installed-root

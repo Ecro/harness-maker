@@ -17,7 +17,7 @@ Apply the PLAN's phases to the codebase. When `tdd_active`, tests are written fr
 ## Usage
 
 {% if is_codex %}
-Invoke via `@hm-execute <slug> [no-tdd]`.
+Invoke via `$hm-execute <slug> [no-tdd]`.
 
 Parse from the user's natural-language input:
 - First token or "slug: <name>" → the task slug (required)
@@ -886,7 +886,7 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the absolute path 
 {% if is_codex %}
 ```
 # All phases GREEN — stage-merge back (NO commit) + cleanup worktree.
-# @hm-wrapup will create the single user-facing commit.
+# $hm-wrapup will create the single user-facing commit.
 Bash("uv run --with {{ harness_maker_src_path }} hm worktree finalize <WT> stage-only")
 ```
 

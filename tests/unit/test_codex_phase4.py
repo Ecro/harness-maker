@@ -119,15 +119,15 @@ def test_codex_agents_md_names_the_stage_chaining_entry_point() -> None:
 
     Was: "must mention the default workflow" (asserted `exec-rev-wrap`). The fused axis
     is gone (PLAN-harness-diet ADR-001), so that string was removed along with a table
-    advertising four `@hm-exec-rev*` skills that no longer render — a review round-1 P1.
+    advertising four `$hm-exec-rev*` skills that no longer render — a review round-1 P1.
     Deleting the assertion outright would drop the guard that AGENTS.md documents ANY
     chaining entry point, so it is re-pointed at the surviving one rather than removed.
     """
     env = _make_env()
     tpl = env.get_template("codex/AGENTS.md.j2")
     rendered = tpl.render(config=_BASE_CONFIG, preset="Production")
-    assert "@hm-loop" in rendered, "AGENTS.md no longer names the stage-chaining entry point"
-    for gone in ("@hm-exec-rev", "Fused workflows"):
+    assert "$hm-loop" in rendered, "AGENTS.md no longer names the stage-chaining entry point"
+    for gone in ("$hm-exec-rev", "Fused workflows"):
         assert gone not in rendered, f"AGENTS.md still advertises the deleted axis: {gone}"
 
 
