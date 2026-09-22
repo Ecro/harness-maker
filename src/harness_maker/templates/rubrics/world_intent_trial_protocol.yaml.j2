@@ -1,0 +1,13 @@
+dimension: world_intent_trial_protocol
+target: Workflow traces and linked repository records for SPEC-world-intent-closed-loop
+rubrics:
+- id: trial_protocol
+  description: For AC-006, do independent fixtures demonstrate start-order enrollment
+    of the next three real task slugs, same-slug resume deduplication, inclusion of
+    failed/aborted tasks, an all-three-terminal window despite concurrent completion,
+    no automatic reset, and separate collection and outcome states? Implementation
+    tests must not claim a real task trial succeeded. Actual three-task evidence belongs
+    to the separate trial SPEC.
+  severity: P0
+  action: Exercise positive and negative protocol cases from the operator-approved
+    requirements.

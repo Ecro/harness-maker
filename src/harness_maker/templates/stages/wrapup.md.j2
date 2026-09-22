@@ -589,6 +589,10 @@ Bash("uv run --with {{ harness_maker_src_path }} hm second_brain promote --type 
 
 #### 5.7 Intent state — three questions, answer-gated (intent layer)
 
+Apply Workflow feedback from intent-layer before these decisions. Reuse existing
+consent for the same operation; record measurement results or missing evidence in
+PLAN Feedback before the closure question. Task completion alone is not intent attainment.
+
 Print `[intent] not in use` and skip this step when `.claude/intent.yaml` is absent or `hm intent status --json` reports `state: not_filled_in`. Otherwise, in order — and **never write without the answer**:
 
 <!-- @hm:answer-gated:assumption -->
@@ -600,6 +604,13 @@ If the answer is "yes": (an id was named, or "new") run ONCE, with the arguments
 Otherwise: write nothing.
 <!-- /@hm:answer-gated -->
 
+<!-- @hm:answer-gated:outcome-measure -->
+Only when `hm intent status --json` lists a metric with `measure: true`. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Measure metrics now?"** — list each measurable metric with its `last` value and `observed_at` age from that output; options: **"yes — measure all"**, **"no"**.
+If the answer is "yes": run ONCE (it records every measurable metric that succeeds and reports the rest; a non-zero exit means one failed, never that nothing was written):
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent metric measure --all"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent metric measure --all{% endif %}
+Otherwise: write nothing.
+<!-- /@hm:answer-gated -->
+
 <!-- @hm:answer-gated:objective-close -->
 Only when the PLAN frontmatter carries `intent: <id>` (or legacy `objective: <id>`; reject conflicts). Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Close intent <id> now?"** — options: **"yes — met"**, **"yes — missed"**, **"yes — no_data"**, **"no, keep it open"**.
 If the answer is "yes": run ONCE, with the observed value chosen and a one-line note from the operator:
@@ -607,12 +618,7 @@ If the answer is "yes": run ONCE, with the observed value chosen and a one-line 
 Otherwise: write nothing.
 <!-- /@hm:answer-gated -->
 
-<!-- @hm:answer-gated:outcome-measure -->
-Only when `hm intent status --json` lists a metric with `measure: true`. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Measure metrics now?"** — list each measurable metric with its `last` value and `observed_at` age from that output; options: **"yes — measure all"**, **"no"**.
-If the answer is "yes": run ONCE (it records every measurable metric that succeeds and reports the rest; a non-zero exit means one failed, never that nothing was written):
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent metric measure --all"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent metric measure --all{% endif %}
-Otherwise: write nothing.
-<!-- /@hm:answer-gated -->
+
 
 Withdrawal: when the `hm intent status --json` output of the outcome-measure check above reports `withdrawal.due: true`, print once `[intent] withdrawal criterion met — <quiet_wrapups> wrapups since <last_signal_at or filled_at>, no fired revisit; removing the layer is the operator's call`. Otherwise print nothing.
 

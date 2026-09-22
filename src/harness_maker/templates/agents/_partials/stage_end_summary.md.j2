@@ -16,11 +16,20 @@
     command and no skill-running tool); the rest of the banner is is_codex-agnostic.
 
     P6 (PLAN-human-bottleneck-auto-advance): an autopilot auto-advance block is emitted
-    before the STOP banner for non-Codex renders. Callers MUST set `summary_stage` (this
+    before the STOP banner with a host-native continuation procedure. Callers MUST set `summary_stage` (this
     stage's atomic name) — a bare REQUIRED var: a forgotten set fails render loud under
     StrictUndefined, so a stage can never pass `--current ""` (which the CLI would treat as
     an unknown stage and clear the marker). `summary_autopilot_gate` (the stage's
     mandatory-gate predicate prose) defaults STOP-biased. -#}
+<!-- @hm:feedback-close -->
+Before close-out or stage handoff, apply Workflow feedback from the intent-layer skill;
+record the next action or stop reason in PLAN Feedback when that PLAN exists.
+For an explicitly activated trial, apply Real-task trial and update its existing row with terminal/evidence disposition through its named collector;
+a stage handoff alone does not terminate a task.
+<!-- @hm:/feedback-close -->
+{% if is_codex is defined and is_codex and config.autonomy.level != "gated" %}
+{% include "agents/_partials/codex_autopilot_advance.md.j2" %}
+{% endif %}
 {% if is_codex is defined and not is_codex and config.autonomy.level != "gated" %}
 <!-- @hm:autopilot-advance -->
 ## Auto-advance check (autopilot — Claude Code only)

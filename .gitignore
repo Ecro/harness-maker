@@ -108,6 +108,8 @@ AGENTS.md
 work-docs/*
 !work-docs/PLAN-*.md
 !work-docs/RESEARCH-*.md
+# Required native workflow evidence must survive temporary-index review freezes.
+!work-docs/EVIDENCE-world-intent-closed-loop.md
 !work-docs/REVIEW-*.md
 !work-docs/SPEC-*.md
 !work-docs/CLOSE-*.md

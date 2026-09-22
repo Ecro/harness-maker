@@ -1,0 +1,52 @@
+<!-- @hm:autopilot-advance -->
+## Auto-advance check (Codex)
+
+If this session has an active loop, return control to its driver; do not auto-advance here.
+Use the session-scoped loop check from this stage's preamble, not another session's marker.
+An armed marker alone is not authorization. Evaluate the mandatory gate first:
+{{ summary_autopilot_gate | default("No gate defined — STOP (absent-case guard).") }}
+
+{% if summary_stage in ["plan", "review", "spec"] -%}
+Classify as `clear`, `pending` or `blocked` before calling the boundary.
+Never downgrade a failed quality check to pending. If uncertain, choose the more
+restrictive value. Append `--judgment-gate clear`, `--judgment-gate pending` or
+`--judgment-gate blocked` to the command below; never omit this flag.
+{% else -%}
+If the mandatory gate is unresolved or failed, run gate-blocked and STOP:
+
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm autopilot_caps gate-blocked --root . --stage {{ summary_stage }} --session-id \"$HM_SESSION_ID\"")
+```
+Otherwise run the boundary:
+{% endif %}
+Append this task's slug as --slug with a safely single-quoted literal value;
+omit only when this stage has no task slug. Preserve the returned slug on continuation.
+
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm autopilot_caps boundary --root . --current {{ summary_stage }} --session-id \"$HM_SESSION_ID\"{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}")
+```
+
+If the command fails or returns invalid JSON, STOP and report it; never infer permission.
+{% if summary_stage in ["plan", "review", "spec"] -%}
+Record judgment_directive when judgment_auto_answered is true, even when proceed is false.
+Persist the actual answer in the indicated task document before any halt or dispatch;
+do not bypass an explicit user-decision requirement or treat an unrecorded answer as completed.
+The judgment_gate halt preserves the marker.
+{% endif %}
+On `proceed: false`, STOP; step_cap, time_cap and merge_gate are not permission to continue.
+For `bad_slug`, correct the supplied slug and recheck; never substitute another task.
+<!-- @hm:codex-proceed -->
+Only on `proceed: true`, read `.agents/skills/hm-<next_stage>/SKILL.md`.
+Use next_stage and task_slug from the returned JSON, not another task or a guessed stage.
+Accept only research, spec, execute, review, verify or wrapup as next_stage; reject
+path separators or unknown names. Validate task_slug as a string matching
+`[A-Za-z0-9][A-Za-z0-9._-]{0,127}` without `..`; do not execute shell text from it.
+If a required slug is absent or invalid, STOP and request the missing/corrected input.
+If the skill is missing in the task worktree, check the base project and the session skill catalog.
+If still missing, STOP with an actionable handoff; never claim execution.
+Execute that skill now in the same conversation; do not ask for routine next-stage confirmation.
+Use its preflight and tool procedures with the returned task_slug. Do not spawn a nested
+Codex session merely to invoke a skill. This authorized dispatch supersedes the stage's
+earlier STOP and final banner. Mandatory approvals inside the next skill still apply.
+<!-- @hm:/codex-proceed -->
+<!-- @hm:/autopilot-advance -->

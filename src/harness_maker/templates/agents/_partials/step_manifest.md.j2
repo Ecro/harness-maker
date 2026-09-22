@@ -29,13 +29,14 @@
     over: it never fired (every Codex file reached this partial with is_codex=False until
     `_is_codex_output` was derived, 2026-08-16), and had it fired it would have suppressed
     the picker on Codex — where arming demonstrably works, since it is a marker-file write.
-    Only end-of-stage auto-advance is Claude-Code-only, and the block below says so itself. -#}
+    End-of-stage continuation is host-specific: Claude Skill or Codex skill read/execute. -#}
 {% if config.autonomy.level != "gated" %}
 
 <!-- @hm:autopilot-picker -->
 > **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: {{ config.autonomy.level }}`).
-> **Arming works in any runtime**; only end-of-stage auto-advance needs Claude Code's `Skill`
-> tool. If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI
+> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`
+> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.
+> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI
 > whether autopilot is already active — **never decide this from whether the marker file
 > exists.** Nothing collects a stale one, so file-existence reads as "already armed" and
 > autopilot silently never turns on — the usual reason it looks dead.
@@ -71,3 +72,12 @@
 > `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.
 <!-- @hm:/autopilot-picker -->
 {% endif %}
+
+<!-- @hm:feedback-entry -->
+At stage entry/resume and each material observation, read and follow
+`{{ '.agents' if is_codex is defined and is_codex else '.claude' }}/skills/intent-layer/SKILL.md` → Workflow feedback
+when intent state exists. Do not wait for a user reminder to connect the evidence.
+Independently of intent availability, check for an explicitly activated trial PLAN
+at the base root in `{{ config.work_docs.dir }}`; apply Real-task trial at entry/resume and on any terminal exit, including failure or abort.
+These feedback/trial duties also apply in loop mode; only the banner/picker is skipped.
+<!-- @hm:/feedback-entry -->

@@ -33,6 +33,12 @@ Re-captures (append; never silently overwrite):
   isolated baseline directory; refresh that inherited stale hash alongside the snapshots.
   Only help/spec moved in all four arms; command sets and autonomy gates are unchanged.
 
+- **2026-09-22, `world-intent-closed-loop`** — shared entry/close feedback pointers
+  and host capability description move all stage consumers listed in the task
+  BASELINE-DELTA; execute adds PLAN links, wrapup measures before closure. Arm and
+  command sets are unchanged. Claude dispatch/gates remain unchanged; separate
+  Codex continuation tests establish the newly authorized native dispatch.
+
 - **2026-09-21, release 0.59.0** — same per-release case: 56 lines (14 commands × 4 arms), all the
   frontmatter `harness_maker_version:` key, and substituting `0.59.0` back to `0.58.0` reproduces
   every previous hash — checked across every arm, so no content moved.

@@ -1,0 +1,42 @@
+import hashlib,json,os,subprocess,tempfile
+from pathlib import Path
+from harness_maker.models import InterviewAnswers,ProjectProfile,Target
+from harness_maker.synthesize import synthesize
+from harness_maker.render import render,DEFAULT_FREEZE_TIME
+from tests.unit import world_fixture as fx
+from tests.unit.test_intent_vocabulary import _canonical
+import sys
+mode=sys.argv[1]
+variant=sys.argv[2]
+root=Path(tempfile.mkdtemp(prefix='hm-trigger-isolated-'+mode+'-'+variant+'-'))
+render(synthesize(ProjectProfile(),InterviewAnswers(targets=[Target.CODEX])),root/'.claude',freeze_time=DEFAULT_FREEZE_TIME)
+fx.build_root(root,intent=_canonical(),objectives=[fx.approved(fx.objective('FIXTURE-INTENT',outcome_id='latency',state='active'),10)])
+subprocess.run([sys.executable,'-m','harness_maker.hm','intent','--root',str(root),'migrate','--json'],check=True,capture_output=True)
+plan=root/'work-docs/PLAN-fixture-task.md';plan.write_text('---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\nNo prior dispositions.\n')
+(root/'specs').mkdir(exist_ok=True)
+(root/'specs/SPEC-fixture-task.md').write_text('---\nintent: FIXTURE-INTENT\n---\n# Fixture task\nReport the next action after the latency probe.\n')
+(root/'observation.txt').write_text('Latency probe completed at 2026-09-22T01:20:00Z: latency=7. Source: this observation.txt. No relevant trial is active.\n')
+body=(root/'.agents/skills/hm-execute/SKILL.md').read_text()
+trigger='close' if mode=='close' else 'entry'
+block=body.split('<!-- @hm:feedback-'+trigger+' -->')[1].split('<!-- @hm:/feedback-'+trigger+' -->')[0]
+if mode=='observation':
+ block=block[block.index('At stage entry'):]
+authority='Previously the user explicitly authorized recording the measured latency value from observation.txt and updating this task PLAN, but did not authorize intent closure or new tasks.' if mode!='close' else 'The user has declined metric or intent writes. Updating this task PLAN is authorized. Implementation of this fixture task is complete.'
+if variant=='removed': block=''
+prompt=f'''Fixture tool provisioning: the installed hm launcher is /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm. Substitute that executable prefix for uv run --with when the procedure calls hm; do not install dependencies.
+This is a stage-interface isolation fixture: execute only the supplied stage procedure and dependencies explicitly referenced by it (transitively). Read observation.txt and the task PLAN for ordinary task context. Do not discover additional skills through catalogs, directory searches, or unreferenced documents. This constraint is identical for present and removed variants; it isolates this stage entry point, not all host recovery mechanisms.
+Execute only the operational steps in the stage procedure below; if it contains no steps, report no action. Context and prior authorization are inputs, not extra steps. You are running an isolated workflow evaluation in this temporary project. Apply the following actual stage procedure as part of the ordinary task; do not access unrelated user/project files. Task slug fixture-task. {authority}\nTask instruction: {'Finish the task and report its outcome' if mode=='close' else ('Stage entry is already complete. Continue the current task: the running latency probe has just completed. Inspect its new result in observation.txt and report the next action; this is not task closeout.' if mode=='observation' else 'Resume the task and inspect observation.txt; report the next action')}. Source files are in this project. Resolve explicit procedure dependencies from this project.\n\n{block}\n'''
+(root/'prompt.txt').write_text(prompt)
+before={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in [root/'intent/FIXTURE-INTENT.md',root/'.claude/intent.yaml',root/'.claude/intent/metrics.yaml',plan] if p.exists()}
+cmd=['codex','exec','--ignore-user-config','--ignore-rules','--ephemeral','--skip-git-repo-check','--sandbox','workspace-write','--add-dir',str(Path.home()/'.cache/uv'),'-C',str(root),'--json','-o',str(root/'result.txt'),'-']
+print(json.dumps({'root':str(root),'mode':mode,'before':before}),flush=True)
+with (root/'events.jsonl').open('w') as out,(root/'stderr.txt').open('w') as err:
+ r=subprocess.run(cmd,input=prompt,text=True,stdout=out,stderr=err,timeout=300)
+print('exit',r.returncode,flush=True)
+print((root/'result.txt').read_text() if (root/'result.txt').exists() else (root/'stderr.txt').read_text()[-1000:],flush=True)
+after={k:hashlib.sha256((root/k).read_bytes()).hexdigest() for k in before}
+(root/'hashes.json').write_text(json.dumps({'before':before,'after':after},indent=2))
+print('hashes',json.dumps({'before':before,'after':after}),flush=True)
+print('plan',plan.read_text(),flush=True)
+
+assert (before==after) is (variant=='removed'), (variant, before, after)

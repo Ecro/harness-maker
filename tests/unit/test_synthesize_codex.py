@@ -57,7 +57,11 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     """
     answers = _make_answers(tmp_path, ["codex"])
     bp = synthesize(profile(tmp_path), answers)
-    skill_paths = [str(f.path) for f in bp.files if str(f.path).startswith(".agents/skills/")]
+    skill_paths = [
+        str(f.path)
+        for f in bp.files
+        if str(f.path).startswith(".agents/skills/") and str(f.path).endswith("/SKILL.md")
+    ]
     # existing + stages + workflows + loop + loop-p5-batch + help
     # base 9 → 10 (2026-07-30, PLAN-second-opinion-acceptance-gate ADR-011): the
     # `second-opinion-gate` skill holds the review stage's main-loop gate procedure, which

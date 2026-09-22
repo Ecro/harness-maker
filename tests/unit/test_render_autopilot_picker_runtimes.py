@@ -1,17 +1,4 @@
-"""The autopilot picker must be true in every runtime it renders into.
-
-Two different capabilities used to sit under one "Claude Code only" label:
-
-- **Arming** writes a marker file. Nothing about that is runtime-specific, and
-  `hm autopilot on --session-id ""` arms the shared degraded marker from any runtime
-  (verified by hand against a Codex session, 2026-08-16).
-- **Auto-advance** invokes the next stage through the `Skill` tool, which Cursor and Codex
-  do not have. That one really is Claude-Code-only.
-
-Collapsing them made the picker read as inapplicable to Codex, so a Codex session read its
-own rendered skill, believed autopilot was unavailable, and stood down — while the CLI it
-would have called worked the whole time. The label was the bug; nothing was missing.
-"""
+"""Arming and native stage dispatch are accurately described for both runtimes."""
 
 from __future__ import annotations
 
@@ -56,22 +43,15 @@ def test_the_picker_is_not_labelled_claude_code_only(bodies: dict[str, str]) -> 
     for runtime, body in bodies.items():
         assert "Autopilot session start (Claude Code only)" not in body, (
             f"{runtime}: the picker claims to be Claude-Code-only again. Arming is a marker "
-            "file write and works everywhere; only auto-advance needs the Skill tool."
+            "file write and works everywhere."
         )
 
 
-def test_the_picker_separates_arming_from_auto_advance(bodies: dict[str, str]) -> None:
-    """Both halves, because dropping the label without the distinction is the other failure.
-
-    Saying only "autopilot works in Codex" would be wrong in the opposite direction: stages
-    do NOT chain themselves there. The block has to carry both facts or it trades one wrong
-    reading for another.
-    """
-    for runtime, body in bodies.items():
-        assert "Arming works in any runtime" in body, f"{runtime}: arming not stated"
-        limit = f"{runtime}: the auto-advance limit is not stated, so a Codex reader will "
-        assert "Skill" in body, limit + "expect stages to chain themselves"
-        assert "auto-advance" in body.lower(), limit + "not know what needs the Skill tool"
+def test_the_picker_names_native_continuation(bodies: dict[str, str]) -> None:
+    for body in bodies.values():
+        assert "Arming works in any runtime" in body
+        assert "Codex's next-skill read/execute procedure" in body
+        assert "Cursor retains the handoff path" in body
 
 
 def test_the_degraded_branch_calls_codex_normal_rather_than_broken(
@@ -95,29 +75,13 @@ def test_the_degraded_branch_calls_codex_normal_rather_than_broken(
         )
 
 
-def test_auto_advance_stays_claude_code_only(bodies: dict[str, str]) -> None:
-    """The half that IS runtime-specific must not be broadened by a future edit here.
-
-    Auto-advance calls the next stage through the `Skill` tool. Telling a Codex session it
-    auto-advances would leave it waiting for a chain that cannot happen.
-    """
-    claude = bodies["claude"]
-    assert "@hm:autopilot-advance" in claude
-    assert "Claude" in claude
+def test_claude_retains_skill_dispatch(bodies: dict[str, str]) -> None:
+    assert "Skill(hm:<next_stage" in bodies["claude"]
 
 
-def test_codex_gets_the_picker_but_not_the_auto_advance_block(bodies: dict[str, str]) -> None:
-    """The two halves separate at RENDER time too, not only in the prose.
-
-    This pairing is the whole point: Codex can arm (marker file write) and cannot chain
-    (no `Skill` tool). Until `_is_codex_output` was derived on 2026-08-16 the split did not
-    exist — every Codex file rendered with `is_codex=False`, so the `not is_codex` gate on
-    `stage_end_summary.md.j2` never fired and Codex stage skills shipped an auto-advance
-    block they had no way to execute.
-    """
+def test_codex_gets_picker_and_native_auto_advance(bodies: dict[str, str]) -> None:
     codex = bodies["codex"]
-    assert "@hm:autopilot-picker" in codex, "Codex lost the picker — it CAN arm"
-    assert "@hm:autopilot-advance" not in codex, (
-        "Codex renders the auto-advance block, which invokes the next stage through the "
-        "`Skill` tool that Codex does not have — it will wait for a chain that cannot happen"
-    )
+    assert "@hm:autopilot-picker" in codex
+    assert "@hm:autopilot-advance" in codex
+    assert ".agents/skills/hm-<next_stage>/SKILL.md" in codex
+    assert "Skill(hm:<next_stage" not in codex

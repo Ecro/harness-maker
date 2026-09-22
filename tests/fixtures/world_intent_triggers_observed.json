@@ -1,0 +1,1163 @@
+{
+  "scope": "Native Codex stage-interface dependency isolation; not a claim about all host recovery paths",
+  "runs": {
+    "entry_present": {
+      "root": "/tmp/hm-trigger-isolated-entry-present-yfpg466b",
+      "prompt": "Fixture tool provisioning: the installed hm launcher is /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm. Substitute that executable prefix for uv run --with when the procedure calls hm; do not install dependencies.\nThis is a stage-interface isolation fixture: execute only the supplied stage procedure and dependencies explicitly referenced by it (transitively). Read observation.txt and the task PLAN for ordinary task context. Do not discover additional skills through catalogs, directory searches, or unreferenced documents. This constraint is identical for present and removed variants; it isolates this stage entry point, not all host recovery mechanisms.\nExecute only the operational steps in the stage procedure below; if it contains no steps, report no action. Context and prior authorization are inputs, not extra steps. You are running an isolated workflow evaluation in this temporary project. Apply the following actual stage procedure as part of the ordinary task; do not access unrelated user/project files. Task slug fixture-task. Previously the user explicitly authorized recording the measured latency value from observation.txt and updating this task PLAN, but did not authorize intent closure or new tasks.\nTask instruction: Resume the task and inspect observation.txt; report the next action. Source files are in this project. Resolve explicit procedure dependencies from this project.\n\n\nAt stage entry/resume and each material observation, read and follow\n`.agents/skills/intent-layer/SKILL.md` \u2192 Workflow feedback\nwhen intent state exists. Do not wait for a user reminder to connect the evidence.\nIndependently of intent availability, check for an explicitly activated trial PLAN\nat the base root in `work-docs/`; apply Real-task trial at entry/resume and on any terminal exit, including failure or abort.\nThese feedback/trial duties also apply in loop mode; only the banner/picker is skipped.\n\n",
+      "hashes": {
+        "before": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        },
+        "after": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "8ce8116dd18311ffbacae01a697f941f1857a24004b0ec40e48f08e0196b42d2",
+          "work-docs/PLAN-fixture-task.md": "1d94e5e5d5a5df082f2721696d230df34adaedbadc6f14ee6aa2e1fc5a2520c8"
+        }
+      },
+      "plan": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\n| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |\n|---|---|---|---|---|---|---|\n| [observation.txt](../observation.txt), line 1; 2026-09-22T01:20:00Z | [FIXTURE-INTENT](../intent/FIXTURE-INTENT.md); [latency definition](../.claude/intent.yaml) | Recorded in [metrics](../.claude/intent/metrics.yaml); status readback confirmed `at_or_better` | Metric target met; this alone does not establish the broader intent outcome. Stop: no further authorized stage work remains. | agent; user owns closure decision | Prior explicit authorization to record the measured latency and update this PLAN; closure and new tasks are not authorized | User decision on whether the evidence supports intent closure; keep intent active pending that decision. |\n\nReal-task trial: checked base-root `work-docs/` at resume and terminal exit; no explicitly activated trial PLAN exists. No trial action applies.\n",
+      "result": "Recorded latency **7**; readback confirms it meets target **10**.\n\n`changed: .claude/intent/metrics.yaml`\n\nUpdated [task PLAN](/tmp/hm-trigger-isolated-entry-present-yfpg466b/work-docs/PLAN-fixture-task.md). No active trial exists.\n\nNext action: your decision on whether the evidence supports intent closure. The intent remains active; no new tasks were created.",
+      "metrics": "schema_version: 1\nvalues:\n- value: 7\n  observed_at: '2026-09-22T01:20:00Z'\n  evidence: observation.txt\n  definition_hash: 43b3d603a9ba25f94acd47be9bf220585ee5d47525127d68a9685279618fcd61\n  metric_id: latency\n",
+      "events": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0c6d6-4da8-7df3-af3f-c25f15f1499a"
+        },
+        {
+          "type": "turn.started"
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_0",
+            "type": "agent_message",
+            "text": "I\u2019ll inspect the observation, task PLAN, and referenced feedback procedure to determine the next action."
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'pwd; cat observation.txt; cat .agents/skills/intent-layer/SKILL.md; rg --files work-docs'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'pwd; cat observation.txt; cat .agents/skills/intent-layer/SKILL.md; rg --files work-docs'",
+            "aggregated_output": "/tmp/hm-trigger-isolated-entry-present-yfpg466b\nLatency probe completed at 2026-09-22T01:20:00Z: latency=7. Source: this observation.txt. No relevant trial is active.\n---\ngenerated_by: harness-maker\nharness_maker_version: 0.59.0\ngenerated_at: '2026-01-01T00:00:00+00:00'\nsource_template: skills/intent-layer/SKILL.md.j2\nprovenance: official\nname: intent-layer\ndescription: Deep-interview the creator before creating intents; improve intent quality,\n  record what was observed, close/approve/drop, or report where things stand, what\n  to do next and gaps. Ask before writes.\ncontent_hash: 75a7e0b3072d6ba88c9ec16d38a5e6cc093552dd66fa440b6bd23af829c029da\n---\n\n# intent-layer\n\nTranslate matching prose into one `hm intent` verb; creation requires the deep interview and quality review below.\nWorkflow stages may load feedback without a separate mention; intent changes still require consent.\n\n**Read freely, write only on an answer.** `hm intent status --json` is read-only, LLM-free and\nfree to run whenever the operator asks where things stand. Mutation verbs write only after consent.\n\nDistinct nonblank `owners` roles trigger an advisory at approval, never a block.\n`approved_by` is an unverified git config string; real separation requires\nCODEOWNERS + branch protection. Empty or identical roles stay silent.\n\nOne intent may serve multiple SPECs (1:N); the record is `intent/<ID>.md`.\n`hm intent migrate --json` preserves record body bytes, approvals and historical clocks;\nRun it before the first canonical write. Reads accept legacy files without rewriting them.\n\nWorkflow feedback: read and follow `references/workflow-feedback.md` at workflow triggers.\n\n## The verbs (full argument forms)\n\n```\nhm intent status --json\nhm intent question add <id> --claim --status <open|confirmed|wrong> [--text --observed-at [--locator <path:A-B>]]\nhm intent question observe <id> --relation <confirms|supersedes|contradicts> --text --observed-at [--claim] [--locator <path:A-B>]\nhm intent question resolve <id> --status --claim\nhm intent metric record <id> --value --observed-at --evidence\nhm intent new <id> --title --statement --scope --metric [--out-of-scope] [--from-proposal --candidates <N> [--declined <title>]\u2026]\nhm intent <approve|activate|drop|reopen> <id>\nhm intent close <id> --observed <met|missed|no_data> --note\nhm intent show <id> --json\n```\n\nPrefix each with `uv run --with $HOME/harness-maker/.worktrees/world-intent-closed-loop` as every other mandated call\nin this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp; `supersedes`\nneeds `--claim`; `close` needs both `--observed` and `--note`.\n`--locator <path:A-B>` cites at most 40 lines of this checkout by content; `status --json` then\nreports `stale_evidence` when that text changed (approval checks never read cited files).\n\n## The rule for every write\n\n1. Work out the verb and its arguments from what the operator said; read `status` first when\n   an id is ambiguous.\n2. Ask with `request_user_input`, showing the exact arguments\n   you are about to pass.\n3. On an affirmative answer, run the write once with those arguments and show the CLI's\n   `changed:` line.\n4. Otherwise \u2014 on any other answer or no answer \u2014 write nothing. Do not retry, rephrase or infer consent.\n\n## Creation: mandatory deep interview and quality review\n\nApply to direct creation, accepted proposals, and drafts requested by another workflow stage.\nInterview the intent creator before `new`; a one-line request or candidate selection is not a completed interview.\nReuse explicit answers from this conversation; ask the creator to correct the synthesis and probe remaining gaps.\nUse `request_user_input_async` when available, or ask in chat and wait; use `request_user_input` only where allowed.\nAsk one to three adaptive multiple-choice questions per round, with concrete, distinct proposals.\nPut the recommended option first, label it, and briefly explain why; always offer a final free-text Other path.\nUse the question tool's built-in Other input when present; otherwise add Other explicitly. Do not lead with free-text-only questions.\nCover: problem and affected users; desired observable change and why now; evidence and assumptions;\nsuccess measure, baseline, target and measurement method; scope, exclusions and tradeoffs;\ndecision owner, feedback timing and what happens on success, failure or missing data.\nWhen artifacts or workflow are affected, cover discoverability, authoritative records, placement rationale,\nexisting conventions and compatibility. Do not impose a folder migration on unrelated intents.\nProbe vague goals with a concrete success example and a counterexample that would not count as success.\nSeparate creator answers, observed evidence and agent suggestions; never manufacture targets or claim a baseline.\nIf no existing metric fits, discuss a suitable definition with the creator; never silently add one or use an unrelated metric.\nStop asking when the creator has resolved the material gaps; preserve implementation questions for the SPEC.\nWithout answers, keep a conversational draft and explain the missing decisions; do not run `new`.\n\nBefore writing, proactively critique clarity, outcome relevance, measurability, scope coherence, evidence,\ndecision/feedback ownership, and overlap with existing or rejected intents. Fix wording; interview for missing decisions.\nShow the proposed statement, scope/exclusions, metric and evidence, responsibilities, and remaining questions.\nFlag proxy metrics that can pass without the intended outcome; require complementary completion evidence where needed.\nMaterial gaps prevent creation until answered; implementation details may remain explicitly deferred.\nObtain the creator's confirmation of this concrete draft under the write rule, then create it as `proposed`.\nPopulate the Markdown body's Problem, Proposed outcome, Affected users and systems, Constraints and Open questions\nfrom the confirmed draft, preserving the CLI-owned frontmatter; do not leave unexplained empty sections.\nRead back the record and status, check references and consistency with the confirmed draft, and report any error.\nOn quality-review requests or substantive revisions, apply this critique without waiting to be asked about each gap;\nreuse existing answers and interview only for changed or missing decisions. Never reopen or alter terminal records.\n\n## Proposing intents (only when the operator asks what to do next / where the gaps are)\n\n1. Run `hm intent status --json` \u2014 read-only, LLM-free. On `state: invalid` print the error and stop;\n   on `not_filled_in` say the purpose and metrics are unwritten and stop.\n2. Open with a **measure first** block: every metric whose `reason` is `never_measured` or\n   `stale_definition`, with its `how_measured` \u2014 those are gaps in evidence, not in the code.\n   For the ones with `measure: true`, run `hm intent metric measure --all --dry-run` and show\n   the table; the record call is `hm intent metric measure --all`, gated by\n   \"The rule for every write\" above (ask once, run once on yes, otherwise write nothing).\n3. Read the codebase against the measured metrics' `gap` and propose **at most three**\n   candidates, unranked, each with `title / statement / scope / out_of_scope / metric / evidence /\n   overlaps-with`. A candidate for an unmeasured metric carries\n   `evidence: none \u2014 statement only`. `overlaps-with` names any intent (any state,\n   especially `closed` + `observed:\n   missed`) or any `rejected[]` entry the candidate resembles \u2014 never silently re-propose it.\n4. Then ask about each candidate in turn with `request_user_input` (yes / no), and\n   answer every candidate before the first write: the declined titles go into every accepted\n   record's `rejected[]`.\n5. Then, once per accepted candidate, show the exact arguments and run\n   `hm intent new <ID> \u2026 --from-proposal --candidates <N> --declined \"<title>\"\u2026`\n   only after its deep interview and quality review (`N` = candidates shown; one `--declined` per no).\n   Nothing else persists a candidate.\n6. The record is `proposed`; the proposer never runs `approve` \u2014 that stamp is the operator's.\n\nWhat the harness guarantees is narrow: the record changes only through these verbs, a terminal\nintent never changes, and the autopilot gate reads the approval you record. Whether the work\nserves the intent is the operator's judgment and `/hm:review`'s Step 3.3, not this skill's.\nwork-docs/PLAN-fixture-task.md\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat .agents/skills/intent-layer/references/workflow-feedback.md work-docs/PLAN-fixture-task.md; /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat .agents/skills/intent-layer/references/workflow-feedback.md work-docs/PLAN-fixture-task.md; /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "{\"state\": \"ok\", \"conflicts\": [], \"fired_revisits\": [], \"broken_references\": [], \"withdrawal\": {\"filled_at\": null, \"last_signal_at\": \"2026-09-02T00:00:00Z\", \"quiet_wrapups\": null, \"revisit_candidates_now\": 0, \"due\": false, \"reason\": \"no_stage_spans\"}, \"stale_evidence\": {}, \"moved_evidence\": {}, \"needs_revalidation\": [], \"purpose\": {\"statement\": \"\ube60\ub974\uac8c ship\", \"vision\": \"keep quality\"}, \"metrics\": {\"latency\": {\"last\": null, \"target\": 10, \"observed_at\": null, \"gap\": \"unevaluable\", \"stale_definition\": false, \"reason\": \"never_measured\", \"how_measured\": \"stopwatch\", \"higher_is_better\": false, \"measure\": false}}, \"intents\": {\"FIXTURE-INTENT\": {\"state\": \"active\", \"title\": \"FIXTURE-INTENT title\", \"observed\": null, \"rejected\": [], \"scope\": [\"cut the interview to one round\"], \"statement\": \"shorter onboarding keeps users\", \"metric_id\": \"latency\", \"out_of_scope\": [\"rewrite the renderer\"]}}, \"open_questions\": [{\"id\": \"q_runtime\", \"claim\": \"Which runtime?\", \"status\": \"open\", \"evidence\": [], \"history\": []}], \"revisits\": {\"FIXTURE-INTENT\": {\"title\": \"FIXTURE-INTENT title\", \"condition\": null, \"last_value\": null, \"result\": \"unevaluable\", \"blocked\": false, \"intent\": \"FIXTURE-INTENT\"}}, \"active\": {\"FIXTURE-INTENT\": {\"approval_valid\": true, \"needs_revalidation\": false}}, \"proposed\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "I\u2019m applying the intent-layer workflow feedback procedure. The measured latency is 7, below the target of 10. I\u2019ll record it and update the PLAN under your prior authorization. No trial PLAN is present."
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_4",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent migrate --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_4",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent migrate --json'",
+            "aggregated_output": "{\"changed\": [], \"retired\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_5",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent metric record latency --value 7 --observed-at 2026-09-22T01:20:00Z --evidence observation.txt'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_5",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent metric record latency --value 7 --observed-at 2026-09-22T01:20:00Z --evidence observation.txt'",
+            "aggregated_output": "value:\n  value: 7\n  observed_at: '2026-09-22T01:20:00Z'\n  evidence: observation.txt\n  definition_hash: 43b3d603a9ba25f94acd47be9bf220585ee5d47525127d68a9685279618fcd61\n  metric_id: latency\nchanged: .claude/intent/metrics.yaml\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_6",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_6",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "{\"state\": \"ok\", \"conflicts\": [], \"fired_revisits\": [], \"broken_references\": [], \"withdrawal\": {\"filled_at\": null, \"last_signal_at\": \"2026-09-22T01:20:00Z\", \"quiet_wrapups\": null, \"revisit_candidates_now\": 0, \"due\": false, \"reason\": \"no_stage_spans\"}, \"stale_evidence\": {}, \"moved_evidence\": {}, \"needs_revalidation\": [], \"purpose\": {\"statement\": \"\ube60\ub974\uac8c ship\", \"vision\": \"keep quality\"}, \"metrics\": {\"latency\": {\"last\": 7, \"target\": 10, \"observed_at\": \"2026-09-22T01:20:00Z\", \"gap\": \"at_or_better\", \"stale_definition\": false, \"reason\": \"measured\", \"how_measured\": \"stopwatch\", \"higher_is_better\": false, \"measure\": false}}, \"intents\": {\"FIXTURE-INTENT\": {\"state\": \"active\", \"title\": \"FIXTURE-INTENT title\", \"observed\": null, \"rejected\": [], \"scope\": [\"cut the interview to one round\"], \"statement\": \"shorter onboarding keeps users\", \"metric_id\": \"latency\", \"out_of_scope\": [\"rewrite the renderer\"]}}, \"open_questions\": [{\"id\": \"q_runtime\", \"claim\": \"Which runtime?\", \"status\": \"open\", \"evidence\": [], \"history\": []}], \"revisits\": {\"FIXTURE-INTENT\": {\"title\": \"FIXTURE-INTENT title\", \"condition\": null, \"last_value\": null, \"result\": \"unevaluable\", \"blocked\": false, \"intent\": \"FIXTURE-INTENT\"}}, \"active\": {\"FIXTURE-INTENT\": {\"approval_valid\": true, \"needs_revalidation\": false}}, \"proposed\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_7",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/tmp/hm-trigger-isolated-entry-present-yfpg466b/work-docs/PLAN-fixture-task.md",
+                "kind": "update"
+              }
+            ],
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_7",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/tmp/hm-trigger-isolated-entry-present-yfpg466b/work-docs/PLAN-fixture-task.md",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_8",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat work-docs/PLAN-fixture-task.md; rg --files work-docs'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_8",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat work-docs/PLAN-fixture-task.md; rg --files work-docs'",
+            "aggregated_output": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\n| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |\n|---|---|---|---|---|---|---|\n| [observation.txt](../observation.txt), line 1; 2026-09-22T01:20:00Z | [FIXTURE-INTENT](../intent/FIXTURE-INTENT.md); [latency definition](../.claude/intent.yaml) | Recorded in [metrics](../.claude/intent/metrics.yaml); status readback confirmed `at_or_better` | Metric target met; this alone does not establish the broader intent outcome. Stop: no further authorized stage work remains. | agent; user owns closure decision | Prior explicit authorization to record the measured latency and update this PLAN; closure and new tasks are not authorized | User decision on whether the evidence supports intent closure; keep intent active pending that decision. |\n\nReal-task trial: checked base-root `work-docs/` at resume and terminal exit; no explicitly activated trial PLAN exists. No trial action applies.\nwork-docs/PLAN-fixture-task.md\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_9",
+            "type": "agent_message",
+            "text": "Recorded latency **7**; readback confirms it meets target **10**.\n\n`changed: .claude/intent/metrics.yaml`\n\nUpdated [task PLAN](/tmp/hm-trigger-isolated-entry-present-yfpg466b/work-docs/PLAN-fixture-task.md). No active trial exists.\n\nNext action: your decision on whether the evidence supports intent closure. The intent remains active; no new tasks were created."
+          }
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 149185,
+            "cached_input_tokens": 136192,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 845,
+            "reasoning_output_tokens": 23
+          }
+        }
+      ],
+      "events_sha256": "49a7ff2b2edee130f2144300b68191850faa65371cfec78e1782db86673e3925"
+    },
+    "entry_removed": {
+      "root": "/tmp/hm-trigger-isolated-entry-removed-1sbtuyd5",
+      "prompt": "Fixture tool provisioning: the installed hm launcher is /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm. Substitute that executable prefix for uv run --with when the procedure calls hm; do not install dependencies.\nThis is a stage-interface isolation fixture: execute only the supplied stage procedure and dependencies explicitly referenced by it (transitively). Read observation.txt and the task PLAN for ordinary task context. Do not discover additional skills through catalogs, directory searches, or unreferenced documents. This constraint is identical for present and removed variants; it isolates this stage entry point, not all host recovery mechanisms.\nExecute only the operational steps in the stage procedure below; if it contains no steps, report no action. Context and prior authorization are inputs, not extra steps. You are running an isolated workflow evaluation in this temporary project. Apply the following actual stage procedure as part of the ordinary task; do not access unrelated user/project files. Task slug fixture-task. Previously the user explicitly authorized recording the measured latency value from observation.txt and updating this task PLAN, but did not authorize intent closure or new tasks.\nTask instruction: Resume the task and inspect observation.txt; report the next action. Source files are in this project. Resolve explicit procedure dependencies from this project.\n\n\n",
+      "hashes": {
+        "before": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        },
+        "after": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        }
+      },
+      "plan": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\nNo prior dispositions.\n",
+      "result": "`observation.txt` records latency=7 and no active trial. The task PLAN has no prior dispositions.\n\nNo stage procedure steps were supplied, so no action was taken and no files were changed. The next action is to supply the stage procedure.",
+      "metrics": "schema_version: 1\nvalues: []\n",
+      "events": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0c6d7-1036-75a2-a8e2-4770d6273b04"
+        },
+        {
+          "type": "turn.started"
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_0",
+            "type": "agent_message",
+            "text": "I\u2019ll inspect `observation.txt` and the task PLAN, then report the next action under the supplied stage procedure.\n"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'pwd; cat observation.txt; if [ -f work-docs/PLAN-fixture-task.md ]; then cat work-docs/PLAN-fixture-task.md; elif [ -f work-docs/fixture-task/PLAN.md ]; then cat work-docs/fixture-task/PLAN.md; fi'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'pwd; cat observation.txt; if [ -f work-docs/PLAN-fixture-task.md ]; then cat work-docs/PLAN-fixture-task.md; elif [ -f work-docs/fixture-task/PLAN.md ]; then cat work-docs/fixture-task/PLAN.md; fi'",
+            "aggregated_output": "/tmp/hm-trigger-isolated-entry-removed-1sbtuyd5\nLatency probe completed at 2026-09-22T01:20:00Z: latency=7. Source: this observation.txt. No relevant trial is active.\n---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\nNo prior dispositions.\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_2",
+            "type": "agent_message",
+            "text": "`observation.txt` records latency=7 and no active trial. The task PLAN has no prior dispositions.\n\nNo stage procedure steps were supplied, so no action was taken and no files were changed. The next action is to supply the stage procedure."
+          }
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 35020,
+            "cached_input_tokens": 28672,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 170,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "events_sha256": "f21fcdbb30408777d3353113fe7c3f20012f270fd73650983f3747700fa635e3"
+    },
+    "observation_present": {
+      "root": "/tmp/hm-trigger-isolated-observation-present-08y3157r",
+      "prompt": "Fixture tool provisioning: the installed hm launcher is /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm. Substitute that executable prefix for uv run --with when the procedure calls hm; do not install dependencies.\nThis is a stage-interface isolation fixture: execute only the supplied stage procedure and dependencies explicitly referenced by it (transitively). Read observation.txt and the task PLAN for ordinary task context. Do not discover additional skills through catalogs, directory searches, or unreferenced documents. This constraint is identical for present and removed variants; it isolates this stage entry point, not all host recovery mechanisms.\nExecute only the operational steps in the stage procedure below; if it contains no steps, report no action. Context and prior authorization are inputs, not extra steps. You are running an isolated workflow evaluation in this temporary project. Apply the following actual stage procedure as part of the ordinary task; do not access unrelated user/project files. Task slug fixture-task. Previously the user explicitly authorized recording the measured latency value from observation.txt and updating this task PLAN, but did not authorize intent closure or new tasks.\nTask instruction: Stage entry is already complete. Continue the current task: the running latency probe has just completed. Inspect its new result in observation.txt and report the next action; this is not task closeout.. Source files are in this project. Resolve explicit procedure dependencies from this project.\n\nAt stage entry/resume and each material observation, read and follow\n`.agents/skills/intent-layer/SKILL.md` \u2192 Workflow feedback\nwhen intent state exists. Do not wait for a user reminder to connect the evidence.\nIndependently of intent availability, check for an explicitly activated trial PLAN\nat the base root in `work-docs/`; apply Real-task trial at entry/resume and on any terminal exit, including failure or abort.\nThese feedback/trial duties also apply in loop mode; only the banner/picker is skipped.\n\n",
+      "hashes": {
+        "before": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        },
+        "after": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "db22250ca01724a14c878eec05d2f66b84fd31f6af184e80d55ea67f3ac45a30",
+          "work-docs/PLAN-fixture-task.md": "962c4942f37c7bd5ecf5a0c42e151a23e87e60fd04ac90f38ce16af28fc78f8d"
+        }
+      },
+      "plan": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\n| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |\n|---|---|---|---|---|---|---|\n| [Probe result](../observation.txt) line 1, 2026-09-22T01:20:00Z | [FIXTURE-INTENT](../intent/FIXTURE-INTENT.md); [latency definition](../.claude/intent.yaml); [measurement](../.claude/intent/metrics.yaml) | Recorded + status readback confirmed | Latency 7 meets target 10 (lower is better); this supports the metric outcome, not intent closure. | agent | Prior explicit authorization to record this measurement and update this PLAN | Evidence update complete. Pause at this intermediate handoff: no further operational task steps were supplied. Resume fixture-task when its next authorized procedure is supplied; do not close the intent or create a new task. |\n\nTrial check at resume: no explicitly activated trial PLAN exists in base-root `work-docs/`. This is an intermediate handoff, not task termination.\n",
+      "result": "Recorded latency **7**; readback confirms it meets the target of **10 or less**.\n\n`changed: .claude/intent/metrics.yaml`\n\nUpdated the task PLAN\u2019s Feedback. Next action: resume fixture-task with its next authorized procedure; none was supplied here. The intent remains active, and this is not task closeout.",
+      "metrics": "schema_version: 1\nvalues:\n- value: 7\n  observed_at: '2026-09-22T01:20:00Z'\n  evidence: observation.txt:1\n  definition_hash: 43b3d603a9ba25f94acd47be9bf220585ee5d47525127d68a9685279618fcd61\n  metric_id: latency\n",
+      "events": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0c6db-0266-7cc0-b7ff-f10825548a81"
+        },
+        {
+          "type": "turn.started"
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_0",
+            "type": "agent_message",
+            "text": "I\u2019ll read the probe result, task PLAN, and referenced feedback procedure to determine the next action."
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat observation.txt; cat .agents/skills/intent-layer/SKILL.md'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat observation.txt; cat .agents/skills/intent-layer/SKILL.md'",
+            "aggregated_output": "Latency probe completed at 2026-09-22T01:20:00Z: latency=7. Source: this observation.txt. No relevant trial is active.\n---\ngenerated_by: harness-maker\nharness_maker_version: 0.59.0\ngenerated_at: '2026-01-01T00:00:00+00:00'\nsource_template: skills/intent-layer/SKILL.md.j2\nprovenance: official\nname: intent-layer\ndescription: Deep-interview the creator before creating intents; improve intent quality,\n  record what was observed, close/approve/drop, or report where things stand, what\n  to do next and gaps. Ask before writes.\ncontent_hash: 75a7e0b3072d6ba88c9ec16d38a5e6cc093552dd66fa440b6bd23af829c029da\n---\n\n# intent-layer\n\nTranslate matching prose into one `hm intent` verb; creation requires the deep interview and quality review below.\nWorkflow stages may load feedback without a separate mention; intent changes still require consent.\n\n**Read freely, write only on an answer.** `hm intent status --json` is read-only, LLM-free and\nfree to run whenever the operator asks where things stand. Mutation verbs write only after consent.\n\nDistinct nonblank `owners` roles trigger an advisory at approval, never a block.\n`approved_by` is an unverified git config string; real separation requires\nCODEOWNERS + branch protection. Empty or identical roles stay silent.\n\nOne intent may serve multiple SPECs (1:N); the record is `intent/<ID>.md`.\n`hm intent migrate --json` preserves record body bytes, approvals and historical clocks;\nRun it before the first canonical write. Reads accept legacy files without rewriting them.\n\nWorkflow feedback: read and follow `references/workflow-feedback.md` at workflow triggers.\n\n## The verbs (full argument forms)\n\n```\nhm intent status --json\nhm intent question add <id> --claim --status <open|confirmed|wrong> [--text --observed-at [--locator <path:A-B>]]\nhm intent question observe <id> --relation <confirms|supersedes|contradicts> --text --observed-at [--claim] [--locator <path:A-B>]\nhm intent question resolve <id> --status --claim\nhm intent metric record <id> --value --observed-at --evidence\nhm intent new <id> --title --statement --scope --metric [--out-of-scope] [--from-proposal --candidates <N> [--declined <title>]\u2026]\nhm intent <approve|activate|drop|reopen> <id>\nhm intent close <id> --observed <met|missed|no_data> --note\nhm intent show <id> --json\n```\n\nPrefix each with `uv run --with $HOME/harness-maker/.worktrees/world-intent-closed-loop` as every other mandated call\nin this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp; `supersedes`\nneeds `--claim`; `close` needs both `--observed` and `--note`.\n`--locator <path:A-B>` cites at most 40 lines of this checkout by content; `status --json` then\nreports `stale_evidence` when that text changed (approval checks never read cited files).\n\n## The rule for every write\n\n1. Work out the verb and its arguments from what the operator said; read `status` first when\n   an id is ambiguous.\n2. Ask with `request_user_input`, showing the exact arguments\n   you are about to pass.\n3. On an affirmative answer, run the write once with those arguments and show the CLI's\n   `changed:` line.\n4. Otherwise \u2014 on any other answer or no answer \u2014 write nothing. Do not retry, rephrase or infer consent.\n\n## Creation: mandatory deep interview and quality review\n\nApply to direct creation, accepted proposals, and drafts requested by another workflow stage.\nInterview the intent creator before `new`; a one-line request or candidate selection is not a completed interview.\nReuse explicit answers from this conversation; ask the creator to correct the synthesis and probe remaining gaps.\nUse `request_user_input_async` when available, or ask in chat and wait; use `request_user_input` only where allowed.\nAsk one to three adaptive multiple-choice questions per round, with concrete, distinct proposals.\nPut the recommended option first, label it, and briefly explain why; always offer a final free-text Other path.\nUse the question tool's built-in Other input when present; otherwise add Other explicitly. Do not lead with free-text-only questions.\nCover: problem and affected users; desired observable change and why now; evidence and assumptions;\nsuccess measure, baseline, target and measurement method; scope, exclusions and tradeoffs;\ndecision owner, feedback timing and what happens on success, failure or missing data.\nWhen artifacts or workflow are affected, cover discoverability, authoritative records, placement rationale,\nexisting conventions and compatibility. Do not impose a folder migration on unrelated intents.\nProbe vague goals with a concrete success example and a counterexample that would not count as success.\nSeparate creator answers, observed evidence and agent suggestions; never manufacture targets or claim a baseline.\nIf no existing metric fits, discuss a suitable definition with the creator; never silently add one or use an unrelated metric.\nStop asking when the creator has resolved the material gaps; preserve implementation questions for the SPEC.\nWithout answers, keep a conversational draft and explain the missing decisions; do not run `new`.\n\nBefore writing, proactively critique clarity, outcome relevance, measurability, scope coherence, evidence,\ndecision/feedback ownership, and overlap with existing or rejected intents. Fix wording; interview for missing decisions.\nShow the proposed statement, scope/exclusions, metric and evidence, responsibilities, and remaining questions.\nFlag proxy metrics that can pass without the intended outcome; require complementary completion evidence where needed.\nMaterial gaps prevent creation until answered; implementation details may remain explicitly deferred.\nObtain the creator's confirmation of this concrete draft under the write rule, then create it as `proposed`.\nPopulate the Markdown body's Problem, Proposed outcome, Affected users and systems, Constraints and Open questions\nfrom the confirmed draft, preserving the CLI-owned frontmatter; do not leave unexplained empty sections.\nRead back the record and status, check references and consistency with the confirmed draft, and report any error.\nOn quality-review requests or substantive revisions, apply this critique without waiting to be asked about each gap;\nreuse existing answers and interview only for changed or missing decisions. Never reopen or alter terminal records.\n\n## Proposing intents (only when the operator asks what to do next / where the gaps are)\n\n1. Run `hm intent status --json` \u2014 read-only, LLM-free. On `state: invalid` print the error and stop;\n   on `not_filled_in` say the purpose and metrics are unwritten and stop.\n2. Open with a **measure first** block: every metric whose `reason` is `never_measured` or\n   `stale_definition`, with its `how_measured` \u2014 those are gaps in evidence, not in the code.\n   For the ones with `measure: true`, run `hm intent metric measure --all --dry-run` and show\n   the table; the record call is `hm intent metric measure --all`, gated by\n   \"The rule for every write\" above (ask once, run once on yes, otherwise write nothing).\n3. Read the codebase against the measured metrics' `gap` and propose **at most three**\n   candidates, unranked, each with `title / statement / scope / out_of_scope / metric / evidence /\n   overlaps-with`. A candidate for an unmeasured metric carries\n   `evidence: none \u2014 statement only`. `overlaps-with` names any intent (any state,\n   especially `closed` + `observed:\n   missed`) or any `rejected[]` entry the candidate resembles \u2014 never silently re-propose it.\n4. Then ask about each candidate in turn with `request_user_input` (yes / no), and\n   answer every candidate before the first write: the declined titles go into every accepted\n   record's `rejected[]`.\n5. Then, once per accepted candidate, show the exact arguments and run\n   `hm intent new <ID> \u2026 --from-proposal --candidates <N> --declined \"<title>\"\u2026`\n   only after its deep interview and quality review (`N` = candidates shown; one `--declined` per no).\n   Nothing else persists a candidate.\n6. The record is `proposed`; the proposer never runs `approve` \u2014 that stamp is the operator's.\n\nWhat the harness guarantees is narrow: the record changes only through these verbs, a terminal\nintent never changes, and the autopilot gate reads the approval you record. Whether the work\nserves the intent is the operator's judgment and `/hm:review`'s Step 3.3, not this skill's.\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'ls work-docs'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'ls work-docs'",
+            "aggregated_output": "PLAN-fixture-task.md\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_3",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat .agents/skills/intent-layer/references/workflow-feedback.md; cat work-docs/PLAN-fixture-task.md'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat .agents/skills/intent-layer/references/workflow-feedback.md; cat work-docs/PLAN-fixture-task.md'",
+            "aggregated_output": "---\ngenerated_by: harness-maker\nharness_maker_version: 0.59.0\ngenerated_at: '2026-01-01T00:00:00+00:00'\nsource_template: skills/intent-layer/references/workflow-feedback.md.j2\nprovenance: official\ncontent_hash: e25c9f36adffbe5dde866a3094094b46367122c6ad99ad865ba3163f6a61b473\n---\n## Workflow feedback\n\nThe workflow agent owns this connection at stage entry/resume, each material\nobservation, and close-out. Read `hm intent status --json` through the launcher\nbelow; load the task's SPEC/PLAN intent link and existing Feedback dispositions.\nIf status is not_filled_in, skip feedback; if invalid, report the error and do not\nmake a dependent intent decision. An absent intent layer costs no record or prompt.\n\n1. Identify the relevant observation, source locator/time, affected question or\n   metric ID, and task/intent link. For code-absent facts, use project-knowledge.\n   If no PLAN exists yet, retain the evidence in the current SPEC/conversation and\n   transfer it when execute creates the PLAN; never create a competing state store.\n2. Reuse existing authorization only for the same operation and agreed scope.\n   Follow the write rule below for unapproved mutations. If consent is pending or\n   declined, write nothing and mark the update pending or declined. A question or\n   proposal is not a recorded update. Never treat silence as consent or missing\n   evidence as success. Do not ask again for the same confirmed operation.\n3. After an authorized write, read back status; use that readback in the next decision.\n   For missing, stale or conflicting evidence, diagnose within scope before the dependent decision.\n   If the observation window is open, record its closing date and next eligible trigger; do not retry now.\n   If uncertainty remains, ask the specific unresolved decision and continue only\n   independent authorized work. A missed target is not automatically a new task.\n4. On replay, link the existing disposition and follow-up; do not create duplicate work.\n   Never rewrite terminal intent records; link delayed evidence to a consented new proposal.\n   Distinguish completed task work from achieved intent outcomes. Measurements and\n   their absence must inform the closure decision, not follow it.\n5. Record the supported next decision and its authority. Continue agreed work only\n   through the host's authorized stage/loop procedure. Goal/scope changes require\n   the user. When no authorized work remains, record the stop reason and stop.\n   If the host cannot invoke the next procedure, give an actionable handoff and\n   explain the missing capability; never claim a stage ran from a suggested command.\n\nAuthoritative record map (link to these; do not copy their current state):\n\n| Role | Record |\n|---|---|\n| Intent scope/lifecycle | `intent/<ID>.md` |\n| Questions/metric definitions | `.claude/intent.yaml` |\n| Measured values | `.claude/intent/metrics.yaml` |\n| Domain facts | `.claude/memory/wiki.md` via project-knowledge |\n| Criteria | `specs/SPEC-<slug>.md` and its machine companion |\n| Execution and disposition | `work-docs/PLAN-<slug>.md`, Feedback section |\n\nUse working links from SPEC/PLAN to the intent, relevant state IDs, source evidence\nand prior/next task; preserve existing IDs, paths, history and approvals. The agent\nrecords each disposition in the task PLAN's Feedback table:\n\n| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |\n|---|---|---|---|---|---|---|\n| source path/anchor or conversation locator + time | intent/question/metric | recorded + readback / pending / declined / unchanged | supported action or stop reason | agent or user | consent/approved scope or pending decision | existing task link, specific question, dated deferral or stop |\n\n## Real-task trial\n\nResolve the base project root using the stage preamble; never search only a task worktree.\nFind trial PLANs in the base root's `work-docs/` with an explicit activation time\nand applied revision. If no explicitly activated trial PLAN exists, do nothing; never infer activation.\nUse the selected repository, window and enrollment policy from that PLAN.\nFor an approved next-three-real-tasks trial, follow the rules below.\nAt entry/resume enroll the task or reuse its existing row, independently of intent\navailability. On every terminal exit, including failure/abort, update that row's\nterminal time, evidence and disposition. Intermediate stage handoff is not task termination.\nBefore enrollment, record activation time and applied revision in the trial PLAN.\nName one collector session in the activated PLAN. Only the named collector may write the authoritative base-root trial PLAN.\nOther task agents record source events in their own PLAN Feedback and leave the\ncollector update pending. Never allocate slots or merge a worktree's stale trial copy.\nThe collector reconciles those task records on every entry/resume and close-out.\nBefore assigning slots, reconcile the base stage-spans ledger (first task-start\nper slug) with task PLAN evidence and the trial's qualifying-task policy; order by\nstart time, not arrival/completion. If start evidence is incomplete or ambiguous, leave enrollment pending.\nDo not finalize the next-three cohort until the preceding start interval is reconciled.\nAn ownership transfer requires the former collector to stop and acknowledge\nbefore the new collector writes; silence or a missing owner is not a transfer.\nA non-collector retains evidence and reports a pending handoff, never writes the\nshared trial or claims enrollment. Preserve the same three rows after assignment.\nEnroll the next three distinct real task slugs in start order; retain failures and aborts.\nResuming the same slug does not enroll another task.\nClose collection only when all three enrolled tasks have terminal dispositions,\nregardless of concurrent completion order. Do not enroll synthetic fixtures, the implementation task, or trial setup.\nDo not reset or replace rows without a new user decision.\n\nActivation changes collection from not_started to collecting, even while enrollment\nis pending; do not move it back to not_started.\nKeep collection (`not_started`, `collecting`, `complete`) separate from outcome:\n- A confirmed continuity failure yields failed, even while collection continues.\n- Otherwise, a terminal row missing evidence yields insufficient_evidence.\n- Otherwise, incomplete enrollment or user assessment yields pending.\n- Only three successful user assessments yield passed.\n\nEach row links execution and conversation evidence; the user owns final assessment.\nA user reminder to reconnect feedback fails; normal approval questions and\nsupported termination may pass even when the task itself was aborted. No relevant\nobservation cannot establish a successful cycle. New evidence may resolve an\ninsufficient row, never erase a confirmed failure. Implementation checks cannot\nsatisfy the real trial or authorize closing the intent as met.\n\nThe separate trial PLAN's Trial section carries activation time/revision and:\n\n| Order | Task slug / PLAN | Start / terminal times | Observation \u2192 update \u2192 decision evidence | Conversation evidence | User assessment |\n|---|---|---|---|---|---|\n---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\nNo prior dispositions.\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_4",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_4",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "{\"state\": \"ok\", \"conflicts\": [], \"fired_revisits\": [], \"broken_references\": [], \"withdrawal\": {\"filled_at\": null, \"last_signal_at\": \"2026-09-02T00:00:00Z\", \"quiet_wrapups\": null, \"revisit_candidates_now\": 0, \"due\": false, \"reason\": \"no_stage_spans\"}, \"stale_evidence\": {}, \"moved_evidence\": {}, \"needs_revalidation\": [], \"purpose\": {\"statement\": \"\ube60\ub974\uac8c ship\", \"vision\": \"keep quality\"}, \"metrics\": {\"latency\": {\"last\": null, \"target\": 10, \"observed_at\": null, \"gap\": \"unevaluable\", \"stale_definition\": false, \"reason\": \"never_measured\", \"how_measured\": \"stopwatch\", \"higher_is_better\": false, \"measure\": false}}, \"intents\": {\"FIXTURE-INTENT\": {\"state\": \"active\", \"title\": \"FIXTURE-INTENT title\", \"observed\": null, \"rejected\": [], \"scope\": [\"cut the interview to one round\"], \"statement\": \"shorter onboarding keeps users\", \"metric_id\": \"latency\", \"out_of_scope\": [\"rewrite the renderer\"]}}, \"open_questions\": [{\"id\": \"q_runtime\", \"claim\": \"Which runtime?\", \"status\": \"open\", \"evidence\": [], \"history\": []}], \"revisits\": {\"FIXTURE-INTENT\": {\"title\": \"FIXTURE-INTENT title\", \"condition\": null, \"last_value\": null, \"result\": \"unevaluable\", \"blocked\": false, \"intent\": \"FIXTURE-INTENT\"}}, \"active\": {\"FIXTURE-INTENT\": {\"approval_valid\": true, \"needs_revalidation\": false}}, \"proposed\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_5",
+            "type": "agent_message",
+            "text": "I\u2019m applying the intent-layer workflow feedback procedure. The probe measured latency at 7 against a target of 10 or less. Your existing authorization covers recording this result and updating the PLAN. No trial PLAN is active."
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_6",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent migrate --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_6",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent migrate --json'",
+            "aggregated_output": "{\"changed\": [], \"retired\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_7",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent metric record latency --value 7 --observed-at 2026-09-22T01:20:00Z --evidence observation.txt:1'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_7",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent metric record latency --value 7 --observed-at 2026-09-22T01:20:00Z --evidence observation.txt:1'",
+            "aggregated_output": "value:\n  value: 7\n  observed_at: '2026-09-22T01:20:00Z'\n  evidence: observation.txt:1\n  definition_hash: 43b3d603a9ba25f94acd47be9bf220585ee5d47525127d68a9685279618fcd61\n  metric_id: latency\nchanged: .claude/intent/metrics.yaml\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_8",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_8",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "{\"state\": \"ok\", \"conflicts\": [], \"fired_revisits\": [], \"broken_references\": [], \"withdrawal\": {\"filled_at\": null, \"last_signal_at\": \"2026-09-22T01:20:00Z\", \"quiet_wrapups\": null, \"revisit_candidates_now\": 0, \"due\": false, \"reason\": \"no_stage_spans\"}, \"stale_evidence\": {}, \"moved_evidence\": {}, \"needs_revalidation\": [], \"purpose\": {\"statement\": \"\ube60\ub974\uac8c ship\", \"vision\": \"keep quality\"}, \"metrics\": {\"latency\": {\"last\": 7, \"target\": 10, \"observed_at\": \"2026-09-22T01:20:00Z\", \"gap\": \"at_or_better\", \"stale_definition\": false, \"reason\": \"measured\", \"how_measured\": \"stopwatch\", \"higher_is_better\": false, \"measure\": false}}, \"intents\": {\"FIXTURE-INTENT\": {\"state\": \"active\", \"title\": \"FIXTURE-INTENT title\", \"observed\": null, \"rejected\": [], \"scope\": [\"cut the interview to one round\"], \"statement\": \"shorter onboarding keeps users\", \"metric_id\": \"latency\", \"out_of_scope\": [\"rewrite the renderer\"]}}, \"open_questions\": [{\"id\": \"q_runtime\", \"claim\": \"Which runtime?\", \"status\": \"open\", \"evidence\": [], \"history\": []}], \"revisits\": {\"FIXTURE-INTENT\": {\"title\": \"FIXTURE-INTENT title\", \"condition\": null, \"last_value\": null, \"result\": \"unevaluable\", \"blocked\": false, \"intent\": \"FIXTURE-INTENT\"}}, \"active\": {\"FIXTURE-INTENT\": {\"approval_valid\": true, \"needs_revalidation\": false}}, \"proposed\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_9",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/tmp/hm-trigger-isolated-observation-present-08y3157r/work-docs/PLAN-fixture-task.md",
+                "kind": "update"
+              }
+            ],
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_9",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/tmp/hm-trigger-isolated-observation-present-08y3157r/work-docs/PLAN-fixture-task.md",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_10",
+            "type": "agent_message",
+            "text": "Recorded latency **7**; readback confirms it meets the target of **10 or less**.\n\n`changed: .claude/intent/metrics.yaml`\n\nUpdated the task PLAN\u2019s Feedback. Next action: resume fixture-task with its next authorized procedure; none was supplied here. The intent remains active, and this is not task closeout."
+          }
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 105000,
+            "cached_input_tokens": 92672,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 807,
+            "reasoning_output_tokens": 18
+          }
+        }
+      ],
+      "events_sha256": "b6c24662c6405defb7ba76ba37558417a5a8b8b7221531940df970dc73b60c49"
+    },
+    "observation_removed": {
+      "root": "/tmp/hm-trigger-isolated-observation-removed-1a2gjil6",
+      "prompt": "Fixture tool provisioning: the installed hm launcher is /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm. Substitute that executable prefix for uv run --with when the procedure calls hm; do not install dependencies.\nThis is a stage-interface isolation fixture: execute only the supplied stage procedure and dependencies explicitly referenced by it (transitively). Read observation.txt and the task PLAN for ordinary task context. Do not discover additional skills through catalogs, directory searches, or unreferenced documents. This constraint is identical for present and removed variants; it isolates this stage entry point, not all host recovery mechanisms.\nExecute only the operational steps in the stage procedure below; if it contains no steps, report no action. Context and prior authorization are inputs, not extra steps. You are running an isolated workflow evaluation in this temporary project. Apply the following actual stage procedure as part of the ordinary task; do not access unrelated user/project files. Task slug fixture-task. Previously the user explicitly authorized recording the measured latency value from observation.txt and updating this task PLAN, but did not authorize intent closure or new tasks.\nTask instruction: Stage entry is already complete. Continue the current task: the running latency probe has just completed. Inspect its new result in observation.txt and report the next action; this is not task closeout.. Source files are in this project. Resolve explicit procedure dependencies from this project.\n\n\n",
+      "hashes": {
+        "before": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        },
+        "after": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        }
+      },
+      "plan": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\nNo prior dispositions.\n",
+      "result": "No action taken: no stage procedure or operational steps were supplied. Intent closure and new tasks remain unauthorized.",
+      "metrics": "schema_version: 1\nvalues: []\n",
+      "events": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0c6dc-905e-7931-ba52-89612db588a5"
+        },
+        {
+          "type": "turn.started"
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_0",
+            "type": "agent_message",
+            "text": "No action taken: no stage procedure or operational steps were supplied. Intent closure and new tasks remain unauthorized."
+          }
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 17412,
+            "cached_input_tokens": 11520,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 121,
+            "reasoning_output_tokens": 94
+          }
+        }
+      ],
+      "events_sha256": "f67491a01d926cdc4fe43b174f76beaaaf736f45c5d7a95486572d6356c19623"
+    },
+    "close_present": {
+      "root": "/tmp/hm-trigger-isolated-close-present-1vjlm_s2",
+      "prompt": "Fixture tool provisioning: the installed hm launcher is /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm. Substitute that executable prefix for uv run --with when the procedure calls hm; do not install dependencies.\nThis is a stage-interface isolation fixture: execute only the supplied stage procedure and dependencies explicitly referenced by it (transitively). Read observation.txt and the task PLAN for ordinary task context. Do not discover additional skills through catalogs, directory searches, or unreferenced documents. This constraint is identical for present and removed variants; it isolates this stage entry point, not all host recovery mechanisms.\nExecute only the operational steps in the stage procedure below; if it contains no steps, report no action. Context and prior authorization are inputs, not extra steps. You are running an isolated workflow evaluation in this temporary project. Apply the following actual stage procedure as part of the ordinary task; do not access unrelated user/project files. Task slug fixture-task. The user has declined metric or intent writes. Updating this task PLAN is authorized. Implementation of this fixture task is complete.\nTask instruction: Finish the task and report its outcome. Source files are in this project. Resolve explicit procedure dependencies from this project.\n\n\nBefore close-out or stage handoff, apply Workflow feedback from the intent-layer skill;\nrecord the next action or stop reason in PLAN Feedback when that PLAN exists.\nFor an explicitly activated trial, apply Real-task trial and update its existing row with terminal/evidence disposition through its named collector;\na stage handoff alone does not terminate a task.\n\n",
+      "hashes": {
+        "before": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        },
+        "after": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "649090c03ea53860dde85db008c11acfc7e73ba45ebb10ec177b3dbf4be73dda"
+        }
+      },
+      "plan": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\n| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |\n|---|---|---|---|---|---|---|\n| [Latency probe](../observation.txt), 2026-09-22T01:20:00Z: latency=7; close-out `hm intent status --json` readback | [FIXTURE-INTENT](../intent/FIXTURE-INTENT.md); [latency definition](../.claude/intent.yaml); [measurement record](../.claude/intent/metrics.yaml) | Metric and intent writes declined; no mutation performed | Probe is below the latency target of 10, but the authoritative measurement remains absent and the intent outcome is unevaluable. Implementation completion does not establish the intent outcome. | agent | User states implementation is complete, authorizes PLAN updates, and declines metric/intent writes | Stop: implementation complete and no further authorized operational work remains. Do not close the intent or claim its outcome achieved. |\n| [Trial context](../observation.txt); user close-out instruction | fixture-task | unchanged | No relevant trial is active; no trial disposition update applies. | agent | Supplied task context | Stop; no collector handoff required. |\n",
+      "result": "Close-out complete. Updated [PLAN Feedback](work-docs/PLAN-fixture-task.md) with the evidence and stop reason.\n\nImplementation is complete. Latency was 7 against target 10, but metric and intent writes remain declined, so the intent outcome remains unevaluated. No relevant trial is active.",
+      "metrics": "schema_version: 1\nvalues: []\n",
+      "events": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0c6d7-74ab-7321-82a5-4b2070f4e51f"
+        },
+        {
+          "type": "turn.started"
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_0",
+            "type": "agent_message",
+            "text": "I\u2019ll read the observation, task PLAN, and referenced intent-layer procedure, then complete the close-out steps within the authorized scope.\n"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc \"cat observation.txt; cat .agents/skills/intent-layer/SKILL.md; rg --files -g '*PLAN*' -g '*fixture-task*' work-docs\"",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc \"cat observation.txt; cat .agents/skills/intent-layer/SKILL.md; rg --files -g '*PLAN*' -g '*fixture-task*' work-docs\"",
+            "aggregated_output": "Latency probe completed at 2026-09-22T01:20:00Z: latency=7. Source: this observation.txt. No relevant trial is active.\n---\ngenerated_by: harness-maker\nharness_maker_version: 0.59.0\ngenerated_at: '2026-01-01T00:00:00+00:00'\nsource_template: skills/intent-layer/SKILL.md.j2\nprovenance: official\nname: intent-layer\ndescription: Deep-interview the creator before creating intents; improve intent quality,\n  record what was observed, close/approve/drop, or report where things stand, what\n  to do next and gaps. Ask before writes.\ncontent_hash: 75a7e0b3072d6ba88c9ec16d38a5e6cc093552dd66fa440b6bd23af829c029da\n---\n\n# intent-layer\n\nTranslate matching prose into one `hm intent` verb; creation requires the deep interview and quality review below.\nWorkflow stages may load feedback without a separate mention; intent changes still require consent.\n\n**Read freely, write only on an answer.** `hm intent status --json` is read-only, LLM-free and\nfree to run whenever the operator asks where things stand. Mutation verbs write only after consent.\n\nDistinct nonblank `owners` roles trigger an advisory at approval, never a block.\n`approved_by` is an unverified git config string; real separation requires\nCODEOWNERS + branch protection. Empty or identical roles stay silent.\n\nOne intent may serve multiple SPECs (1:N); the record is `intent/<ID>.md`.\n`hm intent migrate --json` preserves record body bytes, approvals and historical clocks;\nRun it before the first canonical write. Reads accept legacy files without rewriting them.\n\nWorkflow feedback: read and follow `references/workflow-feedback.md` at workflow triggers.\n\n## The verbs (full argument forms)\n\n```\nhm intent status --json\nhm intent question add <id> --claim --status <open|confirmed|wrong> [--text --observed-at [--locator <path:A-B>]]\nhm intent question observe <id> --relation <confirms|supersedes|contradicts> --text --observed-at [--claim] [--locator <path:A-B>]\nhm intent question resolve <id> --status --claim\nhm intent metric record <id> --value --observed-at --evidence\nhm intent new <id> --title --statement --scope --metric [--out-of-scope] [--from-proposal --candidates <N> [--declined <title>]\u2026]\nhm intent <approve|activate|drop|reopen> <id>\nhm intent close <id> --observed <met|missed|no_data> --note\nhm intent show <id> --json\n```\n\nPrefix each with `uv run --with $HOME/harness-maker/.worktrees/world-intent-closed-loop` as every other mandated call\nin this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp; `supersedes`\nneeds `--claim`; `close` needs both `--observed` and `--note`.\n`--locator <path:A-B>` cites at most 40 lines of this checkout by content; `status --json` then\nreports `stale_evidence` when that text changed (approval checks never read cited files).\n\n## The rule for every write\n\n1. Work out the verb and its arguments from what the operator said; read `status` first when\n   an id is ambiguous.\n2. Ask with `request_user_input`, showing the exact arguments\n   you are about to pass.\n3. On an affirmative answer, run the write once with those arguments and show the CLI's\n   `changed:` line.\n4. Otherwise \u2014 on any other answer or no answer \u2014 write nothing. Do not retry, rephrase or infer consent.\n\n## Creation: mandatory deep interview and quality review\n\nApply to direct creation, accepted proposals, and drafts requested by another workflow stage.\nInterview the intent creator before `new`; a one-line request or candidate selection is not a completed interview.\nReuse explicit answers from this conversation; ask the creator to correct the synthesis and probe remaining gaps.\nUse `request_user_input_async` when available, or ask in chat and wait; use `request_user_input` only where allowed.\nAsk one to three adaptive multiple-choice questions per round, with concrete, distinct proposals.\nPut the recommended option first, label it, and briefly explain why; always offer a final free-text Other path.\nUse the question tool's built-in Other input when present; otherwise add Other explicitly. Do not lead with free-text-only questions.\nCover: problem and affected users; desired observable change and why now; evidence and assumptions;\nsuccess measure, baseline, target and measurement method; scope, exclusions and tradeoffs;\ndecision owner, feedback timing and what happens on success, failure or missing data.\nWhen artifacts or workflow are affected, cover discoverability, authoritative records, placement rationale,\nexisting conventions and compatibility. Do not impose a folder migration on unrelated intents.\nProbe vague goals with a concrete success example and a counterexample that would not count as success.\nSeparate creator answers, observed evidence and agent suggestions; never manufacture targets or claim a baseline.\nIf no existing metric fits, discuss a suitable definition with the creator; never silently add one or use an unrelated metric.\nStop asking when the creator has resolved the material gaps; preserve implementation questions for the SPEC.\nWithout answers, keep a conversational draft and explain the missing decisions; do not run `new`.\n\nBefore writing, proactively critique clarity, outcome relevance, measurability, scope coherence, evidence,\ndecision/feedback ownership, and overlap with existing or rejected intents. Fix wording; interview for missing decisions.\nShow the proposed statement, scope/exclusions, metric and evidence, responsibilities, and remaining questions.\nFlag proxy metrics that can pass without the intended outcome; require complementary completion evidence where needed.\nMaterial gaps prevent creation until answered; implementation details may remain explicitly deferred.\nObtain the creator's confirmation of this concrete draft under the write rule, then create it as `proposed`.\nPopulate the Markdown body's Problem, Proposed outcome, Affected users and systems, Constraints and Open questions\nfrom the confirmed draft, preserving the CLI-owned frontmatter; do not leave unexplained empty sections.\nRead back the record and status, check references and consistency with the confirmed draft, and report any error.\nOn quality-review requests or substantive revisions, apply this critique without waiting to be asked about each gap;\nreuse existing answers and interview only for changed or missing decisions. Never reopen or alter terminal records.\n\n## Proposing intents (only when the operator asks what to do next / where the gaps are)\n\n1. Run `hm intent status --json` \u2014 read-only, LLM-free. On `state: invalid` print the error and stop;\n   on `not_filled_in` say the purpose and metrics are unwritten and stop.\n2. Open with a **measure first** block: every metric whose `reason` is `never_measured` or\n   `stale_definition`, with its `how_measured` \u2014 those are gaps in evidence, not in the code.\n   For the ones with `measure: true`, run `hm intent metric measure --all --dry-run` and show\n   the table; the record call is `hm intent metric measure --all`, gated by\n   \"The rule for every write\" above (ask once, run once on yes, otherwise write nothing).\n3. Read the codebase against the measured metrics' `gap` and propose **at most three**\n   candidates, unranked, each with `title / statement / scope / out_of_scope / metric / evidence /\n   overlaps-with`. A candidate for an unmeasured metric carries\n   `evidence: none \u2014 statement only`. `overlaps-with` names any intent (any state,\n   especially `closed` + `observed:\n   missed`) or any `rejected[]` entry the candidate resembles \u2014 never silently re-propose it.\n4. Then ask about each candidate in turn with `request_user_input` (yes / no), and\n   answer every candidate before the first write: the declined titles go into every accepted\n   record's `rejected[]`.\n5. Then, once per accepted candidate, show the exact arguments and run\n   `hm intent new <ID> \u2026 --from-proposal --candidates <N> --declined \"<title>\"\u2026`\n   only after its deep interview and quality review (`N` = candidates shown; one `--declined` per no).\n   Nothing else persists a candidate.\n6. The record is `proposed`; the proposer never runs `approve` \u2014 that stamp is the operator's.\n\nWhat the harness guarantees is narrow: the record changes only through these verbs, a terminal\nintent never changes, and the autopilot gate reads the approval you record. Whether the work\nserves the intent is the operator's judgment and `/hm:review`'s Step 3.3, not this skill's.\nwork-docs/PLAN-fixture-task.md\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat work-docs/PLAN-fixture-task.md; cat .agents/skills/intent-layer/references/workflow-feedback.md'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat work-docs/PLAN-fixture-task.md; cat .agents/skills/intent-layer/references/workflow-feedback.md'",
+            "aggregated_output": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\nNo prior dispositions.\n---\ngenerated_by: harness-maker\nharness_maker_version: 0.59.0\ngenerated_at: '2026-01-01T00:00:00+00:00'\nsource_template: skills/intent-layer/references/workflow-feedback.md.j2\nprovenance: official\ncontent_hash: e25c9f36adffbe5dde866a3094094b46367122c6ad99ad865ba3163f6a61b473\n---\n## Workflow feedback\n\nThe workflow agent owns this connection at stage entry/resume, each material\nobservation, and close-out. Read `hm intent status --json` through the launcher\nbelow; load the task's SPEC/PLAN intent link and existing Feedback dispositions.\nIf status is not_filled_in, skip feedback; if invalid, report the error and do not\nmake a dependent intent decision. An absent intent layer costs no record or prompt.\n\n1. Identify the relevant observation, source locator/time, affected question or\n   metric ID, and task/intent link. For code-absent facts, use project-knowledge.\n   If no PLAN exists yet, retain the evidence in the current SPEC/conversation and\n   transfer it when execute creates the PLAN; never create a competing state store.\n2. Reuse existing authorization only for the same operation and agreed scope.\n   Follow the write rule below for unapproved mutations. If consent is pending or\n   declined, write nothing and mark the update pending or declined. A question or\n   proposal is not a recorded update. Never treat silence as consent or missing\n   evidence as success. Do not ask again for the same confirmed operation.\n3. After an authorized write, read back status; use that readback in the next decision.\n   For missing, stale or conflicting evidence, diagnose within scope before the dependent decision.\n   If the observation window is open, record its closing date and next eligible trigger; do not retry now.\n   If uncertainty remains, ask the specific unresolved decision and continue only\n   independent authorized work. A missed target is not automatically a new task.\n4. On replay, link the existing disposition and follow-up; do not create duplicate work.\n   Never rewrite terminal intent records; link delayed evidence to a consented new proposal.\n   Distinguish completed task work from achieved intent outcomes. Measurements and\n   their absence must inform the closure decision, not follow it.\n5. Record the supported next decision and its authority. Continue agreed work only\n   through the host's authorized stage/loop procedure. Goal/scope changes require\n   the user. When no authorized work remains, record the stop reason and stop.\n   If the host cannot invoke the next procedure, give an actionable handoff and\n   explain the missing capability; never claim a stage ran from a suggested command.\n\nAuthoritative record map (link to these; do not copy their current state):\n\n| Role | Record |\n|---|---|\n| Intent scope/lifecycle | `intent/<ID>.md` |\n| Questions/metric definitions | `.claude/intent.yaml` |\n| Measured values | `.claude/intent/metrics.yaml` |\n| Domain facts | `.claude/memory/wiki.md` via project-knowledge |\n| Criteria | `specs/SPEC-<slug>.md` and its machine companion |\n| Execution and disposition | `work-docs/PLAN-<slug>.md`, Feedback section |\n\nUse working links from SPEC/PLAN to the intent, relevant state IDs, source evidence\nand prior/next task; preserve existing IDs, paths, history and approvals. The agent\nrecords each disposition in the task PLAN's Feedback table:\n\n| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |\n|---|---|---|---|---|---|---|\n| source path/anchor or conversation locator + time | intent/question/metric | recorded + readback / pending / declined / unchanged | supported action or stop reason | agent or user | consent/approved scope or pending decision | existing task link, specific question, dated deferral or stop |\n\n## Real-task trial\n\nResolve the base project root using the stage preamble; never search only a task worktree.\nFind trial PLANs in the base root's `work-docs/` with an explicit activation time\nand applied revision. If no explicitly activated trial PLAN exists, do nothing; never infer activation.\nUse the selected repository, window and enrollment policy from that PLAN.\nFor an approved next-three-real-tasks trial, follow the rules below.\nAt entry/resume enroll the task or reuse its existing row, independently of intent\navailability. On every terminal exit, including failure/abort, update that row's\nterminal time, evidence and disposition. Intermediate stage handoff is not task termination.\nBefore enrollment, record activation time and applied revision in the trial PLAN.\nName one collector session in the activated PLAN. Only the named collector may write the authoritative base-root trial PLAN.\nOther task agents record source events in their own PLAN Feedback and leave the\ncollector update pending. Never allocate slots or merge a worktree's stale trial copy.\nThe collector reconciles those task records on every entry/resume and close-out.\nBefore assigning slots, reconcile the base stage-spans ledger (first task-start\nper slug) with task PLAN evidence and the trial's qualifying-task policy; order by\nstart time, not arrival/completion. If start evidence is incomplete or ambiguous, leave enrollment pending.\nDo not finalize the next-three cohort until the preceding start interval is reconciled.\nAn ownership transfer requires the former collector to stop and acknowledge\nbefore the new collector writes; silence or a missing owner is not a transfer.\nA non-collector retains evidence and reports a pending handoff, never writes the\nshared trial or claims enrollment. Preserve the same three rows after assignment.\nEnroll the next three distinct real task slugs in start order; retain failures and aborts.\nResuming the same slug does not enroll another task.\nClose collection only when all three enrolled tasks have terminal dispositions,\nregardless of concurrent completion order. Do not enroll synthetic fixtures, the implementation task, or trial setup.\nDo not reset or replace rows without a new user decision.\n\nActivation changes collection from not_started to collecting, even while enrollment\nis pending; do not move it back to not_started.\nKeep collection (`not_started`, `collecting`, `complete`) separate from outcome:\n- A confirmed continuity failure yields failed, even while collection continues.\n- Otherwise, a terminal row missing evidence yields insufficient_evidence.\n- Otherwise, incomplete enrollment or user assessment yields pending.\n- Only three successful user assessments yield passed.\n\nEach row links execution and conversation evidence; the user owns final assessment.\nA user reminder to reconnect feedback fails; normal approval questions and\nsupported termination may pass even when the task itself was aborted. No relevant\nobservation cannot establish a successful cycle. New evidence may resolve an\ninsufficient row, never erase a confirmed failure. Implementation checks cannot\nsatisfy the real trial or authorize closing the intent as met.\n\nThe separate trial PLAN's Trial section carries activation time/revision and:\n\n| Order | Task slug / PLAN | Start / terminal times | Observation \u2192 update \u2192 decision evidence | Conversation evidence | User assessment |\n|---|---|---|---|---|---|\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "I\u2019m applying the intent-layer skill\u2019s Workflow feedback procedure. The observation says no relevant trial is active; I\u2019ll check the linked intent\u2019s status and record the close-out decision in PLAN Feedback, respecting the declined writes.\n"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_4",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_4",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "{\"state\": \"ok\", \"conflicts\": [], \"fired_revisits\": [], \"broken_references\": [], \"withdrawal\": {\"filled_at\": null, \"last_signal_at\": \"2026-09-02T00:00:00Z\", \"quiet_wrapups\": null, \"revisit_candidates_now\": 0, \"due\": false, \"reason\": \"no_stage_spans\"}, \"stale_evidence\": {}, \"moved_evidence\": {}, \"needs_revalidation\": [], \"purpose\": {\"statement\": \"\ube60\ub974\uac8c ship\", \"vision\": \"keep quality\"}, \"metrics\": {\"latency\": {\"last\": null, \"target\": 10, \"observed_at\": null, \"gap\": \"unevaluable\", \"stale_definition\": false, \"reason\": \"never_measured\", \"how_measured\": \"stopwatch\", \"higher_is_better\": false, \"measure\": false}}, \"intents\": {\"FIXTURE-INTENT\": {\"state\": \"active\", \"title\": \"FIXTURE-INTENT title\", \"observed\": null, \"rejected\": [], \"scope\": [\"cut the interview to one round\"], \"statement\": \"shorter onboarding keeps users\", \"metric_id\": \"latency\", \"out_of_scope\": [\"rewrite the renderer\"]}}, \"open_questions\": [{\"id\": \"q_runtime\", \"claim\": \"Which runtime?\", \"status\": \"open\", \"evidence\": [], \"history\": []}], \"revisits\": {\"FIXTURE-INTENT\": {\"title\": \"FIXTURE-INTENT title\", \"condition\": null, \"last_value\": null, \"result\": \"unevaluable\", \"blocked\": false, \"intent\": \"FIXTURE-INTENT\"}}, \"active\": {\"FIXTURE-INTENT\": {\"approval_valid\": true, \"needs_revalidation\": false}}, \"proposed\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_5",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/tmp/hm-trigger-isolated-close-present-1vjlm_s2/work-docs/PLAN-fixture-task.md",
+                "kind": "update"
+              }
+            ],
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_5",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/tmp/hm-trigger-isolated-close-present-1vjlm_s2/work-docs/PLAN-fixture-task.md",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_6",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat work-docs/PLAN-fixture-task.md'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_6",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat work-docs/PLAN-fixture-task.md'",
+            "aggregated_output": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\n| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |\n|---|---|---|---|---|---|---|\n| [Latency probe](../observation.txt), 2026-09-22T01:20:00Z: latency=7; close-out `hm intent status --json` readback | [FIXTURE-INTENT](../intent/FIXTURE-INTENT.md); [latency definition](../.claude/intent.yaml); [measurement record](../.claude/intent/metrics.yaml) | Metric and intent writes declined; no mutation performed | Probe is below the latency target of 10, but the authoritative measurement remains absent and the intent outcome is unevaluable. Implementation completion does not establish the intent outcome. | agent | User states implementation is complete, authorizes PLAN updates, and declines metric/intent writes | Stop: implementation complete and no further authorized operational work remains. Do not close the intent or claim its outcome achieved. |\n| [Trial context](../observation.txt); user close-out instruction | fixture-task | unchanged | No relevant trial is active; no trial disposition update applies. | agent | Supplied task context | Stop; no collector handoff required. |\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_7",
+            "type": "agent_message",
+            "text": "Close-out complete. Updated [PLAN Feedback](work-docs/PLAN-fixture-task.md) with the evidence and stop reason.\n\nImplementation is complete. Latency was 7 against target 10, but metric and intent writes remain declined, so the intent outcome remains unevaluated. No relevant trial is active."
+          }
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 102821,
+            "cached_input_tokens": 91136,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 704,
+            "reasoning_output_tokens": 27
+          }
+        }
+      ],
+      "events_sha256": "50930c01c0389b6b77f8e9fbb92556e1db1160a111bf9aed1ce1b28d35e7b5f9"
+    },
+    "close_removed": {
+      "root": "/tmp/hm-trigger-isolated-close-removed-i9soal_e",
+      "prompt": "Fixture tool provisioning: the installed hm launcher is /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm. Substitute that executable prefix for uv run --with when the procedure calls hm; do not install dependencies.\nThis is a stage-interface isolation fixture: execute only the supplied stage procedure and dependencies explicitly referenced by it (transitively). Read observation.txt and the task PLAN for ordinary task context. Do not discover additional skills through catalogs, directory searches, or unreferenced documents. This constraint is identical for present and removed variants; it isolates this stage entry point, not all host recovery mechanisms.\nExecute only the operational steps in the stage procedure below; if it contains no steps, report no action. Context and prior authorization are inputs, not extra steps. You are running an isolated workflow evaluation in this temporary project. Apply the following actual stage procedure as part of the ordinary task; do not access unrelated user/project files. Task slug fixture-task. The user has declined metric or intent writes. Updating this task PLAN is authorized. Implementation of this fixture task is complete.\nTask instruction: Finish the task and report its outcome. Source files are in this project. Resolve explicit procedure dependencies from this project.\n\n\n",
+      "hashes": {
+        "before": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        },
+        "after": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        }
+      },
+      "plan": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\nNo prior dispositions.\n",
+      "result": "No action taken: the supplied stage procedure contains no operational steps. Implementation is complete as stated. Read the observation and task PLAN; no files, metrics, or intents were changed.",
+      "metrics": "schema_version: 1\nvalues: []\n",
+      "events": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0c6d8-2097-7340-bea1-d13d78271134"
+        },
+        {
+          "type": "turn.started"
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_0",
+            "type": "agent_message",
+            "text": "I\u2019ll read `observation.txt` and the task PLAN to check the supplied stage context."
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc \"pwd; rg --files -g 'observation.txt' -g '*PLAN*' -g '*fixture-task*'\"",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc \"pwd; rg --files -g 'observation.txt' -g '*PLAN*' -g '*fixture-task*'\"",
+            "aggregated_output": "/tmp/hm-trigger-isolated-close-removed-i9soal_e\nspecs/SPEC-fixture-task.md\nobservation.txt\nwork-docs/PLAN-fixture-task.md\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat observation.txt work-docs/PLAN-fixture-task.md'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat observation.txt work-docs/PLAN-fixture-task.md'",
+            "aggregated_output": "Latency probe completed at 2026-09-22T01:20:00Z: latency=7. Source: this observation.txt. No relevant trial is active.\n---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\nNo prior dispositions.\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "No action taken: the supplied stage procedure contains no operational steps. Implementation is complete as stated. Read the observation and task PLAN; no files, metrics, or intents were changed."
+          }
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 52564,
+            "cached_input_tokens": 45952,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 155,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "events_sha256": "16bca0a6be4816d8a40f5e235df50c2b7ecc775972fe8b883963fc819f8c1db8"
+    }
+  },
+  "superseded_duplicate_entry_context": {
+    "observation_present": {
+      "root": "/tmp/hm-trigger-isolated-observation-present-bqh5yl8d",
+      "prompt": "Fixture tool provisioning: the installed hm launcher is /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm. Substitute that executable prefix for uv run --with when the procedure calls hm; do not install dependencies.\nThis is a stage-interface isolation fixture: execute only the supplied stage procedure and dependencies explicitly referenced by it (transitively). Read observation.txt and the task PLAN for ordinary task context. Do not discover additional skills through catalogs, directory searches, or unreferenced documents. This constraint is identical for present and removed variants; it isolates this stage entry point, not all host recovery mechanisms.\nExecute only the operational steps in the stage procedure below; if it contains no steps, report no action. Context and prior authorization are inputs, not extra steps. You are running an isolated workflow evaluation in this temporary project. Apply the following actual stage procedure as part of the ordinary task; do not access unrelated user/project files. Task slug fixture-task. Previously the user explicitly authorized recording the measured latency value from observation.txt and updating this task PLAN, but did not authorize intent closure or new tasks.\nTask instruction: Resume the task and inspect observation.txt; report the next action. Source files are in this project. Resolve explicit procedure dependencies from this project.\n\nAt stage entry/resume and each material observation, read and follow\n`.agents/skills/intent-layer/SKILL.md` \u2192 Workflow feedback\nwhen intent state exists. Do not wait for a user reminder to connect the evidence.\nIndependently of intent availability, check for an explicitly activated trial PLAN\nat the base root in `work-docs/`; apply Real-task trial at entry/resume and on any terminal exit, including failure or abort.\nThese feedback/trial duties also apply in loop mode; only the banner/picker is skipped.\n\n",
+      "hashes": {
+        "before": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        },
+        "after": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "db22250ca01724a14c878eec05d2f66b84fd31f6af184e80d55ea67f3ac45a30",
+          "work-docs/PLAN-fixture-task.md": "89879a88d8760845e8e3acc401c50755cdca703005f2bc13cc28b684c69bc9b7"
+        }
+      },
+      "plan": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\n| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |\n|---|---|---|---|---|---|---|\n| [observation.txt:1](../observation.txt), observed 2026-09-22T01:20:00Z | [FIXTURE-INTENT](../intent/FIXTURE-INTENT.md); [latency definition](../.claude/intent.yaml) | Recorded in [metrics](../.claude/intent/metrics.yaml); status readback confirms `gap: at_or_better` | Measurement meets target; intent remains active. Stop: no further authorized stage work; measurement alone does not establish the broader retention outcome. | agent; user owns closure decision | Prior explicit authorization to record measured latency and update this PLAN; no authorization for closure or new tasks | User to decide whether this evidence supports intent closure; obtain explicit authorization before any lifecycle write. Reuse this disposition on resume. |\n\nTrial check at entry and terminal exit: base-root `work-docs/` contains only this task PLAN, with no explicitly activated trial. No trial action applies.\n",
+      "result": "Recorded latency **7**; status confirms it meets the target of **10 or lower**.\n\n`changed: .claude/intent/metrics.yaml`\n\nUpdated [task PLAN](/tmp/hm-trigger-isolated-observation-present-bqh5yl8d/work-docs/PLAN-fixture-task.md) with the evidence and disposition. No active trial exists.\n\nNext action: user assessment of whether the evidence supports intent closure. The intent remains active; closure and new tasks were not authorized.",
+      "metrics": "schema_version: 1\nvalues:\n- value: 7\n  observed_at: '2026-09-22T01:20:00Z'\n  evidence: observation.txt:1\n  definition_hash: 43b3d603a9ba25f94acd47be9bf220585ee5d47525127d68a9685279618fcd61\n  metric_id: latency\n",
+      "events": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0c6d7-6957-7b92-b63b-36e8e8de3a01"
+        },
+        {
+          "type": "turn.started"
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_0",
+            "type": "agent_message",
+            "text": "I\u2019ll read the observation, task PLAN, and referenced feedback and trial procedures to determine the next action."
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat observation.txt; cat .agents/skills/intent-layer/SKILL.md; rg --files work-docs'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat observation.txt; cat .agents/skills/intent-layer/SKILL.md; rg --files work-docs'",
+            "aggregated_output": "Latency probe completed at 2026-09-22T01:20:00Z: latency=7. Source: this observation.txt. No relevant trial is active.\n---\ngenerated_by: harness-maker\nharness_maker_version: 0.59.0\ngenerated_at: '2026-01-01T00:00:00+00:00'\nsource_template: skills/intent-layer/SKILL.md.j2\nprovenance: official\nname: intent-layer\ndescription: Deep-interview the creator before creating intents; improve intent quality,\n  record what was observed, close/approve/drop, or report where things stand, what\n  to do next and gaps. Ask before writes.\ncontent_hash: 75a7e0b3072d6ba88c9ec16d38a5e6cc093552dd66fa440b6bd23af829c029da\n---\n\n# intent-layer\n\nTranslate matching prose into one `hm intent` verb; creation requires the deep interview and quality review below.\nWorkflow stages may load feedback without a separate mention; intent changes still require consent.\n\n**Read freely, write only on an answer.** `hm intent status --json` is read-only, LLM-free and\nfree to run whenever the operator asks where things stand. Mutation verbs write only after consent.\n\nDistinct nonblank `owners` roles trigger an advisory at approval, never a block.\n`approved_by` is an unverified git config string; real separation requires\nCODEOWNERS + branch protection. Empty or identical roles stay silent.\n\nOne intent may serve multiple SPECs (1:N); the record is `intent/<ID>.md`.\n`hm intent migrate --json` preserves record body bytes, approvals and historical clocks;\nRun it before the first canonical write. Reads accept legacy files without rewriting them.\n\nWorkflow feedback: read and follow `references/workflow-feedback.md` at workflow triggers.\n\n## The verbs (full argument forms)\n\n```\nhm intent status --json\nhm intent question add <id> --claim --status <open|confirmed|wrong> [--text --observed-at [--locator <path:A-B>]]\nhm intent question observe <id> --relation <confirms|supersedes|contradicts> --text --observed-at [--claim] [--locator <path:A-B>]\nhm intent question resolve <id> --status --claim\nhm intent metric record <id> --value --observed-at --evidence\nhm intent new <id> --title --statement --scope --metric [--out-of-scope] [--from-proposal --candidates <N> [--declined <title>]\u2026]\nhm intent <approve|activate|drop|reopen> <id>\nhm intent close <id> --observed <met|missed|no_data> --note\nhm intent show <id> --json\n```\n\nPrefix each with `uv run --with $HOME/harness-maker/.worktrees/world-intent-closed-loop` as every other mandated call\nin this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp; `supersedes`\nneeds `--claim`; `close` needs both `--observed` and `--note`.\n`--locator <path:A-B>` cites at most 40 lines of this checkout by content; `status --json` then\nreports `stale_evidence` when that text changed (approval checks never read cited files).\n\n## The rule for every write\n\n1. Work out the verb and its arguments from what the operator said; read `status` first when\n   an id is ambiguous.\n2. Ask with `request_user_input`, showing the exact arguments\n   you are about to pass.\n3. On an affirmative answer, run the write once with those arguments and show the CLI's\n   `changed:` line.\n4. Otherwise \u2014 on any other answer or no answer \u2014 write nothing. Do not retry, rephrase or infer consent.\n\n## Creation: mandatory deep interview and quality review\n\nApply to direct creation, accepted proposals, and drafts requested by another workflow stage.\nInterview the intent creator before `new`; a one-line request or candidate selection is not a completed interview.\nReuse explicit answers from this conversation; ask the creator to correct the synthesis and probe remaining gaps.\nUse `request_user_input_async` when available, or ask in chat and wait; use `request_user_input` only where allowed.\nAsk one to three adaptive multiple-choice questions per round, with concrete, distinct proposals.\nPut the recommended option first, label it, and briefly explain why; always offer a final free-text Other path.\nUse the question tool's built-in Other input when present; otherwise add Other explicitly. Do not lead with free-text-only questions.\nCover: problem and affected users; desired observable change and why now; evidence and assumptions;\nsuccess measure, baseline, target and measurement method; scope, exclusions and tradeoffs;\ndecision owner, feedback timing and what happens on success, failure or missing data.\nWhen artifacts or workflow are affected, cover discoverability, authoritative records, placement rationale,\nexisting conventions and compatibility. Do not impose a folder migration on unrelated intents.\nProbe vague goals with a concrete success example and a counterexample that would not count as success.\nSeparate creator answers, observed evidence and agent suggestions; never manufacture targets or claim a baseline.\nIf no existing metric fits, discuss a suitable definition with the creator; never silently add one or use an unrelated metric.\nStop asking when the creator has resolved the material gaps; preserve implementation questions for the SPEC.\nWithout answers, keep a conversational draft and explain the missing decisions; do not run `new`.\n\nBefore writing, proactively critique clarity, outcome relevance, measurability, scope coherence, evidence,\ndecision/feedback ownership, and overlap with existing or rejected intents. Fix wording; interview for missing decisions.\nShow the proposed statement, scope/exclusions, metric and evidence, responsibilities, and remaining questions.\nFlag proxy metrics that can pass without the intended outcome; require complementary completion evidence where needed.\nMaterial gaps prevent creation until answered; implementation details may remain explicitly deferred.\nObtain the creator's confirmation of this concrete draft under the write rule, then create it as `proposed`.\nPopulate the Markdown body's Problem, Proposed outcome, Affected users and systems, Constraints and Open questions\nfrom the confirmed draft, preserving the CLI-owned frontmatter; do not leave unexplained empty sections.\nRead back the record and status, check references and consistency with the confirmed draft, and report any error.\nOn quality-review requests or substantive revisions, apply this critique without waiting to be asked about each gap;\nreuse existing answers and interview only for changed or missing decisions. Never reopen or alter terminal records.\n\n## Proposing intents (only when the operator asks what to do next / where the gaps are)\n\n1. Run `hm intent status --json` \u2014 read-only, LLM-free. On `state: invalid` print the error and stop;\n   on `not_filled_in` say the purpose and metrics are unwritten and stop.\n2. Open with a **measure first** block: every metric whose `reason` is `never_measured` or\n   `stale_definition`, with its `how_measured` \u2014 those are gaps in evidence, not in the code.\n   For the ones with `measure: true`, run `hm intent metric measure --all --dry-run` and show\n   the table; the record call is `hm intent metric measure --all`, gated by\n   \"The rule for every write\" above (ask once, run once on yes, otherwise write nothing).\n3. Read the codebase against the measured metrics' `gap` and propose **at most three**\n   candidates, unranked, each with `title / statement / scope / out_of_scope / metric / evidence /\n   overlaps-with`. A candidate for an unmeasured metric carries\n   `evidence: none \u2014 statement only`. `overlaps-with` names any intent (any state,\n   especially `closed` + `observed:\n   missed`) or any `rejected[]` entry the candidate resembles \u2014 never silently re-propose it.\n4. Then ask about each candidate in turn with `request_user_input` (yes / no), and\n   answer every candidate before the first write: the declined titles go into every accepted\n   record's `rejected[]`.\n5. Then, once per accepted candidate, show the exact arguments and run\n   `hm intent new <ID> \u2026 --from-proposal --candidates <N> --declined \"<title>\"\u2026`\n   only after its deep interview and quality review (`N` = candidates shown; one `--declined` per no).\n   Nothing else persists a candidate.\n6. The record is `proposed`; the proposer never runs `approve` \u2014 that stamp is the operator's.\n\nWhat the harness guarantees is narrow: the record changes only through these verbs, a terminal\nintent never changes, and the autopilot gate reads the approval you record. Whether the work\nserves the intent is the operator's judgment and `/hm:review`'s Step 3.3, not this skill's.\nwork-docs/PLAN-fixture-task.md\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat .agents/skills/intent-layer/references/workflow-feedback.md; cat work-docs/PLAN-fixture-task.md; /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_2",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat .agents/skills/intent-layer/references/workflow-feedback.md; cat work-docs/PLAN-fixture-task.md; /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "{\"state\": \"ok\", \"conflicts\": [], \"fired_revisits\": [], \"broken_references\": [], \"withdrawal\": {\"filled_at\": null, \"last_signal_at\": \"2026-09-02T00:00:00Z\", \"quiet_wrapups\": null, \"revisit_candidates_now\": 0, \"due\": false, \"reason\": \"no_stage_spans\"}, \"stale_evidence\": {}, \"moved_evidence\": {}, \"needs_revalidation\": [], \"purpose\": {\"statement\": \"\ube60\ub974\uac8c ship\", \"vision\": \"keep quality\"}, \"metrics\": {\"latency\": {\"last\": null, \"target\": 10, \"observed_at\": null, \"gap\": \"unevaluable\", \"stale_definition\": false, \"reason\": \"never_measured\", \"how_measured\": \"stopwatch\", \"higher_is_better\": false, \"measure\": false}}, \"intents\": {\"FIXTURE-INTENT\": {\"state\": \"active\", \"title\": \"FIXTURE-INTENT title\", \"observed\": null, \"rejected\": [], \"scope\": [\"cut the interview to one round\"], \"statement\": \"shorter onboarding keeps users\", \"metric_id\": \"latency\", \"out_of_scope\": [\"rewrite the renderer\"]}}, \"open_questions\": [{\"id\": \"q_runtime\", \"claim\": \"Which runtime?\", \"status\": \"open\", \"evidence\": [], \"history\": []}], \"revisits\": {\"FIXTURE-INTENT\": {\"title\": \"FIXTURE-INTENT title\", \"condition\": null, \"last_value\": null, \"result\": \"unevaluable\", \"blocked\": false, \"intent\": \"FIXTURE-INTENT\"}}, \"active\": {\"FIXTURE-INTENT\": {\"approval_valid\": true, \"needs_revalidation\": false}}, \"proposed\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "I\u2019m applying the intent-layer feedback procedure. The latency measurement is 7, and the linked intent\u2019s target is 10 or lower. Your prior authorization covers recording the measurement and updating the PLAN. No trial PLAN is present; intent closure remains a separate user decision."
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_4",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat intent/FIXTURE-INTENT.md; /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent migrate --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_4",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat intent/FIXTURE-INTENT.md; /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent migrate --json'",
+            "aggregated_output": "{\"changed\": [], \"retired\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_5",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent metric record latency --value 7 --observed-at 2026-09-22T01:20:00Z --evidence observation.txt:1'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_5",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent metric record latency --value 7 --observed-at 2026-09-22T01:20:00Z --evidence observation.txt:1'",
+            "aggregated_output": "value:\n  value: 7\n  observed_at: '2026-09-22T01:20:00Z'\n  evidence: observation.txt:1\n  definition_hash: 43b3d603a9ba25f94acd47be9bf220585ee5d47525127d68a9685279618fcd61\n  metric_id: latency\nchanged: .claude/intent/metrics.yaml\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_6",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_6",
+            "type": "command_execution",
+            "command": "/bin/bash -lc '/home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm intent status --json'",
+            "aggregated_output": "{\"state\": \"ok\", \"conflicts\": [], \"fired_revisits\": [], \"broken_references\": [], \"withdrawal\": {\"filled_at\": null, \"last_signal_at\": \"2026-09-22T01:20:00Z\", \"quiet_wrapups\": null, \"revisit_candidates_now\": 0, \"due\": false, \"reason\": \"no_stage_spans\"}, \"stale_evidence\": {}, \"moved_evidence\": {}, \"needs_revalidation\": [], \"purpose\": {\"statement\": \"\ube60\ub974\uac8c ship\", \"vision\": \"keep quality\"}, \"metrics\": {\"latency\": {\"last\": 7, \"target\": 10, \"observed_at\": \"2026-09-22T01:20:00Z\", \"gap\": \"at_or_better\", \"stale_definition\": false, \"reason\": \"measured\", \"how_measured\": \"stopwatch\", \"higher_is_better\": false, \"measure\": false}}, \"intents\": {\"FIXTURE-INTENT\": {\"state\": \"active\", \"title\": \"FIXTURE-INTENT title\", \"observed\": null, \"rejected\": [], \"scope\": [\"cut the interview to one round\"], \"statement\": \"shorter onboarding keeps users\", \"metric_id\": \"latency\", \"out_of_scope\": [\"rewrite the renderer\"]}}, \"open_questions\": [{\"id\": \"q_runtime\", \"claim\": \"Which runtime?\", \"status\": \"open\", \"evidence\": [], \"history\": []}], \"revisits\": {\"FIXTURE-INTENT\": {\"title\": \"FIXTURE-INTENT title\", \"condition\": null, \"last_value\": null, \"result\": \"unevaluable\", \"blocked\": false, \"intent\": \"FIXTURE-INTENT\"}}, \"active\": {\"FIXTURE-INTENT\": {\"approval_valid\": true, \"needs_revalidation\": false}}, \"proposed\": []}\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_7",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/tmp/hm-trigger-isolated-observation-present-bqh5yl8d/work-docs/PLAN-fixture-task.md",
+                "kind": "update"
+              }
+            ],
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_7",
+            "type": "file_change",
+            "changes": [
+              {
+                "path": "/tmp/hm-trigger-isolated-observation-present-bqh5yl8d/work-docs/PLAN-fixture-task.md",
+                "kind": "update"
+              }
+            ],
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "id": "item_8",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat work-docs/PLAN-fixture-task.md; rg --files work-docs'",
+            "aggregated_output": "",
+            "exit_code": null,
+            "status": "in_progress"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_8",
+            "type": "command_execution",
+            "command": "/bin/bash -lc 'cat work-docs/PLAN-fixture-task.md; rg --files work-docs'",
+            "aggregated_output": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\n| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |\n|---|---|---|---|---|---|---|\n| [observation.txt:1](../observation.txt), observed 2026-09-22T01:20:00Z | [FIXTURE-INTENT](../intent/FIXTURE-INTENT.md); [latency definition](../.claude/intent.yaml) | Recorded in [metrics](../.claude/intent/metrics.yaml); status readback confirms `gap: at_or_better` | Measurement meets target; intent remains active. Stop: no further authorized stage work; measurement alone does not establish the broader retention outcome. | agent; user owns closure decision | Prior explicit authorization to record measured latency and update this PLAN; no authorization for closure or new tasks | User to decide whether this evidence supports intent closure; obtain explicit authorization before any lifecycle write. Reuse this disposition on resume. |\n\nTrial check at entry and terminal exit: base-root `work-docs/` contains only this task PLAN, with no explicitly activated trial. No trial action applies.\nwork-docs/PLAN-fixture-task.md\n",
+            "exit_code": 0,
+            "status": "completed"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_9",
+            "type": "agent_message",
+            "text": "Recorded latency **7**; status confirms it meets the target of **10 or lower**.\n\n`changed: .claude/intent/metrics.yaml`\n\nUpdated [task PLAN](/tmp/hm-trigger-isolated-observation-present-bqh5yl8d/work-docs/PLAN-fixture-task.md) with the evidence and disposition. No active trial exists.\n\nNext action: user assessment of whether the evidence supports intent closure. The intent remains active; closure and new tasks were not authorized."
+          }
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 150182,
+            "cached_input_tokens": 136960,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 900,
+            "reasoning_output_tokens": 25
+          }
+        }
+      ],
+      "events_sha256": "5b690f175e14046db098cf14013fade2af7f7b747e8d231b9a2d99b0424a757c"
+    },
+    "observation_removed": {
+      "root": "/tmp/hm-trigger-isolated-observation-removed-jjqoywhs",
+      "prompt": "Fixture tool provisioning: the installed hm launcher is /home/noel/harness-maker/.worktrees/world-intent-closed-loop/.venv/bin/python -m harness_maker.hm. Substitute that executable prefix for uv run --with when the procedure calls hm; do not install dependencies.\nThis is a stage-interface isolation fixture: execute only the supplied stage procedure and dependencies explicitly referenced by it (transitively). Read observation.txt and the task PLAN for ordinary task context. Do not discover additional skills through catalogs, directory searches, or unreferenced documents. This constraint is identical for present and removed variants; it isolates this stage entry point, not all host recovery mechanisms.\nExecute only the operational steps in the stage procedure below; if it contains no steps, report no action. Context and prior authorization are inputs, not extra steps. You are running an isolated workflow evaluation in this temporary project. Apply the following actual stage procedure as part of the ordinary task; do not access unrelated user/project files. Task slug fixture-task. Previously the user explicitly authorized recording the measured latency value from observation.txt and updating this task PLAN, but did not authorize intent closure or new tasks.\nTask instruction: Resume the task and inspect observation.txt; report the next action. Source files are in this project. Resolve explicit procedure dependencies from this project.\n\n\n",
+      "hashes": {
+        "before": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        },
+        "after": {
+          "intent/FIXTURE-INTENT.md": "3316e552754f8842388ecfadcc87beb568ea65b5f435fd5d172ae750b609c532",
+          ".claude/intent.yaml": "523ea2195b3fad417ff7c44d889c19f3cc51d6bf9f8e84131203c1ed7d7bda1c",
+          ".claude/intent/metrics.yaml": "b64a3d542eeba0355514bc253e1d8c0d4e5dfd04e30c50a13c4f91e2182372ce",
+          "work-docs/PLAN-fixture-task.md": "df84dff632032435b5164f80f5b3981ca5bff37608e34c976b4f8b2ae47e3e1e"
+        }
+      },
+      "plan": "---\ntype: plan\ntask_slug: fixture-task\nintent: FIXTURE-INTENT\n---\n# Fixture task\n\n## Feedback\n\nNo prior dispositions.\n",
+      "result": "No action taken: the supplied stage procedure contains no operational steps. Next action: provide the stage procedure to execute.",
+      "metrics": "schema_version: 1\nvalues: []\n",
+      "events": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0c6d8-44f2-7d63-a880-153ca28a7a2e"
+        },
+        {
+          "type": "turn.started"
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_0",
+            "type": "agent_message",
+            "text": "No action taken: the supplied stage procedure contains no operational steps. Next action: provide the stage procedure to execute."
+          }
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 17368,
+            "cached_input_tokens": 11520,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 87,
+            "reasoning_output_tokens": 58
+          }
+        }
+      ],
+      "events_sha256": "3791abc86ccdfda89932310b188de2f7c317b53c5f412615676dc138a107fe1e"
+    }
+  }
+}

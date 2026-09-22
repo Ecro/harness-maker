@@ -1,0 +1,369 @@
+schema_version: 3
+spec_slug: world-intent-closed-loop
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Workflow behavior uses independent evidence rubrics
+  and adversarial fixtures. PLAN must declare mutation coverage for any Python contracts
+  it adds; no Python implementation is prescribed by this SPEC.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Evidence precedes the dependent decision
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: world_intent_evidence_before_decision
+  note: Review independent fixture and workflow evidence against this AC-specific
+    rubric. Actual field validation is owned by SPEC-world-intent-closed-loop-trial.
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric world_intent_evidence_before_decision derives
+    from intent/WORLD-INTENT-CLOSED-LOOP.md and operator choices on 2026-09-22 before
+    implementation. Required negative cases are dictated by authority, continuity
+    and no-migration requirements, not inferred from code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-22'
+  judgment_evidence: 'Observation and identity are grounded in actual captured execution
+    at tests/fixtures/world_intent_triggers_observed.json:4, :308, and :604. Authorized
+    update/readback precedes the recorded decisions at :23 and :327; declined closeout
+    writes produce the explicit unevaluable disposition at :623. Current integration
+    retains proactive triggers at step_manifest.md.j2:77, intent-layer/SKILL.md.j2:9,
+    and wrapup.md.j2:592; the invocation-guidance changes do not alter these obligations.
+    Each isolated trigger-removal pair fails the same feedback-completion predicate
+    under tests/unit/test_world_intent_protocol_evidence.py:71, with unchanged negative
+    records captured at :229, :555, and :785. I reran the evidence test file successfully:
+    12 passed. This accepts finite stage-interface evidence, preserving the unrestricted-host
+    recovery limitation documented at EVIDENCE-world-intent-closed-loop.md:315; it
+    does not assert completion of the real three-task trial.'
+  judgment_subject_paths:
+  - work-docs/PLAN-world-intent-closed-loop.md
+  - src/harness_maker/templates/stages/execute.md.j2
+  - src/harness_maker/templates/stages/wrapup.md.j2
+  - src/harness_maker/templates/agents/_partials/step_manifest.md.j2
+  - src/harness_maker/templates/skills/intent-layer/SKILL.md.j2
+  - src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2
+  - work-docs/EVIDENCE-world-intent-closed-loop.md
+  - tests/fixtures/world_intent_protocol_observed.json
+  - tests/fixtures/world_intent_triggers_observed.json
+  - tests/unit/test_world_intent_protocol_evidence.py
+  judgment_subject_hash: fdfa23846c7986456b76d4f1b5fbc0d83c78cc7904dc4df67adb4e5e2b346386
+- id: AC-002
+  title: Continuation respects existing authority
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: world_intent_authority_and_progress
+  note: Review independent fixture and workflow evidence against this AC-specific
+    rubric. Actual field validation is owned by SPEC-world-intent-closed-loop-trial.
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric world_intent_authority_and_progress derives
+    from intent/WORLD-INTENT-CLOSED-LOOP.md and operator choices on 2026-09-22 before
+    implementation. Required negative cases are dictated by authority, continuity
+    and no-migration requirements, not inferred from code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-22'
+  judgment_evidence: Authorized progress is grounded in the real boundary and next-skill
+    execution at EVIDENCE-world-intent-closed-loop.md:12 and the authorized metric
+    write/readback dispositions at tests/fixtures/world_intent_triggers_observed.json:23
+    and :327. User-owned decisions remain protected by workflow-feedback.md.j2:13,
+    :21, and :28, with concrete pending scope and conflict questions at tests/fixtures/world_intent_protocol_observed.json:125
+    and :126. Denied writes are directly supported by the closeout context, unchanged
+    canonical hashes, and explicit disposition at tests/fixtures/world_intent_triggers_observed.json:606,
+    :607, and :623. Unavailable-procedure honesty is required at workflow-feedback.md.j2:30
+    and demonstrated by the intermediate handoff at triggers_observed.json:327. The
+    integrated invocation and configuration guidance changes preserve these current
+    authority rules and their evidence; no additional approval or AC waiver is inferred.
+  judgment_subject_paths:
+  - work-docs/PLAN-world-intent-closed-loop.md
+  - src/harness_maker/templates/stages/execute.md.j2
+  - src/harness_maker/templates/stages/wrapup.md.j2
+  - src/harness_maker/templates/agents/_partials/step_manifest.md.j2
+  - src/harness_maker/templates/skills/intent-layer/SKILL.md.j2
+  - src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2
+  - work-docs/EVIDENCE-world-intent-closed-loop.md
+  - tests/fixtures/world_intent_protocol_observed.json
+  - tests/fixtures/world_intent_triggers_observed.json
+  - tests/unit/test_world_intent_protocol_evidence.py
+  judgment_subject_hash: fdfa23846c7986456b76d4f1b5fbc0d83c78cc7904dc4df67adb4e5e2b346386
+- id: AC-003
+  title: Evidence gaps receive an explicit disposition
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: world_intent_uncertainty_disposition
+  note: Review independent fixture and workflow evidence against this AC-specific
+    rubric. Actual field validation is owned by SPEC-world-intent-closed-loop-trial.
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric world_intent_uncertainty_disposition derives
+    from intent/WORLD-INTENT-CLOSED-LOOP.md and operator choices on 2026-09-22 before
+    implementation. Required negative cases are dictated by authority, continuity
+    and no-migration requirements, not inferred from code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-22'
+  judgment_evidence: Diagnosis is established by current workflow-feedback.md.j2:18
+    and the captured stale, conflict, and missing-evidence PLANs at tests/fixtures/world_intent_protocol_observed.json:124,
+    :126, and :127. Their specific questions identify the unresolved evidence or authority
+    rather than inferring an answer. Dated deferral at protocol_observed.json:128
+    retains both 2026-10-06T00:00:00Z and the first subsequent task closeout, without
+    an immediate probe. No false success is supported by the missing-evidence disposition
+    at :127, the declined-write closeout at tests/fixtures/world_intent_triggers_observed.json:623,
+    and the actual pending real-use outcome at work-docs/PLAN-world-intent-closed-loop.md:404.
+    Integrated wrapup.md.j2:592 still requires measurement results or missing evidence
+    before closure; the invocation-guidance integration does not alter these criteria
+    or the unchanged direct evidence.
+  judgment_subject_paths:
+  - work-docs/PLAN-world-intent-closed-loop.md
+  - src/harness_maker/templates/stages/execute.md.j2
+  - src/harness_maker/templates/stages/wrapup.md.j2
+  - src/harness_maker/templates/agents/_partials/step_manifest.md.j2
+  - src/harness_maker/templates/skills/intent-layer/SKILL.md.j2
+  - src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2
+  - work-docs/EVIDENCE-world-intent-closed-loop.md
+  - tests/fixtures/world_intent_protocol_observed.json
+  - tests/fixtures/world_intent_triggers_observed.json
+  - tests/unit/test_world_intent_protocol_evidence.py
+  judgment_subject_hash: fdfa23846c7986456b76d4f1b5fbc0d83c78cc7904dc4df67adb4e5e2b346386
+- id: AC-004
+  title: Completion and replay do not create extra work
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: world_intent_completion_and_replay
+  note: Review independent fixture and workflow evidence against this AC-specific
+    rubric. Actual field validation is owned by SPEC-world-intent-closed-loop-trial.
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric world_intent_completion_and_replay derives from
+    intent/WORLD-INTENT-CLOSED-LOOP.md and operator choices on 2026-09-22 before implementation.
+    Required negative cases are dictated by authority, continuity and no-migration
+    requirements, not inferred from code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-22'
+  judgment_evidence: Completion separation is grounded in integrated wrapup.md.j2:592,
+    the actual closeout disposition at tests/fixtures/world_intent_triggers_observed.json:623,
+    and the still-unmeasured real-use outcome at PLAN-world-intent-closed-loop.md:404.
+    Replay evidence at EVIDENCE-world-intent-closed-loop.md:218 and :252 reads the
+    existing measurement and reuses its disposition; unchanged canonical hashes at
+    :254 support the absence of duplicate writes. Terminal preservation is directly
+    established by equal before/after hashes at tests/fixtures/world_intent_protocol_observed.json:118
+    and the pending proposal at :125. Authorized continuation and justified stopping
+    remain required by workflow-feedback.md.j2:27 and demonstrated by the intermediate
+    handoff at triggers_observed.json:327 and stop disposition at :623. The integration
+    changes invocation guidance without weakening these completion, replay, or authority
+    rules.
+  judgment_subject_paths:
+  - work-docs/PLAN-world-intent-closed-loop.md
+  - src/harness_maker/templates/stages/execute.md.j2
+  - src/harness_maker/templates/stages/wrapup.md.j2
+  - src/harness_maker/templates/agents/_partials/step_manifest.md.j2
+  - src/harness_maker/templates/skills/intent-layer/SKILL.md.j2
+  - src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2
+  - work-docs/EVIDENCE-world-intent-closed-loop.md
+  - tests/fixtures/world_intent_protocol_observed.json
+  - tests/fixtures/world_intent_triggers_observed.json
+  - tests/unit/test_world_intent_protocol_evidence.py
+  judgment_subject_hash: fdfa23846c7986456b76d4f1b5fbc0d83c78cc7904dc4df67adb4e5e2b346386
+- id: AC-005
+  title: Existing records remain discoverable and authoritative
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: world_intent_discoverability
+  note: Review independent fixture and workflow evidence against this AC-specific
+    rubric. Actual field validation is owned by SPEC-world-intent-closed-loop-trial.
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric world_intent_discoverability derives from intent/WORLD-INTENT-CLOSED-LOOP.md
+    and operator choices on 2026-09-22 before implementation. Required negative cases
+    are dictated by authority, continuity and no-migration requirements, not inferred
+    from code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-22'
+  judgment_evidence: 'Navigation remains concrete after integration: specs/SPEC-world-intent-closed-loop.md:157
+    and work-docs/PLAN-world-intent-closed-loop.md:47 link to canonical intent, definitions/questions,
+    and measurement history using intent_world_closed_loop_cycles. I checked every
+    current relative link and fragment anchor in both documents; all resolve. Evidence,
+    results, and the next decision remain reachable through SPEC:163 and PLAN:50,
+    including existing Feedback and completion-disposition anchors. Preservation is
+    grounded in workflow-feedback.md.j2:33, intent-layer/SKILL.md.j2:18, unchanged
+    canonical fixture hashes at tests/fixtures/world_intent_triggers_observed.json:8,
+    and approval-valid CLI readback at EVIDENCE-world-intent-closed-loop.md:103. PLAN:55
+    and the linked disposition at triggers_observed.json:23 retain shared-state authority.
+    The integrated execute/wrapup invocation guidance does not weaken any navigation
+    or compatibility criterion.'
+  judgment_subject_paths:
+  - work-docs/PLAN-world-intent-closed-loop.md
+  - src/harness_maker/templates/stages/execute.md.j2
+  - src/harness_maker/templates/stages/wrapup.md.j2
+  - src/harness_maker/templates/agents/_partials/step_manifest.md.j2
+  - src/harness_maker/templates/skills/intent-layer/SKILL.md.j2
+  - src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2
+  - work-docs/EVIDENCE-world-intent-closed-loop.md
+  - tests/fixtures/world_intent_protocol_observed.json
+  - tests/fixtures/world_intent_triggers_observed.json
+  - tests/unit/test_world_intent_protocol_evidence.py
+  judgment_subject_hash: fdfa23846c7986456b76d4f1b5fbc0d83c78cc7904dc4df67adb4e5e2b346386
+- id: AC-006
+  title: Trial protocol preserves enrollment and assessment
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: world_intent_trial_protocol
+  note: Review independent fixture and workflow evidence against this AC-specific
+    rubric. Actual field validation is owned by SPEC-world-intent-closed-loop-trial.
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric world_intent_trial_protocol derives from intent/WORLD-INTENT-CLOSED-LOOP.md
+    and operator choices on 2026-09-22 before implementation. Required negative cases
+    are dictated by authority, continuity and no-migration requirements, not inferred
+    from code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-22'
+  judgment_evidence: Fresh evaluation on integrated HEAD 358ba635 confirms every AC-006
+    criterion. Start-order enrollment and resume deduplication remain supported by
+    tests/fixtures/world_intent_protocol_observed.json:14,132,146 and current workflow-feedback.md.j2:67,75,76.
+    Failure/abort retention and all-terminal collection remain supported by captured
+    documents at :24,33,43,53 and terminal ordering at :179, with live integration
+    wiring at step_manifest.md.j2:80. Unauthorized reset is rejected at tests/fixtures/world_intent_protocol_observed.json:43,217;
+    independent collection/outcome combinations remain at :24,33,53,68. Current execute.md.j2:134
+    preserves existing Feedback dispositions, and wrapup.md.j2:592,594 retains feedback
+    before closure without equating completion with attainment. Revised navigation
+    and completion records at work-docs/PLAN-world-intent-closed-loop.md:53,57,404
+    continue to identify the actual trial as separate and pending. No additional tests
+    or Claude-live waiver were used for this reevaluation.
+  judgment_subject_paths:
+  - work-docs/PLAN-world-intent-closed-loop.md
+  - src/harness_maker/templates/stages/execute.md.j2
+  - src/harness_maker/templates/stages/wrapup.md.j2
+  - src/harness_maker/templates/agents/_partials/step_manifest.md.j2
+  - src/harness_maker/templates/skills/intent-layer/SKILL.md.j2
+  - src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2
+  - work-docs/EVIDENCE-world-intent-closed-loop.md
+  - tests/fixtures/world_intent_protocol_observed.json
+  - tests/fixtures/world_intent_triggers_observed.json
+  - tests/unit/test_world_intent_protocol_evidence.py
+  judgment_subject_hash: fdfa23846c7986456b76d4f1b5fbc0d83c78cc7904dc4df67adb4e5e2b346386
+- id: AC-007
+  title: Codex follows authorized next-stage decisions
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: world_intent_codex_continuation
+  note: ''
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric derived from the user-requested Codex autopilot
+    repair and existing boundary authority contracts; negative cases preserve gates
+    rather than deriving expectations from new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-22'
+  judgment_evidence: On the integrated 358ba635 checkout, gate classification and
+    existing CLI invocation pass at codex_autopilot_advance.md.j2:6,10,15,26; authorized
+    same-conversation dispatch passes at :29,36,39,40,47 and is supported by the native
+    payload execution in work-docs/EVIDENCE-world-intent-closed-loop.md:12,15,18,28.
+    Host independence and honest missing-skill handling pass at stage_end_summary.md.j2:30
+    and codex_autopilot_advance.md.j2:45,46,47,48,50. Preserved authority controls
+    pass at :4,10,26,31,36 and tests/unit/test_autopilot_judgment_gate.py:91,132,160,288.
+    A fresh run of test_codex_autopilot_continuation.py, test_autopilot_chain_e2e.py,
+    and test_autopilot_judgment_gate.py completed with 53 passed in 4.25 seconds,
+    complementing the positive dispatch and negative cap traces at work-docs/EVIDENCE-world-intent-closed-loop.md:5,30.
+    No Claude live test result or acceptance waiver was used to establish this verdict.
+  judgment_subject_paths:
+  - src/harness_maker/templates/agents/_partials/stage_end_summary.md.j2
+  - work-docs/PLAN-world-intent-closed-loop.md
+  - src/harness_maker/templates/agents/_partials/codex_autopilot_advance.md.j2
+  - work-docs/EVIDENCE-world-intent-closed-loop.md
+  - tests/fixtures/world_intent_protocol_observed.json
+  - tests/fixtures/world_intent_triggers_observed.json
+  - tests/unit/test_world_intent_protocol_evidence.py
+  judgment_subject_hash: 130494a4593a3857dbf60400f9e4ef3def4da0e6f943e8e01a8b56f51aebf9df
+irreversible_decisions:
+- id: IRR-001
+  decision: Retain existing authoritative stores; place linked task dispositions in
+    PLAN Feedback and the trial in PLAN-world-intent-closed-loop-trial Trial
+  category: schema/file format/storage layout
+  rationale: Workflow consumers and durable references depend on record placement
+    and required fields; later relocation needs compatibility handling
+  source: spec
+approval:
+  kind: human
+  content_hash: bcf577f5994ca86105a120727b465b1a19ba832e87b1d091764c2136751dc2fe
+  approved_by: Ecro
+  approved_at: '2026-09-22T02:03:29Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: bf75b05b0a6a31602e9dc89d1a3419fa50a16765ca6ff70d704218bda0970d67
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: c56852e6b07347076e103522eeb2eff1a93a0ffbe8c88f3225a3716920fc2ddf
+    irreversible_decisions: 03070491607af5a5d755a2b4460693ee8368f0bf967f43dfef335785eba107b8
+    AC-001: bad28253f1187787f37d0b8bfff419ed4974ad7a89c412c657207f1831be587f
+    AC-002: cb1e0a50c65611ccc702a4563176e272e99de72d4d75de77960b47b17178ccc6
+    AC-003: 3572e532d05c286f70c76a810fc96fd170e411ffc41f7cf54ac7360e71c2ef8a
+    AC-004: aa999bcda3ca07e06b9abc1462704654b4e7e1c2bd787f9dc697a419ffcf792a
+    AC-005: 99594a90de232f815de491019acc3cee24276719ddb5f3f25617ed384c86437b
+    AC-006: ad6fa67be2e054fbf1c3182d39f1b0783453b5b5ae334cf0e585cd9c3beb7fdf
+    AC-007: a4c058807fd14d8bcc79e7116ad9b10aa77135160c1e23d9f5d428bdc64cf969
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c

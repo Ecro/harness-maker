@@ -1,0 +1,52 @@
+schema_version: 3
+spec_slug: world-intent-closed-loop-trial
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Real-task evidence with user assessment; no Python implementation.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Three real tasks receive evidence-based user assessment
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: world_intent_real_task_trial
+  note: ''
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric world_intent_real_task_trial derives from intent/WORLD-INTENT-CLOSED-LOOP.md
+    and operator selection on 2026-09-22; actual conversation and execution evidence
+    plus final user assessment decide success, never implementation assertions.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths:
+  - work-docs/PLAN-world-intent-closed-loop-trial.md
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 7573a49fdb4971f47b57de9c2cb82eba002edf352318b0cf121436767a283f1e
+  approved_by: Ecro
+  approved_at: '2026-09-22T00:48:20Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: afa92369a3fc360106d6860535f28ab7a748336d88d94ee096f0fceaa0c61255
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 0e45ba3376b29193885024be0ab0175ed317e2eb63519cb6aa425971de2fd361
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 5067ea8749f151f85777a2e976505e871230710f971bfb7763cbe16e091e9d57
+    ac_order: a1557fcfe162c5ca92cb543b3703219d932e86a98fd3ef7e4d7722599eb526d0

@@ -92,11 +92,11 @@ ac:
   - input: {targets: [cursor]}
     expected: not-applicable
   - input: {targets: [codex]}
-    expected: not-applicable
+    expected: degraded
   - input: {targets: [claude-code, cursor]}
     expected: degraded
   - input: {targets: [cursor, codex]}
-    expected: not-applicable
+    expected: degraded
   rubric_id: null
   pending_test: false
   oracle_source: golden

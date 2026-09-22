@@ -19,12 +19,16 @@ scope:
 - Demonstrate successful feedback-to-decision continuity in all three consecutive
   real tasks using execution and conversation evidence, with final assessment by the
   user. Normal approval questions and justified termination are not failures.
-state: proposed
+state: active
 created_at: '2026-09-22T00:02:18Z'
 schema_version: 1
 rejected: []
 depends_on: []
-approval: null
+approval:
+  content_hash: 8bfe634809a8731133d34693cf7bade4c83382a25e843e5423dd3a5ff9e9b6da
+  approved_by: Ecro
+  approved_at: '2026-09-22T00:47:20Z'
+  approved_target: 3
 revisit_when: null
 observed: null
 note: null

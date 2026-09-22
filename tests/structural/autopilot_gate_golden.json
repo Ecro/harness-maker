@@ -1,68 +1,68 @@
 {
   "arms": {
-    "auto_safe@warn": {
-      "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
-      "execute": "23ccf3d2bcc277548faeed1bc53280373ea41619a295631a1a7acac5200f3f37",
-      "health": "11118caf94ce3a4be2e378fe26a4a377eb37c7af7074c3ff9b4ba8807e9b5c2c",
-      "help": "e799ff8a8bfc9c2a3a9bd897fd403aa36c424eef8fa48fd60d278f49a2e04244",
-      "loop": "17ac6273e0545cb1d156f8764288bbf484600f86d407e1e3ffc7cb873390aa0a",
-      "loop-p5-batch": "bd4f581199118de381895e371f1fb1ddc141396f2985067c91ae7de135f09e0d",
-      "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
-      "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
-      "research": "9243c749de8f9c071645b2c31703b2689b557d9775a98012f80b81b934974728",
-      "review": "6b766f3b0162749702e31bb7655e3f113b7155af76f48429c04719bdb3de0543",
-      "spec": "b1ca85ee5ab53123b3dd57f24c97c984da45a9ca35f9639c3bb90e37b6df5b2e",
-      "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
-      "verify": "675b73c08cf139b7e3a3f8489520f9008b1451075341a61d3e7886c58fe5226f",
-      "wrapup": "3753d2c65c982501e8e3e70beb9cdb794f52e056d04d2a44988512a35e06cc2a"
-    },
-    "auto_safe@block": {
-      "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
-      "execute": "34800139d559bb0e56fe489e5eb6c5b72d6332438716e0960f5f93ab09458dab",
-      "health": "11118caf94ce3a4be2e378fe26a4a377eb37c7af7074c3ff9b4ba8807e9b5c2c",
-      "help": "e799ff8a8bfc9c2a3a9bd897fd403aa36c424eef8fa48fd60d278f49a2e04244",
-      "loop": "17ac6273e0545cb1d156f8764288bbf484600f86d407e1e3ffc7cb873390aa0a",
-      "loop-p5-batch": "bd4f581199118de381895e371f1fb1ddc141396f2985067c91ae7de135f09e0d",
-      "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
-      "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
-      "research": "9243c749de8f9c071645b2c31703b2689b557d9775a98012f80b81b934974728",
-      "review": "6b766f3b0162749702e31bb7655e3f113b7155af76f48429c04719bdb3de0543",
-      "spec": "217c32b3e876405a023212a0978195dc79a6a8bcdbe212dde72cef571dabf1f1",
-      "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
-      "verify": "84ea0693ccc64a6a2e381160e980e59b3fcc8e665d74e49a75c22c92caa21a8f",
-      "wrapup": "62c0a26969839a5d8145645aa6d3337dae700c0847ab30e9e11ec0b85e5d42ed"
-    },
-    "ask@flag_on": {
-      "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
-      "execute": "cf1618fcf65124b5be3f9ff66b9f125e10d4d2612b9cf7f4cf17585c8085987d",
-      "health": "460a5f320d9da1b2f82bce189b5c31da5c8e1659eb13b7b267ac2b2f65811d22",
-      "help": "0036f16bec1759cbcaa30852f7b534959b5b3844f485ce5f522cb3096a54858e",
-      "loop": "f35ff45450f92c9b7f5ef11b58b693256d0990bb3a7f4eea0d3d00c7c23980f8",
-      "loop-p5-batch": "bd4f581199118de381895e371f1fb1ddc141396f2985067c91ae7de135f09e0d",
-      "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
-      "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
-      "research": "91bb7a937fd1c97bb3903771d0260d3fc81ee354860aad31efb1fdd4764d41e9",
-      "review": "b12a5cce8a2b42b5d1372c9c05a55d2347184ff4b8baa56e47754912a2d643a0",
-      "spec": "ef5b01320ace897ad0ed49b6c95456c8678ab00d6fd57f3fbf413acbbfd724f8",
-      "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
-      "verify": "81157d7b45568b538d1cf00f9afc4866044bc824d1ef7cce0cf5e6947446082e",
-      "wrapup": "c50b7a37b183039ef40dd2a207e22d44a2f3110ee97c6804e410de0a58a6aa34"
-    },
     "ask@flag_off": {
       "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
-      "execute": "2eff2f2138f3c5f606a40d34afafa47d1cbfb0e4f802de03e47b31513ac9f4b3",
+      "execute": "d1d229546f77ee8ed780cef95d51e56ed1c6125151df67cd2a66a8f833abc9c4",
       "health": "460a5f320d9da1b2f82bce189b5c31da5c8e1659eb13b7b267ac2b2f65811d22",
       "help": "0036f16bec1759cbcaa30852f7b534959b5b3844f485ce5f522cb3096a54858e",
       "loop": "231484b74cd81e7bdaf19d447a232bd92fd9c6cf04db1a2e6cd7197bb52e520c",
       "loop-p5-batch": "c278e46748b1cc544c2126dbbff4db8a492d378ac23ed31334a81f5a03ccd322",
       "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
       "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
-      "research": "3927bcce749da0a066b4fb5e72463c97496d117e4985d996fdf04052e5ac364f",
-      "review": "292b05222233e1b4d791eca3dd551e57616e3a2ecd2fa07b0a78c7a79414be9e",
-      "spec": "b0a9933af4367db6a46e12eefa4af41600f8d7c170945ce378dee1e44331726d",
+      "research": "754712ea3a84e1a0198fddc9f828ad6f03a010ff8184ee914298784d4da66a81",
+      "review": "be66548f6c02b5e21dd0bec92b4640bcd8492329d026aa3e5586404035e5de69",
+      "spec": "4ee5127c1dbaaea7b4b5eb90c4e6ff1eedca506e33a29fff768b596070c0cb71",
       "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
-      "verify": "053acf439215009df3a5793c1fefc64c93d551dde7f9b9c13ee120ef578803dd",
-      "wrapup": "0f3737825cdb26e2f59fd89c25c1020188d9745ad9b7f81c22feefeedd554a42"
+      "verify": "1802f0f63fab03b8905a35e33e5371e03b2accd246d3cf775c32bccdb6abd30a",
+      "wrapup": "3dda36185f28d2fefe39716b158d2dd1ff73247759b6848ce7a97f33feedb4ef"
+    },
+    "ask@flag_on": {
+      "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
+      "execute": "b92e8ccafe1dfd68d9a180cab8d96f9c093000b8f3919d58e11a015b0c395883",
+      "health": "460a5f320d9da1b2f82bce189b5c31da5c8e1659eb13b7b267ac2b2f65811d22",
+      "help": "0036f16bec1759cbcaa30852f7b534959b5b3844f485ce5f522cb3096a54858e",
+      "loop": "f35ff45450f92c9b7f5ef11b58b693256d0990bb3a7f4eea0d3d00c7c23980f8",
+      "loop-p5-batch": "bd4f581199118de381895e371f1fb1ddc141396f2985067c91ae7de135f09e0d",
+      "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
+      "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
+      "research": "836856b5e907863f09328377d8f040b25ee67b100c1517fa28f46e15e51c7102",
+      "review": "6d3917f0820132cedc441ad7c6362755707f134d28657ae8f9014f38660199cb",
+      "spec": "e3cda0349a76043e7b629d264f5a07a33a56ddb4645d0777232d6fe908d42f6a",
+      "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
+      "verify": "84e9898dad7603d58a5a40cfc8b6e7c517a6b18ef1dc14aeb13bb0752f6f28ab",
+      "wrapup": "6a030279d13bb10256f03b26bec5db0c7fd5a18122a277d65a87141425bff4be"
+    },
+    "auto_safe@block": {
+      "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
+      "execute": "5635ccafb46300f124f623384068c3e35fbf45d13d63e0cfaf0aea5f96e5937a",
+      "health": "11118caf94ce3a4be2e378fe26a4a377eb37c7af7074c3ff9b4ba8807e9b5c2c",
+      "help": "e799ff8a8bfc9c2a3a9bd897fd403aa36c424eef8fa48fd60d278f49a2e04244",
+      "loop": "17ac6273e0545cb1d156f8764288bbf484600f86d407e1e3ffc7cb873390aa0a",
+      "loop-p5-batch": "bd4f581199118de381895e371f1fb1ddc141396f2985067c91ae7de135f09e0d",
+      "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
+      "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
+      "research": "88f1998c488f9f54427a45ea78adfd14c92c568e4452e31723eb1308efc151f4",
+      "review": "47e1a86fc4182601d20344e138fe44b82b8c74b6764c2472cf698f9ae6aa75bf",
+      "spec": "1e84f6279e489cabf336c182ce7bfbdb40da2954991243108dfc48b1284a849e",
+      "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
+      "verify": "c6acd8de1c52a54b41e8b6f3cca6de4d0be9a3552f5fd5270b548496be530504",
+      "wrapup": "a4abb5156905ea4e0172d6ad091a0fcc13099fc8065f23e457094682a3b24c6f"
+    },
+    "auto_safe@warn": {
+      "configure": "788aab0fd47a4678cb3a5c8cca6f63bc201dee5391c4ef6ae3653b2d359b5f97",
+      "execute": "ee4b6dd815933559c1487d8de57e3ddc931c9bc3de07358de0b516b3c08cf231",
+      "health": "11118caf94ce3a4be2e378fe26a4a377eb37c7af7074c3ff9b4ba8807e9b5c2c",
+      "help": "e799ff8a8bfc9c2a3a9bd897fd403aa36c424eef8fa48fd60d278f49a2e04244",
+      "loop": "17ac6273e0545cb1d156f8764288bbf484600f86d407e1e3ffc7cb873390aa0a",
+      "loop-p5-batch": "bd4f581199118de381895e371f1fb1ddc141396f2985067c91ae7de135f09e0d",
+      "make": "24bed51c862eb6402bd5f821a9f708472213b7471682f92a3f4eb718da8c0355",
+      "metrics": "5ff8cdd1b1e313a4e7ef27710b6048436e3a76008fe6e24a66996fc027e51d26",
+      "research": "88f1998c488f9f54427a45ea78adfd14c92c568e4452e31723eb1308efc151f4",
+      "review": "47e1a86fc4182601d20344e138fe44b82b8c74b6764c2472cf698f9ae6aa75bf",
+      "spec": "a943d6463b7a1891d8ec3f0d2dd838e4bea603a957d0d07ef8d0fca68b045486",
+      "uninstall": "2976573d79d5c792952898166ff6af3542caf8cb19bc1d0d64f78b8676f3b7a4",
+      "verify": "d47353b72abf9d74da07110b19a102ede3ca48925a66207506989d6398d31975",
+      "wrapup": "5ad85b55481ea613f9baef503c7d419da04c03abf935ec3f1c602dd4afab0807"
     }
   },
   "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
@@ -197,13 +197,13 @@
       "task": "mission-context-loop"
     },
     {
-      "date": "2026-09-22",
-      "task": "codex-stage-invocation",
       "commands": [
         "help",
         "spec"
       ],
-      "reason": "Help adopts runtime-correct Codex invocation examples and six-stage count; SPEC drift already reproduces with unmodified HEAD source (baseline probe), refreshed alongside stale snapshots. Autopilot gates and command sets unchanged."
+      "date": "2026-09-22",
+      "reason": "Help adopts runtime-correct Codex invocation examples and six-stage count; SPEC drift already reproduces with unmodified HEAD source (baseline probe), refreshed alongside stale snapshots. Autopilot gates and command sets unchanged.",
+      "task": "codex-stage-invocation"
     }
   ]
 }

@@ -49,6 +49,7 @@ def test_session_id_is_quoted_in_every_template_that_passes_it() -> None:
         if "--session-id" not in text:
             continue
         for line in text.splitlines():
+            line = _unescaped(line)
             if (
                 "--session-id" in line
                 and '--session-id "$HM_SESSION_ID"' not in line

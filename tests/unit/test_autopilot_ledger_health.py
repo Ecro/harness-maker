@@ -98,7 +98,7 @@ def test_smoke_cli_emits_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     assert out["degraded"] is True
     assert out["level"] == "auto_safe"
     # full surface locked. `applicable` was added by AC-003 of
-    # PLAN-token-efficiency-autopilot-ux-speed: a harness whose `targets` omit `claude-code` cannot
+    # PLAN-token-efficiency-autopilot-ux-speed: targets without a supported runtime cannot
     # auto-advance at all, so "configured yet never fired" is a permanent false alarm there. This
     # lock is why that addition had to be deliberate rather than silent.
     assert set(out) == {"degraded", "applicable", "level", "entry_count", "reason"}
@@ -121,3 +121,17 @@ def test_ledger_never_writes_a_verdict_literal_in_event(tmp_path: Path) -> None:
     for forbidden in verdicts:
         with pytest.raises(ValueError, match="ADR-009"):
             autopilot_ledger.append_event(tmp_path, event=forbidden)
+
+
+@pytest.mark.parametrize("targets", [["codex"], ["codex", "cursor"]])
+def test_codex_supported_smoke_transitions_from_empty_to_recorded(
+    tmp_path: Path, targets: list[str]
+) -> None:
+    empty = autopilot_ledger.smoke_check(tmp_path, yaml_level="auto_safe", targets=targets)
+    assert empty["applicable"] is True
+    assert empty["degraded"] is True
+    autopilot_ledger.append_event(tmp_path, event="advance_authorized", fields={"to": "spec"})
+    recorded = autopilot_ledger.smoke_check(tmp_path, yaml_level="auto_safe", targets=targets)
+    assert recorded["applicable"] is True
+    assert recorded["degraded"] is False
+    assert recorded["entry_count"] == 1

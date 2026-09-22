@@ -5,10 +5,8 @@ description: Deep-interview the creator before creating intents; improve intent 
 
 # {{ name }}
 
-The operator does not have to remember a verb. When a request in prose fits one of the
-situations in the description, translate it into exactly one of the `hm intent` verbs below.
-For creation, complete the deep interview and quality review below before choosing write arguments.
-{% if is_codex %}On Codex this skill starts only when the operator mentions `$intent-layer`.{% endif %}
+Translate matching prose into one `hm intent` verb; creation requires the deep interview and quality review below.
+Workflow stages may load feedback without a separate mention; intent changes still require consent.
 
 **Read freely, write only on an answer.** `hm intent status --json` is read-only, LLM-free and
 free to run whenever the operator asks where things stand. Mutation verbs write only after consent.
@@ -20,6 +18,8 @@ CODEOWNERS + branch protection. Empty or identical roles stay silent.
 One intent may serve multiple SPECs (1:N); the record is `intent/<ID>.md`.
 `hm intent migrate --json` preserves record body bytes, approvals and historical clocks;
 Run it before the first canonical write. Reads accept legacy files without rewriting them.
+
+Workflow feedback: read and follow `references/workflow-feedback.md` at workflow triggers.
 
 ## The verbs (full argument forms)
 

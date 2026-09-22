@@ -255,7 +255,9 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # harness now DERIVES `warn` from its preset. It used to inherit the model's `spec-driven`
 # default and skip the step. Production still derives `block` and is unchanged, which is why
 # only one arm moved.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 800), ("Production", 802)])
+# 800/802 → 823/825 (world-intent-closed-loop): shared feedback/trial hooks
+# and measure-before-closure integration add 23 lines; delegation remains OFF.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 823), ("Production", 825)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

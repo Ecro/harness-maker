@@ -7,6 +7,24 @@
 
 ---
 
+## Feedback during ordinary work
+
+Stage entry/resume, material observations and closeout follow the existing
+intent-layer workflow-feedback reference. Authoritative records stay in
+`intent/`, `specs/`, `work-docs/` and shared intent state; PLAN Feedback holds
+evidence locators, write/readback or pending dispositions and the next decision.
+Measurements precede closure; existing consent applies only to the same scope.
+
+Codex executes the next local stage skill after the shared boundary authorizes
+it. Auto-answered judgments are recorded before a terminal halt, and missing
+skills produce a handoff. Claude retains Skill dispatch; Cursor keeps handoff.
+No new scheduler, Goal engine, storage schema or approval bypass is introduced.
+
+Real-use validation has a separate activation and three first-start-ordered task
+rows. One named collector writes the authoritative base-root trial PLAN; other
+agents provide local source events. Aborts, failures and missing evidence remain
+visible. Implementation completion and trial outcome are separate.
+
 ## Table of Contents
 
 1. [What is harness-maker?](#1-what-is-harness-maker)

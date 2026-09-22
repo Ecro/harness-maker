@@ -3,6 +3,24 @@
 > **Status:** v2.4 (0.9.3 target + autoloop refresh) · **Written:** 2026-05-03 · **Language:** English
 > Claude Code / Cursor / Codex harness generator — generates and updates project-specific runtime assets with a single `/harness-maker:make` command. Structured for autonomous builds via autoloop.
 
+## Workflow feedback and Codex continuation (2026-09-22)
+
+Stage entry/resume, material observations and closeout follow the existing
+intent-layer workflow-feedback reference. Authoritative records stay in
+`intent/`, `specs/`, `work-docs/` and shared intent state; PLAN Feedback holds
+evidence locators, write/readback or pending dispositions and the next decision.
+Measurements precede closure; existing consent applies only to the same scope.
+
+Codex executes the next local stage skill after the shared boundary authorizes
+it. Auto-answered judgments are recorded before a terminal halt, and missing
+skills produce a handoff. Claude retains Skill dispatch; Cursor keeps handoff.
+No new scheduler, Goal engine, storage schema or approval bypass is introduced.
+
+Real-use validation has a separate activation and three first-start-ordered task
+rows. One named collector writes the authoritative base-root trial PLAN; other
+agents provide local source events. Aborts, failures and missing evidence remain
+visible. Implementation completion and trial outcome are separate.
+
 ## Intent vocabulary and ownership (2026-09-21)
 
 The canonical CLI is `hm intent`, with direct record lifecycle verbs and

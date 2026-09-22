@@ -1,0 +1,99 @@
+## Workflow feedback
+
+The workflow agent owns this connection at stage entry/resume, each material
+observation, and close-out. Read `hm intent status --json` through the launcher
+below; load the task's SPEC/PLAN intent link and existing Feedback dispositions.
+If status is not_filled_in, skip feedback; if invalid, report the error and do not
+make a dependent intent decision. An absent intent layer costs no record or prompt.
+
+1. Identify the relevant observation, source locator/time, affected question or
+   metric ID, and task/intent link. For code-absent facts, use project-knowledge.
+   If no PLAN exists yet, retain the evidence in the current SPEC/conversation and
+   transfer it when execute creates the PLAN; never create a competing state store.
+2. Reuse existing authorization only for the same operation and agreed scope.
+   Follow the write rule below for unapproved mutations. If consent is pending or
+   declined, write nothing and mark the update pending or declined. A question or
+   proposal is not a recorded update. Never treat silence as consent or missing
+   evidence as success. Do not ask again for the same confirmed operation.
+3. After an authorized write, read back status; use that readback in the next decision.
+   For missing, stale or conflicting evidence, diagnose within scope before the dependent decision.
+   If the observation window is open, record its closing date and next eligible trigger; do not retry now.
+   If uncertainty remains, ask the specific unresolved decision and continue only
+   independent authorized work. A missed target is not automatically a new task.
+4. On replay, link the existing disposition and follow-up; do not create duplicate work.
+   Never rewrite terminal intent records; link delayed evidence to a consented new proposal.
+   Distinguish completed task work from achieved intent outcomes. Measurements and
+   their absence must inform the closure decision, not follow it.
+5. Record the supported next decision and its authority. Continue agreed work only
+   through the host's authorized stage/loop procedure. Goal/scope changes require
+   the user. When no authorized work remains, record the stop reason and stop.
+   If the host cannot invoke the next procedure, give an actionable handoff and
+   explain the missing capability; never claim a stage ran from a suggested command.
+
+Authoritative record map (link to these; do not copy their current state):
+
+| Role | Record |
+|---|---|
+| Intent scope/lifecycle | `intent/<ID>.md` |
+| Questions/metric definitions | `.claude/intent.yaml` |
+| Measured values | `.claude/intent/metrics.yaml` |
+| Domain facts | `.claude/memory/wiki.md` via project-knowledge |
+| Criteria | `{{ config.spec.dir }}SPEC-<slug>.md` and its machine companion |
+| Execution and disposition | `{{ config.work_docs.dir }}PLAN-<slug>.md`, Feedback section |
+
+Use working links from SPEC/PLAN to the intent, relevant state IDs, source evidence
+and prior/next task; preserve existing IDs, paths, history and approvals. The agent
+records each disposition in the task PLAN's Feedback table:
+
+| Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |
+|---|---|---|---|---|---|---|
+| source path/anchor or conversation locator + time | intent/question/metric | recorded + readback / pending / declined / unchanged | supported action or stop reason | agent or user | consent/approved scope or pending decision | existing task link, specific question, dated deferral or stop |
+
+## Real-task trial
+
+Resolve the base project root using the stage preamble; never search only a task worktree.
+Find trial PLANs in the base root's `{{ config.work_docs.dir }}` with an explicit activation time
+and applied revision. If no explicitly activated trial PLAN exists, do nothing; never infer activation.
+Use the selected repository, window and enrollment policy from that PLAN.
+For an approved next-three-real-tasks trial, follow the rules below.
+At entry/resume enroll the task or reuse its existing row, independently of intent
+availability. On every terminal exit, including failure/abort, update that row's
+terminal time, evidence and disposition. Intermediate stage handoff is not task termination.
+Before enrollment, record activation time and applied revision in the trial PLAN.
+Name one collector session in the activated PLAN. Only the named collector may write the authoritative base-root trial PLAN.
+Other task agents record source events in their own PLAN Feedback and leave the
+collector update pending. Never allocate slots or merge a worktree's stale trial copy.
+The collector reconciles those task records on every entry/resume and close-out.
+Before assigning slots, reconcile the base stage-spans ledger (first task-start
+per slug) with task PLAN evidence and the trial's qualifying-task policy; order by
+start time, not arrival/completion. If start evidence is incomplete or ambiguous, leave enrollment pending.
+Do not finalize the next-three cohort until the preceding start interval is reconciled.
+An ownership transfer requires the former collector to stop and acknowledge
+before the new collector writes; silence or a missing owner is not a transfer.
+A non-collector retains evidence and reports a pending handoff, never writes the
+shared trial or claims enrollment. Preserve the same three rows after assignment.
+Enroll the next three distinct real task slugs in start order; retain failures and aborts.
+Resuming the same slug does not enroll another task.
+Close collection only when all three enrolled tasks have terminal dispositions,
+regardless of concurrent completion order. Do not enroll synthetic fixtures, the implementation task, or trial setup.
+Do not reset or replace rows without a new user decision.
+
+Activation changes collection from not_started to collecting, even while enrollment
+is pending; do not move it back to not_started.
+Keep collection (`not_started`, `collecting`, `complete`) separate from outcome:
+- A confirmed continuity failure yields failed, even while collection continues.
+- Otherwise, a terminal row missing evidence yields insufficient_evidence.
+- Otherwise, incomplete enrollment or user assessment yields pending.
+- Only three successful user assessments yield passed.
+
+Each row links execution and conversation evidence; the user owns final assessment.
+A user reminder to reconnect feedback fails; normal approval questions and
+supported termination may pass even when the task itself was aborted. No relevant
+observation cannot establish a successful cycle. New evidence may resolve an
+insufficient row, never erase a confirmed failure. Implementation checks cannot
+satisfy the real trial or authorize closing the intent as met.
+
+The separate trial PLAN's Trial section carries activation time/revision and:
+
+| Order | Task slug / PLAN | Start / terminal times | Observation → update → decision evidence | Conversation evidence | User assessment |
+|---|---|---|---|---|---|

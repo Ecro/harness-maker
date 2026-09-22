@@ -536,3 +536,40 @@ any `templates/`-touching phase's exit criterion) has still not been implemented
 **Triggered by:** [fail:test] enumeration-tests-not-updated-with-new-rendered-artifact (count: 3)
 **Proposed mechanism:** test-selection rule selecting detector CLI and unit exact-key suites together when adding provider keys.
 **Rationale:** a new Claude detector key left both exact-set expectations stale; exercising both consumer contracts before the full suite prevents this recurring omission.
+
+## Recurrence audit — world-intent-closed-loop (2026-09-22)
+
+All current count≥3 failures were checked against existing proposals. Existing
+mechanisms and historical evidence are retained; this audit updates their current
+recurrence counts and leaves adoption to the user. No new mechanism is proposed.
+
+| Failure slug | Current count | Proposal disposition |
+|---|---:|---|
+| [fail:tooling] mutation-gate-timeout-leaves-source-mutated-on-disk | 6 | Existing proposal reviewed and retained |
+| [fail:process] targeted-phase-d-subset-missed-the-snapshot-test | 6 | Existing proposal reviewed and retained |
+| [fail:test] snapshot-regen-inside-worktree | 14 | Existing proposal reviewed and retained |
+| [fail:design] worktree-finalize-pulls-orphan-wip-into-main | 3 | Existing proposal reviewed and retained |
+| [fail:review] reviewer-subagent-model-unsupported | 3 | Existing proposal reviewed and retained |
+| [fail:render] wrapup-eof-append-outside-marker | 3 | Existing proposal reviewed and retained |
+| [fail:lint] wrapup-final-verify-skips-ruff-format-check | 3 | Existing proposal reviewed and retained |
+| [fail:runtime] cwd-inherited-from-worktree-into-main-commands | 5 | Existing proposal reviewed and retained |
+| [fail:lint] ruff-format-not-in-local-verify-pass | 3 | Existing proposal reviewed and retained |
+| [fail:test] enumeration-tests-not-updated-with-new-rendered-artifact | 4 | Existing proposal reviewed and retained |
+| [fail:design] green-module-dead-prose-wiring | 7 | Existing proposal reviewed and retained |
+| [fail:design] wrapup-memory-base-seam | 4 | Existing proposal reviewed and retained |
+| [fail:test] assertion-invariant-over-named-dimension | 20 | Existing proposal reviewed and retained |
+| [fail:test] test-pins-retired-implementation-name | 4 | Existing proposal reviewed and retained |
+| [fail:design] verification-cache-key-nondeterministic | 3 | Existing proposal reviewed and retained |
+| [fail:lint] gate-exit-code-lost-through-pipe | 3 | Existing proposal reviewed and retained |
+| [fail:test] shipped-entry-point-not-exercised | 5 | Existing proposal reviewed and retained |
+| [fail:design] fix-introduced-defect-passes-all-gates | 14 | Existing proposal reviewed and retained |
+| [fail:design] remediation-instructs-refused-action | 3 | Existing proposal reviewed and retained |
+| [fail:test] mutant-never-reaches-artifact | 3 | Existing proposal reviewed and retained |
+| [fail:test] gate-scoped-to-the-artifact-being-fixed | 3 | Existing proposal reviewed and retained |
+| [fail:design] fix-introduces-the-defect-class-it-closes | 5 | Existing proposal reviewed and retained |
+| [fail:test] gate-passes-because-its-subject-vanished | 4 | Existing proposal reviewed and retained |
+| [fail:design] ratchet-rebaselined-by-its-own-subject | 3 | Existing proposal reviewed and retained |
+| [fail:test] exit-criterion-names-wrong-suite | 3 | Existing proposal reviewed and retained |
+| [fail:design] handoff-assumes-a-skipped-step | 3 | Existing proposal reviewed and retained |
+| [fail:design] severity-tier-split-drops-unanimity | 3 | Existing proposal reviewed and retained |
+| [fail:design] per-round-step-runs-only-in-round-1 | 3 | Existing proposal reviewed and retained |

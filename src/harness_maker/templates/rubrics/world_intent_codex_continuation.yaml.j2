@@ -1,0 +1,14 @@
+dimension: world_intent_codex_continuation
+target: Codex stage render and boundary execution evidence
+rubrics:
+- id: authorized_codex_dispatch
+  description: Does the Codex stage run the existing boundary CLI after classifying
+    its mandatory gate and, only for proceed true, load and execute the next local
+    hm-stage SKILL.md in the same conversation with the returned task slug? It must
+    not need Claude Skill, ask for routine next-stage confirmation, or merely suggest
+    a command. Missing skills must yield an honest handoff. Pending/blocked gates,
+    caps, gated configuration, loop ownership and merge boundaries must remain effective.
+    Require rendered output and positive/negative boundary evidence.
+  severity: P0
+  action: Keep the boundary authority contract; test both successful Codex dispatch
+    and genuine halts.

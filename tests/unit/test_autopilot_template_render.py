@@ -1,14 +1,4 @@
-"""P6 — autopilot auto-advance renders into Claude stage commands, gated cross-IDE.
-
-Behavioral render assertions (more robust than brittle verbatim golden bodies): the
-auto-advance terminal block + boundary CLI + per-stage mandatory-gate prose appear in
-every rendered Claude stage command; the session-start picker is config-gated (absent
-under the default `gated` level); and the Codex exclusion is structural
-(`{% if is_codex is defined and not is_codex %}`) so no auto-branch leaks into the Codex
-render (ADR-004). NOTE: the Codex stage_skill PRODUCTION render passes `is_codex=True`
-(so `not is_codex` already excludes it); the `is defined` clause additionally guards
-bare/partial renders (e.g. the codex stage_skill unit render) where `is_codex` is unset.
-"""
+"""Autopilot gates retain Claude dispatch and supply a native Codex continuation."""
 
 from __future__ import annotations
 
@@ -87,44 +77,11 @@ def test_picker_absent_when_level_is_pinned_gated(tmp_path: Path) -> None:
     assert "<!-- @hm:autopilot-picker -->" not in body
 
 
-def test_codex_exclusion_is_structural() -> None:
-    # ADR-004: the AUTO-ADVANCE branch is wrapped in `is_codex is defined and not is_codex`
-    # (so the Codex render never emits a Skill auto-invoke branch) AND a second condition.
-    # That second condition used to be a `| default(true)` flag whose only producer was the
-    # since-deleted fused-workflow module; AC-005 of PLAN-token-efficiency-autopilot-ux-speed
-    # replaced it with `config.autonomy.level != "gated"`, the axis that actually decides whether
-    # auto-advance can do anything. Auto-advance is genuinely Claude-Code-only — it calls the next
-    # stage through the `Skill` tool, which Cursor and Codex do not have.
-    partial = (_TEMPLATES / "agents" / "_partials" / "stage_end_summary.md.j2").read_text()
-    manifest = (_TEMPLATES / "agents" / "_partials" / "step_manifest.md.j2").read_text()
-    # The guard used to be a `| default(true)` flag whose only producer was `workflow_fuse.py`;
-    # once that module was deleted the flag had ZERO producers, so the block shipped into every
-    # non-Codex harness — including `gated` ones, where its only possible output is `kill_switch`.
-    # AC-005 of PLAN-token-efficiency-autopilot-ux-speed replaced it in place with the real axis.
-    # The old name is deliberately not spelled here: a structural scan asserts it appears nowhere
-    # in `src/` or `tests/`, and a mention in a comment is indistinguishable from a live reference.
-    assert (
-        "{% if is_codex is defined and not is_codex "
-        'and config.autonomy.level != "gated" %}' in partial
-    )
-    assert "@hm:autopilot-advance" in partial
-    # The PICKER, by contrast, is gated on the config ALONE (2026-08-16). Arming is a marker
-    # file write, so it works in every runtime; suppressing the picker on Codex would leave a
-    # Codex session with no in-band way to turn autopilot on. The `not is_codex` half that
-    # used to be here was inert anyway — until `_is_codex_output` was derived, every Codex
-    # file reached this partial with `is_codex=False`.
-    assert '{% if config.autonomy.level != "gated" %}' in manifest
-    # The property is that the picker is not SUPPRESSED on Codex — measure that directly by
-    # rendering it both ways, rather than through the proxy "no `is_codex` statement appears".
-    # That proxy was too broad: it also forbids naming the runtime's own question tool inside
-    # the picker (`request_user_input` on Codex, `AskUserQuestion` on Claude), which suppresses
-    # nothing and is the correction that a Codex session cannot act on the Claude spelling.
+def test_runtime_dispatch_is_structural() -> None:
+    partial = (_TEMPLATES / "agents/_partials/stage_end_summary.md.j2").read_text()
+    assert 'include "agents/_partials/codex_autopilot_advance.md.j2"' in partial
     for is_codex in (True, False):
-        rendered = _render_manifest(is_codex)
-        assert "hm autopilot on" in rendered, (
-            f"the picker vanished at is_codex={is_codex} — arming is runtime-independent; "
-            "only auto-advance (stage_end_summary, above) needs the Skill tool"
-        )
+        assert "hm autopilot on" in _render_manifest(is_codex)
     assert "request_user_input" in _render_manifest(True)
     assert "AskUserQuestion" in _render_manifest(False)
 
@@ -165,8 +122,10 @@ def _render_partial(is_codex: bool) -> str:
     return env.get_template("agents/_partials/stage_end_summary.md.j2").render(**ctx)
 
 
-def test_autopilot_block_behaviorally_absent_for_codex() -> None:
-    # P2-7: behavioral (not just a source grep) — rendering the terminal with is_codex=True
-    # emits NO auto-advance branch; the Claude render (is_codex=False) does.
-    assert "@hm:autopilot-advance" not in _render_partial(is_codex=True)
-    assert "@hm:autopilot-advance" in _render_partial(is_codex=False)
+def test_autopilot_block_has_native_dispatch_for_each_runtime() -> None:
+    codex = _render_partial(is_codex=True)
+    claude = _render_partial(is_codex=False)
+    assert "@hm:autopilot-advance" in codex
+    assert ".agents/skills/hm-<next_stage>/SKILL.md" in codex
+    assert "Skill(hm:<next_stage" not in codex
+    assert "Skill(hm:<next_stage" in claude

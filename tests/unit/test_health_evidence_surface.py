@@ -113,7 +113,7 @@ def test_ac_003_smoke_is_not_applicable_when_the_runtime_cannot_advance(
 
     Every row is an armed level with zero ledger entries — the one input that makes
     `smoke_check` report degradation today. The variable is `targets`. A harness whose targets
-    omit `claude-code` cannot auto-advance at all (that needs Claude Code's `Skill` tool), so
+    omit both `claude-code` and `codex` cannot auto-advance, so
     reporting "configured yet never fired" there is a permanent false alarm, and a permanent
     false alarm trains the reader to ignore the one real degradation signal.
     """

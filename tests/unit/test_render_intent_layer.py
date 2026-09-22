@@ -303,9 +303,9 @@ def test_ac_005_spec_offers_draft_after_none_and_creates_at_step_4_9(
 def test_ac_007_skill_and_wrapup_call_the_verb(
     surface: dict[str, dict[str, str]], target: str
 ) -> None:
-    """Phrases, marker name and ordering are fixed by SPEC S7 before the templates are edited."""
+    """Keep write consent; WORLD-INTENT-CLOSED-LOOP moves measurement before closure."""
     wrapup = _command(surface, target, "wrapup")
-    assert wrapup.index("@hm:answer-gated:outcome-measure") > wrapup.index(
+    assert wrapup.index("@hm:answer-gated:outcome-measure") < wrapup.index(
         "@hm:answer-gated:objective-close"
     )
     measure_block = _block(wrapup, "<!-- @hm:answer-gated:outcome-measure -->")

@@ -572,17 +572,15 @@ def smoke_check(
     """
     count = _total_entries(project_root, observability_dir)
     armed = yaml_level in _ARMED_LEVELS
-    # End-of-stage auto-advance needs Claude Code's `Skill` tool, so a harness whose targets omit
-    # `claude-code` cannot fire at all and "configured yet never fired" is a PERMANENT false alarm
-    # there — which trains the reader to ignore the one real degradation signal. Absent `targets`
-    # means applicable: that is the pre-existing call path, and defaulting it to not-applicable
-    # would drop the signal for every harness whose yaml has no `targets` key.
-    applicable = targets is None or "claude-code" in targets
+    # Claude dispatches via Skill; Codex reads and executes the next local skill.
+    # Unknown targets retain the historical applicable default; Cursor-only does
+    # not have a native continuation procedure.
+    applicable = targets is None or bool({"claude-code", "codex"}.intersection(targets))
     degraded = applicable and armed and count == 0
     if not applicable:
         reason = (
-            f"targets={list(targets or [])} omit 'claude-code' — end-of-stage auto-advance needs "
-            "Claude Code's Skill tool, so this runtime cannot fire and an empty ledger is expected"
+            f"targets={list(targets or [])} omit 'claude-code' and 'codex' — "
+            "no native auto-advance procedure; an empty ledger is expected"
         )
     elif degraded:
         reason = (

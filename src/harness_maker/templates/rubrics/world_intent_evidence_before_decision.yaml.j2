@@ -1,0 +1,15 @@
+dimension: world_intent_evidence_before_decision
+target: Workflow traces and linked repository records for SPEC-world-intent-closed-loop
+rubrics:
+- id: evidence_before_decision
+  description: "For AC-001, does the source execution/conversation trace identify\
+    \ a real observation, affected state ID, authorized update and readback or explicit\
+    \ pending consent, and a dependent decision citing that state? A link or claimed\
+    \ update without the source evidence is insufficient. The intent WORLD-INTENT-CLOSED-LOOP\
+    \ supplies this oracle independently of implementation.\n At observation, task\
+    \ entry/resume and close-out, the agent must initiate the connection without a\
+    \ user feedback-reminder. Each trigger needs an adversarial fixture that fails\
+    \ when the trigger is removed."
+  severity: P0
+  action: Require trace evidence for each handoff and distinguish proposed from recorded
+    updates.

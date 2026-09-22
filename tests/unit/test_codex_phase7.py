@@ -150,7 +150,12 @@ def test_codex_target_files_total_skill_count() -> None:
     loop-p5-batch skill added (PLAN-latency-worktree-step-preview ADR-006);
     count 18 → 19.
     """
-    out_paths = [out for _, out, _ in _codex_target_files() if out.startswith(".agents/skills/")]
+    out_paths = [
+        out
+        for _, out, _ in _codex_target_files()
+        if out.startswith(".agents/skills/") and out.endswith("/SKILL.md")
+    ]
+    # Lazy-loaded reference files are dependencies, not additional skills.
     # 19 → 20 (2026-07-30, PLAN-second-opinion-acceptance-gate ADR-011): the
     # `second-opinion-gate` skill. This is the second of two enumeration constants the new
     # skill moved — `[fail:test] enumeration-tests-not-updated-with-new-rendered-artifact`

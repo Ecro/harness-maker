@@ -577,6 +577,12 @@ def _skill_files() -> list[FileSpec]:
             {"name": n},
         )
         for n in _ALL_SKILLS
+    ] + [
+        (
+            "skills/intent-layer/references/workflow-feedback.md.j2",
+            "skills/intent-layer/references/workflow-feedback.md",
+            {},
+        )
     ]
 
 
@@ -835,6 +841,12 @@ def _codex_skill_files() -> list[FileSpec]:
     return [
         (f"skills/{n}/SKILL.md.j2", f".agents/skills/{n}/SKILL.md", {"name": n})
         for n in _ALL_SKILLS
+    ] + [
+        (
+            "skills/intent-layer/references/workflow-feedback.md.j2",
+            ".agents/skills/intent-layer/references/workflow-feedback.md",
+            {},
+        )
     ]
 
 

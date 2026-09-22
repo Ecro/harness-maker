@@ -220,6 +220,10 @@ from .conftest import pin_install_ref
 #   `{% if not config.second_opinion.models %}` and this repo's harness has models set. Its
 #   correctness is gated by `tests/unit/test_render_configure_health_second_opinion.py`
 #   instead — do not read a green aggregate as evidence that block works.
+# 2026-09-22 world-intent-closed-loop: final integration re-freeze after removing
+# temporary PLAN allowances. The full feedback protocol is lazy-loaded; only the
+# stage pointers/record links and closeout ordering remain inline. Exact prior
+# frozen vs HEAD vs final measurements are in BASELINE-DELTA for this task.
 _ATOMIC_RATCHET: dict[str, int] = {
     # 33774 → 34533 (execute-step5-model-mismatch, 2026-08-08). Same bar as ADR-012 and the
     # entries above: compaction FIRST, then the residue. Raw addition was +954; two passes cut
@@ -379,7 +383,7 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # 59260 → 60725 (same task, second fold): Step 0.1 gained `spec_need prefilter` +
     # `record` (the evidence half of the removed Step 1.7 gate) and Step 0.2 gained the
     # session-scoped `worktree loop-mode-active` call it had replaced with prose.
-    "execute": 60725,
+    "execute": 62820,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -409,7 +413,7 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # so a Codex session read its own rendered skill and stood down — while the CLI it
     # would have called armed fine the whole time. Arming writes a marker and works in
     # any runtime; only end-of-stage auto-advance needs the `Skill` tool.
-    "research": 27248,
+    "research": 25770,
     # 34760 → 35828 (review round 4): the `CHANGES_REQUESTED` resolution bullet gained an
     # autopilot carve-out, and the APPROVED+human_review_needed bullet was split so the
     # interactive and autopilot paths stop saying the same thing. Both were live
@@ -545,7 +549,7 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # carve-out ADR-011 authorises. This is the SINGLE re-derivation that decision permits:
     # re-deriving again to absorb a later edit is `ratchet-rebaselined-by-its-own-subject`.
     #   review: 70153 -> 80586 (+10433, models-on)
-    "review": 80586,
+    "review": 82883,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text
@@ -566,14 +570,14 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # here from the removed plan stage — CLAUDE.md documents that matrix as a Production
     # guarantee over the judgment-gated stages, which are now `review` and `spec`. Also the
     # ledger pass-cap / over-cap / one-terminal contracts and the barrier-index integer note.
-    "spec": 45248,
+    "spec": 46621,
     # 23796 → 24935 (+1139, 2026-08-16, cross-runtime test-execution recipe). One paragraph,
     # in the stage that owns the whole-suite pass, saying: ask `hm test_runners plan` for THIS
     # runner rather than pasting a parallel flag. The flag is not portable advice — `cargo`,
     # `go`, `vitest`, `jest` and `flutter` are ALREADY parallel and a worker flag there caps or
     # nests instead of accelerating, while `pytest` is the one common runner that is serial by
     # default. Attributed in work-docs/BASELINE-DELTA-plan-validator-transfer.md.
-    "verify": 24935,
+    "verify": 25387,
     # 41345 → 42452 (PLAN-workflow-time-token-savings B3/B4): the shared
     # `stage_end_summary` partial gained the judgment-gate discriminator and
     # `step_manifest` gained the `ask-pending` picker branch, both of which every stage
@@ -598,7 +602,7 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # base-path rule). First re-based to 47084 on top of assumption-entry; re-based again at
     # wrapup onto observed-harness-gaps-salvage, whose Steps 6 → 7.6 paragraph is disjoint, so
     # the deltas add. Attributed in work-docs/BASELINE-DELTA-mission-context-loop.md §3.1.
-    "wrapup": 48388,
+    "wrapup": 50649,
 }
 
 

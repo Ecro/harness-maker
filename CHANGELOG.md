@@ -10,6 +10,11 @@
 - Clarify the six-stage workflow: research hands off to spec, and execute writes
   the PLAN. Updating and regenerating an existing harness refreshes owned guidance.
 
+- Connect stage entry, observations and closeout to consent-aware intent feedback,
+  with links among existing records and a separate three-task real-use trial.
+- Enable Codex next-stage skill execution after the shared autopilot boundary,
+  preserving approval, review, verification and cap gates. Cursor keeps handoff.
+
 ## [0.59.0] - 2026-09-21
 
 ### Intent vocabulary and owners

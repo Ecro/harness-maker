@@ -1,0 +1,18 @@
+dimension: world_intent_real_task_trial
+target: work-docs/PLAN-world-intent-closed-loop-trial.md
+rubrics:
+- id: real_task_trial
+  description: "For trial AC-001, is activation revision/time recorded before enrollment, and are the\
+    \ next three distinct real task slugs in this repository enrolled in start order with no excluded\
+    \ failures/aborts? Reruns remain the same task; fixtures and the already-started implementation task\
+    \ are excluded. Each row must contain execution and conversation evidence and a final user assessment\
+    \ against evidence_before_decision, authority_and_progress, uncertainty_disposition and completion_and_replay.\
+    \ A user reminder to reconnect feedback fails; missing evidence is insufficient, never success. All\
+    \ three successful rows are required. The agent may propose assessments but cannot substitute itself\
+    \ for the final user assessor or reset the trial.\n The observation window ends when ALL three enrolled\
+    \ tasks are terminal regardless of completion order. Collection status and outcome are separate; failure\
+    \ takes precedence over missing evidence, which takes precedence over pending assessment; only three\
+    \ successful user assessments yield passed."
+  severity: P0
+  action: Preserve all enrolled rows and report pending, failed, insufficient_evidence or passed truthfully;
+    only the user supplies final assessments.
