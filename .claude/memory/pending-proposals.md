@@ -47,7 +47,7 @@ mechanism, the loop should be required to escalate to "is this mechanism constru
 rather than schedule round 4 — here the answer was no (no liveness signal outlives the CLI:
 [[fail:design claim-record-used-as-access-control-list]]), and one round spent asking would have
 been cheaper than two spent patching.
-**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 10 as of 2026-08-17; this proposal was written at count: 3)
+**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 14 as of 2026-09-23; this proposal was written at count: 3)
 **Instance 10 (2026-08-17, lens-and-review-fix-verification) supplies the first evidence of what actually stops the compounding, and it is cheaper than a re-review dispatch.** Six consecutive rounds (Phase A.5 3->4, plan-validator 1->2, review 2->3) each introduced ~1 new defect. Round 3 of review was the first to introduce **zero**, and it was also the first whose repairs each added a test that goes RED when the repair is reverted. The two facts are the same fact: the defect-introducing rounds shipped fixes whose only evidence was a green suite — a signal that was green before the fix too — while the clean round shipped fixes whose evidence was a revert. Sharpened mechanism: before round N+1 recomputes a grade, require per-fix revert evidence (name the test, show it dies without the fix). That is mechanically checkable and does not need a second reviewer dispatch, so it can gate rounds the budget cannot afford to re-review.
 **Rate, finally measured (2026-08-15, ai-review-exit-criteria):** round 1 produced 15 findings; the repairs for them produced 8 in round 2, and **all eight were created by those repairs** — not one was a pre-existing defect round 1 had missed. That is the first clean numerator/denominator this entry has: 8/15. It also sharpens what a mechanism must catch, because two of the 15 repairs did not close their own finding (a grace window keyed on the wrong timestamp; a coverage fix that handled only the branch the loop never takes). So a re-review of the fix delta is necessary but not sufficient — the obligation has to include *re-deriving the finding's failure scenario against the repaired code*, which is what caught both.
  — the seventh instance (multi-lens-review-round) extends the proposal's SCOPE, not just its count: five of that unit's six compounding rounds happened during **planning**, where there is no fix delta and no suite to re-review — each PLAN revision introduced the next round's P0 at the same rate the code rounds did. A mechanism aimed only at the review auto-fix loop therefore addresses at most half of this entry's mass; the plan-validator loop needs the mirror obligation (when a PLAN revision is itself a repair, re-derive the truth table of any condition it adds, and re-read the whole rule rather than the edited sentence). The fourth instance is PLAN-harness-diet Phases 2-6: 14 findings over four rounds, 11 of them introduced by this task's own fixes, seven while fixing the other four. It also sharpens the proposal: three of the eleven were a single class-default flip re-fixed four times, so the receipt should demand an ENUMERATION (the grep and its full result set) whenever a fix changes a shared default or a shared allowlist, not just a re-review of the diff.
@@ -213,7 +213,7 @@ positives against the tree BEFORE building the gate, and drop it if the ratio re
 ---
 
 ## Proposal: a whole-file substring assertion may not stand in for a per-item claim (2026-08-08)
-**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 19 as of 2026-09-21).
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 21 as of 2026-09-23).
 Latest evidence: intent-vocabulary collision fixture is malformed, so independent record validation hides deletion of the collision check (REVIEW P2 11175f90347e8125). Require valid contrasting fixtures for semantic conflict claims.
 Latest repair: post-write guard deletion, unconditional dispatch, and nonnumeric round-count mutants all passed broad keyword checks. Scope prose contracts to their owning block and require a failing forbidden-form mutation. Existing mechanism and historical evidence follow (count: 14 as of 2026-08-19.
 Instance 14 (ai-work-boundaries) is the **negative-over-prose** direction, which is invariant in
@@ -368,8 +368,8 @@ the grade and needs its own PLAN. Do not do them in a review round.
 
 ## Proposal: forbid a bare `cd` prefix in stage-rendered Bash (2026-08-10)
 
-**Triggered by:** [fail:runtime] cwd-inherited-from-worktree-into-main-commands (count: 4 as of
-2026-08-17; this proposal was written at count: 3) — the fourth instance (lens-and-review-fix-verification)
+**Triggered by:** [fail:runtime] cwd-inherited-from-worktree-into-main-commands (count: 5 as of
+2026-09-23; this proposal was written at count: 3) — later recurrences preserve the same root cause; the fourth instance (lens-and-review-fix-verification)
 breaks the "the misfire only misreads" assumption this proposal was written under: a `cat >>` heredoc
 ran with cwd back at the BASE repo and **appended a 50-line fixture there**, into a tree another
 session was live in. Detector (2) below (`echo pwd` beside the rc) would not have caught it, because
@@ -401,8 +401,8 @@ step echo `pwd` beside the rc, so an rc is never recorded without the tree it gr
 
 ## Proposal: a fix must be tested in the position where it does not obviously apply (2026-08-13)
 
-**Triggered by:** [fail:design] fix-introduces-the-defect-class-it-closes (count: 4 as of
-2026-08-19. Instance 4 (ai-work-boundaries) is the cheapest possible illustration and suggests a
+**Triggered by:** [fail:design] fix-introduces-the-defect-class-it-closes (count: 5 as of
+2026-09-23. Instance 4 (ai-work-boundaries) is the cheapest possible illustration and suggests a
 narrower, checkable sub-rule: the fix narrowed a MATCH PREDICATE. An over-match — a lexical-prefix
 crossing rule matching `mod.py.bak` against a `mod.py` entry — was repaired by requiring entries
 to be `/`-terminated, which shipped a silent under-match: a directory entry written without a
@@ -445,7 +445,7 @@ new gate.
 **Rationale:** all three instances were caught by suspicion, never by a gate, and each cost a round of false confidence in an unfixed defect. The receipt already exists as a carrier; the missing piece is one required field and one refusal.
 
 ## Proposal: snapshot regeneration must refuse to run where its own path leaks (2026-08-14)
-**Triggered by:** [fail:test] snapshot-regen-inside-worktree (count: 13) — the highest-count entry in this repo and the only one above count 4 with no proposal on file. Note the entry's own guidance INVERTED on 2026-07-26 (regen from the worktree is now correct, pinned three ways); the proposal below is therefore about the invariant, not about the direction.
+**Triggered by:** [fail:test] snapshot-regen-inside-worktree (count: 14 as of 2026-09-23) — the entry's own guidance INVERTED on 2026-07-26 (regen from the worktree is now correct, pinned three ways); the proposal below is therefore about the invariant, not about the direction.
 **Proposed mechanism:** a self-check inside `tests/snapshot/regenerate.py` that, after rendering into a temp dir and BEFORE writing any snapshot, greps the rendered bytes for any absolute path containing `/.worktrees/` or the developer `$HOME`, and hard-exits naming the offending file and template. This is the one condition all 13 instances share regardless of which directory was correct at the time, and it is byte-deterministic — no environment knowledge required.
 **Rationale:** thirteen recurrences under a rule that changed direction mid-life is the definition of a discipline that cannot be held by prose. A leak check does not need to know the right cwd; it only needs to know that a machine-specific path may not enter a committed snapshot.
 
@@ -471,7 +471,7 @@ new gate.
 **Rationale:** all three instances were executed and green, which is more dangerous than a skipped criterion — nothing downstream flags "this criterion ran zero relevant tests" because the exit code is 0. The fix that worked all three times was the same one-line check (`pytest --collect-only`), never applied consistently because nothing requires it before a criterion is written down.
 
 ## Proposal: gate wrapup on the base-memory fold (2026-08-23)
-**Triggered by:** [fail:design] wrapup-memory-base-seam (count: 3)
+**Triggered by:** [fail:design] wrapup-memory-base-seam (count: 4 as of 2026-09-23)
 **Proposed mechanism:** rule update — make Step 7.7's `commit-base-memory` a checked step rather than a conditional one
 **Rationale:** `memory_md` writes the human tiers to the BASE repo, so a wrapup running inside a task worktree never stages them with `git add`, and the squash preserves-but-never-commits them. Step 7.7 already ships `commit-base-memory` for exactly this, but it fires only when `task-land` printed a fresh `SQUASH_SHA` and nothing verifies afterwards that the tiers actually reached a commit. Three recurrences means the conditional is the wrong shape: the fold should be asserted (did the wiki/failure slugs this wrapup wrote end up in `git log -1 --name-only`?) and a miss should be surfaced, not left to the next reader to discover. Observed again this unit: the wrapup delegate reported memory writes it had not made, and the receipt caught that — but a receipt cannot catch the opposite case, where the write happened and the commit did not.
 **Update 2026-09-18 (intent-layer-ops) — same seam, a THIRD writer confirmed (per the entry's
@@ -491,7 +491,7 @@ commit happened."
 **Rationale:** three occurrences of the identical shape (round 1 always captures, rounds 2+ never do) with the SAME root cause named in the entry from round 1 — a step written for "the procedure" reads as a one-time setup step to whatever executes it, and nothing re-presents it on re-entry. The gate has caught all three, always at wrapup or verify time, always after the round's context is gone and the only lawful move left is `_KNOWN_MISSING` + a reason. A detector that fires after the evidence expires cannot get better by being run more carefully next time; only moving the instruction's location removes the class.
 
 ## Proposal: gate any changed/new test file on an explicit module-import audit (2026-09-13)
-**Triggered by:** [fail:process] targeted-phase-d-subset-missed-the-snapshot-test (count: 3)
+**Triggered by:** [fail:process] targeted-phase-d-subset-missed-the-snapshot-test (count: 6 as of 2026-09-23)
 **Proposed mechanism:** for any PLAN phase that touches a `templates/` file or a module that `synthesize`/`render` imports, require `tests/unit/test_synthesize_snapshot.py` and the whole-repo `ruff check .` / `ruff format --check .` in that phase's own exit criterion — not delegated to a hand-built subset selector (`grep -rl <symbol> tests/` or `hm test_dep_map`), both of which this entry shows miss the file because it references the changed surface only transitively (through `profile`+`synthesize`, not `interview`/`render` directly).
 **Rationale:** three phases in one unit reported green while this exact file was red since Phase 1, only surfacing in Phase 6 — a subset-selection failure the mechanical dep-map tool does not close either (already recorded separately). A named, non-optional test file in the phase's own criterion cannot be silently excluded by a selector that under-selects; a dep-map heuristic can.
 **Update 2026-09-18 (intent-layer-ops) — count now 6, still unfixed.** `hm test_dep_map`'s
@@ -507,7 +507,7 @@ any `templates/`-touching phase's exit criterion) has still not been implemented
 **Rationale:** count went 1→7 in a single unit because the unit's whole subject was shipped-surface-vs-runtime-behavior and four of six new capabilities were production-unreachable despite passing unit tests, an APPROVED first review, and zero regressions — the first review graded modules in isolation and never exercised the prose↔module seam. "Prevention that actually worked, four times out of four" per the entry itself: running the rendered recipe, not reading the diff. A structural existence-of-call-site gate is a precondition, not proof.
 
 ## Proposal: fix or replace the mutation gate so it stops collecting zero mutants (2026-09-16)
-**Triggered by:** [fail:tooling] mutation-gate-timeout-leaves-source-mutated-on-disk (count: 3)
+**Triggered by:** [fail:tooling] mutation-gate-timeout-leaves-source-mutated-on-disk (count: 6 as of 2026-09-23)
 **Proposed mechanism:** either (a) fix the `spec_mutation gate` wrapper's interaction with mutmut 2.5.1 so it reliably collects mutants against `src/harness_maker/world.py`/`intent.py`-class targets instead of returning zero (root-cause the collection-phase failure — it is a tool-level failure, not a coverage gap, per the original entry), or (b) replace mutmut in this wrapper with a mutation tool that does not silently collect zero mutants and does not leave a mutated file on disk when interrupted by timeout.
 **Rationale:** three consecutive tasks (intent-world-model-objective-layer, playbook-alignment, objective-gap-proposal — all 2026-09) recorded the identical broken run (zero mutants collected under mutmut 2.5.1) on related world/intent/objective source files, and each time the author had to manually re-run the affected unit suites by hand to get any confidence signal, because the mutation gate itself gave none. The wrapper's known-gap note ("not yet fixed at the tool/wrapper level") has now been carried forward across three separate tasks without anyone owning the fix — the count:3 threshold this proposals file exists to catch.
 **Update 2026-09-17 (outcome-measure) — count now 4, still unfixed.** Fourth consecutive task with the identical zero-mutants collection failure, same manual-suite-rerun workaround. No owner has picked this up across four tasks; the proposal itself has not moved.
@@ -533,7 +533,7 @@ any `templates/`-touching phase's exit criterion) has still not been implemented
 **Rationale:** 5.1/5.2 were moved to the locked CLI after concurrent fleet wrapups lost 5 wiki entries (2026-05-17); Step 5.3 still does the raw read-modify-write on a base-tier file those same sessions share. The file now has a reader (`hm proposals`, and wrapup's main-loop backlog line), so a lost update is no longer invisible — it under-counts the warning. Pre-existing, out of PLAN-observed-harness-gaps-salvage's scope (ADR-004).
 
 ## Proposal: provider-enumeration-contract-pair (2026-09-20)
-**Triggered by:** [fail:test] enumeration-tests-not-updated-with-new-rendered-artifact (count: 3)
+**Triggered by:** [fail:test] enumeration-tests-not-updated-with-new-rendered-artifact (count: 4 as of 2026-09-23)
 **Proposed mechanism:** test-selection rule selecting detector CLI and unit exact-key suites together when adding provider keys.
 **Rationale:** a new Claude detector key left both exact-set expectations stale; exercising both consumer contracts before the full suite prevents this recurring omission.
 
@@ -565,7 +565,7 @@ recurrence counts and leaves adoption to the user. No new mechanism is proposed.
 | [fail:design] fix-introduced-defect-passes-all-gates | 14 | Existing proposal reviewed and retained |
 | [fail:design] remediation-instructs-refused-action | 3 | Existing proposal reviewed and retained |
 | [fail:test] mutant-never-reaches-artifact | 3 | Existing proposal reviewed and retained |
-| [fail:test] gate-scoped-to-the-artifact-being-fixed | 3 | Existing proposal reviewed and retained |
+| [fail:test] gate-scoped-to-the-artifact-being-fixed | 4 | Existing proposal reviewed and retained |
 | [fail:design] fix-introduces-the-defect-class-it-closes | 5 | Existing proposal reviewed and retained |
 | [fail:test] gate-passes-because-its-subject-vanished | 4 | Existing proposal reviewed and retained |
 | [fail:design] ratchet-rebaselined-by-its-own-subject | 3 | Existing proposal reviewed and retained |
@@ -574,9 +574,9 @@ recurrence counts and leaves adoption to the user. No new mechanism is proposed.
 | [fail:design] severity-tier-split-drops-unanimity | 3 | Existing proposal reviewed and retained |
 | [fail:design] per-round-step-runs-only-in-round-1 | 3 | Existing proposal reviewed and retained |
 
-## Recurrence audit — docs-release-sync (2026-09-22)
+## Recurrence audit — docs-release-sync (2026-09-23)
 
 All 28 current count≥3 failures were checked against the existing proposal set. The
 documentation-contract review raised `[fail:test] assertion-invariant-over-named-dimension`
-to count 21; its existing proposal remains the appropriate mechanism, so no new proposal
-was added.
+to count 21; its existing proposal remains the appropriate mechanism. The follow-up
+`spec-need-operation-misclassified` entry is at count 1, so no new proposal was added.

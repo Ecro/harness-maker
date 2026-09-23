@@ -125,3 +125,28 @@ values:
   evidence: 'auto: measure#82611f0fd3e4 @ b48bcec4 exit=0 cwd=base'
   definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
   metric_id: dead_rendered_bytes
+- value: 5.5
+  observed_at: '2026-09-23T01:51:12Z'
+  evidence: 'auto: measure#754a4e8cf656 @ cddfaa1b exit=0 cwd=base'
+  definition_hash: 754a4e8cf65695fd99ede671a80587600f565474a4a388a5122ee97ee5d7b866
+  metric_id: task_lead_time_hours
+- value: 0
+  observed_at: '2026-09-23T01:51:12Z'
+  evidence: 'auto: measure#0a15fd8a1350 @ cddfaa1b exit=0 cwd=base'
+  definition_hash: 0a15fd8a1350b885c8ed3e738f1d252e15f1f66b4b0dee532990a5c2eb35b952
+  metric_id: change_failure_rate
+- value: 16.9
+  observed_at: '2026-09-23T01:51:13Z'
+  evidence: 'auto: measure#2fb56618dd65 @ cddfaa1b exit=0 cwd=base'
+  definition_hash: 2fb56618dd65935c7a801bc949d423b46ee63946579dab955309d04eaca17ae4
+  metric_id: post_merge_churn
+- value: 45.2
+  observed_at: '2026-09-23T01:51:13Z'
+  evidence: 'auto: measure#9213740d0ae8 @ cddfaa1b exit=0 cwd=checkout'
+  definition_hash: 9213740d0ae88c6690466a2d059f646096649288f6bd1b64ee33bdbfd31939b5
+  metric_id: unsourced_step_share
+- value: 21.7
+  observed_at: '2026-09-23T01:51:21Z'
+  evidence: 'auto: measure#82611f0fd3e4 @ cddfaa1b exit=0 cwd=base'
+  definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
+  metric_id: dead_rendered_bytes

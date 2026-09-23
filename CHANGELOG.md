@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Record SPEC-need operations with the actual add/change classification and canonical
+  task slug so final verification can validate newly introduced SPECs without waivers.
 - Keep living workflow and release documentation synchronized with source-derived
   structural checks, mutation controls, and blocking pre/post-publication identity gates.
 - Render Codex stage and shared-skill guidance with `$hm-*` / dollar skill

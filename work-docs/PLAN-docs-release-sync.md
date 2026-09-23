@@ -11,8 +11,8 @@ adrs: 4
 validator_outcome: NOT_RUN
 summary: "Repair living docs and enforce local plus published release documentation contracts"
 intent: WORLD-INTENT-CLOSED-LOOP
-spec_need_verdict: change
-spec_need_target: SPEC-docs-release-sync
+spec_need_verdict: add
+spec_need_target: docs-release-sync
 ---
 
 # PLAN: Release documentation synchronization
@@ -333,6 +333,9 @@ gate also has a mutation receipt backed by an observed RED deletion.
 | Review grade A after one repair round and two confirmation passes; all seven lenses complete, full suite green | `WORLD-INTENT-CLOSED-LOOP` / docs-release-sync | recorded in REVIEW and task PLAN; shared trial update pending | Accept implementation quality; retain two single-model P1 observations for human judgment | agent | `$hm-review` consensus and confirmation gates | Human reviews the manual-only items before wrapup; named trial collector reconciles terminal evidence |
 | User approved both remaining manual-only P1 repairs; source-derived version and real-prose mutation gates pass focused and full verification | `WORLD-INTENT-CLOSED-LOOP` / docs-release-sync | recorded in REVIEW and task PLAN; shared trial update pending | Close both manual findings and clear the review judgment gate | user + agent | explicit user approval + green verification | Continue to verify; named trial collector reconciles terminal evidence |
 | Verify Check 6: `change` operation unsatisfied and no valid waiver; target SPEC is newly added in this task worktree | `WORLD-INTENT-CLOSED-LOOP` / docs-release-sync | recorded in task PLAN; shared trial update pending | Stop verify at the first failing gate without override | agent | `$hm-verify` Check 6 | Correct the SPEC-need operation classification through the spec workflow, then rerun `$hm-verify docs-release-sync` |
+| Spec workflow recovery on 2026-09-23: the approved SPEC was added by this task, while PLAN metadata incorrectly recorded `change` and included an extra `SPEC-` target prefix | `WORLD-INTENT-CLOSED-LOOP` / docs-release-sync | PLAN frontmatter corrected to `add` / `docs-release-sync`; shared trial update pending | Use the actual operation and canonical task slug; no waiver or artificial SPEC edit | agent | existing approved SPEC + `spec_need op-check` contract | Rerun `$hm-verify docs-release-sync` and land the bookkeeping correction only after all checks pass |
+| Wrapup verification on 2026-09-23: corrected SPEC-need metadata passed all gates; lint, format, strict mypy, and the full suite (`9260 passed, 100 skipped, 3 xfailed`) are green | `WORLD-INTENT-CLOSED-LOOP` / docs-release-sync | recorded in task PLAN; shared trial update pending | Land the bookkeeping correction and stop because the authorized sync/prevention work is complete | agent | user-requested wrapup + green verification + clean REVIEW drift verdict | Named trial collector reconciles terminal evidence; no additional task work remains |
+| User-authorized metric measurement on 2026-09-23: lead time `5.5h` and change failure rate `0%` meet targets; post-merge churn `16.9%`, unsourced-step share `45.2%`, and dead-rendered bytes `21.7%` remain above target; the primary `intent_world_closed_loop_cycles` metric remains manual/unmeasured and the wiki-fact window has 25 days left | `WORLD-INTENT-CLOSED-LOOP` and project metrics | five automated values recorded in `.claude/intent/metrics.yaml`; primary intent outcome and wiki-fact metric remain pending | Keep the intent open; do not infer attainment from this task or proxy metrics | user + agent | user-authorized measurement and explicit keep-open decision | Named collector reconciles this task's terminal trial evidence; measure the wiki-fact metric after 2026-10-17 |
 
 Trial enrollment remains pending because the authoritative collector is
 `codex-thread-01a0c683-3cde-7f40-9d06-e871e86c6da4`; this session does not claim ownership or
