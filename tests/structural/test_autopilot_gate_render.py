@@ -28,6 +28,10 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-23, release 0.60.0** — same per-release case: 56 lines (14 commands × 4 arms), all the
+  frontmatter `harness_maker_version:` key, and substituting `0.60.0` back to `0.59.0` reproduces
+  every previous hash — checked across every arm, so no content moved.
+
 - **2026-09-22, `codex-stage-invocation`** — help corrects Codex examples and the six-stage
   count. The SPEC hash drift also reproduces using unmodified HEAD source extracted to an
   isolated baseline directory; refresh that inherited stale hash alongside the snapshots.

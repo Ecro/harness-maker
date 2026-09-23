@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-09-23
+
+### Added
+
+- Require a deep interview with the intent's creator and a quality review of the concrete
+  draft before an intent is created. A one-line request or a picked candidate is not an
+  interview; without answers the draft stays in conversation and no record is written.
+  `/hm:spec` Step 0.5 follows the same procedure before linking a new intent.
+- Connect stage entry, observations and closeout to consent-aware intent feedback,
+  with links among existing records and a separate three-task real-use trial.
+- Enable Codex next-stage skill execution after the shared autopilot boundary,
+  preserving approval, review, verification and cap gates. Cursor keeps handoff.
+
 ### Fixed
 
 - Record SPEC-need operations with the actual add/change classification and canonical
@@ -13,11 +26,6 @@
   examples and user extensions, and avoid recommending unavailable Codex skills.
 - Clarify the six-stage workflow: research hands off to spec, and execute writes
   the PLAN. Updating and regenerating an existing harness refreshes owned guidance.
-
-- Connect stage entry, observations and closeout to consent-aware intent feedback,
-  with links among existing records and a separate three-task real-use trial.
-- Enable Codex next-stage skill execution after the shared autopilot boundary,
-  preserving approval, review, verification and cap gates. Cursor keeps handoff.
 
 ## [0.59.0] - 2026-09-21
 
