@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.60.2] - 2026-09-23
+
 ### Fixed
 
 - **`spec_gate` also searches `SPEC-*.machine.yaml`.** An approved SPEC lists its tests in the
