@@ -190,7 +190,8 @@ def test_probe_is_also_bounded(tmp_path: Path) -> None:
 def running(pid: int) -> bool:
     try:
         state = Path(f"/proc/{pid}/stat").read_text().split(")", 1)[1].split()[0]
-    except FileNotFoundError:
+    # The process can exit between open() and read(); the read then fails with ESRCH.
+    except (FileNotFoundError, ProcessLookupError):
         return False
     return state not in {"Z", "X"}
 
