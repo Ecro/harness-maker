@@ -27,7 +27,12 @@ concurrency:
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The Pytest step is deliberately SERIAL — it is the one full-suite run in CI that is not
+    # `-n auto` (see ci.yml's Pytest comment), so it catches order- and isolation-dependent
+    # failures that parallel runs hide. That makes this cap track suite growth: v0.59.0's gate
+    # took 16m, and v0.60.0 was cancelled at the old 20m cap mid-Pytest before anything was
+    # built. Raise the cap rather than parallelise; revisit if a run nears it.
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:

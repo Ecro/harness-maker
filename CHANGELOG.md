@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.60.1] - 2026-09-23
+
+Re-release of 0.60.0 with no code changes. The v0.60.0 tag was pushed, but its release
+quality-gate was cancelled mid-Pytest before anything was built or published, so 0.60.0 exists
+only as a tag and never shipped. The changes listed under 0.60.0 ship in this release.
+
+### Fixed
+
+- Raise the release quality-gate cap from 20 to 45 minutes. Its Pytest step is deliberately
+  serial — the one full-suite CI run that catches order- and isolation-dependent failures
+  hidden by `-n auto` — and the suite had outgrown the old cap (16 minutes at 0.59.0).
+
 ## [0.60.0] - 2026-09-23
 
 ### Added
