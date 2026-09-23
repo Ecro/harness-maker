@@ -97,6 +97,27 @@ def test_find_spec_returns_none_when_no_match(tmp_path: Path) -> None:
     assert find_spec_for_test(spec_dir, "tests/unit/test_missing.py") is None
 
 
+def test_find_spec_matches_a_test_listed_only_in_the_machine_yaml(tmp_path: Path) -> None:
+    """An approved SPEC names its tests in `.machine.yaml`; the prose need not repeat them."""
+    spec_dir = tmp_path / "specs"
+    spec_dir.mkdir()
+    (spec_dir / "SPEC-baz.md").write_text("# SPEC-baz\n\nBounded transport.\n")
+    (spec_dir / "SPEC-baz.machine.yaml").write_text(
+        "acceptance_criteria:\n- id: AC-001\n  tests:\n  - tests/unit/test_qux.py::test_one\n",
+    )
+    found = find_spec_for_test(spec_dir, "tests/unit/test_qux.py")
+    assert found is not None
+    assert found.name == "SPEC-baz.machine.yaml"
+
+
+def test_find_spec_ignores_yaml_that_is_not_a_machine_spec(tmp_path: Path) -> None:
+    spec_dir = tmp_path / "specs"
+    spec_dir.mkdir()
+    (spec_dir / "notes.yaml").write_text("tests:\n- tests/unit/test_qux.py\n")
+    (spec_dir / "SPEC-baz.yaml").write_text("tests:\n- tests/unit/test_qux.py\n")
+    assert find_spec_for_test(spec_dir, "tests/unit/test_qux.py") is None
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # evaluate() — full decision logic
 # ──────────────────────────────────────────────────────────────────────────────
@@ -173,6 +194,28 @@ def test_evaluate_spec_present_is_allow(tmp_path: Path) -> None:
     assert decision.message == ""
 
 
+def test_evaluate_allows_an_absolute_path_covered_only_by_a_machine_yaml(
+    tmp_path: Path,
+) -> None:
+    """The 2026-09-23 false block: Claude Code passes an absolute `file_path`, and the only
+    reference to `test_claude_transport.py` was in `SPEC-codex-claude-integration.machine.yaml`.
+    """
+    _write_harness_yaml(tmp_path, _spec_driven_yaml("block"))
+    spec_dir = tmp_path / "specs"
+    spec_dir.mkdir()
+    (spec_dir / "SPEC-baz.md").write_text("# SPEC-baz\n")
+    (spec_dir / "SPEC-baz.machine.yaml").write_text(
+        "tests:\n- tests/unit/test_qux.py::test_deadline\n",
+    )
+    decision = evaluate(
+        "Edit",
+        {"file_path": str(tmp_path / "tests" / "unit" / "test_qux.py")},
+        tmp_path,
+    )
+    assert decision.allow is True
+    assert decision.message == ""
+
+
 def test_evaluate_blocks_even_when_the_legacy_severity_key_says_warn(tmp_path: Path) -> None:
     """The legacy key cannot downgrade a `block` strictness (round-1 consensus P1)."""
     _write_harness_yaml(tmp_path, _spec_driven_yaml("warn"))
@@ -185,6 +228,8 @@ def test_evaluate_blocks_even_when_the_legacy_severity_key_says_warn(tmp_path: P
     assert decision.severity == Severity.BLOCK
     assert "test_foo.py" in decision.message
     assert "specs/" in decision.message
+    # `dir: specs/` already ends in a slash and every template appends one.
+    assert "specs//" not in decision.message
 
 
 def test_evaluate_warn_strictness_stands_aside(tmp_path: Path) -> None:

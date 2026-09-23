@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`spec_gate` also searches `SPEC-*.machine.yaml`.** An approved SPEC lists its tests in the
+  machine YAML (`tests: - path::name`), and the prose often never repeats them, so the gate
+  blocked edits to tests a SPEC demonstrably covers — `test_claude_transport.py`, listed only in
+  `SPEC-codex-claude-integration.machine.yaml`, was refused at `block` strictness. Other YAML in
+  the SPEC directory is still ignored.
+- `spec_gate`'s refusal message no longer prints `specs//` for the default `dir: specs/`.
+
 ## [0.60.1] - 2026-09-23
 
 Re-release of 0.60.0 with no code changes. The v0.60.0 tag was pushed, but its release

@@ -56,7 +56,7 @@ def is_test_path(path: str) -> bool:
 
 
 def derive_test_slug(test_path: str) -> str:
-    """Pick the slug fragment we'll search for inside SPEC-*.md.
+    """Pick the slug fragment we'll search for inside SPEC-*.md and SPEC-*.machine.yaml.
 
     e.g. ``tests/unit/test_spec_gate.py`` → ``spec_gate``.
     """
@@ -69,17 +69,23 @@ def derive_test_slug(test_path: str) -> str:
 
 
 def find_spec_for_test(spec_dir: Path, test_path: str) -> Path | None:
-    """Return the first SPEC-*.md that references the test path or its slug."""
+    """Return the first SPEC-*.md or SPEC-*.machine.yaml referencing the test path or its slug.
+
+    The machine YAML is where an approved SPEC lists its tests (`tests: - path::name`); the
+    prose often never repeats them. Searching only the Markdown blocked edits to tests that a
+    SPEC demonstrably covers (2026-09-23, `test_claude_transport.py`).
+    """
     if not spec_dir.is_dir():
         return None
     slug = derive_test_slug(test_path)
-    for spec_md in sorted(spec_dir.glob("SPEC-*.md")):
+    candidates = [*spec_dir.glob("SPEC-*.md"), *spec_dir.glob("SPEC-*.machine.yaml")]
+    for spec_file in sorted(candidates):
         try:
-            content = spec_md.read_text(encoding="utf-8")
+            content = spec_file.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
         if test_path in content or slug in content:
-            return spec_md
+            return spec_file
     return None
 
 
@@ -131,7 +137,9 @@ def evaluate(
     locale = str(cfg.get("locale") or "en")
     severity = _resolve_severity(cfg)
     key = "spec_gate_missing_block" if severity == Severity.BLOCK else "spec_gate_missing_warn"
-    msg = t(key, locale, test_path=file_path, spec_dir=str(spec_dir_str))
+    # Every template appends `/`; the default `specs/` already has one.
+    shown_dir = str(spec_dir_str).rstrip("/") or str(spec_dir_str)
+    msg = t(key, locale, test_path=file_path, spec_dir=shown_dir)
     return GateDecision(
         allow=severity != Severity.BLOCK,
         severity=severity,
