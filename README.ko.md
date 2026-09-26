@@ -96,6 +96,7 @@ action items).
 |--|---|---|
 | 🎯 | **개인화 (Personalized)** | 프로파일러가 12개 이상의 스택/프레임워크/CI 신호를 읽음. 인터뷰가 10개 이상의 차원을 lock. `Side` 실험과 `Production` 서비스는 **구조적으로 다른** 하네스를 받음 — 다른 reviewer 셋, 다른 워크플로 stage, 다른 보안 게이트. 범용 default가 조용히 깔리는 일 없음. |
 | 🛡️ | **신뢰 (Trusted)** | 모든 `/hm:execute`는 fresh worktree + TDD 루프. `/hm:review`는 보고만 하지 않음 — consensus-passed fix를 적용하고 등급 ≥ A까지 재리뷰. Mechanical check (lint/test)가 LLM reviewer가 토큰 쓰기 전에 게이트. |
+| 🧭 | **사람이 소유 (Human-owned)** | *어떻게*는 AI 가 최대한 가져가고, *왜*·*무엇을*·트레이드오프는 당신이 소유. `/hm:spec` 이 코드 이전에 의도·범위·`irreversible_decisions` 를 당신과 함께 lock 하고, autopilot 은 사람의 결정이 필요한 stage 에서 멈추며, intent 기록은 당신의 동의로만 바뀜. **아직 출하 전:** 시스템의 가정이 어떻게 바뀌었는지 wrapup 이 요약해, diff 를 읽지 않고도 변경을 설명할 수 있게 하는 기능. |
 | 🌱 | **자기진화 (Self-evolving)** | agent, skill, CLAUDE.md 어디든 손편집 — block-merge 마커가 `--update` 너머에서도 보존. 메모리가 프로젝트 고유 패턴을 축적; 반복되는 실패는 새 가드레일을 자동 제안. |
 | 🌀 | **무방부패 (Anti-rot)** | 4개 소스 주간 크롤 (Anthropic, GitHub releases, arXiv, OSV CVE). 사용자 accept/reject 이력으로 적응형 relevance filter. 항상 수동 확인 — silent auto-apply 경로는 존재하지 않음. |
 | 🎛️ | **다중 IDE (Multi-IDE)** | Claude Code + Cursor + Codex. 한 개의 `harness.yaml`, 세 개의 target-native 렌더. 기존 Cursor rules / Aider 설정 / Copilot instructions는 첫 실행에서 흡수 — 수동 포팅 0. |
