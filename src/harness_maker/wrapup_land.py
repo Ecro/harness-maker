@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import dataclasses
 import io
 import json
 import os
@@ -32,6 +33,60 @@ from harness_maker.spec_machine import hold_lines, land_states
 EXIT_OK = 0
 EXIT_FAILED = 1
 EXIT_USAGE = 2
+
+
+_UNDERSTANDING = "Understanding:"
+_UNDERSTANDING_NONE = "Understanding: none"
+_UNDERSTANDING_CAP = 5
+_UNDERSTANDING_WARN = "[wrapup_land] understanding:"
+_UNDERSTANDING_PROBLEMS = {
+    "missing": "no `Understanding:` block in the commit body",
+    "empty": "`Understanding:` has no `- ` bullets and is not `Understanding: none`",
+    "too_long": "more than 5 bullets under `Understanding:`",
+    "malformed": "duplicate header, unknown header suffix, or bullets after `none`",
+}
+
+
+@dataclasses.dataclass(frozen=True)
+class UnderstandingCheck:
+    status: str
+    bullets: int
+
+    def as_json(self) -> dict[str, Any]:
+        return {"status": self.status, "bullets": self.bullets}
+
+
+def check_understanding_block(message: str) -> UnderstandingCheck:
+    """Classify the commit body's Understanding block (SPEC-understanding-handoff grammar).
+
+    Read-only by design: the result is reported, never used to edit the message, because
+    the message is what reaches the user's branch (directly, or via `task-land` reuse).
+    """
+    body = message.splitlines()[1:]
+    headers = [i for i, line in enumerate(body) if line.startswith(_UNDERSTANDING)]
+    if not headers:
+        return UnderstandingCheck("missing", 0)
+    if len(headers) > 1:
+        return UnderstandingCheck("malformed", 0)
+    at = headers[0]
+    header = body[at].rstrip()
+    if header not in (_UNDERSTANDING, _UNDERSTANDING_NONE):
+        return UnderstandingCheck("malformed", 0)
+    rest = body[at + 1 :]
+    while rest and not rest[0].strip():
+        rest = rest[1:]
+    bullets = 0
+    for line in rest:
+        if not line.startswith("- "):
+            break
+        bullets += 1
+    if header == _UNDERSTANDING_NONE:
+        return UnderstandingCheck("malformed" if bullets else "none", 0)
+    if bullets == 0:
+        return UnderstandingCheck("empty", 0)
+    if bullets > _UNDERSTANDING_CAP:
+        return UnderstandingCheck("too_long", bullets)
+    return UnderstandingCheck("ok", bullets)
 
 
 class LandAbortError(Exception):
@@ -233,6 +288,11 @@ def _head_subject(worktree: Path) -> str:
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def _head_body(worktree: Path) -> str:
+    r = _git(worktree, "log", "-1", "--format=%B")
+    return r.stdout if r.returncode == 0 else ""
+
+
 # ── the composite ─────────────────────────────────────────────────────────────
 
 
@@ -343,6 +403,15 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             "nothing is staged and HEAD is not this commit — refusing to commit an empty "
             f"index (HEAD subject: {_head_subject(worktree)!r})"
         )
+
+    # Classify what actually landed: on a resume that is HEAD's body, which `task-land` will
+    # reuse — not a message file that may have been edited since the commit happened.
+    landed = message if receipt["steps"]["commit"]["status"] == "created" else _head_body(worktree)
+    understanding = check_understanding_block(landed)
+    receipt["steps"]["understanding"] = understanding.as_json()
+    problem = _UNDERSTANDING_PROBLEMS.get(understanding.status)
+    if problem is not None:
+        print(f"{_UNDERSTANDING_WARN} {problem} (commit proceeds)", file=sys.stderr)
 
     owned = wt._owned_crumb_read(base, args.slug)
     receipt["steps"]["owned_uuids"] = sorted(owned)

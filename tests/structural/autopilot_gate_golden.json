@@ -2,7 +2,7 @@
   "arms": {
     "ask@flag_off": {
       "configure": "a20c2a172b60be2c77251f9335054e4acadb9d05bae7791921c48931ffc6fe6b",
-      "execute": "a560feeec2f3c3ed91dbdfce9ae678db33919f4393d233e8a510ff8b2e32ee0e",
+      "execute": "206b80336475a3824481d4bc02ce21defbcfe11d3fd56aec1b4909a63daa0a44",
       "health": "467e0538f22aeed70e58699f3b8dc44720706be75e0e14a14933d5957275572f",
       "help": "c90fd23ddb3adaf3f20b237333430b877da5382e8b3f40f4e7848180b8c740cb",
       "loop": "5b93bb468467be246ac1f1a0cad5542a7891b225218a2b3fc84cdbe2b8a8442d",
@@ -14,11 +14,11 @@
       "spec": "6b228f07cbe1bbe10eb76cd57805184d44993f61faf33d860920b5bf3d69f11b",
       "uninstall": "d2b4fcc174ff83e5a483852edada57654b290c44d1f8dbb75da61545d7dd7358",
       "verify": "d56ad0db7724739f9189abac71cbf32baf064b763b30a06710e17aee7a8c5012",
-      "wrapup": "e6d2b2e4a81c7075b30d15f497d18f3699c72e527fd9b650e10971ba9a2e9a35"
+      "wrapup": "6703918ee4f7dba1134b18070c68ad1510fcd7042deb43f7a0eff64f86a0cd88"
     },
     "ask@flag_on": {
       "configure": "a20c2a172b60be2c77251f9335054e4acadb9d05bae7791921c48931ffc6fe6b",
-      "execute": "c0dc5f06cfca6bb025ca6d1562f4f7a2052d20004b25303ccbe8e03fbc8a69c6",
+      "execute": "52ecedc88e364095b8754423fde2e4054a20f0557184ab8187acb5daf88d2184",
       "health": "467e0538f22aeed70e58699f3b8dc44720706be75e0e14a14933d5957275572f",
       "help": "c90fd23ddb3adaf3f20b237333430b877da5382e8b3f40f4e7848180b8c740cb",
       "loop": "59d03365b7fa5b54d671ea21af98c54048da62c18e3235fda2a5d9d86827077c",
@@ -30,11 +30,11 @@
       "spec": "ccdf716803e08c4fca6dbef3833fcfbe9aa592fd32bcf371bcb792ae2f74a441",
       "uninstall": "d2b4fcc174ff83e5a483852edada57654b290c44d1f8dbb75da61545d7dd7358",
       "verify": "52eca40315649874c1047fed8e42236641fb1821ed9596fa9f8c861948a0decc",
-      "wrapup": "e7b949bb4fa7c8171883f4d0c58881fdee0d5606fb9dce7b57450bbe7768e823"
+      "wrapup": "cbecabcec0d554020bd527a106a5aacc4f7fda31ef9a5aad4f02089ea71e8839"
     },
     "auto_safe@block": {
       "configure": "a20c2a172b60be2c77251f9335054e4acadb9d05bae7791921c48931ffc6fe6b",
-      "execute": "ceac5bb795ae7196ea67aa19473fc1ef48b125c9a9cfa5d665c3165471aa4e10",
+      "execute": "9cc594f47d33ce7dc0098490033788f0d37260f3b5cd6a9a2a685eaa9392eab1",
       "health": "3f0e3d38a3d2947641e40d32a1dc599f6c9dfd3ef0c6a0f9ca372e1907b22960",
       "help": "4b86d23fe76002e46039e40e46eab7231c1ea3d590daa72f66c2edcc9271306d",
       "loop": "65a03c9b18d5c8dbe1625edf372596bbb12b2b2deabee45d964a1ac15635cb43",
@@ -46,11 +46,11 @@
       "spec": "615cc73710ed48c458e70daeb1a9780efee6641321abef5cced055dea1bf95f0",
       "uninstall": "d2b4fcc174ff83e5a483852edada57654b290c44d1f8dbb75da61545d7dd7358",
       "verify": "5856da990a1cbf2a2111ae512b13c2c35e0f445837896c7f762f9b44b4775d93",
-      "wrapup": "9049833c77eae7782dc4942c3cf52c48bace2cee8848075a834a64c518c7b127"
+      "wrapup": "2c28fc1c1053eede86c9f117a25484ef8d5818a6494846733ab3b0dff923d8aa"
     },
     "auto_safe@warn": {
       "configure": "a20c2a172b60be2c77251f9335054e4acadb9d05bae7791921c48931ffc6fe6b",
-      "execute": "a931ef0e87ac228d7e14187b890bfa9e090f9796d3bb1205dde03c6638680799",
+      "execute": "7374bddbc69c38219854af8cc869cea930e7616921f8df0319cc8ada528f5181",
       "health": "3f0e3d38a3d2947641e40d32a1dc599f6c9dfd3ef0c6a0f9ca372e1907b22960",
       "help": "4b86d23fe76002e46039e40e46eab7231c1ea3d590daa72f66c2edcc9271306d",
       "loop": "65a03c9b18d5c8dbe1625edf372596bbb12b2b2deabee45d964a1ac15635cb43",
@@ -62,7 +62,7 @@
       "spec": "0d0d06d24294edb8cdcfe7959ded863facf038e0905d177e8f5fc5beaf5914fc",
       "uninstall": "d2b4fcc174ff83e5a483852edada57654b290c44d1f8dbb75da61545d7dd7358",
       "verify": "6b217be019a41dc82bba46f98844ea4c0b9fae378f6496e554313ced2c998710",
-      "wrapup": "a603ec984206a10828ff3964014ec89603c47479eded931c0aea1c916df04da2"
+      "wrapup": "7fb6ca8cabbe1ec69b9fddf86f98c11cef6862409fbb132b2f07dc40a8cac2fc"
     }
   },
   "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",

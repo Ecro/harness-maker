@@ -28,6 +28,12 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-26, `understanding-handoff`** — wrapup Step 6 asks for the commit-body
+  `Understanding:` block, which is printed again right before the closing banner (the `Done`
+  line now points at it); execute Step 0's ADR item
+  requires a `**Decided by:**` line. Only `execute` and `wrapup` moved, in all four arms;
+  command sets unchanged; autonomy gates and the picker/advance blocks untouched.
+
 - **2026-09-23, release 0.60.2** — same per-release case: 56 lines (14 commands × 4 arms), all the
   frontmatter `harness_maker_version:` key, and substituting `0.60.2` back to `0.60.1` reproduces
   every previous hash — checked across every arm, so no content moved.

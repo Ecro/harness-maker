@@ -383,7 +383,10 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # 59260 → 60725 (same task, second fold): Step 0.1 gained `spec_need prefilter` +
     # `record` (the evidence half of the removed Step 1.7 gate) and Step 0.2 gained the
     # session-scoped `worktree loop-mode-active` call it had replaced with prose.
-    "execute": 62820,
+    # 62820 → 63008 (understanding-handoff, 2026-09-26): +188, Step 0's ADR item requires a
+    # `**Decided by:**` provenance line. Attributed in
+    # work-docs/BASELINE-DELTA-understanding-handoff.md.
+    "execute": 63008,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -602,7 +605,14 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # base-path rule). First re-based to 47084 on top of assumption-entry; re-based again at
     # wrapup onto observed-harness-gaps-salvage, whose Steps 6 → 7.6 paragraph is disjoint, so
     # the deltas add. Attributed in work-docs/BASELINE-DELTA-mission-context-loop.md §3.1.
-    "wrapup": 50649,
+    # 50649 → 52162 (understanding-handoff, 2026-09-26): +1513, the `Steps 6 → 7.6` paragraph
+    # asking for the commit-body `Understanding:` block, and the instruction to print that block
+    # immediately before the closing banner — re-read from the `--message-file`, with a branch
+    # that surfaces the warning when no usable block landed (review moved it out of the `Done`
+    # line, then anchored its source and added the branch). Re-based rather than left to
+    # consume the next task's headroom. Attributed in
+    # work-docs/BASELINE-DELTA-understanding-handoff.md.
+    "wrapup": 52162,
 }
 
 

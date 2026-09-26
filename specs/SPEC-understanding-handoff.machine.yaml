@@ -1,0 +1,505 @@
+schema_version: 3
+spec_slug: understanding-handoff
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: tier 2 — the classifier is a small pure function covered
+  by a golden table; the rest is rendered prose and an additive receipt key, where
+  mutation testing adds cost without discrimination.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/wrapup_land.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: rendered wrapup Step 6 instructs the Understanding block
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_understanding_handoff.py::test_ac_001_step6_instructs_the_understanding_block
+  - tests/unit/test_render_understanding_handoff.py::test_ac_001_block_instruction_is_not_in_the_delegated_span
+  executable_predicate: all(understanding_instruction_in_step6(render_wrapup(preset,
+    wt)) for preset, wt in ARMS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'the expected tokens (`Understanding:`, `Understanding: none`,
+    the 5-line cap, the before-trailer placement) are copied from this SPEC''s Constraints
+    grammar, and the section boundary is the rendered `Steps 6 → 7.6` heading — neither
+    is read from the new template text.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: understanding block classifier matches the golden table
+  type: parametric
+  test_ids:
+  - tests/unit/test_understanding_block.py::test_ac_002_classifier_matches_golden_table
+  executable_predicate: null
+  golden_table:
+  - input:
+      message: 'feat: x
+
+
+        why
+
+
+        Understanding: none
+
+        '
+    expected:
+      status: none
+      bullets: 0
+    edge: false
+    note: ''
+  - input:
+      message: 'feat: x
+
+
+        Understanding:
+
+        - a -> b
+
+        '
+    expected:
+      status: ok
+      bullets: 1
+    edge: false
+    note: ''
+  - input:
+      message: 'feat: x
+
+
+        Understanding:
+
+        - a
+
+        - b
+
+        - c
+
+        - d
+
+        - agent-decided: ADR-001
+
+        '
+    expected:
+      status: ok
+      bullets: 5
+    edge: true
+    note: exactly at the cap, agent-decided line counts
+  - input:
+      message: 'feat: x
+
+
+        Understanding:
+
+        - a
+
+        - b
+
+        - c
+
+        - d
+
+        - e
+
+        - f
+
+        '
+    expected:
+      status: too_long
+      bullets: 6
+    edge: true
+    note: ''
+  - input:
+      message: 'feat: x
+
+
+        Understanding:
+
+
+        Co-Authored-By: C <n@x>
+
+        '
+    expected:
+      status: empty
+      bullets: 0
+    edge: false
+    note: ''
+  - input:
+      message: 'feat: x
+
+
+        why only
+
+        '
+    expected:
+      status: missing
+      bullets: 0
+    edge: false
+    note: ''
+  - input:
+      message: 'feat: x'
+    expected:
+      status: missing
+      bullets: 0
+    edge: true
+    note: subject-only message
+  - input:
+      message: 'feat: Understanding: none
+
+
+        why
+
+        '
+    expected:
+      status: missing
+      bullets: 0
+    edge: true
+    note: the header in the subject line does not count
+  - input:
+      message: 'feat: x
+
+
+        Understanding:
+
+        - a -> b
+
+
+        Co-Authored-By: C <n@x>
+
+        '
+    expected:
+      status: ok
+      bullets: 1
+    edge: false
+    note: bullets stop at the blank line before trailers
+  - input:
+      message: 'feat: x
+
+
+        Understanding:
+
+
+        - a -> b
+
+        - unknown: c
+
+        '
+    expected:
+      status: ok
+      bullets: 2
+    edge: false
+    note: blank line between header and bullets is allowed
+  - input:
+      message: 'feat: x
+
+
+        Understanding: foo
+
+        - a
+
+        '
+    expected:
+      status: malformed
+      bullets: 0
+    edge: true
+    note: header with a suffix other than none
+  - input:
+      message: 'feat: x
+
+
+        Understanding: none
+
+        - a
+
+        '
+    expected:
+      status: malformed
+      bullets: 0
+    edge: true
+    note: none followed by bullets
+  - input:
+      message: 'feat: x
+
+
+        Understanding:
+
+        - a
+
+
+        Understanding: none
+
+        '
+    expected:
+      status: malformed
+      bullets: 0
+    edge: true
+    note: duplicate headers
+  - input:
+      message: 'feat: x
+
+
+        Understanding:
+
+        - a
+
+        plain text
+
+        - b
+
+        '
+    expected:
+      status: ok
+      bullets: 1
+    edge: false
+    note: the run ends at the first non-bullet line
+  - input:
+      message: "feat: x\n\nUnderstanding: none   \n"
+    expected:
+      status: none
+      bullets: 0
+    edge: false
+    note: trailing whitespace on the header is ignored
+  - input:
+      message: 'feat: x
+
+
+        understanding: none
+
+        '
+    expected:
+      status: missing
+      bullets: 0
+    edge: true
+    note: case-sensitive header
+  - input:
+      message: 'feat: x
+
+
+        Understanding:
+
+        - agent-decided: none (unmarked: 3)
+
+        '
+    expected:
+      status: ok
+      bullets: 1
+    edge: false
+    note: legacy PLAN with only unmarked ADRs
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: every row's expected status and count is derived by hand from the
+    grammar the DRI approved in interview round 2 (header line, 1–5 `- ` lines or
+    `none`, subject excluded), before the classifier exists.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: wrapup_land warns without blocking
+  type: mechanical
+  test_ids:
+  - tests/unit/test_understanding_block.py::test_ac_003_wrapup_land_warns_without_blocking
+  - tests/unit/test_understanding_block.py::test_ac_003_resume_classifies_the_committed_body_not_an_edited_message_file
+  executable_predicate: result.returncode == baseline_returncode and result.stderr.count('[wrapup_land]
+    understanding:') == (0 if expected['status'] in ('ok', 'none') else 1) and receipt['steps']['commit']['status']
+    == 'created' and receipt['steps']['understanding'] == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the test runs wrapup_land twice on identical temp repos differing
+    only in whether the message carries the block; the exit code is compared against
+    the with-block run (not a constant) and the stderr prefix and receipt enum come
+    from this SPEC's Constraints table.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: task-land squash preserves the block
+  type: mechanical
+  test_ids:
+  - tests/unit/test_understanding_block.py::test_ac_004_task_land_squash_preserves_understanding_block
+  executable_predicate: block_text in squash_commit_body(base_repo)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: block_text is a literal the test writes into the task-branch commit;
+    the assertion reads the base branch's HEAD body via git, independent of task-land's
+    message-building code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: rendered wrapup closing output repeats the block
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_understanding_handoff.py::test_ac_005_closing_output_repeats_the_block
+  executable_predicate: all(closing_output_repeats_block(render_wrapup(preset, wt))
+    for preset, wt in ARMS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the required instruction (print the same Understanding block that
+    was committed) is stated in this SPEC's Outcomes; the test checks the rendered
+    closing section, not the template source.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: rendered execute ADR section requires Decided by
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_understanding_handoff.py::test_ac_006_execute_adr_section_requires_decided_by
+  executable_predicate: all(adr_requires_decided_by(render_execute(preset, wt)) for
+    preset, wt in ARMS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the literal field `**Decided by:**`, the two values and the source
+    requirement for `user` come from the DRI's round-1 answer recorded in this SPEC.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: rendered wrapup reports agent-decided and unmarked ADRs
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_understanding_handoff.py::test_ac_007_step6_reports_agent_decided_and_unmarked
+  executable_predicate: all(step6_reports_agent_and_unmarked(render_wrapup(preset,
+    wt)) for preset, wt in ARMS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the `agent-decided:` line and the `unmarked` count for ADRs lacking
+    the field are the absent-case rule the DRI chose in round 1; the tokens are copied
+    from this SPEC, not from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: wrapup_land commits the supplied message unchanged
+  type: mechanical
+  test_ids:
+  - tests/unit/test_understanding_block.py::test_ac_008_wrapup_land_commits_the_supplied_message_unchanged
+  executable_predicate: committed_body(repo).rstrip() == message_file.read_text().rstrip()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the expected body is the literal message file the test writes (block
+    plus a Co-Authored-By trailer); the actual is read back from git with `git log
+    -1 --format=%B`, never from wrapup_land's receipt or code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 4fadc1f466995040ea1430fede3c8b56b611b032d90cc7b4c45aa891831b744a
+  approved_by: Ecro
+  approved_at: '2026-09-26T14:40:19Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 86403fdaf1c70182c234f30a95356b8d050bad301592ffa125a5ecec07d03b4a
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: ae0de8d058ff20f032d552e1b2f665713c1b32df5d89c587cab8eab1a581646d
+    paths_to_mutate: 3bf22a46283eecf8f2b4db04875dfb10f4779232cb561d172cbb336e97dcb32b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: c30e927f70e89801d23cdb7b34e15532b8fc55b4a836b140f5ba8727d5931f32
+    AC-002: d9952fc90905fef88183661afb20cdbf23d6d20aa938cfadcc28cba577795cdd
+    AC-003: f314b5fccc93437bf7e3d92f59cbcae2334adcbdf09d57884c918adfdf811925
+    AC-004: 91fe1eadc4adef67e2cf29112955076e40f723d654cee6eead5e7e0173e7b9c9
+    AC-005: ac3114844e18413ad246f8ab2c6386ef6430dd60116290b9f6521f78c66a4476
+    AC-006: 4ba6c24371c1884d0130af9988e9c4b0fa90ab40ef1c116838fe674294d49f4c
+    AC-007: 3a667ba7f7916a148522e30538ae351ffd8cd318da864f34704be820f2df8281
+    AC-008: ca0041e9f5546adc88263173e6b446b4b905154d01c6b743a035627e23beab1b
+    ac_order: b62ad8faf895c4ebdf45f3fce97982d2bcc0a3fa6daa1e45993897fb730655c6

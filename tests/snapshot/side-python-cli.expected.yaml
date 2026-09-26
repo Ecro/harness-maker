@@ -55,7 +55,7 @@ files:
   body_sha256: 49f2e4fa1f17894e1c8c555f8be60142bd4cd4a4dfe96d5884637908956bad05
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 878e4820831c44f28354e203196a38f78772029e5bc73602f76481c88b478678
+  body_sha256: 7bb5aa4a8489d56576f22a53715a35b06e2874c3b2399723e1a5e688e908dd04
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: b16b0c64191d45f0b5d01ffa6e3f68ff8f0cf46a6b361f0193fc57ad692db222
@@ -91,7 +91,7 @@ files:
   body_sha256: 2fba6aa40e800f4075d7be4584b5d918f14c9716c5af19d5bfb898100a1972a4
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: e2521d527b719662dc034d2d3cbf3b1ff944e391736247ea8d68c5874c360276
+  body_sha256: ae970b7b182ada099d153396cd73ab5a0103939a2cff9cbe2e6ef9dd7bbf29a8
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: 679d83ac455cc0e06cb78a3b7cfbb4d9376e2e5faa7a9a6e1429f12182cabeb2
@@ -166,7 +166,7 @@ files:
   body_sha256: b3ce34ea25321280d309fe3188fd757e1665aad75a95aa76ecd942bdcc128b47
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: 2681a772360388da1f68d2b2d0ef0c70fc175bd2320b3fddf861e3a89fc8b20b
+  body_sha256: 0072597eb5712db33a807c768f137b504e69e3c4f2227daa815de1603c52fc1a
 - path: stages/research.md
   template: stages/research.md.j2
   body_sha256: 1bdf22500cb3c24a0de255ba6fb47f4284ab3be98168edbfb11fcc0dc10d319f
@@ -181,4 +181,4 @@ files:
   body_sha256: 2b612fad991591c94746c856971d38626134476ad94d3a8d82279e23ed61c61d
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: c1f29fdc4acdb8579e31c5f62304af85aeff9a9498cf8bd1e3aebfc8004f78a4
+  body_sha256: 34043aba53fc59701ffd6dfc758170354ed475b7a2541a3c97411398b174689f

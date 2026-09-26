@@ -637,6 +637,24 @@ First write the commit message to a file. `<type>(<scope>): <subject ≤72 chars
 one, then a body explaining **why**, not **what** — the diff already says what. **Type**
 (per CLAUDE.md convention): `feat | fix | chore | ci | test | docs | refactor`.
 
+**End the body with the `Understanding:` block**, in English, before the trailers. It is what
+lets the user explain this change without reading the diff:
+
+```
+Understanding:
+- <assumption, invariant or boundary>: <before> -> <after>
+- unknown: <what this task left open>
+- agent-decided: ADR-002, ADR-004 (unmarked: N)
+```
+
+Keep it to at most 5 bullets, the `agent-decided:` one included. Write before -> after for
+what moved in the system's assumptions, invariants or ownership boundaries, and `unknown:` for
+what is still not known. Do not list files or restate the diff. Whenever the PLAN has ADRs, add
+the `- agent-decided:` bullet: the ids marked `**Decided by:** agent` (or `none`), plus
+`(unmarked: N)` for ADRs with no `Decided by` line — never count those as agent. Nothing moved
+and no ADRs → the single line `Understanding: none`. `wrapup_land` warns, never blocks, when the
+block is missing or malformed.
+
 **Proposal backlog — print it here, in the main loop.** Step 5.3 writes proposals; nothing
 reads them unless this does. Ask the CLI; do **not** describe a counting rule here —
 resolved proposals carry no heading of their own, so a prose rule would disagree with it:
@@ -858,7 +876,14 @@ If the user asks to push during wrapup, that is fine — but never push without 
 - PLAN frontmatter `status: complete` and zero `- [ ]` remain in the body.
 - Final verification pass GREEN before commit.
 
-{% set summary_done = "Final checks + drift gate passed; single commit created" -%}
+**Immediately before the stage summary banner, show the Understanding result.** Branch on the
+`wrapup_land` receipt's `steps.understanding.status`: `ok` or `none` → print the block verbatim,
+re-read from the file you passed as `--message-file` (`wrapup_land` commits it unchanged) —
+never from memory, and never from a bare `HEAD`, which a peer's land can move. Any other status
+→ print the `[wrapup_land] understanding:` warning instead and say the commit carries no usable
+block; never present a block that did not land.
+
+{% set summary_done = "Final checks + drift gate passed; single commit created; its `Understanding:` block verbatim (or the warning) is printed above" -%}
 {% set summary_artifact = "the commit + committed deliverables (PLAN/RESEARCH/REVIEW/SPEC)" -%}
 {% set summary_next = "STOP — task complete" -%}
 {% set summary_stage = "wrapup" -%}

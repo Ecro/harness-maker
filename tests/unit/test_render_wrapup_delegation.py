@@ -257,7 +257,10 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # only one arm moved.
 # 800/802 → 823/825 (world-intent-closed-loop): shared feedback/trial hooks
 # and measure-before-closure integration add 23 lines; delegation remains OFF.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 823), ("Production", 825)])
+# 823/825 → 848/850 (understanding-handoff, 2026-09-26): +25, the `Steps 6 → 7.6` paragraph
+# and fenced example for the commit-body `Understanding:` block, and the instruction to print
+# it before the closing banner. Both arms, same delta.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 848), ("Production", 850)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

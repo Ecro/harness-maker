@@ -169,7 +169,9 @@ documented. Nothing parses this field, so an honest value costs no reader — an
 1. **🎯 Executive Summary** — TL;DR, what/why, the key decisions and where they came from.
 2. **📚 Prior Work** — similar PLANs, lessons from `failures.md` / `wiki.md`, RESEARCH findings.
 3. **📐 Architecture Decision Records** — the design records this stage locks. The SPEC owns
-   the irreversible ones; these are the reversible calls you make while building.
+   the irreversible ones; these are the reversible calls you make while building. Every ADR
+   carries a provenance line: `**Decided by:** user (source: <SPEC section or conversation>)`
+   only when the user explicitly made that call, otherwise `**Decided by:** agent`.
 4. **🏗️ Technical Design** — current state, affected components, dependencies, data flow.
 5. **📝 Implementation Plan** — numbered phases. **Each phase MUST have** `depends_on`,
    `parallel_group`, `merge_hazards`, scope (files in / out), an exit criterion that is a

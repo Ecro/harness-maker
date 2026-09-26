@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Understanding handoff.** `/hm:wrapup` now asks the closing commit message to carry an
+  `Understanding:` block — a short bullet list of what changed in the system's assumptions,
+  written by the agent so a future reader does not have to re-derive it from the diff. A pure
+  classifier in `wrapup_land.py` checks the block's presence/shape and warns (never blocks) on
+  `missing`/`empty`/`too_long`, recording the verdict under the wrapup receipt's
+  `steps.understanding` key; the wrapup closing output repeats the same block. `/hm:execute`
+  also now requires `**Decided by:**` on every PLAN ADR, and wrapup reports which ADRs were
+  agent-decided vs. left unmarked.
+
 ## [0.60.2] - 2026-09-23
 
 ### Fixed
