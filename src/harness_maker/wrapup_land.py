@@ -51,6 +51,9 @@ _UNDERSTANDING_PROBLEMS = {
 class UnderstandingCheck:
     status: str
     bullets: int
+    #: The block exactly as it sits in the checked text — only for a usable (`ok`/`none`)
+    #: block, so a caller that prints it can never present an unusable one as if it landed.
+    text: str | None = None
 
     def as_json(self) -> dict[str, Any]:
         return {"status": self.status, "bullets": self.bullets}
@@ -72,21 +75,22 @@ def check_understanding_block(message: str) -> UnderstandingCheck:
     header = body[at].rstrip()
     if header not in (_UNDERSTANDING, _UNDERSTANDING_NONE):
         return UnderstandingCheck("malformed", 0)
-    rest = body[at + 1 :]
-    while rest and not rest[0].strip():
-        rest = rest[1:]
-    bullets = 0
-    for line in rest:
-        if not line.startswith("- "):
-            break
-        bullets += 1
+    i = at + 1
+    while i < len(body) and not body[i].strip():
+        i += 1
+    run: list[str] = []
+    while i < len(body) and body[i].startswith("- "):
+        run.append(body[i].rstrip())
+        i += 1
     if header == _UNDERSTANDING_NONE:
-        return UnderstandingCheck("malformed" if bullets else "none", 0)
-    if bullets == 0:
+        if run:
+            return UnderstandingCheck("malformed", 0)
+        return UnderstandingCheck("none", 0, header)
+    if not run:
         return UnderstandingCheck("empty", 0)
-    if bullets > _UNDERSTANDING_CAP:
-        return UnderstandingCheck("too_long", bullets)
-    return UnderstandingCheck("ok", bullets)
+    if len(run) > _UNDERSTANDING_CAP:
+        return UnderstandingCheck("too_long", len(run))
+    return UnderstandingCheck("ok", len(run), "\n".join([header, *run]))
 
 
 class LandAbortError(Exception):
@@ -409,6 +413,7 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     landed = message if receipt["steps"]["commit"]["status"] == "created" else _head_body(worktree)
     understanding = check_understanding_block(landed)
     receipt["steps"]["understanding"] = understanding.as_json()
+    receipt["steps"]["understanding_block"] = understanding.text
     problem = _UNDERSTANDING_PROBLEMS.get(understanding.status)
     if problem is not None:
         print(f"{_UNDERSTANDING_WARN} {problem} (commit proceeds)", file=sys.stderr)

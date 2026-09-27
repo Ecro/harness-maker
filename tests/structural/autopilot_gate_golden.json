@@ -14,7 +14,7 @@
       "spec": "6b228f07cbe1bbe10eb76cd57805184d44993f61faf33d860920b5bf3d69f11b",
       "uninstall": "d2b4fcc174ff83e5a483852edada57654b290c44d1f8dbb75da61545d7dd7358",
       "verify": "d56ad0db7724739f9189abac71cbf32baf064b763b30a06710e17aee7a8c5012",
-      "wrapup": "6703918ee4f7dba1134b18070c68ad1510fcd7042deb43f7a0eff64f86a0cd88"
+      "wrapup": "d41553583dbf56ae5de8cb76efb7be900b4133b5e40781cc4e49085a6f9babc3"
     },
     "ask@flag_on": {
       "configure": "a20c2a172b60be2c77251f9335054e4acadb9d05bae7791921c48931ffc6fe6b",
@@ -30,7 +30,7 @@
       "spec": "ccdf716803e08c4fca6dbef3833fcfbe9aa592fd32bcf371bcb792ae2f74a441",
       "uninstall": "d2b4fcc174ff83e5a483852edada57654b290c44d1f8dbb75da61545d7dd7358",
       "verify": "52eca40315649874c1047fed8e42236641fb1821ed9596fa9f8c861948a0decc",
-      "wrapup": "cbecabcec0d554020bd527a106a5aacc4f7fda31ef9a5aad4f02089ea71e8839"
+      "wrapup": "edecd8b36e55cbe65bf15925cd61a73817ae6cbdc4988b4d336a6fa602116e27"
     },
     "auto_safe@block": {
       "configure": "a20c2a172b60be2c77251f9335054e4acadb9d05bae7791921c48931ffc6fe6b",
@@ -46,7 +46,7 @@
       "spec": "615cc73710ed48c458e70daeb1a9780efee6641321abef5cced055dea1bf95f0",
       "uninstall": "d2b4fcc174ff83e5a483852edada57654b290c44d1f8dbb75da61545d7dd7358",
       "verify": "5856da990a1cbf2a2111ae512b13c2c35e0f445837896c7f762f9b44b4775d93",
-      "wrapup": "2c28fc1c1053eede86c9f117a25484ef8d5818a6494846733ab3b0dff923d8aa"
+      "wrapup": "8322fc60d0571689af66845b4eb840dc61c4bd52950ef277345e48e081e9e027"
     },
     "auto_safe@warn": {
       "configure": "a20c2a172b60be2c77251f9335054e4acadb9d05bae7791921c48931ffc6fe6b",
@@ -62,7 +62,7 @@
       "spec": "0d0d06d24294edb8cdcfe7959ded863facf038e0905d177e8f5fc5beaf5914fc",
       "uninstall": "d2b4fcc174ff83e5a483852edada57654b290c44d1f8dbb75da61545d7dd7358",
       "verify": "6b217be019a41dc82bba46f98844ea4c0b9fae378f6496e554313ced2c998710",
-      "wrapup": "7fb6ca8cabbe1ec69b9fddf86f98c11cef6862409fbb132b2f07dc40a8cac2fc"
+      "wrapup": "c901a8e477f700fa018b5ae03c077aa09e9ef9d71bbe6f9ed072e9f25809495f"
     }
   },
   "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",

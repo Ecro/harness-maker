@@ -876,12 +876,14 @@ If the user asks to push during wrapup, that is fine — but never push without 
 - PLAN frontmatter `status: complete` and zero `- [ ]` remain in the body.
 - Final verification pass GREEN before commit.
 
-**Immediately before the stage summary banner, show the Understanding result.** Branch on the
-`wrapup_land` receipt's `steps.understanding.status`: `ok` or `none` → print the block verbatim,
-re-read from the file you passed as `--message-file` (`wrapup_land` commits it unchanged) —
-never from memory, and never from a bare `HEAD`, which a peer's land can move. Any other status
-→ print the `[wrapup_land] understanding:` warning instead and say the commit carries no usable
-block; never present a block that did not land.
+**Immediately before the stage summary banner, show the Understanding result** from the
+`wrapup_land` receipt. `steps.understanding.status` is `ok` or `none` → print
+`steps.understanding_block` verbatim: it is the block as committed, HEAD's on a resume — take it
+from the receipt, never from memory, the message file or `HEAD` (a peer's land moves `HEAD`, and
+a resumed run's message file can differ from what landed). Any other status → print the
+`[wrapup_land] understanding:` warning and say the commit carries no usable block. The receipt
+has no `understanding` key (an older `wrapup_land`) → say the block was not checked and print
+none; never present a block that did not land.
 
 {% set summary_done = "Final checks + drift gate passed; single commit created; its `Understanding:` block verbatim (or the warning) is printed above" -%}
 {% set summary_artifact = "the commit + committed deliverables (PLAN/RESEARCH/REVIEW/SPEC)" -%}

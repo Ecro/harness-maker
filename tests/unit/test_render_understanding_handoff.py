@@ -95,19 +95,20 @@ def test_ac_005_closing_output_repeats_the_block(
     assert "`Understanding:` block verbatim" in done[0]
 
     # The instruction that produces the repeat, not only the Done-line phrase pointing at it:
-    # it sits after Step 8 and before the banner, reads an anchored source, and has a branch
-    # for the warn-only statuses (review confirm-2: bare HEAD races a peer land; a missing
-    # block must surface the warning rather than a claimed repeat).
+    # it sits after Step 8 and before the banner, prints the receipt's landed text (review:
+    # a bare HEAD races a peer land; the message file can differ from HEAD on a resume), has
+    # a branch for the warn-only statuses, and one for a receipt that predates the key.
     start = body.index("### Step 8")
     closing = _flat(body[start : body.index("> ✅ **Done:**")])
     for anchor in (
+        "steps.understanding_block",
         "steps.understanding.status",
-        "`--message-file`",
-        "never from memory",
-        "never from a bare `HEAD`",
+        "never from memory, the message file or `HEAD`",
         "`[wrapup_land] understanding:` warning",
+        "has no `understanding` key",
     ):
         assert anchor in closing, f"closing instruction lacks {anchor!r}"
+    assert "re-read from the file you passed as `--message-file`" not in closing
 
 
 @pytest.mark.parametrize(("preset", "wt_on"), ARMS, ids=ARM_IDS)

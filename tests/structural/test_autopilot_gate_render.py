@@ -28,6 +28,10 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-27, `understanding-handoff` follow-up** — wrapup's closing print reads
+  `steps.understanding_block` from the receipt and handles a receipt without the key. Only
+  `wrapup` moved, in all four arms; command sets and autonomy gates unchanged.
+
 - **2026-09-26, `understanding-handoff`** — wrapup Step 6 asks for the commit-body
   `Understanding:` block, which is printed again right before the closing banner (the `Done`
   line now points at it); execute Step 0's ADR item

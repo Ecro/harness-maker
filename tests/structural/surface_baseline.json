@@ -1,12 +1,12 @@
 {
   "aggregate_chars": {
-    "claude": 410665,
-    "codex": 364431
+    "claude": 410826,
+    "codex": 364592
   },
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus that variant's DISPATCH call-site form \u2014 'Task(subagent_type=' on claude, 'spawn_agent(agent_type=\"' on codex; fenced examples included, backticked prose excluded. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
-  "payload_digest": "8193601e334044f39631fc732720d2f3079aedb895386e90fbcc5f4456765e4b",
-  "render_sha": "ba55cb3f9051dd9aa9034e4d2129d21a30d6b086",
+  "payload_digest": "675b7b8323a38a22813ff2e0208743fe8a1a5b9f3ccf96324d0a7f3187b9d8ed",
+  "render_sha": "59a811d63dbbcfc619b544c9fe6e8d994fa7785f",
   "schema_version": 1,
   "surface": {
     "claude": {
@@ -63,7 +63,7 @@
         "round_trips": 12
       },
       "wrapup": {
-        "chars": 55404,
+        "chars": 55565,
         "round_trips": 33
       }
     },
@@ -101,7 +101,7 @@
         "round_trips": 11
       },
       "hm-wrapup": {
-        "chars": 56105,
+        "chars": 56266,
         "round_trips": 33
       }
     }

@@ -260,7 +260,9 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # 823/825 → 848/850 (understanding-handoff, 2026-09-26): +25, the `Steps 6 → 7.6` paragraph
 # and fenced example for the commit-body `Understanding:` block, and the instruction to print
 # it before the closing banner. Both arms, same delta.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 848), ("Production", 850)])
+# 848/850 → 850/852 (understanding-handoff follow-up, 2026-09-27): +2, the closing print
+# reads `steps.understanding_block` and handles a receipt without the key.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 850), ("Production", 852)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

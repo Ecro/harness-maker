@@ -34,3 +34,28 @@ checkout; `payload_digest` changes mechanically.
 | `_ATOMIC_RATCHET["wrapup"]` | 50649 | 52162 | re-based; the pre-review figure 51617 was 44 chars short of its ceiling |
 | delegate-OFF wrapup lines (Side / Production) | 823 / 825 | 848 / 850 | +25 in both arms |
 | `autopilot_gate_golden.json` | — | re-captured | only `execute` and `wrapup` moved, in all four arms; command sets unchanged |
+
+## Follow-up: closing print reads the receipt (2026-09-27)
+
+A focused confirmation review of the post-review fix found the closing print re-read the
+`--message-file`, which on a resumed run can differ from what landed, and had no branch for a
+receipt without the `understanding` key. `wrapup_land` now records the landed block as
+`steps.understanding_block`, and the closing instruction prints that. ADR-010 ownership and
+the ratchet-rebaselined-by-its-own-subject rule are unchanged: the behaviour is tested
+(`test_the_receipt_carries_the_landed_block_text_only_when_usable`,
+`test_resume_reports_the_committed_block_not_the_edited_file`, AC-005 anchors); the baseline
+only records cost.
+
+The aggregate grew (larger) again, from the landed `59a811d6`: Claude 410665 → 410826 (+161),
+Codex 364431 → 364592 (+161). `render_sha` and `payload_digest` move mechanically.
+
+| Variant | Subject | Before chars | After chars | Before trips | After trips |
+|---|---|---:|---:|---:|---:|
+| `claude` | `wrapup` | 55404 | 55565 | 33 | 33 |
+| `codex` | `hm-wrapup` | 56105 | 56266 | 33 | 33 |
+
+| Site | Before | After |
+|---|---:|---:|
+| `_ATOMIC_RATCHET["wrapup"]` | 52162 | 52323 |
+| delegate-OFF wrapup lines (Side / Production) | 848 / 850 | 850 / 852 |
+| `autopilot_gate_golden.json` | — | re-captured (`wrapup` only, all four arms) |

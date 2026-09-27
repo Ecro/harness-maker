@@ -612,7 +612,10 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # line, then anchored its source and added the branch). Re-based rather than left to
     # consume the next task's headroom. Attributed in
     # work-docs/BASELINE-DELTA-understanding-handoff.md.
-    "wrapup": 52162,
+    # 52162 → 52323 (understanding-handoff follow-up, 2026-09-27): +161, the closing print takes
+    # `steps.understanding_block` from the receipt (resume-safe) and handles a receipt without
+    # the key. Attributed in the same document.
+    "wrapup": 52323,
 }
 
 

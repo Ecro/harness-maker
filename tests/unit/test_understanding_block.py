@@ -173,6 +173,53 @@ def test_ac_003_resume_classifies_the_committed_body_not_an_edited_message_file(
     assert capsys.readouterr().err.count(_PREFIX) == 1
 
 
+_BLOCK_CASES = {
+    "ok": (
+        "feat(x): subject\n\nWhy.\n\nUnderstanding:\n\n- a -> b\n- unknown: c\n\n"
+        "Co-Authored-By: C <n@x>\n",
+        "Understanding:\n- a -> b\n- unknown: c",
+    ),
+    "none": ("feat(x): subject\n\nWhy.\n\nUnderstanding: none   \n", "Understanding: none"),
+    "missing": ("feat(x): subject\n\nWhy.\n", None),
+    "too_long": ("feat(x): subject\n\nUnderstanding:\n- a\n- b\n- c\n- d\n- e\n- f\n", None),
+    "malformed": ("feat(x): subject\n\nUnderstanding: none\n- stray\n", None),
+}
+
+
+@pytest.mark.parametrize("case", sorted(_BLOCK_CASES))
+def test_the_receipt_carries_the_landed_block_text_only_when_usable(
+    case: str, tmp_path: Path
+) -> None:
+    """The closing output prints `steps.understanding_block`, so it must be the landed text.
+
+    Confirmation review of the closing instruction: re-reading the message file (or a bare
+    HEAD) at print time can show a block that never landed. The receipt is the one place that
+    knows what was committed; an unusable block is reported as null, never as its raw lines.
+    """
+    message, expected = _BLOCK_CASES[case]
+    _, receipt, _, _ = _land(tmp_path, message)
+    assert receipt["steps"]["understanding"]["status"] == case
+    assert receipt["steps"]["understanding_block"] == expected
+
+
+def test_resume_reports_the_committed_block_not_the_edited_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On `already-present`, the block to print is HEAD's — the one `task-land` will reuse."""
+    base, task = _repo_with_task(tmp_path)
+    msg = tmp_path / "msg.txt"
+    msg.write_text("feat(x): subject\n\nUnderstanding:\n- landed -> yes\n", encoding="utf-8")
+    monkeypatch.setattr(wt, "_cli_post_commit_pop", lambda _a: 1)
+    wrapup_land.run(_args(task, base, msg))
+
+    msg.write_text("feat(x): subject\n\nUnderstanding:\n- rewritten -> later\n", encoding="utf-8")
+    monkeypatch.setattr(wt, "_cli_post_commit_pop", lambda _a: 0)
+    _, r2 = wrapup_land.run(_args(task, base, msg))
+
+    assert r2["steps"]["commit"]["status"] == "already-present"
+    assert r2["steps"]["understanding_block"] == "Understanding:\n- landed -> yes"
+
+
 # ── AC-008 — the committed body is the supplied message ───────────────────────
 
 
