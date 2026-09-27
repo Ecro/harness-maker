@@ -4,7 +4,7 @@ harness_maker_version: 0.60.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 29725ad5f5dc7a92e6d845f060e13697cd823efd51f7e8114b7ffb9d0aea996e
+content_hash: e757ce2300eb7ec23d910c2356e81da78d6f7e5a8fdd872ff61d8e575bec6fb4
 ---
 preset: Production
 locale: ko
@@ -176,7 +176,7 @@ economics:
   span_max_turns: 400
   span_max_min: 240.0
 delegation:
-  stages: ["wrapup"]
+  stages: ["wrapup", "verify"]
 loop:
   # /hm:loop + /hm:loop-p5-batch. false = not rendered; set true and run /hm:make to enable.
   enabled: true
