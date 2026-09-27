@@ -287,14 +287,17 @@ def _staged_paths(worktree: Path) -> list[str]:
     return [ln for ln in r.stdout.splitlines() if ln.strip()]
 
 
-def _head_subject(worktree: Path) -> str:
-    r = _git(worktree, "log", "-1", "--pretty=%s")
-    return r.stdout.strip() if r.returncode == 0 else ""
+def _head_message(worktree: Path) -> tuple[str, str]:
+    """HEAD's subject and full body from ONE read.
 
-
-def _head_body(worktree: Path) -> str:
-    r = _git(worktree, "log", "-1", "--format=%B")
-    return r.stdout if r.returncode == 0 else ""
+    The resume decision (subject) and the classified body must describe the same commit;
+    two `git log` calls let HEAD move between them.
+    """
+    r = _git(worktree, "log", "-1", "--format=%s%x00%B")
+    if r.returncode != 0 or "\x00" not in r.stdout:
+        return "", ""
+    subject, body = r.stdout.split("\x00", 1)
+    return subject.strip(), body
 
 
 # ── the composite ─────────────────────────────────────────────────────────────
@@ -398,25 +401,29 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         if r.returncode != 0:
             raise LandAbortError(f"git commit failed: {r.stderr.strip()}")
         receipt["steps"]["commit"] = {"status": "created", "subject": subject}
-    elif _head_subject(worktree) == subject:
+        landed = message
+    else:
+        head_subject, head_body = _head_message(worktree)
+        if head_subject != subject:
+            raise LandAbortError(
+                "nothing is staged and HEAD is not this commit — refusing to commit an empty "
+                f"index (HEAD subject: {head_subject!r})"
+            )
         # Resume after a failed pop: the commit already happened, so re-committing would
         # add an empty duplicate. Skipping is what makes a retry safe to run.
         receipt["steps"]["commit"] = {"status": "already-present", "subject": subject}
-    else:
-        raise LandAbortError(
-            "nothing is staged and HEAD is not this commit — refusing to commit an empty "
-            f"index (HEAD subject: {_head_subject(worktree)!r})"
-        )
-
-    # Classify what actually landed: on a resume that is HEAD's body, which `task-land` will
-    # reuse — not a message file that may have been edited since the commit happened.
-    landed = message if receipt["steps"]["commit"]["status"] == "created" else _head_body(worktree)
+        # Classify what actually landed — HEAD's body, which `task-land` will reuse — not a
+        # message file that may have been edited since the commit happened.
+        landed = head_body
     understanding = check_understanding_block(landed)
     receipt["steps"]["understanding"] = understanding.as_json()
     receipt["steps"]["understanding_block"] = understanding.text
     problem = _UNDERSTANDING_PROBLEMS.get(understanding.status)
     if problem is not None:
-        print(f"{_UNDERSTANDING_WARN} {problem} (commit proceeds)", file=sys.stderr)
+        print(
+            f"{_UNDERSTANDING_WARN} {problem} (warning only — the commit is unaffected)",
+            file=sys.stderr,
+        )
 
     owned = wt._owned_crumb_read(base, args.slug)
     receipt["steps"]["owned_uuids"] = sorted(owned)

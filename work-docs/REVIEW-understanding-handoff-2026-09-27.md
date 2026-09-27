@@ -134,3 +134,15 @@ Carried open for a human sweep (P2/P3, not grade-bearing): stale warning wording
 `(commit proceeds)` (542b4c78b72ec41b); TOCTOU subject/body read on resume; AC-008 lacks
 `missing`/`none` and double-blank-line cases; quadratic blank-line skip (789be9036c14d74e /
 codex 5c8cd231ab250bd7); AC-005 same-author literal note (f73d3cca15df1b78).
+
+## Follow-ups after landing (2026-09-27)
+
+- `67faab2c` — focused confirmation of the two confirm-2 P1 fixes found the closing print still
+  re-read the message file (differs from the landed body on a resume) and had no branch for a
+  receipt without the key. `wrapup_land` now records `steps.understanding_block`; the closing
+  print uses it. Quadratic blank-line skip (789be9036c14d74e) fixed on the way.
+- Carried P2s resolved: stale warning wording (542b4c78b72ec41b) → "(warning only — the commit
+  is unaffected)"; resume TOCTOU → HEAD's subject and body come from one `git log` read;
+  AC-008 gains `missing`/`none` and a git-cleanup case.
+- The round-3 payload reconstructed in `67faab2c` was removed and recorded in
+  `_KNOWN_MISSING` instead, with the other 12 pre-existing misses the local gate listed.

@@ -145,6 +145,10 @@ def test_ac_003_wrapup_land_warns_without_blocking(
     assert receipt["steps"]["commit"]["status"] == "created"
     assert receipt["steps"]["understanding"] == row.expected
     assert _git(task, "rev-list", "--count", "HEAD").stdout.strip() == "2"
+    # The warning prints after the commit decision, so its wording must not predict it.
+    assert "(commit proceeds)" not in stderr
+    if expected_lines:
+        assert "the commit is unaffected" in stderr
 
 
 def test_ac_003_resume_classifies_the_committed_body_not_an_edited_message_file(
@@ -220,6 +224,37 @@ def test_resume_reports_the_committed_block_not_the_edited_file(
     assert r2["steps"]["understanding_block"] == "Understanding:\n- landed -> yes"
 
 
+def test_resume_reads_head_once_for_both_the_decision_and_the_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The `already-present` decision and the classified body must describe one commit.
+
+    Two separate `git log` reads let HEAD move between them (a peer `task-refresh`, a stray
+    retry), so the decision and the block could come from different commits.
+    """
+    base, task = _repo_with_task(tmp_path)
+    msg = tmp_path / "msg.txt"
+    msg.write_text("feat(x): subject\n\nUnderstanding:\n- a -> b\n", encoding="utf-8")
+    monkeypatch.setattr(wt, "_cli_post_commit_pop", lambda _a: 1)
+    wrapup_land.run(_args(task, base, msg))
+
+    reads: list[tuple[str, ...]] = []
+    real_git = wrapup_land._git
+
+    def counting_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        if args[:1] == ("log",):
+            reads.append(args)
+        return real_git(root, *args)
+
+    monkeypatch.setattr(wrapup_land, "_git", counting_git)
+    monkeypatch.setattr(wt, "_cli_post_commit_pop", lambda _a: 0)
+    _, r2 = wrapup_land.run(_args(task, base, msg))
+
+    assert r2["steps"]["commit"]["status"] == "already-present"
+    assert r2["steps"]["understanding_block"] == "Understanding:\n- a -> b"
+    assert len(reads) == 1, f"HEAD was read {len(reads)} times: {reads}"
+
+
 # ── AC-008 — the committed body is the supplied message ───────────────────────
 
 
@@ -230,6 +265,9 @@ _PRESERVATION_CASES = {
     "too_long": "feat(x): subject\n\nWhy.\n\nUnderstanding:\n- a\n- b\n- c\n- d\n- e\n- f",
     "empty": "feat(x): subject\n\nWhy.\n\nUnderstanding:",
     "malformed": "feat(x): subject\n\nWhy.\n\nUnderstanding: none\n- stray bullet",
+    # The status where an implementation is most tempted to "repair" by injecting a default.
+    "missing": "feat(x): subject\n\nWhy only.",
+    "none": "feat(x): subject\n\nWhy.\n\nUnderstanding: none",
 }
 
 
@@ -243,6 +281,36 @@ def test_ac_008_wrapup_land_commits_the_supplied_message_unchanged(
     assert receipt["steps"]["understanding"]["status"] == case
     committed = _git(task, "log", "-1", "--format=%B").stdout
     assert committed.rstrip() == msg.read_text(encoding="utf-8").rstrip()
+
+
+def _git_default_cleanup(text: str) -> str:
+    """git's documented cleanup for a `-m` message: strip trailing whitespace per line,
+    collapse runs of blank lines to one, and drop leading/trailing blank lines."""
+    out: list[str] = []
+    for line in (ln.rstrip() for ln in text.splitlines()):
+        if not line and (not out or not out[-1]):
+            continue
+        out.append(line)
+    while out and not out[-1]:
+        out.pop()
+    return "\n".join(out)
+
+
+def test_ac_008_git_cleanup_is_the_only_change_to_the_committed_body(tmp_path: Path) -> None:
+    """`unchanged` means unchanged by wrapup_land: git's own `-m` cleanup is the one rewrite.
+
+    A body with consecutive blank lines and trailing spaces is where the two could diverge,
+    so the committed body is compared against git's documented rule applied to the file.
+    """
+    message = (
+        "feat(x): subject\n\n\nWhy.   \n\n\nUnderstanding:\n\n\n- a -> b  \n"
+        "- unknown: c\n\n\n" + _TRAILER.lstrip("\n")
+    )
+    _, receipt, task, msg = _land(tmp_path, message)
+    assert receipt["steps"]["understanding"] == {"status": "ok", "bullets": 2}
+    committed = _git(task, "log", "-1", "--format=%B").stdout
+    assert _git_default_cleanup(committed) == _git_default_cleanup(msg.read_text(encoding="utf-8"))
+    assert committed.rstrip() == _git_default_cleanup(msg.read_text(encoding="utf-8"))
 
 
 # ── AC-004 — task_land keeps the block on the base branch ─────────────────────

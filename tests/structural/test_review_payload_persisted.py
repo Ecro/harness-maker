@@ -219,6 +219,106 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         )
         for n in (1, 2, 3)
     },
+    ("source-plan-steps", 2): (
+        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
+        "round-axis disagreement recorded above: the review's later work was a confirmation "
+        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
+        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
+        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
+        "nothing reconstructed."
+    ),
+    ("intent-layer-ops", 2): (
+        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
+        "round-axis disagreement recorded above: the review's later work was a confirmation "
+        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
+        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
+        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
+        "nothing reconstructed."
+    ),
+    ("assumption-entry-and-evidence-locator", 2): (
+        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
+        "round-axis disagreement recorded above: the review's later work was a confirmation "
+        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
+        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
+        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
+        "nothing reconstructed."
+    ),
+    ("assumption-entry-and-evidence-locator", 3): (
+        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
+        "round-axis disagreement recorded above: the review's later work was a confirmation "
+        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
+        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
+        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
+        "nothing reconstructed."
+    ),
+    ("mission-context-loop", 2): (
+        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
+        "round-axis disagreement recorded above: the review's later work was a confirmation "
+        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
+        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
+        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
+        "nothing reconstructed."
+    ),
+    ("ai-native-sdlc-vs-intent-world", 3): (
+        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
+        "round-axis disagreement recorded above: the review's later work was a confirmation "
+        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
+        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
+        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
+        "nothing reconstructed."
+    ),
+    ("dev-mode-removal", 2): (
+        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
+        "round-axis disagreement recorded above: the review's later work was a confirmation "
+        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
+        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
+        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
+        "nothing reconstructed."
+    ),
+    ("intent-vocabulary-and-owners", 3): (
+        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
+        "round-axis disagreement recorded above: the review's later work was a confirmation "
+        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
+        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
+        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
+        "nothing reconstructed."
+    ),
+    ("docs-release-sync", 2): (
+        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
+        "round-axis disagreement recorded above: the review's later work was a confirmation "
+        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
+        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
+        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
+        "nothing reconstructed."
+    ),
+    ("mutation-survivors-and-approval-p2s", 3): (
+        "no merged payload was persisted for ANY round of this slug (run efae9d5dd1a9): the "
+        "review ran — its REVIEW document and telemetry exist — but the Step 3.4 persist line "
+        "was skipped throughout, and no copy survives anywhere on disk. Recorded in the "
+        "2026-09-27 sweep; reconstructing from the REVIEW narrative would put post-hoc entries "
+        "in a corpus of captures."
+    ),
+    ("withdrawal-criterion-window", 2): (
+        "no merged payload was persisted for ANY round of this slug (run aeb96c3b0764): the "
+        "review ran — its REVIEW document and telemetry exist — but the Step 3.4 persist line "
+        "was skipped throughout, and no copy survives anywhere on disk. Recorded in the "
+        "2026-09-27 sweep; reconstructing from the REVIEW narrative would put post-hoc entries "
+        "in a corpus of captures."
+    ),
+    ("codex-plan-integration-repair", 1): (
+        "no merged payload was persisted for ANY round of this slug (run 692c4c590fe5): the "
+        "review ran — its REVIEW document and telemetry exist — but the Step 3.4 persist line "
+        "was skipped throughout, and no copy survives anywhere on disk. Recorded in the "
+        "2026-09-27 sweep; reconstructing from the REVIEW narrative would put post-hoc entries "
+        "in a corpus of captures."
+    ),
+    ("understanding-handoff", 3): (
+        "the confirm-1 repair round. Its findings came from the confirm-1 pass, which writes "
+        "lens files under `confirm-1/`, not a merged payload, and the terminal telemetry row "
+        "numbers the round 3. A payload reconstructed from those findings was committed in "
+        "67faab2c to clear this gate and removed the next commit: a reconstruction is exactly "
+        "what this corpus excludes, whatever its content."
+    ),
 }
 
 

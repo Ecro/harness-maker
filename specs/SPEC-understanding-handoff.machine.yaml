@@ -325,6 +325,9 @@ ac:
   test_ids:
   - tests/unit/test_understanding_block.py::test_ac_003_wrapup_land_warns_without_blocking
   - tests/unit/test_understanding_block.py::test_ac_003_resume_classifies_the_committed_body_not_an_edited_message_file
+  - tests/unit/test_understanding_block.py::test_resume_reads_head_once_for_both_the_decision_and_the_block
+  - tests/unit/test_understanding_block.py::test_the_receipt_carries_the_landed_block_text_only_when_usable
+  - tests/unit/test_understanding_block.py::test_resume_reports_the_committed_block_not_the_edited_file
   executable_predicate: result.returncode == baseline_returncode and result.stderr.count('[wrapup_land]
     understanding:') == (0 if expected['status'] in ('ok', 'none') else 1) and receipt['steps']['commit']['status']
     == 'created' and receipt['steps']['understanding'] == expected
@@ -460,6 +463,7 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_understanding_block.py::test_ac_008_wrapup_land_commits_the_supplied_message_unchanged
+  - tests/unit/test_understanding_block.py::test_ac_008_git_cleanup_is_the_only_change_to_the_committed_body
   executable_predicate: committed_body(repo).rstrip() == message_file.read_text().rstrip()
   golden_table: []
   rubric_id: null
