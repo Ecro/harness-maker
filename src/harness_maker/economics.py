@@ -27,8 +27,8 @@ if TYPE_CHECKING:
 # comment here claimed the table made "historical reports reproducible" — it never
 # did, and that claim is what made a wrong rate look safe to leave in place.) Both
 # labels move together: the version says WHICH table, the date says FROM WHEN.
-PRICE_TABLE_VERSION = "2"
-PRICE_TABLE_EFFECTIVE_DATE = "2026-07-27"
+PRICE_TABLE_VERSION = "3"
+PRICE_TABLE_EFFECTIVE_DATE = "2026-09-27"
 
 SpendCategory = Literal["REWORK", "VERIFY", "PRODUCE", "OTHER"]
 Scope = Literal["main", "subagent"]
@@ -91,9 +91,25 @@ PRICE_TABLE: dict[str, ModelPrice] = {
     "opus-4-7": _OPUS_4_5_PLUS,
     "opus-4-8": _OPUS_4_5_PLUS,
     "opus-5": _OPUS_4_5_PLUS,
+    # Opus 5.5 contains the `opus-5` key, so without its own row it resolved to 5/25
+    # with no family-priced trace. Its cache read is 0.05x, not 0.1x.
+    "opus-5-5": ModelPrice(
+        input=4.0, output=20.0, cache_read=0.2, cache_write_5m=5.0, cache_write_1h=8.0
+    ),
+    # Fable 5 and 5.1 share 10/50; 5.1 reads cache at 0.025x where 5 reads at 0.1x.
+    # Before these rows every Fable turn fell through to `price_model` (opus 15/75).
+    "fable-5": ModelPrice(
+        input=10.0, output=50.0, cache_read=1.0, cache_write_5m=12.5, cache_write_1h=20.0
+    ),
+    "fable-5-1": ModelPrice(
+        input=10.0, output=50.0, cache_read=0.25, cache_write_5m=12.5, cache_write_1h=20.0
+    ),
     "sonnet": _SONNET,
     "sonnet-4-5": _SONNET,
-    "sonnet-5": _SONNET,
+    # Sonnet 5 is published at 2/10 — it was priced at the 4.x 3/15 until table v3.
+    "sonnet-5": ModelPrice(
+        input=2.0, output=10.0, cache_read=0.2, cache_write_5m=2.5, cache_write_1h=4.0
+    ),
     # Pre-4.5 Haiku. The 0.25/1.25 this row carries is the Haiku 3 published rate — it
     # is NOT a stale value to overwrite. An earlier draft of this change edited it in
     # place to Haiku 4.5's 1/5, which repriced every older Haiku turn 4x: the same

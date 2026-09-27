@@ -25,8 +25,8 @@ from harness_maker.economics import (
 
 # The pre-change values, pinned here so the "changed" arms cannot silently become
 # no-ops if someone edits the constants without touching this file.
-_PRE_CHANGE_PRICE_TABLE_VERSION = "1"
-_PRE_CHANGE_PRICE_TABLE_EFFECTIVE_DATE = "2026-07-25"
+_PRE_CHANGE_PRICE_TABLE_VERSION = "2"
+_PRE_CHANGE_PRICE_TABLE_EFFECTIVE_DATE = "2026-07-27"
 
 
 def _turn_for(model: str) -> TurnRecord:
@@ -72,8 +72,8 @@ def test_opus5_rate_and_versioned_history() -> None:
     # VALUES, not `!=` relations — `PRICE_TABLE_VERSION = "banana"` satisfied a `!=`
     # arm, and a one-shot `!=` can never fire again after the first bump. Pinning means
     # the next rate edit must touch this file and cannot ship with a stale label.
-    assert PRICE_TABLE_VERSION == "2"
-    assert PRICE_TABLE_EFFECTIVE_DATE == "2026-07-27"
+    assert PRICE_TABLE_VERSION == "3"
+    assert PRICE_TABLE_EFFECTIVE_DATE == "2026-09-27"
     assert PRICE_TABLE_VERSION != _PRE_CHANGE_PRICE_TABLE_VERSION
     assert PRICE_TABLE_EFFECTIVE_DATE != _PRE_CHANGE_PRICE_TABLE_EFFECTIVE_DATE
     date.fromisoformat(PRICE_TABLE_EFFECTIVE_DATE)  # raises if not a real ISO date
@@ -212,3 +212,32 @@ def test_pre_4_5_opus_still_prices_at_the_legacy_rate() -> None:
     """
     assert PRICE_TABLE["opus"].input == 15.0
     assert PRICE_TABLE["opus"].output == 75.0
+
+
+def test_table_v3_rows_state_the_published_5x_rates() -> None:
+    """Sonnet 5, Opus 5.5 and Fable 5/5.1 at their published rates (table v3).
+
+    Rejects: v2, where `claude-sonnet-5` was priced at the 4.x 3/15, `claude-opus-5-5`
+    resolved through the `opus-5` substring at 5/25 with no family-priced trace, and
+    `claude-fable-5-1` matched no key and fell back to the legacy `opus` 15/75.
+    """
+    sonnet5 = _price_for("claude-sonnet-5")
+    assert (sonnet5.input, sonnet5.output, sonnet5.cache_read) == (2.0, 10.0, 0.2)
+    assert (sonnet5.cache_write_5m, sonnet5.cache_write_1h) == (2.5, 4.0)
+
+    assert resolve_model_family("claude-opus-5-5") == "opus-5-5"
+    opus55 = _price_for("claude-opus-5-5")
+    assert (opus55.input, opus55.output, opus55.cache_read) == (4.0, 20.0, 0.2)
+    assert (opus55.cache_write_5m, opus55.cache_write_1h) == (5.0, 8.0)
+
+    assert resolve_model_family("claude-fable-5-1") == "fable-5-1"
+    fable51 = _price_for("claude-fable-5-1")
+    assert (fable51.input, fable51.output, fable51.cache_read) == (10.0, 50.0, 0.25)
+    assert (fable51.cache_write_5m, fable51.cache_write_1h) == (12.5, 20.0)
+
+    # Fable 5 shares the rate card but reads cache at 0.1x — the 5.1 row must not
+    # be reachable from the bare 5 id.
+    assert resolve_model_family("claude-fable-5") == "fable-5"
+    assert _price_for("claude-fable-5").cache_read == 1.0
+
+    assert not price_turn(_turn_for("claude-fable-5-1")).priced_with_fallback

@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`hm economics report` priced three current models wrong (price table v3, 2026-09-27).**
+  `claude-sonnet-5` sat at the 4.x rate of 3/15 against a published 2/10, which overstated
+  every Sonnet-run reviewer by 1.5x. `claude-opus-5-5` contains the `opus-5` key, so it
+  resolved to 5/25 against a published 4/20 and left no family-priced trace. `claude-fable-5-1`
+  matched no key at all and fell back to the legacy `opus` 15/75 against 10/50. The table
+  gains `opus-5-5`, `fable-5` and `fable-5-1` rows and corrects `sonnet-5`, including the
+  lower cache-read multipliers (0.05x on Opus 5.5, 0.025x on Fable 5.1). Reports are
+  recomputed from raw transcripts, so re-running one reprices its historical window.
+
 ## [0.60.4] - 2026-09-27
 
 Re-release of 0.60.3 with one test fix. The v0.60.3 tag was pushed, but its release
