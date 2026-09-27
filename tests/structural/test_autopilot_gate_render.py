@@ -28,6 +28,13 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-28, verify delegation opt-in** — this repo's `harness.yaml` added `verify` to
+  `delegation.stages`, so the two `auto_safe@*` arms rendered from it gain verify's Step 0.5
+  (`hm wrapup_brief --stage verify`, the `stage-delegate` dispatch, `hm wrapup_receipt --stage
+  verify`). Only `verify` moved, in `auto_safe@warn` and `auto_safe@block`; the `ask@*` arms,
+  the command sets and the autopilot gate itself are unchanged. Dropping `verify` from the
+  list restores both previous hashes.
+
 - **2026-09-27, release 0.60.4** — same per-release case: 56 lines (14 commands × 4 arms), all the
   frontmatter `harness_maker_version:` key, and substituting `0.60.4` back to `0.60.3` reproduces
   every previous hash — checked across every arm, so no content moved. 0.60.3 never shipped: its
