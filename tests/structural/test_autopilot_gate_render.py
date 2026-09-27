@@ -28,6 +28,10 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-27, release 0.60.3** — same per-release case: 56 lines (14 commands × 4 arms), all the
+  frontmatter `harness_maker_version:` key, and substituting `0.60.3` back to `0.60.2` reproduces
+  every previous hash — checked across every arm, so no content moved.
+
 - **2026-09-27, `understanding-handoff` follow-up** — wrapup's closing print reads
   `steps.understanding_block` from the receipt and handles a receipt without the key. Only
   `wrapup` moved, in all four arms; command sets and autonomy gates unchanged.

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.60.3] - 2026-09-27
+
 ### Changed
 
 - **`/hm:loop` and `/hm:loop-p5-batch` are now opt-in via `harness.yaml`'s `loop.enabled`.**
