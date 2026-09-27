@@ -11,13 +11,13 @@ Workflow stages may load feedback without a separate mention; intent changes sti
 **Read freely, write only on an answer.** `hm intent status --json` is read-only, LLM-free and
 free to run whenever the operator asks where things stand. Mutation verbs write only after consent.
 
-Distinct nonblank `owners` roles trigger an advisory at approval, never a block.
-`approved_by` is an unverified git config string; real separation requires
-CODEOWNERS + branch protection. Empty or identical roles stay silent.
+Distinct nonblank `owners` roles trigger an advisory at approval, never a block. `approved_by` is
+an unverified git config string; real separation requires CODEOWNERS + branch protection. Empty or identical roles stay silent.
 
 One intent may serve multiple SPECs (1:N); the record is `intent/<ID>.md`.
-`hm intent migrate --json` preserves record body bytes, approvals and historical clocks;
-Run it before the first canonical write. Reads accept legacy files without rewriting them.
+`hm intent migrate --json` preserves record body bytes, approvals and historical clocks; Run it before the first canonical write. Reads accept legacy files without rewriting them.
+
+**Fact or question.** A claim that bears on an intent's metric or decision is an intent question (`hm intent question`, open → confirmed or wrong); any other domain fact is a `[wiki:fact]`. Record each claim in one place only and link to it from the other. Other facts belong to the project-knowledge skill; cite one with `--locator .claude/memory/wiki.md:<A-B>`.
 
 Workflow feedback: read and follow `references/workflow-feedback.md` at workflow triggers.
 
@@ -46,7 +46,7 @@ reports `stale_evidence` when that text changed (approval checks never read cite
 1. Work out the verb and its arguments from what the operator said; read `status` first when
    an id is ambiguous.
 2. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}, showing the exact arguments
-   you are about to pass.
+   you are about to pass; compose `--claim`/`--text`/`--note` yourself, single-quoted, with no quote, backtick or `$` inside.
 3. On an affirmative answer, run the write once with those arguments and show the CLI's
    `changed:` line.
 4. Otherwise — on any other answer or no answer — write nothing. Do not retry, rephrase or infer consent.

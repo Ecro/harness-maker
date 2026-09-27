@@ -1,7 +1,6 @@
 """Unit tests for memory_retrieve — markdown loader for .claude/memory/{wiki,failures}.md.
 
-Distinct from harness_maker.memory.retrieval.MemoryRetriever (JSONL 3-layer store);
-this module handles the markdown wiki/failures files surfaced to research/plan/spec.
+Covers the markdown wiki/failures files surfaced to research/plan/spec.
 """
 
 from __future__ import annotations

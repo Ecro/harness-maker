@@ -28,6 +28,19 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-27, `sdlc-three-loops-gap` (review confirm-1 repair)** — `wrapup` alone moved, in all
+  four arms: Step 5.7's Claude-branch `hm intent question add/observe` and `hm intent close`
+  calls now single-quote `--claim` / `--text` / `--note` (they were double-quoted, so `$(...)` or
+  a backtick in operator text would expand), matching the Codex branch. Net 0 characters, so no
+  `surface_allowance` was declared. Verified before re-capture that `wrapup` is the ONLY moved
+  command in every arm and that no command was added or removed. Re-captured again in the same
+  task (re-review confirm-1): the two Step 5.7 run lines now say `(no `'` inside)` next to the
+  calls, reworded from existing text for a net −8 characters — `wrapup` again the only moved
+  command in every arm.
+  Re-captured a third time (re-review confirm-2): the Step 5.7 `add` intro gained the same cue,
+  paid for by trimming its `--locator` wording (net −4 overall) — `wrapup` the only moved command.
+  Rebased onto the 2026-09-28 verify re-capture below and re-captured on top of it: `wrapup`
+  (all four arms) is the only command whose hash differs from that entry.
 - **2026-09-28, verify delegation opt-in** — this repo's `harness.yaml` added `verify` to
   `delegation.stages`, so the two `auto_safe@*` arms rendered from it gain verify's Step 0.5
   (`hm wrapup_brief --stage verify`, the `stage-delegate` dispatch, `hm wrapup_receipt --stage

@@ -597,10 +597,10 @@ Print `[intent] not in use` and skip this step when `.claude/intent.yaml` is abs
 
 <!-- @hm:answer-gated:assumption -->
 Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Did this task confirm, supersede or contradict a recorded question — or show one worth recording?"** — four options at most: at most two question ids from `hm intent status --json`'s `open_questions`, those in its `stale_evidence` first and labelled **"(cited code changed)"**; **"new — record a question"**; **"no"**. Name any other ids in the question text for the operator to type via Other.
-If the answer is "yes": (an id was named, or "new") run ONCE, with the arguments the operator confirmed — for an id:
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text '<what was observed>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim '<new claim>' — required when the relation is supersedes]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text "<what was observed>" --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim "<new claim>" — required when the relation is supersedes]{% endif %}
-— for "new": first show the exact `add` arguments you propose (id, claim, status; `--text`/`--observed-at`, and `--locator` citing ≤ 40 lines of the code the claim rests on) and ask once more with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}; run only on "yes", otherwise write nothing:
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim '<claim>' --status <open|confirmed|wrong> [--text '<why>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim "<claim>" --status <open|confirmed|wrong> [--text "<why>" --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]{% endif %}
+If the answer is "yes": (an id was named, or "new") run ONCE, with the confirmed arguments (no `'` inside) — for an id:
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text '<what was observed>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim '<new claim>' — required when the relation is supersedes]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text '<what was observed>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim '<new claim>' — required when the relation is supersedes]{% endif %}
+— for "new": first show the exact `add` arguments you propose (id, claim, status; `--text`/`--observed-at`, and `--locator` citing ≤ 40 lines the claim rests on) and ask once more with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}; run only on "yes" (no `'` inside), otherwise write nothing:
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim '<claim>' --status <open|confirmed|wrong> [--text '<why>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim '<claim>' --status <open|confirmed|wrong> [--text '<why>' --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]{% endif %}
 Otherwise: write nothing.
 <!-- /@hm:answer-gated -->
 
@@ -613,8 +613,8 @@ Otherwise: write nothing.
 
 <!-- @hm:answer-gated:objective-close -->
 Only when the PLAN frontmatter carries `intent: <id>` (or legacy `objective: <id>`; reject conflicts). Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Close intent <id> now?"** — options: **"yes — met"**, **"yes — missed"**, **"yes — no_data"**, **"no, keep it open"**.
-If the answer is "yes": run ONCE, with the observed value chosen and a one-line note from the operator:
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent close <id> --observed <met|missed|no_data> --note '<operator note>'"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent close <id> --observed <met|missed|no_data> --note "<operator note>"{% endif %}
+If the answer is "yes": run ONCE, with the chosen value and a one-line note (no `'` inside):
+{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent close <id> --observed <met|missed|no_data> --note '<operator note>'"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent close <id> --observed <met|missed|no_data> --note '<operator note>'{% endif %}
 Otherwise: write nothing.
 <!-- /@hm:answer-gated -->
 

@@ -1,4 +1,4 @@
-"""Cross-process file lock for index-shape stores (semantic, profile).
+"""Cross-process file lock for the markdown memory tiers written by `memory_md`.
 
 POSIX `fcntl.flock(LOCK_EX)` serializes the read-modify-write block so two
 concurrent sessions cannot race against each other. On platforms without
@@ -7,9 +7,9 @@ the harness primarily targets POSIX-compatible environments (Linux, macOS,
 WSL2) so the no-op path is acceptable graceful degradation, not the
 default execution path.
 
-**Lock files are permanent sentinels by design.** They accumulate one per
-protected store directory (``index.lock``, ``profile.lock``), never grow
-individually, and are never auto-deleted. Cleanup is the operator's
+**Lock files are permanent sentinels by design.** There is one per protected
+tier (``.session.lock``, ``.wiki.lock``, ``.failures.lock``); they never grow
+and are never auto-deleted. Cleanup is the operator's
 responsibility — `find .claude/memory -name '*.lock' -mtime +30 -delete`
 is safe at any time since the file holds no data, only the flock anchor.
 """

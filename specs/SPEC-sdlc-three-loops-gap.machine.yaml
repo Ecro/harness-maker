@@ -1,0 +1,202 @@
+schema_version: 3
+spec_slug: sdlc-three-loops-gap
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Deletion plus template prose; no new logic to mutate.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Dead memory tier modules removed
+  type: mechanical
+  test_ids:
+  - tests/unit/test_memory_tier_removed.py::test_dead_tier_not_importable
+  - tests/unit/test_memory_tier_removed.py::test_no_imports_remain
+  executable_predicate: all(find_spec(f"harness_maker.memory.{m}") is None for m in
+    ("episodic", "semantic", "profile", "retrieval")) and not ast_uses(REMOVED_NAMES,
+    exclude=SELF_TEST)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Module and class list comes from the RESEARCH census and memory/__init__.py
+    __all__, fixed before any code change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: memory_md write paths still take the lock
+  type: mechanical
+  test_ids:
+  - tests/unit/test_memory_tier_removed.py::test_memory_md_writes_take_lock
+  - tests/unit/test_memory/test_locking.py
+  executable_predicate: all(lock_calls[path] >= 1 for path in ("upsert_wiki", "append_failure",
+    "append_session"))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: memory_md.py acquires exclusive_lock at lines 119, 271 and 699
+    today (observed before the change); the deleted test_semantic.py was the only
+    caller-acquires-lock test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Legacy memory-tier dirs stay harness churn
+  type: mechanical
+  test_ids:
+  - tests/unit/test_worktree_churn_pollution.py::test_is_harness_artifact_recognizes_churn
+  - tests/unit/test_worktree_task_lifecycle.py::test_path_owner_machine_memory_tiers_are_operational
+  - tests/unit/test_memory_tier_removed.py::test_churn_dirs_retained
+  executable_predicate: '{".claude/memory/semantic/", ".claude/memory/episodic/",
+    ".claude/memory/profile/"} <= set(_HARNESS_CHURN_DIRS)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: DRI decision in Round 2 (keep); the pre-existing churn classification
+    tests predate this change and parametrize these exact paths.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Boundary rule rendered in both skills
+  type: mechanical
+  test_ids:
+  - tests/unit/test_memory_tier_removed.py::test_boundary_rule_in_both_skills
+  executable_predicate: BOUNDARY_RULE in project_knowledge_md and BOUNDARY_RULE in
+    intent_layer_md and "intent-layer" in project_knowledge_md and "project-knowledge"
+    in intent_layer_md
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The sentence is locked verbatim in the SPEC from the DRI's Round
+    2 choice, not derived from the templates.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: project-knowledge routes intent-bearing claims to intent-layer
+  type: mechanical
+  test_ids:
+  - tests/unit/test_memory_tier_removed.py::test_project_knowledge_routes_intent_claims
+  executable_predicate: '"intent-layer" in pk_description and "intent-layer" in pk_procedure
+    and "--locator .claude/memory/wiki.md" in project_knowledge_md'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: consensus
+  oracle_evidence: Required strings are locked in S4 of this SPEC; full-text consistency
+    is judged by the independent /hm:review reviewers plus the Codex voter, not by
+    the author.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Removal and window effect recorded in CHANGELOG
+  type: mechanical
+  test_ids: []
+  executable_predicate: all(name in unreleased_changelog for name in ("EpisodicStore",
+    "SemanticStore", "ProfileStore", "MemoryRetriever", "wiki_fact_entries_28d"))
+  golden_table: []
+  rubric_id: null
+  note: One-time wrapup check, deliberately not a permanent test; the [Unreleased]
+    section is renamed at release.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Class names copied from memory/__init__.py __all__ before deletion
+    (IRR-001); metric id from .claude/intent.yaml.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Remove EpisodicStore, SemanticStore, ProfileStore, MemoryRetriever from
+    the published harness_maker.memory package
+  category: public API/CLI contract
+  rationale: Names disappear from a PyPI release; restoring them later is a new release,
+    not an undo.
+  source: spec
+approval:
+  kind: human
+  content_hash: 3ffdf089424a0ece82e863f3eeeebb5c2e0d564e3c96e2c660f9708dd558d045
+  approved_by: Ecro
+  approved_at: '2026-09-27T08:06:42Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 4c77c05c62f79515d21cff9ef689a6378f70e54a1a5b978597407c710b01c953
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: afa4afd616f3601a114710a00e2621d9e54c7e75212e6b7a2fc6906ca9688cf3
+    irreversible_decisions: 2c1052dc44e7a37d154c3d408884c362c926dcd4c3ba4a5d0f215b868e95eefe
+    AC-001: acab8fac39b3dedebaa06ede59fb62a698de65353d13e126b8d356feb9743db5
+    AC-002: 7ee5b9341ce8c52403d9175e0eba213f3ffb1c8197a75238093af937f6bee736
+    AC-003: 67efadc193cf3292ff2d568fb8748e594a206cd7a26ee4576067014e0108682e
+    AC-004: 6f43dac324a2b64a3f5838b1762fc1178c0ee648e4ba250d034a7ab6eac3f0e0
+    AC-005: 2dd7f12f3169cb5d1e1829e5b708a37388e283f21e17ce91e6395d3fefe9c795
+    AC-006: 9f77e9f11a178896c164ba8cda469381963cde9160b4dec2d93a441b335f7216
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923

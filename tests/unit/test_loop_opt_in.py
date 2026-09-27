@@ -34,6 +34,10 @@ from harness_maker.synthesize import synthesize
 
 _REPO = Path(__file__).resolve().parents[2]
 _BASE_COMMIT = "055cce85"
+# The commit that made loop opt-in and regenerated the (loop-off) snapshots. A path whose
+# off-render changed after it was changed by later, unrelated work, so the pre-change pin at
+# _BASE_COMMIT no longer describes it; such a path is judged against the current snapshot instead.
+_OPT_IN_COMMIT = "18714dd1"
 
 LOOP_CLAUDE = {".claude/commands/hm/loop.md", ".claude/commands/hm/loop-p5-batch.md"}
 LOOP_CODEX = {".agents/skills/hm-loop/SKILL.md", ".agents/skills/hm-loop-p5-batch/SKILL.md"}
@@ -217,7 +221,27 @@ def test_ac003_enabled_matches_pre_change_snapshots(fixture: str, tmp_path: Path
     sys.path.insert(0, str(_REPO / "tests" / "snapshot"))
     from regenerate import is_excluded, load_exclusions
 
-    reference = yaml.safe_load(_git_show(_BASE_COMMIT, f"tests/snapshot/{fixture}.expected.yaml"))
+    snapshot = f"tests/snapshot/{fixture}.expected.yaml"
+    reference = yaml.safe_load(_git_show(_BASE_COMMIT, snapshot))
+    base = {r["path"]: r["body_sha256"] for r in reference["files"]}
+    at_opt_in = {
+        r["path"]: r["body_sha256"]
+        for r in yaml.safe_load(_git_show(_OPT_IN_COMMIT, snapshot))["files"]
+    }
+    now_rows = {
+        r["path"]: r
+        for r in yaml.safe_load((_REPO / snapshot).read_text(encoding="utf-8"))["files"]
+    }
+    now = {path: r["body_sha256"] for path, r in now_rows.items()}
+    moved = {path for path in at_opt_in.keys() | now.keys() if at_opt_in.get(path) != now.get(path)}
+    # Paths whose render depends on loop.enabled are the ones the opt-in commit itself changed.
+    loop_sensitive = {
+        path for path in base.keys() | at_opt_in.keys() if base.get(path) != at_opt_in.get(path)
+    }
+    # A moved loop-insensitive path renders the same with the loop on or off, so its loop-ON
+    # expectation is today's loop-OFF snapshot. A moved loop-SENSITIVE path has no committed
+    # loop-ON expectation at all: fail here so it is handled deliberately, never dropped silently.
+    assert not moved & loop_sensitive, sorted(moved & loop_sensitive)
     p = profile(_REPO / "tests" / "fixtures" / fixture)
     a = interview(p, autoloop_mode=True).model_copy(
         update={"loop": models.LoopConfig(enabled=True)}
@@ -233,7 +257,16 @@ def test_ac003_enabled_matches_pre_change_snapshots(fixture: str, tmp_path: Path
         ),
         key=lambda x: x["path"] or "",
     )
-    expected = reference["files"]
+    expected = sorted(
+        (
+            now_rows[r["path"]] if r["path"] in moved else r
+            for r in reference["files"]
+            if not (r["path"] in moved and r["path"] not in now_rows)
+        ),
+        key=lambda x: x["path"] or "",
+    )
+    expected += [now_rows[path] for path in sorted(moved - base.keys()) if path in now_rows]
+    expected.sort(key=lambda x: x["path"] or "")
 
     def strip(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [r for r in rows if r["path"] != "harness.yaml"]

@@ -1,9 +1,8 @@
 """Markdown retrieval for .claude/memory/{wiki,failures}.md → research/plan/spec stages.
 
-Distinct from ``harness_maker.memory.retrieval.MemoryRetriever`` (JSONL 3-layer
-episodic/semantic/profile store, ADR-002 MemMachine pattern). This module
-parses the markdown wiki/failures index files and surfaces top-K relevant
-entries to the stage-template-hosting Claude turn for inline semantic rerank.
+This module parses the markdown wiki/failures index files and surfaces top-K
+relevant entries to the stage-template-hosting Claude turn for inline semantic
+rerank.
 
 PLAN-memory-md-operations Phase 1. The Python layer here owns deterministic
 lexical pre-filtering only; semantic top-K selection happens prompt-natively

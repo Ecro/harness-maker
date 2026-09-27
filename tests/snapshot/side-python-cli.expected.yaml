@@ -85,7 +85,7 @@ files:
   body_sha256: 2fba6aa40e800f4075d7be4584b5d918f14c9716c5af19d5bfb898100a1972a4
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 505cc5a43defcb2efcfaed70c4e24132308a708036667b28799420b9d2e80b1f
+  body_sha256: 68d9f5e87a32a0d153a3d0c43153410dc85ed86cf9029b6aa56814bd711197f8
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: 97f65e124061869449cc394fe78eb31d6a1d2c410401d36a29fd50b251e60452
@@ -133,13 +133,13 @@ files:
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 - path: skills/intent-layer/SKILL.md
   template: skills/intent-layer/SKILL.md.j2
-  body_sha256: 32c29805fbfce66daecdf54e0d0701363567e1e0408d05a8b8d961ffa61a69a1
+  body_sha256: c8d41ef59ea4ea16c945b31201700728c8b55e54d775dee156dd437936b873dd
 - path: skills/intent-layer/references/workflow-feedback.md
   template: skills/intent-layer/references/workflow-feedback.md.j2
   body_sha256: e25c9f36adffbe5dde866a3094094b46367122c6ad99ad865ba3163f6a61b473
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
-  body_sha256: 3917bfb9902dad068aa9d267375e85eb27fe2724da184e71fbcc4c5966756210
+  body_sha256: e800e0ea086e32a898ed2b0a23781fb9fbb0a4421569b68199d22f282f25acce
 - path: skills/refdocs-search/SKILL.md
   template: skills/refdocs-search/SKILL.md.j2
   body_sha256: cc7d9e2c7dbc02ded11f10bf3acdc9132aba55794452d933a8397d90fe8c8380
@@ -175,4 +175,4 @@ files:
   body_sha256: 2b612fad991591c94746c856971d38626134476ad94d3a8d82279e23ed61c61d
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 77eac7f0326cbf33619cdaf62697baa36095cc7854f16305c307a6db9049a44a
+  body_sha256: 6567104b97e75b3cae105b629737001967face74f67b87d40e92154395d9bb62
