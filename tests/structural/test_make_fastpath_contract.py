@@ -47,6 +47,10 @@ _DISCLOSED_AXES: frozenset[str] = frozenset(
         # types the review oracle will run checks on at all, so a user who never learns it
         # exists cannot tell an honestly-empty oracle from a broken one.
         "toolchains",
+        # SPEC-loop-opt-in AC-006: `false` on a fresh install, never asked. Set without a
+        # question, so a fast-path user needs the disclosure row to learn `/hm:loop` exists
+        # and how to turn it on.
+        "loop",
     }
 )
 

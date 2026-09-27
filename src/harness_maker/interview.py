@@ -53,6 +53,7 @@ from harness_maker.models import (
     FeedbackConfig,
     InstrumentationConfig,
     InterviewAnswers,
+    LoopConfig,
     PermissionsConfig,
     Preset,
     ProjectProfile,
@@ -746,8 +747,9 @@ def _build_answers(
     instrumentation: InstrumentationConfig | None = None,
     worktree_enabled: bool | None = None,
     toolchains: list[ToolchainConfig] | None = None,
+    loop: LoopConfig | None = None,
     comprehension_depth: str | None = None,
-    schema_version: int = 5,
+    schema_version: int = 6,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
     extras = _preset_extras(preset, schema_version=schema_version)
@@ -772,6 +774,7 @@ def _build_answers(
         second_brain=second_brain if second_brain is not None else SecondBrainConfig(),
         second_opinion=(second_opinion if second_opinion is not None else SecondOpinionConfig()),
         toolchains=list(toolchains) if toolchains else [],
+        loop=loop if loop is not None else LoopConfig(),
         reviewers={
             "installed": list(_ALL_REVIEWERS),
             "enabled": list(_SIDE_ENABLED_REVIEWERS if is_side else _PROD_ENABLED_REVIEWERS),
@@ -895,7 +898,7 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     # silently return provenance keys as user data on truncated writes.
     try:
         data = load_harness_yaml(yaml_path)
-    except (OSError, yaml.YAMLError):
+    except (OSError, UnicodeError, yaml.YAMLError):
         return None
     if not isinstance(data, dict) or not data:
         return None
@@ -1009,6 +1012,8 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         "permissions": permissions,
         "autonomy": _parse_autonomy(data.get("autonomy")),
         "instrumentation": _parse_instrumentation(data.get("instrumentation")),
+        # SPEC-loop-opt-in: a file that predates the key keeps the loop; malformed raises.
+        "loop": LoopConfig(enabled=parse_loop(data.get("loop", _ABSENT))),
         "sibling_repos": sibling_repos,
         "wrapup_docs": wrapup_docs,
         "reviewers": {
@@ -1439,6 +1444,37 @@ def _parse_second_brain(value: object) -> SecondBrainConfig:
     except Exception as e:  # noqa: BLE001 — tolerant upgrade path like mcp_servers
         logger.warning("harness.yaml second_brain: invalid config ignored (%s).", e)
         return SecondBrainConfig()
+
+
+class LoopConfigError(ValueError):
+    """A present `loop` block that is not `{enabled: <bool>}` (SPEC-loop-opt-in AC-011)."""
+
+
+_ABSENT = object()
+
+
+def parse_loop(value: object) -> bool:
+    """Existing-file meaning of the `loop` block: absent or `{}` keeps the loop ON.
+
+    Unlike the tolerant blocks around it, a malformed value RAISES. It is the only way to
+    turn the loop off in an existing harness, so resolving `enabled: "false"` to either
+    bool silently reverses or silently ignores the user's choice (IRR-002).
+    """
+    if value is _ABSENT:
+        return True
+    if not isinstance(value, dict):
+        raise LoopConfigError(f"harness.yaml `loop` must be a mapping, got {value!r}")
+    # YAML allows non-string keys (`1: true`), so sort and print by repr rather than
+    # letting sorted()/join() raise a TypeError the CLI does not catch.
+    unknown = sorted(repr(k) for k in value if k != "enabled")
+    if unknown:
+        raise LoopConfigError(f"harness.yaml `loop` has unknown key(s): {', '.join(unknown)}")
+    if "enabled" not in value:
+        return True
+    enabled = value["enabled"]
+    if not isinstance(enabled, bool):
+        raise LoopConfigError(f"harness.yaml `loop.enabled` must be true or false, got {enabled!r}")
+    return enabled
 
 
 def _parse_instrumentation(value: object) -> InstrumentationConfig:

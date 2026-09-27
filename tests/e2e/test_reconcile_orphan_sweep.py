@@ -234,12 +234,13 @@ def test_orphan_sweep_deletes_three_legacy_commands_preserves_user_assets(
     # ── 5. Apply the current blueprint via `make --update`. The current
     # blueprint contains health.md and not the three legacy templates.
     cp = _run_make_update(project)
-    # rc==0 means full path (render + verify) clean; rc==1 only signals a
-    # downstream verify mismatch (unrelated to the sweep we're asserting).
-    # The KEEP/DELETE state on disk is independent of CLI exit code — same
-    # contract as test_dogfood_sandbox::test_reconcile_preserves_user_edits.
-    assert cp.returncode in (0, 1), (
-        f"make --update crashed: rc={cp.returncode}\nstdout={cp.stdout}\nstderr={cp.stderr}"
+    # rc==0 is now required. It used to be `in (0, 1)` because a sweep-KEPT orphan
+    # (the user-edited legacy file below) failed verify's content_hash check and exited
+    # before the rest of make ran. verify now exempts kept orphans like reconcile-KEPT
+    # files (SPEC-loop-opt-in AC-007, PLAN Deviation 1), so an rc of 1 here is that
+    # regression coming back.
+    assert cp.returncode == 0, (
+        f"make --update failed: rc={cp.returncode}\nstdout={cp.stdout}\nstderr={cp.stderr}"
     )
 
     # ── 6. Assertions on disk.
@@ -254,8 +255,11 @@ def test_orphan_sweep_deletes_three_legacy_commands_preserves_user_assets(
     assert (commands / "health.md").is_file(), "blueprint-present health.md should be rendered"
     # R4 — adaptive/overrides.jsonl untouched.
     assert overrides_path.is_file(), "adaptive/overrides.jsonl must survive sweep"
-    assert overrides_path.read_text(encoding="utf-8") == overrides_payload, (
-        "adaptive/overrides.jsonl bytes mutated"
+    # The sweep must not touch it. A completed make APPENDS configure-exit records
+    # (cli._emit_configure_exit_overrides), so the pre-existing bytes must survive
+    # verbatim as the file's prefix.
+    assert overrides_path.read_text(encoding="utf-8").startswith(overrides_payload), (
+        "adaptive/overrides.jsonl pre-existing bytes mutated"
     )
     # theirs-fallback — user-edited legacy file KEPT.
     assert user_edited_path.is_file(), "user-modified legacy file must NOT be swept"

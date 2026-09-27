@@ -1,0 +1,360 @@
+schema_version: 3
+spec_slug: loop-opt-in
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: Python config/migration/render-filter logic is small
+  and branchy (absent/true/false x targets); 70 matches tier-2 Python precedent.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/synthesize.py
+- src/harness_maker/interview.py
+- src/harness_maker/models.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Disabled loop renders no Claude loop commands
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac001_disabled_renders_no_claude_loop_commands
+  executable_predicate: not (LOOP_CLAUDE & normalized_paths(loop_enabled=False)) and
+    LOOP_CLAUDE <= normalized_paths(loop_enabled=True)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Golden paths/literals come from intent/LOOP-OPT-IN.md scope and
+    the user's 2026-09-27 SPEC interview answers (rounds 1-3), fixed before implementation;
+    they name pre-existing output paths, not values read from new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Disabled loop renders no Codex loop skills
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac002_disabled_renders_no_codex_loop_skills
+  executable_predicate: not (LOOP_CODEX & normalized_paths(loop_enabled=False, targets=['codex']))
+    and LOOP_CODEX <= normalized_paths(loop_enabled=True, targets=['codex'])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Golden paths/literals come from intent/LOOP-OPT-IN.md scope and
+    the user's 2026-09-27 SPEC interview answers (rounds 1-3), fixed before implementation;
+    they name pre-existing output paths, not values read from new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Enabled loop renders exactly what it renders today
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac003_enabled_matches_pre_change_snapshots
+  executable_predicate: all(snapshot_diff(fixture, loop_enabled=True, reference=git_blob('055cce85',
+    fixture), exclude={'.claude/harness.yaml'}) == [] for fixture in SNAPSHOT_FIXTURES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Reference = tests/snapshot/*.expected.yaml blobs read from git
+    at base 055cce85 (git show), produced by the pre-change renderer; working-tree
+    regeneration in this change cannot alter them.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Disabled loop leaves no advertisement on the listing surfaces
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac004_disabled_leaves_no_loop_advertisement
+  executable_predicate: all(surface_exists(s) and all('loop.enabled' in line for line
+    in lines_mentioning(s, ('hm:loop', 'hm-loop'))) and count_enable_hint(s) == 1
+    for s in LISTING_SURFACES(loop_enabled=False))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Surface list (help, CLAUDE.md, AGENTS.md, harness.mdc x en/ko
+    x preset) and token set (hm:loop, hm-loop) come from a grep of templates at base
+    055cce85 before any edit plus Codex/validator findings; hint wording fixed in
+    the interview. Amended 2026-09-27 (DRI): the Codex help twin .agents/skills/hm-help/SKILL.md
+    is a listing surface.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: An existing harness.yaml without the key keeps the loop
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac005_existing_absent_key_keeps_loop
+  executable_predicate: all(update_render(v).yaml['loop']['enabled'] is True and LOOP_CLAUDE
+    <= update_render(v).paths for v in (NO_VERSION, V5, V6_NO_KEY, EMPTY_LOOP_BLOCK))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected True is the user's explicit decision (rounds 1 and 3);
+    fixtures derive from this repo's real pre-feature .claude/harness.yaml at 055cce85.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: A project with no harness.yaml gets the loop off
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac006_no_harness_yaml_writes_loop_off
+  executable_predicate: all(fresh_render(p).yaml['loop']['enabled'] is False and fresh_render(p).yaml['schema_version']
+    == 6 and 'loop.enabled' in fresh_render(p).disclosure for p in PRESETS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: False, version 6 and the disclosure row were fixed by the user's
+    decisions (IRR-001/002, round 1 default) before implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Turning the loop off sweeps manifest-proven pristine files and keeps edited
+    ones
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac007_disable_sweeps_pristine_keeps_edited
+  executable_predicate: not any((root / p).exists() for p in PRISTINE) and all((root
+    / p).read_bytes() == before[p] for p in EDITED) and all(p in sweep_output for
+    p in EDITED)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected outcomes are fixed by the pre-existing reconcile._classify_orphan
+    contract (docstring, reconcile.py:557) and the user's scope, stated before implementation;
+    the test observes files and output end-to-end.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: An explicit value survives re-render
+  type: property
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac008_explicit_value_round_trips
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Round-trip idempotence holds regardless of implementation: a re-render
+    must never rewrite a user''s explicit choice (CLAUDE.md pre-change checklist #1,
+    user-state preservation).'
+  oracle_independence_waiver: null
+  input_domain: loop.enabled in {true, false} explicitly present in harness.yaml,
+    both presets
+  transformation: load harness.yaml, /hm:make --update re-render, reload
+  expected_relation: reloaded loop.enabled == original loop.enabled
+  preconditions: []
+  observable_output: rendered .claude/harness.yaml
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Disabling removes only the loop files
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac009_disable_removes_only_loop_files
+  executable_predicate: enabled_paths - disabled_paths == LOOP_CLAUDE | LOOP_CODEX
+    and not (disabled_paths - enabled_paths) and changed_rendered_bodies(enabled,
+    disabled) <= ALLOWED_BODY_DIFFS
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: 'The enabled render of the same answers is the reference; the permitted
+    delta (four paths + five listing bodies + harness.yaml) was fixed in the interview
+    and validator reconciliation before implementation. Amended 2026-09-27 (DRI):
+    bodies compared post-render; the allowed set includes .agents/skills/hm-help/SKILL.md.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: An existing harness.yaml keeps the loop on every re-render path
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac010_existing_yaml_keeps_loop_on_every_path
+  - tests/unit/test_loop_opt_in.py::test_ac010_preset_switch_keeps_existing_loop
+  executable_predicate: reinterview_render(V5).yaml['loop']['enabled'] is True and
+    fallback_render(UNLOADABLE_YAML).yaml['loop']['enabled'] is True and reinterview_render(EXPLICIT_FALSE).yaml['loop']['enabled']
+    is False
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected values follow the user's round-3 decision (fresh = no
+    file on disk), made after the validator traced cli.py:356-366; not derived from
+    new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: A malformed loop value fails the render
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac011_malformed_loop_value_fails_render
+  executable_predicate: all(update_exit_code(v) != 0 and 'loop' in update_stderr(v)
+    and tree_unchanged(v) for v in (LOOP_NULL, ENABLED_NULL, ENABLED_STR_FALSE, LOOP_UNKNOWN_KEY))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fail-loud behaviour is the user's round-3 decision, matching the
+    worktree.enabled fail-closed precedent in CLAUDE.md; inputs enumerated by Codex/validator
+    before implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: 'Add top-level loop.enabled: bool to harness.yaml; fresh renders write
+    schema_version: 6'
+  category: schema/file format/storage layout
+  rationale: Shipped user files carry the key; renaming needs a migration and older
+    plugins reject it (extra=forbid)
+  source: spec
+- id: IRR-002
+  decision: Off only when no harness.yaml exists on disk; every existing file keeps
+    its explicit bool, or true when absent/unreadable, on every re-render path
+  category: data migration
+  rationale: Decides what every existing harness becomes on its next --update; a wrong
+    default silently removes a command users may rely on
+  source: spec
+approval:
+  kind: human
+  content_hash: 2e82fd32b48327f5ba4568879ea2bb83bbf0a13d7944dc4134524a6966dfc178
+  approved_by: Ecro
+  approved_at: '2026-09-27T04:30:54Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: f48c14b496f3053780abc029721bd726fbdc2564ba597d412ca0cdde83251596
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: 30f646791fc1d6283eb2ea31269b9e19b02dec2ea15806f202a492a924040432
+    paths_to_mutate: f6709cd82ea27802ced042dd4f06607d48a9dee38c1f794f131b206c394fcd65
+    irreversible_decisions: 27904abfeecc1770147758ff4dcb830a74c44de4fe2026e618a23cb8f00a8cc6
+    AC-001: beea85736e62f2f101c707f16e6799620869b99543c7068c0d3e327ba4ef76bc
+    AC-002: ad8f5dfc187453755fd2de265661a7694449dd30b100a0152cb523f6e3e399e0
+    AC-003: 0f1324aebf3a02a56b29f0425e300a4a93776e1460c747dbe8c2bf96fd9917e7
+    AC-004: d8cca15c4832dc7dd420baf189afde8833acd444182e2826eae758afb8552cde
+    AC-005: 3acf2e5c31ea92c8c6d4fd9e7d4d635282ce94c9cf8bbb20ba1911778bf85088
+    AC-006: 16e0b255da3a0eb9934577c830a3052c5e129ca8afe7ea9680fda4bcce5177c0
+    AC-007: 8f0725d3f184c51bb36a0340b98605509b49359091fb2ecdbe8c5ea2a7ceee00
+    AC-008: 1d84a013ea5ba1964bdf81c6ca42835f856e3249f6a0950978fced8af2a48ce0
+    AC-009: db4785915008f3a495b06f307e8e03ddcfa9bc00ebae1dd37629f821e34f7ac1
+    AC-010: da4375e4bc459a6d05c23af611ff9c4351215d4ee63c82dc35b8cba293e4691f
+    AC-011: f6944379f6daee7aa377528b4d4094a9f281b32120def4cac78367b9585558ca
+    ac_order: 507fc837fd64ae8964fbe1ec5bd2043668206ddae62a90d715516324c2b27cdf

@@ -657,6 +657,25 @@ def _strict_fallback_dump() -> dict[str, Any]:
     return HarnessConfig(spec=holder["spec"]).model_dump(mode="json")
 
 
+def _loop_enabled(config_dump: dict[str, Any] | None) -> bool:
+    """Whether the /hm:loop family renders (SPEC-loop-opt-in, ADR-003 of its PLAN).
+
+    ``None`` is the legacy no-answers path (``SIDE_FILES`` and direct test calls), which
+    has always meant the full inventory. It is checked BEFORE the strict fallback dump is
+    substituted, because that dump carries the fresh-install ``False``.
+    """
+    if config_dump is None:
+        return True
+    return bool(config_dump.get("loop", {}).get("enabled", False))
+
+
+def _loop_command_files() -> list[FileSpec]:
+    return [
+        ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
+        ("commands/hm/loop-p5-batch.md.j2", "commands/hm/loop-p5-batch.md", {}),
+    ]
+
+
 def _base_files(
     preset: Preset,
     locale: str = "en",
@@ -688,8 +707,7 @@ def _base_files(
         ("memory/session-readme.md.j2", "memory/session/README.md", {}),
         *_stage_files(),
         *_atomic_command_files(config_dump=config_dump),
-        ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
-        ("commands/hm/loop-p5-batch.md.j2", "commands/hm/loop-p5-batch.md", {}),
+        *(_loop_command_files() if _loop_enabled(config_dump) else []),
         ("commands/hm/health.md.j2", "commands/hm/health.md", {}),
         # PLAN-cfr-churn-metrics (0.36.0): /hm:metrics is a manual, read-only
         # command with no on/off flag — always rendered as the full CFR+churn
@@ -776,20 +794,36 @@ def _codex_target_files(
     """
     from harness_maker.render import _make_env  # local import: avoid cycle
 
+    loop_on = _loop_enabled(config_dump)
     if config_dump is None:
-        config_dump = _strict_fallback_dump()
+        # Keep the listing prose consistent with the full inventory this path renders.
+        config_dump = {**_strict_fallback_dump(), "loop": {"enabled": True}}
     env = _make_env()
     install_ref = _compute_install_ref()
-    loop_body = env.get_template("commands/hm/loop.md.j2").render(
-        harness_maker_src_path=install_ref,
-        is_codex=True,
-        config=config_dump,
-    )
-    p5_batch_body = env.get_template("commands/hm/loop-p5-batch.md.j2").render(
-        harness_maker_src_path=install_ref,
-        is_codex=True,
-        config=config_dump,
-    )
+    loop_specs: list[FileSpec] = []
+    if loop_on:
+        loop_body = env.get_template("commands/hm/loop.md.j2").render(
+            harness_maker_src_path=install_ref,
+            is_codex=True,
+            config=config_dump,
+        )
+        p5_batch_body = env.get_template("commands/hm/loop-p5-batch.md.j2").render(
+            harness_maker_src_path=install_ref,
+            is_codex=True,
+            config=config_dump,
+        )
+        loop_specs = [
+            (
+                "codex/loop_skill.md.j2",
+                ".agents/skills/hm-loop/SKILL.md",
+                {"loop_body": loop_body},
+            ),
+            (
+                "codex/loop_p5_batch_skill.md.j2",
+                ".agents/skills/hm-loop-p5-batch/SKILL.md",
+                {"p5_batch_body": p5_batch_body},
+            ),
+        ]
     help_locale_raw = str(config_dump.get("locale", "en")) if config_dump else "en"
     help_body = env.get_template(_localized("commands/hm/help", help_locale_raw)).render(
         harness_maker_src_path=install_ref,
@@ -815,16 +849,7 @@ def _codex_target_files(
         *_codex_agent_files(preset, agent_models, default_model),
         *_codex_skill_files(),
         *_codex_stage_skills(config_dump=config_dump),
-        (
-            "codex/loop_skill.md.j2",
-            ".agents/skills/hm-loop/SKILL.md",
-            {"loop_body": loop_body},
-        ),
-        (
-            "codex/loop_p5_batch_skill.md.j2",
-            ".agents/skills/hm-loop-p5-batch/SKILL.md",
-            {"p5_batch_body": p5_batch_body},
-        ),
+        *loop_specs,
         (
             "codex/help_skill.md.j2",
             ".agents/skills/hm-help/SKILL.md",
@@ -996,6 +1021,9 @@ def synthesize(
         # ADR-011: without this the rendered harness.yaml always emits the empty
         # default, so `--update` silently disarms the delegation rollback switch.
         delegation=answers.delegation,
+        # SPEC-loop-opt-in: without this the rendered harness.yaml always writes the
+        # fresh default, and every `--update` would switch an existing loop off.
+        loop=answers.loop,
     )
     if answers.strictness is not None:
         # Written, not derived, so an explicit choice survives a later `--preset` switch.

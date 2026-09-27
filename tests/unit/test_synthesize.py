@@ -47,7 +47,10 @@ def test_side_file_count_in_range() -> None:
 
 def test_synthesize_side_returns_blueprint() -> None:
     p = _profile()
-    a = interview(p, autoloop_mode=True)
+    # loop enabled explicitly: SIDE_FILES is the ADR-003 full-inventory skeleton
+    # (config_dump=None => loop on), and a fresh default install now renders
+    # loop off (SPEC-loop-opt-in AC-006), so the comparison needs the loop-on arm.
+    a = interview(p, autoloop_mode=True).model_copy(update={"loop": {"enabled": True}})
     bp = synthesize(p, a)
     assert isinstance(bp, Blueprint)
     assert bp.config.preset == Preset.SIDE
@@ -62,7 +65,8 @@ def test_synthesize_side_returns_blueprint() -> None:
 
 def test_synthesize_production_via_explicit_preset() -> None:
     p = _profile(scale="medium", lifecycle="active")
-    a = interview(p, autoloop_mode=True)
+    # loop enabled explicitly, same reason as test_synthesize_side_returns_blueprint.
+    a = interview(p, autoloop_mode=True).model_copy(update={"loop": {"enabled": True}})
     bp = synthesize(p, a, preset=Preset.PRODUCTION)
     assert bp.config.preset == Preset.PRODUCTION
     assert len(bp.files) == len(PRODUCTION_FILES)
@@ -96,7 +100,10 @@ def test_synthesize_includes_harness_yaml_and_settings_json() -> None:
 def test_synthesize_fused_workflow_command_count() -> None:
     """Side starter set has 3 fused + 7 atomic + 8 fixed = 18 commands/hm/."""
     p = _profile()
-    a = interview(p, autoloop_mode=True)
+    # loop enabled explicitly: the "8 fixed" count below includes loop.md and
+    # loop-p5-batch.md, which a fresh default install no longer renders
+    # (SPEC-loop-opt-in AC-006).
+    a = interview(p, autoloop_mode=True).model_copy(update={"loop": {"enabled": True}})
     bp = synthesize(p, a)
     cmd_paths = [str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")]
     # atomic(7) + fixed(8: loop/loop-p5-batch/health/metrics/make/configure/uninstall/help) + fused.

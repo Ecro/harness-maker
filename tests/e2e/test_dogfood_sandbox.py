@@ -23,6 +23,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SANDBOX = REPO_ROOT / "tests" / "e2e" / "sandbox"
 CLAUDE = SANDBOX / ".claude"
 
+# "loop" is deliberately absent: /harness-maker:make --autoloop renders a fresh
+# install with `loop.enabled: false` by default (SPEC-loop-opt-in AC-006), so a
+# freshly-applied sandbox never has loop.md. Loop-on render behavior is covered
+# by tests/unit/test_loop_opt_in.py, not this fresh-install fixture.
 REQUIRED_COMMANDS = [
     "research",
     "spec",
@@ -30,7 +34,6 @@ REQUIRED_COMMANDS = [
     "review",
     "wrapup",
     "verify",
-    "loop",
     "health",
 ]
 

@@ -514,7 +514,7 @@ There is no fused-workflow command. Two mechanisms chain the atomic stages: <!--
 
 | Mechanism | What it does |
 |---|---|
-| `/hm:loop` | Bounded autoloop. `--per-iter-stages execute,review` (default) sets the per-iteration sequence; `wrapup` is rejected there because loop-close owns it. |
+| `/hm:loop` | Bounded autoloop. `--per-iter-stages execute,review` (default) sets the per-iteration sequence; `wrapup` is rejected there because loop-close owns it. **Opt-in** via `harness.yaml`'s `loop.enabled` — a fresh install renders without it; an existing harness keeps it unless the key is set. |
 | Autopilot | Auto-advances the configured `autonomy.pipeline` past two-way-door boundaries, always stopping at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge. Claude Code and Codex; Cursor retains manual handoff. |
 
 ### Utility commands

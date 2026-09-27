@@ -581,3 +581,22 @@ All 28 current count≥3 failures were checked against the existing proposal set
 documentation-contract review raised `[fail:test] assertion-invariant-over-named-dimension`
 to count 21; its existing proposal remains the appropriate mechanism. The follow-up
 `spec-need-operation-misclassified` entry is at count 1, so no new proposal was added.
+
+## Proposal: a PLAN's final phase must run the CI-mirrored gate command, not the phase's own narrower one (2026-09-27)
+
+**Triggered by:** [fail:type] phase-verification-narrower-than-gate (count: 3 as of 2026-09-27; crossed the threshold this unit)
+**Proposed mechanism:** structural test / stage-template rule
+**Rationale:** the entry now has three independent occurrences (2026-09-12, 2026-09-19, 2026-09-27), each the same shape — a stage or phase runs `mypy --strict` (or an equivalent gate) over a scope narrower than what `hm verification_plan commands` derives from CI, reports green, and the full-scope gate later fails on exactly the files the narrow run never looked at. `hm verification_plan` already exists and derives the CI-mirrored command set (SPEC-ci-derived-verification-plan), but nothing forces execute/wrapup to run it INSTEAD OF a hand-typed narrower substitute — this unit's occurrence ran `mypy --strict src` by hand during execute although `verification_plan commands` would have printed `mypy --strict src tests`. A mechanical guard would grep the executed command against `verification_plan commands`'s output before accepting a "gate passed" claim in a phase/execute receipt, rather than trusting the LLM to remember to use the full scope every time.
+
+## Recurrence audit — loop-opt-in (2026-09-27)
+
+29 current count≥3 failures (28 from the 2026-09-23 audit plus `phase-verification-narrower-than-gate`,
+which crossed from 2 to 3 this unit) were checked against the existing proposal set.
+`assertion-invariant-over-named-dimension` (now 22) and `fix-introduced-defect-passes-all-gates`
+(now 16) both recurred again this unit (AC-009's pre-render body_sha256 comparison; the loop-off
+hint-exclusion fix that hid the co-located `$hm-make` reference); their existing proposals remain
+the appropriate mechanism, no new proposal needed. `phase-verification-narrower-than-gate` crossed
+the count≥3 threshold for the first time this unit (execute ran `mypy --strict src` instead of the
+CI-mirrored `mypy --strict src tests`) — new proposal added above. `promoted-default-reaches-bare-callers`
+also recurred (the `--preset` rebuild allowlist dropping the new `loop` field) but is still below
+threshold (count: 2).

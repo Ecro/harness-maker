@@ -17,6 +17,7 @@ import pytest
 
 from harness_maker.models import (
     InterviewAnswers,
+    LoopConfig,
     Preset,
     ProjectProfile,
     Target,
@@ -35,7 +36,12 @@ ARMS = [(p, d) for p in Preset for d in ("warn", "block")]
 def _render(
     tmp: Path, preset: Preset, strictness: Strictness, *, depth: str | None = None
 ) -> dict[str, str]:
-    answers = InterviewAnswers(preset=preset, strictness=strictness, targets=[Target.CLAUDE_CODE])
+    answers = InterviewAnswers(
+        preset=preset,
+        strictness=strictness,
+        targets=[Target.CLAUDE_CODE],
+        loop=LoopConfig(enabled=True),
+    )
     if depth is not None:
         interview = {**answers.interview, "comprehension": {"depth": depth}}
         answers = answers.model_copy(update={"interview": interview})

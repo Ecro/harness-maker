@@ -1848,7 +1848,7 @@ def _preserve_yaml_user_keys(out: Path, new_body: str) -> str:
 
     try:
         existing_data = load_harness_yaml(out)
-    except (OSError, yaml.YAMLError):
+    except (OSError, UnicodeError, yaml.YAMLError):
         return new_body
     if not isinstance(existing_data, dict) or not existing_data:
         return new_body

@@ -420,11 +420,15 @@ def test_ac_005_the_non_gated_arms_are_byte_identical_to_the_pre_change_golden(
         }
     live["ask@flag_on"] = {
         k: hashlib.sha256(v.encode()).hexdigest()
-        for k, v in sorted(_render(feature_branch_workflow=True, tmp=tmp_path / "on").items())
+        for k, v in sorted(
+            _render(feature_branch_workflow=True, tmp=tmp_path / "on", loop=True).items()
+        )
     }
     live["ask@flag_off"] = {
         k: hashlib.sha256(v.encode()).hexdigest()
-        for k, v in sorted(_render(feature_branch_workflow=False, tmp=tmp_path / "off").items())
+        for k, v in sorted(
+            _render(feature_branch_workflow=False, tmp=tmp_path / "off", loop=True).items()
+        )
     }
 
     assert set(live) == set(golden), "the captured arm set drifted"

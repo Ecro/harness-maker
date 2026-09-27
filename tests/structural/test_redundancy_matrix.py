@@ -24,7 +24,7 @@ from tempfile import mkdtemp
 import pytest
 
 from harness_maker.interview import interview
-from harness_maker.models import Preset, ProjectProfile, Target
+from harness_maker.models import LoopConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -37,6 +37,10 @@ def _rendered_root() -> Path:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
     answers.targets = [Target.CLAUDE_CODE]
+    # The matrix documents every shipped subject, including the loop commands, so
+    # this render must not use the loop-off fresh-install default (SPEC-loop-opt-in
+    # AC-006).
+    answers.loop = LoopConfig(enabled=True)
     bp = synthesize(profile, answers, preset=Preset.PRODUCTION)
     root = Path(mkdtemp(prefix="hm-matrix-"))
     render(bp, root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)

@@ -31,7 +31,9 @@
 {% if not is_codex -%}
 | `{{ cmd }}health`    | 3-layer audit (structural / external / personalization) |
 {% endif -%}
+{% if config.loop.enabled -%}
 | `{{ cmd }}loop`      | Bounded autoloop with safety rails |
+{% endif -%}
 {% if not is_codex -%}
 | `{{ cmd }}uninstall` | Remove the harness |
 {% endif -%}
@@ -45,7 +47,7 @@
   research ─► spec ─► execute ─► review ─► verify ─► wrapup
 ```
 
-Stages are chained by `{{ cmd }}loop` or by autopilot — there is no fused workflow command. <!-- @hm:axis-removed -->
+{% if config.loop.enabled %}Stages are chained by `{{ cmd }}loop` or by autopilot — there is no fused workflow command. <!-- @hm:axis-removed -->{% else %}Stages are chained by autopilot — there is no fused workflow command; `{{ cmd }}loop` is off (set `loop.enabled: true` in `.claude/harness.yaml` and run `/hm:make` to enable it). <!-- @hm:axis-removed -->{% endif %}
 
 ## ⚙️ Your current settings
 

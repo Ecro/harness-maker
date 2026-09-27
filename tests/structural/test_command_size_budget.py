@@ -43,6 +43,7 @@ import pytest
 
 from harness_maker.models import (
     InterviewAnswers,
+    LoopConfig,
     Preset,
     ProjectProfile,
     SecondOpinionConfig,
@@ -681,6 +682,7 @@ def _render(
     feature_branch_workflow: bool,
     tmp: Path,
     second_opinion_models: list[Literal["codex", "antigravity"]] | None = None,
+    loop: bool = False,
 ) -> dict[str, str]:
     """`fused_workflows` is passed explicitly: its model default is a single 3-stage
     workflow, so an implicit render would not contain the commands this gate measures
@@ -695,6 +697,11 @@ def _render(
     byte-identity golden about the autopilot advance block, which is orthogonal to second-opinion
     surface, and flipping the shared default would have re-based that golden a third time for a
     fixture change rather than a template change.
+
+    `loop` DEFAULTS TO OFF too, matching a fresh install (SPEC-loop-opt-in AC-006).
+    `test_autopilot_gate_render.py`'s byte-identity golden was captured before the loop
+    became opt-in, when every fresh render carried `loop.md`/`loop-p5-batch.md`, so it
+    passes `loop=True` explicitly to keep comparing the same command set.
     """
     with pytest.MonkeyPatch.context() as mp:
         pin_install_ref(mp)
@@ -708,6 +715,7 @@ def _render(
                     second_opinion=SecondOpinionConfig(
                         models=list(second_opinion_models) if second_opinion_models else []
                     ),
+                    loop=LoopConfig(enabled=loop),
                 ),
             ),
             tmp,

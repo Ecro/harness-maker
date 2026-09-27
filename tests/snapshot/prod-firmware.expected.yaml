@@ -1,10 +1,10 @@
 preset: Production
 strictness: block
-file_count: 60
+file_count: 58
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
-  body_sha256: 73b23ece6a31e60189e044d86b2b4f9e1417c85e85d3de91a9ed483b7d49be58
+  body_sha256: ebd8b4c4648227c7ff27f59c13d6c0948cb76828c06e512a5aa3b285a532f06b
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
   body_sha256: 37c6a5d761e169c3247145c71d451f988c3bb1608ee01b29cbb876eec392f154
@@ -61,13 +61,7 @@ files:
   body_sha256: b16b0c64191d45f0b5d01ffa6e3f68ff8f0cf46a6b361f0193fc57ad692db222
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: 0343a589298c652c88e5712b715e79cafdfd95a8f8508d1db6aa80cf04729d17
-- path: commands/hm/loop-p5-batch.md
-  template: commands/hm/loop-p5-batch.md.j2
-  body_sha256: 280eb19ef60faaa3a4a97e2d0c74aa8013ebae06b68e48b0573438474fa6e8cf
-- path: commands/hm/loop.md
-  template: commands/hm/loop.md.j2
-  body_sha256: 9d849b2c48788828a5ec738b637969b1cfbfeb9bc93fb05c9f50239134ffdec8
+  body_sha256: b221546be1df7f053e5d8da69602144902c4d4ba3e0188f7dfb4c979161fdc4d
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 8cb01c899f55914258b01e856b75f0a36d0008f7c032c212af4faa174e6409d1
@@ -94,7 +88,7 @@ files:
   body_sha256: 05d4d377f9290aa4888a6136a3be0ae87bbd91413b1476591a4d2c770b884752
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
-  body_sha256: 143857b4150fe1c01447e4fa5dbc92be073d333724987e668416de314b60d378
+  body_sha256: bbefab0467d89d88d70f64a1b60fa2922afcbcbdc83a513fb5f3a0e14d958f1d
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: 66df0bc5b3506d8f8b4b05c7a60690a6f8651a6493659a0b7545c2322aa7c73f

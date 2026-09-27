@@ -30,7 +30,9 @@
 {% if not is_codex -%}
 | `{{ cmd }}health`    | 3-layer 진단 (structural / external / personalization) |
 {% endif -%}
+{% if config.loop.enabled -%}
 | `{{ cmd }}loop`      | 안전 레일 있는 bounded autoloop |
+{% endif -%}
 {% if not is_codex -%}
 | `{{ cmd }}uninstall` | 하네스 제거 |
 {% endif -%}
@@ -44,7 +46,7 @@
   research ─► spec ─► execute ─► review ─► verify ─► wrapup
 ```
 
-stage 연결은 `{{ cmd }}loop` 또는 autopilot 이 담당합니다 — 융합 워크플로우 명령은 없습니다. <!-- @hm:axis-removed -->
+{% if config.loop.enabled %}stage 연결은 `{{ cmd }}loop` 또는 autopilot 이 담당합니다 — 융합 워크플로우 명령은 없습니다. <!-- @hm:axis-removed -->{% else %}stage 연결은 autopilot 이 담당합니다 — 융합 워크플로우 명령은 없습니다. `{{ cmd }}loop` 는 꺼져 있습니다 (켜려면 `.claude/harness.yaml` 에 `loop.enabled: true` 를 설정하고 `/hm:make` 를 실행하세요). <!-- @hm:axis-removed -->{% endif %}
 
 ## ⚙️ 현재 설정
 

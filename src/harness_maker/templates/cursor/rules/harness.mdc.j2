@@ -44,7 +44,11 @@ mirror is required.
 Representative commands:
 
 - `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`
+{% if config.loop.enabled -%}
 - `/hm:loop` — bounded autoloop runner
+{% else -%}
+- `/hm:loop` is off — set `loop.enabled: true` in `.claude/harness.yaml` and run `/hm:make` to enable it
+{% endif -%}
 - `/hm:health` — 2-layer health audit (structural + personalization)
 
 ## Atomic stages

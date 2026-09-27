@@ -18,18 +18,21 @@ from harness_maker.add_domain import AddDomainError, add_domain, validate_domain
 from harness_maker.block_merge import MergeReport
 from harness_maker.codex_user_config import bootstrap_user_codex_profiles
 from harness_maker.interview import (
+    LoopConfigError,
     _input_or_empty,
     _parse_autonomy,
     answers_from_harness_yaml,
     interview,
+    parse_loop,
 )
-from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde
+from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.locate import compare_version
 from harness_maker.locate import resolve as resolve_plugin
 from harness_maker.models import (
     AutonomyConfig,
     Blueprint,
     InterviewAnswers,
+    LoopConfig,
     Preset,
     RefFolder,
     Target,
@@ -344,6 +347,9 @@ def make(
             err=True,
         )
         raise typer.Exit(code=1)
+    # SPEC-loop-opt-in ADR-002: resolved BEFORE answers and before any write, so a
+    # malformed `loop` block stops the render with nothing touched (AC-011).
+    existing_loop = _resolve_existing_loop_or_exit(existing_yaml)
     p = profile(target)
     # Re-render path: silently reuse prior interview answers from harness.yaml
     # so locale / strictness / custom workflows / reviewer-enablement survive
@@ -364,6 +370,15 @@ def make(
         if effective_autoloop and not autoloop:
             typer.echo("non-tty stdin detected; using --autoloop defaults")
         a = interview(p, autoloop_mode=effective_autoloop)
+        if existing_loop is not None:
+            # IRR-002: only a project with no harness.yaml on disk gets the fresh default;
+            # --reinterview and the unloadable-file fallback land here and keep the file's
+            # value. Re-read AFTER the interview, which can block on a prompt, so an edit
+            # made meanwhile is not overwritten by the pre-interview snapshot. The reuse
+            # path needs none of this: answers_from_harness_yaml already parsed `loop`.
+            existing_loop = _resolve_existing_loop_or_exit(existing_yaml)
+            if existing_loop is not None:
+                a = a.model_copy(update={"loop": LoopConfig(enabled=existing_loop)})
     # ADR-012 deprecation: --recommended-model is a back-compat alias for
     # --default-model. Emit DeprecationWarning on use; new code should use
     # --default-model. Removal no earlier than 0.17.0.
@@ -588,7 +603,11 @@ def make(
     # template body we *would* have written) isn't ours to verify. Without this,
     # any runtime-mutated KEEP file — e.g. observability/dashboard.md, whose body
     # /hm:health rewrites in place below our frontmatter — hard-fails make.
-    errors = verify(target_dotclaude, skip_hash_paths=frozenset(keep_paths))
+    # Orphans the sweep KEPT are the same category: no longer in the blueprint and left
+    # on disk because the user edited them. Without this, turning a feature off (e.g.
+    # `loop.enabled: false`) over an edited file hard-fails make (SPEC-loop-opt-in AC-007).
+    kept_orphans = {Path(*p.parts[1:]) for p, _ in sweep_report.kept if p.parts[:1] == (".claude",)}
+    errors = verify(target_dotclaude, skip_hash_paths=frozenset(keep_paths | kept_orphans))
     if errors:
         for err in errors:
             typer.echo(f"VERIFY ERROR: {err}", err=True)
@@ -1022,7 +1041,7 @@ def _load_harness_yaml_body(yaml_path: Path) -> dict[str, Any]:
         return {}
     try:
         text = yaml_path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeError):
         return {}
     body = text
     if text.startswith("---\n"):
@@ -1514,6 +1533,10 @@ def _apply_dimension_overrides(
                 # silently drops the user's (or the seeder's) toolchains and the oracle falls
                 # back to ADR-006's Python default with no diagnostic.
                 toolchains=list(answers.toolchains),
+                # `loop=` likewise: without it a `--preset` switch resets an existing
+                # harness's loop to the fresh-install `False` and the orphan sweep then
+                # deletes the loop commands (SPEC-loop-opt-in IRR-002).
+                loop=answers.loop,
                 # `comprehension_depth=` is NOT optional here, for the same reason
                 # `autonomy=` and `toolchains=` are not: this rebuild takes a field
                 # allowlist, so `interview` is otherwise reset to the new preset's default
@@ -1757,6 +1780,31 @@ def _retire_stale_hooks_json(project_root: Path, blueprint: Blueprint) -> None:
             ".claude/settings.json, then delete the file.",
             err=True,
         )
+
+
+def _resolve_existing_loop_or_exit(existing_yaml: Path) -> bool | None:
+    """`_resolve_existing_loop`, turning a malformed `loop` block into exit 1 (AC-011)."""
+    try:
+        return _resolve_existing_loop(existing_yaml)
+    except LoopConfigError as e:
+        typer.echo(f"ERROR: {e}. Fix or remove the `loop` block in {existing_yaml}.", err=True)
+        raise typer.Exit(code=1) from e
+
+
+def _resolve_existing_loop(existing_yaml: Path) -> bool | None:
+    """The `loop.enabled` an existing harness.yaml carries; None when there is no file.
+
+    An unreadable file keeps the loop on: this runs on the fallback path where
+    `answers_from_harness_yaml` gave up, and that path must not silently remove a
+    command the project may use. Only a malformed `loop` block itself raises.
+    """
+    if not existing_yaml.is_file():
+        return None
+    try:
+        data = load_harness_yaml(existing_yaml)
+    except (OSError, UnicodeError, yaml.YAMLError):
+        return True
+    return parse_loop(data["loop"]) if "loop" in data else True
 
 
 def _emit_orphan_sweep_report(report: OrphanSweepReport) -> None:

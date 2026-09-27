@@ -32,7 +32,9 @@ _ALL_TARGETS = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
 
 def _blueprint(preset: Preset = Preset.PRODUCTION) -> Any:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
-    answers = interview(profile, autoloop_mode=True).model_copy(update={"targets": _ALL_TARGETS})
+    answers = interview(profile, autoloop_mode=True).model_copy(
+        update={"targets": _ALL_TARGETS, "loop": {"enabled": True}}
+    )
     return synthesize(profile, answers, preset=preset)
 
 

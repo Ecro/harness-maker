@@ -55,7 +55,10 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     research-crawler and relevance-filter alongside the external_risks layer.
     loop-p5-batch skill added (PLAN-latency-worktree-step-preview ADR-006).
     """
-    answers = _make_answers(tmp_path, ["codex"])
+    # loop enabled explicitly: the expected count below includes the
+    # loop + loop-p5-batch skill twins, which a fresh default install no longer
+    # renders (SPEC-loop-opt-in AC-002/AC-006).
+    answers = _make_answers(tmp_path, ["codex"]).model_copy(update={"loop": {"enabled": True}})
     bp = synthesize(profile(tmp_path), answers)
     skill_paths = [
         str(f.path)

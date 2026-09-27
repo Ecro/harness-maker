@@ -143,6 +143,9 @@ economics:
   span_max_min: {{ (config.economics.span_max_min if config.economics else 240.0) }}
 delegation:
   stages: {{ (config.delegation.stages if config.delegation else []) | tojson }}
+loop:
+  # /hm:loop + /hm:loop-p5-batch. false = not rendered; set true and run /hm:make to enable.
+  enabled: {{ (config.loop.enabled if config.loop else false) | tojson }}
 autonomy:
   level: {{ (config.autonomy.level if config.autonomy else "ask") | tojson }}
   pipeline: {{ (config.autonomy.pipeline if config.autonomy else ['research', 'spec', 'execute', 'review', 'verify', 'wrapup']) | tojson }}

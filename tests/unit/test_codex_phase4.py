@@ -33,6 +33,10 @@ _BASE_CONFIG = {
     "work_docs": {"dir": "work-docs/"},
     "spec": {"dir": "specs/"},
     "mcp_servers": {},
+    # AGENTS.md branches on config.loop.enabled (SPEC-loop-opt-in). This fixture
+    # asserts AGENTS.md names `$hm-loop` as the stage-chaining entry point, so the
+    # loop-on arm is the one under test here.
+    "loop": {"enabled": True},
 }
 
 _CONFIG_WITH_MCP = {

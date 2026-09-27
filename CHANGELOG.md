@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`/hm:loop` and `/hm:loop-p5-batch` are now opt-in via `harness.yaml`'s `loop.enabled`.**
+  A fresh install (no `harness.yaml` on disk) renders without the loop commands and skills
+  by default; re-rendering an existing harness keeps the loop ON unless the key is explicitly
+  set (absent/`{}` on an existing file resolves to `True`, never silently drops files a user
+  already has). A malformed `loop` value fails the render loudly rather than being coerced.
+  Six listing surfaces (help en/ko, CLAUDE.md/AGENTS.md, `.cursor/rules/harness.mdc`, and the
+  bundled `hm-help` skill) branch on the flag alongside the four loop template files, and the
+  `--preset` rebuild path now forwards the flag so switching presets never flips an explicit
+  `loop.enabled: true` back to the default.
+
 ### Added
 
 - **Understanding handoff.** `/hm:wrapup` now asks the closing commit message to carry an

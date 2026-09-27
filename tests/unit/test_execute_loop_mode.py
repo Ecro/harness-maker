@@ -30,7 +30,7 @@ def _profile() -> ProjectProfile:
 def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     out = tmp_path_factory.mktemp("rendered-phase4")
     p = _profile()
-    a = interview(p, autoloop_mode=True)
+    a = interview(p, autoloop_mode=True).model_copy(update={"loop": {"enabled": True}})
     bp = synthesize(p, a)
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return out

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, LoopConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -48,7 +48,11 @@ def rendered(tmp_path_factory: pytest.TempPathFactory) -> dict[str, dict[str, st
     root = tmp_path_factory.mktemp("spec-acceptance")
     bp = synthesize(
         ProjectProfile(),
-        InterviewAnswers(preset=Preset.PRODUCTION, targets=[Target.CLAUDE_CODE, Target.CODEX]),
+        InterviewAnswers(
+            preset=Preset.PRODUCTION,
+            targets=[Target.CLAUDE_CODE, Target.CODEX],
+            loop=LoopConfig(enabled=True),
+        ),
     )
     render(bp, root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
     out: dict[str, dict[str, str]] = {"claude": {}, "codex": {}}

@@ -34,6 +34,7 @@ from harness_maker import interview as iv
 from harness_maker.models import (
     DelegationConfig,
     InterviewAnswers,
+    LoopConfig,
     Preset,
     ProjectProfile,
     Target,
@@ -89,6 +90,10 @@ def rendered(tmp_path_factory: pytest.TempPathFactory) -> Path:
                     "installed": list(iv._ALL_REVIEWERS),
                     "enabled": list(iv._PROD_ENABLED_REVIEWERS),
                 },
+                # `autoloop-coder` is named only by loop.md; render with the loop
+                # on so this full-inventory wiring check still exercises it
+                # (SPEC-loop-opt-in AC-006 default-off does not apply here).
+                loop=LoopConfig(enabled=True),
             ),
         ),
         out,

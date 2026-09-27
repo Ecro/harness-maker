@@ -227,6 +227,15 @@ The `research` fragment includes a discovery-lens calibration step so broad tren
 
 Stages are chained instead by `/hm:loop --per-iter-stages execute,review` or by autopilot's `autonomy.pipeline`. `io_utils.load_harness_yaml` strips the two retired keys at LOAD time (one advisory per project), so an old config keeps working without a re-render.
 
+`/hm:loop` and `/hm:loop-p5-batch` are themselves gated by `harness.yaml`'s `loop.enabled`
+(PLAN-loop-opt-in). Resolution is fresh-vs-existing rather than a single class default: no
+`harness.yaml` on disk → `False` (a fresh install renders without the loop commands, listing
+mentions, and skills); an existing file with the key absent or `{}` → `True` (re-rendering an
+old project never silently drops files it already has); a malformed value fails the render
+rather than being coerced. The CLI (`interview.parse_loop`) is the single resolution point,
+and the `--preset` rebuild path forwards the resolved value explicitly rather than relying on
+a field allowlist to carry it.
+
 Every rendered Step/Phase/Check heading across the six stages is classified in
 `step_sensitivity.py` along two independent axes of "should this shrink": **COMP**
 (capability-compensation — shrinks as the underlying model improves), **HOST** (host-absorbed —

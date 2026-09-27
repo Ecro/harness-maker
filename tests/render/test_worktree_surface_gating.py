@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, LoopConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -29,6 +29,7 @@ def _render(tmp_path: Path, *, enabled: bool, targets: list[Target] | None = Non
             preset=Preset.PRODUCTION,
             targets=targets or [Target.CLAUDE_CODE],
             worktree={"enabled": enabled},
+            loop=LoopConfig(enabled=True),
         ),
     )
     tmp_path.mkdir(parents=True, exist_ok=True)

@@ -15,18 +15,24 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, LoopConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 from harness_maker.template_globals import TEMPLATE_GLOBALS, stage_invocation
 
 
 @cache
-def _rendered(preset: Preset, locale: str = "en") -> dict[str, str]:
+def _rendered(preset: Preset, locale: str = "en", loop: bool = True) -> dict[str, str]:
+    # loop defaults ON here because most tests in this module read the loop skills; the
+    # fresh-install value is off (SPEC-loop-opt-in AC-006), so
+    # `test_recommendations_resolve_to_skills` renders both arms.
     blueprint = synthesize(
         ProjectProfile(),
         InterviewAnswers(
-            preset=preset, locale=locale, targets=[Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+            preset=preset,
+            locale=locale,
+            targets=[Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX],
+            loop=LoopConfig(enabled=loop),
         ),
     )
     with tempfile.TemporaryDirectory() as td:
@@ -135,42 +141,46 @@ def test_preserves_executable_and_non_codex_content() -> None:
     assert "/hm:" in files[".cursor/rules/harness.mdc"]
 
 
+@pytest.mark.parametrize("loop", [True, False], ids=["loop-on", "loop-off"])
 @pytest.mark.parametrize("preset", [Preset.SIDE, Preset.PRODUCTION])
 @pytest.mark.parametrize("locale", ["en", "ko", "ja"])
-def test_recommendations_resolve_to_skills(preset: Preset, locale: str) -> None:
-    files = _rendered(preset, locale)
+def test_recommendations_resolve_to_skills(preset: Preset, locale: str, loop: bool) -> None:
+    files = _rendered(preset, locale, loop)
     names = {p.split("/")[2] for p in files if p.startswith(".agents/skills/")}
-    assert {
+    core = {
         "hm-research",
         "hm-spec",
         "hm-execute",
         "hm-review",
         "hm-verify",
         "hm-wrapup",
-        "hm-loop",
         "hm-help",
-    } <= names
+    }
+    assert core <= names
+    assert ("hm-loop" in names) is loop
     assert "hm-plan" not in names
     for path, body in files.items():
         if path.startswith(".agents/skills/hm-"):
             for line in _next_lines(body):
                 for name in re.findall(r"(?:\$hm-|@hm-|/hm:)([a-z][a-z-]+)", line):
                     assert f"hm-{name}" in names, (path, line)
-    help_body = files[".agents/skills/hm-help/SKILL.md"]
+    # The loop-off enable hint names `$hm-loop` on purpose (SPEC-loop-opt-in AC-004): only
+    # that one token is exempt, so every other reference on the hint line (its re-render
+    # command) is still checked. The re-render skill ships in the plugin bundle
+    # (`skills/`), not in the project render, so it resolves against both sets.
+    help_lines = files[".agents/skills/hm-help/SKILL.md"].splitlines()
+    help_body = "\n".join(
+        re.sub(r"`(?:\$hm-|@hm-|/hm:)loop`", "", line) if "loop.enabled" in line else line
+        for line in help_lines
+    )
     advertised = {
         f"hm-{name}" for name in re.findall(r"`(?:\$hm-|@hm-|/hm:)([a-z][a-z-]+)`", help_body)
     }
-    assert {
-        "hm-research",
-        "hm-spec",
-        "hm-execute",
-        "hm-review",
-        "hm-verify",
-        "hm-wrapup",
-        "hm-loop",
-        "hm-help",
-    } <= advertised
-    assert advertised <= names
+    plugin_skills = {p.name for p in (Path(__file__).resolve().parents[2] / "skills").iterdir()}
+    assert core | ({"hm-loop"} if loop else set()) <= advertised
+    assert advertised <= names | plugin_skills
+    if not loop:
+        assert any("loop.enabled" in line for line in help_lines), "enable hint missing"
 
 
 def test_update_repairs_guidance(tmp_path: Path) -> None:

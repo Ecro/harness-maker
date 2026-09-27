@@ -22,9 +22,13 @@ Use this Codex spelling in next-step and recovery guidance; recommend only avail
 
 ### Autoloop
 
+{% if config.loop.enabled -%}
 | Skill | Purpose |
 |-------|---------|
 | `$hm-loop` | Bounded autoloop: interview → iterate the configured atomic stages → wrapup |
+{% else -%}
+`$hm-loop` is off — set `loop.enabled: true` in `.claude/harness.yaml` and run `/hm:make` to enable it.
+{% endif -%}
 
 ## Configuration
 

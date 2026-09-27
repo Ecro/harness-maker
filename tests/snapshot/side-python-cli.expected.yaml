@@ -1,10 +1,10 @@
 preset: Side
 strictness: warn
-file_count: 60
+file_count: 58
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.en.md.j2
-  body_sha256: b37a3ab5b70e0d924c3789a4bfac2c453bcac73684a5beaa1ff6cd0658f61bc3
+  body_sha256: e1df18fe6d563f382f4071c4b13bca81d8ee33c0b2124fe7aaed5fe407c85dde
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
   body_sha256: 37c6a5d761e169c3247145c71d451f988c3bb1608ee01b29cbb876eec392f154
@@ -61,13 +61,7 @@ files:
   body_sha256: b16b0c64191d45f0b5d01ffa6e3f68ff8f0cf46a6b361f0193fc57ad692db222
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: e75fa23c4755b9a301067420224c3c1fbd173cda974b480e4cf4b3d2684668e1
-- path: commands/hm/loop-p5-batch.md
-  template: commands/hm/loop-p5-batch.md.j2
-  body_sha256: 71d837717af12de134250b81385524e9694875dd510e51e5ed2915c345763951
-- path: commands/hm/loop.md
-  template: commands/hm/loop.md.j2
-  body_sha256: 49108b3d0d49e7ffd47c4a7a90828bb27c64289c9a082ff13f74b1410ce674fa
+  body_sha256: 391ddff68330226873906c850897c4d166815880f6963e0bbad36c75a4536669
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 8cb01c899f55914258b01e856b75f0a36d0008f7c032c212af4faa174e6409d1
@@ -94,7 +88,7 @@ files:
   body_sha256: 505cc5a43defcb2efcfaed70c4e24132308a708036667b28799420b9d2e80b1f
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: 679d83ac455cc0e06cb78a3b7cfbb4d9376e2e5faa7a9a6e1429f12182cabeb2
+  body_sha256: 97f65e124061869449cc394fe78eb31d6a1d2c410401d36a29fd50b251e60452
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: b146802f48337b5f0d9651ab9a4d735036bb3cefca8ff3ecfb9c63ee01c31e72

@@ -915,6 +915,19 @@ class InstrumentationConfig(BaseModel):
     stage_agent_ledger: bool = False
 
 
+class LoopConfig(BaseModel):
+    """Whether `/hm:loop` and `/hm:loop-p5-batch` are rendered (SPEC-loop-opt-in).
+
+    The default is the FRESH-install value. An existing harness.yaml that predates the
+    key keeps the loop — `interview.parse_loop` maps an absent block to ``True`` and
+    `cli._resolve_existing_loop` applies that on every re-render path (IRR-002).
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    enabled: bool = False
+
+
 class AutonomyConfig(BaseModel):
     """Pipeline auto-advance policy (PLAN-human-bottleneck-auto-advance).
 
@@ -1241,16 +1254,20 @@ class HarnessConfig(BaseModel):
     # default_factory keeps legacy harness.yaml loading; empty `stages` leaves every
     # dispatch block a dead Jinja branch.
     delegation: DelegationConfig = Field(default_factory=DelegationConfig)
+    # SPEC-loop-opt-in: gates the /hm:loop family. default_factory keeps legacy files
+    # loading; the absent-key meaning (on) is applied by the answers loader, not here.
+    loop: LoopConfig = Field(default_factory=LoopConfig)
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. PLAN-second-opinion-multi-model ADR-001: bumped 2 → 3 for the
     # codex_second_opinion → second_opinion rename (silent migration in interview.py).
     # PLAN-harness-diet ADR-002/012: bumped 3 -> 4 for the retired fused-workflow axis
     # (`workflows` / `default_workflow`). SPEC-dev-mode-removal IRR-001: bumped 4 -> 5 when
-    # the development-methodology axis was folded into `spec.strictness`. This records WHEN
+    # the development-methodology axis was folded into `spec.strictness`. SPEC-loop-opt-in
+    # IRR-001: bumped 5 -> 6 for the `loop` block. This records WHEN
     # a file was written; it does not gate the migration -- `io_utils.strip_retired_keys`
     # keys on key PRESENCE, so a hand-edited file with no version, or one left at 3, still
     # migrates.
-    schema_version: int = 5
+    schema_version: int = 6
     # 0.16.0: deep_gate redesigned as 5-term inequality (PLAN-deep-interview-question-criteria).
     # Default literal lives in `interview_deep_gate_defaults()` at module bottom —
     # also consumed by `harness_maker.interview._preset_extras` to avoid 3-way drift.
@@ -1420,7 +1437,7 @@ class InterviewAnswers(BaseModel):
             "comprehension": interview_comprehension_defaults(),
         }
     )
-    schema_version: int = 5
+    schema_version: int = 6
     sibling_repos: list[str] = Field(default_factory=list)
     # Paths to additional documents that wrapup should update/manage.
     # User specifies via --wrapup-docs or /hm:configure. Examples:
@@ -1453,6 +1470,8 @@ class InterviewAnswers(BaseModel):
     # the ROLLBACK for a medium-likelihood/high-impact quality risk, so dropping it
     # on `--update` would disarm the escape hatch itself.
     delegation: DelegationConfig = Field(default_factory=DelegationConfig)
+    # Mirror of HarnessConfig.loop (SPEC-loop-opt-in).
+    loop: LoopConfig = Field(default_factory=LoopConfig)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

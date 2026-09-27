@@ -27,6 +27,7 @@ import pytest
 
 from harness_maker.models import (
     InterviewAnswers,
+    LoopConfig,
     Preset,
     ProjectProfile,
     SecondOpinionConfig,
@@ -56,14 +57,22 @@ _ALLOW_ARRAY_RE = re.compile(r'"allow"\s*:\s*\[(.*?)\](?=\s*[,}])', re.S)
 _JSON_STRING_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 
-def _render_allow(tmp_path: Path, *, preset: Preset, models: list[str]) -> list[str]:
-    """The `permissions.allow` list a FRESH install gets today."""
+def _render_allow(
+    tmp_path: Path, *, preset: Preset, models: list[str], loop: bool = False
+) -> list[str]:
+    """The `permissions.allow` list a FRESH install gets today.
+
+    ``loop`` defaults to False (matching the fresh-install default,
+    SPEC-loop-opt-in AC-006); pass True only where a test needs the loop
+    templates rendered too (they never appear in the default allow list).
+    """
     blueprint = synthesize(
         ProjectProfile(),
         InterviewAnswers(
             preset=preset,
             targets=[Target.CLAUDE_CODE],
             second_opinion=SecondOpinionConfig(models=models),  # type: ignore[arg-type]
+            loop=LoopConfig(enabled=loop),
         ),
     )
     render(blueprint, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
@@ -523,7 +532,7 @@ def test_multiline_python_c_was_never_covered_even_by_the_blanket_grant(tmp_path
     respect quoting (at which point the cost claim needs revisiting).
     """
     render_root = tmp_path / "r"
-    allow = _render_allow(render_root, preset=Preset.SIDE, models=[])
+    allow = _render_allow(render_root, preset=Preset.SIDE, models=[], loop=True)
 
     # `^\s*` on both ends, because `/hm:loop-p5-batch` indents its block — an anchored
     # `^!?` silently matched only ONE of the two emitting templates (REVIEW round 2).

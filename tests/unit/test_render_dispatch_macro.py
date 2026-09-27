@@ -24,7 +24,7 @@ import pytest
 from jinja2 import UndefinedError
 
 from harness_maker.conditional_router import LENS_DISPATCH, lens_dispatch
-from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, LoopConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, _make_env, render
 from harness_maker.synthesize import synthesize
 
@@ -319,9 +319,16 @@ def _norm(text: str) -> str:
 
 
 def _render_all(preset: Preset) -> dict[str, str]:
+    # loop enabled: `claude_arm_baseline.json` is a frozen pre-migration capture that
+    # includes `loop.md`'s dispatch/question lines, from when every fresh render
+    # carried the loop (SPEC-loop-opt-in AC-006 made it opt-in afterwards).
     blueprint = synthesize(
         ProjectProfile(),
-        InterviewAnswers(preset=preset, targets=[Target.CLAUDE_CODE, Target.CODEX]),
+        InterviewAnswers(
+            preset=preset,
+            targets=[Target.CLAUDE_CODE, Target.CODEX],
+            loop=LoopConfig(enabled=True),
+        ),
     )
     with tempfile.TemporaryDirectory() as td:
         # `target_dir` is the `.claude` dir; Codex output goes to its PARENT.

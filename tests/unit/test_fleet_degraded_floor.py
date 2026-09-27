@@ -31,7 +31,9 @@ def loop_md(tmp_path_factory: pytest.TempPathFactory) -> str:
     # marker only exist under `worktree.enabled: true` (PLAN-worktree-side-defaults
     # ADR-005). The recommended preset for this profile is Side, which is now OFF, so
     # rendering it would test the wrong configuration.
-    answers = interview(p, autoloop_mode=True).model_copy(update={"worktree": {"enabled": True}})
+    answers = interview(p, autoloop_mode=True).model_copy(
+        update={"worktree": {"enabled": True}, "loop": {"enabled": True}}
+    )
     render(synthesize(p, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
     return (out / "commands" / "hm" / "loop.md").read_text(encoding="utf-8")
 

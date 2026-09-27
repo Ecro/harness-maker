@@ -150,3 +150,18 @@ values:
   evidence: 'auto: measure#82611f0fd3e4 @ cddfaa1b exit=0 cwd=base'
   definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
   metric_id: dead_rendered_bytes
+- value: 4.7
+  observed_at: '2026-09-27T02:11:41Z'
+  evidence: 'auto: measure#754a4e8cf656 @ 055cce85 exit=0 cwd=base'
+  definition_hash: 754a4e8cf65695fd99ede671a80587600f565474a4a388a5122ee97ee5d7b866
+  metric_id: task_lead_time_hours
+- value: 45.2
+  observed_at: '2026-09-27T02:11:42Z'
+  evidence: 'auto: measure#9213740d0ae8 @ 055cce85 exit=0 cwd=checkout'
+  definition_hash: 9213740d0ae88c6690466a2d059f646096649288f6bd1b64ee33bdbfd31939b5
+  metric_id: unsourced_step_share
+- value: 21.7
+  observed_at: '2026-09-27T02:11:49Z'
+  evidence: 'auto: measure#82611f0fd3e4 @ 055cce85 exit=0 cwd=base'
+  definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
+  metric_id: dead_rendered_bytes

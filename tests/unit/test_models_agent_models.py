@@ -186,10 +186,11 @@ def test_harness_config_agent_models_default_empty() -> None:
     assert cfg.agent_models == {}
 
 
-def test_harness_config_schema_version_bumped_to_5() -> None:
-    """1 → 2 (ADR-011), 2 → 3 (second-opinion rename), 3 → 4 (fused-workflow retirement)."""
+def test_harness_config_schema_version_bumped_to_6() -> None:
+    """1 → 2 (ADR-011), 2 → 3 (second-opinion rename), 3 → 4 (fused-workflow retirement),
+    5 → 6 (PLAN-loop-opt-in ADR-005, loop.enabled gate)."""
     cfg = HarnessConfig()
-    assert cfg.schema_version == 5
+    assert cfg.schema_version == 6
 
 
 def test_interview_answers_default_model_alias() -> None:

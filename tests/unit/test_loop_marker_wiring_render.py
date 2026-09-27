@@ -29,7 +29,9 @@ def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     # marker only exist under `worktree.enabled: true` (PLAN-worktree-side-defaults
     # ADR-005). The recommended preset for this profile is Side, which is now OFF, so
     # rendering it would test the wrong configuration.
-    a = interview(p, autoloop_mode=True).model_copy(update={"worktree": {"enabled": True}})
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"worktree": {"enabled": True}, "loop": {"enabled": True}}
+    )
     bp = synthesize(p, a)
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return out
