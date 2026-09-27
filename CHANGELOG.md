@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.60.4] - 2026-09-27
+
+Re-release of 0.60.3 with one test fix. The v0.60.3 tag was pushed, but its release
+quality-gate failed on a flaky test before anything was built or published, so 0.60.3 exists
+only as a tag and never shipped. The changes listed under 0.60.3 ship in this release.
+
+### Fixed
+
+- `test_codex_setup::test_ac_003_timeout_kills_owned_generation_tree` read
+  `/proc/<pid>/stat` after an `exists()` check, so a process exiting in between raised
+  `ProcessLookupError` (ESRCH) instead of counting as gone. That is the race `77d4a7db` fixed
+  in another test. The probe now reads once and treats both errors as "gone".
+
 ## [0.60.3] - 2026-09-27
 
 ### Changed

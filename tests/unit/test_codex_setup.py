@@ -310,12 +310,20 @@ def test_ac_003_timeout_kills_owned_generation_tree(tmp_path: Path) -> None:
             _run_command([sys.executable, "-c", code], timeout=1)
         pid = int(pidfile.read_text())
         status = Path(f"/proc/{pid}/stat")
+
+        def gone_or_zombie() -> bool:
+            # The process can exit between exists() and read(); the read then fails with ESRCH
+            # (ProcessLookupError), not FileNotFoundError — release run 36297544529 hit exactly
+            # that. Read once, and treat both as "gone".
+            try:
+                return status.read_text().split()[2] == "Z"
+            except (FileNotFoundError, ProcessLookupError):
+                return True
+
         deadline = time.monotonic() + 2
-        while (
-            status.exists() and status.read_text().split()[2] != "Z" and time.monotonic() < deadline
-        ):
+        while not gone_or_zombie() and time.monotonic() < deadline:
             time.sleep(0.01)
-        assert not status.exists() or status.read_text().split()[2] == "Z"
+        assert gone_or_zombie()
     finally:
         if pid is not None:
             import contextlib

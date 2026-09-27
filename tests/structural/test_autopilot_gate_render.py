@@ -28,6 +28,11 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-27, release 0.60.4** — same per-release case: 56 lines (14 commands × 4 arms), all the
+  frontmatter `harness_maker_version:` key, and substituting `0.60.4` back to `0.60.3` reproduces
+  every previous hash — checked across every arm, so no content moved. 0.60.3 never shipped: its
+  release quality-gate failed on a flaky ESRCH race in test_codex_setup.
+
 - **2026-09-27, release 0.60.3** — same per-release case: 56 lines (14 commands × 4 arms), all the
   frontmatter `harness_maker_version:` key, and substituting `0.60.3` back to `0.60.2` reproduces
   every previous hash — checked across every arm, so no content moved.
