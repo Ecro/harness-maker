@@ -58,7 +58,7 @@ def _render_root(preset: Preset) -> Path:
     answers = interview(profile, autoloop_mode=True)
     answers.second_opinion = SecondOpinionConfig(models=list(_SECOND_OPINION_MODELS))
     bp = synthesize(profile, answers, preset=preset)
-    out = Path(mkdtemp(prefix="hm-read-budget-"))
+    out = Path(mkdtemp(prefix="hm-read-budget-")) / ".claude"
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return out
 

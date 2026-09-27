@@ -152,7 +152,7 @@ def _render_review(*, gate: bool) -> str:
     profile = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     answers = interview(profile, autoloop_mode=True)
     answers.rereview_churn_gate = gate
-    out = Path(tempfile.mkdtemp())
+    out = Path(tempfile.mkdtemp()) / ".claude"
     render(synthesize(profile, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
     return (out / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
 

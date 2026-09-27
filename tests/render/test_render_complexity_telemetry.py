@@ -43,7 +43,7 @@ def _review(preset: Preset) -> str:
     profile = _profile(preset)
     answers = interview(profile, autoloop_mode=True)
     bp = synthesize(profile, answers, preset=preset)
-    out = Path(mkdtemp(prefix="hm-complexity-"))
+    out = Path(mkdtemp(prefix="hm-complexity-")) / ".claude"
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return (out / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
 

@@ -77,7 +77,7 @@ def _render_root(preset: Preset) -> Path:
     profile = _profile(preset)
     answers = interview(profile, autoloop_mode=True)
     bp = synthesize(profile, answers, preset=preset)
-    out = Path(mkdtemp(prefix="hm-oracle-blocked-"))
+    out = Path(mkdtemp(prefix="hm-oracle-blocked-")) / ".claude"
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return out
 

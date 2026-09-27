@@ -57,7 +57,7 @@ _FIELD_REF = re.compile(r"`unattributed_breakdown`")
 def _metrics_render() -> str:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
-    out = Path(mkdtemp(prefix="hm-metrics-"))
+    out = Path(mkdtemp(prefix="hm-metrics-")) / ".claude"
     with pytest.MonkeyPatch.context() as mp:
         pin_install_ref(mp)
         render(

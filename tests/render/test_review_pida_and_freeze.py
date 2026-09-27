@@ -41,7 +41,7 @@ def _render_root(models: tuple[Literal["codex", "antigravity"], ...]) -> Path:
     answers = interview(profile, autoloop_mode=True)
     answers.second_opinion = SecondOpinionConfig(models=list(models))
     bp = synthesize(profile, answers, preset=Preset.PRODUCTION)
-    out = Path(mkdtemp(prefix="hm-pida-render-"))
+    out = Path(mkdtemp(prefix="hm-pida-render-")) / ".claude"
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return out
 

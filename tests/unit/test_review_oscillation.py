@@ -244,7 +244,7 @@ def test_the_rendered_stage_scans_for_oscillation_and_keeps_it_off_the_grade() -
     answers = interview(profile, autoloop_mode=True)
     answers.worktree["enabled"] = True
     answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
-    out = Path(tempfile.mkdtemp())
+    out = Path(tempfile.mkdtemp()) / ".claude"
     render(synthesize(profile, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
 
     bodies = {
