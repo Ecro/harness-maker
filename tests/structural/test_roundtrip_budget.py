@@ -226,7 +226,11 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # examples were four charged lines, the derivation is one. The stage still runs four
     # gates — it now runs the four CI runs, which is the point. A DROP here is the expected
     # shape for this change; a rise would mean the examples survived alongside the call.
-    "verify": 12,
+    # 12 → 14 on 2026-09-27, config half like `health`: this repo's `harness.yaml`
+    # `delegation.stages` gained `verify`, which renders Step 0.5's `hm wrapup_brief
+    # --stage verify` and `hm wrapup_receipt --stage verify`. The inline checks stay as the
+    # degraded path, so nothing was removed. Dropping `verify` from the list restores 12.
+    "verify": 14,
     # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
     # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
     # not render. A config flip that adds a gate in two commands and removes an advisory in a
