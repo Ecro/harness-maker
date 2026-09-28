@@ -207,9 +207,9 @@ def _wrapup(target: Target) -> str:
 
 
 @pytest.mark.parametrize("target", list(SKILL_PATHS), ids=["claude", "codex"])
-def test_wrapup_intent_writes_single_quote_inline_values(target: Target) -> None:
-    # Superseded by SPEC-intent-file-inputs: text reaches these calls through `-file` paths, so
-    # no quoting of any kind is left on the line. Kept as a guard that the inline forms stay out.
+def test_wrapup_intent_writes_pass_file_paths_not_inline_text(target: Target) -> None:
+    # SPEC-intent-file-inputs: text reaches these calls through `-file` paths, so no quoted
+    # inline value is left on the line.
     lines = [ln for ln in _wrapup(target).splitlines() if any(c in ln for c in _INTENT_WRITE_CALLS)]
     assert lines, "no intent write call rendered in wrapup"
     for flag in ("--claim", "--text", "--note"):
