@@ -179,6 +179,14 @@ open_questions:
       voter raised; the concurrency lens contributed none on this CLI-parsing diff.'
     observed_at: '2026-09-28T04:04:18Z'
     relation: confirms
+  - text: 'intent-feedback-continuity (2026-09-28/29): four /hm:review runs on a Python
+      task. The concurrency lens and the Codex voter each surfaced P0/P1 defects no
+      other lens raised (post-commit-pop trial guard, fence re-check on the success
+      path, publish revalidation), while the tests lens mostly repeated standing P2s.
+      Supports the fan-out recall gain on Python; cost was 4 dispatches x 2 passes
+      per run plus confirmation passes.'
+    observed_at: '2026-09-28T22:22:33Z'
+    relation: confirms
   history: []
 - id: revalidation_is_report_only
   claim: 'needs_revalidation is a report only: the autopilot objective gate reads
