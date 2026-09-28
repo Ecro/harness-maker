@@ -169,6 +169,16 @@ open_questions:
       in all 12 dispatches'
     observed_at: '2026-09-27T22:05:00Z'
     relation: confirms
+  - text: 'intent-file-inputs review (run f8dec5471aad, 2026-09-28): round 1 dispatched
+      7 lenses in 4 dispatches plus codex. The one functional recipe failure (intent-layer
+      proposal path always passing --declined-file, which the CLI refuses when every
+      candidate is accepted) came from codex alone; no Claude lens raised it. The
+      tests lens alone found that the AC-001 property could not tell rstrip from strip.
+      Concurrency returned 0 findings in round 1 and in confirm-1, as on sdlc-three-loops-gap.
+      Distinct lenses and the heterogeneous model each contributed findings no other
+      voter raised; the concurrency lens contributed none on this CLI-parsing diff.'
+    observed_at: '2026-09-28T04:04:18Z'
+    relation: confirms
   history: []
 - id: revalidation_is_report_only
   claim: 'needs_revalidation is a report only: the autopilot objective gate reads
