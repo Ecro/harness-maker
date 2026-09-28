@@ -56,6 +56,10 @@ Re-captures (append; never silently overwrite):
   the command sets and the autopilot gate itself are unchanged. Dropping `verify` from the
   list restores both previous hashes.
 
+- **2026-09-28, release 0.60.5** — same per-release case: 56 lines (14 commands × 4 arms), all the
+  frontmatter `harness_maker_version:` key, and substituting `0.60.5` back to `0.60.4` reproduces
+  every previous hash — checked across every arm, so no content moved.
+
 - **2026-09-27, release 0.60.4** — same per-release case: 56 lines (14 commands × 4 arms), all the
   frontmatter `harness_maker_version:` key, and substituting `0.60.4` back to `0.60.3` reproduces
   every previous hash — checked across every arm, so no content moved. 0.60.3 never shipped: its

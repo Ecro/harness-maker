@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.60.5] - 2026-09-28
+
 ### Added
 
 - **`hm intent` reads free text from files.** Every free-text argument of the write verbs has a
@@ -21,9 +23,6 @@
   through the `-file` flag. This closes the prompt-only quote-breakout residual accepted in
   sdlc-three-loops-gap. The recipes need this release of the CLI; a harness rendered from it
   fails against an older plugin cache.
-
-### Changed
-
 - **One boundary between `[wiki:fact]` and intent questions**, rendered in both the
   project-knowledge and intent-layer skills: a claim that bears on an intent's metric or
   decision is an intent question; any other domain fact is a `[wiki:fact]`; each claim lives
@@ -32,11 +31,6 @@
 - **Measurement note:** this lands 2026-09-27, inside the pre-registered `wiki_fact_entries_28d`
   window (2026-09-19..10-17), and moves intent-bearing claims out of `[wiki:fact]`. The
   thresholds are unchanged; read the 10-17 count against this landing date.
-- **Wrapup Step 5.7 quoting:** the `intent question observe`, `intent question add` and
-  `intent close` run lines now single-quote every `--claim`/`--text`/`--note` value, with
-  `(no ' inside)` stated beside all three, and the intent-layer write rule names all three
-  flags. The defence is still prompt-level; file-based `--*-file` inputs, which would close
-  the class, are a follow-up.
 
 ### Removed
 
