@@ -11,10 +11,10 @@
       "metrics": "7de52fe603110d4ee647c68b93b30807113e42b482c33d63ca6ca9bf43cb7e52",
       "research": "b80593cd9acee4cdb63f7a05646b4084f82831a894744362d819051c95055a69",
       "review": "fcef797bc0784ddc8c2bc96e5f6fa9144b67325bf735d52a080918e4e7d4f861",
-      "spec": "66452dc65e516608dcfa9b6838b5688a995e5ca3cbe228392930c02bdd8a9cd8",
+      "spec": "0a4bd3ad80e9707274e177b1802a5fd703353607beddf025a29342e5b385c822",
       "uninstall": "7c800cfe3a114b04f7d23136414170aec68388d4ac075574669fc7b160d76eda",
       "verify": "a46ad55fbb1381440df4cd4400940e1a7a6ad87ba39d7ab097a99bb90e1456cc",
-      "wrapup": "988fdac2060dc09c11e0735db91807bd2c6d3696e263577ed19c5504473b643f"
+      "wrapup": "92dfc6be0c95ccf03f9eb0fff7eae6176849495dd3566278dc8a5e730eae1b96"
     },
     "ask@flag_on": {
       "configure": "63d088f8015f864f8ae06fadf65a9ccfbaf076fcb8c0852ce3c5bac987d4bd3a",
@@ -27,10 +27,10 @@
       "metrics": "7de52fe603110d4ee647c68b93b30807113e42b482c33d63ca6ca9bf43cb7e52",
       "research": "3c75744296a06bfc2fb3c50349324db0b7e56a6dfa8d824953d28f74eebc50ab",
       "review": "ae75ea2e5f19276162b99108b1ef4cbae0c1b51e53e751efa083c2dc75f0c199",
-      "spec": "6904c8cbe7930f3182d320ec2c9a6a0eb43d9aec17f1caccaa637620ba61bdb6",
+      "spec": "424819fa06d9946b15a3c9c43a0ff5ce85b18c476713b292da42fa2c1f1747d2",
       "uninstall": "7c800cfe3a114b04f7d23136414170aec68388d4ac075574669fc7b160d76eda",
       "verify": "04bb5eb82693d48dfa6c91f7257922a955288137d64371296da523398f0969c7",
-      "wrapup": "044c6a002cca4eb6c2047948b241c3e5d6d308eda43817b20f674abf7e2532ba"
+      "wrapup": "7ef3867a3f5627e98b2c647c6a80480c3256c25631ed79ed0220e2c34e6155ad"
     },
     "auto_safe@block": {
       "configure": "63d088f8015f864f8ae06fadf65a9ccfbaf076fcb8c0852ce3c5bac987d4bd3a",
@@ -43,10 +43,10 @@
       "metrics": "7de52fe603110d4ee647c68b93b30807113e42b482c33d63ca6ca9bf43cb7e52",
       "research": "f1145ecd9244df0e5628d2239c0d44594863afa96ee3b351ed52279867b55c0f",
       "review": "a8fca0e88b221615d0eeb7a6c693b9869e3c4a80f33ee23942737e3172e126ab",
-      "spec": "2e7e4f343f2bf258bdfef33fd69fccb3e309f0709603426e67538b8eb6ba127a",
+      "spec": "30131df367def8d31251c696f7d245c6c5626471760a3b8ddea0ae71f509970c",
       "uninstall": "7c800cfe3a114b04f7d23136414170aec68388d4ac075574669fc7b160d76eda",
       "verify": "57c58d29e62be92d279307176da7752dfceed08530e8fdad4590d51f4e81154a",
-      "wrapup": "84ebe55cd174311dcdb5f7684aad6ede821f127f19e917b08b020195dfca1124"
+      "wrapup": "c4912ce7e5aca68e2d4b81d9af156b2e6c0dc02b4e8bb2122f2c865a856dba32"
     },
     "auto_safe@warn": {
       "configure": "63d088f8015f864f8ae06fadf65a9ccfbaf076fcb8c0852ce3c5bac987d4bd3a",
@@ -59,10 +59,10 @@
       "metrics": "7de52fe603110d4ee647c68b93b30807113e42b482c33d63ca6ca9bf43cb7e52",
       "research": "f1145ecd9244df0e5628d2239c0d44594863afa96ee3b351ed52279867b55c0f",
       "review": "a8fca0e88b221615d0eeb7a6c693b9869e3c4a80f33ee23942737e3172e126ab",
-      "spec": "3f4abb53a0880403b7803dca469b4c9c7dbc924cb92fe1fc6692a9aecf9f0528",
+      "spec": "4cf97171dd4eaf38ba9da83183aa70230896ad66affd26b697c3aa356456c0c2",
       "uninstall": "7c800cfe3a114b04f7d23136414170aec68388d4ac075574669fc7b160d76eda",
       "verify": "76f39ce9bcdbfae0aebe2c71cafa3dc57c523fa2234775c20ac57e2a317e7c3b",
-      "wrapup": "07c0509aac063f8dd1c4003e6c5012f514893b48e9e8e6eceff689e06125c7ef"
+      "wrapup": "69b8db8cd9b2f62585bfed4c03e38e0261a9cb12992803cb2d729f012043119c"
     }
   },
   "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",

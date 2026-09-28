@@ -1,0 +1,290 @@
+schema_version: 3
+spec_slug: intent-file-inputs
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: New parsing logic in intent.py; T2 targeted mutation
+  over the file-reading helper.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/intent.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: File value equals inline value
+  type: property
+  test_ids:
+  - tests/unit/test_intent_file_inputs.py::test_file_equals_inline
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'The oracle is the generated original x itself: each stored field
+    is compared to x, not to the other path, so a shared normaliser that alters both
+    paths still fails; timestamps are excluded and each call uses a fresh root.'
+  oracle_independence_waiver: null
+  input_domain: non-empty Unicode text not ending in a newline, including quotes,
+    backticks, $ and embedded newlines
+  transformation: write x plus 0-2 trailing newlines to a file and pass --<name>-file;
+    separately pass --<name> x inline; each on a fresh root
+  expected_relation: stored field via file == x and stored field via inline == x (timestamp
+    fields excluded)
+  preconditions:
+  - text is non-empty after removing trailing newlines
+  observable_output: intent record fields read back from disk
+  generator_hint: hypothesis text() filtered to non-empty, not ending in newline
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Metacharacters stored verbatim
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_file_inputs.py::test_metacharacters_verbatim
+  executable_predicate: stored_value == PAYLOAD
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: PAYLOAD is a fixed string written in the test from the SPEC's listed
+    characters (quote, double quote, backtick, $(...), newline), not derived from
+    the implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Ambiguous or empty input refused
+  type: parametric
+  test_ids:
+  - tests/unit/test_intent_file_inputs.py::test_refused_inputs
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: both inline and file (single-valued)
+      flag: --claim
+    expected:
+      exit_nonzero: true
+      message_contains: --claim
+      artefacts_unchanged: true
+    edge: false
+    note: both-forms-single
+  - input:
+      case: both inline and file (multi-item)
+      flag: --scope
+    expected:
+      exit_nonzero: true
+      message_contains: --scope
+      artefacts_unchanged: true
+    edge: false
+    note: both-forms-list
+  - input:
+      case: required argument in neither form
+      flag: --note
+    expected:
+      exit_nonzero: true
+      message_contains: --note
+      artefacts_unchanged: true
+    edge: false
+    note: neither-form
+  - input:
+      case: missing file
+      flag: --text-file
+    expected:
+      exit_nonzero: true
+      message_contains: --text
+      artefacts_unchanged: true
+    edge: false
+    note: missing-file
+  - input:
+      case: non-UTF-8 file
+      flag: --evidence-file
+    expected:
+      exit_nonzero: true
+      message_contains: --evidence
+      artefacts_unchanged: true
+    edge: false
+    note: non-utf8
+  - input:
+      case: file holding only newlines
+      flag: --title-file
+    expected:
+      exit_nonzero: true
+      message_contains: --title
+      artefacts_unchanged: true
+    edge: false
+    note: empty-value
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each refusal case, the argument its message must name, and the
+    artefact set (intent.yaml, intent/*.md, intent/metrics.yaml, the intent ledger)
+    were fixed by the DRI in interview Rounds 1-3 before implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Multi-item file parsing
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_file_inputs.py::test_scope_file_lines
+  executable_predicate: all(parsed[flag] == ["alpha item", "beta item"] for flag in
+    ("scope", "out_of_scope", "declined")) and all(zero_item_refused[flag] for flag
+    in ("scope", "out_of_scope", "declined"))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The file content with surrounding spaces and a blank line, its
+    expected two-item list, and the zero-item refusal follow the DRI's Round-2 rule,
+    written before implementation, for all three list arguments.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Rendered recipes carry no inline free text
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_file_inputs.py::test_recipes_carry_no_inline_text
+  executable_predicate: EXPECTED_CALL_SITES <= present_call_sites(renders) and not
+    covered_inline_flags(renders) and all(write_tool_mktemp_instruction(surface) for
+    surface in SURFACES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected call-site set and the covered flag list are fixed
+    in the SPEC (S5 and the covered-argument list); the check reads real Claude and
+    Codex renders.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Inline invocations unchanged
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_doc_new.py
+  - tests/unit/test_intent_doc_record.py
+  - tests/unit/test_intent_vocabulary.py
+  executable_predicate: existing_intent_tests_exit_code == 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: These CLI behaviour tests predate this change, pass inline values,
+    and are not edited by this task (render tests pinning old recipe text may change).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Mixed forms in one call
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_file_inputs.py::test_mixed_forms
+  executable_predicate: record.title == TITLE and record.statement == STATEMENT
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: TITLE and STATEMENT are fixed strings in the test; the per-argument
+    form rule was set by the DRI in Round 1-3.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: 'Add --text-file, --claim-file, --evidence-file, --note-file, --title-file,
+    --statement-file, --scope-file, --out-of-scope-file and --declined-file to the
+    public hm intent CLI, with fixed value semantics: UTF-8; single values = content
+    minus trailing newlines, empty refused; multi-item = one item per non-empty stripped
+    line, zero items refused'
+  category: public API/CLI contract
+  rationale: Rendered harnesses will write files to these semantics; removing a flag
+    or changing the semantics later breaks them.
+  source: spec
+approval:
+  kind: human
+  content_hash: 4cfccb34b0a6f6093772503f490664f2b93d9ecda1cecba3bbcda71efabaeb1f
+  approved_by: Ecro
+  approved_at: '2026-09-27T23:18:40Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 194653c2fdd427f0441ba73614c86f38f07f3ea1736d197598880da31bc56709
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: 5efba88e105e7bfe7418736d6d58cff33a784ec08f8f309d72dece62ca665b29
+    paths_to_mutate: b0b2e4b228a6ea168b008983cb28613b7fa31d977a7f61b46ec59f7f3a14df70
+    irreversible_decisions: e5227a38397b3a247821edc1f54388172f3c12839f6633df6fdba3927a6ade64
+    AC-001: 51ed6132d3cf45e969124a4e4585365991524e69cfcb85f4bfb64d12239fbf86
+    AC-002: 3855beaeafce9dfa26b49bac417b63949198b0c7c64b218d4bdb9532ba54365c
+    AC-003: c8222f4a48a52cf679093c2efb296847659e51405f7bb259431a9bd9c17da94d
+    AC-004: d25f032792ae46cc3fbff7824780140487fc9b095250a8235b54919a7d30a50f
+    AC-005: fde28f9baac1d1bd2a8e59a7d8341dab03ee71bd0ec944510d574599861ffff3
+    AC-006: cb5963f4fc611f48982e176d295f486b0da3811acdc784c790269d80bb419ab0
+    AC-007: f0b137dc7afb38523059f1a3aca7dad556652a6cc72e2ff231540eb90340b8be
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c

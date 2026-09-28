@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`hm intent` reads free text from files.** Every free-text argument of the write verbs has a
+  `-file` twin: `--claim-file`, `--text-file` (`question add/observe/resolve`),
+  `--evidence-file` (`metric record`), `--note-file` (`close`), `--title-file`,
+  `--statement-file`, `--scope-file`, `--out-of-scope-file`, `--declined-file` (`new`). A file
+  is read as UTF-8; a single value keeps its content minus trailing newlines, a list takes one
+  item per non-empty line, and an empty value or list is refused. Each argument takes exactly one
+  form (at most one when optional), and every refusal happens before anything is written. The
+  inline flags are unchanged.
+
+### Changed
+
+- **Rendered intent writes carry paths, not text.** wrapup Step 5.7, spec Step 4.9, the
+  intent-layer skill and project-knowledge's hand-off now tell the agent to write each value
+  with the Write tool to a `mktemp -t hm-intent.XXXXXXXX` path outside the repo and pass it
+  through the `-file` flag. This closes the prompt-only quote-breakout residual accepted in
+  sdlc-three-loops-gap. The recipes need this release of the CLI; a harness rendered from it
+  fails against an older plugin cache.
+
 ### Changed
 
 - **One boundary between `[wiki:fact]` and intent questions**, rendered in both the

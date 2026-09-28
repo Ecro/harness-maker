@@ -208,12 +208,12 @@ def _wrapup(target: Target) -> str:
 
 @pytest.mark.parametrize("target", list(SKILL_PATHS), ids=["claude", "codex"])
 def test_wrapup_intent_writes_single_quote_inline_values(target: Target) -> None:
+    # Superseded by SPEC-intent-file-inputs: text reaches these calls through `-file` paths, so
+    # no quoting of any kind is left on the line. Kept as a guard that the inline forms stay out.
     lines = [ln for ln in _wrapup(target).splitlines() if any(c in ln for c in _INTENT_WRITE_CALLS)]
     assert lines, "no intent write call rendered in wrapup"
     for flag in ("--claim", "--text", "--note"):
-        assert not [ln for ln in lines if f'{flag} "' in ln], flag
-    assert any("--claim '" in ln for ln in lines)
-    assert any("--note '" in ln for ln in lines)
-    # Single quotes make `$` and backticks inert; only an embedded quote can end the argument,
-    # so the instruction must sit next to the calls, not only in a file 5.7 points to.
-    assert _wrapup(target).count("(no `'` inside)") == 3
+        assert not [ln for ln in lines if f"{flag} '" in ln or f'{flag} "' in ln], flag
+    assert any("--claim-file" in ln for ln in lines)
+    assert any("--text-file" in ln for ln in lines)
+    assert any("--note-file" in ln for ln in lines)

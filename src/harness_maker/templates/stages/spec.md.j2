@@ -505,17 +505,17 @@ Only when Step 0.5 recorded consent. Read `{{ '.agents' if is_codex else '.claud
 and complete its mandatory deep interview and quality review with the creator; reuse this interview's
 answers, ask about remaining intent gaps, and confirm the concrete draft before writing. Without answers,
 leave the draft in conversation and continue with no intent link. Derive from the interview + RESEARCH: `<ID>` = `OBJ-` +
-the task slug upper-cased, `--title`, `--statement`, one `--scope` per in-scope item,
+the task slug upper-cased, the title, the statement, and the in-scope items one per line — each written with the Write tool to its own path from `mktemp -t hm-intent.XXXXXXXX` (outside the repo), never inline,
 `--metric` = the metric the interview named (none fits → say so and skip). Show the
 arguments, run once:
 
 {% if is_codex %}
 ```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm intent new <ID> --title '<title>' --statement '<statement>' --scope '<item>' --metric <outcome-id> --from-proposal --candidates 1")
+Bash("uv run --with {{ harness_maker_src_path }} hm intent new <ID> --title-file <title path> --statement-file <statement path> --scope-file <scope path> --metric <outcome-id> --from-proposal --candidates 1")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm intent new <ID> --title "<title>" --statement "<statement>" --scope "<item>" --metric <outcome-id> --from-proposal --candidates 1
+!uv run --with {{ harness_maker_src_path }} hm intent new <ID> --title-file <title path> --statement-file <statement path> --scope-file <scope path> --metric <outcome-id> --from-proposal --candidates 1
 ```
 {% endif %}
 

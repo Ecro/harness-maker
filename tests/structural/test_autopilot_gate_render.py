@@ -28,6 +28,14 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-28, `intent-file-inputs`** — `spec` and `wrapup` moved, in all four arms: spec Step
+  4.9's `hm intent new` and wrapup Step 5.7's `question observe` / `question add` / `close` now
+  pass free text through `--title-file` / `--statement-file` / `--scope-file` /
+  `--text-file` / `--claim-file` / `--note-file` paths written with the Write tool, instead of
+  inline quoted values (SPEC-intent-file-inputs, closing the accepted residual P1 of
+  sdlc-three-loops-gap). Verified before re-capture that `spec` and `wrapup` are the ONLY moved
+  commands in every arm and that no command was added or removed. Its review round 1 moved
+  `wrapup` alone once more: the `add` preview prose named `--text`, now "the why text".
 - **2026-09-27, `sdlc-three-loops-gap` (review confirm-1 repair)** — `wrapup` alone moved, in all
   four arms: Step 5.7's Claude-branch `hm intent question add/observe` and `hm intent close`
   calls now single-quote `--claim` / `--text` / `--note` (they were double-quoted, so `$(...)` or

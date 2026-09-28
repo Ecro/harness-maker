@@ -32,13 +32,13 @@ MANDATED_CALL_PREFIXES = {
 }
 ASK_TOKEN = {"claude": "AskUserQuestion", "codex": "request_user_input"}
 VERB_ARGUMENT_FORMS = (
-    "hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text"
+    "hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file"
     " --observed-at",
-    "hm intent question resolve <id> --status --claim",
-    "hm intent metric record <id> --value --observed-at --evidence",
-    "hm intent new <id> --title --statement --scope --metric",
+    "hm intent question resolve <id> --status --claim-file",
+    "hm intent metric record <id> --value --observed-at --evidence-file",
+    "hm intent new <id> --title-file --statement-file --scope-file --metric",
     "hm intent <approve|activate|drop|reopen> <id>",
-    "hm intent close <id> --observed <met|missed|no_data> --note",
+    "hm intent close <id> --observed <met|missed|no_data> --note-file",
 )
 TRIGGER_PHRASES = ("observed", "close", "approve", "drop", "record", "where")
 ORDERED_RULE = (

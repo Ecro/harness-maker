@@ -61,7 +61,9 @@ def _metric_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = intent._parser().parse_args(sys.argv[1:] if argv is None else argv)
+    parser = intent._parser()
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    intent.resolve_file_args(parser, args)
     migration = args.cmd == "migrate"
     if args.cmd in {"new", "approve", "activate", "drop", "reopen", "close", "show"}:
         args.verb = args.cmd

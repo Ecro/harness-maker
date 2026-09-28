@@ -33,12 +33,12 @@ GAP_SOURCE = "`hm intent status --json`"
 ASK_TOKEN = {"claude": "AskUserQuestion", "codex": "request_user_input"}
 MANDATED = {"claude": ("!uv run", "!python -m", "!hm "), "codex": ('Bash("uv run', 'Bash("hm ')}
 SKILL_ADD_FORM = (
-    "hm intent question add <id> --claim --status <open|confirmed|wrong>"
-    " [--text --observed-at [--locator <path:A-B>]]"
+    "hm intent question add <id> --claim-file --status <open|confirmed|wrong>"
+    " [--text-file --observed-at [--locator <path:A-B>]]"
 )
 SKILL_OBSERVE_FORM = (
-    "hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text"
-    " --observed-at [--claim] [--locator <path:A-B>]"
+    "hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file"
+    " --observed-at [--claim-file] [--locator <path:A-B>]"
 )
 
 

@@ -433,6 +433,79 @@ def is_not_filled_in(intent: Intent) -> bool:
     return not intent.mission.strip() and not intent.outcomes
 
 
+#: Every free-text argument of the write verbs and its file twin: (dest, file dest, flag, multi).
+#: Rendered recipes pass the file form so operator text never lands on a shell command line.
+FILE_TWINS: tuple[tuple[str, str, str, bool], ...] = (
+    ("claim", "claim_file", "--claim", False),
+    ("text", "text_file", "--text", False),
+    ("evidence", "evidence_file", "--evidence", False),
+    ("note", "note_file", "--note", False),
+    ("title", "title_file", "--title", False),
+    ("hypothesis", "hypothesis_file", "--statement", False),
+    ("scope", "scope_file", "--scope", True),
+    ("non_scope", "non_scope_file", "--out-of-scope", True),
+    ("declined", "declined_file", "--declined", True),
+)
+
+
+def _pair(
+    parser: argparse.ArgumentParser,
+    flag: str,
+    *,
+    dest: str,
+    required: bool,
+    multi: bool = False,
+) -> None:
+    """An inline flag and its `-file` twin: exactly one when required, at most one otherwise.
+
+    Refuses a pair FILE_TWINS does not list: `resolve_file_args` reads only that table, so an
+    unlisted twin would parse and then reach its handler as None.
+    """
+    if (dest, f"{dest}_file", flag, multi) not in FILE_TWINS:
+        raise ValueError(
+            f"{flag}: add ({dest!r}, {dest + '_file'!r}, {flag!r}, {multi}) to FILE_TWINS"
+        )
+    group = parser.add_mutually_exclusive_group(required=required)
+    if multi:
+        group.add_argument(flag, action="append", default=None, dest=dest)
+    else:
+        group.add_argument(flag, default=None, dest=dest)
+    group.add_argument(f"{flag}-file", default=None, dest=f"{dest}_file", metavar="PATH")
+
+
+def _read_text_file(parser: argparse.ArgumentParser, flag: str, raw: str) -> str:
+    try:
+        data = Path(raw).read_bytes().decode("utf-8")
+    except OSError as exc:
+        parser.error(f"argument {flag}-file: cannot read {raw}: {exc.strerror or exc}")
+    except UnicodeDecodeError:
+        parser.error(f"argument {flag}-file: {raw} is not UTF-8 text")
+    return data
+
+
+def resolve_file_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Replace every given `-file` twin with its value before any handler runs.
+
+    Single values drop only trailing newlines; list values take one item per non-empty
+    stripped line. An empty result is refused. Inline values are never touched.
+    """
+    for dest, file_dest, flag, multi in FILE_TWINS:
+        raw = getattr(args, file_dest, None)
+        if raw is None:
+            continue
+        data = _read_text_file(parser, flag, raw)
+        if multi:
+            items = [line.strip() for line in data.splitlines() if line.strip()]
+            if not items:
+                parser.error(f"argument {flag}-file: {raw} holds no items (one per line)")
+            setattr(args, dest, items)
+        else:
+            value = data.rstrip("\n")
+            if not value:
+                parser.error(f"argument {flag}-file: {raw} is empty")
+            setattr(args, dest, value)
+
+
 def _parser() -> argparse.ArgumentParser:
     from harness_maker import world
 
@@ -450,23 +523,23 @@ def _parser() -> argparse.ArgumentParser:
     ob = asub.add_parser("observe")
     ob.add_argument("id")
     ob.add_argument("--relation", required=True, choices=world.RELATIONS)
-    ob.add_argument("--text", required=True)
+    _pair(ob, "--text", dest="text", required=True)
     ob.add_argument("--observed-at", required=True, dest="observed_at")
-    ob.add_argument("--claim", default=None)
+    _pair(ob, "--claim", dest="claim", required=False)
     ob.add_argument("--locator", default=None)
     ob.add_argument("--json", action="store_true")
     ad = asub.add_parser("add")
     ad.add_argument("id")
-    ad.add_argument("--claim", required=True)
+    _pair(ad, "--claim", dest="claim", required=True)
     ad.add_argument("--status", required=True, choices=("open", "confirmed", "wrong"))
-    ad.add_argument("--text", default=None)
+    _pair(ad, "--text", dest="text", required=False)
     ad.add_argument("--observed-at", default=None, dest="observed_at")
     ad.add_argument("--locator", default=None)
     ad.add_argument("--json", action="store_true")
     rs = asub.add_parser("resolve")
     rs.add_argument("id")
     rs.add_argument("--status", required=True, choices=("open", "confirmed", "wrong"))
-    rs.add_argument("--claim", required=True)
+    _pair(rs, "--claim", dest="claim", required=True)
     rs.add_argument("--json", action="store_true")
 
     o = sub.add_parser("metric")
@@ -475,7 +548,7 @@ def _parser() -> argparse.ArgumentParser:
     rc.add_argument("id")
     rc.add_argument("--value", required=True, type=float)
     rc.add_argument("--observed-at", required=True, dest="observed_at")
-    rc.add_argument("--evidence", required=True)
+    _pair(rc, "--evidence", dest="evidence", required=True)
     rc.add_argument("--json", action="store_true")
     ms = osub.add_parser("measure")
     ms.add_argument("id", nargs="?", default=None)
@@ -488,14 +561,14 @@ def _parser() -> argparse.ArgumentParser:
     # the registry must list every one, so a loop over a tuple would hide six verbs from it.
     nw = jsub.add_parser("new")
     nw.add_argument("id")
-    nw.add_argument("--title", required=True)
-    nw.add_argument("--statement", required=True, dest="hypothesis")
-    nw.add_argument("--scope", action="append", required=True)
+    _pair(nw, "--title", dest="title", required=True)
+    _pair(nw, "--statement", dest="hypothesis", required=True)
+    _pair(nw, "--scope", dest="scope", required=True, multi=True)
     nw.add_argument("--metric", required=True, dest="outcome_id")
-    nw.add_argument("--out-of-scope", action="append", default=None, dest="non_scope")
+    _pair(nw, "--out-of-scope", dest="non_scope", required=False, multi=True)
     nw.add_argument("--from-proposal", action="store_true", dest="from_proposal")
     nw.add_argument("--candidates", type=int, default=None)
-    nw.add_argument("--declined", action="append", default=None)
+    _pair(nw, "--declined", dest="declined", required=False, multi=True)
     nw.add_argument("--json", action="store_true")
     ap = jsub.add_parser("approve")
     ac = jsub.add_parser("activate")
@@ -509,7 +582,7 @@ def _parser() -> argparse.ArgumentParser:
     cl = jsub.add_parser("close")
     cl.add_argument("id")
     cl.add_argument("--observed", required=True, choices=world.OBSERVED_VALUES)
-    cl.add_argument("--note", required=True)
+    _pair(cl, "--note", dest="note", required=True)
     cl.add_argument("--json", action="store_true")
     return parser
 

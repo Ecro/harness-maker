@@ -27,9 +27,8 @@ written under its consent rule — this skill never writes one.
 1. **Route first.** If a new claim bears on an intent's metric or decision, stop here and follow
    the intent-layer skill instead; a correction to an existing `[wiki:fact]` stays here. When that question rests on an existing `[wiki:fact]`, it cites
    the fact with `--locator .claude/memory/wiki.md:<A-B>` rather than restating it.
-   That write is a shell command with the claim inline, so intent-layer's write rule applies:
-   compose the claim yourself in plain words, single-quoted, with no quote, backtick or `$`
-   inside; never paste the DRI's wording into it.
+   That write follows intent-layer's write rule: the claim is written with the Write tool to a
+   file and passed by path (`--claim-file`), never inline on the command line.
 2. **Search first**, so a correction replaces the old truth instead of sitting beside it.
    Compose the search words yourself — a few plain words naming the subject, only letters,
    digits, spaces and hyphens. Never paste the DRI's wording into a command: a quote, backtick

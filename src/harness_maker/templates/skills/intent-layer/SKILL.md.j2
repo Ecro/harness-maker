@@ -25,19 +25,19 @@ Workflow feedback: read and follow `references/workflow-feedback.md` at workflow
 
 ```
 hm intent status --json
-hm intent question add <id> --claim --status <open|confirmed|wrong> [--text --observed-at [--locator <path:A-B>]]
-hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text --observed-at [--claim] [--locator <path:A-B>]
-hm intent question resolve <id> --status --claim
-hm intent metric record <id> --value --observed-at --evidence
-hm intent new <id> --title --statement --scope --metric [--out-of-scope] [--from-proposal --candidates <N> [--declined <title>]…]
+hm intent question add <id> --claim-file --status <open|confirmed|wrong> [--text-file --observed-at [--locator <path:A-B>]]
+hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file --observed-at [--claim-file] [--locator <path:A-B>]
+hm intent question resolve <id> --status --claim-file
+hm intent metric record <id> --value --observed-at --evidence-file
+hm intent new <id> --title-file --statement-file --scope-file --metric [--out-of-scope-file] [--from-proposal --candidates <N> [--declined-file]]
 hm intent <approve|activate|drop|reopen> <id>
-hm intent close <id> --observed <met|missed|no_data> --note
+hm intent close <id> --observed <met|missed|no_data> --note-file
 hm intent show <id> --json
 ```
 
 Prefix each with `uv run --with {{ harness_maker_src_path }}` as every other mandated call
 in this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp; `supersedes`
-needs `--claim`; `close` needs both `--observed` and `--note`.
+needs `--claim-file`; `close` needs both `--observed` and `--note-file`. Each `-file` flag takes a path (list flags: one item per line).
 `--locator <path:A-B>` cites at most 40 lines of this checkout by content; `status --json` then
 reports `stale_evidence` when that text changed (approval checks never read cited files).
 
@@ -46,7 +46,7 @@ reports `stale_evidence` when that text changed (approval checks never read cite
 1. Work out the verb and its arguments from what the operator said; read `status` first when
    an id is ambiguous.
 2. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}, showing the exact arguments
-   you are about to pass; compose `--claim`/`--text`/`--note` yourself, single-quoted, with no quote, backtick or `$` inside.
+   you are about to pass; write every free-text value with the Write tool to its own path from `mktemp -t hm-intent.XXXXXXXX` (outside the repo) and pass the path — never text inline.
 3. On an affirmative answer, run the write once with those arguments and show the CLI's
    `changed:` line.
 4. Otherwise — on any other answer or no answer — write nothing. Do not retry, rephrase or infer consent.
@@ -102,8 +102,8 @@ reuse existing answers and interview only for changed or missing decisions. Neve
    answer every candidate before the first write: the declined titles go into every accepted
    record's `rejected[]`.
 5. Then, once per accepted candidate, show the exact arguments and run
-   `hm intent new <ID> … --from-proposal --candidates <N> --declined "<title>"…`
-   only after its deep interview and quality review (`N` = candidates shown; one `--declined` per no).
+   `hm intent new <ID> … --from-proposal --candidates <N> [--declined-file <path>]`
+   only after its deep interview and quality review (`N` = candidates shown; the declined file holds one title per no, one per line — omit it when every candidate was accepted).
    Nothing else persists a candidate.
 6. The record is `proposed`; the proposer never runs `approve` — that stamp is the operator's.
 
