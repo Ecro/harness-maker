@@ -93,6 +93,8 @@ _LOOP_MARKER_GITIGNORE_PATTERN = ".claude/.hm-loop-*"
 # that may belong to a peer.
 _TASK_MARKER_PREFIX = ".hm-task-"
 _TASK_MARKER_GITIGNORE_PATTERN = ".claude/.hm-task-*"
+_COPY_PENDING_PREFIX = ".hm-copy-pending-"
+_COPY_PENDING_GITIGNORE_PATTERN = ".claude/.hm-copy-pending-*"
 
 # PLAN-worktree-base-artifact-pollution ADR-002/ADR-003: single source of
 # truth for harness-generated CHURN paths. The gitignore set AND both
@@ -147,6 +149,7 @@ _HARNESS_CHURN_GLOBS: tuple[str, ...] = (
     ".claude/.hm-autopilot*",
     ".claude/.hm-review-run-*",
     _TASK_MARKER_GITIGNORE_PATTERN,
+    _COPY_PENDING_GITIGNORE_PATTERN,
 )
 # Patterns appended to the user's .gitignore (ADR-002) — dirs + exact files + globs.
 # The Phase 2 sync test asserts this equals the dir+file+glob union so the gitignore
@@ -481,8 +484,10 @@ def create(
     reservation = _reservation_path(base, name)
     _ensure_gitignore_entry(base, _RESERVATION_GITIGNORE_PATTERN)
     atomic_write(reservation, f"{session_uuid}\n")
+    rollback_incomplete = False
     try:
-        _run(["git", "worktree", "add", "-b", name, str(primary_wt)], cwd=base)
+        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+            _run(["git", "worktree", "add", "-b", name, str(primary_wt)], cwd=base)
 
         # Create sibling worktrees
         sibling_wts: list[Path] = []
@@ -491,26 +496,42 @@ def create(
                 sib_name = f"{name}-{slug}"
                 (sibling / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
                 sib_wt = sibling / WORKTREE_DIR_NAME / sib_name
-                _run(["git", "worktree", "add", "-b", sib_name, str(sib_wt)], cwd=sibling)
+                with _acquire_merge_fence(sibling, timeout=_FENCE_TIMEOUT):
+                    _run(["git", "worktree", "add", "-b", sib_name, str(sib_wt)], cwd=sibling)
                 sibling_wts.append(sib_wt)
-        except RuntimeError:
+        except (RuntimeError, OSError):
             # Rollback: remove all already-created worktrees (including primary) so
             # no orphaned git worktrees accumulate without a marker or cleanup path.
             for created_wt, sib in zip(sibling_wts, siblings[: len(sibling_wts)], strict=False):
-                with contextlib.suppress(RuntimeError):
-                    _run(["git", "worktree", "remove", "--force", str(created_wt)], cwd=sib)
-            with contextlib.suppress(RuntimeError):
-                _run(["git", "worktree", "remove", "--force", str(primary_wt)], cwd=base)
+                try:
+                    with _acquire_merge_fence(sib, timeout=_FENCE_TIMEOUT):
+                        _run(["git", "worktree", "remove", "--force", str(created_wt)], cwd=sib)
+                except (RuntimeError, OSError) as cleanup_exc:
+                    rollback_incomplete = True
+                    print(
+                        f"[worktree] rollback pending for {created_wt}: {cleanup_exc}",
+                        file=sys.stderr,
+                    )
+            try:
+                with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+                    _run(["git", "worktree", "remove", "--force", str(primary_wt)], cwd=base)
+            except (RuntimeError, OSError) as cleanup_exc:
+                rollback_incomplete = True
+                print(
+                    f"[worktree] rollback pending for {primary_wt}: {cleanup_exc}",
+                    file=sys.stderr,
+                )
             raise
 
         all_wts = [primary_wt, *sibling_wts]
         _write_loop_marker(base, primary_wt.name, all_wts, claude_session_id=claude_session_id)
         return all_wts
     finally:
-        reservation.unlink(missing_ok=True)
+        if not rollback_incomplete:
+            reservation.unlink(missing_ok=True)
 
 
-def cleanup(wt_path: Path, on_success: bool) -> None:
+def cleanup(wt_path: Path, on_success: bool, *, already_fenced: bool = False) -> None:
     """Remove the given worktree.
 
     On success: force removal (drop the branch's working copy unconditionally).
@@ -525,7 +546,11 @@ def cleanup(wt_path: Path, on_success: bool) -> None:
         args.append("--force")
     args.append(str(wt))
     try:
-        _run(args, cwd=base)
+        if already_fenced:
+            _run(args, cwd=base)
+        else:
+            with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+                _run(args, cwd=base)
     except RuntimeError:
         # Failure-path cleanup is best-effort: if removal fails (e.g. dirty
         # worktree on the failure branch), leave the directory for the user
@@ -664,6 +689,7 @@ _HARNESS_ARTIFACT_PREFIXES = (
     # PLAN-multisession-marker-scoping ADR-010/011: task markers, same reasoning — the
     # finalize dirt-filter reads this tuple and never the globs.
     ".claude/.hm-task-",
+    ".claude/.hm-copy-pending-",
 )
 
 
@@ -893,10 +919,20 @@ def _fenced_restore_base_dirty(base: Path, ref_sha: str) -> tuple[bool, str, lis
     already SHA-targeted (wrong-entry-safe), so the unfenced path is exactly the
     pre-change behavior.
     """
+    from harness_maker import intent_trial
+
+    trial_stash = intent_trial.stash_contains_protected_trial(base, ref_sha)
     try:
-        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+        with _acquire_merge_fence(base, timeout=5.0 if trial_stash else _FENCE_TIMEOUT):
+            # Re-check under the fence: a trial may have been activated while we waited.
+            if intent_trial.stash_contains_protected_trial(base, ref_sha):
+                return (False, "protected_trial_pending", [])
             return _restore_base_dirty(base, ref_sha)
     except (RuntimeError, TimeoutError):
+        # Re-check: a trial may have been activated during the wait, and the fallback
+        # below runs outside every fence.
+        if trial_stash or intent_trial.stash_contains_protected_trial(base, ref_sha):
+            return (False, "protected_trial_pending", [])
         return _restore_base_dirty(base, ref_sha)
 
 
@@ -2438,10 +2474,16 @@ def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
         # git the suppressed RuntimeError SKIPS the prune (never a bare prune,
         # which would re-open the de-registration race).
         if not dry_run and not _any_fresh_reservation(base):
-            _run(
-                ["git", "worktree", "prune", f"--expire={_git_expire_arg(_PRUNE_GRACE_SECONDS)}"],
-                cwd=base,
-            )
+            with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+                _run(
+                    [
+                        "git",
+                        "worktree",
+                        "prune",
+                        f"--expire={_git_expire_arg(_PRUNE_GRACE_SECONDS)}",
+                    ],
+                    cwd=base,
+                )
 
     if not dry_run:
         _reap_aged_reservations(base)
@@ -2703,7 +2745,8 @@ def cleanup_all(base_dir: Path, force: bool = False) -> int:
             args.append("--force")
         args.append(str(wt))
         try:
-            _run(args, cwd=base)
+            with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+                _run(args, cwd=base)
             removed += 1
             # ADR-013: `cleanup_all` is session-BLIND by design — a deliberate operator
             # sweep over every worktree — and is therefore the one caller permitted to
@@ -3607,7 +3650,40 @@ def _cli_finalize(args: list[str]) -> int:
                 # then the squash merge. The fence (a context manager) releases
                 # on every exit, INCLUDING the stash-failure path below.
                 try:
-                    with _acquire_merge_fence(base_repo, timeout=_FENCE_TIMEOUT):
+                    from harness_maker import intent_trial
+
+                    trial_paths = intent_trial.protected_trial_paths(base_repo)
+                    with _acquire_merge_fence(
+                        base_repo, timeout=5.0 if trial_paths else _FENCE_TIMEOUT
+                    ):
+                        trial_paths = intent_trial.protected_trial_paths(base_repo)
+                        if trial_paths:
+                            pending_trial = intent_trial.pending_trial_stashes(base_repo)
+                            if pending_trial:
+                                raise RuntimeError(
+                                    "protected trial stash recovery is pending: "
+                                    + str(pending_trial)
+                                )
+                            dirty_trial = [
+                                relative
+                                for relative in trial_paths
+                                if _run(
+                                    ["git", "status", "--porcelain", "--", relative],
+                                    cwd=base_repo,
+                                ).stdout.strip()
+                            ]
+                            branch_name = _run(
+                                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                                cwd=current_wt,
+                            ).stdout.strip()
+                            branch_trial = (
+                                set(_squash_path_set(base_repo, branch_name)) & trial_paths
+                            )
+                            if dirty_trial or branch_trial:
+                                raise RuntimeError(
+                                    "protected trial would be hidden or overwritten by finalize: "
+                                    + str(sorted(set(dirty_trial) | branch_trial))
+                                )
                         stash_ref = _stash_base_dirty(base_repo, current_wt.name)
                         staged_before = _snapshot_staged_paths(base_repo)
                         merge(current_wt, strategy=strategy, commit=auto_commit)
@@ -3917,6 +3993,13 @@ def _cli_post_commit_pop(args: list[str]) -> int:
 
             # Live session match — pop and clean up.
             wt_name = ref_file.name[len(_STASH_REF_PREFIX) :]
+            from harness_maker import intent_trial
+
+            if intent_trial.stash_contains_protected_trial(target_base, ref_sha):
+                # A trial activated since the stash was taken: never pop over its PLAN.
+                _emit_pop_failure_signal("protected_trial_pending", ref_sha, [], wt_name)
+                overall_rc = 1
+                continue
             ok, klass, files = _restore_base_dirty(target_base, ref_sha)
             if not ok:
                 _emit_pop_failure_signal(klass, ref_sha, files, wt_name)
@@ -4731,11 +4814,9 @@ def _copy_and_exclude_secrets(base: Path, wt: Path, include: list[str]) -> None:
     common_dir = Path(common) if Path(common).is_absolute() else (wt / common).resolve()
     exclude = common_dir / "info" / "exclude"
     exclude.parent.mkdir(parents=True, exist_ok=True)
-    existing = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
-    existing_lines = set(existing.splitlines())
     base_r = base.resolve()
     wt_r = wt.resolve()
-    new_lines: list[str] = []
+    copies: list[tuple[str, Path, Path]] = []
     for rel in include:
         if _path_owner(rel) == "external":  # absolute / `..`-escaping → skip
             continue
@@ -4754,15 +4835,32 @@ def _copy_and_exclude_secrets(base: Path, wt: Path, include: list[str]) -> None:
             _run(["git", "check-ignore", "-q", "--", rel], cwd=base)
         except RuntimeError:
             continue
+        copies.append((rel, src, dst))
+    # Every task worktree shares this file. Serialize the whole read/modify/write
+    # so a simultaneous task creation cannot erase another secret's exclusion.
+    with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+        existing = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
+        existing_lines = set(existing.splitlines())
+        new_lines: list[str] = []
+        for rel, _src, _dst in copies:
+            entry = _gitignore_literal(rel)
+            if entry not in existing_lines:
+                new_lines.append(entry)
+                existing_lines.add(entry)
+        if new_lines:
+            sep = "" if (not existing or existing.endswith("\n")) else "\n"
+            atomic_write(exclude, existing + sep + "\n".join(new_lines) + "\n")
+    # Publish every exclusion before copying any secret. A failed copy can
+    # leave a partial file in a worktree whose rollback is still pending.
+    for rel, src, dst in copies:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
-        entry = _gitignore_literal(rel)
-        if entry not in existing_lines:
-            new_lines.append(entry)
-            existing_lines.add(entry)
-    if new_lines:
-        sep = "" if (not existing or existing.endswith("\n")) else "\n"
-        atomic_write(exclude, existing + sep + "\n".join(new_lines) + "\n")
+        try:
+            _run(["git", "check-ignore", "-q", "--", rel], cwd=wt)
+        except RuntimeError as exc:
+            # An unignored secret must not outlive the failure, whichever path retries it.
+            dst.unlink(missing_ok=True)
+            raise RuntimeError(f"copied include is not ignored in task worktree: {rel}") from exc
 
 
 def task_create(
@@ -4813,8 +4911,25 @@ def task_create(
         pid=os.getpid(),
         allow_shared=allow_shared,
     )
+    rollback_incomplete = False
+    copy_pending = base / _LOOP_MARKER_DIR / f"{_COPY_PENDING_PREFIX}{wt.name}.json"
     try:
-        if not wt.is_dir():
+        if copy_pending.exists():
+            pending_include = json.loads(copy_pending.read_text(encoding="utf-8"))
+            if (
+                not isinstance(pending_include, list)
+                or not pending_include
+                or not all(isinstance(path, str) for path in pending_include)
+            ):
+                raise RuntimeError(f"invalid pending include record: {copy_pending}")
+            if include is not None and include != pending_include:
+                raise RuntimeError(f"pending include list differs at {copy_pending}")
+            include = pending_include
+        created_now = not wt.is_dir()
+        if created_now:
+            if include and not copy_pending.exists():
+                _ensure_gitignore_entry(base, _COPY_PENDING_GITIGNORE_PATTERN)
+                atomic_write(copy_pending, json.dumps(include))
             (base / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
             # Reattach an existing branch (persistent dir removed but branch kept)
             # instead of wedging on `-b ... already exists` (REVIEW Phase 2 P1).
@@ -4823,18 +4938,39 @@ def task_create(
                 if _branch_exists(base, branch)
                 else ["git", "worktree", "add", "-b", branch, str(wt)]
             )
-            _run(add, cwd=base)
-            if include:
-                try:
-                    _copy_and_exclude_secrets(base, wt, include)
-                except Exception:
-                    with contextlib.suppress(RuntimeError):
-                        _run(["git", "worktree", "remove", "--force", str(wt)], cwd=base)
-                    raise
+            # Trial collection inventories Git-registered worktrees while
+            # holding this same fence. Registration must not appear between
+            # its final source check and publication.
+            with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+                _run(add, cwd=base)
+        if include and copy_pending.exists():
+            try:
+                _copy_and_exclude_secrets(base, wt, include)
+            except Exception:
+                if created_now:
+                    try:
+                        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+                            _run(["git", "worktree", "remove", "--force", str(wt)], cwd=base)
+                    except (RuntimeError, OSError) as cleanup_exc:
+                        rollback_incomplete = True
+                        print(
+                            f"[worktree] rollback pending for {wt}: {cleanup_exc}; "
+                            "retry task creation after resolving the original copy error",
+                            file=sys.stderr,
+                        )
+                raise
+            copy_pending.unlink()
     except Exception:
-        # A failed `git worktree add` (e.g. the loser of a truly-simultaneous
-        # create race) must not strand the claim — roll back our own row only.
-        release_session(base, session_uuid=session_uuid)
+        # Keep the claim if Git still has a worktree after a failed add or a
+        # failed rollback. A retry can reattach to the deterministic path.
+        if not rollback_incomplete and not wt.is_dir():
+            copy_pending.unlink(missing_ok=True)
+            release_session(base, session_uuid=session_uuid)
+        elif not rollback_incomplete:
+            print(
+                f"[worktree] creation incomplete at {wt}; retry task creation to recover",
+                file=sys.stderr,
+            )
         raise
     # AFTER the worktree exists: a create that rolled back must leave no marker (ADR-008's
     # transition table — "create rollback → leave the marker" applies only to a marker that
@@ -4985,6 +5121,16 @@ def task_preflight(
     return wt, warnings
 
 
+def _trial_active(base: Path) -> bool:
+    """ADR-006: an unreadable trial directory counts as active, so evidence is never skipped."""
+    try:
+        from harness_maker import intent_trial
+
+        return bool(intent_trial.active_trials(base))
+    except Exception:
+        return True
+
+
 def _emit_stage_span(
     base: Path,
     *,
@@ -4993,12 +5139,13 @@ def _emit_stage_span(
     task_slug: str | None = None,
     claude_session_id: str | None = None,
 ) -> None:
-    """Never let telemetry break a stage: emission failure warns and proceeds.
+    """Require a task start while a trial is active; otherwise telemetry failures only warn.
 
     `stage=None` writes an EMPTY stage on purpose — see ADR-008: the reader maps it
     to `(unknown-stage)` and counts it, whereas normalising here would leave the
     absent-case counter at 0 forever.
     """
+    required = task_slug is not None and _trial_active(base)
     try:
         from .stage_spans import emit_event
 
@@ -5009,8 +5156,15 @@ def _emit_stage_span(
             session_id=claude_session_id or os.environ.get("HM_SESSION_ID") or None,
             git_branch=git_branch,
             task_slug=task_slug,
+            # Required trial evidence waits as long as a land or finalize may hold the same
+            # fence; a 5 s try failed preflight on normal contention.
+            fence_timeout=_FENCE_TIMEOUT if required else 5.0,
         )
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception as exc:
+        if required:
+            raise RuntimeError(
+                f"task start was not recorded for {task_slug}; retry task preflight"
+            ) from exc
         print(f"[span] emission failed (non-fatal): {exc}", file=sys.stderr)
 
 
@@ -5053,19 +5207,20 @@ def task_refresh(base_dir: Path, slug: str) -> int:
         )
         return 1
     try:
-        base_head = _run(["git", "rev-parse", "HEAD"], cwd=base).stdout.strip()
-    except RuntimeError as exc:
-        print(f"[refresh] cannot resolve base tip: {exc}", file=sys.stderr)
-        return 1
-    try:
-        _run(["git", "rebase", base_head], cwd=wt)
-    except RuntimeError as exc:
-        with contextlib.suppress(RuntimeError):
-            _run(["git", "rebase", "--abort"], cwd=wt)
-        print(
-            f"[refresh] rebase conflict; aborted, branch {branch} unchanged: {exc}",
-            file=sys.stderr,
-        )
+        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+            base_head = _run(["git", "rev-parse", "HEAD"], cwd=base).stdout.strip()
+            try:
+                _run(["git", "rebase", base_head], cwd=wt)
+            except RuntimeError as exc:
+                with contextlib.suppress(RuntimeError):
+                    _run(["git", "rebase", "--abort"], cwd=wt)
+                print(
+                    f"[refresh] rebase conflict; aborted, branch {branch} unchanged: {exc}",
+                    file=sys.stderr,
+                )
+                return 1
+    except (RuntimeError, OSError) as exc:
+        print(f"[refresh] cannot acquire source fence or resolve base tip: {exc}", file=sys.stderr)
         return 1
     # Diagnostics go to STDERR, never stdout (ADR-002 / Codex P2): preflight's
     # auto-refresh runs inside `_cli_task_preflight`, whose stdout contract is
@@ -5287,7 +5442,12 @@ def task_land(
     # `_capture_pending_in_worktree`, so the tip is the wrapup commit.
     msg = message or _branch_tip_message(base, branch) or f"chore({slug}): squash-land {branch}"
     try:
-        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+        from harness_maker import intent_trial
+
+        with _acquire_merge_fence(
+            base,
+            timeout=5.0 if intent_trial.protected_trial_paths(base) else _FENCE_TIMEOUT,
+        ):
             # In-fence re-check: a concurrent winner may have deleted the branch
             # since the pre-fence check (TOCTOU). Converge instead of re-squashing.
             if not _branch_exists(base, branch):
@@ -5301,11 +5461,27 @@ def task_land(
                 _converge_landed()
                 return 0
 
+            trial_protected = intent_trial.protected_trial_paths(base)
+            try:
+                trial_runtime = intent_trial.verified_trial_landing_paths(base)
+            except (OSError, ValueError) as exc:
+                print(f"[land] trial publication conflict: {exc}", file=sys.stderr)
+                return 1
+
             if _has_user_dirty_state(base):
                 dirty = _list_user_dirty_files(base)
                 print(
                     f"[land] base has uncommitted user changes — aborting land to "
                     f"avoid clobber: {dirty}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            copy_pending = base / _LOOP_MARKER_DIR / f"{_COPY_PENDING_PREFIX}{wt.name}.json"
+            if copy_pending.exists():
+                print(
+                    f"[land] task include copy is incomplete at {copy_pending}; "
+                    "retry task creation before landing",
                     file=sys.stderr,
                 )
                 return 1
@@ -5331,6 +5507,7 @@ def task_land(
             already = _read_landed_marker(base, branch) == _branch_tip(
                 base, branch
             ) or _branch_content_in_head(base, branch)
+            runtime_committed = False
 
             # SPEC-ai-native-sdlc ADR-005 — AFTER the capture (a late edit is on the branch,
             # so it is checked too) and BEFORE the squash. The branch and worktree survive.
@@ -5354,6 +5531,13 @@ def task_land(
                 )
             else:
                 touched = _squash_path_set(base, branch)
+                if set(touched) & trial_protected:
+                    print(
+                        f"[land] stale branch edits protected trial: "
+                        f"{sorted(set(touched) & trial_protected)}",
+                        file=sys.stderr,
+                    )
+                    return 1
                 if not touched:
                     # Empty path set in the NOT-already branch means the merge-base
                     # probe failed (unrelated histories) — `_branch_content_in_head`
@@ -5435,18 +5619,55 @@ def task_land(
                                 file=sys.stderr,
                             )
                             return 1
-                        to_unstage = sorted(staged_after - set(touched))
+                        if trial_runtime:
+                            _run(["git", "add", "--", *sorted(trial_runtime)], cwd=base)
+                            staged_after = _staged_files(base)
+                        to_unstage = sorted(staged_after - (set(touched) | trial_runtime))
                         if to_unstage:
                             _run(["git", "reset", "-q", "HEAD", "--", *to_unstage], cwd=base)
                         _run(["git", "commit", "-m", msg], cwd=base)
                         landed_sha = _run(["git", "rev-parse", "HEAD"], cwd=base).stdout.strip()
+                        runtime_committed = True
                 except RuntimeError as e:
                     _scoped_conflict_cleanup(base, touched, pre_untracked, preserve=pre_staged)
+                    newly_staged_trial = sorted(trial_runtime - pre_staged)
+                    if newly_staged_trial:
+                        with contextlib.suppress(RuntimeError):
+                            _run(
+                                ["git", "reset", "-q", "HEAD", "--", *newly_staged_trial],
+                                cwd=base,
+                            )
                     print(
                         f"[land] squash-merge of {branch} failed (conflict?); base "
                         f"reset clean, branch preserved for manual resolution: {e}",
                         file=sys.stderr,
                     )
+                    return 1
+
+            # An already-landed branch or an empty squash can still coincide with
+            # a newly published trial record. Persist that verified runtime delta
+            # before the branch is torn down, with unrelated staged files excluded.
+            if trial_runtime and not runtime_committed:
+                pre_staged_runtime = _staged_files(base)
+                try:
+                    _run(["git", "add", "--", *sorted(trial_runtime)], cwd=base)
+                    unrelated = sorted(_staged_files(base) - trial_runtime)
+                    if unrelated:
+                        _run(["git", "reset", "-q", "HEAD", "--", *unrelated], cwd=base)
+                    _run(
+                        ["git", "commit", "-m", "chore(intent): persist trial collection"],
+                        cwd=base,
+                    )
+                    landed_sha = _run(["git", "rev-parse", "HEAD"], cwd=base).stdout.strip()
+                except RuntimeError as e:
+                    newly_staged_trial = sorted(trial_runtime - pre_staged_runtime)
+                    if newly_staged_trial:
+                        with contextlib.suppress(RuntimeError):
+                            _run(
+                                ["git", "reset", "-q", "HEAD", "--", *newly_staged_trial],
+                                cwd=base,
+                            )
+                    print(f"[land] trial publication commit failed: {e}", file=sys.stderr)
                     return 1
 
             # Recovery anchor BEFORE teardown — NOT best-effort: without it a
@@ -5462,7 +5683,7 @@ def task_land(
 
             if wt.is_dir():
                 try:
-                    cleanup(wt, on_success=True)
+                    cleanup(wt, on_success=True, already_fenced=True)
                 except RuntimeError as e:
                     print(
                         f"[land] worktree cleanup failed (squash already in HEAD; "

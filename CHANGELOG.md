@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`intent_trial` collection is session-independent.** Trial cohort membership now derives
+  only from public `status`/`reconcile`/decision calls, never from a live process or PID — a
+  workflow-owning trigger writes a `trial_feedback` observation and a later, separate session's
+  ordinary reconcile call picks it up. Protected decisions (policy, source_review, assessment)
+  are typed, ID-keyed and conflict-checked against an expected destination revision, coordinated
+  with the repository merge fence so no unrelated prose can be swept into a land. Fixed a
+  worktree-name-match bug where a member's `source_refs` could capture unrelated files from a
+  different task's worktree when the directory name coincided with the task slug — refs now
+  bind to the task's exact artifact paths. An approved equal-time source-review order now
+  extends only when growth is unambiguous — a same-slug resume append or one later-acknowledged
+  task keeps the frozen order, but two or more later tasks that themselves tie fail closed; a
+  trial-less rejection keeps `_read`'s own classification instead of a generic catch-all. Task-
+  start span evidence is now fatal only while a trial is actually active — a project with no
+  active trial warns and proceeds instead of blocking preflight — and `status()` reads under the
+  same trial fence, returning `lock_busy`/`unsupported_lock` rather than falling through to an
+  unfenced read. `_publish` revalidates its destination immediately before writing, and both
+  restore paths (`post-commit-pop` and the fenced restore) now refuse to restore a stash that
+  holds a protected trial path, so a peer's in-flight trial state can never be overwritten by
+  someone else's stash pop.
+
 ## [0.60.5] - 2026-09-28
 
 ### Added

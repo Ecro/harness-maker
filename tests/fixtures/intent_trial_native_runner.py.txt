@@ -1,0 +1,162 @@
+"""Capture actual Codex A/B trial handoff and a missing-trigger control.
+
+Run manually from the task worktree. It never mutates the live project.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+from harness_maker.models import InterviewAnswers, ProjectProfile, Target
+from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.synthesize import synthesize
+from tests.unit import trial_fixture as fx
+
+WT = Path(__file__).resolve().parents[2]
+LAUNCHER = WT / ".venv/bin/python"
+TRIAL = fx.TRIAL
+ROOT = Path(tempfile.mkdtemp(prefix="hm-intent-continuity-native-"))
+BEFORE_B = ROOT.parent / f"{ROOT.name}-control"
+
+
+def files(root: Path) -> dict[str, str]:
+    watched = [fx.path(root), root / "work-docs/RESEARCH-a.md"]
+    return {
+        p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in watched
+        if p.exists()
+    }
+
+
+def run(root: Path, name: str, prompt: str) -> dict[str, Any]:
+    (root / f"{name}-prompt.txt").write_text(prompt)
+    cmd = [
+        "codex",
+        "exec",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--ephemeral",
+        "--skip-git-repo-check",
+        "--sandbox",
+        "danger-full-access",
+        "-C",
+        str(root),
+        "--json",
+        "-o",
+        str(root / f"{name}-result.txt"),
+        "-",
+    ]
+    with (
+        (root / f"{name}-events.jsonl").open("w") as out,
+        (root / f"{name}-stderr.txt").open("w") as err,
+    ):
+        proc = subprocess.run(cmd, input=prompt, text=True, stdout=out, stderr=err, timeout=300)
+    events = []
+    for line in (root / f"{name}-events.jsonl").read_text().splitlines():
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            pass
+    commands = [
+        item["item"].get("command", "")
+        for item in events
+        if item.get("type") == "item.completed"
+        and item.get("item", {}).get("type") == "command_execution"
+    ]
+    output = root / f"{name}-result.txt"
+    return {
+        "exit": proc.returncode,
+        "commands": commands,
+        "result": output.read_text() if output.exists() else "",
+        "stderr_tail": (root / f"{name}-stderr.txt").read_text()[-1000:],
+    }
+
+
+fx.build(ROOT)
+render(
+    synthesize(ProjectProfile(), InterviewAnswers(targets=[Target.CODEX])),
+    ROOT / ".claude",
+    freeze_time=DEFAULT_FREEZE_TIME,
+)
+(ROOT / "work-docs/RESEARCH-a.md").write_text(
+    "---\ntype: research\ntask_slug: a\n---\n# Task a research\n\nObserved an authorized decision at source.txt.\n"
+)
+(ROOT / "source.txt").write_text("Task a observation: source evidence available.\n")
+actor_prompt = f"""You are session A of an isolated research workflow. Record the factual task-start and observation in the existing work-docs/RESEARCH-a.md frontmatter as trial_feedback. Use stable IDs a-start and a-observation; both trial_id {TRIAL}, task_slug a, at {fx.T1}. Start kind=start. Observation kind=observation, evidence_refs=['source.txt','conversation:a'], decision='Continue authorized task'. Append one JSON line to .claude/observability/stage-spans.jsonl: schema_version=1,event=start,stage=hm:research,cwd/base_root={ROOT},task_slug=a,ts={fx.T1},session_id=A. This is ordinary source recording; the session ends after saving the source facts, before the next eligible stage entry. Do not evaluate or reconcile the shared trial in this session.\n"""
+A = run(ROOT, "session-a", actor_prompt)
+if A["exit"]:
+    raise RuntimeError(f"Session A failed: {A['stderr_tail']}")
+# Acknowledged typed start is sufficient for this fresh activated trial.
+from harness_maker import intent_trial
+
+a_status = intent_trial.status(ROOT, TRIAL)
+if a_status["candidates"] != ["a"] or a_status["cohort"]:
+    raise AssertionError(a_status)
+source_after_a = (ROOT / "work-docs/RESEARCH-a.md").read_text()
+shutil.copytree(ROOT, BEFORE_B)
+entry = (ROOT / ".agents/skills/hm-execute/SKILL.md").read_text()
+marker = "<!-- @hm:feedback-entry -->"
+block = entry.split(marker)[1].split("<!-- @hm:/feedback-entry -->")[0]
+base_prompt = f"""Fixture tool provisioning: invoke hm with `{LAUNCHER} -m harness_maker.hm`; do not install dependencies. This isolated fixture has a fresh activated trial, and you are a different session B entering the ordinary execute stage for task a. Execute the supplied stage-entry procedure and any directly referenced dependency in this project. Task instruction: resume the existing task and report its next action. No one has asked you to repair a trial. Do not discover unrelated skills or projects.\n\n"""
+positive = base_prompt + block
+negative = (
+    base_prompt
+    + "The stage-entry procedure is absent in this control. If no supplied operational step applies, report no action.\n"
+)
+pre = files(ROOT)
+B = run(ROOT, "session-b-present", positive)
+post = files(ROOT)
+C = run(BEFORE_B, "session-b-removed", negative)
+control = files(BEFORE_B)
+final = intent_trial.status(ROOT, TRIAL)
+control_status = intent_trial.status(BEFORE_B, TRIAL)
+assert B["exit"] == 0 and C["exit"] == 0
+assert final["cohort"] == ["a"] and control_status["cohort"] == []
+assert any("harness_maker.hm intent --root" in command and " trial reconcile " in command for command in B["commands"])
+assert not any(" trial reconcile " in command for command in C["commands"])
+assert pre["work-docs/PLAN-field-trial.md"] != post["work-docs/PLAN-field-trial.md"]
+assert pre["work-docs/PLAN-field-trial.md"] == control["work-docs/PLAN-field-trial.md"]
+observed = {
+    "root": str(ROOT),
+    "control_root": str(BEFORE_B),
+    "protocol_sha256": hashlib.sha256(
+        (
+            WT
+            / "src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2"
+        ).read_bytes()
+    ).hexdigest(),
+    "source_hash_before": pre,
+    "source_hash_after": post,
+    "control_hash_after": control,
+    "source_doc_after_a": source_after_a,
+    "trial_doc_after_b": fx.path(ROOT).read_text(),
+    "session_a": A,
+    "session_b": B,
+    "control": C,
+    "status_before_b": {k: a_status[k] for k in ("reason", "candidates", "cohort", "outcome")},
+    "status_after_b": {k: final[k] for k in ("reason", "candidates", "cohort", "outcome")},
+    "control_status": {k: control_status[k] for k in ("reason", "candidates", "cohort", "outcome")},
+}
+(WT / "tests/fixtures/intent_feedback_continuity_native_observed.json").write_text(
+    json.dumps(observed, indent=2, ensure_ascii=False) + "\n"
+)
+print(
+    json.dumps(
+        {
+            "root": str(ROOT),
+            "A": A["exit"],
+            "B": final["cohort"],
+            "control": control_status["cohort"],
+            "B_commands": B["commands"],
+        },
+        ensure_ascii=False,
+    ),
+    flush=True,
+)

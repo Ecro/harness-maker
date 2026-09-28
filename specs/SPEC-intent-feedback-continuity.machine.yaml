@@ -1,0 +1,941 @@
+schema_version: 3
+spec_slug: intent-feedback-continuity
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: Tier-2 local collection contracts; execute must bind
+  changed Python coverage before implementation, including exclusion, identity, authority
+  and source-conflict handling. Initial paths identify existing CLI owners and the
+  proposed collector module.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/intent_cli.py
+- src/harness_maker/intent.py
+- src/harness_maker/intent_trial.py
+mutation_runner: null
+spec_quality_score: 92
+spec_quality_score_at: '2026-09-23'
+ac:
+- id: AC-001
+  title: Read-only status distinguishes work from enrollment
+  type: parametric
+  test_ids:
+  - tests/unit/test_intent_trial.py::test_machine_golden_tables_are_exercised
+  executable_predicate: null
+  golden_table:
+  - input:
+      starts:
+      - a
+      cohort: []
+      bounded_coverage:
+        inventory_readable: true
+        identities_match: true
+        preceding_interval: accepted
+        attributed_starts: true
+        ordering: unambiguous
+        unresolved_gaps: []
+    expected:
+      candidates:
+      - a
+      cohort: []
+      reason: awaiting_reconciliation
+      writes: 0
+    edge: false
+    note: ''
+  - input:
+      starts: []
+      bounded_coverage:
+        inventory_readable: true
+        identities_match: true
+        preceding_interval: accepted
+        attributed_starts: true
+        ordering: unambiguous
+        unresolved_gaps: []
+    expected:
+      reason: no_candidates
+      writes: 0
+    edge: false
+    note: ''
+  - input:
+      sources: missing
+    expected:
+      reason: source_incomplete
+      writes: 0
+    edge: false
+    note: ''
+  - input:
+      policy: legacy
+      operation: apply
+    expected:
+      reason: policy_revision_required
+      writes: 0
+    edge: false
+    note: ''
+  - input:
+      raw_sources:
+        interval:
+          from: '2026-09-22T02:45:59Z'
+          through: '2026-09-22T04:00:00Z'
+        inventory:
+          ledger: digest-L1
+          task-a: digest-A1
+        starts:
+        - task: a
+          at: '2026-09-22T03:39:48Z'
+          source: ledger
+        unresolved_gaps: []
+      source_review: null
+    expected:
+      candidates:
+      - a
+      cohort: []
+      reason: source_review_required
+      writes: 0
+    edge: false
+    note: ''
+  - input:
+      raw_sources:
+        interval:
+          from: '2026-09-22T02:45:59Z'
+          through: '2026-09-22T04:00:00Z'
+        inventory:
+          ledger: digest-L1
+          task-a: digest-A1
+        starts:
+        - task: a
+          at: '2026-09-22T03:39:48Z'
+          source: ledger
+        unresolved_gaps: []
+      source_review:
+        kind: source_review
+        decision_id: review-1
+        actor: user
+        evidence_refs:
+        - ledger
+        - task-a
+        inventory:
+          ledger: digest-L1
+          task-a: digest-A1
+        through: '2026-09-22T04:00:00Z'
+        ordered_tasks:
+        - a
+        excluded_tasks: []
+        disposition: accepted
+    expected:
+      candidates:
+      - a
+      cohort: []
+      reason: awaiting_reconciliation
+      writes: 0
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Independent golden cases derived from SPEC-world-intent-closed-loop-trial
+    and the user selections on 2026-09-23, authored before implementation; cases state
+    expected observations rather than copying implementation outputs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Mechanical progress survives session replacement
+  type: parametric
+  test_ids:
+  - tests/unit/test_intent_trial.py::test_s1_next_session_enrolls_without_plan_or_collector
+  executable_predicate: null
+  golden_table:
+  - input:
+      active: true
+      authorized: true
+      old_session: ended
+      next_session: B
+      starts:
+      - a
+      cohort: []
+      bounded_coverage:
+        inventory_readable: true
+        identities_match: true
+        preceding_interval: accepted
+        attributed_starts: true
+        ordering: unambiguous
+        unresolved_gaps: []
+    expected:
+      cohort:
+      - a
+      old_session_ack_required: false
+      additional_user_confirmation: false
+    edge: false
+    note: ''
+  - input:
+      active: false
+    expected:
+      writes: 0
+      questions: 0
+    edge: false
+    note: ''
+  - input:
+      artifact: RESEARCH
+      stage_handoff: true
+      starts:
+      - a
+      authorized: true
+      bounded_coverage:
+        inventory_readable: true
+        identities_match: true
+        preceding_interval: accepted
+        attributed_starts: true
+        ordering: unambiguous
+        unresolved_gaps: []
+    expected:
+      candidate:
+      - a
+      terminal: false
+    edge: false
+    note: ''
+  - input:
+      raw_sources:
+        interval:
+          from: '2026-09-22T02:45:59Z'
+          through: '2026-09-22T04:00:00Z'
+        inventory:
+          ledger: digest-L1
+          task-a: digest-A1
+        starts:
+        - task: a
+          at: '2026-09-22T03:39:48Z'
+          source: ledger
+        unresolved_gaps: []
+      source_review: null
+      operation: reconcile
+      authorized: true
+    expected:
+      cohort: []
+      reason: source_review_required
+    edge: false
+    note: ''
+  - input:
+      raw_sources:
+        interval:
+          from: '2026-09-22T02:45:59Z'
+          through: '2026-09-22T04:00:00Z'
+        inventory:
+          ledger: digest-L1
+          task-a: digest-A1
+        starts:
+        - task: a
+          at: '2026-09-22T03:39:48Z'
+          source: ledger
+        unresolved_gaps: []
+      source_review:
+        kind: source_review
+        decision_id: review-1
+        actor: user
+        evidence_refs:
+        - ledger
+        - task-a
+        inventory:
+          ledger: digest-L1
+          task-a: digest-A1
+        through: '2026-09-22T04:00:00Z'
+        ordered_tasks:
+        - a
+        excluded_tasks: []
+        disposition: accepted
+      operation: reconcile
+      authorized: true
+    expected:
+      cohort:
+      - a
+      additional_confirmation: false
+    edge: false
+    note: ''
+  - input:
+      raw_sources:
+        interval:
+          from: '2026-09-22T02:45:59Z'
+          through: '2026-09-22T04:00:00Z'
+        inventory:
+          ledger: digest-L1
+          task-a: digest-A1
+        starts:
+        - task: a
+          at: '2026-09-22T03:39:48Z'
+          source: ledger
+        unresolved_gaps: []
+      source_review:
+        kind: source_review
+        decision_id: review-1
+        actor: user
+        evidence_refs:
+        - ledger
+        - task-a
+        inventory:
+          ledger: digest-L1
+          task-a: digest-A1
+        through: '2026-09-22T04:00:00Z'
+        ordered_tasks:
+        - a
+        excluded_tasks: []
+        disposition: unresolved
+      operation: reconcile
+      authorized: true
+    expected:
+      cohort: []
+      reason: source_incomplete
+    edge: false
+    note: ''
+  - input:
+      raw_sources:
+        interval:
+          from: '2026-09-22T02:45:59Z'
+          through: '2026-09-22T04:00:00Z'
+        inventory:
+          ledger: digest-L2
+          task-a: digest-A1
+        starts:
+        - task: a
+          at: '2026-09-22T03:39:48Z'
+          source: ledger
+        unresolved_gaps: []
+      source_review:
+        kind: source_review
+        decision_id: review-1
+        actor: user
+        evidence_refs:
+        - ledger
+        - task-a
+        inventory:
+          ledger: digest-L1
+          task-a: digest-A1
+        through: '2026-09-22T04:00:00Z'
+        ordered_tasks:
+        - a
+        excluded_tasks: []
+        disposition: accepted
+      operation: reconcile
+      authorized: true
+    expected:
+      cohort: []
+      reason: source_conflict
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Independent golden cases derived from SPEC-world-intent-closed-loop-trial
+    and the user selections on 2026-09-23, authored before implementation; cases state
+    expected observations rather than copying implementation outputs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Replay and evidence reordering preserve identity
+  type: property
+  test_ids:
+  - tests/unit/test_intent_trial.py::test_ac_003_snapshot_permutation_and_replay
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Implementation-independent metamorphic invariant from the approved
+    one-task-one-slot, retained-history and explicit-authority requirements in SPEC-world-intent-closed-loop-trial
+    and this interview; subprocess faults and source variations are controlled by
+    the test, not by implementation self-report.
+  oracle_independence_waiver: null
+  input_domain: One fixed accepted source snapshot with uniquely ordered task starts,
+    stable event identities and explicit bounded coverage; not a sequence of partial
+    snapshots
+  transformation: Duplicate entries, permute enumeration within that same accepted
+    snapshot, replay operations and change session identity
+  expected_relation: 'Cohort and assessments equal reconciliation of the deduplicated
+    contents of the same snapshot; unchanged replay writes nothing. Partial new evidence
+    is outside this equivalence: unresolved prefixes remain provisional; contradictory
+    late evidence after commitment preserves members and reports conflict.'
+  preconditions:
+  - Inputs satisfy the explicit scenario preconditions; failures of those preconditions
+    return the specified pending/conflict reason.
+  observable_output: Persisted membership, assessment fields, artifact hashes and
+    conflict reasons
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Concurrent and interrupted writes preserve committed state
+  type: property
+  test_ids:
+  - tests/integration/test_intent_trial_concurrency.py::test_ac_004_parallel_decisions_conserve_committed_records
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Implementation-independent metamorphic invariant from the approved
+    one-task-one-slot, retained-history and explicit-authority requirements in SPEC-world-intent-closed-loop-trial
+    and this interview; subprocess faults and source variations are controlled by
+    the test, not by implementation self-report.
+  oracle_independence_waiver: null
+  input_domain: Valid trial records and authorized collection/user-decision updates
+    on a supported local filesystem, including actual supported task_land and legacy
+    finalize/stash/restore paths
+  transformation: Overlap collection with another collector, new user assessment/policy
+    revocation, actual task landing or legacy finalize; kill a writer before/after
+    publication; retry from another process
+  expected_relation: Independently read durable documents are valid prior or complete
+    next states, with committed decisions conserved. Authorized uncontended landing
+    persists collection deltas without permanent self-induced base-dirty refusal.
+    Overlap serializes or safely reports a bounded conflict; stale revisions and unsupported
+    writes change nothing; collection after committed revocation is denied.
+  preconditions:
+  - Inputs satisfy the explicit scenario preconditions; failures of those preconditions
+    return the specified pending/conflict reason.
+  observable_output: Final durable trial and Git history, process exits, bounded lock
+    wait, conflict reasons, and preserved assessment/authority fields
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Uncertain sources cannot silently change membership
+  type: parametric
+  test_ids:
+  - tests/unit/test_intent_trial.py::test_machine_golden_tables_are_exercised
+  executable_predicate: null
+  golden_table:
+  - input:
+      cohort:
+      - b
+      late_start: a_before_b
+    expected:
+      cohort:
+      - b
+      reason: order_conflict
+    edge: false
+    note: ''
+  - input:
+      registered_source: unreadable
+    expected:
+      reason: source_incomplete
+      commit: false
+    edge: false
+    note: ''
+  - input:
+      base_and_worktree: divergent
+    expected:
+      reason: source_conflict
+      commit: false
+    edge: false
+    note: ''
+  - input:
+      earlier: a_incomplete
+      later: b_complete
+    expected:
+      prefer_later: false
+    edge: false
+    note: ''
+  - input:
+      start_order:
+      - a
+      - b
+      - c
+      task_result:
+        a: aborted
+      bounded_coverage:
+        inventory_readable: true
+        identities_match: true
+        preceding_interval: accepted
+        attributed_starts: true
+        ordering: unambiguous
+        unresolved_gaps: []
+    expected:
+      cohort:
+      - a
+      - b
+      - c
+    edge: false
+    note: ''
+  - input:
+      source_changed_before_commit: true
+    expected:
+      stale_commit: false
+    edge: false
+    note: ''
+  - input:
+      start_times:
+        a: same
+        b: same
+      ordering_evidence: null
+    expected:
+      reason: order_conflict
+      commit: false
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Independent golden cases derived from SPEC-world-intent-closed-loop-trial
+    and the user selections on 2026-09-23, authored before implementation; cases state
+    expected observations rather than copying implementation outputs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Collection cannot manufacture user judgment
+  type: parametric
+  test_ids:
+  - tests/unit/test_intent_trial.py::test_s3_user_decision_is_persisted_and_replay_is_safe
+  executable_predicate: null
+  golden_table:
+  - input:
+      terminal_count: 3
+      evidence: complete
+      user_assessments: []
+    expected:
+      outcome: pending
+      invented_assessments: 0
+    edge: false
+    note: ''
+  - input:
+      terminal_member_missing_evidence: true
+      user_failure: false
+    expected:
+      outcome: insufficient_evidence
+    edge: false
+    note: ''
+  - input:
+      user_failure: true
+      terminal_count: 1
+    expected:
+      outcome: failed
+      collection: collecting
+    edge: false
+    note: ''
+  - input:
+      member_count: 3
+      terminal_count: 3
+      evidence: complete
+      user_assessments:
+      - pass
+      - pass
+      - pass
+    expected:
+      outcome: passed
+      collection: complete
+    edge: false
+    note: ''
+  - input:
+      authority: revoked
+    expected:
+      writes: 0
+    edge: false
+    note: ''
+  - input:
+      operation: mechanical_reconcile
+    expected:
+      assessment_mutation: false
+      intent_mutation: false
+      metric_mutation: false
+      activation_mutation: false
+    edge: false
+    note: ''
+  - input:
+      operation: record-decision
+      decision:
+        id: judge-a
+        kind: assessment
+        actor: user
+        verdict: fail
+        task: a
+        evidence_refs:
+        - conversation-1
+      explicit_user_answer: true
+      expected_revision_matches: true
+    expected:
+      persisted_decision: judge-a
+      next_session_assessment: fail
+    edge: false
+    note: ''
+  - input:
+      operation: record-decision
+      explicit_user_answer: false
+    expected:
+      writes: 0
+      reason: authority_required
+    edge: false
+    note: ''
+  - input:
+      operation: record-decision
+      expected_revision_matches: false
+    expected:
+      writes: 0
+      reason: revision_conflict
+    edge: false
+    note: ''
+  - input:
+      operation: record-decision
+      same_id: different_payload
+    expected:
+      writes: 0
+      reason: decision_conflict
+    edge: false
+    note: ''
+  - input:
+      operation: record-decision
+      same_id: same_payload
+    expected:
+      writes: 0
+      replay: true
+    edge: false
+    note: ''
+  - input:
+      operation: record-decision
+      kind: policy_replacement
+      current_policy: legacy_collector
+      explicit_user_answer: true
+      expected_revision_matches: true
+    expected:
+      policy_decision_persisted: true
+      old_session_ack_required: false
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Independent golden cases derived from SPEC-world-intent-closed-loop-trial
+    and the user selections on 2026-09-23, authored before implementation; cases state
+    expected observations rather than copying implementation outputs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Migration preserves history and is reviewable
+  type: property
+  test_ids:
+  - tests/unit/test_intent_trial.py::test_ac_007_migration_preserves_history
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Implementation-independent metamorphic invariant from the approved
+    one-task-one-slot, retained-history and explicit-authority requirements in SPEC-world-intent-closed-loop-trial
+    and this interview; subprocess faults and source variations are controlled by
+    the test, not by implementation self-report.
+  oracle_independence_waiver: null
+  input_domain: Pre-change legacy trial fixture including activation, cohort, user
+    judgments, source links and intervention evidence
+  transformation: Preview migration, apply authorized policy revision, then replay;
+    also vary missing authority and divergent input
+  expected_relation: Preview changes nothing; authorized migration retains all historical
+    decisions and replay is unchanged; missing authority or conflict changes nothing
+  preconditions:
+  - Inputs satisfy the explicit scenario preconditions; failures of those preconditions
+    return the specified pending/conflict reason.
+  observable_output: Migration diff, retained-field comparison, source hashes and
+    authority reason
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Status exposes a next action without expanding work
+  type: parametric
+  test_ids:
+  - tests/unit/test_intent_trial.py::test_machine_golden_tables_are_exercised
+  executable_predicate: null
+  golden_table:
+  - input:
+      reason: source_incomplete
+    expected:
+      action: collect_missing_evidence
+      independent_work_may_continue: true
+    edge: false
+    note: ''
+  - input:
+      reason: awaiting_reconciliation
+      authorized: true
+    expected:
+      action: reconcile
+    edge: false
+    note: ''
+  - input:
+      reason: order_conflict
+    expected:
+      action: resolve_order_conflict
+      silent_replacement: false
+    edge: false
+    note: ''
+  - input:
+      reason: policy_revision_required
+    expected:
+      action: request_policy_decision
+    edge: false
+    note: ''
+  - input:
+      reason: awaiting_user_assessment
+    expected:
+      action: request_user_assessment
+      invented_verdict: false
+    edge: false
+    note: ''
+  - input:
+      active: false
+    expected:
+      action: none
+      writes: 0
+      questions: 0
+    edge: false
+    note: ''
+  - input:
+      reason: observation_window_open
+      closing_date: '2026-10-17'
+    expected:
+      action: wait_until_window_closes
+      immediate_remeasurement: false
+    edge: false
+    note: ''
+  - input:
+      reason: source_review_required
+      readable_legacy_sources: true
+    expected:
+      action: request_bounded_source_review
+      invented_coverage: false
+    edge: false
+    note: ''
+  - input:
+      recovery: blocked
+      blocker_cleared: true
+      next_session: B
+      authorized: true
+    expected:
+      action: resume_recovery_and_readback
+      old_session_ack_required: false
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Independent golden cases derived from SPEC-world-intent-closed-loop-trial
+    and the user selections on 2026-09-23, authored before implementation; cases state
+    expected observations rather than copying implementation outputs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Workflow integration demonstrates unprompted recovery
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: intent_feedback_continuity
+  note: ''
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric intent_feedback_continuity was authored from
+    this user interview and the existing field-trial contract before implementation.
+    Judge captured tool actions, conversation and pre/post artifacts, never a model
+    summary or implementation-derived success flag.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-28'
+  judgment_evidence: AC-009's single applicable rubric criterion (native_recovery)
+    is grounded in real, independently replayable evidence rather than a self-reported
+    summary. The primary native capture (tests/fixtures/intent_feedback_continuity_native_observed.json,
+    produced by the live-Codex-CLI runner tests/fixtures/intent_trial_native_runner.py.txt)
+    shows session A writing trial_feedback frontmatter and exiting, then a separate
+    session B — instructed only to 'resume the existing task and report its next action'
+    with an explicit 'No one has asked you to repair a trial' — independently discovering
+    and calling the real `hm intent ... trial reconcile` CLI path, changing the trial
+    cohort from `[]` to `[a]`; a same-environment control with the owning stage-entry
+    trigger removed leaves the trial file byte-identical to the pre-B hash and contains
+    no reconcile call (asserted in tests/integration/test_intent_trial_native_evidence.py:47-53).
+    Three further native captures in tests/fixtures/intent_feedback_continuity_native_edge_observed.json
+    independently cover closeout (terminal event recorded, hash changed, reconcile
+    called), revoked policy authority (no reconcile, hash unchanged, `authority_required`),
+    and an unavailable registered source (no reconcile, hash unchanged, `source_incomplete`),
+    each replayed by its own assertion in test_intent_trial_native_evidence.py. A
+    dedicated render test proves the identical CLI commands are rendered into both
+    supported hosts' procedure files (Codex `.agents/skills/...` and Claude Code `.claude/skills/...`).
+    Research/spec-without-PLAN and intermediate-handoff are not isolated as separate
+    fixtures but are structurally present in the same main run (task `a` never acquires
+    a PLAN and its RESEARCH-a.md never gains an `a-terminal` event across the handoff),
+    which is a defensible but comparatively thinner form of coverage than the four
+    dedicated fixtures. EVIDENCE-intent-feedback-continuity.md explicitly disclaims
+    that these are isolated workflow trials and not proof the real three-task field
+    trial passed, satisfying the rubric's non-inference requirement.
+  judgment_subject_paths:
+  - work-docs/PLAN-intent-feedback-continuity.md
+  - work-docs/EVIDENCE-intent-feedback-continuity.md
+  - src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2
+  - src/harness_maker/templates/codex/stage_skill.md.j2
+  judgment_subject_hash: 7547a9ba6065013686bff94ead57c3595605580fa68fd6ea002f4163eb6c1f30
+- id: AC-010
+  title: Existing trial recovery is reported separately from attainment
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: intent_feedback_continuity
+  note: Implementation landing is separate from live recovery and field-trial attainment.
+    A blocked recovery report requires a persisted discoverable obligation and captured
+    later resumption after prerequisites clear; live recovery is complete only with
+    actual apply plus independent status readback.
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Independent rubric intent_feedback_continuity was authored from
+    this user interview and the existing field-trial contract before implementation.
+    Judge captured tool actions, conversation and pre/post artifacts, never a model
+    summary or implementation-derived success flag.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-09-28'
+  judgment_evidence: 'AC-010 requires the recovery report to be truthful and separated
+    from field-trial attainment. EVIDENCE-intent-feedback-continuity.md L37-93 and
+    the linked work-docs/evidence/intent-feedback-continuity/*.json files show a real
+    pre-change blocked state (live-pre-status.json: policy_revision_required, recovery.state=pending,
+    next_trigger=next_eligible_invocation), an explicit user-authorized policy decision
+    (live-policy-decision.json, authority=explicit_user_decision), a public apply,
+    and an independent post-apply status readback (live-post-status.json: cohort=[docs-release-sync,
+    intent-feedback-continuity], outcome=pending, recovery.state=complete) — distinct
+    revision hashes across files confirm a genuine state transition rather than a
+    restated summary. A subsequently discovered source-ref attribution bug and its
+    repair are documented and re-verified by a second idempotent reconcile (live-final-replay.json),
+    and a later observation edit on the task''s own PLAN is shown not to reopen the
+    reviewed cohort. Both EVIDENCE.md (L84-92) and PLAN-intent-feedback-continuity.md''s
+    Success Criteria/Feedback table (L292-298, L306) explicitly keep the trial at
+    2/3 enrolled with assessments={} and state that implementation completion does
+    not establish field-trial success, satisfying the rubric''s ban on repair-assisted
+    execution or fixtures standing in for three real successful tasks. The rendered
+    workflow-feedback.md.j2 (L52-104) wires the same blocked/resume/readback obligation
+    into the generated procedure (recovery next-trigger record, explicit record-decision
+    requirement, never deriving pass/fail from task success), so the reported behavior
+    is backed by an actual generated artifact, not only prose. All checked sub-criteria
+    pass; overall verdict is pass.'
+  judgment_subject_paths:
+  - work-docs/PLAN-intent-feedback-continuity.md
+  - work-docs/EVIDENCE-intent-feedback-continuity.md
+  - src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2
+  judgment_subject_hash: 077046df90429076c9f881a082b796effdcbc23ca970b09d572aa7f86748473f
+irreversible_decisions:
+- id: IRR-001
+  decision: Add versioned typed trial metadata to the existing trial PLAN and keep
+    task evidence attached to existing stage artifacts with one authoritative source
+    per fact
+  category: schema/file format/storage layout
+  rationale: Persistent state is consumed across sessions and versions
+  source: spec
+- id: IRR-002
+  decision: Expose hm intent trial status, dry-run/apply reconcile and explicitly
+    authorized record-decision with versioned JSON
+  category: public API/CLI contract
+  rationale: Workflow procedures and scripts depend on the command contract
+  source: spec
+- id: IRR-003
+  decision: Authorize session-independent mechanical collection through activated
+    trial policy and a protected explicit user-decision path; retain human judgment
+  category: security/permission boundary
+  rationale: Changes which sessions may write shared trial records
+  source: spec
+- id: IRR-004
+  decision: Migrate the current trial in place, preserving activation, cohort, assessments
+    and intervention history without reset
+  category: data migration
+  rationale: Historical records and policy provenance must survive conversion
+  source: spec
+approval:
+  kind: human
+  content_hash: 5efa68ce987c5cebe703c0671b24cf4d34cd53e7843c64e2dbea74a681a7d378
+  approved_by: Ecro
+  approved_at: '2026-09-23T13:29:11Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 3507816b5e69c23604f8f2151c292d39f2300af8533e5606fde5c6b90a5566f2
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: b1640e4e930ccc79b59335b15bb32d82d859f809e4141eb51707cd7cdd53f78b
+    paths_to_mutate: 765e5003f0a8a9cafa5f474aefab0c9bf833a416974bfcc15b1cb8ceb1a37ed1
+    irreversible_decisions: 80f512c2d9e915f7a2fccca04f9e26158faf9b8faa836f683ff2139164466c16
+    AC-001: 0fc5205c1d6104d970d6f8ce6b7650df50433373d5f73ab327132ad80efb7a4a
+    AC-002: cb3b873babf2084d1d84616676fbca46e423f0410ac5e37e6223e795675d959b
+    AC-003: ae246cf9bc8fa891a09063edaa78811e45049021364a0752f6d6674d10dfa7c3
+    AC-004: 56f6a4db276265a4588f6c7a5d6cdf22b4a2d12c8fa3d75d7322ff9393152ab7
+    AC-005: d2d3f21a1c1f53122fa023ea48ac7ca894a2a6d87b36286500569b34c3fc1fa4
+    AC-006: 02bed67c02ec0389e1eba0180ad060b98c3d3596c09957441abd1750353e675a
+    AC-007: bf9b56213e2142bdfdd1b5ef19102b0357f88eb45ff0e085edd809f828b2c3f1
+    AC-008: 4fd1730112b7b65c55146936aa56e7e53f97ba60032778731e43e6a7afa8fd3f
+    AC-009: 314950db790ad4ac138d2b7f271b7387249e3fcfd727523a2c90228892d3cea4
+    AC-010: b5bcb2adfc0e162f635b70de3f78a2bbefdefd8acb6f88388984296ee089082f
+    ac_order: 9197b2c918245ab06ace42d9ff4679ea85b92fa0c38b4938b0bc74e8d2d86aab

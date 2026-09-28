@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "trial_id": "world-intent-closed-loop-trial",
+  "activation": "2026-09-22T02:45:59.012195Z",
+  "policy_revision": "legacy_collector",
+  "revision": "1038b9dbaaf2cebed67829d390cefbff281ff1252be0c72622c183b65804f2b8",
+  "inventory": {
+    "base:ledger": "b835e7c31ad279ea72486b82e0034b81878e7d63e41e93c0b5652c989c2ba8b7",
+    "base:work-docs/RESEARCH-docs-release-sync.md": "ce84d0d9cc37da655243beeba751d90b2ae7f56950307766cc12d223f6030057",
+    "base:work-docs/PLAN-docs-release-sync.md": "bf45661f1c3a062ed45336e354e823362f1bfac743ac0904363db1857b5d093f",
+    "worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/RESEARCH-docs-release-sync.md": "ce84d0d9cc37da655243beeba751d90b2ae7f56950307766cc12d223f6030057",
+    "worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/PLAN-docs-release-sync.md": "bf45661f1c3a062ed45336e354e823362f1bfac743ac0904363db1857b5d093f",
+    "worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/RESEARCH-intent-feedback-continuity.md": "360a835b6773c49f3e92243972e3f871b50959009a4140e01a1f587f5f4afab6",
+    "worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/PLAN-intent-feedback-continuity.md": "da22fc726fb1a12e696b2a6e2e852f02a042bfd41a82201d2c1b4962b7308de5"
+  },
+  "cutoff": "2026-09-23T12:55:56.463716Z",
+  "candidates": [
+    "docs-release-sync",
+    "intent-feedback-continuity"
+  ],
+  "cohort": [],
+  "collection": "collecting",
+  "outcome": "pending",
+  "assessments": {},
+  "tasks": {
+    "docs-release-sync": {
+      "terminal": false,
+      "evidence": false,
+      "deferred_until": null,
+      "events": []
+    },
+    "intent-feedback-continuity": {
+      "terminal": false,
+      "evidence": false,
+      "deferred_until": null,
+      "events": []
+    }
+  },
+  "reason": "policy_revision_required",
+  "action": "request_policy_decision",
+  "questions": [],
+  "recovery": {
+    "state": "pending",
+    "next_trigger": "next_eligible_invocation"
+  },
+  "source": null,
+  "changed": false
+}

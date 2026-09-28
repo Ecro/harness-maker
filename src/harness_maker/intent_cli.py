@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -75,6 +76,31 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(args.root) if args.root else world.checkout_root(Path.cwd())
     as_json = bool(getattr(args, "json", False))
     try:
+        if args.cmd == "trial":
+            from harness_maker import intent_trial
+
+            if args.trial_verb == "status":
+                payload = intent_trial.status(root, args.trial_id)
+            elif args.trial_verb == "reconcile":
+                payload = intent_trial.reconcile(root, args.trial_id, dry_run=args.dry_run)
+            else:
+                decision = json.loads(Path(args.file).read_text(encoding="utf-8"))
+                payload = intent_trial.record_decision(
+                    root, args.trial_id, decision, expected_revision=args.expected_revision
+                )
+            world._emit(payload, as_json=as_json)
+            return (
+                0
+                if payload.get("reason")
+                not in {
+                    "decision_conflict",
+                    "revision_conflict",
+                    "authority_required",
+                    "unsupported_lock",
+                    "lock_busy",
+                }
+                else 1
+            )
         reading = args.cmd == "status" or (args.cmd == "objective" and args.verb == "show")
         dry_run = bool(getattr(args, "dry_run", False))
         if not migration and not reading and not dry_run and not world._canonical_project(root):

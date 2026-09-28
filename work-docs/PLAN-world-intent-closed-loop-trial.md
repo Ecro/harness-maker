@@ -4,7 +4,79 @@ task_slug: world-intent-closed-loop-trial
 status: planning
 created: 2026-09-22
 intent: WORLD-INTENT-CLOSED-LOOP
-spec: "[[SPEC-world-intent-closed-loop-trial]]"
+spec: '[[SPEC-world-intent-closed-loop-trial]]'
+trial:
+  schema_version: 1
+  activation: '2026-09-22T02:45:59.012195Z'
+  policy:
+    enabled: true
+    revision: intent-feedback-continuity-v1
+    authority: intent-feedback-continuity-policy-approval
+  collector_provenance: codex-thread-01a0c683-3cde-7f40-9d06-e871e86c6da4
+  decisions:
+  - id: intent-feedback-continuity-policy-approval
+    kind: policy
+    actor: user
+    decided_at: '2026-09-23T14:58:00.443103Z'
+    evidence_refs:
+    - conversation:spec-approval
+    - specs/SPEC-intent-feedback-continuity.md
+    - work-docs/PLAN-intent-feedback-continuity.md
+    authority: explicit_user_decision
+    payload:
+      enabled: true
+      revision: intent-feedback-continuity-v1
+  - id: intent-feedback-continuity-historical-source-review
+    kind: source_review
+    actor: user
+    decided_at: '2026-09-23T14:58:20.140099Z'
+    evidence_refs:
+    - conversation:call_uUHsEHSHPszjtqCpeZFrOmE0
+    - .claude/observability/stage-spans.jsonl
+    - work-docs/PLAN-docs-release-sync.md
+    - work-docs/PLAN-intent-feedback-continuity.md
+    authority: explicit_user_decision
+    payload:
+      inventory:
+        base:ledger: b835e7c31ad279ea72486b82e0034b81878e7d63e41e93c0b5652c989c2ba8b7
+        base:work-docs/RESEARCH-docs-release-sync.md: ce84d0d9cc37da655243beeba751d90b2ae7f56950307766cc12d223f6030057
+        base:work-docs/PLAN-docs-release-sync.md: bf45661f1c3a062ed45336e354e823362f1bfac743ac0904363db1857b5d093f
+        worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/RESEARCH-docs-release-sync.md: ce84d0d9cc37da655243beeba751d90b2ae7f56950307766cc12d223f6030057
+        worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/PLAN-docs-release-sync.md: bf45661f1c3a062ed45336e354e823362f1bfac743ac0904363db1857b5d093f
+        worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/RESEARCH-intent-feedback-continuity.md: 360a835b6773c49f3e92243972e3f871b50959009a4140e01a1f587f5f4afab6
+        worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/PLAN-intent-feedback-continuity.md: 1cbf2ded92807392eb1fb780ac55c8afa8ec650064a51d1a2514d2731a99143f
+      through: '2026-09-23T12:55:56.463716Z'
+      disposition: accepted
+      ordered_tasks:
+      - docs-release-sync
+      - intent-feedback-continuity
+      excluded_tasks: []
+  members:
+  - task: docs-release-sync
+    start: '2026-09-22T03:39:48.368348Z'
+    source_refs:
+    - base:work-docs/RESEARCH-docs-release-sync.md
+    - base:work-docs/PLAN-docs-release-sync.md
+    - worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/RESEARCH-docs-release-sync.md
+    - worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/PLAN-docs-release-sync.md
+  - task: intent-feedback-continuity
+    start: '2026-09-23T12:55:56.463716Z'
+    source_refs:
+    - worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/RESEARCH-intent-feedback-continuity.md
+    - worktree:/home/noel/harness-maker/.worktrees/intent-feedback-continuity:work-docs/PLAN-intent-feedback-continuity.md
+  recovery:
+    state: complete
+    next_trigger: next_eligible_invocation
+    authority: intent-feedback-continuity-policy-approval
+  legacy_snapshot:
+    activation: '2026-09-22T02:45:59.012195Z'
+    members: []
+    assessments: {}
+    body_hash: 674dee56babcab41dda11b4f754ba6d88e7468d9170f5056fbdb56d98ab0d86d
+  publication:
+    base_blob: 1038b9dbaaf2cebed67829d390cefbff281ff1252be0c72622c183b65804f2b8
+    content_hash: ee75e25a5919704f05ec664ab358c0d9c69c0340046386064098ac9c71c0b928
+    owner: intent_trial
 ---
 # Real-task feedback continuity trial
 

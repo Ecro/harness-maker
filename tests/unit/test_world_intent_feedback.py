@@ -106,17 +106,14 @@ def test_s6_trial_includes_failed_rows_and_concurrent_completion(
     skill = _protocol(roots[host])
     block = _section(skill, "## Real-task trial")
     for obligation in (
-        "Before enrollment, record activation time and applied revision in the trial PLAN",
-        "Enroll the next three distinct real task slugs in start order; retain failures and aborts",
-        "Resuming the same slug does not enroll another task",
-        "Close collection only when all three enrolled tasks have terminal dispositions",
-        "Do not enroll synthetic fixtures, the implementation task, or trial setup",
-        "Do not reset or replace rows without a new user decision",
-        "A confirmed continuity failure yields failed, even while collection continues",
-        "Otherwise, a terminal row missing evidence yields insufficient_evidence",
-        "Otherwise, incomplete enrollment or user assessment yields pending",
-        "Only three successful user assessments yield passed",
-        "Each row links execution and conversation evidence; the user owns final assessment",
+        "typed `trial` frontmatter is authoritative for activation",
+        "one stable event ID per fact",
+        "terminal event records the actual task closeout, including failure or abort",
+        "Intermediate stage handoff is not terminal",
+        "cohort is chronological by first start, includes failures/aborts",
+        "excludes administrative/synthetic work under its original policy",
+        "Never reset members, close the intent or declare trial success",
+        "Never derive a pass/fail from task success",
     ):
         assert obligation in " ".join(block.split())
 
@@ -160,25 +157,25 @@ def test_s6_trial_hooks_run_without_intent_and_keep_operator_choice_local(
         )
     protocol = _protocol(root)
     trial = _section(protocol, "## Real-task trial")
-    assert (
-        "If no explicitly activated trial PLAN exists, do nothing; never infer activation" in trial
+    assert "If none is active, do nothing and ask no trial question" in " ".join(trial.split())
+    assert "inspect `work-docs/PLAN-*.md` for an explicit trial activation" in " ".join(
+        trial.split()
     )
-    assert "For an approved next-three-real-tasks trial, follow the rules below" in trial
     assert "the operator selected this" not in trial
     assert "WORLD-INTENT-CLOSED-LOOP" not in trial
 
 
 @pytest.mark.parametrize("host", ["codex", "claude"])
-def test_trial_has_one_base_collector_and_no_worktree_enrollment_race(
+def test_trial_uses_session_independent_base_writer_and_no_worktree_enrollment_race(
     roots: dict[str, Path], host: str
 ) -> None:
     trial = " ".join(_section(_protocol(roots[host]), "## Real-task trial").split())
     for rule in (
-        "Only the named collector may write the authoritative base-root trial PLAN",
-        "Other task agents record source events in their own PLAN Feedback",
-        "Never allocate slots or merge a worktree's stale trial copy",
-        "Before assigning slots, reconcile the base stage-spans ledger",
-        "If start evidence is incomplete or ambiguous, leave enrollment pending",
-        "An ownership transfer requires the former collector to stop and acknowledge",
+        "Any session may perform this mechanical update under the recorded active policy",
+        "It does not need a previous collector's acknowledgment",
+        "A worktree copy is never the authoritative trial PLAN",
+        "all trial commands resolve the base root",
+        "A user accepted historical population is recorded through",
+        "do not infer acceptance from readable logs, silence or a model summary",
     ):
         assert rule in trial

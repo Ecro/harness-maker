@@ -9,6 +9,8 @@ they never land in the squash). `_path_owner` is the code form of the ADR-010 ma
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -108,6 +110,49 @@ def test_task_create_excludes_secret_via_per_worktree_info_exclude(tmp_path: Pat
     # but excluded there via per-worktree info/exclude → not a tracked/untracked dirt
     status = _git(["status", "--porcelain"], wt)
     assert ".env" not in status
+
+
+def test_task_create_retry_completes_include_after_rollback_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path)
+    (repo / ".env").write_text("SECRET=1\n")
+    original_copy = worktree._copy_and_exclude_secrets
+    original_fence = worktree._acquire_merge_fence
+    failed_copy = False
+    timed_out = False
+    copies = 0
+
+    def copy_once(base: Path, wt: Path, include: list[str]) -> None:
+        nonlocal failed_copy, copies
+        copies += 1
+        if copies == 1:
+            failed_copy = True
+            raise OSError("injected include failure")
+        original_copy(base, wt, include)
+
+    @contextmanager
+    def fence(
+        base: Path, timeout: float = 60.0, lock_basename: str = "index.lock-hm"
+    ) -> Iterator[None]:
+        nonlocal timed_out
+        if failed_copy and not timed_out:
+            timed_out = True
+            raise TimeoutError("injected rollback contention")
+        with original_fence(base, timeout=timeout, lock_basename=lock_basename):
+            yield
+
+    monkeypatch.setattr(worktree, "_copy_and_exclude_secrets", copy_once)
+    monkeypatch.setattr(worktree, "_acquire_merge_fence", fence)
+    with pytest.raises(OSError, match="injected include failure"):
+        worktree.task_create(repo, "feat", session_uuid="u-feat", include=[".env"])
+    wt = worktree.task_worktree_path(repo, "feat")
+    assert wt.is_dir()
+    assert any(row.session_uuid == "u-feat" for row in worktree._read_sessions(repo))
+    assert worktree.task_create(repo, "feat", session_uuid="u-feat", include=[".env"]) == wt
+    assert copies == 2
+    assert (wt / ".env").read_text() == "SECRET=1\n"
+    assert ".env" not in _git(["status", "--porcelain"], wt)
 
 
 # ── REVIEW Phase 2 hardening (auto-fix) ──────────────────────────────────────

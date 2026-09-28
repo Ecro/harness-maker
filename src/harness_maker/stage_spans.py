@@ -114,9 +114,15 @@ def emit_event(
     git_branch: str | None = None,
     task_slug: str | None = None,
     now: datetime | None = None,
+    fence_timeout: float = 5.0,
 ) -> Path:
-    """Append one event. Atomic per `telemetry.py`'s O_APPEND + single-write pattern."""
+    """Append one event under the trial source fence.
+
+    `fence_timeout` is short by default because optional telemetry must not stall a stage;
+    a caller whose event is required evidence passes the budget of the fence's holders.
+    """
     from .loop_marker import sanitize_session_id
+    from .worktree import _acquire_merge_fence
 
     base = resolve_base_root(cwd)
     # Sanitize at the WRITE point so the ledger is uniformly sanitized and the reader
@@ -140,11 +146,12 @@ def emit_event(
     path = base / ".claude" / "observability" / "stage-spans.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     line = (json.dumps(record.model_dump(mode="json")) + "\n").encode("utf-8")
-    fd = os.open(str(path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
-    try:
-        os.write(fd, line)
-    finally:
-        os.close(fd)
+    with _acquire_merge_fence(base, timeout=fence_timeout):
+        fd = os.open(str(path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, line)
+        finally:
+            os.close(fd)
     return path
 
 

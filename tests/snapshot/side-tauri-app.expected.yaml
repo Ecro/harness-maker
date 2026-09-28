@@ -136,7 +136,7 @@ files:
   body_sha256: 648cb7bfc6f2e3c391ac9544794c18f0e1e43b5823f10deef3a28e22f222ab80
 - path: skills/intent-layer/references/workflow-feedback.md
   template: skills/intent-layer/references/workflow-feedback.md.j2
-  body_sha256: e25c9f36adffbe5dde866a3094094b46367122c6ad99ad865ba3163f6a61b473
+  body_sha256: aab22f67f503c8494748be4f42765a37cffe914b02068425ae7514abf0f6509c
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 12611c8e959f5e774908e01684d63bbac86c253a665a20a34ae47825eeb76315

@@ -18,10 +18,10 @@ CAPTURE: dict[str, Any] = json.loads(
 )
 
 
-def test_capture_is_bound_to_current_protocol() -> None:
-    source = ROOT / (
-        "src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2"
-    )
+def test_capture_is_bound_to_historical_protocol() -> None:
+    # This capture predates session-independent collection. Keep its exact
+    # protocol as historical evidence; the new protocol has separate evidence.
+    source = ROOT / "tests/fixtures/workflow-feedback-legacy.md.txt"
     normalized = (source.read_text().rstrip() + "\n").encode()
     assert hashlib.sha256(normalized).hexdigest() == CAPTURE["protocol_sha256_normalized"]
     assert not CAPTURE["errors"]

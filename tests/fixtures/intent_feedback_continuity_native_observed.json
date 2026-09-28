@@ -1,0 +1,79 @@
+{
+  "root": "/tmp/hm-intent-continuity-native-gtpa6for",
+  "control_root": "/tmp/hm-intent-continuity-native-gtpa6for-control",
+  "protocol_sha256": "dfba46cc887f9738f2e26c02bb3eb4ccd8e113d1255c86be5608c30463e1249f",
+  "source_hash_before": {
+    "work-docs/PLAN-field-trial.md": "303643318e21e82fa6e2e5a790d6faacf097ceb3bd90903ab53611f9f8e89291",
+    "work-docs/RESEARCH-a.md": "46db1c95a8029b94d1a5c0667ed71adcd93bbd797daa9c3e2631853baa48b1b5"
+  },
+  "source_hash_after": {
+    "work-docs/PLAN-field-trial.md": "f60586a0cd8b8d4439af3a3731e4207aae05f78e00e23978f6d431d2592c6c0d",
+    "work-docs/RESEARCH-a.md": "966a9729c5aebb5b8ab6619bf784fa54df874f38767fddd2b53b2ddd8ebcc53c"
+  },
+  "control_hash_after": {
+    "work-docs/PLAN-field-trial.md": "303643318e21e82fa6e2e5a790d6faacf097ceb3bd90903ab53611f9f8e89291",
+    "work-docs/RESEARCH-a.md": "46db1c95a8029b94d1a5c0667ed71adcd93bbd797daa9c3e2631853baa48b1b5"
+  },
+  "session_a": {
+    "exit": 0,
+    "commands": [
+      "/bin/bash -lc \"pwd && rg --files -g AGENTS.md -g 'RESEARCH-a.md' -g 'stage-spans.jsonl' -g 'source.txt' -g '*trial*' -g 'harness.yaml' -g '\"'!node_modules'\"' -g '\"'!.git'\"'\"",
+      "/bin/bash -lc 'cat work-docs/RESEARCH-a.md; tail -n 5 .claude/observability/stage-spans.jsonl'",
+      "/bin/bash -lc \"python - <<'PY'\nfrom pathlib import Path\nimport json\np = Path('work-docs/RESEARCH-a.md')\ns = p.read_text()\nfrontmatter = '''trial_feedback:\n  - id: a-start\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: start\n  - id: a-observation\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: observation\n    evidence_refs: ['source.txt', 'conversation:a']\n    decision: 'Continue authorized task'\n'''\nassert s.startswith('---\\\\n')\nend = s.index('\\\\n---', 4)\np.write_text(s[:end] + '\\\\n' + frontmatter.rstrip('\\\\n') + s[end:])\nlog = Path('.claude/observability/stage-spans.jsonl')\nlog.parent.mkdir(parents=True, exist_ok=True)\nevent = dict(schema_version=1, event='start', stage='hm:research', cwd='/tmp/hm-intent-continuity-native-gtpa6for', base_root='/tmp/hm-intent-continuity-native-gtpa6for', task_slug='a', ts='2026-09-22T01:00:00Z', session_id='A')\nwith log.open('a') as f:\n    f.write(json.dumps(event, separators=(',', ':')) + '\\\\n')\nassert frontmatter.rstrip('\\\\n') in p.read_text()\nassert json.loads(log.read_text().splitlines()[-1]) == event\nprint('Saved and verified both trial_feedback records and the stage-start JSON line.')\nPY\""
+    ],
+    "result": "Saved `a-start` and `a-observation` in `work-docs/RESEARCH-a.md` frontmatter and appended the specified JSON event to `.claude/observability/stage-spans.jsonl`.\n\nVerified the records. No shared-trial evaluation or reconciliation performed; stopping here.",
+    "stderr_tail": ""
+  },
+  "session_b": {
+    "exit": 0,
+    "commands": [
+      "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'harness.yaml' -g '*PLAN*' -g '*a*' work-docs .agents/skills/hm-execute .agents/skills/intent-layer\"",
+      "/bin/bash -lc 'cat .agents/skills/hm-execute/SKILL.md .agents/skills/intent-layer/SKILL.md'",
+      "/bin/bash -lc 'cat .agents/skills/intent-layer/references/workflow-feedback.md'",
+      "/bin/bash -lc 'ls -a; rg --files --hidden work-docs intent specs .claude | head -100; cat work-docs/PLAN-field-trial.md work-docs/RESEARCH-a.md; cat .claude/harness.yaml'",
+      "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root /tmp/hm-intent-continuity-native-gtpa6for trial status field-trial --json'",
+      "/bin/bash -lc 'cat source.txt session-a-result.txt; git status --short; /home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm worktree loop-mode-active . --claude-session-id \"$HM_SESSION_ID\"; /home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm autopilot status --root . --session-id \"$HM_SESSION_ID\"; /home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent status --json'",
+      "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root /tmp/hm-intent-continuity-native-gtpa6for trial reconcile field-trial --json'",
+      "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root /tmp/hm-intent-continuity-native-gtpa6for trial status field-trial --json'",
+      "/bin/bash -lc 'date -u +%Y-%m-%dT%H:%M:%SZ; cat .claude/observability/stage-spans.jsonl; cat work-docs/PLAN-field-trial.md'",
+      "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root /tmp/hm-intent-continuity-native-gtpa6for trial reconcile field-trial --json'",
+      "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root /tmp/hm-intent-continuity-native-gtpa6for trial status field-trial --json'"
+    ],
+    "result": "Resumed task `a` and recorded the handoff in [RESEARCH-a.md](/tmp/hm-intent-continuity-native-gtpa6for/work-docs/RESEARCH-a.md).\n\nReconciled the trial under its existing authorization. Readback confirms `a` is enrolled, evidence retained, and task still open; outcome remains pending.\n\n**Next:** establish concrete implementation scope and exit criteria, then create `PLAN-a.md` through `$hm-execute a`. Existing evidence contains no implementation requirement.\n\nIntent-dependent decisions remain unavailable because `.claude/intent.yaml` is missing.",
+    "stderr_tail": ""
+  },
+  "control": {
+    "exit": 0,
+    "commands": [],
+    "result": "No action. The control supplies no stage-entry procedure or applicable operational step.",
+    "stderr_tail": ""
+  },
+  "status_before_b": {
+    "reason": "awaiting_reconciliation",
+    "candidates": [
+      "a"
+    ],
+    "cohort": [],
+    "outcome": "pending"
+  },
+  "status_after_b": {
+    "reason": "pending",
+    "candidates": [
+      "a"
+    ],
+    "cohort": [
+      "a"
+    ],
+    "outcome": "pending"
+  },
+  "control_status": {
+    "reason": "awaiting_reconciliation",
+    "candidates": [
+      "a"
+    ],
+    "cohort": [],
+    "outcome": "pending"
+  },
+  "source_doc_after_a": "---\ntype: research\ntask_slug: a\ntrial_feedback:\n  - id: a-start\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: start\n  - id: a-observation\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: observation\n    evidence_refs: ['source.txt', 'conversation:a']\n    decision: 'Continue authorized task'\n---\n# Task a research\n\nObserved an authorized decision at source.txt.\n",
+  "trial_doc_after_b": "---\ntype: plan\ntask_slug: field-trial\ntrial:\n  schema_version: 1\n  activation: '2026-09-22T00:00:00Z'\n  policy:\n    enabled: true\n    revision: v1\n    authority: conversation:approved\n  decisions: []\n  members:\n  - task: a\n    start: '2026-09-22T01:00:00Z'\n    source_refs:\n    - base:ledger\n    - base:work-docs/RESEARCH-a.md\n  recovery:\n    state: complete\n    next_trigger: next_eligible_invocation\n    authority: conversation:approved\n  publication:\n    base_blob: 303643318e21e82fa6e2e5a790d6faacf097ceb3bd90903ab53611f9f8e89291\n    content_hash: 3e27705e8fc0caa0dc3ae5b25455d4a8fa739102d227124133b29a4399848405\n    owner: intent_trial\n---\n## Trial\n\nActivation: 2026-09-22T00:00:00Z\nCollector: old-session\nCollection: collecting\nOutcome: pending\nEnrolled: 0/3\n\nOriginal user prose.\n"
+}

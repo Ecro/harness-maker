@@ -1247,4 +1247,34 @@ A stray `/tmp/.git` (unrelated repo artifact left outside the project, e.g. from
 sdlc-three-loops-gap deleted the dead JSONL memory tier (`harness_maker.memory.{episodic,semantic,profile,retrieval}` — EpisodicStore/SemanticStore/ProfileStore/MemoryRetriever); the `memory` package now holds only the shared flock used by `memory_md`'s write paths (`.session.lock` / `.wiki.lock` / `.failures.lock`), and every remaining import routes through that lock, not the removed stores. Both the `project-knowledge` and `intent-layer` skills now state the same fact-vs-question boundary sentence (mutual cross-reference between the two SKILL.md files) so a captured `[wiki:fact]` observation and an open intent question are not conflated at write time — `project-knowledge` routes intent-shaped claims to `intent-layer` rather than writing them as facts. Wrapup Step 5.7's three CLI invocation lines (`intent question observe/add`, `intent metric measure`, `intent close`) now single-quote every `--claim`/`--text`/`--note` value with the explicit constraint "(no ' inside)" next to all three, and the intent-layer skill's write-rule prose names all three flags — this closes the shell-quote-breakout risk for the common case but is a prompt-level defence only: file-based `--*-file` inputs remain a known follow-up, not yet closed. Separately, `workflow-feedback.md.j2` is hash-bound trial-protocol evidence for the Real-task trial mechanism — its content is pinned by a recorded hash, so any edit to it must go through a re-capture step, not a normal template edit; an earlier draft of this change edited it directly and that edit was reverted for exactly this reason.
 ## [wiki:pattern] intent-cli-file-input-twins | 2026-09-28
 Every free-text argument of the `hm intent` write verbs (`question observe`, `question add`, `metric measure` operator note, `close`) now has a `--<name>-file` twin — nine twins total, defined in a single `FILE_TWINS` table in `intent.py` that `_pair()` walks to build argparse mutually-exclusive groups (raises `ValueError` at import time if a twin is missing from the table, so a new free-text arg cannot silently ship without its file form). `intent.resolve_file_args()` runs once, before any dispatch, reading each present `--*-file` path as UTF-8 and substituting its content for the inline value: single-valued args store the file content minus trailing newlines (empty-after-strip is refused), list-valued args (`--scope-file`, `--out-of-scope-file`, `--declined-file`) split on non-empty stripped lines (zero items is refused). Both forms present, or a required arg in neither form, exits non-zero naming the argument and changes nothing. This closes the residual P1 from `sdlc-three-loops-gap`/`memory-package-post-tier-removal` (2026-09-27): the three rendered recipes (wrapup Step 5.7's `intent question observe/add`/`intent metric measure`/`intent close` lines, the `intent-layer` skill, and the `project-knowledge` skill, plus spec.md.j2's oracle-elicitation recipe) now write untrusted/multi-line text to a mktemp path via the Write tool and pass `--<name>-file <path>`, rather than interpolating operator text into a shell-quoted inline argument — the same Write-tool-to-mktemp pattern already used for wiki/failure bodies and second-opinion prompts. An optional list flag's file twin must stay optional in the recipe text: review caught a fix draft that always passed `--declined-file`, which broke the all-accepted path because an empty file is refused by the zero-items-refused rule.
+## [wiki:architecture] intent-trial-session-independent | 2026-09-28
+Session-independent trial collection for `intent_trial` now derives cohort membership from
+public reconcile/status calls only, never from a live process or an in-flight session PID —
+a workflow-owning trigger (e.g. `/hm:execute`'s repair reminder) writes a `trial_feedback`
+observation, and a *separate* later session's ordinary `hm intent trial reconcile` call picks
+it up. Removing the owning trigger (control run) leaves the source event available but the
+cohort untouched, proving enrollment is trigger-gated, not opportunistic. `worktree-path
+attribution` is a live footgun here: when a task's worktree directory name matches its slug,
+naive source-ref capture pulls in unrelated files from that worktree — fixed by binding
+`source_refs` to exact artifact paths, not a worktree-name prefix match. Judgment ACs
+(machine SPEC `type: judgment`) bind via a two-call protocol distinct from mechanical/
+property/parametric: `judgment-reviewer` (independent, read-only) evaluates the rubric,
+then `spec_machine mark-judged` records the verdict; `find-unjudged` fail-closes on any
+judgment AC whose `judgment_subject_paths` exist on disk but which has no current `pass`.
+A subject-paths-absent judgment AC is safely skipped as future-PLAN work — only a
+present-subject, never-judged AC blocks. Two later ADRs harden the read/write edges: ADR-005
+makes an approved equal-time source-review order extend only when growth is unambiguous —
+a same-slug resume append or a single later-acknowledged task keeps the frozen order, but two
+or more later tasks that themselves tie fail closed (`order_conflict`, members unchanged), and
+a trial-less rejection keeps `_read`'s own classification (absent / deleted-after-commit /
+pending-stash) instead of collapsing every case to a generic `no_trial`. ADR-006 scopes
+task-start span evidence so it is fatal only while a trial is actually active — in a project
+with no active trial, a failed span append warns and preflight proceeds; the fence-reuse
+extends to `status()`, which now reads under the trial fence and returns `lock_busy` /
+`unsupported_lock` without ever falling through to an unfenced `_read`. Two more edges close
+the loop: `_publish` revalidates its destination immediately before writing (a de-marked or
+otherwise drifted committed trial is caught at publish time, not assumed from an earlier
+check), and both restore paths — `post-commit-pop` and the fenced restore inside
+`_fenced_restore_base_dirty` — refuse to restore a stash that holds a protected trial path,
+so a peer's in-flight trial state can never be overwritten by someone else's stash pop.
 <!-- @hm:/user:entries -->

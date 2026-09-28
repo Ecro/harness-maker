@@ -1,0 +1,102 @@
+"""Capture closeout, revoked authority and unavailable-source native stage actions."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+from harness_maker import intent_trial
+from tests.unit import trial_fixture as fx
+
+WT = Path(__file__).resolve().parents[2]
+LAUNCHER = WT / ".venv/bin/python"
+BASE_CAPTURE: dict[str, Any] = json.loads(
+    (WT / "tests/fixtures/intent_feedback_continuity_native_observed.json").read_text()
+)
+BASE = Path(BASE_CAPTURE["control_root"])
+STAGE = (BASE / ".agents/skills/hm-execute/SKILL.md").read_text()
+ENTRY = STAGE.split("<!-- @hm:feedback-entry -->")[1].split("<!-- @hm:/feedback-entry -->")[0]
+CLOSE = STAGE.split("<!-- @hm:feedback-close -->")[1].split("<!-- @hm:/feedback-close -->")[0]
+
+
+def run(root: Path, name: str, prompt: str) -> dict[str, Any]:
+    cmd = [
+        "codex", "exec", "--ignore-user-config", "--ignore-rules", "--ephemeral",
+        "--skip-git-repo-check", "--sandbox", "danger-full-access", "-C", str(root),
+        "--json", "-o", str(root / f"{name}-result.txt"), "-",
+    ]
+    with (root / f"{name}-events.jsonl").open("w") as out, (root / f"{name}-stderr.txt").open("w") as err:
+        proc = subprocess.run(cmd, input=prompt, text=True, stdout=out, stderr=err, timeout=300)
+    events = []
+    for line in (root / f"{name}-events.jsonl").read_text().splitlines():
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            pass
+    commands = [
+        item["item"].get("command", "")
+        for item in events
+        if item.get("type") == "item.completed"
+        and item.get("item", {}).get("type") == "command_execution"
+    ]
+    output = root / f"{name}-result.txt"
+    return {
+        "exit": proc.returncode,
+        "commands": commands,
+        "result": output.read_text() if output.exists() else "",
+        "stderr_tail": (root / f"{name}-stderr.txt").read_text()[-1000:],
+    }
+
+
+PREFIX = f"""Fixture tool provisioning: invoke hm with `{LAUNCHER} -m harness_maker.hm`; do not install dependencies. You are a distinct session entering the ordinary stage for existing task a. Apply only the supplied stage procedure and directly referenced dependencies. No one has asked you to repair a trial. Do not discover unrelated projects.\n\n"""
+OBSERVED: dict[str, Any] = {}
+for name in ("closeout", "revoked", "unavailable"):
+    root = Path(tempfile.mkdtemp(prefix=f"hm-intent-native-{name}-"))
+    shutil.rmtree(root)
+    shutil.copytree(BASE, root)
+    if name == "revoked":
+        state = intent_trial.status(root, fx.TRIAL)
+        result = intent_trial.record_decision(
+            root, fx.TRIAL,
+            fx.decision("policy", {"enabled": False, "revision": "v2"}, decision_id="revoke-1"),
+            expected_revision=state["revision"],
+        )
+        assert result["changed"]
+    if name == "unavailable":
+        missing = root / ".worktrees/evidence"
+        missing.parent.mkdir(exist_ok=True)
+        fx.git(root, "worktree", "add", "-qb", "hm/evidence", str(missing))
+        missing.rename(root / ".worktrees/lost-evidence")
+    before = fx.path(root).read_bytes()
+    if name == "closeout":
+        prompt = PREFIX + "Task instruction: the underlying research task a has now ended. Record its factual terminal event with evidence_refs=['source.txt','conversation:a:terminal'] in the existing RESEARCH-a.md, then run the ordinary stage closeout procedure. Do not decide continuity success or close an intent.\n\n" + CLOSE
+    else:
+        prompt = PREFIX + "Task instruction: resume task a and report its next supported action. The source.txt observation remains available.\n\n" + ENTRY
+    actor = run(root, name, prompt)
+    after = fx.path(root).read_bytes()
+    state = intent_trial.status(root, fx.TRIAL)
+    OBSERVED[name] = {
+        "root": str(root), "before_hash": hashlib.sha256(before).hexdigest(),
+        "after_hash": hashlib.sha256(after).hexdigest(),
+        "state": {key: state.get(key) for key in ("reason", "action", "cohort", "outcome", "tasks", "source")},
+        "actor": actor,
+        "source_doc": (root / "work-docs/RESEARCH-a.md").read_text(),
+    }
+    print(json.dumps({"case": name, "exit": actor["exit"], "reason": state["reason"], "cohort": state["cohort"], "changed": before != after}, ensure_ascii=False), flush=True)
+
+assert OBSERVED["closeout"]["actor"]["exit"] == 0
+assert OBSERVED["closeout"]["state"]["cohort"] == ["a"]
+assert OBSERVED["closeout"]["state"]["tasks"]["a"]["terminal"] is True
+assert OBSERVED["revoked"]["state"]["cohort"] == []
+assert OBSERVED["revoked"]["before_hash"] == OBSERVED["revoked"]["after_hash"]
+assert OBSERVED["unavailable"]["state"]["cohort"] == []
+assert OBSERVED["unavailable"]["before_hash"] == OBSERVED["unavailable"]["after_hash"]
+(WT / "tests/fixtures/intent_feedback_continuity_native_edge_observed.json").write_text(
+    json.dumps(OBSERVED, indent=2, ensure_ascii=False) + "\n"
+)

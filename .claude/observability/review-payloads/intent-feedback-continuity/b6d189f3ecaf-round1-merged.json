@@ -1,0 +1,141 @@
+[
+  {
+    "severity": "P1",
+    "file": "src/harness_maker/intent_trial.py",
+    "line": 868,
+    "summary": "Deleted active trial PLAN loses its committed identity",
+    "suggestion": "Include committed active trial PLANs absent from worktree in discovery; retain protection and report conflict.",
+    "reasoning": {
+      "observe": "active_trials scans only present PLAN files; _read treats absent PLAN as no_trial.",
+      "trace": "Deleted committed PLAN vanishes from protected_trial_paths, so finalize/task_land have no path to protect.",
+      "infer": "Observable deletion loses committed identity and conflict signal.",
+      "conclude": "Approved preservation contract is violated."
+    },
+    "lens": "functionality",
+    "source": "core",
+    "voices": [
+      {
+        "source": "functionality",
+        "kind": "lens"
+      },
+      {
+        "source": "security",
+        "kind": "lens"
+      },
+      {
+        "source": "codex",
+        "kind": "cross-model"
+      }
+    ],
+    "disposition": "accepted"
+  },
+  {
+    "severity": "P1",
+    "file": "src/harness_maker/intent_trial.py",
+    "line": 716,
+    "summary": "Equivalent timestamps bypass ambiguous-start guard",
+    "suggestion": "Compare parsed instants with _iso in the tie guard and require accepted source review.",
+    "reasoning": {
+      "observe": "Starts are sorted by _iso but ties checked by raw timestamp string.",
+      "trace": "Equivalent UTC instants with different offsets and typed acknowledgments pass coverage and enroll in slug order.",
+      "infer": "Chronology remains ambiguous without reviewed order.",
+      "conclude": "SPEC AC-005 equal-time requirement is bypassed."
+    },
+    "lens": "functionality",
+    "source": "core",
+    "voices": [
+      {
+        "source": "functionality",
+        "kind": "lens"
+      },
+      {
+        "source": "codex",
+        "kind": "cross-model"
+      }
+    ],
+    "disposition": "accepted"
+  },
+  {
+    "severity": "P1",
+    "file": "src/harness_maker/intent_trial.py",
+    "line": 1138,
+    "summary": "Decision write can omit newly registered worktree",
+    "suggestion": "Re-enumerate worktrees inside _writer and reject changed roots.",
+    "reasoning": {
+      "observe": "record_decision uses roots read before lock; reconcile checks roots inside lock.",
+      "trace": "task_create registers between decision enumeration and lock acquisition.",
+      "infer": "Published source review can omit source.",
+      "conclude": "Decision snapshot is stale at commit."
+    },
+    "lens": "concurrency",
+    "source": "concurrency",
+    "voices": [
+      {
+        "source": "concurrency",
+        "kind": "lens"
+      }
+    ],
+    "disposition": "accepted"
+  },
+  {
+    "severity": "P1",
+    "file": "src/harness_maker/worktree.py",
+    "line": 498,
+    "summary": "Sibling fence timeout bypasses create rollback",
+    "suggestion": "Catch timeout in rollback path and retain recovery signal if rollback cannot acquire fence.",
+    "reasoning": {
+      "observe": "Sibling fence added but rollback catches only RuntimeError.",
+      "trace": "Fence raises TimeoutError after primary creation.",
+      "infer": "Rollback skipped while reservation removed.",
+      "conclude": "Failed multi-repo create strands registered worktree."
+    },
+    "lens": "concurrency",
+    "source": "concurrency",
+    "voices": [
+      {
+        "source": "concurrency",
+        "kind": "lens"
+      }
+    ],
+    "disposition": "accepted"
+  },
+  {
+    "severity": "P2",
+    "file": "tests/integration/test_intent_trial_concurrency.py",
+    "line": 113,
+    "summary": "Writer-kill test accepts failed recovery as success",
+    "suggestion": "Require successful apply or identical no-op, then verify persisted policy decision and document state.",
+    "reasoning": {
+      "observe": "Follow-up result accepted unless lock_busy; after-publication checks only policy.enabled.",
+      "trace": "source_incomplete or unsupported_lock would pass.",
+      "infer": "Lock release is not usable recovery.",
+      "conclude": "AC-004 crash recovery can be broken while test green."
+    },
+    "lens": "tests",
+    "source": "tests",
+    "voices": [
+      {
+        "source": "tests",
+        "kind": "lens"
+      }
+    ],
+    "disposition": "accepted"
+  },
+  {
+    "id": "123f6d6e94c7535b",
+    "severity": "P2",
+    "file": "src/harness_maker/intent_trial.py",
+    "line": 1191,
+    "summary": "Dry-run returns status without proposed mutation calculation",
+    "evidence": "dry_run branch returns status and skips proposed membership/recovery calculation.",
+    "source": "codex",
+    "needs_relaxation": false,
+    "voices": [
+      {
+        "source": "codex",
+        "kind": "cross-model"
+      }
+    ],
+    "disposition": "accepted"
+  }
+]

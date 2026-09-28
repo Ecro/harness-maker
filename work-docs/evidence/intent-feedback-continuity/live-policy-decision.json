@@ -1,0 +1,16 @@
+{
+  "id": "intent-feedback-continuity-policy-approval",
+  "kind": "policy",
+  "actor": "user",
+  "decided_at": "2026-09-23T14:58:00.443103Z",
+  "evidence_refs": [
+    "conversation:spec-approval",
+    "specs/SPEC-intent-feedback-continuity.md",
+    "work-docs/PLAN-intent-feedback-continuity.md"
+  ],
+  "authority": "explicit_user_decision",
+  "payload": {
+    "enabled": true,
+    "revision": "intent-feedback-continuity-v1"
+  }
+}

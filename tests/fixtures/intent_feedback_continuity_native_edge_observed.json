@@ -1,0 +1,122 @@
+{
+  "closeout": {
+    "root": "/tmp/hm-intent-native-closeout-fy52og8c",
+    "before_hash": "303643318e21e82fa6e2e5a790d6faacf097ceb3bd90903ab53611f9f8e89291",
+    "after_hash": "a3f95b742bfb5a2bb5c19ee74bc3e58ae609560799cec7b4faa7b0c7a71ba0de",
+    "state": {
+      "reason": "awaiting_user_assessment",
+      "action": "request_user_assessment",
+      "cohort": [
+        "a"
+      ],
+      "outcome": "pending",
+      "tasks": {
+        "a": {
+          "terminal": true,
+          "evidence": true,
+          "deferred_until": null,
+          "events": [
+            "a-start",
+            "a-observation",
+            "a-terminal"
+          ]
+        }
+      },
+      "source": null
+    },
+    "actor": {
+      "exit": 0,
+      "commands": [
+        "/bin/bash -lc 'cat .agents/skills/hm-research/SKILL.md .agents/skills/intent-layer/SKILL.md'",
+        "/bin/bash -lc \"cat .agents/skills/intent-layer/references/workflow-feedback.md; rg --files -g 'PLAN*' -g 'RESEARCH-a.md' -g '*trial*' -g 'source.txt' -g 'harness.yaml' -g '.hm-loop*' -g 'AGENTS.md' -g '.current-iter' -g '\"'!'\"\\\\.git' . .claude; printenv HM_SESSION_ID\"",
+        "/bin/bash -lc 'cat work-docs/RESEARCH-a.md work-docs/PLAN-field-trial.md source.txt .claude/harness.yaml; rg --files --hidden .claude specs intent work-docs 2>/dev/null'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent status --json; /home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm autopilot status --root . --session-id \"$HM_SESSION_ID\"'",
+        "/bin/bash -lc \"/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root . trial status field-trial --json; git status --short; rg --files --hidden -g '.hm-loop*' -g '.current-iter' .\"",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root . trial reconcile field-trial --json'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root . trial status field-trial --json'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root . trial reconcile field-trial --json'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root . trial status field-trial --json; cat work-docs/PLAN-field-trial.md'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm autopilot_caps boundary --root . --current research --session-id \"$HM_SESSION_ID\" --step-cap 20 --time-cap-min 300 --slug '\"'a'\nif [ -f \\\"./.claude/.hm-iter-receipts/.current-iter\\\" ]; then HM_CLOSEOUT_ITER=\"'$(cat \"./.claude/.hm-iter-receipts/.current-iter\"); if [ -n \"$HM_CLOSEOUT_ITER\" ]; then /home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm iter_receipts write --iter \"$HM_CLOSEOUT_ITER\" --stage research --verdict fail --root .; fi; fi'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root . trial status field-trial --json; cat work-docs/RESEARCH-a.md; git diff --stat'"
+      ],
+      "result": "Recorded `a-terminal` in [RESEARCH-a.md](/tmp/hm-intent-native-closeout-fy52og8c/work-docs/RESEARCH-a.md) with the exact requested evidence references.\n\nCloseout reconciliation/readback confirms `terminal: true` and `evidence: true`. Recorded the stop reason in PLAN Feedback; auto-advance stopped. Continuity remains pending, and no intent was closed.\n\nLimitations: intent configuration is absent; the existing research lacks required stage sections.",
+      "stderr_tail": ""
+    },
+    "source_doc": "---\ntype: research\ntask_slug: a\ntrial_feedback:\n  - id: a-start\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: start\n  - id: a-observation\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: observation\n    evidence_refs: ['source.txt', 'conversation:a']\n    decision: 'Continue authorized task'\n  - id: a-terminal\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-23T14:43:11Z\n    kind: terminal\n    evidence_refs: ['source.txt', 'conversation:a:terminal']\n    decision: 'Underlying research task a ended, as explicitly reported by the user. Stop after ordinary research closeout; continuity assessment remains pending.'\n---\n# Task a research\n\nObserved an authorized decision at source.txt.\n"
+  },
+  "revoked": {
+    "root": "/tmp/hm-intent-native-revoked-pflkfl6s",
+    "before_hash": "d7774e853520074085192d2cb2a4969e792c79cedc1ff33f7aaecd35d9312b18",
+    "after_hash": "d7774e853520074085192d2cb2a4969e792c79cedc1ff33f7aaecd35d9312b18",
+    "state": {
+      "reason": "authority_required",
+      "action": "request_policy_decision",
+      "cohort": [],
+      "outcome": "pending",
+      "tasks": {
+        "a": {
+          "terminal": false,
+          "evidence": true,
+          "deferred_until": null,
+          "events": [
+            "a-start",
+            "a-observation"
+          ]
+        }
+      },
+      "source": null
+    },
+    "actor": {
+      "exit": 0,
+      "commands": [
+        "/bin/bash -lc 'cat .agents/skills/intent-layer/SKILL.md'",
+        "/bin/bash -lc \"pwd; rg --files -g '*a*' work-docs .harness* .claude 2>/dev/null\"",
+        "/bin/bash -lc 'cat .agents/skills/intent-layer/references/workflow-feedback.md; cat work-docs/RESEARCH-a.md; cat work-docs/PLAN-field-trial.md; cat source.txt'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent status --json'",
+        "/bin/bash -lc 'git rev-parse --show-toplevel --git-common-dir; rg --files work-docs specs 2>/dev/null; /home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root /tmp/hm-intent-native-revoked-pflkfl6s trial status field-trial --json'"
+      ],
+      "result": "Task a has a recorded observation in [RESEARCH-a.md](/tmp/hm-intent-native-revoked-pflkfl6s/work-docs/RESEARCH-a.md), and `source.txt` remains available. It is not terminal.\n\nThe trial’s next supported action is `request_policy_decision`: policy v2 explicitly revoked collection authority. Reconciliation cannot proceed without an explicit user-approved policy replacement.\n\nIntent-dependent progression is also blocked: status reports `invalid` because `.claude/intent.yaml` is missing.\n\nNo files were changed, and no trial repair or reconciliation was attempted.",
+      "stderr_tail": ""
+    },
+    "source_doc": "---\ntype: research\ntask_slug: a\ntrial_feedback:\n  - id: a-start\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: start\n  - id: a-observation\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: observation\n    evidence_refs: ['source.txt', 'conversation:a']\n    decision: 'Continue authorized task'\n---\n# Task a research\n\nObserved an authorized decision at source.txt.\n"
+  },
+  "unavailable": {
+    "root": "/tmp/hm-intent-native-unavailable-9mxq19hw",
+    "before_hash": "303643318e21e82fa6e2e5a790d6faacf097ceb3bd90903ab53611f9f8e89291",
+    "after_hash": "303643318e21e82fa6e2e5a790d6faacf097ceb3bd90903ab53611f9f8e89291",
+    "state": {
+      "reason": "source_incomplete",
+      "action": "collect_missing_evidence",
+      "cohort": [],
+      "outcome": "pending",
+      "tasks": {
+        "a": {
+          "terminal": false,
+          "evidence": true,
+          "deferred_until": null,
+          "events": [
+            "a-start",
+            "a-observation",
+            "a-source-unavailable"
+          ]
+        }
+      },
+      "source": "/tmp/hm-intent-native-unavailable-9mxq19hw/.worktrees/evidence"
+    },
+    "actor": {
+      "exit": 0,
+      "commands": [
+        "/bin/bash -lc 'cat .agents/skills/intent-layer/SKILL.md'",
+        "/bin/bash -lc \"cat .agents/skills/intent-layer/references/workflow-feedback.md\nrg --files -g '\"'! .git'\"' work-docs intent .harness .claude 2>/dev/null\"",
+        "/bin/bash -lc 'git rev-parse --show-toplevel --git-common-dir\ncat work-docs/RESEARCH-a.md work-docs/PLAN-field-trial.md source.txt'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent status --json'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root /tmp/hm-intent-native-unavailable-9mxq19hw trial status field-trial --json'",
+        "/bin/bash -lc 'ls -ld .worktrees/evidence\ncat .claude/observability/stage-spans.jsonl\n git status --short'",
+        "/bin/bash -lc '/home/noel/harness-maker/.worktrees/intent-feedback-continuity/.venv/bin/python -m harness_maker.hm intent --root /tmp/hm-intent-native-unavailable-9mxq19hw trial status field-trial --json'"
+      ],
+      "result": "Task a remains open. The next supported action is `collect_missing_evidence` from `.worktrees/evidence`, which is absent. `source.txt` remains available.\n\nRecorded the gap and next-trigger obligation in [RESEARCH-a.md](/tmp/hm-intent-native-unavailable-9mxq19hw/work-docs/RESEARCH-a.md). Trial readback confirms the outcome is pending. Intent-dependent decisions are blocked by missing `.claude/intent.yaml`. No trial repair or assessment was performed.",
+      "stderr_tail": ""
+    },
+    "source_doc": "---\ntype: research\ntask_slug: a\ntrial_feedback:\n  - id: a-start\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: start\n  - id: a-observation\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-22T01:00:00Z\n    kind: observation\n    evidence_refs: ['source.txt', 'conversation:a']\n    decision: 'Continue authorized task'\n  - id: a-source-unavailable\n    trial_id: field-trial\n    task_slug: a\n    at: 2026-09-23T14:45:06Z\n    kind: observation\n    evidence_refs: ['source.txt', 'work-docs/PLAN-field-trial.md', 'conversation:task-a-resume']\n    decision: 'Preserve task a as open; collect missing evidence from the named source before a dependent trial decision.'\n---\n# Task a research\n\nObserved an authorized decision at source.txt.\n\n## Resume disposition\n\nAt 2026-09-23T14:45:06Z, `source.txt` remains available; the existing\n`a-start` and `a-observation` events are retained without duplication.\nThe ledger records task a's first start at 2026-09-22T01:00:00Z.\nTrial status for [field-trial](PLAN-field-trial.md) reports\n`collect_missing_evidence` / `source_incomplete`, naming\n`.worktrees/evidence`, which is absent in this checkout. Inventory contains\n`base:ledger` and `base:work-docs/RESEARCH-a.md`; cutoff is\n2026-09-22T01:00:00Z, candidate order is `[a]`, and committed cohort is empty.\nNo historical-population acceptance or continuity assessment is inferred.\n\nIntent status is invalid because `.claude/intent.yaml` is absent. No dependent\nintent decision or intent mutation is supported. The next supported action is\nto make the named trial source available and collect its missing evidence;\nno source repair was requested. Re-read trial status at the next stage\nentry/resume, material observation, or closeout after source availability changes.\nAuthority: the supplied Workflow feedback / Real-task trial procedure and the\nexisting active trial policy. This report is a handoff, not task completion or\nabort; task a remains open and trial outcome remains pending.\n"
+  }
+}
