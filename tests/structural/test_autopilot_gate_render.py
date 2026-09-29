@@ -28,6 +28,9 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-29, release 0.60.6** — all 56 commands across four arms moved only in
+  their rendered version: substituting `0.60.5` for `0.60.6` reproduced every prior
+  hash before the golden was updated. No command content changed.
 - **2026-09-28, `intent-file-inputs`** — `spec` and `wrapup` moved, in all four arms: spec Step
   4.9's `hm intent new` and wrapup Step 5.7's `question observe` / `question add` / `close` now
   pass free text through `--title-file` / `--statement-file` / `--scope-file` /

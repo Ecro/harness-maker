@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.60.6] - 2026-09-29
+
 ### Changed
 
 - **`intent_trial` collection is session-independent.** Trial cohort membership now derives
