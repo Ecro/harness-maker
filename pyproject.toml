@@ -41,6 +41,7 @@ dependencies = [
     "pydantic>=2",
     "anthropic",
     "httpx",
+    "anyio>=4.14.2",  # minimum patched transitive runtime version
     "typer",
     "rich",
 ]

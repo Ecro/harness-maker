@@ -4,6 +4,11 @@
 
 ## [0.60.6] - 2026-09-29
 
+### Security
+
+- Require AnyIO 4.14.2 or later so installs cannot resolve the versions affected by
+  its TLS hostname validation and process-pool stderr advisories.
+
 ### Changed
 
 - **`intent_trial` collection is session-independent.** Trial cohort membership now derives
