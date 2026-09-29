@@ -9,9 +9,9 @@ trial:
   schema_version: 1
   activation: '2026-09-22T02:45:59.012195Z'
   policy:
-    enabled: true
-    revision: intent-feedback-continuity-v1
-    authority: intent-feedback-continuity-policy-approval
+    enabled: false
+    revision: intent-layer-improvements-freeze-v1
+    authority: world-intent-closed-loop-trial-freeze
   collector_provenance: codex-thread-01a0c683-3cde-7f40-9d06-e871e86c6da4
   decisions:
   - id: intent-feedback-continuity-policy-approval
@@ -51,6 +51,18 @@ trial:
       - docs-release-sync
       - intent-feedback-continuity
       excluded_tasks: []
+  - id: world-intent-closed-loop-trial-freeze
+    kind: policy
+    actor: user
+    decided_at: '2026-09-29T12:36:34Z'
+    evidence_refs:
+    - conversation:hm-spec-interview-round-1-trial-question
+    - specs/SPEC-intent-layer-improvements.md
+    - work-docs/RESEARCH-intent-layer-improvements.md
+    authority: explicit_user_decision
+    payload:
+      enabled: false
+      revision: intent-layer-improvements-freeze-v1
   members:
   - task: docs-release-sync
     start: '2026-09-22T03:39:48.368348Z'
@@ -74,10 +86,25 @@ trial:
     assessments: {}
     body_hash: 674dee56babcab41dda11b4f754ba6d88e7468d9170f5056fbdb56d98ab0d86d
   publication:
-    base_blob: 1038b9dbaaf2cebed67829d390cefbff281ff1252be0c72622c183b65804f2b8
-    content_hash: ee75e25a5919704f05ec664ab358c0d9c69c0340046386064098ac9c71c0b928
+    base_blob: e6537294e82b26151718c112f53db36f57140620d54ab55308e873bcaca8a3df
+    content_hash: 2e0c40750ca40bfcd2cf58cec1a18a0dbbdd2f1930775ab964a9f1f29376289b
     owner: intent_trial
 ---
+## Trial
+
+Activated at: 2026-09-22T02:45:59.012195Z
+Collection: collecting
+Outcome: pending
+Enrolled: 2/3
+
+| Order | Task | Start | Terminal | User assessment |
+|---|---|---|---|---|
+| 1 | docs-release-sync | 2026-09-22T03:39:48.368348Z | False | pending |
+| 2 | intent-feedback-continuity | 2026-09-23T12:55:56.463716Z | False | pending |
+
+<details><summary>Preserved trial history</summary>
+
+<!-- intent-trial:history:start -->
 # Real-task feedback continuity trial
 
 ## Trial
@@ -150,3 +177,5 @@ degraded=false, entry_count=362. Implementation find-unjudged remains clear.
 The post-update health scan reported two unrelated historical stale judgments
 (SPEC-intent-world-model-objective-layer AC-017 and SPEC-workflow-loop-efficiency
 AC-010); they are not re-certified by this implementation acceptance.
+<!-- intent-trial:history:end -->
+</details>

@@ -262,7 +262,12 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # it before the closing banner. Both arms, same delta.
 # 848/850 → 850/852 (understanding-handoff follow-up, 2026-09-27): +2, the closing print
 # reads `steps.understanding_block` and handles a receipt without the key.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 850), ("Production", 852)])
+# 850/852 → 840/842 (intent-layer-improvements, 2026-09-29): −10, Step 5.7's three answer-gated
+# questions became one record batch plus a close question, and the feedback partials became
+# collect-only (wrapup's close block is the one-line 5.7 cutoff). Both arms, same delta;
+# delegation remains OFF. Then 840/842 → 841/843 in the same task's /hm:review round 2: the
+# metric-row item added to the 5.7 record batch (review finding cea50c76).
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 841), ("Production", 843)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

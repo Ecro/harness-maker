@@ -1,0 +1,416 @@
+"""SPEC-intent-layer-improvements AC-001..004, AC-007, AC-011, AC-012 — rendered wrapup/stage prose.
+
+Every assertion is scoped to its owning block (a marker pair or a heading-bounded section) of the
+synthesized output, never to the whole file, and every clause has a deletion control: the same
+predicate applied to a copy of the block with that clause removed must turn false. A predicate
+that stays true on the mutated copy is the assertion-invariant defect this module exists to avoid.
+
+Phase A.4 (after the round-2 repair, measured 78 failed, 8 passed): `test_resume_predicate_controls`
+and `test_trial_duty_control` test the predicates on literal strings, independent of the
+templates, and go red if a predicate is weakened. `test_collect_only_controls_forbidden[*]` (3),
+`test_wrapup_close_collects_nothing_control[*]` (2) and `test_id_derivation_controls[upper-cased]`
+are vacuous until the new blocks render (the clauses they need are absent today, so the predicate
+is already false). Their RED siblings are the arm tests
+(`test_wrapup_delegated_path_resumes_at_5_7`, `test_feedback_blocks_collect_only`,
+`test_no_trial_duty_in_rendered_prose`, `test_spec_intent_id_derivation`).
+"""
+
+from __future__ import annotations
+
+import re
+from functools import cache
+from pathlib import Path
+
+import pytest
+
+from harness_maker.models import (
+    DelegationConfig,
+    InterviewAnswers,
+    Preset,
+    ProjectProfile,
+    Target,
+)
+from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.synthesize import synthesize
+
+STAGES = ("research", "spec", "execute", "review", "verify", "wrapup")
+ARMS = [(p, h) for p in (Preset.PRODUCTION, Preset.SIDE) for h in ("claude", "codex")]
+ARM_IDS = [f"{p.value}-{h}" for p, h in ARMS]
+
+
+@cache
+def _root(preset: Preset) -> Path:
+    import tempfile
+
+    root = Path(tempfile.mkdtemp(prefix=f"hm-feedback-batch-{preset.value}-"))
+    render(
+        synthesize(
+            ProjectProfile(),
+            InterviewAnswers(
+                preset=preset,
+                targets=[Target.CLAUDE_CODE, Target.CODEX],
+                # Delegation on, as in this repo: only then does wrapup render the Step 0.5
+                # jump that AC-001 is about. With it off there is no jump to misroute.
+                delegation=DelegationConfig(stages=["wrapup", "verify"]),
+            ),
+        ),
+        root / ".claude",
+        freeze_time=DEFAULT_FREEZE_TIME,
+    )
+    return root
+
+
+def _stage(preset: Preset, host: str, stage: str) -> str:
+    root = _root(preset)
+    rel = (
+        f".claude/commands/hm/{stage}.md"
+        if host == "claude"
+        else f".agents/skills/hm-{stage}/SKILL.md"
+    )
+    return (root / rel).read_text(encoding="utf-8")
+
+
+def _block(text: str, name: str) -> str:
+    m = re.search(
+        rf"<!-- @hm:{re.escape(name)} -->(.*?)<!-- @hm:/{re.escape(name)} -->", text, re.S
+    )
+    return m.group(1) if m else ""
+
+
+def _section(text: str, heading: str) -> str:
+    m = re.search(rf"^#+ {re.escape(heading)}.*?(?=^#{{2,4}} )", text, re.S | re.M)
+    return m.group(0) if m else ""
+
+
+def _gated(section: str, name: str) -> str:
+    m = re.search(
+        rf"<!-- @hm:answer-gated:{re.escape(name)} -->(.*?)<!-- /@hm:answer-gated -->",
+        section,
+        re.S,
+    )
+    return m.group(1) if m else ""
+
+
+def _without(text: str, clause: str) -> str:
+    assert clause in text, clause
+    return text.replace(clause, "")
+
+
+# ── AC-001 ───────────────────────────────────────────────────────────────────
+
+_RESUME = re.compile(
+    r"(?:proceed|skip straight|skip|continue|go|resume|jump)(?: straight)? "
+    r"(?:to|at) Step (\d+(?:\.\d+)?)",
+    re.I,
+)
+
+
+def resumes_at_5_7(region: str) -> bool:
+    """At least one routing directive, every one names 5.7, and Step 6 is never named at all."""
+    targets = _RESUME.findall(region)
+    return bool(targets) and all(t == "5.7" for t in targets) and "Step 6" not in region
+
+
+def _wrapup_regions(preset: Preset, host: str) -> tuple[str, str]:
+    text = _stage(preset, host, "wrapup")
+    assert "#### 5.7" in text
+    delegated = _section(text, "Step 0.5")
+    inline = _section(text, "Steps 1–5.6 — inline body")
+    return delegated, inline
+
+
+@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
+def test_wrapup_delegated_path_resumes_at_5_7(preset: Preset, host: str) -> None:
+    delegated, inline = _wrapup_regions(preset, host)
+    # Delegation is on in this render, so BOTH regions must exist: an empty one would mean a
+    # heading rename silently dropped a path from the check.
+    assert delegated
+    assert inline
+    assert resumes_at_5_7(delegated)
+    assert resumes_at_5_7(inline)
+
+
+def test_resume_predicate_controls() -> None:
+    assert resumes_at_5_7("- exit 0 → proceed to Step 5.7.")
+    assert not resumes_at_5_7("- exit 0 → proceed to Step 6.")
+    assert not resumes_at_5_7("skip straight to Step 5.7, then jump to Step 6")
+    assert not resumes_at_5_7("proceed to Step 5.7. exit 1 → fix the gap before Step 6")
+    assert not resumes_at_5_7("no directive at all")
+
+
+# ── AC-002 ───────────────────────────────────────────────────────────────────
+
+_FORBIDDEN = re.compile(r"intent status|skill\.md|trial", re.I)
+_ENTRY_CLAUSES = (
+    "`.claude/intent.yaml` is absent",
+    "nothing to do",
+    "append a `pending` row",
+    "`## Feedback`",
+    "PLAN, else SPEC, else RESEARCH",
+)
+_COLLECTING = ("append a `pending` row", "`## Feedback`")
+_WRAPUP_CLOSE_CLAUSES = (
+    "`.claude/intent.yaml`",
+    "`pending`",
+    "Step 5.7",
+    "cutoff",
+    "final summary",
+)
+
+
+def collect_only(block: str, *, wrapup_close: bool) -> bool:
+    clauses = _WRAPUP_CLOSE_CLAUSES if wrapup_close else _ENTRY_CLAUSES
+    if not all(c in block for c in clauses) or _FORBIDDEN.search(block):
+        return False
+    # Wrapup's close block is the cutoff: it must not itself instruct collecting a row.
+    return not (wrapup_close and any(c in block for c in _COLLECTING))
+
+
+@pytest.mark.parametrize("stage", STAGES)
+@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
+def test_feedback_blocks_collect_only(preset: Preset, host: str, stage: str) -> None:
+    text = _stage(preset, host, stage)
+    entry, close = _block(text, "feedback-entry"), _block(text, "feedback-close")
+    assert entry
+    assert close
+    assert collect_only(entry, wrapup_close=False)
+    assert collect_only(close, wrapup_close=stage == "wrapup")
+
+
+@pytest.mark.parametrize("clause", _ENTRY_CLAUSES)
+def test_collect_only_controls_entry(clause: str) -> None:
+    entry = _block(_stage(Preset.PRODUCTION, "claude", "execute"), "feedback-entry")
+    assert not collect_only(_without(entry, clause), wrapup_close=False)
+
+
+@pytest.mark.parametrize("injected", ["read hm intent status first", "see SKILL.md", "the Trial"])
+def test_collect_only_controls_forbidden(injected: str) -> None:
+    entry = _block(_stage(Preset.PRODUCTION, "claude", "execute"), "feedback-entry")
+    assert not collect_only(entry + injected, wrapup_close=False)
+
+
+@pytest.mark.parametrize("clause", _WRAPUP_CLOSE_CLAUSES)
+def test_collect_only_controls_wrapup_close(clause: str) -> None:
+    close = _block(_stage(Preset.PRODUCTION, "claude", "wrapup"), "feedback-close")
+    assert not collect_only(_without(close, clause), wrapup_close=True)
+
+
+@pytest.mark.parametrize("injected", _COLLECTING)
+def test_wrapup_close_collects_nothing_control(injected: str) -> None:
+    close = _block(_stage(Preset.PRODUCTION, "claude", "wrapup"), "feedback-close")
+    assert not collect_only(close + " " + injected, wrapup_close=True)
+
+
+# ── AC-003 / AC-004 / AC-012 ─────────────────────────────────────────────────
+
+
+def _step_5_7(preset: Preset, host: str) -> str:
+    section = _section(_stage(preset, host, "wrapup"), "5.7")
+    assert section
+    return section
+
+
+_RECORD_CLAUSES = (
+    "each with its exact arguments",
+    "`pending` rows",
+    "previous attempt failed",
+    "that bears on a metric",
+    "`## Feedback`",
+    "PLAN, SPEC and RESEARCH",
+    "Read `hm intent status --json` once",
+    "only the selected",
+    "read status back",
+    "`declined`",
+    "`failed`",
+    "do not retry",
+    "ask nothing",
+)
+_CODEX_CLAUSES = ("numbered list", "one reply", "`none`")
+
+
+def record_batch_ok(section: str, host: str) -> bool:
+    if section.count("<!-- @hm:answer-gated:record-batch -->") != 1:
+        return False
+    block = _gated(section, "record-batch")
+    if not all(c in block for c in _RECORD_CLAUSES):
+        return False
+    # The exact arguments are the consent: they must be shown before the operator is asked.
+    ask = "AskUserQuestion" if host == "claude" else "numbered list"
+    if not 0 <= block.find("each with its exact arguments") < block.find(ask):
+        return False
+    if host == "claude":
+        # AskUserQuestion caps one call at 4 questions x 4 options; Codex's reply has no cap.
+        return "multiSelect" in block and "at most 16 items" in block
+    return all(c in block for c in _CODEX_CLAUSES) and "multiSelect" not in block
+
+
+@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
+def test_wrapup_5_7_record_batch(preset: Preset, host: str) -> None:
+    section = _step_5_7(preset, host)
+    assert record_batch_ok(section, host)
+    assert section.count("<!-- @hm:answer-gated:") == 2
+
+
+@pytest.mark.parametrize("clause", [*_RECORD_CLAUSES, "multiSelect", "at most 16 items"])
+def test_record_batch_controls_claude(clause: str) -> None:
+    section = _step_5_7(Preset.PRODUCTION, "claude")
+    block = _gated(section, "record-batch")
+    assert not record_batch_ok(section.replace(block, _without(block, clause)), "claude")
+
+
+@pytest.mark.parametrize("clause", _CODEX_CLAUSES)
+def test_record_batch_controls_codex(clause: str) -> None:
+    section = _step_5_7(Preset.PRODUCTION, "codex")
+    block = _gated(section, "record-batch")
+    assert not record_batch_ok(section.replace(block, _without(block, clause)), "codex")
+    assert not record_batch_ok(section.replace(block, block + " multiSelect"), "codex")
+
+
+_VERDICT_CLAUSES = (
+    "measure: false",
+    "`how_measured`",
+    "proposing a value from its `last`",
+    "names this task's slug",
+    "that is the verdict row the skip rule above reads",
+    "hm intent metric record",
+    "only when selected",
+    "already has a `recorded` verdict row",
+)
+
+
+def verdict_item_ok(section: str) -> bool:
+    block = _gated(section, "record-batch")
+    return all(c in block for c in _VERDICT_CLAUSES)
+
+
+@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
+def test_wrapup_5_7_judgment_verdict_item(preset: Preset, host: str) -> None:
+    assert verdict_item_ok(_step_5_7(preset, host))
+
+
+@pytest.mark.parametrize("clause", _VERDICT_CLAUSES)
+def test_verdict_item_controls(clause: str) -> None:
+    section = _step_5_7(Preset.PRODUCTION, "claude")
+    block = _gated(section, "record-batch")
+    mutated = section.replace(block, _without(block, clause))
+    assert not verdict_item_ok(mutated)
+    # Moving the clause outside the gated block must also fail.
+    assert not verdict_item_ok(mutated + "\n" + clause)
+
+
+_CLOSE_CLAUSES = (
+    "`met`",
+    "`missed`",
+    "`no_data`",
+    "keep open",
+    "one single-choice question",
+    "PLAN frontmatter",
+    "`intent: <id>`",
+)
+_READBACK = "read status back"
+_RECORD_MARK = "<!-- @hm:answer-gated:record-batch -->"
+_CLOSE_MARK = "<!-- @hm:answer-gated:intent-close -->"
+
+
+def close_after_readback(section: str) -> bool:
+    """record-batch start < the record block's own readback < intent-close start."""
+    record = section.find(_RECORD_MARK)
+    close = section.find(_CLOSE_MARK)
+    rel = _gated(section, "record-batch").find(_READBACK)
+    if record < 0 or close < 0 or rel < 0:
+        return False
+    readback = record + len(_RECORD_MARK) + rel
+    if not record < readback < close:
+        return False
+    block = _gated(section, "intent-close")
+    return all(c in block for c in _CLOSE_CLAUSES)
+
+
+@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
+def test_wrapup_5_7_close_after_readback(preset: Preset, host: str) -> None:
+    assert close_after_readback(_step_5_7(preset, host))
+
+
+def _whole(section: str, name: str, mark: str) -> str:
+    return mark + _gated(section, name) + "<!-- /@hm:answer-gated -->"
+
+
+def test_close_after_readback_controls() -> None:
+    section = _step_5_7(Preset.PRODUCTION, "claude")
+    close = _whole(section, "intent-close", _CLOSE_MARK)
+    record = _whole(section, "record-batch", _RECORD_MARK)
+    # Close hoisted above the record block, even with the readback phrase left in a preamble.
+    hoisted = section.replace(close, "")
+    hoisted = hoisted.replace(record, _READBACK + "\n" + close + record)
+    assert not close_after_readback(hoisted)
+    # Readback removed from the record block but kept elsewhere in the section.
+    rb = _gated(section, "record-batch")
+    assert not close_after_readback(section.replace(rb, _without(rb, _READBACK)) + _READBACK)
+    block = _gated(section, "intent-close")
+    for clause in _CLOSE_CLAUSES:
+        assert not close_after_readback(section.replace(block, _without(block, clause)))
+
+
+# ── AC-007 ───────────────────────────────────────────────────────────────────
+
+
+def _trial_duty_files(preset: Preset) -> list[Path]:
+    root = _root(preset)
+    files = [*sorted((root / ".claude/commands/hm").glob("*.md"))]
+    files += sorted((root / ".agents/skills").glob("hm-*/SKILL.md"))
+    for base in (root / ".claude/skills/intent-layer", root / ".agents/skills/intent-layer"):
+        files += [base / "SKILL.md", *sorted((base / "references").glob("*"))]
+    return files
+
+
+_TRIAL_DUTY = re.compile(
+    r"real-task trial|trial\s+status|trial\s+plan|activated\s+trial|trial\s+reconcile"
+    r"|record-decision|trial_feedback",
+    re.I,
+)
+
+
+def has_trial_duty(text: str) -> bool:
+    return bool(_TRIAL_DUTY.search(text))
+
+
+@pytest.mark.parametrize("preset", [Preset.PRODUCTION, Preset.SIDE], ids=lambda p: p.value)
+def test_no_trial_duty_in_rendered_prose(preset: Preset) -> None:
+    files = _trial_duty_files(preset)
+    assert any("references" in f.parts for f in files)
+    offenders = [str(f) for f in files if has_trial_duty(f.read_text(encoding="utf-8"))]
+    assert not offenders, offenders
+
+
+def test_trial_duty_control() -> None:
+    assert has_trial_duty("## Real-task trial\n")
+    assert has_trial_duty("run hm intent trial  status x --json")
+    assert has_trial_duty("check for an explicitly activated trial PLAN")
+    assert has_trial_duty("hm intent --root <base> trial reconcile x --json")
+    assert has_trial_duty("record it through record-decision")
+    assert has_trial_duty("as trial_feedback frontmatter events")
+    assert not has_trial_duty("a pending row in the Feedback table of the PLAN")
+    assert not has_trial_duty("record the close decision after readback")
+
+
+# ── AC-011 ───────────────────────────────────────────────────────────────────
+
+_ID_CLAUSES = ("`FOO-BAR`", "upper-cased")
+
+
+def id_derivation_ok(section: str) -> bool:
+    return all(c in section for c in _ID_CLAUSES) and "OBJ-" not in section
+
+
+@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
+def test_spec_intent_id_derivation(preset: Preset, host: str) -> None:
+    section = _section(_stage(preset, host, "spec"), "Step 4.9")
+    assert section
+    assert id_derivation_ok(section)
+
+
+@pytest.mark.parametrize("clause", _ID_CLAUSES)
+def test_id_derivation_controls(clause: str) -> None:
+    section = _section(_stage(Preset.PRODUCTION, "claude", "spec"), "Step 4.9")
+    assert not id_derivation_ok(_without(section, clause))
+    assert not id_derivation_ok(section + " `OBJ-` + slug")

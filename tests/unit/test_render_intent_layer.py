@@ -33,9 +33,9 @@ MANDATED_CALL_PREFIXES = {
 ASK_TOKEN = {"claude": "AskUserQuestion", "codex": "request_user_input"}
 VERB_ARGUMENT_FORMS = (
     "hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file"
-    " --observed-at",
+    " [--observed-at]",
     "hm intent question resolve <id> --status --claim-file",
-    "hm intent metric record <id> --value --observed-at --evidence-file",
+    "hm intent metric record <id> --value [--observed-at] --evidence-file",
     "hm intent new <id> --title-file --statement-file --scope-file --metric",
     "hm intent <approve|activate|drop|reopen> <id>",
     "hm intent close <id> --observed <met|missed|no_data> --note-file",
@@ -107,19 +107,25 @@ def _block(text: str, open_marker: str) -> str:
 @pytest.mark.parametrize(
     ("marker", "cmd"),
     [
-        ("<!-- @hm:answer-gated:assumption -->", "hm intent question"),
-        ("<!-- @hm:answer-gated:objective-close -->", "hm intent close"),
+        ("<!-- @hm:answer-gated:record-batch -->", "hm intent question"),
+        ("<!-- @hm:answer-gated:intent-close -->", "hm intent close"),
     ],
-    ids=["assumption", "objective-close"],
+    ids=["record-batch", "intent-close"],
 )
 def test_ac_015_wrapup_writes_sit_inside_answer_gated_blocks_with_an_explicit_no_branch(
     surface: dict[str, dict[str, str]], target: str, marker: str, cmd: str
 ) -> None:
     wrapup = _command(surface, target, "wrapup")
     block = _block(wrapup, marker)
-    assert _in_order(
-        block, [ASK_TOKEN[target], 'If the answer is "yes":', cmd, "Otherwise: write nothing"]
-    ), block
+    # SPEC-intent-layer-improvements: the record batch asks once (multi-select on Claude, a
+    # numbered list with one reply on Codex) and its "no" branch is marking rows `declined`;
+    # the close question keeps the single-choice ask and a "keep open: write nothing" branch.
+    if "record-batch" in marker:
+        ask = {"claude": "AskUserQuestion", "codex": "numbered list"}[target]
+        order = [cmd, ask, "Run only the selected writes", "`declined`"]
+    else:
+        order = [ASK_TOKEN[target], cmd, "On keep open: write nothing"]
+    assert _in_order(block, order), block
 
 
 # ── AC-019 ───────────────────────────────────────────────────────────────────
@@ -194,7 +200,7 @@ def test_ac_007_wrapup_supersedes_carries_claim(
     """`world.observe` refuses `supersedes` without a claim, so a rendered instruction that
     offers the relation without the flag fails by construction (review finding 5202e61a)."""
     wrapup = _command(surface, target, "wrapup")
-    block = _block(wrapup, "<!-- @hm:answer-gated:assumption -->")
+    block = _block(wrapup, "<!-- @hm:answer-gated:record-batch -->")
     observe_lines = [
         ln for ln in block.splitlines() if "hm intent question observe <id> --relation" in ln
     ]
@@ -203,9 +209,10 @@ def test_ac_007_wrapup_supersedes_carries_claim(
     # the rendered invocation unable to satisfy world.observe's supersedes rule.
     assert "--claim" in observe_lines[0]
     assert "supersedes" in observe_lines[0]
-    # 2 at playbook-alignment; SPEC-outcome-measure S7 adds the third (`outcome-measure`) block.
-    assert wrapup.count("<!-- @hm:answer-gated:") == 3
-    assert "Otherwise: write nothing" in block
+    # 2 at playbook-alignment, 3 after SPEC-outcome-measure S7; SPEC-intent-layer-improvements
+    # folds them into one record batch plus the close question.
+    assert wrapup.count("<!-- @hm:answer-gated:") == 2
+    assert "`declined`" in block
 
 
 # ── AC-004 / AC-005 (SPEC-objective-gap-proposal): the proposer's rules and the plan draft ────
@@ -303,25 +310,27 @@ def test_ac_005_spec_offers_draft_after_none_and_creates_at_step_4_9(
 def test_ac_007_skill_and_wrapup_call_the_verb(
     surface: dict[str, dict[str, str]], target: str
 ) -> None:
-    """Keep write consent; WORLD-INTENT-CLOSED-LOOP moves measurement before closure."""
+    """Keep write consent; WORLD-INTENT-CLOSED-LOOP moves measurement before closure.
+
+    SPEC-intent-layer-improvements folds the measure question into the record batch: the
+    measure item is one selectable write, and the close question follows the batch readback.
+    """
     wrapup = _command(surface, target, "wrapup")
-    assert wrapup.index("@hm:answer-gated:outcome-measure") < wrapup.index(
-        "@hm:answer-gated:objective-close"
+    assert wrapup.index("@hm:answer-gated:record-batch") < wrapup.index(
+        "@hm:answer-gated:intent-close"
     )
-    measure_block = _block(wrapup, "<!-- @hm:answer-gated:outcome-measure -->")
-    assert "Measure metrics now?" in measure_block
+    measure_block = _block(wrapup, "<!-- @hm:answer-gated:record-batch -->")
+    assert "measure all" in measure_block
     record_calls = re.findall(r"hm intent metric measure --all(?! --dry-run)", measure_block)
     assert len(record_calls) == 1, "exactly one bare record call (never the --dry-run preview)"
     assert "--dry-run" not in measure_block
-    assert "write nothing" in measure_block
+    assert "`declined`" in measure_block
     assert "hm intent status --json" in measure_block, "the listing source (ADR-006)"
-    yes = measure_block.index('If the answer is "yes":')
-    assert _in_order(measure_block[:yes], [ASK_TOKEN[target], "Measure metrics now?"])
     assert _in_order(
-        measure_block[yes:], ["hm intent metric measure --all", "Otherwise: write nothing"]
+        measure_block, ["hm intent metric measure --all", "Run only the selected writes"]
     ), measure_block
-    assert "three questions" in wrapup
-    assert "two questions, answer-gated" not in wrapup
+    assert "one record batch, then close" in wrapup
+    assert "three questions, answer-gated" not in wrapup
 
 
 @pytest.mark.parametrize(
@@ -371,7 +380,7 @@ def test_ac_005_wrapup_prints_withdrawal_line_when_due(
     assert "withdrawal.due" in step
     line_at = step.index("[intent] withdrawal criterion met")
     # V-10: the sentence reads the gap output the outcome-measure check already obtained.
-    assert line_at > step.index("<!-- @hm:answer-gated:outcome-measure -->")
+    assert line_at > step.index("<!-- @hm:answer-gated:record-batch -->")
     assert wrapup.count("[intent] withdrawal criterion met") == 1
     assert "hm intent status" in intent.SKELETON
     assert "withdrawal.due" in intent.SKELETON

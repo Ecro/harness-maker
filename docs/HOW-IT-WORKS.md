@@ -1501,8 +1501,8 @@ hm intent close <ID> --observed <met|missed|no_data> --note <note>
 hm intent drop <ID>
 hm intent reopen <ID>
 hm intent question add <id> --claim <claim> --status <open|confirmed|wrong>
-hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text <text> --observed-at <timestamp>
-hm intent question resolve <id> --status <open|confirmed|wrong> --claim <claim>
+hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text <text> [--observed-at <timestamp>]
+hm intent question resolve <id> --status <open|confirmed|wrong> --claim <claim>   # open->confirmed|wrong, wrong->confirmed|open
 hm intent metric record <id> --value <number> --observed-at <timestamp> --evidence <evidence>
 hm intent metric measure <id>
 hm intent metric measure --all --dry-run
@@ -1510,6 +1510,8 @@ hm intent migrate --json
 ```
 
 The skill reads freely and writes only after the operator answers with the exact arguments.
+`--observed-at` defaults to now when omitted; a file-valued flag accepts `-` to read stdin (scripted
+callers only — rendered recipes use Write-tool files).
 `status` combines metrics/gaps, all intents (including rejected work), open questions, revisit
 results, cited-code staleness, and withdrawal. It is read-only and LLM-free. Proposals are at
 most three unranked candidates; collect all answers before `new --from-proposal --candidates N

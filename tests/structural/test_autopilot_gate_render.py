@@ -28,6 +28,19 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-29, `intent-layer-improvements`** — `research`, `spec`, `execute`, `review`,
+  `verify` and `wrapup` moved, in all four arms: the shared feedback-entry/close partials became
+  collect-only (a `pending` Feedback row; no intent-status read, no trial duty), wrapup Step 5.7
+  became one record batch plus a separate close question, wrapup Step 0.5 resumes at 5.7, and
+  spec Step 4.9 derives the bare upper-cased id (SPEC-intent-layer-improvements). Verified
+  before re-capture that these six are the ONLY moved commands in every arm and that no command
+  was added or removed.
+  Re-captured again in the same task after the partials and the 5.7 intro were compressed
+  (aggregate surface kept from growing): the same six commands moved, nothing else.
+  Re-captured a third time after `/hm:review` round 2 edited wrapup Step 5.7 (review findings):
+  only `wrapup` moved, in all four arms.
+  Re-captured a fourth time after the confirm-1 repair round (verdict row, stale/failed marks,
+  feedback-entry column note): the same six stage commands moved, nothing else.
 - **2026-09-29, loop opt-out** — this repo's `harness.yaml` set `loop.enabled: false` (the
   SPEC-loop-opt-in post-release follow-up). `loop` and `loop-p5-batch` were REMOVED from both
   `auto_safe@*` arms, and `help` moved by its one-line enable hint (AC-004). Verified before

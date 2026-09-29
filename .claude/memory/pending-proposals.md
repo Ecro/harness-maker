@@ -601,3 +601,9 @@ the count≥3 threshold for the first time this unit (execute ran `mypy --strict
 CI-mirrored `mypy --strict src tests`) — new proposal added above. `promoted-default-reaches-bare-callers`
 also recurred (the `--preset` rebuild allowlist dropping the new `loop` field) but is still below
 threshold (count: 2).
+
+## Proposal: every guard/skip rule must name its producer, and a test must show the producer runs (2026-09-29)
+
+**Triggered by:** [fail:design] roster-field-never-assigned (count: 3; crossed the threshold this unit)
+**Proposed mechanism:** structural test / review-lens rule
+**Rationale:** the third occurrence (intent-layer-improvements confirm-1 P1) was a skip rule keyed on a verdict row that no step ever wrote, so the rule could never fire while every gate stayed green. Same shape as the two earlier instances (a schema/roster field nothing assigns). A guard that reads state must cite the step that writes it; a test should render the stage and assert a writer exists for every row/field a skip or gate condition reads.

@@ -273,7 +273,11 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 32 → 33 (ai-native-sdlc-vs-intent-world, 2026-09-19): `hm spec_machine approval-status`
     # once before the land call (the DRI's acceptance check). Declared in that PLAN's
     # `surface_allowance.round_trips.wrapup`, attributed in its BASELINE-DELTA §3.
-    "wrapup": 33,
+    # 33 → 34 (intent-layer-improvements, 2026-09-29): Step 5.7's record batch replaced the three
+    # answer-gated questions and adds one `hm intent metric record` call for the measure:false
+    # verdict item. Declared in that PLAN's `surface_allowance.round_trips.wrapup`, attributed
+    # in `work-docs/BASELINE-DELTA-intent-layer-improvements.md`.
+    "wrapup": 34,
 }
 
 

@@ -112,9 +112,9 @@ Bash("uv run --with {{ harness_maker_src_path }} hm wrapup_receipt --root . --st
 at the BASE repo while the delegate writes in the worktree, so without it every truthful run
 reports `document-missing`. Delete the temp file once you have the verdict.
 
-- exit 0 → proceed to Step 6.
+- exit 0 → proceed to Step 5.7.
 - exit 1 (`mismatch`) → the agent claimed work that is not on disk. **Print every mismatch
-  verbatim and fix the gap yourself before Step 6** — the commit is about to make those
+  verbatim and fix the gap yourself before Step 5.7** — the commit is about to make those
   claims permanent. Do not paraphrase the list.
 - exit 2 (`unparseable`) → no usable receipt. Run the inline body; the delegated attempt
   produced nothing you can verify, so treat it as not having run.
@@ -127,7 +127,7 @@ that a summarising main loop cannot vouch for work it did not observe.
 ### Steps 1–5.6 — inline body (degraded — dispatch unavailable, brief incomplete, or receipt unusable)
 
 Run Steps 1 through 5.6 below **only** when Step 0.5 sent you here. When the dispatch
-succeeded and its receipt reconciled, skip straight to Step 6.
+succeeded and its receipt reconciled, skip straight to Step 5.7.
 {% endif %}
 ### Step 1 — Pre-flight checks
 
@@ -587,40 +587,36 @@ Bash("uv run --with {{ harness_maker_src_path }} hm second_brain promote --type 
 
 **Receipt (ADR-006):** end this step by printing exactly one line — `promotion evaluated: <N> candidates, <M> promoted`. **`N` = the number of distinct local entries you wrote or touched in 5.1–5.4 that map to a promotable note_type** (every `failures.md` entry, every PLAN ADR, every confirmed preference) — it is NOT 0 if you wrote any such entry this unit. `M` = how many of those `N` you judged cross-project-durable and promoted. When `M < N`, add a one-line reason per skipped candidate. This is what makes silent under-promotion visible — do not collapse `N` to 0 to avoid the work.
 
-#### 5.7 Intent state — three questions, answer-gated (intent layer)
+#### 5.7 Intent state — one record batch, then close (intent layer)
 
-Apply Workflow feedback from intent-layer before these decisions. Reuse existing
-consent for the same operation; record measurement results or missing evidence in
-PLAN Feedback before the closure question. Task completion alone is not intent attainment.
+Print `[intent] not in use` and skip this step when `.claude/intent.yaml` is absent or `hm intent status --json` reports `state: not_filled_in`. Task completion alone is not intent attainment; the intent-layer skill's `references/workflow-feedback.md` governs these writes. Free text never goes on a command line or into a heredoc: write each value with the Write tool to its own path from `mktemp -t hm-intent.XXXXXXXX` (outside the repo) and pass that path.
 
-Print `[intent] not in use` and skip this step when `.claude/intent.yaml` is absent or `hm intent status --json` reports `state: not_filled_in`. Otherwise, in order — and **never write without the answer**. Free text never goes on a command line: write each value with the Write tool to its own path from `mktemp -t hm-intent.XXXXXXXX` (outside the repo) and pass that path.
-
-<!-- @hm:answer-gated:assumption -->
-Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Did this task confirm, supersede or contradict a recorded question — or show one worth recording?"** — four options at most: at most two question ids from `hm intent status --json`'s `open_questions`, those in its `stale_evidence` first and labelled **"(cited code changed)"**; **"new — record a question"**; **"no"**. Name any other ids in the question text for the operator to type via Other.
-If the answer is "yes": (an id was named, or "new") run ONCE, with the confirmed arguments — for an id:
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file <text path> --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim-file <claim path> — required when the relation is supersedes]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file <text path> --observed-at <ISO-8601 UTC> [--locator <path:A-B>] [--claim-file <claim path> — required when the relation is supersedes]{% endif %}
-— for "new": first show the exact `add` arguments you propose (id, claim, status; the why text, `--observed-at`, and `--locator` citing ≤ 40 lines the claim rests on) and ask once more with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}; run only on "yes", otherwise write nothing:
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim-file <claim path> --status <open|confirmed|wrong> [--text-file <why path> --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim-file <claim path> --status <open|confirmed|wrong> [--text-file <why path> --observed-at <ISO-8601 UTC> [--locator <path:A-B>]]{% endif %}
-Otherwise: write nothing.
+<!-- @hm:answer-gated:record-batch -->
+1. Gather the `pending` rows from the `## Feedback` tables of this task's PLAN, SPEC and RESEARCH; skip rows already `recorded` or `declined`, and re-offer a `failed` row once, labelled **"(previous attempt failed: <error>)"**. Read `hm intent status --json` once; the questions in its `stale_evidence` join the list even without a row, first, labelled **"(cited code changed)"**.
+2. Build one list of proposed record writes, each with its exact arguments and an excerpt of the text it records:
+   - each pending row that bears on a question → its question write, for an id:
+     {% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file <text path> [--locator <path:A-B>] [--claim-file <claim path> — required when the relation is supersedes]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file <text path> [--locator <path:A-B>] [--claim-file <claim path> — required when the relation is supersedes]{% endif %}
+     — or for a new question (the why text cites ≤ 40 lines with `--locator`):
+     {% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim-file <claim path> --status <open|confirmed|wrong> [--text-file <why path> [--locator <path:A-B>]]"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent question add <id> --claim-file <claim path> --status <open|confirmed|wrong> [--text-file <why path> [--locator <path:A-B>]]{% endif %}
+   - each pending row that bears on a metric → one `metric record` item (the command under the verdict item below) with the row's proposed value and its evidence;
+   - when status lists a metric with `measure: true` → one item "measure all", showing each metric's `last` and `observed_at` age (a non-zero exit means one failed, never that nothing was written):
+     {% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent metric measure --all"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent metric measure --all{% endif %}
+   - when the PLAN's `intent:` is bound to a metric with `measure: false` → one verdict item: a one-line question derived from the metric's `how_measured`, proposing a value from its `last` (a consecutive-success count becomes `last`+1 on yes, 0 on no). Skip it when this task already has a `recorded` verdict row. It is recorded only when selected, with the answer as evidence that names this task's slug and its PLAN Feedback rows:
+     {% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent metric record <metric-id> --value <value> --evidence-file <evidence path>"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent metric record <metric-id> --value <value> --evidence-file <evidence path>{% endif %}
+3. An empty list → ask nothing; print `[intent] nothing to record` — nothing was written, so the Step 1 read is the readback — and go to the close question.
+{% if is_codex %}4. Show the list as a numbered list with each item's exact arguments and ask for one reply: the numbers to apply, or `none`. An edit to an item's text or value travels in the same reply.
+{% else %}4. Ask once with `AskUserQuestion`, `multiSelect: true`: one option per item with its exact arguments, split across the questions of that one call when there are more than four. That call holds at most 16 items: offer stale and failed rows first, leave the rest `pending` and print how many were deferred; Other edits an item's text or value.
+{% endif %}5. Run only the selected writes, once each. Mark each row `recorded` on success, or `failed` with the error text — do not retry it in this wrapup; mark unselected rows that were shown `declined`. A shown item with no row yet (a stale question, the verdict) gets a new row in the PLAN's `## Feedback` table carrying its mark — for the verdict, that is the verdict row the skip rule above reads. A re-offered row that fails again is marked `declined` with the error and not offered again. Then read status back.
 <!-- /@hm:answer-gated -->
 
-<!-- @hm:answer-gated:outcome-measure -->
-Only when `hm intent status --json` lists a metric with `measure: true`. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Measure metrics now?"** — list each measurable metric with its `last` value and `observed_at` age from that output; options: **"yes — measure all"**, **"no"**.
-If the answer is "yes": run ONCE (it records every measurable metric that succeeds and reports the rest; a non-zero exit means one failed, never that nothing was written):
-{% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent metric measure --all"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent metric measure --all{% endif %}
-Otherwise: write nothing.
-<!-- /@hm:answer-gated -->
-
-<!-- @hm:answer-gated:objective-close -->
-Only when the PLAN frontmatter carries `intent: <id>` (or legacy `objective: <id>`; reject conflicts). Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Close intent <id> now?"** — options: **"yes — met"**, **"yes — missed"**, **"yes — no_data"**, **"no, keep it open"**.
-If the answer is "yes": run ONCE, with the chosen value and a one-line note from the operator:
+<!-- @hm:answer-gated:intent-close -->
+Only when the PLAN frontmatter carries `intent: <id>` (or legacy `objective: <id>`; reject conflicts), and only after the record batch's readback — the measurements just recorded inform this answer. Ask one single-choice question with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: **"Close intent <id> now?"** — `met` / `missed` / `no_data` / keep open.
+On a close answer run ONCE, with the chosen value and a one-line note from the operator:
 {% if is_codex %}Bash("uv run --with {{ harness_maker_src_path }} hm intent close <id> --observed <met|missed|no_data> --note-file <note path>"){% else %}!uv run --with {{ harness_maker_src_path }} hm intent close <id> --observed <met|missed|no_data> --note-file <note path>{% endif %}
-Otherwise: write nothing.
+On keep open: write nothing.
 <!-- /@hm:answer-gated -->
 
-
-
-Withdrawal: when the `hm intent status --json` output of the outcome-measure check above reports `withdrawal.due: true`, print once `[intent] withdrawal criterion met — <quiet_wrapups> wrapups since <last_signal_at or filled_at>, no fired revisit; removing the layer is the operator's call`. Otherwise print nothing.
+Withdrawal: when the `hm intent status --json` output read in the record batch reports `withdrawal.due: true`, print once `[intent] withdrawal criterion met — <quiet_wrapups> wrapups since <last_signal_at or filled_at>, no fired revisit; removing the layer is the operator's call`. Otherwise print nothing.
 
 ### Steps 6 → 7.6 — Stage, commit, pop, drain (ONE call)
 

@@ -963,6 +963,49 @@ def _marks_trial_content(content: bytes) -> bool:
     return "trial" in meta or _legacy(body) is not None
 
 
+def _user_disabled(content: bytes) -> bool:
+    """A freeze needs recorded authority, not an edited flag.
+
+    Only a trial whose latest `policy` decision is an explicit user disable, and whose `policy`
+    names that decision, stops being active; a hand-edited `enabled: false` stays protected.
+    """
+    try:
+        meta, _body = _split(content)
+    except ValueError:
+        return False
+    trial = meta.get("trial")
+    if not isinstance(trial, dict):
+        return False
+    policy, decisions = trial.get("policy"), trial.get("decisions")
+    if not isinstance(policy, dict) or not isinstance(decisions, list):
+        return False
+    policies = [d for d in decisions if isinstance(d, dict) and d.get("kind") == "policy"]
+    if not policies:
+        return False
+    latest = policies[-1]
+    payload = latest.get("payload")
+    decision_id = latest.get("id")
+    return (
+        isinstance(decision_id, str)
+        and bool(decision_id)
+        and policy.get("enabled") is False
+        and policy.get("authority") == decision_id
+        and latest.get("actor") == "user"
+        and latest.get("authority") == "explicit_user_decision"
+        and isinstance(payload, dict)
+        and payload.get("enabled") is False
+    )
+
+
+def _committed_user_disabled(base: Path, name: str) -> bool:
+    """HEAD must agree: an uncommitted or unreadable freeze keeps landing protection."""
+    try:
+        committed = _head_bytes(base, f"work-docs/{name}")
+    except OSError:
+        return False
+    return committed is not None and _user_disabled(committed)
+
+
 def active_trials(root: Path) -> list[str]:
     base, _ = _roots(Path(root))
     results: list[str] = []
@@ -981,7 +1024,11 @@ def active_trials(root: Path) -> list[str]:
             results.append(path.stem.removeprefix("PLAN-"))
             continue
         if _marks_trial_content(raw):
-            results.append(path.stem.removeprefix("PLAN-"))
+            # A freeze is honoured only here, where both copies can be read and both carry the
+            # user's disable. A frozen trial whose marker was removed or whose file was deleted
+            # falls through to the HEAD-based branches below and stays protected on purpose.
+            if not (_user_disabled(raw) and _committed_user_disabled(base, path.name)):
+                results.append(path.stem.removeprefix("PLAN-"))
             continue
         # A valid marker-free working copy can still be an edit of an active
         # committed trial. Probe HEAD only for changed PLANs: checking every

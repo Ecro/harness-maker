@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import re
 import shlex
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -474,6 +475,17 @@ def _pair(
 
 
 def _read_text_file(parser: argparse.ArgumentParser, flag: str, raw: str) -> str:
+    if raw == "-":
+        stream = getattr(sys.stdin, "buffer", None)
+        if stream is None:
+            parser.error(f"argument {flag}-file: '-' needs piped stdin, and none is attached")
+        if sys.stdin.isatty():
+            parser.error(f"argument {flag}-file: '-' needs piped stdin, not a terminal")
+        try:
+            raw_bytes: bytes = stream.read()
+            return raw_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            parser.error(f"argument {flag}-file: stdin is not UTF-8 text")
     try:
         data = Path(raw).read_bytes().decode("utf-8")
     except OSError as exc:
@@ -487,8 +499,14 @@ def resolve_file_args(parser: argparse.ArgumentParser, args: argparse.Namespace)
     """Replace every given `-file` twin with its value before any handler runs.
 
     Single values drop only trailing newlines; list values take one item per non-empty
-    stripped line. An empty result is refused. Inline values are never touched.
+    stripped line. An empty result is refused. Inline values are never touched. `-` reads
+    stdin, which can feed only one value, so a second `-` is refused before anything is read.
     """
+    from_stdin = [
+        f"{flag}-file" for _d, fd, flag, _m in FILE_TWINS if getattr(args, fd, None) == "-"
+    ]
+    if len(from_stdin) > 1:
+        parser.error(f"only one -file value may read stdin (got {', '.join(from_stdin)})")
     for dest, file_dest, flag, multi in FILE_TWINS:
         raw = getattr(args, file_dest, None)
         if raw is None:
@@ -538,7 +556,7 @@ def _parser() -> argparse.ArgumentParser:
     ob.add_argument("id")
     ob.add_argument("--relation", required=True, choices=world.RELATIONS)
     _pair(ob, "--text", dest="text", required=True)
-    ob.add_argument("--observed-at", required=True, dest="observed_at")
+    ob.add_argument("--observed-at", default=None, dest="observed_at")
     _pair(ob, "--claim", dest="claim", required=False)
     ob.add_argument("--locator", default=None)
     ob.add_argument("--json", action="store_true")
@@ -561,7 +579,7 @@ def _parser() -> argparse.ArgumentParser:
     rc = osub.add_parser("record")
     rc.add_argument("id")
     rc.add_argument("--value", required=True, type=float)
-    rc.add_argument("--observed-at", required=True, dest="observed_at")
+    rc.add_argument("--observed-at", default=None, dest="observed_at")
     _pair(rc, "--evidence", dest="evidence", required=True)
     rc.add_argument("--json", action="store_true")
     ms = osub.add_parser("measure")

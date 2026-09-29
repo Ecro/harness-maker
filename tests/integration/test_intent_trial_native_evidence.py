@@ -1,4 +1,9 @@
-"""Independent replay checks over captured native Codex session A/B executions."""
+"""Independent replay checks over captured native Codex session A/B executions.
+
+`test_s1_trial_procedure_renders_both_supported_hosts` was retired by
+SPEC-intent-layer-improvements (2026-09-29): the trial is frozen and AC-007 requires that no
+rendered reference carries the trial procedure. The captured sessions remain historical evidence.
+"""
 
 from __future__ import annotations
 
@@ -8,10 +13,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-from harness_maker.models import InterviewAnswers, ProjectProfile, Target
-from harness_maker.render import DEFAULT_FREEZE_TIME, render
-from harness_maker.synthesize import synthesize
 
 ROOT = Path(__file__).parents[2]
 CAPTURE: dict[str, Any] = json.loads(
@@ -23,9 +24,10 @@ EDGE: dict[str, Any] = json.loads(
 
 
 def test_s1_native_stage_entry_recovers_prior_session_without_repair_prompt() -> None:
-    protocol = (
-        ROOT / "src/harness_maker/templates/skills/intent-layer/references/workflow-feedback.md.j2"
-    )
+    # The capture ran against the Real-task trial protocol that SPEC-intent-layer-improvements
+    # retired (trial frozen, 2026-09-29). Its exact bytes are kept as a fixture so this historical
+    # evidence stays bound to the protocol it observed rather than to the live template.
+    protocol = ROOT / "tests/fixtures/workflow-feedback-trial-protocol.md.j2.txt"
     assert hashlib.sha256(protocol.read_bytes()).hexdigest() == CAPTURE["protocol_sha256"]
     assert CAPTURE["session_a"]["exit"] == 0
     assert CAPTURE["session_b"]["exit"] == 0
@@ -51,24 +53,6 @@ def test_s1_removing_stage_entry_trigger_breaks_same_recovery_assertion() -> Non
     path = "work-docs/PLAN-field-trial.md"
     assert CAPTURE["source_hash_before"][path] != CAPTURE["source_hash_after"][path]
     assert CAPTURE["source_hash_before"][path] == CAPTURE["control_hash_after"][path]
-
-
-def test_s1_trial_procedure_renders_both_supported_hosts(tmp_path: Path) -> None:
-    render(
-        synthesize(
-            ProjectProfile(),
-            InterviewAnswers(targets=[Target.CODEX, Target.CLAUDE_CODE]),
-        ),
-        tmp_path / ".claude",
-        freeze_time=DEFAULT_FREEZE_TIME,
-    )
-    for reference in (
-        tmp_path / ".agents/skills/intent-layer/references/workflow-feedback.md",
-        tmp_path / ".claude/skills/intent-layer/references/workflow-feedback.md",
-    ):
-        rendered = reference.read_text()
-        assert "hm intent --root <base> trial status <trial-id> --json" in rendered
-        assert "hm intent --root <base> trial reconcile <trial-id> --json" in rendered
 
 
 def test_s1_native_closeout_preserves_terminal_evidence_and_pending_judgment() -> None:

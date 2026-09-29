@@ -1,0 +1,418 @@
+schema_version: 3
+spec_slug: intent-layer-improvements
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: New branching in intent CLI input handling, resolve
+  lifecycle and trial activity; T2 targeted mutation over those modules.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/intent.py
+- src/harness_maker/intent_cli.py
+- src/harness_maker/intent_trial.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Delegated and inline wrapup paths resume at Step 5.7
+  type: property
+  test_ids:
+  - tests/unit/test_render_intent_feedback_batch.py::test_wrapup_delegated_path_resumes_at_5_7
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation is read off the step order the template itself declares
+    (5.6 < 5.7 < 6); any directive that names Step 6 as the resume point after delegation
+    violates it regardless of wording, and a deletion control that removes the 5.7
+    resume line must turn the test red.
+  oracle_independence_waiver: null
+  input_domain: every render arm {Production, Side} x {claude-code, codex} whose wrapup
+    renders Step 5.7
+  transformation: render wrapup and extract every resume directive in the Step 0.5
+    region and the inline preamble
+  expected_relation: each extracted resume target == "5.7" and none == "6"
+  preconditions:
+  - Step 5.7 heading is present in the render
+  observable_output: rendered wrapup markdown
+  generator_hint: parametrize over the four arms
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Stage feedback blocks only collect pending rows
+  type: property
+  test_ids:
+  - tests/unit/test_render_intent_feedback_batch.py::test_feedback_blocks_collect_only
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The forbidden tokens come from the RESEARCH F3 cost audit (what
+    the old block made the model load), not from the new template; the relation must
+    hold for every stage render and Codex stage skill, so rewording one stage cannot
+    satisfy it.
+  oracle_independence_waiver: null
+  input_domain: every rendered .claude/commands/hm/*.md stage and .agents/skills/hm-*/SKILL.md
+    in every arm
+  transformation: extract the feedback-entry and feedback-close marker blocks
+  expected_relation: block mentions ".claude/intent.yaml" and "pending" and contains
+    none of "intent status", "SKILL.md", "trial"; in wrapup the close block names
+    5.7 as the cutoff
+  preconditions: []
+  observable_output: rendered stage markdown
+  generator_hint: parametrize over stages x arms
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Step 5.7 asks one batched record question
+  type: property
+  test_ids:
+  - tests/unit/test_render_intent_feedback_batch.py::test_wrapup_5_7_record_batch
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The required clauses are the DRI's Round 1/4 decisions (one record
+    question, target-specific form, selected-only writes, declined/failed/empty semantics),
+    enumerated here before the template exists; each must appear inside the single
+    record block, and per-clause deletion controls must fail.
+  oracle_independence_waiver: null
+  input_domain: rendered wrapup Step 5.7 in every arm
+  transformation: extract the record answer-gated block
+  expected_relation: exactly one record block; it names PLAN, SPEC and RESEARCH Feedback
+    sources, one status read, "multiSelect" on claude-code and a numbered list with
+    one reply and no "multiSelect" on codex, selected-only writes, "declined", "failed",
+    and no question for an empty batch
+  preconditions: []
+  observable_output: rendered wrapup markdown
+  generator_hint: parametrize over arms; one deletion control per clause
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Judgment metric verdict item in the batch
+  type: property
+  test_ids:
+  - tests/unit/test_render_intent_feedback_batch.py::test_wrapup_5_7_judgment_verdict_item
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Required clauses name the DRI's Round 3 decision (verdict item
+    for a measure:false metric, recorded only when selected, not re-proposed once
+    recorded); scoping them to the record block means a clause moved outside the gate
+    fails.
+  oracle_independence_waiver: null
+  input_domain: rendered wrapup Step 5.7 in every arm
+  transformation: extract the record answer-gated block
+  expected_relation: the block contains the measure:false verdict item, "metric record",
+    and the already-recorded skip rule
+  preconditions: []
+  observable_output: rendered wrapup markdown
+  generator_hint: deletion control per clause
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Trial inactive only on a recorded user disable
+  type: property
+  test_ids:
+  - tests/unit/test_intent_trial_freeze.py::test_frozen_trial_is_inactive
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation is stated on recorded authority (a user policy decision
+    present in working copy and HEAD) and checked against every fail-closed path enumerated
+    from the pre-change code (intent_trial.py:956-1023, :211-215), so an implementation
+    that reads the working-copy enabled field alone fails the hand-edit and legacy
+    fixtures.
+  oracle_independence_waiver: null
+  input_domain: temp repos with trial PLAN fixtures covering user-disable in both
+    copies (inactive) and must-stay-active cases enabled true, hand-edited enabled
+    false without decision, decision only in working copy, legacy body-only, unparseable
+    frontmatter, unreadable, symlinked, deleted tracked, marker-free working copy
+    over trial HEAD, git failure
+  transformation: call active_trials and protected_trial_paths
+  expected_relation: trial not in active_trials iff fixture is user-disable in both
+    copies; protected_trial_paths == {work-docs/PLAN-<id>.md for id in active_trials}
+  preconditions: []
+  observable_output: returned list and set
+  generator_hint: one parametrized case per fixture
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Repository trial frozen by recorded decision
+  type: mechanical
+  test_ids: []
+  executable_predicate: '"world-intent-closed-loop-trial" not in active and latest_policy["payload"]["enabled"]
+    is False and preserved'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The expected state is the DRI's recorded interview decision (freeze,
+    2026-09-29); preserved compares member, event and decision ids against a snapshot
+    taken before execute writes, not against the implementation's report.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: No trial duty in rendered prose
+  type: property
+  test_ids:
+  - tests/unit/test_render_intent_feedback_batch.py::test_no_trial_duty_in_rendered_prose
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Absence is checked over every rendered stage, Codex stage skill
+    and rendered intent-layer reference in every arm, so removing the duty from one
+    file cannot pass; the pinned legacy fixture is excluded by path.
+  oracle_independence_waiver: null
+  input_domain: rendered .claude/commands/hm/*.md, .agents/skills/hm-*/SKILL.md and
+    skills/intent-layer/references/* in every arm
+  transformation: search for "Real-task trial" and "trial status"
+  expected_relation: no match in any rendered file
+  preconditions: []
+  observable_output: rendered files
+  generator_hint: parametrize over arms
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Stdin value matches file semantics
+  type: property
+  test_ids:
+  - tests/unit/test_intent_cli_inputs_resolve.py::test_stdin_matches_file_semantics
+  - tests/unit/test_intent_cli_inputs_resolve.py::test_stdin_keeps_boundary_whitespace
+  - tests/unit/test_intent_cli_inputs_resolve.py::test_stdin_list_flags
+  - tests/unit/test_intent_cli_inputs_resolve.py::test_two_stdin_values_refused
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Expected values are written in the SPEC independent of the normaliser
+    (scalar x.rstrip newline; list = non-empty stripped lines), so a shared normaliser
+    bug that alters both file and stdin paths still fails.
+  oracle_independence_waiver: null
+  input_domain: non-empty Unicode text including quotes, backticks, $ and embedded/trailing
+    newlines, split into scalar flags and list flags (--scope-file, --out-of-scope-file,
+    --declined-file)
+  transformation: pass x via --<name>-file - with stdin on a fresh root
+  expected_relation: scalar stored == x.rstrip("\n"); list stored == [l.strip() for
+    l in x.splitlines() if l.strip()]; two "-" values in one call exit non-zero with
+    the root unchanged
+  preconditions:
+  - x.rstrip("\n") is non-empty
+  observable_output: intent records read back from disk
+  generator_hint: hypothesis text() filtered to non-empty
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Omitted observed-at defaults to now
+  type: property
+  test_ids:
+  - tests/unit/test_intent_cli_inputs_resolve.py::test_observed_at_defaults_to_now
+  - tests/unit/test_intent_cli_inputs_resolve.py::test_add_without_text_writes_no_evidence
+  - tests/unit/test_intent_cli_inputs_resolve.py::test_explicit_observed_at_is_kept
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The bounds are wall-clock readings taken by the test around the
+    call, not values the implementation returns.
+  oracle_independence_waiver: null
+  input_domain: question observe, question add with --text-file, metric record — each
+    without --observed-at
+  transformation: record t0, run the verb, record t1, read the stored timestamp
+  expected_relation: stored is timezone-aware and t0 <= stored <= t1; question add
+    without --text-file writes no evidence entry
+  preconditions: []
+  observable_output: stored observed_at
+  generator_hint: parametrize over verbs
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: Resolve lifecycle open and wrong exits
+  type: property
+  test_ids:
+  - tests/unit/test_intent_cli_inputs_resolve.py::test_resolve_lifecycle
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The allowed set is the DRI's Round 4 rule enumerated over all 3x3
+    source/target pairs; refusals are checked by byte-comparing intent.yaml, not by
+    the CLI's own report.
+  oracle_independence_waiver: null
+  input_domain: source status in {open, confirmed, wrong} x target in {open, confirmed,
+    wrong}
+  transformation: run question resolve on a fresh root
+  expected_relation: success == ((source, target) in {(open, confirmed), (open, wrong),
+    (wrong, confirmed), (wrong, open)}); on refusal exit != 0 and intent.yaml bytes
+    unchanged
+  preconditions: []
+  observable_output: exit code and intent.yaml bytes
+  generator_hint: parametrize the 9 pairs
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: Spec draft intent id is the upper-cased slug
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_feedback_batch.py::test_spec_intent_id_derivation
+  executable_predicate: '"`FOO-BAR`" in spec_step_4_9 and "upper-cased" in spec_step_4_9
+    and "OBJ-" not in spec_step_4_9'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The golden is the id shape of the four existing records in intent/
+    (bare upper-case ids), which predate this change; the positive example must be
+    present, so deleting the derivation line fails.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: Close question follows the record readback
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_intent_feedback_batch.py::test_wrapup_5_7_close_after_readback
+  executable_predicate: section_5_7.index(close_block) > section_5_7.index(record_readback)
+    and "no_data" in close_block
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The ordering is the DRI's Round 4 decision and the shipped rule
+    that measurements must inform closure (workflow-feedback.md.j2:25-26), both fixed
+    before this change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: hm intent question resolve accepts only open->confirmed/wrong and wrong->confirmed/open;
+    all other pairs are refused
+  category: public API/CLI contract
+  rationale: invocations that succeed today (e.g. confirmed->wrong) start failing
+  source: spec
+- id: IRR-002
+  decision: a trial is inactive only when its latest user policy decision has enabled
+    false in both working copy and HEAD; every other case stays active and protected
+  category: schema/file format/storage layout
+  rationale: changes the meaning of a stored field that the land path reads
+  source: spec
+- id: IRR-003
+  decision: workflow-feedback consent moves from per-write at any stage to one batched
+    record question plus one close question at wrapup 5.7
+  category: security/permission boundary
+  rationale: the unit of human approval for intent writes changes in every rendered
+    harness
+  source: spec
+- id: IRR-004
+  decision: '- on any --*-file flag reads stdin; --observed-at becomes optional (default
+    now)'
+  category: public API/CLI contract
+  rationale: once consumers rely on the additive inputs, removing them breaks callers
+  source: spec
+approval:
+  kind: human
+  content_hash: b6f7110a412e22c580faf6d777b2fd37b051d86065a31b4a84d3c9513c1ccf96
+  approved_by: Ecro
+  approved_at: '2026-09-29T12:36:34Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: e3674614bcb2f4c4f32c9e399767622094e4cc218662c677256862528c0ad3b6
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: 8843d5e318c93bcbba96012f2d11dc290ef368de19f561d2c895162d0d5b8988
+    paths_to_mutate: cecf563453d9dc3803dc3398905720832323546ddabc5c45a0b98c91958432de
+    irreversible_decisions: 9b6452999c88133657d9e6a2583cdfc4d0aad0b8749344ee71c16ed555ebf762
+    AC-001: 51234d4ea8138ca9616e6cd94a6d0d360de0d97d621edcdff1744a48c9e733fd
+    AC-002: 00a725440323574e64faeb85318411c6c244849769f4718d12e3b11edf8479fb
+    AC-003: a8d9fcea8757fb85d8040551bf7a412bbf8cda5afd483d48104daed0cfcd53ad
+    AC-004: d27b2b34fb3d293b2c4a982443d702b2c04d3ab455b133e68c9946644f3669b7
+    AC-005: 01e6a3d7c4b7da3c6be174cb5a3aaddc3ef55259040bf97e22237e8390b71ed9
+    AC-006: ddebc12b1e2df5b0b817efb8b2b46266e02ac3fe1bc9724c55f9e78680c906fc
+    AC-007: 2a12d5cd8862fc31c345fb09f2ba46c17867c794eb2ded79a6f4d01f384dcf70
+    AC-008: e552445a82a4ecb401ac4fac74c92e8adc0d03ca85682753b094640eea091886
+    AC-009: 3c54bf9aaa964b7ea8b4e038d20acb7be0b73bdd11a93392e39b87e9f1fc3a9a
+    AC-010: e800df5c4b622e7cac9485440237d9b1a5061f2469e100e3b10556c402cb3aa9
+    AC-011: c4e4dfeef9542d3a0fb00c811133e0210e5004dd9e9838848120f361d015d187
+    AC-012: 53c620c4f89d20736bffc98b9110f6a94f17fd6fcc6da3185e2c0df426f1f97f
+    ac_order: 5d5b29b5dde25247a09577085a3501bfcfe37764c50920023e8933350c90e2aa

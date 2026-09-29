@@ -6,7 +6,7 @@ description: Deep-interview the creator before creating intents; improve intent 
 # {{ name }}
 
 Translate matching prose into one `hm intent` verb; creation requires the deep interview and quality review below.
-Workflow stages may load feedback without a separate mention; intent changes still require consent.
+Workflow stages only collect `pending` Feedback rows; wrapup Step 5.7 decides them in one batch, and intent changes still require consent.
 
 **Read freely, write only on an answer.** `hm intent status --json` is read-only, LLM-free and
 free to run whenever the operator asks where things stand. Mutation verbs write only after consent.
@@ -19,16 +19,16 @@ One intent may serve multiple SPECs (1:N); the record is `intent/<ID>.md`.
 
 **Fact or question.** A claim that bears on an intent's metric or decision is an intent question (`hm intent question`, open → confirmed or wrong); any other domain fact is a `[wiki:fact]`. Record each claim in one place only and link to it from the other. Other facts belong to the project-knowledge skill; cite one with `--locator .claude/memory/wiki.md:<A-B>`.
 
-Workflow feedback: read and follow `references/workflow-feedback.md` at workflow triggers.
+Workflow feedback: read and follow `references/workflow-feedback.md` at wrapup Step 5.7; stages only collect.
 
 ## The verbs (full argument forms)
 
 ```
 hm intent status --json
 hm intent question add <id> --claim-file --status <open|confirmed|wrong> [--text-file --observed-at [--locator <path:A-B>]]
-hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file --observed-at [--claim-file] [--locator <path:A-B>]
-hm intent question resolve <id> --status --claim-file
-hm intent metric record <id> --value --observed-at --evidence-file
+hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file [--observed-at] [--claim-file] [--locator <path:A-B>]
+hm intent question resolve <id> --status --claim-file   # open→confirmed|wrong, wrong→confirmed|open; confirmed: observe first
+hm intent metric record <id> --value [--observed-at] --evidence-file
 hm intent new <id> --title-file --statement-file --scope-file --metric [--out-of-scope-file] [--from-proposal --candidates <N> [--declined-file]]
 hm intent <approve|activate|drop|reopen> <id>
 hm intent close <id> --observed <met|missed|no_data> --note-file
@@ -36,8 +36,8 @@ hm intent show <id> --json
 ```
 
 Prefix each with `uv run --with {{ harness_maker_src_path }}` as every other mandated call
-in this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp; `supersedes`
-needs `--claim-file`; `close` needs both `--observed` and `--note-file`. Each `-file` flag takes a path (list flags: one item per line).
+in this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp and defaults to now; `supersedes`
+needs `--claim-file`; `close` needs both `--observed` and `--note-file`. Each `-file` flag takes a path (list flags: one item per line); `-` reads stdin, for scripted callers only — agents always write free text to a file.
 `--locator <path:A-B>` cites at most 40 lines of this checkout by content; `status --json` then
 reports `stale_evidence` when that text changed (approval checks never read cited files).
 
@@ -46,7 +46,7 @@ reports `stale_evidence` when that text changed (approval checks never read cite
 1. Work out the verb and its arguments from what the operator said; read `status` first when
    an id is ambiguous.
 2. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}, showing the exact arguments
-   you are about to pass; write every free-text value with the Write tool to its own path from `mktemp -t hm-intent.XXXXXXXX` (outside the repo) and pass the path — never text inline.
+   you are about to pass; write every free-text value with the Write tool to its own path from `mktemp -t hm-intent.XXXXXXXX` (outside the repo) and pass the path — never text inline or in a heredoc.
 3. On an affirmative answer, run the write once with those arguments and show the CLI's
    `changed:` line.
 4. Otherwise — on any other answer or no answer — write nothing. Do not retry, rephrase or infer consent.

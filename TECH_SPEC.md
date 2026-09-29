@@ -11,6 +11,13 @@ intent-layer workflow-feedback reference. Authoritative records stay in
 evidence locators, write/readback or pending dispositions and the next decision.
 Measurements precede closure; existing consent applies only to the same scope.
 
+Update (2026-09-29): stages only collect `pending` Feedback rows. Wrapup Step 5.7 is
+the single read/write point — one batched record consent, then a separate close
+question after readback — and the delegated wrapup path now resumes at 5.7. The
+real-task trial is frozen by a recorded user policy decision (`active_trials` treats
+it as inactive only when the latest decision is a user disable named by
+`policy.authority` in both working copy and HEAD).
+
 Codex executes the next local stage skill after the shared boundary authorizes
 it. Auto-answered judgments are recorded before a terminal halt, and missing
 skills produce a handoff. Claude retains Skill dispatch; Cursor keeps handoff.

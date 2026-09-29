@@ -2,63 +2,63 @@
   "arms": {
     "auto_safe@warn": {
       "configure": "b6b54c4a22a48218151445ed740f0ea638d0e41678ed92b64acc05b9a0f42d8b",
-      "execute": "18f4353265a00aa0ce35067858dfa2a8f56ac26594fc6c26223e22915e890864",
+      "execute": "d09520e863a1366959dde361bb9631646718c7e9fcec0dc043487c35b5dfc207",
       "health": "e57adc5fc45c188c7bf60ccd1a9d063a7a37b1d0ca80519d1b8431b0b5235937",
       "help": "96c06fa7235131b069300a6fdb90e83e7dba8716326cdddd083b4f503e79f0ab",
       "make": "586a53c8107c069fe4fac3137dd7a7c5191d300f3258917220b109b787f396ae",
       "metrics": "b6fc0e6fe350f7f1453d98a7073f8ecb48cb41ef7334e3935063cf66266ea098",
-      "research": "1985c440e2e150193600126731c02a4a2a0381462fab95fd733bdd03c084b1e5",
-      "review": "1fd885a106508b7b8518a11c6b5620ebe4a491adc321d1c49ef47eba061de2e1",
-      "spec": "ecd98f281f44f044f6fb19197fc0b6bbd6bb500b998c45f031e41f799d97901e",
+      "research": "d94cf7527787f42760778e5061c184325d818c9087b1ea936bbe766ebfb20ff7",
+      "review": "de0466ed97b5e45f846686a7ad8efd6a16a32db0722e0c4c91ca7defb25b37b3",
+      "spec": "39b35c0b0b72accec570022b4e3bacfd88ca6ba148a05123fcd5194ee01d8155",
       "uninstall": "118870fc6314852625f34e4d6a1a18ef94b80cd44d0f6aabd3656f141a2efaf1",
-      "verify": "28e0ad84c46d4ecd3689d456da67dd6926449add06632c497daf888a7c92f6ae",
-      "wrapup": "1bdd5ea54c5cd6e3b4ebd31fc15e8dde5d0c042931af65d0fbc9a7849130ff00"
+      "verify": "1420c100ee0e39a73cdbb54adbbda74889542ae953ae02a1492938583c04fc7c",
+      "wrapup": "d908ce6089b61148e9be6e678b2f305df320a277d0b0845f9ab4c8ca27aaaa89"
     },
     "auto_safe@block": {
       "configure": "b6b54c4a22a48218151445ed740f0ea638d0e41678ed92b64acc05b9a0f42d8b",
-      "execute": "fde0f26364bc2e686960a39f654272483ca6cda9df3a7622ccf5de78312c77a0",
+      "execute": "efb4b93f9ab427e45fddece5c10f2c6c7d3443078904ba80f5ac335fca16802f",
       "health": "e57adc5fc45c188c7bf60ccd1a9d063a7a37b1d0ca80519d1b8431b0b5235937",
       "help": "96c06fa7235131b069300a6fdb90e83e7dba8716326cdddd083b4f503e79f0ab",
       "make": "586a53c8107c069fe4fac3137dd7a7c5191d300f3258917220b109b787f396ae",
       "metrics": "b6fc0e6fe350f7f1453d98a7073f8ecb48cb41ef7334e3935063cf66266ea098",
-      "research": "1985c440e2e150193600126731c02a4a2a0381462fab95fd733bdd03c084b1e5",
-      "review": "1fd885a106508b7b8518a11c6b5620ebe4a491adc321d1c49ef47eba061de2e1",
-      "spec": "9a85eae5088df9b5136a08b5fc5021c00e04bbde42466c3f9d564f63200eebfc",
+      "research": "d94cf7527787f42760778e5061c184325d818c9087b1ea936bbe766ebfb20ff7",
+      "review": "de0466ed97b5e45f846686a7ad8efd6a16a32db0722e0c4c91ca7defb25b37b3",
+      "spec": "d61247979568f6db4a25aff155a74ecd5f068810a30998490e236042ff76d023",
       "uninstall": "118870fc6314852625f34e4d6a1a18ef94b80cd44d0f6aabd3656f141a2efaf1",
-      "verify": "2a616f98ff82c7e8e128fe2e7b8a6e6cf8914b350e65f5bc156b0810d3314402",
-      "wrapup": "123aa2b02d8f801b03cd0567a0c8c9829b12023a436575e2b5f9fe40826b854b"
+      "verify": "d4533dea58cd8707ff5d451a25f9f94210dcede4df756294f73de5ff7400c2f7",
+      "wrapup": "46e70c09a32cfc5c1575057dc4bfb12521f75c5d2f9342dd813a9e8aeb981944"
     },
     "ask@flag_on": {
       "configure": "b6b54c4a22a48218151445ed740f0ea638d0e41678ed92b64acc05b9a0f42d8b",
-      "execute": "4d5577bdccd3b34df4de4a2ba9b8107730dbb8e53155dcc3a65559395192d12e",
+      "execute": "3a3b9bfdbda7a66e0a58a61faeb280a40626a49ba7a67b63d6c9f5db4dbc5879",
       "health": "b105e22c23398a8fb8af4c13c95b347f7929d0aa95ebef7006a849c8ed61f965",
       "help": "3e01f6499d7964f0958d98bcc22aabd0b5c9e43b19a4e07438d52f223009f84d",
       "loop-p5-batch": "3b15c7b9f5afa704c3fe8465d18e1c0a6c020542a23467c1af1f92766d7362e4",
       "loop": "212052d67b3dfe93ca3bbf0499a4772066c1ceb2f81000f5c71cc5f8f0a83d48",
       "make": "586a53c8107c069fe4fac3137dd7a7c5191d300f3258917220b109b787f396ae",
       "metrics": "b6fc0e6fe350f7f1453d98a7073f8ecb48cb41ef7334e3935063cf66266ea098",
-      "research": "74c83b4f76dd29df528ea78009a5a63b959ee24aa264dba98900d4aaee461ed6",
-      "review": "199a86e4fd647c8a6eb16884790ff8a974b61a57fed5bafd9f1455beeb179965",
-      "spec": "bd2c0f029eef6740153e48156cc24c3bd6bfb58ebc920ae5c4c7bcbc05289319",
+      "research": "42049787a78090d8d4993acd034dc7e94fee489f9f1fd12dc7b6b19066af56f4",
+      "review": "002b50e51b8a0067924111fd008247a20669ded39a934c3bf33bb920725680d0",
+      "spec": "5cbd8918124d8bfceeaeede0648c66a43b2bc688dfa01e84337ca49003e42f92",
       "uninstall": "118870fc6314852625f34e4d6a1a18ef94b80cd44d0f6aabd3656f141a2efaf1",
-      "verify": "fe899a2248366db476e001e936221dddbd399e93a04046470f842817bb222352",
-      "wrapup": "6919793a3e7c2edb75832f41c03a5646f608e2938bcea59dff583fc6ffa1aa67"
+      "verify": "9576b75a7ffd4bc3e260097250900f6e6df398755d17097a4873ca5d6a6afe8b",
+      "wrapup": "d80a74ec04e43151402a02767e7815d676cb66b5b11736f449b91b3508dccf6d"
     },
     "ask@flag_off": {
       "configure": "b6b54c4a22a48218151445ed740f0ea638d0e41678ed92b64acc05b9a0f42d8b",
-      "execute": "4a4f9032aca8105323361134274890a02b911b0003cf57fb0eadafbbd18eeb68",
+      "execute": "fb9279d547bf29cd0cec584c887811f2df95f9c319b4e688985baaf9b46ed528",
       "health": "b105e22c23398a8fb8af4c13c95b347f7929d0aa95ebef7006a849c8ed61f965",
       "help": "3e01f6499d7964f0958d98bcc22aabd0b5c9e43b19a4e07438d52f223009f84d",
       "loop-p5-batch": "150aaf50cab2c191bee1fc193e272f48a6e769ff6c2bbb55fb38b01e94394bbd",
       "loop": "c6d8b45bb90999ee54ca552d8da8ad92ec568c8fc851215ed4171b2286086dff",
       "make": "586a53c8107c069fe4fac3137dd7a7c5191d300f3258917220b109b787f396ae",
       "metrics": "b6fc0e6fe350f7f1453d98a7073f8ecb48cb41ef7334e3935063cf66266ea098",
-      "research": "41186bda671e2bb989e461d7fa29945b1679dbe5c11881c22cbccefe3d8e909b",
-      "review": "02e1125ec7acaa7e1f600d9c7163b1dde8bed9a2bfbd9fe7793689cd4610b506",
-      "spec": "3b2775d3286645f91d41ac6d82d34f33a5ae4f0ca61a1761e71665adaf0b2c2d",
+      "research": "112d5ea9d1a81a05431ae2028141e222ef65234b9d86bedb9fad0fcfc9e664df",
+      "review": "3208d7bb7c499956232c1c582b489df695e7fa63a2a1acb03f0cab2c287f3710",
+      "spec": "4d206ed485620fec21a67f845e87f2508ede83c0d56c171b14c104f32f6d4b6c",
       "uninstall": "118870fc6314852625f34e4d6a1a18ef94b80cd44d0f6aabd3656f141a2efaf1",
-      "verify": "a8424a02b3402c02e308702d9c4f98c257d3bccadfd6444339af6d3a554c41c9",
-      "wrapup": "be528106043633ec9d49999caba4bb7e3202ac78f759fd84ea9b53340e0048a6"
+      "verify": "954fe72f5906238b7b5fbf8dcb1dcf0050b1cd1e4014f0555d856ef4fcd26365",
+      "wrapup": "234eac8c559e5d3168180603ffcf7cff0aab20b5ff8405a11632f2264e2905f9"
     }
   },
   "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture — a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
@@ -211,6 +211,20 @@
       "reason": "This repo set loop.enabled: false (SPEC-loop-opt-in post-release follow-up), and the two auto_safe arms render from its harness.yaml. loop and loop-p5-batch were REMOVED from both auto_safe arms; help moved by its one-line loop enable hint (AC-004). Verified before re-capture that these are the only changes in either arm and nothing was added. The ask@* arms pass loop=True and are unchanged. No template changed.",
       "attributed_in": "work-docs/BASELINE-DELTA-loop-opt-out.md",
       "task": "loop-opt-out"
+    },
+    {
+      "commands": [
+        "execute",
+        "research",
+        "review",
+        "spec",
+        "verify",
+        "wrapup"
+      ],
+      "date": "2026-09-29",
+      "reason": "The shared feedback-entry/close partials became collect-only (a pending Feedback row; no intent-status read, no trial duty), wrapup Step 5.7 became one record batch plus a separate close question, wrapup Step 0.5 resumes at 5.7, and spec Step 4.9 derives the bare upper-cased id. Verified before re-capture that these six are the only moved commands in every arm and that no command was added or removed. No autopilot advance or picker block moved. Re-captured once more in the same task after the feedback partials and 5.7 intro were compressed to keep the aggregate surface from growing; the same six commands moved. Re-captured a third time after /hm:review round 2 edited wrapup Step 5.7 (review findings); only wrapup moved. Re-captured a fourth time after the confirm-1 repair round (verdict row, stale/failed marks, feedback-entry column note): the same six commands moved.",
+      "attributed_in": "specs/SPEC-intent-layer-improvements.md",
+      "task": "intent-layer-improvements"
     }
   ]
 }

@@ -74,10 +74,8 @@
 {% endif %}
 
 <!-- @hm:feedback-entry -->
-At stage entry/resume and each material observation, read and follow
-`{{ '.agents' if is_codex is defined and is_codex else '.claude' }}/skills/intent-layer/SKILL.md` → Workflow feedback
-when intent state exists. Do not wait for a user reminder to connect the evidence.
-Independently of intent availability, check for an explicitly activated trial PLAN
-at the base root in `{{ config.work_docs.dir }}`; apply Real-task trial at entry/resume and on any terminal exit, including failure or abort.
-These feedback/trial duties also apply in loop mode; only the banner/picker is skipped.
+Intent feedback is collect-only: when `.claude/intent.yaml` is absent there is nothing to do;
+otherwise append a `pending` row (intent-layer Feedback columns; add the table if missing) to the `## Feedback`
+table of this task's most downstream artifact — PLAN, else SPEC, else RESEARCH. Never read,
+write or ask about intent state here; `/hm:wrapup` Step 5.7 decides every row. Loop mode too.
 <!-- @hm:/feedback-entry -->

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Intent layer: collect in stages, decide once at wrapup.** Wrapup Step 5.7 is now reachable
+  from the delegated path (it was skipped). Stages only collect `pending` Feedback rows; 5.7
+  asks one batched record consent, then a separate close question after readback. The
+  real-task trial is frozen by a recorded user policy decision, so stages no longer carry a
+  trial duty. `hm intent` accepts `-` for stdin, `--observed-at` is optional (defaults to now),
+  `question resolve` gets an explicit lifecycle (open->confirmed|wrong, wrong->confirmed|open),
+  and `/hm:spec` derives a bare intent id (no `OBJ-` prefix requirement).
+
 ## [0.60.6] - 2026-09-29
 
 ### Security

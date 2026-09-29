@@ -24,11 +24,8 @@ sys.path.insert(0, str(_REPO / "tests" / "structural"))
 from _surface_baseline import render_surface  # noqa: E402
 
 STALE_LABEL = "(cited code changed)"
-NEW_LABEL = "new — record a question"
 ADD_CMD = "hm intent question add <id> --claim"
 OBSERVE_LOCATOR = "[--locator <path:A-B>]"
-OPTION_CAP = "at most two question ids"
-CONFIRM_NEW = "show the exact `add` arguments"
 GAP_SOURCE = "`hm intent status --json`"
 ASK_TOKEN = {"claude": "AskUserQuestion", "codex": "request_user_input"}
 MANDATED = {"claude": ("!uv run", "!python -m", "!hm "), "codex": ('Bash("uv run', 'Bash("hm ')}
@@ -38,7 +35,7 @@ SKILL_ADD_FORM = (
 )
 SKILL_OBSERVE_FORM = (
     "hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file"
-    " --observed-at [--claim-file] [--locator <path:A-B>]"
+    " [--observed-at] [--claim-file] [--locator <path:A-B>]"
 )
 
 
@@ -49,7 +46,7 @@ def surface() -> dict[str, dict[str, str]]:
 
 def _assumption_block(surface: dict[str, dict[str, str]], target: str) -> str:
     wrapup = surface[target]["wrapup" if target == "claude" else "hm-wrapup"]
-    start = wrapup.index("<!-- @hm:answer-gated:assumption -->")
+    start = wrapup.index("<!-- @hm:answer-gated:record-batch -->")
     return wrapup[start : wrapup.index("<!-- /@hm:answer-gated -->", start)]
 
 
@@ -67,14 +64,14 @@ def test_ac_010_wrapup_offers_add_and_lists_stale_first(
     surface: dict[str, dict[str, str]], target: str
 ) -> None:
     block = _assumption_block(surface, target)
-    for literal in (STALE_LABEL, NEW_LABEL, OPTION_CAP, GAP_SOURCE, "`stale_evidence`"):
+    # SPEC-intent-layer-improvements: the record batch replaced the per-question ask. Stale
+    # questions still lead the list; "new" is no longer an option (new questions arrive as
+    # pending rows), and selecting an item that shows its exact arguments is the confirmation,
+    # so the old second question and the two-id cap are retired with it.
+    for literal in (STALE_LABEL, GAP_SOURCE, "`stale_evidence`"):
         assert literal in block, literal
-    assert _after(
-        block, ASK_TOKEN[target], 'If the answer is "yes":', ADD_CMD, "Otherwise: write nothing"
-    ), block
-    # "new" is a choice to record, not approval of a record the model wrote: the arguments are
-    # shown and confirmed with a second question before the one `add` call (codex dbc13952).
-    assert _after(block, NEW_LABEL, CONFIRM_NEW, ASK_TOKEN[target], ADD_CMD), block
+    ask = {"claude": "AskUserQuestion", "codex": "numbered list"}[target]
+    assert _after(block, "`stale_evidence`", ADD_CMD, ask, "`declined`"), block
     calls = [ln for ln in block.splitlines() if ln.strip().startswith(MANDATED[target])]
     assert sum(ADD_CMD in ln for ln in calls) == 1, calls
     observe = [ln for ln in calls if "hm intent question observe" in ln]

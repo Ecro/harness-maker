@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from harness_maker import intent, world
 from harness_maker.intent_migrate import migrate
-from harness_maker.intent_vocabulary import RECORD_ALIASES, canonical_question, condition, translate
+from harness_maker.intent_vocabulary import (
+    QUESTION_STATES,
+    RECORD_ALIASES,
+    canonical_question,
+    condition,
+    translate,
+)
 
 
 def status_report(root: Path) -> dict[str, Any]:
@@ -61,10 +68,29 @@ def _metric_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _writes_observation(args: Any) -> bool:
+    """`question add` without text records no evidence, so it must not be stamped either."""
+    verb = getattr(args, "verb", None)
+    if args.cmd == "question":
+        return verb == "observe" or (verb == "add" and getattr(args, "text", None) is not None)
+    return args.cmd == "metric" and verb == "record"
+
+
+#: Engine status → the canonical targets `question resolve` may move it to. `known` is absent on
+#: purpose: a confirmed claim changes only through `observe --relation contradicts` first.
+_RESOLVABLE = {
+    "unknown": {"confirmed", "wrong"},
+    "assumed": {"confirmed", "wrong"},
+    "conflict": {"confirmed", "open"},
+}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = intent._parser()
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     intent.resolve_file_args(parser, args)
+    if getattr(args, "observed_at", "") is None and _writes_observation(args):
+        args.observed_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     migration = args.cmd == "migrate"
     if args.cmd in {"new", "approve", "activate", "drop", "reopen", "close", "show"}:
         args.verb = args.cmd
@@ -162,6 +188,14 @@ def main(argv: list[str] | None = None) -> int:
                     with world._rmw_lock(world.intent_path(root)):
                         doc = world._load_assumptions_doc(root)
                         rec = world._find(doc, args.id)
+                        if args.status not in _RESOLVABLE.get(str(rec.get("status")), set()):
+                            current = QUESTION_STATES.get(str(rec.get("status")), rec.get("status"))
+                            raise world.WorldError(
+                                "status",
+                                f"{args.id!r} is {current!r}; resolve settles an open question "
+                                "(to confirmed|wrong) or leaves wrong (to confirmed|open) — "
+                                "record an observation first with observe --relation",
+                            )
                         rec.setdefault("history", []).append(rec["claim"])
                         rec["claim"] = args.claim
                         rec["status"] = {

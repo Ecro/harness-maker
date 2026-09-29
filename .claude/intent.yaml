@@ -187,6 +187,17 @@ open_questions:
       per run plus confirmation passes.'
     observed_at: '2026-09-28T22:22:33Z'
     relation: confirms
+  - text: 'intent-layer-improvements (2026-09-29): /hm:review run cda10095b67a on
+      a Python + template diff, 4 dispatches x 2 passes + codex, then two confirmation
+      passes. The security lens alone found the heredoc-sentinel injection channel
+      (P1 in Pass 1, P2 after Pass 2). The core lens alone found the confirm-1 P1
+      (verdict skip rule keyed on a row no step wrote). Codex contributed three findings
+      no Claude lens raised (PIDA accepted), one corroborating security. The concurrency
+      lens dropped all three of its Pass 1 findings in Pass 2 and returned 0 at confirm-2.
+      Distinct lenses and the heterogeneous model again each contributed findings
+      no other voter raised; the concurrency lens contributed none that survived.'
+    observed_at: '2026-09-29T15:00:00Z'
+    relation: confirms
   history: []
 - id: revalidation_is_report_only
   claim: 'needs_revalidation is a report only: the autopilot objective gate reads

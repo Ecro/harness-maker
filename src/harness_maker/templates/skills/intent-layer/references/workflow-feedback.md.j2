@@ -1,16 +1,20 @@
 ## Workflow feedback
 
-The workflow agent owns this connection at stage entry/resume, each material
-observation, and close-out. Read `hm intent status --json` through the launcher
-below; load the task's SPEC/PLAN intent link and existing Feedback dispositions.
-If status is not_filled_in, skip feedback; if invalid, report the error and do not
-make a dependent intent decision. An absent intent layer costs no record or prompt.
+Two moments own this connection. **Collect** — in every stage, an observation that bears
+on an intent question or metric becomes a `pending` row in the Feedback table of the task's
+most downstream existing artifact (PLAN, else SPEC, else RESEARCH); collecting reads and writes
+no intent state and asks nothing. **Decide** — wrapup Step 5.7 reads `hm intent status --json`
+once, offers every pending row and the measurable metrics as one batch, reads status back, and
+only then asks the close question. If status is not_filled_in, skip feedback; if invalid, report
+the error and do not make a dependent intent decision. An absent intent layer costs no record or
+prompt.
 
 1. Identify the relevant observation, source locator/time, affected question or
    metric ID, and task/intent link. For code-absent facts, use project-knowledge.
-   If no PLAN exists yet, retain the evidence in the current SPEC/conversation and
-   transfer it when execute creates the PLAN; never create a competing state store.
+   Record it as a `pending` row where it was observed; when execute creates the PLAN,
+   carry earlier rows into it. Never create a competing state store.
 2. Reuse existing authorization only for the same operation and agreed scope.
+   Workflow writes are consented once, as a batch, at wrapup Step 5.7.
    Follow the write rule below for unapproved mutations. If consent is pending or
    declined, write nothing and mark the update pending or declined. A question or
    proposal is not a recorded update. Never treat silence as consent or missing
@@ -47,58 +51,4 @@ records each disposition in the task PLAN's Feedback table:
 
 | Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |
 |---|---|---|---|---|---|---|
-| source path/anchor or conversation locator + time | intent/question/metric | recorded + readback / pending / declined / unchanged | supported action or stop reason | agent or user | consent/approved scope or pending decision | existing task link, specific question, dated deferral or stop |
-
-## Real-task trial
-
-At stage entry/resume, each material observation and closeout, resolve the base
-project root and inspect `work-docs/PLAN-*.md` for an explicit trial activation.
-If none is active, do nothing and ask no trial question. Do this even when the
-intent layer is unfilled or the current task has no execution PLAN.
-
-For each activated trial, use `hm intent --root <base> trial status <trial-id> --json`. Status separates observed candidates, committed members,
-collection, outcome, source uncertainty and the next action; a read is never an
-assessment. Follow its action during this invocation:
-
-- `reconcile` or `resume_recovery_and_readback`: call
-  `hm intent --root <base> trial reconcile <trial-id> --json` once, then independently read
-  status again. Any session may perform this mechanical update under the recorded
-  active policy. It does not need a previous collector's acknowledgment or a new
-  user confirmation. If a write reports `lock_busy`, retry at the next eligible
-  stage trigger; do not wait longer than the command's bounded lock period.
-- `request_bounded_source_review`, `collect_missing_evidence`, or
-  `resolve_order_conflict` / `resolve_source_conflict`: identify the named source,
-  current inventory, observed cutoff and candidate order. Keep independent
-  authorized task work moving. A user accepted historical population is recorded
-  through `hm intent --root <base> trial record-decision` with an explicit decision file and
-  the current expected revision; do not infer acceptance from readable logs,
-  silence or a model summary. A blocked recovery keeps its next-trigger record.
-- `request_policy_decision`: leave the existing policy effective. Record only an
-  explicit user approved policy replacement using `record-decision`, then read
-  status and reconcile under the newly recorded authority. Do not ask again if
-  the decision already exists. Revoked authority forbids mechanical writes.
-- `request_user_assessment`: present the observed trace and ask the user to
-  decide each task's continuity result. Persist the exact explicit answer with
-  evidence references and expected revision, then read it back. Never derive a
-  pass/fail from task success, stage completion or the agent's own judgment.
-- `wait_until_window_closes`: retain the closing date and next eligible trigger;
-  do not remeasure or create a new task just to fill the trial.
-
-Write task evidence in the earliest existing RESEARCH, SPEC or PLAN artifact as
-`trial_feedback` frontmatter events, retaining one stable event ID per fact when
-that fact is linked or moved to a later artifact. A start claim cites the existing
-ledger first start; an observation links its concrete source and decision; a
-terminal event records the actual task closeout, including failure or abort.
-Intermediate stage handoff is not terminal. When no artifact exists yet, carry
-its source facts into the first existing stage artifact during this invocation;
-do not create a competing store. At closeout, update the current task artifact
-first, then reconcile/read back the activated trial once more. If source writing
-fails, report it as an evidence gap and preserve the next-trigger obligation.
-
-The trial PLAN's typed `trial` frontmatter is authoritative for activation,
-policy, membership and explicit human decisions. Its original prose remains
-historical provenance. A worktree copy is never the authoritative trial PLAN;
-all trial commands resolve the base root. The approved next-three-real-tasks
-cohort is chronological by first start, includes failures/aborts and excludes
-administrative/synthetic work under its original policy. Never reset members,
-close the intent or declare trial success from implementation checks.
+| source path/anchor or conversation locator + time | intent/question/metric | recorded + readback / pending / declined / failed / unchanged | supported action or stop reason | agent or user | consent/approved scope or pending decision | existing task link, specific question, dated deferral or stop |
