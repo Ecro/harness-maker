@@ -11,13 +11,6 @@ adrs: 6
 validator_outcome: NOT_RUN
 summary: "CLI stdin/now/resolve, trial freeze on recorded disable, collect-only stages + wrapup batch"
 intent: WORLD-INTENT-CLOSED-LOOP
-surface_allowance:
-  chars: 1
-  reason: "Step 5.7 record batch adds one mandated `hm intent metric record` call (the measure:false verdict item); aggregate chars shrink"
-  delta_doc: BASELINE-DELTA-intent-layer-improvements.md
-  round_trips:
-    wrapup: 1
-    hm-wrapup: 1
 spec_need_verdict: change
 spec_need_target: intent-layer-improvements
 ---
@@ -203,6 +196,6 @@ AC-001 guards is not rendered at all, so the default render could not exercise i
 | Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |
 |---|---|---|---|---|---|---|
 | RESEARCH F1 (`wrapup.md:212`), 2026-09-29 | intent WORLD-INTENT-CLOSED-LOOP / metric intent_world_closed_loop_cycles | pending | this task repairs the skip; metric stays unmeasured until a post-release wrapup | agent | SPEC approval 2026-09-29 | wrapup 5.7 of this task |
-| SPEC interview Round 1 trial freeze, 2026-09-29; write consented in execute Phase 5 | trial world-intent-closed-loop-trial | recorded + readback: decision `world-intent-closed-loop-trial-freeze` present, 2 prior decisions + 2 members preserved, policy enabled false; still active until committed (HEAD half) | freeze recorded in base working copy | user | explicit consent to the exact record-decision arguments | wrapup: after task-land, confirm `active_trials` omits the trial (AC-006) |
-| `surface_allowance` (wrapup +1 round trip) expires when this PLAN is `complete`, 2026-09-29 | tests/structural/surface_baseline.json | pending | after task-land, regenerate the baseline at the landed main SHA and attribute it in the BASELINE-DELTA doc | agent | DRI approval of SPEC (IRR-003 batch adds the record call) | post-land chore commit, same session |
+| SPEC interview Round 1 trial freeze, 2026-09-29; write consented in execute Phase 5 | trial world-intent-closed-loop-trial | recorded + readback: decision `world-intent-closed-loop-trial-freeze` present, 2 prior decisions + 2 members preserved, policy enabled false; still active until committed (HEAD half) | freeze recorded in base working copy | user | explicit consent to the exact record-decision arguments | verified 2026-09-29 after land (e5851a67): `active_trials` → [], `protected_trial_paths` → empty (AC-006 met) |
+| `surface_allowance` (wrapup +1 round trip) expires when this PLAN is `complete`, 2026-09-29 | tests/structural/surface_baseline.json | pending | after task-land, regenerate the baseline at the landed main SHA and attribute it in the BASELINE-DELTA doc | agent | DRI approval of SPEC (IRR-003 batch adds the record call) | done 2026-09-29: regenerated at e5851a67, attributed in BASELINE-DELTA §4 |
 | REVIEW-intent-layer-improvements-2026-09-29 (APPROVED, grade A, 2026-09-29) | — | unchanged | three P3 carried (`_RESOLVABLE` `assumed` key, SKILL `question add` synopsis, `_user_disabled` vs `_validate_decision`) | agent | review record | follow-up task; not blocking wrapup |

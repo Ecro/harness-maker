@@ -342,6 +342,13 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "churn-skipped (0.077 < 0.30). Both runs' round 1 persisted. Recorded in the 2026-09-29 "
         "sweep; nothing reconstructed."
     ),
+    ("intent-layer-improvements", 2): (
+        "Round 2 dispatched no reviewers: the churn gate skipped the re-review "
+        "(`review_consensus plan` → empty `dispatches`, churn 0.22 < 0.30), so no merged payload "
+        "existed to capture. Run cda10095b67a's round 1 persisted; its 17 round-2 fixes were "
+        "reviewed by confirm-1 and confirm-2 instead (REVIEW-intent-layer-improvements-"
+        "2026-09-29.md). Nothing reconstructed."
+    ),
 }
 
 
