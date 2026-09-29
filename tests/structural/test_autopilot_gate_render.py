@@ -28,6 +28,13 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-29, loop opt-out** — this repo's `harness.yaml` set `loop.enabled: false` (the
+  SPEC-loop-opt-in post-release follow-up). `loop` and `loop-p5-batch` were REMOVED from both
+  `auto_safe@*` arms, and `help` moved by its one-line enable hint (AC-004). Verified before
+  re-capture that nothing else moved and nothing was added in either arm. The `ask@*` arms
+  render with `loop=True` and are unchanged. Setting the key back to true restores every
+  previous hash. Attributed in `work-docs/BASELINE-DELTA-loop-opt-out.md`.
+
 - **2026-09-29, release 0.60.6** — all 56 commands across four arms moved only in
   their rendered version: substituting `0.60.5` for `0.60.6` reproduced every prior
   hash before the golden was updated. No command content changed.

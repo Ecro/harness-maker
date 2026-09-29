@@ -4,8 +4,6 @@
   "execute",
   "health",
   "help",
-  "loop",
-  "loop-p5-batch",
   "make",
   "metrics",
   "research",
@@ -18,8 +16,6 @@
  "codex": [
   "hm-execute",
   "hm-help",
-  "hm-loop",
-  "hm-loop-p5-batch",
   "hm-research",
   "hm-review",
   "hm-spec",

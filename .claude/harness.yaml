@@ -4,7 +4,7 @@ harness_maker_version: 0.60.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: e757ce2300eb7ec23d910c2356e81da78d6f7e5a8fdd872ff61d8e575bec6fb4
+content_hash: 50cfd6043cb8ee9404b524bd6b78194b18b0806ad06fca59107dfbd6315ef0e7
 ---
 preset: Production
 locale: ko
@@ -179,7 +179,7 @@ delegation:
   stages: ["wrapup", "verify"]
 loop:
   # /hm:loop + /hm:loop-p5-batch. false = not rendered; set true and run /hm:make to enable.
-  enabled: true
+  enabled: false
 autonomy:
   level: "auto_safe"
   pipeline: ["research", "spec", "execute", "review", "verify", "wrapup"]

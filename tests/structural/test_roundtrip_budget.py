@@ -118,8 +118,9 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # model stops rendering. Re-enabling the model restores the call and this row.
     "health": 6,
     "help": 0,
-    "loop": 10,
-    "loop-p5-batch": 2,
+    # `loop` (10) and `loop-p5-batch` (2) removed 2026-09-29: this repo set `loop.enabled:
+    # false` (SPEC-loop-opt-in follow-up), so neither renders from its harness.yaml. The
+    # templates still ship; setting the key back to true restores both rows.
     "make": 1,
     "metrics": 7,
     # `plan` removed 2026-09-20 (SPEC-plan-stage-absorption IRR-001). Its 29 round trips did

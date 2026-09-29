@@ -265,3 +265,8 @@ values:
   evidence: 'auto: measure#82611f0fd3e4 @ 9f60e97d exit=0 cwd=base'
   definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
   metric_id: dead_rendered_bytes
+- value: 7.3
+  observed_at: '2026-09-29T11:35:33Z'
+  evidence: 'auto: measure#82611f0fd3e4 @ 36e944b3 exit=0 cwd=base'
+  definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
+  metric_id: dead_rendered_bytes

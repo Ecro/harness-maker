@@ -4,9 +4,7 @@
       "configure": "b6b54c4a22a48218151445ed740f0ea638d0e41678ed92b64acc05b9a0f42d8b",
       "execute": "18f4353265a00aa0ce35067858dfa2a8f56ac26594fc6c26223e22915e890864",
       "health": "e57adc5fc45c188c7bf60ccd1a9d063a7a37b1d0ca80519d1b8431b0b5235937",
-      "help": "e4752c58739842d9cd6c00a35575850e8d9de045d10d72a04b04b3fb8a68a798",
-      "loop-p5-batch": "3b15c7b9f5afa704c3fe8465d18e1c0a6c020542a23467c1af1f92766d7362e4",
-      "loop": "80afa08e36ac029773c340e4785ab029d66eaddbd2397817e86da8f9da82fb14",
+      "help": "96c06fa7235131b069300a6fdb90e83e7dba8716326cdddd083b4f503e79f0ab",
       "make": "586a53c8107c069fe4fac3137dd7a7c5191d300f3258917220b109b787f396ae",
       "metrics": "b6fc0e6fe350f7f1453d98a7073f8ecb48cb41ef7334e3935063cf66266ea098",
       "research": "1985c440e2e150193600126731c02a4a2a0381462fab95fd733bdd03c084b1e5",
@@ -20,9 +18,7 @@
       "configure": "b6b54c4a22a48218151445ed740f0ea638d0e41678ed92b64acc05b9a0f42d8b",
       "execute": "fde0f26364bc2e686960a39f654272483ca6cda9df3a7622ccf5de78312c77a0",
       "health": "e57adc5fc45c188c7bf60ccd1a9d063a7a37b1d0ca80519d1b8431b0b5235937",
-      "help": "e4752c58739842d9cd6c00a35575850e8d9de045d10d72a04b04b3fb8a68a798",
-      "loop-p5-batch": "3b15c7b9f5afa704c3fe8465d18e1c0a6c020542a23467c1af1f92766d7362e4",
-      "loop": "80afa08e36ac029773c340e4785ab029d66eaddbd2397817e86da8f9da82fb14",
+      "help": "96c06fa7235131b069300a6fdb90e83e7dba8716326cdddd083b4f503e79f0ab",
       "make": "586a53c8107c069fe4fac3137dd7a7c5191d300f3258917220b109b787f396ae",
       "metrics": "b6fc0e6fe350f7f1453d98a7073f8ecb48cb41ef7334e3935063cf66266ea098",
       "research": "1985c440e2e150193600126731c02a4a2a0381462fab95fd733bdd03c084b1e5",
@@ -204,6 +200,17 @@
       "date": "2026-09-22",
       "reason": "Help adopts runtime-correct Codex invocation examples and six-stage count; SPEC drift already reproduces with unmodified HEAD source (baseline probe), refreshed alongside stale snapshots. Autopilot gates and command sets unchanged.",
       "task": "codex-stage-invocation"
+    },
+    {
+      "commands": [
+        "help",
+        "loop",
+        "loop-p5-batch"
+      ],
+      "date": "2026-09-29",
+      "reason": "This repo set loop.enabled: false (SPEC-loop-opt-in post-release follow-up), and the two auto_safe arms render from its harness.yaml. loop and loop-p5-batch were REMOVED from both auto_safe arms; help moved by its one-line loop enable hint (AC-004). Verified before re-capture that these are the only changes in either arm and nothing was added. The ask@* arms pass loop=True and are unchanged. No template changed.",
+      "attributed_in": "work-docs/BASELINE-DELTA-loop-opt-out.md",
+      "task": "loop-opt-out"
     }
   ]
 }
