@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.60.7] - 2026-09-30
+
 ### Changed
 
 - **Intent layer: collect in stages, decide once at wrapup.** Wrapup Step 5.7 is now reachable

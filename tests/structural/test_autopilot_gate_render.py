@@ -28,6 +28,9 @@ original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
 
+- **2026-09-30, release 0.60.7** — 52 commands across four arms moved only in their rendered
+  version: substituting `0.60.6` for `0.60.7` reproduced every prior hash before the golden was
+  updated. No command content changed.
 - **2026-09-29, `intent-layer-improvements`** — `research`, `spec`, `execute`, `review`,
   `verify` and `wrapup` moved, in all four arms: the shared feedback-entry/close partials became
   collect-only (a `pending` Feedback row; no intent-status read, no trial duty), wrapup Step 5.7
