@@ -319,6 +319,29 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "67faab2c to clear this gate and removed the next commit: a reconstruction is exactly "
         "what this corpus excludes, whatever its content."
     ),
+    ("loop-opt-in", 2): (
+        "churn-skipped re-review (run de811b436e83): round 2's telemetry row records churn "
+        "0.07 < 0.30 and REVIEW-loop-opt-in-2026-09-27.md says 'Re-review: skipped', so no "
+        "reviewer ran and there was no merged payload. The terminal row carries the confirm-1 "
+        "pass, whose lens files are under `.hm-lens-results/loop-opt-in/de811b436e83/"
+        "confirm-1/`. Round 1 persisted. Recorded in the 2026-09-29 sweep; nothing reconstructed."
+    ),
+    ("sdlc-three-loops-gap", 2): (
+        "churn-skipped re-review in all three runs (6cb74c0a3f9f, a8bcd353b3b0, d5a96ec922f4): "
+        "the three terminal round-2 rows record churn 0.078, 0.052 and 0.063, all < 0.30, and "
+        "REVIEW-sdlc-three-loops-gap-2026-09-27.md records the skips. The confirmation passes "
+        "that followed are not rounds. Each run's round 1 persisted. Listed three times because "
+        "each run emitted a terminal `round: 2` row. Recorded in the 2026-09-29 sweep; nothing "
+        "reconstructed."
+    ),
+    ("intent-feedback-continuity", 4): (
+        "no round 4 dispatched in either run. Runs 01263f044f17 and 4ddd6e47b02f both ended on "
+        "'Confirmation pass 2 — terminal' (REVIEW-intent-feedback-continuity-2026-09-28.md and "
+        "its -rerun), and the terminal telemetry row numbers that pass round 4: the round-axis "
+        "disagreement the `review-loop-ledger-fixes` entry records. The first run's round 2 was "
+        "churn-skipped (0.077 < 0.30). Both runs' round 1 persisted. Recorded in the 2026-09-29 "
+        "sweep; nothing reconstructed."
+    ),
 }
 
 
