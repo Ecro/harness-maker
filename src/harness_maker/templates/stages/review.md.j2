@@ -402,6 +402,20 @@ No halt, no auto-edit of the record, no gate: P2 keeps it out of `unverified_sev
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm codex_adapter stamp-ids < <the literal temp path>
 ```
 
+Then stamp `caused_by` on it from this round's pinned fix delta (`r<N>`) — its only owner:
+
+{% if is_codex %}
+```
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn attribute --slug {slug} --run-id <run-id> --round <N> --findings-file <the literal temp path>")
+```
+{% else %}
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn attribute --slug {slug} --run-id <run-id> --round <N> --findings-file <the literal temp path>
+```
+{% endif %}
+
+Exit 1 = not stamped; fix the file and re-run.
+
 {% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) %}
 **Then persist the round's finding payload (ADR-006 part 2).** Run this **exactly once per
 round**, against the merged temp file you already wrote, with the literal reviewer label
@@ -807,7 +821,7 @@ merge-by-`id`, the two-arm trigger. Binding with second opinion off; the only co
 Per iteration:
 
 1. **Merge and attribute.** Merge the previous round's re-review by `id`, stamp `id`s on new
-   findings, then determine each one's `caused_by` from the previous round's fix log.
+   findings, then read each one's `caused_by` from the Step 3.4 `review_churn attribute` stamp.
 
 2. **Group.** On a §5 trigger fire, emit its per-group block and make ONE consolidated edit.
 
@@ -952,7 +966,7 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
    Fixes applied: {count}
    | # | Severity | Summary | File | Status |
    |---|----------|---------|------|--------|
-   | 1 | P0 | ... | ... | Applied · caused_by=#7 |
+   | 1 | P0 | ... | ... | Applied · caused_by=fix-r1 |
    | 2 | P1 | ... | ... | Skipped — overlap · caused_by=none |
 
    Remaining: {count} | New issues introduced: {count}

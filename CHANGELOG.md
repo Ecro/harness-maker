@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`hm review_churn attribute` stamps `caused_by` deterministically.** It diffs the round's
+  fix commit (`git diff -U0`), maps each finding's line to the new-side hunks, and stamps only
+  findings whose `caused_by` is unset. Round label convention: REVIEW round N <-> churn ref
+  `r{N}`. Carried ids come from the same-run persisted payload store; a malformed file is left
+  untouched. A fix-defect-rate report reads the stamped values.
+- **`hm observability.verification_cache run` owns gate execution and the marker.** It runs the
+  CI-derived commands, writes a `writer: run` marker (with `commands_sha256`) only when every
+  gate passes and the key is stable, and `/hm:verify` and `/hm:wrapup` trust only that marker
+  for skip. Gates run in their own process group with cleanup on interrupt and a bounded reap;
+  the stage recipe runs it in the background because the suite exceeds a foreground host cap.
+- **CLAUDE.md character budget** beside the line budget (Side 16,000 / Production 40,000
+  characters, also AGENTS.md), folded into the existing readiness signal. Over-budget sections
+  moved verbatim to `docs/reference/*.md`, which the documentation contract treats as
+  historical snapshots.
+
 ## [0.60.7] - 2026-09-30
 
 ### Changed

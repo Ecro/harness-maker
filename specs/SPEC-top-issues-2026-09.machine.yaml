@@ -1,0 +1,619 @@
+schema_version: 3
+spec_slug: top-issues-2026-09
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: tier 2; the mutation gate collected zero mutants in
+  five consecutive tasks (failures.md mutation entries), so it is not relied on here;
+  property ACs AC-003/AC-007 carry the discrimination.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/review_churn.py
+- src/harness_maker/observability/verification_cache.py
+- src/harness_maker/context_lint.py
+- src/harness_maker/readiness.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: attribute stamps fix-r(N) on findings inside the round's fix delta
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_churn_attribute.py::test_finding_inside_fix_delta_is_fix_r1
+  executable_predicate: stamped(findings_after)['a.py:41'] == 'fix-r2'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the test builds a real git repo whose round-1 fix inserts ten lines
+    after line 2 and edits original lines 30-32, so new-side (40-42) and old-side
+    (30-32) ranges are more than the +/-3 tolerance apart; the finding line 41 and
+    expected label come from the SPEC coordinate rule, not from the attribution code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: attribute stamps none or unknown for every non-attributable case
+  type: parametric
+  test_ids:
+  - tests/unit/test_review_churn_attribute.py::test_non_attributable_cases
+  executable_predicate: null
+  golden_table:
+  - input:
+      round: 2
+      finding: a.py:55
+      fix_new_side: a.py:3-12,40-42
+    expected: none
+    edge: false
+    note: ''
+  - input:
+      round: 1
+      finding: a.py:41
+      fix_new_side: null
+    expected: none
+    edge: false
+    note: ''
+  - input:
+      round: 2
+      finding: a.py:null
+      fix_new_side: a.py:3-12,40-42
+    expected: unknown
+    edge: false
+    note: ''
+  - input:
+      round: 2
+      finding: a.py:41
+      fix_new_side: refs missing
+    expected: unknown
+    edge: false
+    note: ''
+  - input:
+      round: 2
+      finding: a.py:55 (caused_by key absent)
+      fix_new_side: a.py:3-12,40-42
+    expected: none
+    edge: false
+    note: ''
+  - input:
+      round: 2
+      finding: b.py:6
+      fix_new_side: b.py deletion-only +4,0
+    expected: fix-r2
+    edge: false
+    note: ''
+  - input:
+      round: 2
+      finding: a.py:31 (old-side line only)
+      fix_new_side: a.py:3-12,40-42
+    expected: none
+    edge: false
+    note: ''
+  - input:
+      round: 2
+      finding: a.py:41
+      fix_new_side: only r1 refs pinned
+    expected: unknown
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: each row pairs a hand-authored fixture situation (outside delta,
+    round 1, null line in changed file, missing refs) with the label the SPEC S2 defines
+    for it; the table comes from the SPEC, not the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: attribute preserves shape, stamped values and all other fields
+  type: property
+  test_ids:
+  - tests/unit/test_review_churn_attribute.py::test_attribute_changes_only_unstamped_caused_by
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'a frame invariant: for any findings file, the output minus the
+    caused_by key equals the input minus the caused_by key, and non-null caused_by
+    values are identical; this holds for any correct stamping implementation independent
+    of how it locates hunks.'
+  oracle_independence_waiver: null
+  input_domain: 'findings files in list or {"findings": [...]} shape; each finding
+    has caused_by as a string, null, or absent, plus arbitrary extra fields'
+  transformation: run review_churn attribute
+  expected_relation: strip(out, 'caused_by') == strip(in, 'caused_by') and all(o.get('caused_by')
+    == i.get('caused_by') for i, o in zip(in, out) if isinstance(i.get('caused_by'),
+    str)) and all(isinstance(o.get('caused_by'), str) for o in out)
+  preconditions: []
+  observable_output: rewritten findings file
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: attribute exits 1 on a malformed file and leaves it untouched
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_churn_attribute.py::test_malformed_file_untouched
+  executable_predicate: rc == 1 and path.read_bytes() == original_bytes
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the malformed input bytes are authored by the test and compared
+    byte-for-byte after the call; the expected rc is the SPEC S3 contract.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: fix-defect-rate reports per-slug and total counts and rate
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_churn_attribute.py::test_fix_defect_rate_report
+  executable_predicate: report['total']['counts'] == expected_counts and report['total']['rate']
+    == 0.5 and report['slugs'].keys() == {'s-one', 's-two'}
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'the fixture store holds a hand-counted mix across two slugs (hyphenated
+    run id): round-2 P0/P1 fix-r1 x2, none x2, unknown x1, absent x1, plus excluded
+    rows (P2, round-1, carried); expected per-slug and total counts and rate 0.5 are
+    computed by hand.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: review template stamps and persists the same temp file in both variants
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_review_attribution.py::test_attribute_and_persist_share_file
+  executable_predicate: file_arg(step34, 'review_churn attribute', '--findings-file')
+    == file_arg(step34, 'persist-payload', '--file') and step34.index('review_churn
+    attribute') < step34.index('persist-payload')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the required ordering is stated by SPEC S6; the test reads the
+    rendered claude and codex review stage text, which the attribution code does not
+    produce.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: verification_cache run marks only when every command passes on an unchanged
+    key
+  type: property
+  test_ids:
+  - tests/unit/test_verification_cache_run.py::test_marks_only_when_all_pass_and_key_stable
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: marker-written is a biconditional over observable inputs (stub
+    command exit codes and whether the fixture mutates a relevant file mid-run); it
+    holds for any correct implementation regardless of how commands are executed.
+  oracle_independence_waiver: null
+  input_domain: sequences of stub gate commands with exit codes in {0,1,timeout},
+    with or without a mid-run edit to a relevant file
+  transformation: run verification_cache run
+  expected_relation: marker_exists_after == (all(rc == 0 for rc in rcs) and key_before
+    == key_after); exit_code == (0 if marker_exists_after else (1 if any(rc != 0 for
+    rc in rcs) else 4))
+  preconditions: []
+  observable_output: marker file presence and process exit code
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: verification_cache run reports cached only for its own marker with the same
+    commands
+  type: mechanical
+  test_ids:
+  - tests/unit/test_verification_cache_run.py::test_cached_only_for_own_marker
+  executable_predicate: run_after_mark_pass(sentinel).cached is False and sentinel.exists()
+    and run_after_run().cached is True
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the test writes a marker via mark-pass (no writer field) and one
+    via run with a different command list; SPEC S5/IRR-003 say neither satisfies the
+    cached path, and a stub command that creates a sentinel file proves execution
+    happened.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: verification_cache run exits 3 without running or marking on a degraded plan
+  type: mechanical
+  test_ids:
+  - tests/unit/test_verification_cache_run.py::test_degraded_plan_exit_3
+  executable_predicate: rc == 3 and not marker_exists and not sentinel.exists()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: a repo fixture with no .github/workflows is degraded by the verification_plan
+    contract; expected exit 3 is the SPEC S5 contract.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: verify and wrapup templates call run and confine mark-pass to the degraded
+    fallback
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_verification_run.py::test_stages_call_run
+  executable_predicate: '''verification_cache run'' in body and all(in_degraded_block(body,
+    i) for i in mark_pass_positions(body))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the rule is from SPEC S6 and is checked against rendered stage
+    text in both variants.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: context_lint warns on CLAUDE.md and AGENTS.md over the character budget
+  type: parametric
+  test_ids:
+  - tests/unit/test_context_lint_chars.py::test_char_budget_warns_under_line_budget
+  executable_predicate: null
+  golden_table:
+  - input:
+      asset: CLAUDE.md
+      preset: Production
+      lines: 300
+      chars: 45000
+    expected: warn
+    edge: false
+    note: ''
+  - input:
+      asset: CLAUDE.md
+      preset: Production
+      lines: 300
+      chars: 30000
+    expected: ok
+    edge: false
+    note: ''
+  - input:
+      asset: CLAUDE.md
+      preset: Side
+      lines: 300
+      chars: 20000
+    expected: warn
+    edge: false
+    note: ''
+  - input:
+      asset: CLAUDE.md
+      preset: Side
+      lines: 300
+      chars: 12000
+    expected: ok
+    edge: false
+    note: ''
+  - input:
+      asset: AGENTS.md
+      preset: Production
+      lines: 300
+      chars: 45000
+    expected: warn
+    edge: false
+    note: ''
+  - input:
+      asset: AGENTS.md
+      preset: Production
+      lines: 300
+      chars: 30000
+    expected: ok
+    edge: false
+    note: ''
+  - input:
+      asset: AGENTS.md
+      preset: Side
+      lines: 300
+      chars: 20000
+    expected: warn
+    edge: false
+    note: ''
+  - input:
+      asset: AGENTS.md
+      preset: Side
+      lines: 300
+      chars: 12000
+    expected: ok
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: budgets 40,000/16,000 come from the SPEC constraints table; each
+    row places the authored fixture on one side of that budget while under the line
+    budget.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: readiness claude_md_within_limit fails on character overflow
+  type: mechanical
+  test_ids:
+  - tests/unit/test_context_lint_chars.py::test_readiness_char_overflow_fails
+  executable_predicate: signal('claude_md_within_limit').passed is False
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: same authored over-budget fixture as AC-011; the expected failed
+    signal is SPEC S7.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-013
+  title: repo CLAUDE.md is at most 40000 characters
+  type: mechanical
+  test_ids:
+  - tests/unit/test_context_lint_chars.py::test_repo_claude_md_within_char_budget
+  executable_predicate: len(body_of(Path('CLAUDE.md').read_text())) <= 40000
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 40,000 is the Production budget fixed in the SPEC constraints table,
+    independent of the file content.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-014
+  title: attribute copies the earlier round value for carried ids of the same run
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_churn_attribute.py::test_carried_ids_same_run_only
+  executable_predicate: stamped(out)[carried_in_delta] == 'none' and stamped(out)[other_run_id]
+    == 'fix-r2'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the test persists a round-1 payload for run R1 holding id X (caused_by
+    none) and a payload for run R2 holding id Y; in round 2 of R1 both X and Y sit
+    inside the fix delta. SPEC S3 fixes the expected labels independent of the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-015
+  title: review loop and gate skill read caused_by from the stamp
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_review_attribution.py::test_caused_by_single_owner
+  executable_predicate: '''determine each one'' not in autofix_step1 and ''caused_by=#''
+    not in skill and ''fix-r'' in skill_arm_b'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the single-owner rule is SPEC S6; the test reads rendered review
+    stage and second-opinion-gate skill text, which the attribution code does not
+    generate.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-016
+  title: relocated CLAUDE.md sections survive verbatim
+  type: property
+  test_ids:
+  - tests/unit/test_claude_md_relocation.py::test_relocated_sections_survive
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: differential against the base commit blob 3b718d91:CLAUDE.md, an
+    artifact that predates and is independent of the relocation edit.
+  oracle_independence_waiver: null
+  input_domain: non-blank lines of the relocated sections in 3b718d91:CLAUDE.md
+  transformation: relocation edit
+  expected_relation: every such line is in lines(CLAUDE.md) | lines(docs/reference/*.md)
+  preconditions: []
+  observable_output: line sets
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: 'Persisted review payloads carry caused_by in {none, unknown, fix-r<N>}
+    written by review_churn attribute; REVIEW grammar changes from #N to the same
+    literals'
+  category: schema/file format/storage layout
+  rationale: the payload corpus is append-only history; readers will key on these
+    literals
+  source: spec
+- id: IRR-002
+  decision: New CLI verbs review_churn attribute (requires --run-id), review_churn
+    fix-defect-rate, observability.verification_cache run (exit 0/1/3/4)
+  category: public API/CLI contract
+  rationale: rendered templates in every consumer harness call them by name and branch
+    on the exit codes
+  source: spec
+- id: IRR-003
+  decision: Verification markers gain writer and commands_sha256; run treats markers
+    without writer=run and the matching hash as not fresh
+  category: schema/file format/storage layout
+  rationale: markers are shared across harness versions in ~/.cache/harness-maker/verify
+  source: spec
+approval:
+  kind: human
+  content_hash: 64c6d6ef0698701b93b46bd7bed00186b3997f90fb66455415e02219f401dcd7
+  approved_by: Ecro
+  approved_at: '2026-09-29T17:54:59Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 735a30c48cf02d9c99179b037efda9e6d7e8908673299afcc03a9350813ffa30
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: cb3d01d7f87771db467e15932a2ed17d14494f4d580e2300cf8514d92211d45f
+    paths_to_mutate: 0507b6870495b906dfeea3d77adf90ef4b13ec14dcf03ce5111d57444b39dd12
+    irreversible_decisions: 41fc2bed25bae04acc95fbe67325329bdba226384900495b786783fdd89414a9
+    AC-001: 01ea5f0199ff939c4c6c874a12819e513cf9a3f2005c34c136cd1ce3b837e913
+    AC-002: 0c76ffcbc869b62f846a63a72e04e32560510462c560d01be086c5bb0eecff01
+    AC-003: 04db91147085685656740ac72e467e8ef421fc5d58c13c2c30bd816bdf1b0187
+    AC-004: 4079b26f086f4ac62d839058b67896cc22b5264d70b55543fa716385c69941e0
+    AC-005: 1266d5ba4c76bf83121adfee8c37f8a4425558b48fb7e0d26b05c2b03fc41e42
+    AC-006: a1b2be20dfff9ae32846182e09c9a3a37b536bbb2d8f75ed176a00a4ddb8d831
+    AC-007: dcaef9fdb31a2f309bfa01e50d3574727356a0c1a92fd51377acab2e68ab0490
+    AC-008: cf5d7fdd37f2c705c0b2bc20d581922d3f76080fd4adf433034c8e6ec07149fa
+    AC-009: 83a80959f4a69a75cfd0081aed7a2f7167fad8566855ea27b59cddcc2647f202
+    AC-010: 83a63aa909115f9c3e0639819df06c852522f2f2fabcafd038799da1dd1d12d4
+    AC-011: 081d09e8ebb2bf8b533c1584753b306c376d364430ee540e5f753ebefe219b04
+    AC-012: 84cc9dff8528737d24e5a66d7125f07f5539acc17362730cb689b80d230aa3cb
+    AC-013: a86c77d9d431530092c079bdae12688bf290b252b35676c01481ed368b56dd86
+    AC-014: ba101488c4466e3751ee7b68f1c838395de53052a39473fd4d85d52e5ff4f753
+    AC-015: 8899ce6adafa7779cea0888c449115f7e4f7fc9b58aae4f12b0cb0eeda13ebf4
+    AC-016: cbae3fb298b78b3842b08aeb3e95beac5c2d49d9d02fa2c0a7927aad029a75a9
+    ac_order: 70e92b8efcd1900894508a41cf0cf81af32766af15a6bcb1b683fafe9258d49e

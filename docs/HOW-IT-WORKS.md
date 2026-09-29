@@ -2315,6 +2315,8 @@ Side preset:    CLAUDE.md ≤200 lines, agent ≤300 lines, skill ≤300 lines
 Production:     CLAUDE.md ≤500 lines, agent ≤300 lines, skill ≤300 lines
 ```
 
+CLAUDE.md and AGENTS.md also carry a character budget (Side 16,000 / Production 40,000), because a dense file can pass the line cap and still cost thousands of tokens every turn.
+
 When limit exceeded: suggest "lines to trim + use external document links instead of inline".
 
 **Why this connects to cache**: Smaller prefixes are easier to put in cache, and fewer changes means fewer `invalidation` misses. Context size control = prerequisite for cache hit rate optimization.

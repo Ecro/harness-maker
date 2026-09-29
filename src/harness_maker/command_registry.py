@@ -118,7 +118,7 @@ MODULES: dict[str, ModuleSpec] = {
     ),
     "run_classify": ModuleSpec("subparser", _s("boundaries", "record")),
     "observability.verification_cache": ModuleSpec(
-        "subparser", _s("key", "check", "mark-pass", "explain")
+        "subparser", _s("key", "check", "mark-pass", "explain", "run")
     ),
     "second_brain": ModuleSpec(
         "subparser",
@@ -201,7 +201,8 @@ MODULES: dict[str, ModuleSpec] = {
     "proposals": ModuleSpec("subparser", _s("list", "count", "summary")),
     "test_runners": ModuleSpec("manual-dispatch", _s("plan", "list")),
     "review_churn": ModuleSpec(
-        "manual-dispatch", _s("measure", "pin", "oscillation", "complexity")
+        "manual-dispatch",
+        _s("measure", "pin", "oscillation", "complexity", "attribute", "fix-defect-rate"),
     ),
     "review_run": ModuleSpec("manual-dispatch", _s("open", "status", "close")),
     "verifier_discrimination": ModuleSpec("manual-dispatch", _s("report", "rounds", "agents")),

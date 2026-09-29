@@ -20,7 +20,8 @@ import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from harness_maker._metrics_io import _candidate_files
-from harness_maker.context_lint import _count_body_lines
+from harness_maker.context_lint import CHAR_THRESHOLDS, _count_body_lines
+from harness_maker.context_lint import _strip_frontmatter as _lint_body
 from harness_maker.models import Preset
 from harness_maker.review_churn import (
     ChurnConfigError,
@@ -414,7 +415,11 @@ def _dim_context_quality(project_dir: Path, preset: Preset) -> DimensionScore:
     claude_md = project_dir / "CLAUDE.md"
     claude_limit = _CONTEXT_LIMITS[("CLAUDE.md", preset.value)]
     if claude_md.is_file():
-        body_lines = _count_body_lines(_read_text(claude_md))
+        claude_text = _read_text(claude_md)
+        body_lines = _count_body_lines(claude_text)
+        body_chars = len(_lint_body(claude_text))
+        char_limit = CHAR_THRESHOLDS[("CLAUDE.md", preset.value)]
+        within = body_lines <= claude_limit and body_chars <= char_limit
         signals.append(
             _signal(
                 "claude_md_present",
@@ -427,11 +432,13 @@ def _dim_context_quality(project_dir: Path, preset: Preset) -> DimensionScore:
         signals.append(
             _signal(
                 "claude_md_within_limit",
-                body_lines <= claude_limit,
+                within,
                 15,
-                f"{body_lines} lines vs {claude_limit} limit ({preset.value})",
-                f"Trim CLAUDE.md to ≤ {claude_limit} lines (split into skills or imports)"
-                if body_lines > claude_limit
+                f"{body_lines} lines vs {claude_limit} limit, {body_chars} characters vs "
+                f"{char_limit} limit ({preset.value})",
+                f"Trim CLAUDE.md to ≤ {claude_limit} lines and ≤ {char_limit} characters "
+                "(move detail into linked reference docs)"
+                if not within
                 else None,
             )
         )

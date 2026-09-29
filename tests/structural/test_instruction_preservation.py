@@ -434,6 +434,34 @@ _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
             "--round <N> | tee <FINALIZE-r{N}>",
         ],
     },
+    # top-issues-2026-09: `check` + `verification_plan commands` + a self-attested `mark-pass`
+    # became one `verification_cache run` that runs the CI gates and writes the marker itself.
+    "top-issues-2026-09-verification-run": {
+        "verify@block": [
+            "!uv run --with $HOME/harness-maker python -m "
+            "harness_maker.observability.verification_cache check --root . --mode relevant",
+            "!uv run --with $HOME/harness-maker python -m "
+            "harness_maker.verification_plan commands --root .",
+        ],
+        "verify@warn": [
+            "!uv run --with $HOME/harness-maker python -m "
+            "harness_maker.observability.verification_cache check --root . --mode relevant",
+            "!uv run --with $HOME/harness-maker python -m "
+            "harness_maker.verification_plan commands --root .",
+        ],
+        "wrapup@block": [
+            "!uv run --with $HOME/harness-maker python -m "
+            "harness_maker.observability.verification_cache check --root . --mode relevant",
+            "!uv run --with $HOME/harness-maker python -m "
+            "harness_maker.verification_plan commands --root .",
+        ],
+        "wrapup@warn": [
+            "!uv run --with $HOME/harness-maker python -m "
+            "harness_maker.observability.verification_cache check --root . --mode relevant",
+            "!uv run --with $HOME/harness-maker python -m "
+            "harness_maker.verification_plan commands --root .",
+        ],
+    },
 }
 
 _KINDS = ("headings", "executables")

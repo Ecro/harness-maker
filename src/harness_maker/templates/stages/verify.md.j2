@@ -64,52 +64,31 @@ cost of `--no-tdd` without a SPEC contract.{% endif %}
 
 ### Check 2 — Regression smoke
 
-**Check-suite skip** (ADR-007 + PLAN-workflow-overhead-post024): use the
-deterministic verification-cache CLI, not prose reasoning, before running
-the suite. The default `relevant` mode ignores wrapup-only memory/work-docs
-churn but invalidates on source, tests, lockfiles, tool config, CI, and
-verification script changes.
+**One verb runs the gates and owns the marker.** It takes the gates from the project's CI (a
+narrower guess passes locally, fails on push) and marks only a pass on an unchanged tree.
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache check --root . --mode relevant")
+Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache check --root . --mode relevant
+!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant --timeout-s 3600 --deadline-s 3600
 ```
 {% endif %}
 
-If this exits `0`, print `PASS (cached)` and skip to Check 3. If it exits
-`1`, run the suite below. Do not write a passing marker until every suite
-command has passed.
+{% if is_codex %}Foreground call: the defaults (540 s/gate, 570 s total) report their own timeout.{% else %}Run it in the **background** (`run_in_background: true`): a full suite outlives the 10-minute
+foreground cap.{% endif %} Branch on the `"exit"` field of the JSON line it prints, never on the
+host's status; no JSON line = not a pass.
 
-**Ask the project's CI what the gates are — never guess them.** A guessed command that is
-NARROWER than CI passes locally and fails on push, saying nothing about what it skipped.
+- `0` → PASS (`cached: true` = its own marker reused). Skip to Check 3.
+- `1` → a gate failed or timed out, not a pass — stderr names the command and its output tail.
+- `4` → the tree changed during the run, not a pass (stderr lists the paths); re-run.
+- Killed by the host (no exit code) → not a pass, no marker.
+- `3` → degraded: no readable CI (stderr says why). Only then:
 
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm verification_plan commands --root .")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm verification_plan commands --root .
-```
-{% endif %}
-
-Run each printed command verbatim. **Exit 1 = degraded** (no CI, unreadable, nothing
-recognised — stderr says which): only then fall back to the project's toolchain
-(`pytest -q` / `ruff check .` / `ruff format --check .` / `mypy --strict`; `cargo test`;
-`pnpm test`) and say the gates were guessed. `show` prints the full plan — blocking CI
-commands NOT selected, plus what it could not classify — read it when a gate looks missing.
-Parallel flags stay with `hm test_runners plan --root .`: `pytest` is serial by default,
-`cargo`/`go`/`vitest`/`jest` are already parallel and a worker flag there nests.
-
-If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it over the generic toolchain commands.
-
-FAIL when: any subprocess returns non-zero.
-
-After every selected suite command passes, write the marker:
+<!-- @hm:verify-degraded -->
+fall back to the project's toolchain (`pytest -q` / `ruff check .` / `ruff format --check .` / `mypy --strict`; `cargo test`; `pnpm test`) and say the gates were guessed. If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it. After every command passes — and only then — write the marker:
 
 {% if is_codex %}
 ```
@@ -120,6 +99,9 @@ Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_c
 !uv run --with {{ harness_maker_src_path }} hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest
 ```
 {% endif %}
+<!-- @hm:/verify-degraded -->
+
+FAIL when: any subprocess returns non-zero.
 
 ### Check 3 — Structural delta (formerly "Health delta")
 

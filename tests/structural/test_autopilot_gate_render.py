@@ -27,6 +27,12 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-09-30, `top-issues-2026-09`** — `review`, `verify` and `wrapup` moved, in all four arms:
+  review Step 3.4 gained `hm review_churn attribute` (the stamped `caused_by` owner) and its
+  auto-fix step 1 / iteration-record grammar read that stamp; verify Check 2 and wrapup Step 2
+  replaced `check` + `verification_plan commands` + `mark-pass` with one `verification_cache run`
+  (`mark-pass` kept only in the degraded block). Verified before re-capture that these three are
+  the ONLY moved commands in every arm and that no command was added or removed.
 
 - **2026-09-30, release 0.60.7** — 52 commands across four arms moved only in their rendered
   version: substituting `0.60.6` for `0.60.7` reproduced every prior hash before the golden was

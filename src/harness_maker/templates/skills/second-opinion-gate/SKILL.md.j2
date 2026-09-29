@@ -183,9 +183,9 @@ cd <the task worktree> && uv run --with {{ harness_maker_src_path }} hm second_o
 > invariant read a re-classification as work done and keep a stalled loop running.
 
 **Round order — pinned end to end.** Merge the previous round's re-review output by `id` → stamp
-`id`s on new findings → determine `caused_by` → group and evaluate the trigger → batch re-derive
+`id`s on new findings → read the stamped `caused_by` → group and evaluate the trigger → batch re-derive
 on a fire → select fixes → apply → verify build, reverting on failure → selective re-review →
-recompute grade → progress invariant → append the iteration record. Determining `caused_by`
+recompute grade → progress invariant → append the iteration record. Reading `caused_by`
 **before** the trigger is what makes arm (b) reachable at all: computed at record-append time it
 would arrive after fix selection, and a lone regression finding would take the fast path —
 reproducing the chain the batch step exists to stop. Verify and re-review stay INSIDE the round —
@@ -193,10 +193,12 @@ a break reverted only next round means a full round built on a broken tree.
 
 **Two-arm batch trigger.** Re-derive the underlying model before editing when **either**
 (a) ≥2 of this round's findings share a subsystem / state model, **or** (b) any finding **new
-this round** carries a non-null `caused_by`. Otherwise patch per finding as before — a lone,
-unattributed finding keeps the fast path, which is the majority case and must not get slower.
+this round** whose stamped `caused_by` is a `fix-r<N>` value. `none` and `unknown` never fire it.
+Otherwise patch per finding as before — a lone, unattributed finding keeps the fast path, which
+is the majority case and must not get slower.
 
-`caused_by` is stamped **once**, at a finding's first appearance, and never recomputed. That is
+`caused_by` is stamped **once**, by `hm review_churn attribute` at a finding's first appearance
+(a carried `id` keeps its earlier round's value), and never recomputed. That is
 well-defined across a `stale`-then-re-report because `codex_adapter.finding_id` hashes
 `[source, file, line, message]` and freezes it: a re-report at a shifted location is a different
 `id` (genuinely new — arm (b) may fire), and one at an unchanged location keeps its `id` (not
@@ -210,7 +212,8 @@ edit. Patching the reported cell without re-deriving the table is what produced 
 in the case this contract comes from.
 
 **`caused_by` grammar.** It shares the iteration record's `Status` cell with a different enum, so
-the encoding is literal: `Applied · caused_by=#7` / `· caused_by=none` / `· caused_by=unknown`,
+the encoding is literal and copies the stamp: `Applied · caused_by=fix-r1` / `· caused_by=none` /
+`· caused_by=unknown`,
 and the same `· caused_by=` suffix on `Skipped — overlap` and `Reverted — build failure`. Without
 one grammar, rounds encode it differently, arm (b) misses attributions, and the counters disagree
 with the rows they are derived from — with nothing able to detect it.

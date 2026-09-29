@@ -213,7 +213,16 @@ def test_the_slash_scanner_rejects_a_name_that_does_not_render() -> None:
 #:
 #: Named as data, not matched by a pattern: an entry here is a visible edit, and a new file
 #: does not get exempted by accident.
-_HISTORICAL_RECORD = {"docs/reference/pre-change-checklist.md"}
+_HISTORICAL_RECORD = {
+    "docs/reference/pre-change-checklist.md",
+    # Verbatim CLAUDE.md sections relocated on 2026-09-30 (SPEC-top-issues-2026-09); they name
+    # `/hm:plan` as it stood when written. Same list as documentation_contract's, by name.
+    "docs/reference/second-opinion.md",
+    "docs/reference/security-permissions.md",
+    "docs/reference/reviewer-fanout.md",
+    "docs/reference/multi-session-worktree.md",
+    "docs/reference/second-brain-promotion.md",
+}
 
 
 def test_every_hm_command_named_in_the_plugin_surface_renders() -> None:

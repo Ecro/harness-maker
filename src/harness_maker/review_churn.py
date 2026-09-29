@@ -614,11 +614,248 @@ def collect_complexity(root: Path, pre_ref: str, post_ref: str) -> list[dict[str
     ]
 
 
+# ── fix attribution (SPEC-top-issues-2026-09 S1–S4) ─────────────────────────
+
+ATTRIBUTION_TOLERANCE = 3
+"""A finding within this many lines of a line the previous fix touched is attributed to it.
+
+Reviewers anchor on whatever line their reasoning cited — the `def`, the `assert`, a decorator —
+so an exact-line match would call most fix-introduced findings unrelated.
+"""
+
+_U0_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+_UNSTAMPED = (None, "")
+_CAUSES = ("none", "unknown")
+
+
+def changed_new_lines(root: Path, pre_ref: str, post_ref: str) -> dict[str, set[int]]:
+    """New-side lines each file's hunks cover, from `git diff -U0 pre post`.
+
+    New side because round N's reviewers read the tree pinned as `post`: an insertion above
+    an edit moves it, and an old-side map would point at the wrong code. A deletion-only hunk
+    (`+c,0`) covers `c` and `c+1`, the two lines the removal sits between.
+    """
+    diff = _git(root, "diff", "-U0", "--no-color", "--no-renames", pre_ref, post_ref)
+    covered: dict[str, set[int]] = {}
+    path = ""
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            target = line[4:].strip()
+            path = "" if target == "/dev/null" else target.removeprefix("b/")
+            continue
+        m = _U0_HUNK.match(line)
+        if not m or not path:
+            continue
+        start = int(m.group(1))
+        count = 1 if m.group(2) is None else int(m.group(2))
+        lines = range(start, start + count) if count else (start, start + 1)
+        covered.setdefault(path, set()).update(lines)
+    return covered
+
+
+def _payload_findings(payload: Any) -> list[Any]:
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict) and isinstance(payload.get("findings"), list):
+        findings: list[Any] = payload["findings"]
+        return findings
+    raise ValueError("findings payload is neither a list nor an object with a 'findings' list")
+
+
+def _prior_causes(base_root: Path, slug: str, run_id: str, round_n: int) -> dict[str, str | None]:
+    """`id` → earlier stamp, from this run's persisted payloads of rounds before `round_n`.
+
+    Same slug AND same run: `finding_id` hashes file/line/message, so an identical id recurs
+    across runs of one slug, and a different run's value says nothing about this run's fix.
+    """
+    from harness_maker.stage_agent_ledger import (
+        DEFAULT_OBSERVABILITY_DIR,
+        PAYLOAD_DIRNAME,
+        _safe_component,
+    )
+
+    store = (
+        base_root
+        / DEFAULT_OBSERVABILITY_DIR
+        / PAYLOAD_DIRNAME
+        / _safe_component(slug, field="slug")
+    )
+    safe_run = _safe_component(run_id, field="run_id")
+    prior: dict[str, str | None] = {}
+    for k in range(1, round_n):
+        path = store / f"{safe_run}-round{k}-merged.json"
+        if not path.is_file():
+            continue
+        try:
+            findings = _payload_findings(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            continue
+        for f in findings:
+            if isinstance(f, dict) and isinstance(f.get("id"), str) and f["id"] not in prior:
+                cause = f.get("caused_by")
+                prior[f["id"]] = cause if isinstance(cause, str) and cause else None
+    return prior
+
+
+def _near(line: int, covered: set[int]) -> bool:
+    return any(abs(line - c) <= ATTRIBUTION_TOLERANCE for c in covered)
+
+
+def attribute_findings(
+    findings: list[dict[str, Any]],
+    *,
+    root: Path,
+    base_root: Path,
+    slug: str,
+    run_id: str,
+    round_n: int,
+) -> list[dict[str, Any]]:
+    """Stamp `caused_by` on every finding that lacks one; never touch anything else.
+
+    An absent key is the same as `null` — 67 of 69 persisted payloads had no key at all, so a
+    null-only rule would stamp almost nothing. The result is always a string, never null.
+    """
+    covered: dict[str, set[int]] | None = None
+    if round_n >= 2:
+        # The Auto-Fix Loop pins iteration N's fixes as `r{N}-pre/post` and round N's findings
+        # come from the re-review that follows them — so round N reads `r{N}`, not `r{N-1}`.
+        label = f"r{round_n}"
+        try:
+            covered = changed_new_lines(
+                root, pin_ref(slug, f"{label}-pre"), pin_ref(slug, f"{label}-post")
+            )
+        except (subprocess.CalledProcessError, ChurnMeasurementError):
+            covered = None
+    prior = _prior_causes(base_root, slug, run_id, round_n) if round_n >= 2 else {}
+    fix_label = f"fix-r{round_n}"
+
+    out: list[dict[str, Any]] = []
+    for finding in findings:
+        stamped = dict(finding)
+        if finding.get("caused_by") in _UNSTAMPED:
+            stamped["caused_by"] = _cause(finding, round_n, covered, prior, fix_label)
+        out.append(stamped)
+    return out
+
+
+def _cause(
+    finding: dict[str, Any],
+    round_n: int,
+    covered: dict[str, set[int]] | None,
+    prior: dict[str, str | None],
+    fix_label: str,
+) -> str:
+    if round_n < 2:
+        return "none"
+    fid = finding.get("id")
+    if isinstance(fid, str) and fid in prior:
+        return prior[fid] or "unknown"
+    if covered is None:
+        return "unknown"
+    lines = covered.get(str(finding.get("file") or ""))
+    if not lines:
+        return "none"
+    line = finding.get("line")
+    if not isinstance(line, int) or isinstance(line, bool):
+        return "unknown"
+    return fix_label if _near(line, lines) else "none"
+
+
+def attribute_file(
+    path: Path, *, root: Path, base_root: Path, slug: str, run_id: str, round_n: int
+) -> dict[str, Any]:
+    """Rewrite a findings file in place with stamps; the top-level shape is preserved.
+
+    Raises before writing anything on an unreadable or malformed file, so a failure leaves the
+    file byte-identical — it is about to be persisted as the round's record.
+    """
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    findings = _payload_findings(payload)
+    if not all(isinstance(f, dict) for f in findings):
+        raise ValueError("every finding must be a JSON object")
+    stamped = attribute_findings(
+        findings, root=root, base_root=base_root, slug=slug, run_id=run_id, round_n=round_n
+    )
+    new_payload: Any = {**payload, "findings": stamped} if isinstance(payload, dict) else stamped
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(new_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+    counts: dict[str, int] = {}
+    for f in stamped:
+        counts[f["caused_by"]] = counts.get(f["caused_by"], 0) + 1
+    return {"slug": slug, "run_id": run_id, "round": round_n, "counts": counts}
+
+
+_PAYLOAD_NAME = re.compile(r"^(?P<run>.+)-round(?P<round>\d+)-merged\.json$")
+_SEVERE = ("P0", "P1")
+
+
+def _bucket(cause: Any) -> str:
+    if isinstance(cause, str) and cause.startswith("fix-"):
+        return "fix"
+    if cause in _CAUSES:
+        return str(cause)
+    return "unstamped"
+
+
+def fix_defect_rate(base_root: Path) -> dict[str, Any]:
+    """How often a later-round severe finding was introduced by the previous round's fix.
+
+    Counts P0/P1 findings FIRST seen in round >= 2 of their run — a carried id is the same
+    finding re-reported, not a new one. `rate = fix / (fix + none)`: `unknown` and unstamped
+    rows are reported beside it, never folded into either side.
+    """
+    from harness_maker.stage_agent_ledger import DEFAULT_OBSERVABILITY_DIR, PAYLOAD_DIRNAME
+
+    store = base_root / DEFAULT_OBSERVABILITY_DIR / PAYLOAD_DIRNAME
+    slugs: dict[str, dict[str, int]] = {}
+    if store.is_dir():
+        for slug_dir in sorted(p for p in store.iterdir() if p.is_dir()):
+            runs: dict[str, dict[int, list[Any]]] = {}
+            for path in slug_dir.glob("*-merged.json"):
+                m = _PAYLOAD_NAME.match(path.name)
+                if not m:
+                    continue
+                try:
+                    findings = _payload_findings(json.loads(path.read_text(encoding="utf-8")))
+                except (OSError, ValueError):
+                    continue
+                runs.setdefault(m.group("run"), {})[int(m.group("round"))] = findings
+            counts = {"fix": 0, "none": 0, "unknown": 0, "unstamped": 0}
+            for rounds in runs.values():
+                seen: set[str] = set()
+                for round_n in sorted(rounds):
+                    for f in rounds[round_n]:
+                        if not isinstance(f, dict):
+                            continue
+                        fid = f.get("id")
+                        carried = isinstance(fid, str) and fid in seen
+                        if isinstance(fid, str):
+                            seen.add(fid)
+                        if round_n < 2 or carried or f.get("severity") not in _SEVERE:
+                            continue
+                        counts[_bucket(f.get("caused_by"))] += 1
+            slugs[slug_dir.name] = counts
+    total = {k: sum(c[k] for c in slugs.values()) for k in ("fix", "none", "unknown", "unstamped")}
+    return {
+        "slugs": {s: {"counts": c, "rate": _rate(c)} for s, c in slugs.items()},
+        "total": {"counts": total, "rate": _rate(total)},
+    }
+
+
+def _rate(counts: dict[str, int]) -> float | None:
+    denom = counts["fix"] + counts["none"]
+    return None if denom == 0 else counts["fix"] / denom
+
+
 _USAGE = (
     "usage: hm review_churn measure --pre <ref> --post <ref> [--root <dir>]\n"
     "       hm review_churn pin --slug <slug> --label <name> [--root <dir>]\n"
     "       hm review_churn oscillation --slug <slug> --rounds 2,3,4 [--root <dir>]\n"
     "       hm review_churn complexity --pre <ref> --post <ref> --slug <slug> --round <n>\n"
+    "       hm review_churn attribute --slug <slug> --run-id <id> --round <n>"
+    " --findings-file <path> [--root <dir>]\n"
+    "       hm review_churn fix-defect-rate [--root <dir>]\n"
 )
 
 
@@ -627,7 +864,12 @@ def main(argv: list[str] | None = None) -> int:
     if guard is not None:
         return guard
     parser = argparse.ArgumentParser(prog="hm review_churn", add_help=True)
-    parser.add_argument("verb", choices=["measure", "pin", "oscillation", "complexity"])
+    parser.add_argument(
+        "verb",
+        choices=["measure", "pin", "oscillation", "complexity", "attribute", "fix-defect-rate"],
+    )
+    parser.add_argument("--run-id", dest="run_id")
+    parser.add_argument("--findings-file", dest="findings_file")
     parser.add_argument("--pre")
     parser.add_argument("--post")
     parser.add_argument("--slug")
@@ -642,6 +884,9 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit:
         sys.stderr.write(_USAGE)
         raise
+
+    if opts.verb in ("attribute", "fix-defect-rate"):
+        return _attribution_main(opts)
 
     try:
         if opts.verb == "pin":
@@ -689,6 +934,37 @@ def main(argv: list[str] | None = None) -> int:
     if opts.slug and opts.round_n is not None:
         detail["slug"], detail["round"] = opts.slug, opts.round_n
     sys.stdout.write(json.dumps(detail, sort_keys=True) + "\n")
+    return 0
+
+
+def _attribution_main(opts: argparse.Namespace) -> int:
+    from harness_maker.second_opinion_invoke import resolve_base_root
+
+    root = Path(opts.root)
+    # Payloads live at the BASE root (`persist_payload` writes there so they survive
+    # `task-land`); a worktree `--root` must still find them.
+    base_root = resolve_base_root(root)
+    if opts.verb == "fix-defect-rate":
+        sys.stdout.write(json.dumps(fix_defect_rate(base_root), sort_keys=True) + "\n")
+        return 0
+    if not (opts.slug and opts.run_id and opts.findings_file) or opts.round_n is None:
+        sys.stderr.write(_USAGE)
+        return 2
+    try:
+        summary = attribute_file(
+            Path(opts.findings_file),
+            root=root,
+            base_root=base_root,
+            slug=opts.slug,
+            run_id=opts.run_id,
+            round_n=opts.round_n,
+        )
+    except (OSError, ValueError) as e:
+        # Loud and non-zero: the next step persists this file as the round's record, and an
+        # unstamped record is indistinguishable from the pre-fix corpus.
+        sys.stderr.write(f"[churn] attribution NOT written: {e}\n")
+        return 1
+    sys.stdout.write(json.dumps(summary, sort_keys=True) + "\n")
     return 0
 
 

@@ -195,9 +195,16 @@ def test_verify_marker_covers_wrapup_python_checks(tmp_path: Path) -> None:
     verify_stage = (tmp_path / "stages" / "verify.md").read_text(encoding="utf-8")
     wrapup_stage = (tmp_path / "stages" / "wrapup.md").read_text(encoding="utf-8")
 
-    derive = "hm verification_plan commands --root ."
-    assert derive in verify_stage, "verify no longer derives its gates from the project's CI"
-    assert derive in wrapup_stage, "wrapup no longer derives its gates from the project's CI"
+    # SPEC-top-issues-2026-09: both stages now call ONE verb that derives the gates from CI
+    # itself (`run_gates` → `verification_plan.read_plan`), so the shared source is that verb's
+    # exact invocation — identical in both stages, which is the "derive identically" property.
+    derive = "hm observability.verification_cache run --root . --mode relevant"
+    verify_line = next(ln for ln in verify_stage.splitlines() if derive in ln)
+    wrapup_line = next(ln for ln in wrapup_stage.splitlines() if derive in ln)
+    assert verify_line == wrapup_line, "verify and wrapup derive their gates differently"
+    from harness_maker.observability import verification_cache
+
+    assert "read_plan" in verification_cache.run_gates.__code__.co_names
     assert "--checks lint,format,mypy,pytest" in verify_stage
     assert "--checks lint,format,mypy,pytest" in wrapup_stage
 

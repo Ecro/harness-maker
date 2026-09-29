@@ -8,11 +8,11 @@
       "make": "a83d6a277e7379b5a5b281384b894557202e1d71d8b9c8793b1c2b52d769fe6f",
       "metrics": "679201f279818fd7ca47f0c35511b2d4fce94003dcf4847a76baf57208ebc619",
       "research": "5c4fdcd4725d3efbd2a44335e1ae32248d72fdd564e80e23e416b3ead4cafcef",
-      "review": "18a08d8c05595aa5f4774d4b3d568eac14e3e8b062ba0e616ab5a986ce5f6858",
+      "review": "23b0f9848de827815b97318b1d1f1191c694cc81f0dcd5e3ecd96468197a2607",
       "spec": "338956c88d6d1139ccd1e714e88ff3b39d0875d905ea216a4cec019ab4974ab2",
       "uninstall": "bb99995c6b3943f3735b4de858a3cc7917cd3b3ba0c31b45926a2e2a870f2df2",
-      "verify": "38d18ef851fc34597e15e5f9d109b8fef138f93eae3bccd2ccab12e6bb2d7e08",
-      "wrapup": "0711a9cf01278af85545b508f85ce7938d0afd4b73149157a15e1edd7419d692"
+      "verify": "333a6d0e089885a5a5de39f5b8dfb77dd571d445f88da148da3cc39c4fefb662",
+      "wrapup": "bbcf639dca4d82460746c62f9223785124f2ce6422085af734b54fa7c73dcc74"
     },
     "auto_safe@block": {
       "configure": "2b016145c515a3c20a42ba67f51d83dd5532e61d16a5709e7522e7ff4f1d84cb",
@@ -22,11 +22,11 @@
       "make": "a83d6a277e7379b5a5b281384b894557202e1d71d8b9c8793b1c2b52d769fe6f",
       "metrics": "679201f279818fd7ca47f0c35511b2d4fce94003dcf4847a76baf57208ebc619",
       "research": "5c4fdcd4725d3efbd2a44335e1ae32248d72fdd564e80e23e416b3ead4cafcef",
-      "review": "18a08d8c05595aa5f4774d4b3d568eac14e3e8b062ba0e616ab5a986ce5f6858",
+      "review": "23b0f9848de827815b97318b1d1f1191c694cc81f0dcd5e3ecd96468197a2607",
       "spec": "958b54dd62f01d66d221658d13bc5a24a5d5f0ded734124dab756511405b23c3",
       "uninstall": "bb99995c6b3943f3735b4de858a3cc7917cd3b3ba0c31b45926a2e2a870f2df2",
-      "verify": "b923c475616a5240bf340ef6e265ca5e17c73f45e8f95de7b27dccc68c1086c6",
-      "wrapup": "cf74ba8bb907411dbba571b4baf7d53799e0e2802802a0ab60a1370f61d59db5"
+      "verify": "b88ef3f2fa8aa63e3e305aac2c289427523c2c478610d09d7c1e10203af0f9a2",
+      "wrapup": "c0c79858e343a9b6c16b9f436dac49f88fd1404dac94dd4a001e10f3bc7d797f"
     },
     "ask@flag_on": {
       "configure": "2b016145c515a3c20a42ba67f51d83dd5532e61d16a5709e7522e7ff4f1d84cb",
@@ -38,11 +38,11 @@
       "make": "a83d6a277e7379b5a5b281384b894557202e1d71d8b9c8793b1c2b52d769fe6f",
       "metrics": "679201f279818fd7ca47f0c35511b2d4fce94003dcf4847a76baf57208ebc619",
       "research": "9cc40dcddc6bf2bafeafac47d0dfa82a73a8febac3343df4223db9a76aee49b0",
-      "review": "6131d8e2c51232e584141c772c3e194566de66db18ced0368e9d3fbe68524a6d",
+      "review": "3c86460da2f3f498b7dff052a67146e3673551d576628dbb4f73d9f72ddf6504",
       "spec": "0db260d7d3f919fd1e18115e7df919c0994099aa7841c4864968e52cfb51ebf2",
       "uninstall": "bb99995c6b3943f3735b4de858a3cc7917cd3b3ba0c31b45926a2e2a870f2df2",
-      "verify": "25a7ad56ac12ad17e19960bdc1dd42b47ec3f0116818e5be97aff98f94fb41bf",
-      "wrapup": "e0e66ef8769b68244d5af73a15ffaa72bd4d62d676b5f84feec31c09aa6018cc"
+      "verify": "4714e615a9dfd49cba6aa2aa1d15094e4d5b00b2b1c6d4853813bd90c7fb4ebe",
+      "wrapup": "c04a7a8789c9b14fc4fc3d68415495ca79b4fcbfa50324bc7ed6ab42f958e8c2"
     },
     "ask@flag_off": {
       "configure": "2b016145c515a3c20a42ba67f51d83dd5532e61d16a5709e7522e7ff4f1d84cb",
@@ -54,11 +54,11 @@
       "make": "a83d6a277e7379b5a5b281384b894557202e1d71d8b9c8793b1c2b52d769fe6f",
       "metrics": "679201f279818fd7ca47f0c35511b2d4fce94003dcf4847a76baf57208ebc619",
       "research": "c5cda8672f418720fd96f4f22304302cd564018b248df06f4a1ca1004a9423ec",
-      "review": "ee72676e8f6c63575df01ee8355fd81390d7b8d54c0d5c27f756265263a02379",
+      "review": "0cff583555e3d12e05bdd4e1ef2124c031285ed7e3436622aa7523eb0df4a079",
       "spec": "2d60d5dfe582b3d7cf7321cdb7913c3c215658e7fb38d13ab183194c7e9f4e2b",
       "uninstall": "bb99995c6b3943f3735b4de858a3cc7917cd3b3ba0c31b45926a2e2a870f2df2",
-      "verify": "58e4880e93efa02bc675a358ed38651c4e2a9617bf6a5a9dd79f30915dd4d3b8",
-      "wrapup": "70502b867341cc6ad0c28df06bf7583b96f7c589559fc4bcafd9aba01d43db0a"
+      "verify": "8523c5c8d7c66f9d7bbb3142c37e2b124c4cddecfebc360db52cc51fda5800f1",
+      "wrapup": "040dadf38f3746e70cb6e7a01326afa92e78944afbc14b715aa15c30ffabe3ef"
     }
   },
   "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture — a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",

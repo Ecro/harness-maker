@@ -43,6 +43,19 @@ THRESHOLDS: dict[tuple[str, str], int] = {
 }
 
 
+# (asset_type, preset) → max body CHARACTER count, beside the line cap (SPEC-top-issues-2026-09).
+# Lines are blind to density: this repo's CLAUDE.md passed 429/500 lines at 65,108 bytes (~18k
+# tokens, carried on every turn of every session and subagent). Characters, not bytes — Korean is
+# ~3 bytes per character, and a byte cap would flag a file that fits. Only the always-loaded
+# assets get one; agent/skill/workflow units stay lines (PLAN-token-efficiency ADR-004).
+CHAR_THRESHOLDS: dict[tuple[str, str], int] = {
+    ("CLAUDE.md", Preset.SIDE.value): 16_000,
+    ("CLAUDE.md", Preset.PRODUCTION.value): 40_000,
+    ("AGENTS.md", Preset.SIDE.value): 16_000,
+    ("AGENTS.md", Preset.PRODUCTION.value): 40_000,
+}
+
+
 # TODO(io-utils-migration): out of scope for ADR-001 — strips frontmatter for
 # body-line counting on non-YAML body types. See docs/followups/io-utils-migration.md.
 def _strip_frontmatter(text: str) -> str:
@@ -94,15 +107,24 @@ def lint(file_path: Path, asset_type: str, preset: Preset) -> list[str]:
         return []
     limit = THRESHOLDS[key]
     text = file_path.read_text(encoding="utf-8", errors="replace")
+    warnings: list[str] = []
     actual = _count_body_lines(text)
-    if actual <= limit:
-        return []
-    excess = actual - limit
-    return [
-        f"{file_path}: {asset_type} body has {actual} lines "
-        f"(>{limit} threshold for {preset.value} preset; "
-        f"trim ~{excess} lines or split into a referenced doc)"
-    ]
+    if actual > limit:
+        excess = actual - limit
+        warnings.append(
+            f"{file_path}: {asset_type} body has {actual} lines "
+            f"(>{limit} threshold for {preset.value} preset; "
+            f"trim ~{excess} lines or split into a referenced doc)"
+        )
+    char_limit = CHAR_THRESHOLDS.get(key)
+    chars = len(_strip_frontmatter(text))
+    if char_limit is not None and chars > char_limit:
+        warnings.append(
+            f"{file_path}: {asset_type} body has {chars} characters "
+            f"(>{char_limit} threshold for {preset.value} preset; it is loaded on every turn — "
+            f"move detail into a linked reference doc)"
+        )
+    return warnings
 
 
 _MCP_SERVER_WARN_THRESHOLD = 6

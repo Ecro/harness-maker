@@ -39,7 +39,19 @@ PRESET_FILES: Final[tuple[str, ...]] = (
 HISTORICAL_DOC_DIRS: Final[frozenset[str]] = frozenset(
     {"adr", "migration", "observability", "followups", "assets"}
 )
-HISTORICAL_DOC_FILES: Final[frozenset[str]] = frozenset({"docs/reference/pre-change-checklist.md"})
+#: `docs/reference/<x>.md` files that are verbatim, dated snapshots — the pre-change checklist, and
+#: the CLAUDE.md sections relocated on 2026-09-30 (SPEC-top-issues-2026-09). Their current rules
+#: live in CLAUDE.md's summaries; the snapshot is the recorded *why* and is not rewritten.
+HISTORICAL_DOC_FILES: Final[frozenset[str]] = frozenset(
+    {
+        "docs/reference/pre-change-checklist.md",
+        "docs/reference/second-opinion.md",
+        "docs/reference/security-permissions.md",
+        "docs/reference/reviewer-fanout.md",
+        "docs/reference/multi-session-worktree.md",
+        "docs/reference/second-brain-promotion.md",
+    }
+)
 CONTRACT_DOCS: Final[frozenset[str]] = frozenset(
     {"README.md", "README.ko.md", "docs/HOW-IT-WORKS.md", "docs/HOW-IT-WORKS.ko.md"}
 )

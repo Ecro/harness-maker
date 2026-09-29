@@ -1,0 +1,396 @@
+[
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "Per command. Under Claude Code's 600 s Bash cap",
+    "file": "src/harness_maker/observability/verification_cache.py",
+    "id": "cc6ec6771d1793e9",
+    "lens": "robustness",
+    "line": 421,
+    "reasoning": {
+      "conclude": "docstring over-promises",
+      "infer": "host kill",
+      "observe": "540 per command",
+      "trace": "sum can exceed 600"
+    },
+    "severity": "P2",
+    "source": "robustness",
+    "suggestion": "Use a total deadline with min(timeout_s, remaining) per command.",
+    "summary": "Per-command timeout while the docstring implies the run stays under the 600s host cap",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "robustness"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "subprocess.run(shlex.split(cmd), ...)",
+    "file": "src/harness_maker/observability/verification_cache.py",
+    "id": "8b9ccd8e8a9de506",
+    "lens": "functionality",
+    "line": 490,
+    "reasoning": {
+      "conclude": "loud but wrong",
+      "infer": "never a marker, blame on the command",
+      "observe": "plan keeps && commands verbatim",
+      "trace": "&& becomes argv"
+    },
+    "severity": "P2",
+    "source": "functionality",
+    "suggestion": "Detect shell operators/VAR= prefixes and return EXIT_DEGRADED naming the command.",
+    "summary": "shlex.split mis-runs CI commands with shell operators or env prefixes",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "functionality"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "target.removeprefix(\"b/\")",
+    "file": "src/harness_maker/review_churn.py",
+    "id": "5cad42ed2160044d",
+    "lens": "robustness",
+    "line": 638,
+    "reasoning": {
+      "conclude": "disable quotepath",
+      "infer": "silent misattribution",
+      "observe": "default quotepath quotes non-ASCII",
+      "trace": "key never matches finding file"
+    },
+    "severity": "P2",
+    "source": "robustness",
+    "suggestion": "Run git with -c core.quotepath=off.",
+    "summary": "changed_new_lines mis-parses quoted non-ASCII paths, stamping fix-introduced findings none",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "robustness"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "return fix_label if _near(line, lines) else \"none\"",
+    "file": "src/harness_maker/review_churn.py",
+    "id": "200f8232db054f97",
+    "lens": "functionality",
+    "line": 756,
+    "reasoning": {
+      "conclude": "map to unknown",
+      "infer": "arbitrary attribution",
+      "observe": "line 0 accepted",
+      "trace": "proximity to line 0 arbitrary"
+    },
+    "severity": "P2",
+    "source": "functionality",
+    "suggestion": "Return unknown for line <= 0 in a changed file.",
+    "summary": "Whole-file findings (line 0) attributed by proximity to line 0",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "functionality"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "tmp = path.with_name(path.name + \".tmp\")",
+    "file": "src/harness_maker/review_churn.py",
+    "id": "9e6c5e809f6cd256",
+    "lens": "consistency",
+    "line": 778,
+    "reasoning": {
+      "conclude": "use helper",
+      "infer": "second implementation",
+      "observe": "fixed tmp name",
+      "trace": "leak and collision"
+    },
+    "severity": "P2",
+    "source": "consistency",
+    "suggestion": "Use harness_maker.io_utils.atomic_write.",
+    "summary": "Hand-rolled tmp+replace instead of the project's atomic_write helper",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "consistency"
+      },
+      {
+        "kind": "lens",
+        "source": "concurrency"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "subprocess.run(shlex.split(cmd), cwd=root, ...)",
+    "file": "src/harness_maker/observability/verification_cache.py",
+    "id": "2e1b08d6b64e8b34",
+    "lens": "security",
+    "line": 486,
+    "reasoning": {
+      "conclude": "document the trust boundary",
+      "infer": "code execution as user",
+      "observe": "commands come from .github/workflows of the tree",
+      "trace": "head allowlisted, args free"
+    },
+    "severity": "P2",
+    "source": "security",
+    "suggestion": "Document in verify/wrapup that run executes the checked-out tree's CI commands and must not run on an unreviewed branch.",
+    "summary": "run executes argv from the working tree's workflow YAML; an untrusted checkout runs its own commands automatically",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "security"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "if marker.get(\"writer\") != RUN_WRITER: return None",
+    "file": "src/harness_maker/observability/verification_cache.py",
+    "id": "26e339e3560d4e0a",
+    "lens": "security",
+    "line": 441,
+    "reasoning": {
+      "conclude": "say so",
+      "infer": "not a boundary",
+      "observe": "unkeyed JSON",
+      "trace": "anyone can write writer=run"
+    },
+    "severity": "P3",
+    "source": "security",
+    "suggestion": "Document writer as accident protection, not a security boundary.",
+    "summary": "writer provenance is self-declared and forgeable; check still honours writer-less markers",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "security"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "except OSError as e:",
+    "file": "src/harness_maker/observability/verification_cache.py",
+    "id": "7cc4f57d4ae1a65f",
+    "lens": "security",
+    "line": 490,
+    "reasoning": {
+      "conclude": "catch it",
+      "infer": "exit contract broken",
+      "observe": "only TimeoutExpired/OSError caught",
+      "trace": "ValueError propagates"
+    },
+    "severity": "P3",
+    "source": "security",
+    "suggestion": "Catch ValueError with OSError and return EXIT_FAILED.",
+    "summary": "shlex.split ValueError uncaught; unbalanced quote crashes run outside the 0/1/3/4 contract",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "security"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "tmp = path.with_name(path.name + \".tmp\")",
+    "file": "src/harness_maker/review_churn.py",
+    "id": "1772092b508e988b",
+    "lens": "security",
+    "line": 778,
+    "reasoning": {
+      "conclude": "hardening",
+      "infer": "low exploitability",
+      "observe": "predictable name",
+      "trace": "symlink could be followed"
+    },
+    "severity": "P3",
+    "source": "security",
+    "suggestion": "Use mkstemp + os.replace or io_utils.atomic_write.",
+    "summary": "Predictable .tmp sibling written with write_text follows a pre-planted symlink",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "security"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "hm review_churn attribute --slug {slug}",
+    "file": "src/harness_maker/templates/stages/review.md.j2",
+    "id": "0bf906118b65b462",
+    "lens": "security",
+    "line": 409,
+    "reasoning": {
+      "conclude": "quote it",
+      "infer": "small risk",
+      "observe": "other recipes quote slug",
+      "trace": "shell splits odd slugs"
+    },
+    "severity": "P3",
+    "source": "security",
+    "suggestion": "Use --slug '{slug}'.",
+    "summary": "attribute recipe interpolates {slug} unquoted",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "security"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "os.replace(tmp, path)",
+    "file": "src/harness_maker/observability/verification_cache.py",
+    "id": "d2dc6673186d1aed",
+    "lens": "concurrency",
+    "line": 383,
+    "reasoning": {
+      "conclude": "benign cross-session invalidation",
+      "infer": "redundant re-run, not a false pass",
+      "observe": "shared cache path per key",
+      "trace": "mark-pass after run replaces the trusted marker"
+    },
+    "severity": "P2",
+    "source": "concurrency",
+    "suggestion": "Skip a writer-less overwrite of an existing writer=run marker.",
+    "summary": "mark-pass can overwrite a run-written marker under the same key (safe-direction downgrade)",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "concurrency"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "_file_arg(...) == _file_arg(...) both '<the literal temp path>'",
+    "file": "tests/render/test_render_review_attribution.py",
+    "id": "b7d8809fa99a7045",
+    "lens": "tests",
+    "line": 40,
+    "reasoning": {
+      "conclude": "overstated guarantee",
+      "infer": "cannot catch stamp-A/persist-B",
+      "observe": "both commands use the same literal placeholder",
+      "trace": "equality is constant"
+    },
+    "severity": "P2",
+    "source": "tests",
+    "suggestion": "Add a negative control with different placeholders, and require a binding phrase ('same file'/'on it') in the attribute prose.",
+    "summary": "test_attribute_and_persist_share_file compares two identical placeholders, so the equality holds for any template",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "tests"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "_NONE_UNKNOWN_NEVER searched over all of arm_b",
+    "file": "tests/render/test_render_review_attribution.py",
+    "id": "f59b6c0cbab4fe37",
+    "lens": "tests",
+    "line": 20,
+    "reasoning": {
+      "conclude": "tighten or accept",
+      "infer": "low residual risk",
+      "observe": "regexes search whole arm",
+      "trace": "misattached clause passes"
+    },
+    "severity": "P3",
+    "source": "tests",
+    "suggestion": "Bind the never-fire clause to 'it' after the (b) sentence and add controls for a negated fix-r and a misattached never clause.",
+    "summary": "arm (b) predicate clauses not bound to the (b) sentence; one negative control only",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "tests"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "@settings(max_examples=12) @given(...)",
+    "file": "tests/unit/test_verification_cache_run.py",
+    "id": "0c63e3765854a9f6",
+    "lens": "tests",
+    "line": 105,
+    "reasoning": {
+      "conclude": "make deterministic",
+      "infer": "flaky detector",
+      "observe": "8-point domain, random draws",
+      "trace": "(0,0,True) may be missed"
+    },
+    "severity": "P3",
+    "source": "tests",
+    "suggestion": "Parametrize the 8 cases deterministically.",
+    "summary": "property test samples 12 of an 8-point space and may skip the only exit-4 case",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "tests"
+      }
+    ]
+  },
+  {
+    "authority": null,
+    "caused_by": "none",
+    "disposition": "accepted",
+    "evidence": "assert out['cached'] is False, tamper",
+    "file": "tests/unit/test_verification_cache_run.py",
+    "id": "ffdb58e33394fd7c",
+    "lens": "tests",
+    "line": 174,
+    "reasoning": {
+      "conclude": "optional hardening",
+      "infer": "Path B requirement met",
+      "observe": "writer isolated from hash",
+      "trace": "each rejection reason pinned"
+    },
+    "severity": "P3",
+    "source": "tests",
+    "suggestion": "assert json.loads(own.read_text())['writer'] == 'run' after each rejected run",
+    "summary": "test_cached_only_for_own_marker is sound; optionally assert the rejected marker was rewritten with writer=run",
+    "voices": [
+      {
+        "kind": "lens",
+        "source": "tests"
+      }
+    ]
+  }
+]

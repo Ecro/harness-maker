@@ -207,7 +207,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # domain lenses have their own agents and are untouched, so Production and Side both go from
     # seven dispatches to four. Nothing else about the command moved: no call was added, removed
     # or chained, and this is the whole of the -6.
-    "review": 34,
+    # 34 → 35 (top-issues-2026-09, 2026-09-30): Step 3.4 runs `hm review_churn attribute` on the
+    # merged temp file before `persist-payload`, so `caused_by` is stamped by code instead of
+    # being "determined" in prose that never reached the payload (621/621 findings unstamped).
+    "review": 35,
     # 6 → 7 (ai-native-sdlc-vs-intent-world, 2026-09-19): spec runs `hm spec_machine approve`
     # twice as rendered calls (Step 0 `--exempt`, Step 5 human stamp) and, now judgment-gated,
     # no longer renders the gate-first `autopilot_caps gate-blocked` line: +2 -1. Declared in
@@ -231,7 +234,11 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `delegation.stages` gained `verify`, which renders Step 0.5's `hm wrapup_brief
     # --stage verify` and `hm wrapup_receipt --stage verify`. The inline checks stay as the
     # degraded path, so nothing was removed. Dropping `verify` from the list restores 12.
-    "verify": 14,
+    # 14 → 13 (top-issues-2026-09, 2026-09-30): Check 2's `verification_cache check` +
+    # `verification_plan commands` + self-attested `mark-pass` became one `verification_cache run`
+    # that runs the CI gates and writes the marker itself; `mark-pass` survives only inside the
+    # degraded (no-CI) block. -2 +1.
+    "verify": 13,
     # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
     # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
     # not render. A config flip that adds a gate in two commands and removes an advisory in a
@@ -277,7 +284,9 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # answer-gated questions and adds one `hm intent metric record` call for the measure:false
     # verdict item. Declared in that PLAN's `surface_allowance.round_trips.wrapup`, attributed
     # in `work-docs/BASELINE-DELTA-intent-layer-improvements.md`.
-    "wrapup": 34,
+    # 34 → 33 (top-issues-2026-09, 2026-09-30): Step 2's check + plan + mark-pass → one
+    # `verification_cache run`, same change as verify. -2 +1.
+    "wrapup": 33,
 }
 
 

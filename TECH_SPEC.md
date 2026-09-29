@@ -402,6 +402,8 @@ harness-maker/
 | agent prompt | 100 lines | 200 lines |
 | skill SKILL.md | 50 lines | 150 lines |
 
+CLAUDE.md / AGENTS.md also have a body **character** budget (Side 16,000 / Production 40,000) — lines are blind to density. `readiness` fails on overflow.
+
 When exceeded, the renderer emits a warning (override: `harness.yaml.context_lint.strict: false`).
 
 ---

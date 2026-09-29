@@ -383,7 +383,8 @@ def test_the_batch_trigger_is_reachable_and_ordered_before_fix_selection() -> No
     skill = " ".join(gate_skill().split())
     order = [
         "Merge the previous round's re-review output by `id`",
-        "determine `caused_by`",
+        # top-issues-2026-09: read, not determined — `hm review_churn attribute` owns the value.
+        "read the stamped `caused_by`",
         "group and evaluate the trigger",
         "select fixes",
         "apply",
@@ -454,7 +455,8 @@ def test_caused_by_uses_the_pinned_status_cell_grammar() -> None:
     # The GRAMMAR is a rule, so §5 owns it (ADR-005); the stage carries exemplar
     # rows so a reader at the point of use sees the encoding without opening it.
     skill = gate_skill()
-    for literal in ("· caused_by=#7", "· caused_by=none", "· caused_by=unknown"):
+    # top-issues-2026-09: the literal copies the stamp — `fix-r<N>`, not a fix number `#N`.
+    for literal in ("· caused_by=fix-r1", "· caused_by=none", "· caused_by=unknown"):
         assert literal in skill, f"{literal} missing from §5's grammar"
     for body in (review_on(), review_off()):
         assert "· caused_by=" in body, "the iteration record shows no attribution encoding"

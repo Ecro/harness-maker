@@ -139,50 +139,31 @@ Before touching anything, verify state:
 
 ### Step 2 — Final verification pass
 
-**Verification marker reuse** (ADR-007 + PLAN-workflow-overhead-post024):
-`/hm:verify` is the single owner of the full regression suite in the canonical
-workflow. Before running any final suite here, ask the deterministic
-verification-cache CLI whether the code/test-relevant fingerprint is still
-fresh. This ignores wrapup-only memory/work-docs churn but invalidates on
-source, tests, lockfiles, tool config, CI, and verification script changes.
+**Verification marker reuse** (ADR-007): `/hm:verify` owns the full suite, so this is usually a
+cached PASS (wrapup-only memory/work-docs churn does not invalidate it).
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache check --root . --mode relevant")
+Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache check --root . --mode relevant
+!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant --timeout-s 3600 --deadline-s 3600
 ```
 {% endif %}
 
-If this exits `0`, print `PASS (verification marker fresh)` and skip to Step
-3. If it exits `1`, run the suite below once. Do not write a passing marker
-until every suite command has passed.
+{% if is_codex %}Foreground call: the defaults (540 s/gate, 570 s total) report their own timeout.{% else %}Run it in the **background** (`run_in_background: true`): a full suite outlives the 10-minute
+foreground cap.{% endif %} Branch on the `"exit"` field of the JSON line it prints, never on the
+host's status; no JSON line = not a pass.
 
-Run the project's full check suite only when the marker is absent or stale, and take the
-commands from the project's CI rather than an example — an example that is narrower than CI
-passes locally and fails on push, saying nothing about what it skipped:
+- `0` → PASS (`cached: true` = its own marker reused). Skip to Step 3.
+- `1` → a gate failed or timed out, not a pass — stderr names the command and its output tail.
+- `4` → the tree changed during the run, not a pass (stderr lists the paths); re-run.
+- Killed by the host (no exit code) → not a pass, no marker.
+- `3` → degraded: no readable CI (stderr says why). Only then:
 
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm verification_plan commands --root .")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm verification_plan commands --root .
-```
-{% endif %}
-
-Run each printed command verbatim. **Exit 1 = degraded** (no CI, unreadable, or nothing
-recognised — stderr says which): only then fall back to the project's toolchain
-(`uv run pytest -x` / `ruff check .` / `ruff format --check .` / `mypy --strict`), say the
-gates were guessed. Never drop the format check: lint alone misses format violations
-(`[fail:lint] ruff-format-not-in-local-verify-pass` count:2).
-
-If any fail: STOP, surface the failure, do NOT proceed. Reverting an executed-merge is more painful than diagnosing here.
-
-After every selected suite command passes, write the marker:
+<!-- @hm:verify-degraded -->
+fall back to the project's toolchain (`uv run pytest -x` / `ruff check .` / `ruff format --check .` / `mypy --strict`; never drop the format check — `[fail:lint] ruff-format-not-in-local-verify-pass` count:2) and say the gates were guessed. If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it. After every command passes — and only then — write the marker:
 
 {% if is_codex %}
 ```
@@ -193,6 +174,9 @@ Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_c
 !uv run --with {{ harness_maker_src_path }} hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest
 ```
 {% endif %}
+<!-- @hm:/verify-degraded -->
+
+If any fail: STOP, surface the failure, do NOT proceed. Reverting an executed-merge is more painful than diagnosing here.
 
 ### Step 3 — Drift verdict check (read-only — no LLM re-analysis)
 

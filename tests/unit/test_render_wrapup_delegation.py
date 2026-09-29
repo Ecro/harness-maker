@@ -267,7 +267,12 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # collect-only (wrapup's close block is the one-line 5.7 cutoff). Both arms, same delta;
 # delegation remains OFF. Then 840/842 → 841/843 in the same task's /hm:review round 2: the
 # metric-row item added to the 5.7 record batch (review finding cea50c76).
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 841), ("Production", 843)])
+# 841/843 → 828/830 (top-issues-2026-09, 2026-09-30): −13, Step 2's check + verification_plan +
+# mark-pass prose became one `verification_cache run` with its exit-code list; `mark-pass` kept
+# only in the degraded block. Both arms, same delta; delegation remains OFF. Then 828/830 →
+# 829/831 at the task's /hm:verify: the run call lifts its budget and says to run in the
+# background (a real suite outlives the 10-minute foreground cap).
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 829), ("Production", 831)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

@@ -40,14 +40,18 @@ and `test_the_key_is_identical_across_two_subprocess_invocations` are those fenc
 from __future__ import annotations
 
 import argparse
+import contextlib
 import fnmatch
 import hashlib
 import json
 import os
 import re
+import shlex
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -371,18 +375,27 @@ def mark_passed(
     *,
     checks: list[str] | None = None,
     project_root: str = "",
+    writer: str | None = None,
 ) -> Path:
-    """Write a passing marker for the given key. Returns the marker path."""
+    """Write a passing marker for the given key. Returns the marker path.
+
+    `writer` is provenance: only `run` passes it, and only `run` trusts it. A marker written
+    without one is a claim someone made, which `check` still honours for older harnesses.
+    """
     cache = _cache_dir()
     cache.mkdir(parents=True, exist_ok=True)
 
-    marker = {
+    recorded = checks or ["lint", "mypy", "pytest"]
+    marker: dict[str, Any] = {
         "passed": True,
         "passed_at": datetime.now(tz=UTC).isoformat(),
-        "checks": checks or ["lint", "mypy", "pytest"],
+        "checks": recorded,
         "project_root": project_root,
         "key": key,
     }
+    if writer is not None:
+        marker["writer"] = writer
+        marker["commands_sha256"] = _commands_hash(recorded)
 
     path = _marker_path(key)
     fd, tmp = tempfile.mkstemp(
@@ -398,6 +411,219 @@ def mark_passed(
         Path(tmp).unlink(missing_ok=True)
         raise
     return path
+
+
+def _commands_hash(commands: list[str]) -> str:
+    return hashlib.sha256(json.dumps(list(commands)).encode("utf-8")).hexdigest()
+
+
+# ── run: the gate run and the marker in one process (SPEC-top-issues-2026-09 S5) ─
+
+RUN_WRITER = "run"
+DEFAULT_RUN_TIMEOUT_S = 540
+"""Per command, and never more than what is left of `RUN_DEADLINE_S`."""
+
+RUN_DEADLINE_S = 570
+"""Whole-run default. Under Claude Code's 600 s FOREGROUND Bash cap, so running out of time is
+reported by this process — with an exit code to branch on — rather than the host killing it with
+none. A per-command cap alone does not do that: three gates at 400 s each are each "under" 540.
+A real suite often needs longer (this repo's pytest gate alone took 425–702 s), so callers that
+can run in the background pass `--deadline-s` / `--timeout-s` to lift both caps."""
+
+EXIT_PASSED = 0
+EXIT_FAILED = 1
+EXIT_DEGRADED = 3
+EXIT_TREE_CHANGED = 4
+_TAIL_LINES = 60
+
+
+def is_run_fresh(key: str, commands: list[str]) -> dict[str, Any] | None:
+    """A marker `run` itself wrote for this key AND this exact command list, else None.
+
+    Stricter than `is_fresh` on purpose: a marker from `mark-pass` records that someone said
+    the suite passed — the 2026-09-20 route that landed an uncollectable test on main.
+    """
+    marker = is_fresh(key)
+    if marker is None:
+        return None
+    if marker.get("writer") != RUN_WRITER:
+        return None
+    if marker.get("commands_sha256") != _commands_hash(commands):
+        return None
+    return marker
+
+
+def _tail(text: str) -> str:
+    return "\n".join(text.splitlines()[-_TAIL_LINES:])
+
+
+REAP_TIMEOUT_S = 5
+"""After killing a gate's group, how long to wait for its pipe to close. A descendant that left
+the group (`setsid`) keeps the pipe open forever; an unbounded wait would outlive the deadline."""
+
+
+def _kill_group(proc: subprocess.Popen[str]) -> None:
+    """SIGKILL the gate's whole process group and reap it, in bounded time."""
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(proc.pid, signal.SIGKILL)
+    try:
+        proc.communicate(timeout=REAP_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        if proc.stdout is not None:
+            proc.stdout.close()
+        proc.kill()
+        proc.wait(timeout=REAP_TIMEOUT_S)
+
+
+def _run_gate(cmd: str, root: Path, timeout_s: float) -> tuple[int, str]:
+    """Run one gate in its own process group; on ANY abnormal exit, kill the whole group.
+
+    `subprocess.run(timeout=)` kills only the direct child, and a gate is usually `uv run
+    pytest`, whose workers would outlive it. The group is its own session, so a signal aimed at
+    this process no longer reaches it — every exit that is not a normal return (timeout,
+    Ctrl-C, the SIGTERM `run_gates` turns into an exception) must kill the group explicitly.
+    """
+    proc = subprocess.Popen(
+        shlex.split(cmd),
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        out, _ = proc.communicate(timeout=timeout_s)
+    except BaseException:
+        _kill_group(proc)
+        raise
+    return proc.returncode, out or ""
+
+
+class _TerminatedError(Exception):
+    """SIGTERM raised as an exception, so `_run_gate`'s cleanup runs before the process exits."""
+
+
+def run_gates(
+    root: Path,
+    *,
+    mode: str = "relevant",
+    docs_are_behavior: bool = False,
+    timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
+    deadline_s: float = RUN_DEADLINE_S,
+) -> tuple[int, dict[str, Any]]:
+    """Run the CI-derived primary gate commands and write the marker only on a clean pass.
+
+    Stops at the first failure. A pass on a tree that changed while the gates ran is not a
+    pass of the tree now on disk, so it writes nothing and says which paths moved.
+    """
+    from harness_maker.verification_plan import read_plan
+
+    def key_now() -> str:
+        if mode == "relevant":
+            return compute_relevant_skip_key(root, docs_are_behavior=docs_are_behavior)
+        return compute_skip_key(root)
+
+    plan = read_plan(root.resolve())
+    if plan.degraded:
+        sys.stderr.write(f"[verify] degraded plan, nothing run: {plan.reason}\n")
+        return EXIT_DEGRADED, {"cached": False, "commands": [], "reason": plan.reason}
+
+    commands = plan.primary_commands()
+    if not commands:
+        # Every CI gate is non-blocking (continue-on-error). Nothing would run, and a marker
+        # written here would record lint/mypy/pytest as passed — a pass nobody observed.
+        sys.stderr.write("[verify] degraded plan, nothing run: CI declares no blocking gate\n")
+        return EXIT_DEGRADED, {"cached": False, "commands": [], "reason": "no blocking gate"}
+    for extra in plan.additional_commands():
+        sys.stderr.write(f"[verify] not run (additional CI gate): {extra}\n")
+    key_before = key_now()
+    summary: dict[str, Any] = {"cached": False, "commands": commands, "key": key_before}
+    if is_run_fresh(key_before, commands) is not None:
+        return EXIT_PASSED, {**summary, "cached": True}
+
+    results: list[dict[str, Any]] = []
+    summary["results"] = results
+    previous = _install_sigterm_bridge()
+    try:
+        code = _run_all(commands, root, timeout_s, results, deadline_s)
+    finally:
+        _restore_sigterm(previous)
+    if code != EXIT_PASSED:
+        return code, summary
+    return _finish(root, key_now, key_before, commands, summary)
+
+
+def _install_sigterm_bridge() -> Any:
+    """Turn SIGTERM into `_TerminatedError` for the duration of the gate loop (main thread only)."""
+    import threading
+
+    if threading.current_thread() is not threading.main_thread():
+        return None
+
+    def _raise(_signum: int, _frame: Any) -> None:
+        raise _TerminatedError
+
+    return signal.signal(signal.SIGTERM, _raise)
+
+
+def _restore_sigterm(previous: Any) -> None:
+    if previous is not None:
+        signal.signal(signal.SIGTERM, previous)
+
+
+def _run_all(
+    commands: list[str],
+    root: Path,
+    timeout_s: float,
+    results: list[dict[str, Any]],
+    deadline_s: float,
+) -> int:
+    deadline = time.monotonic() + deadline_s
+    for cmd in commands:
+        started = time.monotonic()
+        budget = min(timeout_s, deadline - started)
+        if budget <= 0:
+            sys.stderr.write(
+                f"[verify] timed out: the {deadline_s:g}s run deadline passed before {cmd}\n"
+            )
+            results.append({"cmd": cmd, "rc": None, "timed_out": True})
+            return EXIT_FAILED
+        try:
+            rc, output = _run_gate(cmd, root, budget)
+        except subprocess.TimeoutExpired:
+            sys.stderr.write(f"[verify] timed out after {budget:g}s: {cmd}\n")
+            results.append({"cmd": cmd, "rc": None, "timed_out": True})
+            return EXIT_FAILED
+        except (OSError, ValueError) as e:
+            # ValueError: `shlex.split` on an unbalanced quote — still a failure to start.
+            sys.stderr.write(f"[verify] could not start {cmd!r}: {e}\n")
+            results.append({"cmd": cmd, "rc": None, "error": str(e)})
+            return EXIT_FAILED
+        results.append({"cmd": cmd, "rc": rc, "seconds": round(time.monotonic() - started, 1)})
+        if rc != 0:
+            sys.stderr.write(f"[verify] FAILED (rc={rc}): {cmd}\n")
+            sys.stderr.write(_tail(output) + "\n")
+            return EXIT_FAILED
+    return EXIT_PASSED
+
+
+def _finish(
+    root: Path,
+    key_now: Any,
+    key_before: str,
+    commands: list[str],
+    summary: dict[str, Any],
+) -> tuple[int, dict[str, Any]]:
+    if key_now() != key_before:
+        changed = _changed_paths(root)
+        sys.stderr.write(
+            "[verify] the tree changed while the gates ran — no marker written. "
+            f"Changed or dirty paths: {', '.join(changed) or '(unknown)'}\n"
+        )
+        return EXIT_TREE_CHANGED, summary
+
+    mark_passed(key_before, checks=commands, project_root=str(root.resolve()), writer=RUN_WRITER)
+    return EXIT_PASSED, summary
 
 
 def invalidate(key: str) -> bool:
@@ -441,7 +667,28 @@ def main(argv: list[str] | None = None) -> int:
     explain_p = sub.add_parser("explain")
     add_common(explain_p)
 
+    run_p = sub.add_parser("run")
+    add_common(run_p)
+    run_p.add_argument("--timeout-s", type=float, default=DEFAULT_RUN_TIMEOUT_S)
+    run_p.add_argument("--deadline-s", type=float, default=RUN_DEADLINE_S)
+
     args = parser.parse_args(argv)
+    if args.command == "run":
+        try:
+            code, summary = run_gates(
+                Path(args.root),
+                mode=args.mode,
+                docs_are_behavior=args.docs_are_behavior,
+                timeout_s=args.timeout_s,
+                deadline_s=args.deadline_s,
+            )
+        except _TerminatedError:
+            sys.stderr.write(
+                "[verify] terminated — the running gate's group was killed; no marker\n"
+            )
+            return EXIT_FAILED
+        print(json.dumps({**summary, "exit": code}, sort_keys=True))
+        return code
     key = _compute_key_for_args(args)
 
     if args.command == "key":
