@@ -62,7 +62,7 @@ def test_attribute_and_persist_share_file(variant: str, body: str) -> None:
 
 @pytest.mark.parametrize(("variant", "body"), stage_bodies("review"), ids=["claude", "codex"])
 def test_caused_by_single_owner(variant: str, body: str) -> None:
-    autofix_step1 = section(body, "1. **Merge and attribute.**", "\n2. **Group.**")
+    autofix_step1 = section(body, "**Merge and attribute.**", "**Group.**")
     assert "determine each one" not in autofix_step1, variant
     assert "caused_by" in autofix_step1
     assert "review_churn attribute" in autofix_step1
@@ -90,10 +90,10 @@ def test_single_owner_predicates_discriminate() -> None:
     simply renamed — the assertion-invariant-over-named-dimension shape (count:22).
     """
     old = (
-        "1. **Merge and attribute.** ... then determine each one's `caused_by` "
+        "**Merge and attribute.** ... then determine each one's `caused_by` "
         "from the fix log.\n2. **Group.**"
     )
-    assert "determine each one" in section(old, "1. **Merge and attribute.**", "\n2. **Group.**")
+    assert "determine each one" in section(old, "**Merge and attribute.**", "**Group.**")
 
     fires_on_everything = (
         "Re-derive when **either** (a) two findings share a subsystem, **or** (b) any finding "
