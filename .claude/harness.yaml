@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.60.7
+harness_maker_version: 0.61.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 50cfd6043cb8ee9404b524bd6b78194b18b0806ad06fca59107dfbd6315ef0e7
+content_hash: 4a1917d6d2fc0898ae0a8df8037949c00b0c4ff0cf8249d086433985040e0e9c
 ---
 preset: Production
 locale: ko
@@ -180,6 +180,10 @@ delegation:
 loop:
   # /hm:loop + /hm:loop-p5-batch. false = not rendered; set true and run /hm:make to enable.
   enabled: false
+world_model:
+  # The name you call this project's world model by, and its /<handle> skill. Change with /hm:configure.
+  name: "Maker"
+  handle: "maker"
 autonomy:
   level: "auto_safe"
   pipeline: ["research", "spec", "execute", "review", "verify", "wrapup"]
