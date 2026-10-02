@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.61.0] - 2026-10-02
+
 ### Added
 
 - **World model follow-ups: a briefing digest instead of ledger greps.** `hm world_model digest`

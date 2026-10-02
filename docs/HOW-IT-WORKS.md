@@ -3,7 +3,7 @@
 # harness-maker: How It Works — Complete Guide
 
 > **Audience**: Developers new to harness-maker, or users who want a deep understanding of internal behavior.
-> **Version**: 0.60.7
+> **Version**: 0.61.0
 >
 > Focus is on **procedures, flow, and responsibilities** — not implementation details.
 
@@ -2921,4 +2921,4 @@ Even when tests pass, the AI Readiness composite score can drop by 5 or more poi
 
 ---
 
-*This document is current as of harness-maker 0.60.7. Generated via: `/hm:execute how-it-works-docs`*
+*This document is current as of harness-maker 0.61.0. Generated via: `/hm:execute how-it-works-docs`*

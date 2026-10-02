@@ -1,3 +1,3 @@
 """harness-maker package."""
 
-__version__ = "0.60.7"
+__version__ = "0.61.0"

@@ -1,0 +1,130 @@
+{
+  "findings": [
+    {
+      "lens": "functionality",
+      "severity": "P1",
+      "file": "src/harness_maker/world_model_digest.py",
+      "line": 152,
+      "summary": "Slug-prefix globs attribute another task's SPEC/REVIEW files to this slug",
+      "suggestion": "Accept only REVIEW-<slug>-<YYYY-MM-DD>.md (regex) and SPEC-<slug>.md / SPEC-<slug>.machine.yaml.",
+      "reasoning": {
+        "observe": "globs REVIEW-{slug}-*.md and SPEC-{slug}*",
+        "trace": "slug A prefix of slug B; worktrees carry other tasks' committed docs",
+        "infer": "A reads B's REVIEW/SPEC; wrong next_stage",
+        "conclude": "artifact-derived next_stage wrong for hyphen-prefix slugs"
+      },
+      "p1_key": "core-1",
+      "pass": 2,
+      "id": "a003ff6837bc3052",
+      "caused_by": "none"
+    },
+    {
+      "lens": "robustness",
+      "severity": "P2",
+      "file": "src/harness_maker/world_model_digest.py",
+      "line": 75,
+      "summary": "Whole span ledger read into memory, contradicting streamed-once constraint",
+      "suggestion": "Stream lines and keep newest row per slug.",
+      "reasoning": {
+        "observe": "read_bytes then splitlines",
+        "trace": "every briefing",
+        "infer": "grows linearly",
+        "conclude": "misses cost constraint"
+      },
+      "p1_key": "core-3",
+      "pass": 2,
+      "id": "5a2dbc401b530364",
+      "caused_by": "none"
+    },
+    {
+      "lens": "design",
+      "severity": "P2",
+      "file": "src/harness_maker/world_model_digest.py",
+      "line": 178,
+      "summary": "Digest reaches into private autopilot._freshness",
+      "suggestion": "Public read-only helper in autopilot.",
+      "reasoning": {
+        "observe": "calls autopilot._freshness",
+        "trace": "refactor breaks digest",
+        "infer": "masked as unreadable marker",
+        "conclude": "hidden coupling"
+      },
+      "p1_key": "core-5",
+      "pass": 2,
+      "id": "23ab1ccdcff7ffd1",
+      "caused_by": "none"
+    },
+    {
+      "lens": "concurrency",
+      "severity": "P1",
+      "file": "src/harness_maker/world_model_digest.py",
+      "line": 231,
+      "summary": "next_stage runs for every worktree before the MAX_TASKS slice; no total deadline",
+      "suggestion": "Slice to newest MAX_TASKS before next_stage; add a monotonic deadline and report unavailable/null on overrun.",
+      "reasoning": {
+        "observe": "next_stage for every worktree before slicing; _verify_done -> compute_relevant_skip_key runs git + tool --version with 30s timeouts",
+        "trace": "repeats per worktree",
+        "infer": "briefing can stall for minutes",
+        "conclude": "unbounded wall time breaks cheap never-fails contract"
+      },
+      "p1_key": "concurrency-1",
+      "pass": 2,
+      "id": "6d4374d156c226a7",
+      "caused_by": "none"
+    },
+    {
+      "lens": "concurrency",
+      "severity": "P2",
+      "file": "src/harness_maker/observability/verification_cache.py",
+      "line": 302,
+      "summary": "_verify_done runs git diff in live task worktrees; may take index.lock (a write)",
+      "suggestion": "Run git with GIT_OPTIONAL_LOCKS=0 / --no-optional-locks, or avoid git in the worktree.",
+      "reasoning": {
+        "observe": "git diff in wt via verification_cache",
+        "trace": "index refresh may take index.lock",
+        "infer": "concurrent session's git add/commit can fail",
+        "conclude": "read-only briefing can interfere with git index"
+      },
+      "p1_key": "concurrency-2",
+      "pass": 2,
+      "id": "ff606ab0a970de1a",
+      "caused_by": "none"
+    },
+    {
+      "lens": "concurrency",
+      "severity": "P2",
+      "file": "src/harness_maker/world_model_digest.py",
+      "line": 48,
+      "summary": "Worktree vanishing mid-scan voids the digest or yields a bogus next_stage",
+      "suggestion": "Guard iterdir with OSError; skip tasks whose .git vanished after next_stage.",
+      "reasoning": {
+        "observe": "iterdir outside try",
+        "trace": "task-land removes worktree",
+        "infer": "whole digest unavailable or next_stage research",
+        "conclude": "lifecycle races unhandled"
+      },
+      "p1_key": "concurrency-3",
+      "pass": 2,
+      "id": "63e23fc7f1d0b384",
+      "caused_by": "none"
+    },
+    {
+      "lens": "tests",
+      "severity": "P2",
+      "file": "tests/unit/test_world_model_digest.py",
+      "line": 511,
+      "summary": "AC-009 reference is a monkeypatched stub of intent_cli.status_report, not the real payload",
+      "suggestion": "Add one unstubbed case with a real intent.yaml fixture compared to real status_report.",
+      "reasoning": {
+        "observe": "status_report stubbed with author-built dict",
+        "trace": "digest counts whatever stub returns",
+        "infer": "real key drift undetected",
+        "conclude": "add unstubbed differential case"
+      },
+      "p1_key": "tests-2",
+      "pass": 2,
+      "id": "b257eb78878491ef",
+      "caused_by": "none"
+    }
+  ]
+}
