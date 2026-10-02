@@ -39,6 +39,22 @@ _BASE_COMMIT = "055cce85"
 # _BASE_COMMIT no longer describes it; such a path is judged against the current snapshot instead.
 _OPT_IN_COMMIT = "18714dd1"
 
+# Loop-sensitive paths a LATER task moved, re-captured deliberately (append; never silently
+# overwrite). Value: the loop-ON body hash per snapshot fixture.
+# - 2026-10-02, `world-model-name`: CLAUDE.md gained the `## World model` pointer. Verified
+#   before capture that the loop-ON vs loop-OFF render of CLAUDE.md differs ONLY in the opt-in
+#   loop sentence, i.e. the new pointer is loop-independent.
+_LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
+    "../CLAUDE.md": {
+        "side-python-cli": "da2a62fe4d57ba70d8a1fc981c19ea9759bca2f4e66d1fe98916005a0726310b",
+        "side-tauri-app": "da2a62fe4d57ba70d8a1fc981c19ea9759bca2f4e66d1fe98916005a0726310b",
+        "prod-tauri-app": "9db5896146df9a9800d921a4a482f7822da32541f01d22aed743e429fa8eb724",
+        "prod-firmware": "9db5896146df9a9800d921a4a482f7822da32541f01d22aed743e429fa8eb724",
+    },
+}
+# Loop-sensitive but never hash-compared below (`strip`), so a later key addition may move it.
+_LOOP_SENSITIVE_HASH_EXEMPT = {"harness.yaml"}
+
 LOOP_CLAUDE = {".claude/commands/hm/loop.md", ".claude/commands/hm/loop-p5-batch.md"}
 LOOP_CODEX = {".agents/skills/hm-loop/SKILL.md", ".agents/skills/hm-loop-p5-batch/SKILL.md"}
 LISTING_SURFACES = (
@@ -241,7 +257,8 @@ def test_ac003_enabled_matches_pre_change_snapshots(fixture: str, tmp_path: Path
     # A moved loop-insensitive path renders the same with the loop on or off, so its loop-ON
     # expectation is today's loop-OFF snapshot. A moved loop-SENSITIVE path has no committed
     # loop-ON expectation at all: fail here so it is handled deliberately, never dropped silently.
-    assert not moved & loop_sensitive, sorted(moved & loop_sensitive)
+    unhandled = (moved & loop_sensitive) - _LOOP_ON_RECAPTURES.keys() - _LOOP_SENSITIVE_HASH_EXEMPT
+    assert not unhandled, sorted(unhandled)
     p = profile(_REPO / "tests" / "fixtures" / fixture)
     a = interview(p, autoloop_mode=True).model_copy(
         update={"loop": models.LoopConfig(enabled=True)}
@@ -266,6 +283,12 @@ def test_ac003_enabled_matches_pre_change_snapshots(fixture: str, tmp_path: Path
         key=lambda x: x["path"] or "",
     )
     expected += [now_rows[path] for path in sorted(moved - base.keys()) if path in now_rows]
+    expected = [
+        {**r, "body_sha256": _LOOP_ON_RECAPTURES[r["path"]][fixture]}
+        if r["path"] in _LOOP_ON_RECAPTURES
+        else r
+        for r in expected
+    ]
     expected.sort(key=lambda x: x["path"] or "")
 
     def strip(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

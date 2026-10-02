@@ -132,7 +132,7 @@ def test_interview_locale_first_question_accepts_arbitrary_tag(
 
 def test_interview_preset_override_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
     """User on a small-experiment profile picks Production explicitly."""
-    inputs: Iterator[str] = iter(["", "", "Production", "", "", "", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "", "", "Production", "", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
@@ -147,7 +147,7 @@ def test_interview_ref_folders_multiple_with_glob_override(
     # of PLAN-onboarding-interview-ux removed consensus and caching, and SPEC-dev-mode-removal
     # ADR-007 removed the methodology question.
     inputs: Iterator[str] = iter(
-        ["", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
+        ["", "", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
@@ -161,7 +161,7 @@ def test_interview_ref_folders_multiple_with_glob_override(
 def test_interview_targets_multi_select_input(monkeypatch: pytest.MonkeyPatch) -> None:
     """Comma-separated input parses into list[Target]; whitespace tolerated."""
     inputs: Iterator[str] = iter(
-        ["", "claude-code, cursor", "", "", "", "", "", "", "", "", ""],
+        ["", "", "claude-code, cursor", "", "", "", "", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
@@ -170,7 +170,7 @@ def test_interview_targets_multi_select_input(monkeypatch: pytest.MonkeyPatch) -
 
 def test_interview_targets_cursor_only_input(monkeypatch: pytest.MonkeyPatch) -> None:
     """User can pick Cursor as the sole target."""
-    inputs: Iterator[str] = iter(["", "cursor", "", "", "", "", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "", "cursor", "", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.targets == [Target.CURSOR]
@@ -188,7 +188,7 @@ def test_interview_targets_unknown_value_skipped(monkeypatch: pytest.MonkeyPatch
 
 def test_interview_targets_codex_input(monkeypatch: pytest.MonkeyPatch) -> None:
     """User can pick codex as the sole target."""
-    inputs: Iterator[str] = iter(["", "codex", "", "", "", "", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "", "codex", "", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.targets == [Target.CODEX]
@@ -197,7 +197,7 @@ def test_interview_targets_codex_input(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_interview_targets_all_three(monkeypatch: pytest.MonkeyPatch) -> None:
     """All three targets in comma-separated input."""
     inputs: Iterator[str] = iter(
-        ["", "claude-code, cursor, codex", "", "", "", "", "", "", "", "", ""],
+        ["", "", "claude-code, cursor, codex", "", "", "", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)

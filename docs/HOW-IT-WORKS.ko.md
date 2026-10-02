@@ -18,7 +18,7 @@
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`
+> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > <!-- hm-doc-contract:mechanisms:start -->

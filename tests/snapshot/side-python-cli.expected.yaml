@@ -1,10 +1,10 @@
 preset: Side
 strictness: warn
-file_count: 58
+file_count: 59
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.en.md.j2
-  body_sha256: e1df18fe6d563f382f4071c4b13bca81d8ee33c0b2124fe7aaed5fe407c85dde
+  body_sha256: cd22c604e8c5043b1882cc66d832665105f1a833bfaaf0ab34e76b7f0197612d
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
   body_sha256: 37c6a5d761e169c3247145c71d451f988c3bb1608ee01b29cbb876eec392f154
@@ -52,7 +52,7 @@ files:
   body_sha256: 0cd2a9b5d4c1aa58ffc2518e3255c15dec09f1bcaeb68842943f3000b275877d
 - path: commands/hm/configure.md
   template: commands/hm/configure.md.j2
-  body_sha256: 49f2e4fa1f17894e1c8c555f8be60142bd4cd4a4dfe96d5884637908956bad05
+  body_sha256: 21018297793864154d0b065fdd700302d101d6576fc503c3c65138255e901fc8
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 6b3f117665616fbe351bee838e6441d8709681825e718244581862ddef89a2ff
@@ -88,7 +88,7 @@ files:
   body_sha256: afc0ff0b8846ba501a9f10cb4d634fe7fb466a747824eea250a4501d4b6a7158
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: 97f65e124061869449cc394fe78eb31d6a1d2c410401d36a29fd50b251e60452
+  body_sha256: 3cef2c8dd1f5482919ede44139d6ec5a772a654d2acf5578e0d8496ed07dd0fc
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: b146802f48337b5f0d9651ab9a4d735036bb3cefca8ff3ecfb9c63ee01c31e72
@@ -137,6 +137,9 @@ files:
 - path: skills/intent-layer/references/workflow-feedback.md
   template: skills/intent-layer/references/workflow-feedback.md.j2
   body_sha256: ad1b8ae99e2a60e2d6f8e9726635150e9e0de31231d85ef72385e956b0347999
+- path: skills/maker/SKILL.md
+  template: skills/world-model/SKILL.md.j2
+  body_sha256: b7411e4b91eb5d62d27f502ec6a98edea182584d6f7acb18a5435d045a3fc81a
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 12611c8e959f5e774908e01684d63bbac86c253a665a20a34ae47825eeb76315

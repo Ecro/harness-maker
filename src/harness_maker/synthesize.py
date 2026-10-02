@@ -19,6 +19,7 @@ from typing import Any
 
 import typer
 
+from harness_maker import world_model
 from harness_maker.models import (
     AgentModelSpec,
     AtomicStage,
@@ -586,6 +587,30 @@ def _skill_files() -> list[FileSpec]:
     ]
 
 
+def _world_model_handle(config_dump: dict[str, object] | None) -> str:
+    """The router's directory. Callers without a config (module-level skeletons) get the default."""
+    wm = (config_dump or {}).get("world_model")
+    handle = wm.get("handle") if isinstance(wm, dict) else None
+    return handle if isinstance(handle, str) else world_model.DEFAULT_HANDLE
+
+
+def _world_model_skill_files(
+    config_dump: dict[str, object] | None, prefix: str = ""
+) -> list[FileSpec]:
+    """SPEC-world-model-name: one fixed template rendered at the user-named `skills/<handle>/`.
+
+    Kept out of `skills.enabled` on purpose — those names must match a template directory.
+    """
+    handle = _world_model_handle(config_dump)
+    return [
+        (
+            "skills/world-model/SKILL.md.j2",
+            f"{prefix}skills/{handle}/SKILL.md",
+            {"name": handle},
+        )
+    ]
+
+
 # `repair_guard_force` judges the rendered Phase D.5 repair guard. It ships to every
 # harness because that step does — and because "does this step carry operative force"
 # is a semantic question, which is exactly what a literal-grep structural test cannot
@@ -718,6 +743,7 @@ def _base_files(
         ("commands/hm/uninstall.md.j2", "commands/hm/uninstall.md", {}),
         (_localized("commands/hm/help", locale), "commands/hm/help.md", {}),
         *_skill_files(),
+        *_world_model_skill_files(config_dump),
         *_agent_files(preset, agent_models, default_model),
         *_rubric_files(),
         # `.claude/hooks/hooks.json` is NOT rendered (ADR-005 of
@@ -848,6 +874,7 @@ def _codex_target_files(
         ),
         *_codex_agent_files(preset, agent_models, default_model),
         *_codex_skill_files(),
+        *_world_model_skill_files(config_dump, prefix=".agents/"),
         *_codex_stage_skills(config_dump=config_dump),
         *loop_specs,
         (
@@ -1024,6 +1051,8 @@ def synthesize(
         # SPEC-loop-opt-in: without this the rendered harness.yaml always writes the
         # fresh default, and every `--update` would switch an existing loop off.
         loop=answers.loop,
+        # SPEC-world-model-name: without this every render writes the default Maker/maker.
+        world_model=answers.world_model,
     )
     if answers.strictness is not None:
         # Written, not derived, so an explicit choice survives a later `--preset` switch.

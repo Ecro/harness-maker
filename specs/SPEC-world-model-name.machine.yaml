@@ -1,0 +1,477 @@
+schema_version: 3
+spec_slug: world-model-name
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: 'Tier-2: the Python behaviour is handle derivation/validation
+  and a config default; the rest is rendered prose pinned by golden render tests that
+  mutation cannot reach.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/world_model.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: onboarding asks the name right after locale and defaults to Maker
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_model.py::test_ac_001_interview_default_maker
+  executable_predicate: interview_with_empty_answers().world_model.name == "Maker"
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The default "Maker" and the post-locale position were fixed by
+    the user in the task request, not derived from the implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the router skill renders at the handle path with the display name
+  type: parametric
+  test_ids:
+  - tests/render/test_render_world_model.py::test_ac002_router_skill_rendered
+  executable_predicate: null
+  golden_table:
+  - input:
+      name: Maker
+      handle: maker
+      targets:
+      - claude-code
+    expected:
+      expect_paths:
+      - .claude/skills/maker/SKILL.md
+    edge: false
+    note: ''
+  - input:
+      name: Atlas
+      handle: atlas
+      targets:
+      - claude-code
+      - codex
+    expected:
+      expect_paths:
+      - .claude/skills/atlas/SKILL.md
+      - .agents/skills/atlas/SKILL.md
+    edge: false
+    note: ''
+  - input:
+      name: 비비
+      handle: bibi
+      targets:
+      - claude-code
+    expected:
+      expect_paths:
+      - .claude/skills/bibi/SKILL.md
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Paths and frontmatter name follow the Agent Skills spec rule that
+    name equals the parent directory (agentskills.io/specification) and the existing
+    .agents/skills Codex dual-render convention, both external to this change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: derived handles always satisfy the skill name rule
+  type: property
+  test_ids:
+  - tests/unit/test_world_model.py::test_ac003_handle_derivation_property
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation is the Agent Skills spec name grammar (1-64 chars,
+    a-z0-9 and single inner hyphens), an external regex; it holds for any derivation
+    algorithm, so the implementation cannot satisfy it by construction of its own
+    expectation.
+  oracle_independence_waiver: null
+  input_domain: arbitrary Unicode strings of length 0-200
+  transformation: derive_handle(name)
+  expected_relation: derive_handle(name) is None or (re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*",
+    h) and len(h) <= 64)
+  preconditions: []
+  observable_output: str | None
+  generator_hint: Hypothesis st.text() plus st.sampled_from(["비비", "메이커", "Maker",
+    "My Bot!"])
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: an absent world_model key renders identically to the explicit default
+  type: property
+  test_ids:
+  - tests/render/test_render_world_model.py::test_ac004_absent_key_matches_explicit_default
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is a render of the same project whose yaml explicitly
+    declares the default; equality of two renders does not depend on what the router
+    skill text says.
+  oracle_independence_waiver: null
+  input_domain: a fixture harness.yaml for each preset (Side, Production) without
+    the world_model key
+  transformation: render once as-is and once with world_model {name Maker, handle
+    maker} added
+  expected_relation: the two rendered file trees are byte-identical apart from harness.yaml
+    itself
+  preconditions:
+  - same harness_maker version and pinned clock
+  observable_output: rendered file tree
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: renaming removes the pristine old router skill and keeps an edited one
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_world_model.py::test_ac005_rename_sweeps_pristine_keeps_edited
+  executable_predicate: (not (root / ".claude/skills/maker/SKILL.md").exists()) and
+    (root / ".claude/skills/atlas/SKILL.md").exists()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The keep-if-edited rule is the existing reconcile.sweep_orphans
+    contract (pristine content_hash deleted, user-modified kept), already shipped
+    and tested independently of this change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: invalid or colliding handles are rejected without touching harness.yaml
+  type: parametric
+  test_ids:
+  - tests/unit/test_world_model.py::test_ac006_invalid_handle_rejected
+  executable_predicate: null
+  golden_table:
+  - input:
+      handle: intent-layer
+    expected:
+      rejected: true
+      reason: collision
+    edge: false
+    note: ''
+  - input:
+      handle: project-knowledge
+    expected:
+      rejected: true
+      reason: collision
+    edge: false
+    note: ''
+  - input:
+      handle: hm-research
+    expected:
+      rejected: true
+      reason: reserved-prefix
+    edge: false
+    note: ''
+  - input:
+      handle: Maker!
+    expected:
+      rejected: true
+      reason: grammar
+    edge: false
+    note: ''
+  - input:
+      handle: -x
+    expected:
+      rejected: true
+      reason: grammar
+    edge: false
+    note: ''
+  - input:
+      handle: a--b
+    expected:
+      rejected: true
+      reason: grammar
+    edge: false
+    note: ''
+  - input:
+      handle: 65 x a
+    expected:
+      rejected: true
+      reason: length
+    edge: false
+    note: ''
+  - input:
+      handle: atlas
+    expected:
+      rejected: false
+      reason: null
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Grammar and length come from the Agent Skills spec; collisions
+    come from the rendered skill names that exist before this change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: every always-loaded file names the world model and its handle within budget
+  type: parametric
+  test_ids:
+  - tests/render/test_render_world_model.py::test_ac007_pointer_in_every_always_loaded_variant
+  executable_predicate: null
+  golden_table:
+  - input:
+      file: CLAUDE.md
+    expected:
+      expect:
+      - Maker
+      - /maker
+    edge: false
+    note: ''
+  - input:
+      file: AGENTS.md
+    expected:
+      expect:
+      - Maker
+      - $maker
+    edge: false
+    note: ''
+  - input:
+      file: .cursor/rules/harness.mdc
+    expected:
+      expect:
+      - Maker
+      - /maker
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected tokens are the default name and handle fixed by the user;
+    budgets are the pre-existing context-lint thresholds and AC-005 pointer cap tests.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: world_model survives load and re-render unchanged
+  type: property
+  test_ids:
+  - tests/unit/test_world_model.py::test_ac008_world_model_roundtrip_property
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Round-trip identity holds for any serializer/loader pair regardless
+    of field layout; the relation is independent of how the field is implemented.
+  oracle_independence_waiver: null
+  input_domain: valid (name, handle) pairs - names any non-empty Unicode, handles
+    satisfying the skill grammar and not reserved
+  transformation: write harness.yaml, load it, re-render through the Update path,
+    load again
+  expected_relation: loaded_after.world_model == original.world_model
+  preconditions: []
+  observable_output: HarnessConfig.world_model
+  generator_hint: Hypothesis st.text(min_size=1) for name, st.from_regex for handle
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: ci flags set the world model name and handle
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_model.py::test_ac_009_ci_flags_set_world_model
+  executable_predicate: load_config(run_ci(world_model_name="Atlas")).world_model.handle
+    == "atlas"
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected handle is the lower-cased ASCII of the given name,
+    a value fixed in the SPEC scenario, not computed from the code under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: the router skill routes each request class to the existing surface
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: skill
+  note: ''
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: An independent judgment-reviewer scores the rendered skill body
+    against the existing skill rubric and S7's six request classes, plus a manual
+    dogfood pass by the DRI; neither reads the implementer's tests.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-10-02'
+  judgment_evidence: 'All five skill-rubric criteria pass. trigger_conditions_explicit:
+    SKILL.md.j2:9 states when to invoke (name or handle) and when not to (bare verbs).
+    progressive_disclosure: this is a standalone skill file with name/description
+    frontmatter (lines 7-10). implementation_referenced: the briefing bash block (lines
+    41-46, 52) holds the concrete commands, and the route table (lines 28-32) names
+    the surfaces. input_output_specified: input is $ARGUMENTS (line 22) and output
+    is at most 8 lines opening with the display name (lines 17, 61). under_fifty_lines_side:
+    the file is 74 lines, under the 300 cap. The AC''s request classes are also covered.
+    (a) Empty maps to read-only Briefing (line 27; lines 36 and 61 say it writes nothing).
+    (b) Build/fix X maps to research or spec, with ''State the choice and why in one
+    line'' (line 28). (c) Continue maps to Resume (lines 29, 65-74): one task re-enters
+    its stage, and two or more get ''ONE closed question''. (d) Remember X maps to
+    the project-knowledge skill (line 30). (e) Goal/metric/assumption maps to the
+    intent-layer skill, ''its consent rule applies unchanged'' (line 31). (f) What
+    next maps to Briefing plus 2-4 options, and ''Start no stage'' (line 32). Every
+    reply opens with ''{name} —'' in the harness voice (line 17).'
+  judgment_subject_paths:
+  - src/harness_maker/templates/skills/world-model/SKILL.md.j2
+  judgment_subject_hash: 2857f2cec89301d93f99ed0bdb4960715ec548cb202db42f9a7f241ee2c93d6d
+- id: AC-011
+  title: configure offers the world model name as a dimension
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_world_model.py::test_ac_011_configure_dimension
+  executable_predicate: '"World model name" in render_configure_command()'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The dimension label is fixed by this SPEC; the test checks the
+    rendered command text against it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Add world_model {name, handle} to harness.yaml
+  category: schema/file format/storage layout
+  rationale: HarnessConfig is extra=forbid, so older plugin CLIs reject a yaml carrying
+    the key; once in users' files the shape is hard to change
+  source: spec
+- id: IRR-002
+  decision: /<handle> and $<handle> invocation plus --ci world_model_name= and world_model_handle=
+    flags
+  category: public API/CLI contract
+  rationale: Operators and scripts depend on the handle and the flag names
+  source: spec
+- id: IRR-003
+  decision: The router skill render path skills/<handle>/ is chosen by user input
+  category: schema/file format/storage layout
+  rationale: First user-determined render path; rename correctness depends on the
+    orphan sweep
+  source: spec
+approval:
+  kind: human
+  content_hash: 96832ff6bb81d4114ac5e41d1f19049bf60df56148725a916593941b0a5dba95
+  approved_by: Ecro
+  approved_at: '2026-10-02T01:36:07Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 9c0ead964019e8fc8030c6d4f48222569781a8d6d45e5f2b1c4af4b0b735ddcb
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: e98c46f56214a234b0548ec714f0043f4c4b426fb63ddb26eafed73f2a7a9361
+    paths_to_mutate: 6ad4e614d29f7c52dbebb60c0b1e313ad61abc796ae70bc707959111d38c96e3
+    irreversible_decisions: 241bc72a4fdf983dd8f765af47a6796dffabba20e1da1eac786d132a8fc0d283
+    AC-001: 304ce62645d5b0e678fb3d30ac50a5d2c1b6505e5c4240bf1bbf37cbeee6d6eb
+    AC-002: a46bed1c6de7e42ab20dc92ee4ba428c6fefb8cd4b5a5448475edae5639ac45e
+    AC-003: 61cba1e07722fe7eba1efea74e48285db3eca0ab3da21579a3e7020f4c39408c
+    AC-004: ade803680382639e85e68181cedc25289e3d7970bb4716b878746e46a9ccf528
+    AC-005: d2ecc3584dfd93899509271c1d3748c66db1bc48aa1ce74d20bc6ecf30110932
+    AC-006: 7ef2a34d93c22f64b6b6a433fbc8e09f8f32fb523750e78ff615704a9719331f
+    AC-007: 9857e8a37a78e8bb81e17256156682fd3e7043617ead0f5950c0dcfba52fbc69
+    AC-008: 867bebceddbbd889c7c8bca393243172758bf7472c50c3a03d2421f4539922bc
+    AC-009: 54e3d3b57f6d3e4e09c92c297c832b0c5410684af8667e937ea314852c5229ed
+    AC-010: 24fe4ccf742ef10f5b7f17faa37bcea7ad3241d66d1acbf8257a63db9884eaf0
+    AC-011: 9ea76cf0279af9eaf593b57f680da75cccfafcd0f887eeed7645ec9a2d7ce7ec
+    ac_order: 507fc837fd64ae8964fbe1ec5bd2043668206ddae62a90d715516324c2b27cdf

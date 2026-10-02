@@ -607,3 +607,9 @@ threshold (count: 2).
 **Triggered by:** [fail:design] roster-field-never-assigned (count: 3; crossed the threshold this unit)
 **Proposed mechanism:** structural test / review-lens rule
 **Rationale:** the third occurrence (intent-layer-improvements confirm-1 P1) was a skip rule keyed on a verdict row that no step ever wrote, so the rule could never fire while every gate stayed green. Same shape as the two earlier instances (a schema/roster field nothing assigns). A guard that reads state must cite the step that writes it; a test should render the stage and assert a writer exists for every row/field a skip or gate condition reads.
+
+## Proposal: local verify takes gate commands from CI, incl. mypy path args (2026-10-02)
+
+**Triggered by:** [fail:type] mypy-strict-local-scope-narrower-than-ci (count: 3; crossed the threshold this unit)
+**Proposed mechanism:** rule update (stage text) — `hm observability.verification_cache run` already derives commands from CI; make the degraded `mypy --strict` fallback in execute/verify/wrapup name `src tests` (or read it from the CI workflow) instead of bare `mypy --strict`.
+**Rationale:** world-model-name again reached /hm:verify with 11 unused `type: ignore` in a test file because the local check covered `src` only; same family as `phase-verification-narrower-than-gate` (count 3), so the existing proposal for that slug should absorb this one.

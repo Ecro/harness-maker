@@ -27,7 +27,7 @@
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`
+> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > <!-- hm-doc-contract:mechanisms:start -->
@@ -157,6 +157,7 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Preset** | `Side` · `Production` | Reviewer count (1 vs 5), workflow stage count, security gate depth, verify-required flag |
 | **Targets** | `claude-code` · `cursor` · `codex` (multi-select) | Which IDE-native asset trees are rendered |
 | **Locale** | `en` · `ko` · any tag | Interview text + user-facing error messages |
+| **World model name** | Default `Maker` (`/maker`) · any name | Names the one router skill you start work from (`/<handle>`); stored as `world_model.name` / `world_model.handle` in `harness.yaml`, asked right after locale |
 | **Reviewers / skills** | Preset defaults + overrides | Which reviewers are active + agent model tiers (the full agent/skill set always installs) |
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |

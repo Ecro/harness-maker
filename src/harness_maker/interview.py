@@ -31,7 +31,7 @@ from typing import Any, TextIO
 import yaml
 from pydantic import ValidationError
 
-from harness_maker import review_churn
+from harness_maker import review_churn, world_model
 from harness_maker.io_utils import denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.models import (
     _MODEL_ID_PATTERN,
@@ -65,6 +65,7 @@ from harness_maker.models import (
     SecondOpinionConfig,
     Target,
     ToolchainConfig,
+    WorldModelConfig,
     drop_retired_stages,
     interview_comprehension_defaults,
     interview_deep_gate_defaults,
@@ -202,6 +203,8 @@ def interview(
         f"\nDetected: stack={profile.stack}, scale={profile.scale}, lifecycle={profile.lifecycle}",
     )
     locale = _ask_locale()
+    # SPEC-world-model-name S1: the name is the second question, right after locale.
+    world = _ask_world_model()
     targets = _ask_targets()
     preset = _ask_preset(recommended)
     worktree_enabled = _ask_worktree(preset)
@@ -230,6 +233,7 @@ def interview(
         autonomy=autonomy,
         instrumentation=instrumentation,
         worktree_enabled=worktree_enabled,
+        world_model=world,
     )
 
 
@@ -267,6 +271,36 @@ def _ask_locale() -> str:
     )
     cleaned = raw.strip()
     return cleaned or _DEFAULT_LOCALE
+
+
+def _ask_world_model() -> WorldModelConfig:
+    """Name the world model; ask for a handle only when the name cannot yield one (S2)."""
+    while True:
+        name = (
+            _input_or_empty(
+                f"World model name — call it to brief, start or resume work "
+                f"({world_model.DEFAULT_NAME}): ",
+            ).strip()
+            or world_model.DEFAULT_NAME
+        )
+        err = world_model.name_error(name)
+        if err is None:
+            break
+        print(f"  {err}")
+    handle = world_model.derive_handle(name)
+    while handle is None:
+        raw = (
+            _input_or_empty(
+                f"Handle for /<handle> (a-z, 0-9, hyphens) ({world_model.DEFAULT_HANDLE}): ",
+            ).strip()
+            or world_model.DEFAULT_HANDLE
+        )
+        rule = world_model.handle_error(raw)
+        if rule is None:
+            handle = raw
+        else:
+            print(f"  {raw!r} breaks the {rule} rule")
+    return WorldModelConfig(name=name, handle=handle)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -749,6 +783,7 @@ def _build_answers(
     toolchains: list[ToolchainConfig] | None = None,
     loop: LoopConfig | None = None,
     comprehension_depth: str | None = None,
+    world_model: WorldModelConfig | None = None,
     schema_version: int = 6,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
@@ -775,6 +810,7 @@ def _build_answers(
         second_opinion=(second_opinion if second_opinion is not None else SecondOpinionConfig()),
         toolchains=list(toolchains) if toolchains else [],
         loop=loop if loop is not None else LoopConfig(),
+        world_model=world_model if world_model is not None else WorldModelConfig(),
         reviewers={
             "installed": list(_ALL_REVIEWERS),
             "enabled": list(_SIDE_ENABLED_REVIEWERS if is_side else _PROD_ENABLED_REVIEWERS),
@@ -1014,6 +1050,8 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         "instrumentation": _parse_instrumentation(data.get("instrumentation")),
         # SPEC-loop-opt-in: a file that predates the key keeps the loop; malformed raises.
         "loop": LoopConfig(enabled=parse_loop(data.get("loop", _ABSENT))),
+        # SPEC-world-model-name: absent → default; malformed or reserved RAISES (ADR-001).
+        "world_model": parse_world_model(data.get("world_model", _ABSENT)),
         "sibling_repos": sibling_repos,
         "wrapup_docs": wrapup_docs,
         "reviewers": {
@@ -1475,6 +1513,26 @@ def parse_loop(value: object) -> bool:
     if not isinstance(enabled, bool):
         raise LoopConfigError(f"harness.yaml `loop.enabled` must be true or false, got {enabled!r}")
     return enabled
+
+
+class WorldModelConfigError(ValueError):
+    """A present `world_model` block that WorldModelConfig rejects (SPEC-world-model-name)."""
+
+
+def parse_world_model(value: object) -> WorldModelConfig:
+    """Existing-file meaning of `world_model`: absent → Maker/maker; anything invalid raises.
+
+    Raising (not defaulting) matters: a silent fallback would re-render the router under the
+    default handle and the orphan sweep would then delete the user's named one.
+    """
+    if value is _ABSENT or value is None:
+        return WorldModelConfig()
+    if not isinstance(value, dict):
+        raise WorldModelConfigError(f"harness.yaml `world_model` must be a mapping, got {value!r}")
+    try:
+        return WorldModelConfig.model_validate(value)
+    except ValueError as e:
+        raise WorldModelConfigError(f"harness.yaml `world_model` is invalid: {e}") from e
 
 
 def _parse_instrumentation(value: object) -> InstrumentationConfig:

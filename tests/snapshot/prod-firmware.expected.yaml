@@ -1,10 +1,10 @@
 preset: Production
 strictness: block
-file_count: 58
+file_count: 59
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
-  body_sha256: ebd8b4c4648227c7ff27f59c13d6c0948cb76828c06e512a5aa3b285a532f06b
+  body_sha256: 1479c42a2bb3aa491cb548a8056849c2db0269c7e5725bdd4d0d98e69fdcf732
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
   body_sha256: 37c6a5d761e169c3247145c71d451f988c3bb1608ee01b29cbb876eec392f154
@@ -52,7 +52,7 @@ files:
   body_sha256: 0cd2a9b5d4c1aa58ffc2518e3255c15dec09f1bcaeb68842943f3000b275877d
 - path: commands/hm/configure.md
   template: commands/hm/configure.md.j2
-  body_sha256: 49f2e4fa1f17894e1c8c555f8be60142bd4cd4a4dfe96d5884637908956bad05
+  body_sha256: 21018297793864154d0b065fdd700302d101d6576fc503c3c65138255e901fc8
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 79cd6fc135a74febc2516ef2559af9d8b22dffede72ba71c61420b79ee16dbbc
@@ -88,7 +88,7 @@ files:
   body_sha256: 39ff7d4bcd285bc0a29ac2b627e77c78a8fbe303f9581f9ba57b3caf07f6f2ff
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
-  body_sha256: bbefab0467d89d88d70f64a1b60fa2922afcbcbdc83a513fb5f3a0e14d958f1d
+  body_sha256: 2d591a1c68a645c5169b5a9532381611c6379adf7076b62d0154fe3d1914fa76
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: 66df0bc5b3506d8f8b4b05c7a60690a6f8651a6493659a0b7545c2322aa7c73f
@@ -137,6 +137,9 @@ files:
 - path: skills/intent-layer/references/workflow-feedback.md
   template: skills/intent-layer/references/workflow-feedback.md.j2
   body_sha256: ad1b8ae99e2a60e2d6f8e9726635150e9e0de31231d85ef72385e956b0347999
+- path: skills/maker/SKILL.md
+  template: skills/world-model/SKILL.md.j2
+  body_sha256: b7411e4b91eb5d62d27f502ec6a98edea182584d6f7acb18a5435d045a3fc81a
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 12611c8e959f5e774908e01684d63bbac86c253a665a20a34ae47825eeb76315

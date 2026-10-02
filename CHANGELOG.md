@@ -4,6 +4,16 @@
 
 ### Added
 
+- **Named world model.** `harness.yaml` gains `world_model: {name, handle}` (default `Maker` /
+  `maker`, validated at load; a missing handle is derived from the name, an absent key equals the
+  explicit default). One router skill renders at `skills/<handle>/SKILL.md` (and
+  `.agents/skills/<handle>/` for Codex) from a fixed template and only routes to existing surfaces
+  (stages, `intent-layer`, `project-knowledge`, read-only status); its stage lookup reads the
+  ledger from the git base root so it works inside a task worktree. The name is asked right after
+  locale in the interview, `commands/make.md`, `--ci` and `/hm:configure`; a short `## World model`
+  pointer is added to every always-loaded variant. Reserved names, `hm-*`, bad grammar and length
+  are rejected; a handle that equals a user-owned skill dir is kept and named in a warning. Renaming
+  sweeps the pristine old router and keeps edited files.
 - **`hm review_churn attribute` stamps `caused_by` deterministically.** It diffs the round's
   fix commit (`git diff -U0`), maps each finding's line to the new-side hunks, and stamps only
   findings whose `caused_by` is unset. Round label convention: REVIEW round N <-> churn ref

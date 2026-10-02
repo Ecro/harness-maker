@@ -81,7 +81,8 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     # 7 → 6 STAGE skills (2026-09-20, SPEC-plan-stage-absorption IRR-001): `@hm-plan` went
     # with the stage. The base-skill count is unchanged — `spec-validator` replaced
     # `plan-validator` one-for-one and agents are not skills.
-    expected = 13 + 6 + 1 + 1 + 1
+    # +1 (2026-10-02, SPEC-world-model-name): the world-model router at `.agents/skills/<handle>/`.
+    expected = 13 + 6 + 1 + 1 + 1 + 1
     assert len(skill_paths) == expected, (
         f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
     )

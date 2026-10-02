@@ -61,7 +61,10 @@ def test_ac_009_onboarding_asks_no_strictness_question(
 ) -> None:
     prompts = interview_questions(monkeypatch)
     assert not [p for p in prompts if _AXIS.search(p)], prompts
-    assert len(prompts) < _PRE_CHANGE_PROMPT_COUNT
+    # The world-model name question (SPEC-world-model-name S1) is an unrelated later addition;
+    # this invariant is about the removed strictness question, so it is not counted.
+    counted = [p for p in prompts if not p.startswith("World model name")]
+    assert len(counted) < _PRE_CHANGE_PROMPT_COUNT
 
     assert "spec.strictness" in configure_editable_keys(tmp_path, monkeypatch)
 

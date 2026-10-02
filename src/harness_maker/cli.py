@@ -14,16 +14,19 @@ import yaml
 from jinja2 import TemplateError
 from pydantic import ValidationError
 
+from harness_maker import i18n, world_model
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.codex_user_config import bootstrap_user_codex_profiles
 from harness_maker.interview import (
     LoopConfigError,
+    WorldModelConfigError,
     _input_or_empty,
     _parse_autonomy,
     answers_from_harness_yaml,
     interview,
     parse_loop,
+    parse_world_model,
 )
 from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.locate import compare_version
@@ -36,12 +39,19 @@ from harness_maker.models import (
     Preset,
     RefFolder,
     Target,
+    WorldModelConfig,
 )
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
 from harness_maker.profile import profile
-from harness_maker.reconcile import OrphanSweepReport, backup, reconcile, sweep_orphans
+from harness_maker.reconcile import (
+    OrphanSweepReport,
+    backup,
+    parse_frontmatter,
+    reconcile,
+    sweep_orphans,
+)
 from harness_maker.render import (
     DEFAULT_FREEZE_TIME,
     render,
@@ -250,6 +260,18 @@ def make(
             "refused while in-flight task worktrees would be stranded."
         ),
     ),
+    world_model_name_override: str | None = typer.Option(
+        None,
+        "--world-model-name",
+        help="Name you call this project's world model by (default 'Maker'). The handle "
+        "is derived from it unless --world-model-handle is given.",
+    ),
+    world_model_handle_override: str | None = typer.Option(
+        None,
+        "--world-model-handle",
+        help="Invocation handle for the world model skill (/<handle>, $<handle> on Codex): "
+        "a-z, 0-9 and single hyphens; shipped skill names and 'hm-' are reserved.",
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -350,6 +372,9 @@ def make(
     # SPEC-loop-opt-in ADR-002: resolved BEFORE answers and before any write, so a
     # malformed `loop` block stops the render with nothing touched (AC-011).
     existing_loop = _resolve_existing_loop_or_exit(existing_yaml)
+    # SPEC-world-model-name ADR-001: same contract — an invalid `world_model` stops the
+    # render before any write, instead of re-rendering under the default handle.
+    _check_existing_world_model_or_exit(existing_yaml)
     p = profile(target)
     # Re-render path: silently reuse prior interview answers from harness.yaml
     # so locale / strictness / custom workflows / reviewer-enablement survive
@@ -415,7 +440,10 @@ def make(
         autonomy_persistent_override=autonomy_persistent_override,
         comprehension_depth_override=comprehension_depth_override,
         worktree_override=worktree_override,
+        world_model_name_override=world_model_name_override,
+        world_model_handle_override=world_model_handle_override,
     )
+    _warn_world_model_handle_taken(target, a)
     # Seed `toolchains` from manifest detection, fill-if-empty (ADR-007). Placed AFTER the
     # override pass so a `--preset` rebuild cannot discard what we just seeded, and so a
     # user-authored value round-tripped from harness.yaml wins — `seed_toolchains` returns the
@@ -1343,6 +1371,8 @@ def _apply_dimension_overrides(
     autonomy_persistent_override: bool | None = None,
     comprehension_depth_override: str | None = None,
     worktree_override: bool | None = None,
+    world_model_name_override: str | None = None,
+    world_model_handle_override: str | None = None,
 ) -> InterviewAnswers:
     """Apply per-dimension CLI overrides on top of the answers.
 
@@ -1369,6 +1399,13 @@ def _apply_dimension_overrides(
         update["worktree"] = {"enabled": worktree_override}
     if locale_override:
         update["locale"] = locale_override
+    if world_model_name_override is not None or world_model_handle_override is not None:
+        update["world_model"] = _world_model_from_flags(
+            answers,
+            name_flag=world_model_name_override,
+            handle_flag=world_model_handle_override,
+            locale=locale_override or answers.locale,
+        )
     if strictness_override:
         if strictness_override not in ("block", "warn"):
             typer.echo(f"--strictness invalid: {strictness_override} (block|warn)", err=True)
@@ -1537,6 +1574,9 @@ def _apply_dimension_overrides(
                 # harness's loop to the fresh-install `False` and the orphan sweep then
                 # deletes the loop commands (SPEC-loop-opt-in IRR-002).
                 loop=answers.loop,
+                # `world_model=` likewise: a reset would rename the router to the default
+                # and the orphan sweep would delete the user's named one.
+                world_model=answers.world_model,
                 # `comprehension_depth=` is NOT optional here, for the same reason
                 # `autonomy=` and `toolchains=` are not: this rebuild takes a field
                 # allowlist, so `interview` is otherwise reset to the new preset's default
@@ -1780,6 +1820,89 @@ def _retire_stale_hooks_json(project_root: Path, blueprint: Blueprint) -> None:
             ".claude/settings.json, then delete the file.",
             err=True,
         )
+
+
+def _world_model_from_flags(
+    answers: InterviewAnswers,
+    *,
+    name_flag: str | None,
+    handle_flag: str | None,
+    locale: str,
+) -> WorldModelConfig:
+    """Resolve the world-model flags; an underivable name with no handle is refused, never
+    silently defaulted, so `/maker` cannot end up describing someone else's name (ADR-006)."""
+    name = name_flag if name_flag is not None else answers.world_model.name
+    name = name.strip()
+    err = world_model.name_error(name)
+    if err is not None:
+        typer.echo(f"ERROR: --world-model-name: {err}", err=True)
+        raise typer.Exit(code=1)
+    if handle_flag is not None:
+        handle = handle_flag
+    elif name_flag is not None:
+        derived = world_model.derive_handle(name)
+        if derived is None:
+            typer.echo(
+                f"ERROR: {i18n.t('world_model_handle_required', locale, name=name)}", err=True
+            )
+            raise typer.Exit(code=1)
+        handle = derived
+    else:
+        handle = answers.world_model.handle
+    rule = world_model.handle_error(handle)
+    if rule is not None:
+        typer.echo(
+            f"ERROR: {i18n.t(f'world_model_handle_{rule}', locale, handle=handle)}", err=True
+        )
+        raise typer.Exit(code=1)
+    return WorldModelConfig(name=name, handle=handle)
+
+
+def _warn_world_model_handle_taken(target: Path, answers: InterviewAnswers) -> None:
+    """Name the collision when the handle's skill dir already holds a user-owned skill.
+
+    Reconcile keeps an un-provenanced file there (never overwritten), which means the router
+    is NOT installed at `/<handle>` — say so instead of leaving the front door silently missing.
+    """
+    handle = answers.world_model.handle
+    roots = [target / ".claude" / "skills"]
+    if Target.CODEX in answers.targets:
+        roots.append(target / ".agents" / "skills")
+    for root in roots:
+        path = root / handle / "SKILL.md"
+        if not path.is_file():
+            continue
+        fm, _ = parse_frontmatter(path)
+        if fm is None or fm.get("generated_by") != "harness-maker":
+            typer.echo(
+                "WARN: "
+                + i18n.t(
+                    "world_model_handle_taken",
+                    answers.locale,
+                    path=str(path.relative_to(target)),
+                    handle=handle,
+                ),
+                err=True,
+            )
+
+
+def _check_existing_world_model_or_exit(existing_yaml: Path) -> None:
+    """Refuse to render over a `world_model` block that WorldModelConfig rejects."""
+    if not existing_yaml.is_file():
+        return
+    try:
+        data = load_harness_yaml(existing_yaml)
+    except Exception:  # noqa: BLE001 — unreadable files are the reuse path's concern
+        return
+    if not isinstance(data, dict) or "world_model" not in data:
+        return
+    try:
+        parse_world_model(data["world_model"])
+    except WorldModelConfigError as e:
+        typer.echo(
+            f"ERROR: {e}. Fix or remove the `world_model` block in {existing_yaml}.", err=True
+        )
+        raise typer.Exit(code=1) from e
 
 
 def _resolve_existing_loop_or_exit(existing_yaml: Path) -> bool | None:

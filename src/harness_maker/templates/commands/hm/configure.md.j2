@@ -24,6 +24,7 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 - sibling_repos (relative paths if any)
 - second_brain: enabled, vault_path, project_id (if configured)
 - worktree isolation (`worktree.enabled`)
+- world model (`world_model.name` + `handle` — how the user calls it)
 
 ### 2. Ask what to change
 
@@ -91,6 +92,10 @@ Options (multi-select):
   shell *before* the CLI's allowlist ever sees it. An out-of-set value exits non-zero.
 - **Locale** — the `locale` tag (en / ko / …), for this conversation and the re-render.
   Unknown tags fall back to English.
+- **World model name** — what the user calls the project's front door (default `Maker`) and
+  its handle (`/<handle>`, `$<handle>` on Codex). The handle is derived from the name; ask
+  for one only when the name has no ASCII handle. Renaming moves the skill: the old pristine
+  `skills/<old>/` is removed on re-render, an edited one is kept.
 - **Delivery metrics tuning** — `{% if is_codex %}$hm-metrics{% else %}/hm:metrics{% endif %}`
   is manual and read-only (CFR + churn from local git, no network) with no on/off switch.
   This only adjusts its tuning knobs (`tag_pattern`, `default_branch`, `cfr_window_days`,
@@ -187,7 +192,9 @@ Append when changed: `--comprehension-depth "$COMPREHENSION_DEPTH"` (one of `min
 `standard` / `deep` — an out-of-set value exits non-zero rather than being corrected, so
 pass the literal the user chose, quoted); `--locale "$LOCALE"`; `--second-opinion-models "$SO_MODELS"` (comma
 list, `""` disables — per-model sub-blocks like `codex.hermetic` survive either way);
-`--strictness "$STRICTNESS"`; `--autonomy-level "$AUTONOMY"` (`gated` turns auto-advance off while preserving persistence
+`--strictness "$STRICTNESS"`; `--world-model-name "$WM_NAME"` plus `--world-model-handle
+"$WM_HANDLE"` when a handle was asked (a reserved or malformed handle exits non-zero naming
+the rule — surface it and ask again); `--autonomy-level "$AUTONOMY"` (`gated` turns auto-advance off while preserving persistence
 and caps) plus `--autonomy-persistent` / `--no-autonomy-persistent` only on an explicit
 choice.
 

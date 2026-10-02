@@ -145,6 +145,10 @@ delegation:
 loop:
   # /hm:loop + /hm:loop-p5-batch. false = not rendered; set true and run /hm:make to enable.
   enabled: {{ (config.loop.enabled if config.loop else false) | tojson }}
+world_model:
+  # The name you call this project's world model by, and its /<handle> skill. Change with /hm:configure.
+  name: "{{ config.world_model.name | replace('\\', '\\\\') | replace('"', '\\"') }}"
+  handle: "{{ config.world_model.handle }}"
 autonomy:
   level: {{ (config.autonomy.level if config.autonomy else "ask") | tojson }}
   pipeline: {{ (config.autonomy.pipeline if config.autonomy else ['research', 'spec', 'execute', 'review', 'verify', 'wrapup']) | tojson }}

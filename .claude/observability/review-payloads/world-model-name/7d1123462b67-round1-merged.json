@@ -1,0 +1,166 @@
+{
+  "findings": [
+    {
+      "lens": "functionality",
+      "severity": "P3",
+      "file": "src/harness_maker/templates/skills/world-model/SKILL.md.j2",
+      "line": 42,
+      "summary": "Briefing/Resume find tasks only via hm/ branches; flag-OFF harnesses show none",
+      "suggestion": "State that Briefing/Resume cover the per-task (worktree-enabled) model, or also list execute- worktrees.",
+      "reasoning": {
+        "observe": "Briefing greps ^branch refs/heads/hm/; hm/<slug> exists only with worktree flag ON.",
+        "trace": "Resume step 2 says None -> offer Start.",
+        "infer": "With worktree off, in-progress work is invisible; continue offers Start.",
+        "conclude": "S7(a)/(c) hold only for flag-ON harnesses and the skill does not say so."
+      },
+      "p1_key": "core-1",
+      "pass": 2,
+      "id": "130d174a400aea9f",
+      "caused_by": "none"
+    },
+    {
+      "lens": "functionality",
+      "severity": "P2",
+      "file": "src/harness_maker/templates/skills/world-model/SKILL.md.j2",
+      "line": 51,
+      "summary": "Span grep uses a cwd-relative path, but spans live at the base root",
+      "suggestion": "grep the base-root ledger: \"$(git rev-parse --path-format=absolute --git-common-dir)/../.claude/observability/stage-spans.jsonl\".",
+      "reasoning": {
+        "observe": "Template greps .claude/observability/stage-spans.jsonl; stage_spans writes to resolve_base_root(cwd).",
+        "trace": "Router invoked inside a task worktree resolves to the worktree's own .claude/observability.",
+        "infer": "Every task reports stage unknown; Resume cannot pick the stage.",
+        "conclude": "Base-root span ledger not read from a worktree."
+      },
+      "p1_key": "core-2",
+      "pass": 2,
+      "id": "6d3f14adb4b3f19b",
+      "caused_by": "none"
+    },
+    {
+      "lens": "consistency",
+      "severity": "P2",
+      "file": "src/harness_maker/interview.py",
+      "line": 302,
+      "summary": "Interactive rejection messages are hardcoded English, not locale messages",
+      "suggestion": "Pass locale into _ask_world_model and print i18n.t(f'world_model_handle_{rule}', locale, handle=raw).",
+      "reasoning": {
+        "observe": "interview prints raw name_error and '{raw!r} breaks the {rule} rule'; S5 requires a locale message naming the rule.",
+        "trace": "_ask_world_model is called after _ask_locale but not passed the locale.",
+        "infer": "ko operator typing intent-layer gets English.",
+        "conclude": "S5 locale-message requirement unmet on the interactive path."
+      },
+      "p1_key": "core-3",
+      "pass": 2,
+      "id": "7c1d76705129ead3",
+      "caused_by": "none"
+    },
+    {
+      "lens": "consistency",
+      "severity": "P3",
+      "file": "src/harness_maker/reconcile.py",
+      "line": 685,
+      "summary": "Empty-dir cleanup applies to every orphan under skills/, but docs say world-model only",
+      "suggestion": "Reword the docstring to state it applies to any swept skills/<name>/SKILL.md.",
+      "reasoning": {
+        "observe": "Docstring says a renamed world-model router; call runs after every orphan deletion guarded only by parent.parent.name == skills.",
+        "trace": "Any orphaned skill now has its emptied dir removed.",
+        "infer": "Behaviour changes for unrelated skills; docstring undersells.",
+        "conclude": "Docstring understates blast radius."
+      },
+      "p1_key": "core-4",
+      "pass": 2,
+      "id": "a94029446e30e507",
+      "caused_by": "none"
+    },
+    {
+      "lens": "robustness",
+      "severity": "P3",
+      "file": "src/harness_maker/templates/skills/world-model/SKILL.md.j2",
+      "line": 9,
+      "summary": "tojson escapes non-BMP characters (emoji in name) as surrogate pairs inside YAML frontmatter",
+      "suggestion": "Add a render test with a name like 'Maker 🚀' that parses frontmatter with PyYAML and compares.",
+      "reasoning": {
+        "observe": "Description uses | tojson (ensure_ascii); name_error allows astral emoji.",
+        "trace": "Emoji renders as \\ud83d\\ude80 in a YAML double-quoted scalar.",
+        "infer": "PyYAML may produce lone surrogates.",
+        "conclude": "Latent cross-parser fragility; no test."
+      },
+      "p1_key": "core-5",
+      "pass": 2,
+      "id": "8a53a1be601d2b63",
+      "caused_by": "none"
+    },
+    {
+      "lens": "concurrency",
+      "severity": "P3",
+      "file": "src/harness_maker/templates/skills/world-model/SKILL.md.j2",
+      "line": 54,
+      "summary": "Resume treats a trailing 'start' span as interrupted, but another live session may own it",
+      "suggestion": "Before re-entering a task whose newest span is 'start', check for a live session on that slug (marker or span age). If one exists, report 'running in another session' and do not resume. Also skip a torn last line from tail.",
+      "reasoning": {
+        "observe": "Briefing/Resume read grep ... stage-spans.jsonl | tail -n 1; 'start' with no 'end' is labelled interrupted and Resume re-enters that stage.",
+        "trace": "Session A starts /hm:execute on slug X (start span). Session B says continue; reads newest span 'start'; re-enters execute on X.",
+        "infer": "Two sessions can run the same stage on the same task; a torn last line could also be misread.",
+        "conclude": "The rule cannot tell a crashed stage from one running in a concurrent session, so Resume can launch a duplicate stage."
+      },
+      "p1_key": "concurrency-1",
+      "pass": 2,
+      "id": "915118c871bf9ef3",
+      "caused_by": "none"
+    },
+    {
+      "lens": "tests",
+      "severity": "P2",
+      "file": "tests/render/test_render_world_model.py",
+      "line": 280,
+      "summary": "ADR-011 behaviours (capped briefing, newest-span-per-slug, 8-line reply, no whole-file reads, interrupted/ended resume rule) are not pinned by any test",
+      "suggestion": "Add a render test asserting the 7-key filter, tail -n 1, 'at most 8 lines', the Never Read clause, the interrupted/ended Resume rules, and no unfiltered 'hm intent status --json' line.",
+      "reasoning": {
+        "observe": "Only 'hm intent status --json' substring is asserted, which also holds for the unfiltered command.",
+        "trace": "No test exercises resume mapping.",
+        "infer": "Removing the filter or inverting resume passes all tests.",
+        "conclude": "ADR-011 untested."
+      },
+      "p1_key": "tests-1",
+      "pass": 2,
+      "id": "0248ff45a41f5b1c",
+      "caused_by": "none"
+    },
+    {
+      "lens": "tests",
+      "severity": "P3",
+      "file": "tests/render/test_render_world_model.py",
+      "line": 261,
+      "summary": "Routing rows (what next starts no stage; record first) pinned only by subset checks",
+      "suggestion": "Assert '**Start no stage**' is present.",
+      "reasoning": {
+        "observe": "Subset checks only.",
+        "trace": "Dropping rows leaves tests green.",
+        "infer": "Negative-route behaviours untested.",
+        "conclude": "Pin load-bearing phrases."
+      },
+      "p1_key": "tests-2",
+      "pass": 2,
+      "id": "a62626ddb9a4ce1d",
+      "caused_by": "none"
+    },
+    {
+      "lens": "tests",
+      "severity": "P3",
+      "file": "tests/render/test_render_world_model.py",
+      "line": 318,
+      "summary": "every-dispatch check selects blocks by --locale, a proxy",
+      "suggestion": "Select by 'make \"$(pwd)\"' and assert a minimum count.",
+      "reasoning": {
+        "observe": "dispatch = blocks with --locale.",
+        "trace": "A dispatch block without --locale escapes.",
+        "infer": "Coverage can silently shrink.",
+        "conclude": "Tighten selector."
+      },
+      "p1_key": "tests-4",
+      "pass": 2,
+      "id": "3749a9d7ef617a04",
+      "caused_by": "none"
+    }
+  ]
+}

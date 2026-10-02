@@ -55,7 +55,8 @@ _DISCLOSED_AXES: frozenset[str] = frozenset(
 )
 
 # Axes the fast path DOES put on screen already (make.md §4.3's five existing lines).
-_ASKED_OR_SHOWN_AXES: frozenset[str] = frozenset({"preset", "reviewers", "locale"})
+# `world_model` is asked right after locale (make.md §1.5, SPEC-world-model-name S1).
+_ASKED_OR_SHOWN_AXES: frozenset[str] = frozenset({"preset", "reviewers", "locale", "world_model"})
 
 # Everything else: internal machinery, not an onboarding decision. `consensus` and `caching`
 # are here deliberately — ADR-003 makes them silently preset-defaulted, and disclosing an

@@ -18,6 +18,8 @@ from pydantic import (
     model_validator,
 )
 
+from harness_maker import world_model
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Enums (string-valued)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -915,6 +917,44 @@ class InstrumentationConfig(BaseModel):
     stage_agent_ledger: bool = False
 
 
+class WorldModelConfig(BaseModel):
+    """The world model's display name and invocation handle (SPEC-world-model-name).
+
+    Validated here, at load, rather than only at the prompts: a hand-edited reserved handle
+    would otherwise render the router over a shipped skill (ADR-001).
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    name: str = world_model.DEFAULT_NAME
+    handle: str = world_model.DEFAULT_HANDLE
+
+    @model_validator(mode="before")
+    @classmethod
+    def _derive_missing_handle(cls, data: Any) -> Any:
+        # A partial `{name: Atlas}` names the router after the name, not after the default.
+        if isinstance(data, dict) and "handle" not in data and isinstance(data.get("name"), str):
+            derived = world_model.derive_handle(data["name"])
+            return {**data, "handle": derived or world_model.DEFAULT_HANDLE}
+        return data
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str) -> str:
+        err = world_model.name_error(v)
+        if err is not None:
+            raise ValueError(err)
+        return v
+
+    @field_validator("handle")
+    @classmethod
+    def _valid_handle(cls, v: str) -> str:
+        rule = world_model.handle_error(v)
+        if rule is not None:
+            raise ValueError(f"world_model.handle {v!r} breaks the {rule} rule")
+        return v
+
+
 class LoopConfig(BaseModel):
     """Whether `/hm:loop` and `/hm:loop-p5-batch` are rendered (SPEC-loop-opt-in).
 
@@ -1257,6 +1297,8 @@ class HarnessConfig(BaseModel):
     # SPEC-loop-opt-in: gates the /hm:loop family. default_factory keeps legacy files
     # loading; the absent-key meaning (on) is applied by the answers loader, not here.
     loop: LoopConfig = Field(default_factory=LoopConfig)
+    # SPEC-world-model-name: absent key = the default Maker/maker (S3).
+    world_model: WorldModelConfig = Field(default_factory=WorldModelConfig)
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. PLAN-second-opinion-multi-model ADR-001: bumped 2 → 3 for the
     # codex_second_opinion → second_opinion rename (silent migration in interview.py).
@@ -1472,6 +1514,8 @@ class InterviewAnswers(BaseModel):
     delegation: DelegationConfig = Field(default_factory=DelegationConfig)
     # Mirror of HarnessConfig.loop (SPEC-loop-opt-in).
     loop: LoopConfig = Field(default_factory=LoopConfig)
+    # Mirror of HarnessConfig.world_model (SPEC-world-model-name).
+    world_model: WorldModelConfig = Field(default_factory=WorldModelConfig)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

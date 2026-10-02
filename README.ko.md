@@ -27,7 +27,7 @@
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`
+> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > <!-- hm-doc-contract:mechanisms:start -->
@@ -138,6 +138,7 @@ action items).
 | **Preset** | `Side` · `Production` | Reviewer 개수 (1 vs 5), 워크플로 stage 수, 보안 게이트 깊이, verify-required 플래그 |
 | **Targets** | `claude-code` · `cursor` · `codex` (다중 선택) | 어떤 IDE-native 자산 트리가 렌더되나 |
 | **Locale** | `en` · `ko` · 임의 태그 | 인터뷰 텍스트 + 사용자 대면 에러 메시지 |
+| **World model 이름** | 기본 `Maker` (`/maker`) · 임의 이름 | 작업을 시작하는 단일 라우터 skill 이름 (`/<handle>`). `harness.yaml` 의 `world_model.name` / `world_model.handle` 에 저장되며 locale 직후에 묻는다 |
 | **Reviewers / skills** | Preset default + 오버라이드 | 어떤 reviewer가 활성화되고 agent model tier가 어떻게 되나 (agent·skill 전량은 항상 설치) |
 | **Ref folders** | 경로 + glob 쌍 | `refdocs-search` skill로 검색 가능한 외부 문서 |
 | **Sibling repos** | 상대 경로 | 같은 하네스 세션을 공유할 인접 repo |

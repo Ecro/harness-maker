@@ -15,13 +15,18 @@ If the prompt text contains `--ci`, extract inline params and skip all
 `Side` / `en` / `claude-code` for any that are absent. Export the parsed value as
 `$STRICTNESS` (empty when absent) — every dispatch below passes
 `${STRICTNESS:+--strictness "$STRICTNESS"}`, which forwards it when set and omits the flag
-entirely when it is not, so an unset strictness leaves the preset to derive it. Skip the live locale question and
+entirely when it is not, so an unset strictness leaves the preset to derive it. Likewise parse the
+optional `world_model_name=` and `world_model_handle=` into `$WM_NAME` / `$WM_HANDLE`
+(empty when absent); the dispatch forwards them the same way, and the CLI derives the handle
+from the name — a name with no ASCII handle and no `world_model_handle=` exits 1 naming the
+flag. Skip the live locale and world-model questions and
 jump directly to section 5 (Dispatch → Fresh install or Update,
 depending on whether `.claude/harness.yaml` exists).
 
 Example invocation:
 ```
 /harness-maker:make --ci preset=Side locale=en targets=claude-code,cursor,codex
+/harness-maker:make --ci preset=Side locale=ko world_model_name=비비 world_model_handle=bibi
 ```
 
 ### 0.5. `--reinterview` shortcut
@@ -54,6 +59,27 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 
 Store the answer as `$LOCALE` and use it in every later dispatch unless the
 user explicitly changes it.
+
+### 1.5. Name the world model
+
+Right after locale, ask what the user wants to call this project's **world model** — the one
+entry point they talk to while developing (briefing, start or resume work, remember a project
+fact, goals and metrics). Default is **Maker**. Skip this when `.claude/harness.yaml` already
+exists: a re-render keeps the existing name (renaming is a `/hm:configure` dimension).
+
+Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code), in `$LOCALE`:
+
+- **Maker** — default.
+- **Other** — free-text name (single line, at most 40 characters, any language).
+
+Store the answer as `$WM_NAME`. The invocation handle is derived from the name (lowercase
+`a-z`, `0-9`, single hyphens). When the name yields no handle — e.g. `비비` or `메이커` — ask
+once more for a handle (default `maker`) and store it as `$WM_HANDLE`; otherwise leave
+`$WM_HANDLE` empty. Shipped skill names (`intent-layer`, `project-knowledge`, …) and anything
+starting with `hm-` are reserved — the CLI refuses them with a message naming the rule.
+
+Then tell the user, in one line, how to call it: `/<handle>` in Claude Code, `$<handle>` in
+Codex, or simply address it by name (e.g. "Maker, where are we?").
 
 ### 2. Detect state
 
@@ -441,9 +467,11 @@ enables broader review and stricter gates; Side is lighter.
 
 ```bash
 # claude-code / cursor:
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --locale ko
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --locale ko \
+  ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)" --locale ko
+!harness-maker make "$(pwd)" --locale ko \
+  ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 #### Switch SPEC strictness
@@ -579,7 +607,8 @@ Then dispatch with the collected values:
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
-  --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL"
+  --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL" \
+  ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --targets "$TARGETS" \
@@ -588,7 +617,8 @@ Then dispatch with the collected values:
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
-  --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL"
+  --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL" \
+  ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 Omit `--second-brain-vault-path` when the user chose "none"; omit
@@ -649,6 +679,7 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
   --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL" \
+  ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"} \
   --autoloop
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" \
@@ -659,6 +690,7 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
   --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL" \
+  ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"} \
   --autoloop
 ```
 
@@ -762,8 +794,8 @@ Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
   every dimension (workflows, reviewer enablement, anti-rot, etc.) —
   the slash-command Full reconfigure covers preset / locale /
   targets / ref_folders / sibling_repos (not workflows or reviewer enablement).
-- `--preset / --locale / --strictness / --targets` are the in-band override
-  flags; prefer these for slash-command-driven reconfiguration since they
+- `--preset / --locale / --strictness / --targets / --world-model-name /
+  --world-model-handle` are the in-band override flags; prefer these for slash-command-driven reconfiguration since they
   don't need a TTY.
 - `@hm:user:*` block markers preserve user content during re-render —
   separate from interview answers.

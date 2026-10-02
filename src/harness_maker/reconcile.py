@@ -29,6 +29,7 @@ AGENTS.md) are NEVER touched — the renderer only writes there.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import re
@@ -681,6 +682,20 @@ def _normalize_expected_path(fe_path: Path) -> str:
     return ".claude/" + path_str
 
 
+def _remove_emptied_skill_dir(deleted: Path) -> None:
+    """A renamed world-model router leaves `skills/<old>/` empty; remove only that shape.
+
+    Restricted to a direct `skills/<name>/` parent so the sweep never removes a directory a
+    user or another tool may still be filling (SPEC-world-model-name ADR-007).
+    """
+    parent = deleted.parent
+    if parent.parent.name != "skills":
+        return
+    # Not empty (user files remain) or already gone: leave it.
+    with contextlib.suppress(OSError):
+        parent.rmdir()
+
+
 def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport:
     """Delete blueprint-orphaned files that fingerprint as ours; keep+warn the rest.
 
@@ -724,6 +739,7 @@ def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport
                 report.kept.append((rel_path, "unlink-failed"))
                 continue
             report.deleted.append(rel_path)
+            _remove_emptied_skill_dir(project_root / rel_path)
         else:
             print(
                 f"WARN: orphan-sweep KEPT {rel_key} ({classification}) — manual review needed",

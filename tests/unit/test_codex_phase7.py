@@ -174,4 +174,7 @@ def test_codex_target_files_total_skill_count() -> None:
     # 22 → 23 (2026-09-19, SPEC-mission-context-loop): the `project-knowledge` skill. Same
     # constants (`synthesize._ALL_SKILLS`, `interview._ALL_SKILLS`, the Side enabled list,
     # this count, `test_synthesize_codex`'s base).
-    assert len(out_paths) == 22, f"Expected 22 skill paths, got {len(out_paths)}"
+    #
+    # 22 → 23 (2026-10-02, SPEC-world-model-name): the `/<handle>` world-model router skill,
+    # rendered at a user-named path from `skills/world-model/`; it is NOT in `_ALL_SKILLS`.
+    assert len(out_paths) == 23, f"Expected 23 skill paths, got {len(out_paths)}"
