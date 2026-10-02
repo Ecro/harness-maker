@@ -349,6 +349,19 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "reviewed by confirm-1 and confirm-2 instead (REVIEW-intent-layer-improvements-"
         "2026-09-29.md). Nothing reconstructed."
     ),
+    ("world-model-name", 2): (
+        "Round 2 dispatched no reviewers: it is the confirm-1 repair round, and the churn gate "
+        "skipped its re-review (`churn 0.09 < 0.30`), so no merged payload existed to capture. "
+        "The row's `pass1_n: 5` counts confirm-1's five new findings, not a round-2 dispatch. "
+        "Run 7d1123462b67's round 1 persisted; confirm-1/confirm-2 are in "
+        "REVIEW-world-model-name-2026-10-02.md. Nothing reconstructed."
+    ),
+    ("world-model-followups", 2): (
+        "Round 2 dispatched no reviewers: the churn gate skipped the re-review "
+        "(`churn 0.13 < 0.30`, `pass1_n: 0`), so no merged payload existed to capture. Run "
+        "70e2bb292bcf's round 1 persisted; the round-2 fixes were reviewed by confirm-1 instead "
+        "(REVIEW-world-model-followups-2026-10-02.md). Nothing reconstructed."
+    ),
 }
 
 
