@@ -15,6 +15,7 @@ rather than skipped.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,12 @@ _STEP_LANDED = "2026-08-05"
 
 #: (slug, round) pairs that ran on or after the cutoff WITHOUT persisting. Each needs a
 #: reason. Adding an entry is the visible cost of skipping the step; removing one is free.
+#:
+#: Churn-skipped rounds are not listed: the gate excludes them itself (`_churn_skipped`).
+#: Two slugs whose terminal round was churn-skipped also skipped Step 3.4 on EVERY round that
+#: dispatched, and those rounds emitted no telemetry row, so the gate cannot see them:
+#: `mutation-survivors-and-approval-p2s` (run efae9d5dd1a9) and `withdrawal-criterion-window`
+#: (run aeb96c3b0764). No copy survives on disk; nothing was reconstructed (2026-09-27 sweep).
 _KNOWN_MISSING: dict[tuple[str, int], str] = {
     ("objective-gap-proposal", 2): (
         "Round 2 dispatched no reviewers: the churn gate skipped the re-review "
@@ -58,16 +65,6 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "round (the terminal row plus the post-review-fix row of 2026-09-16), which is why the "
         "gate lists it twice. Nothing was reconstructed to clear this (`[fail:design] "
         "per-round-step-runs-only-in-round-1`)."
-    ),
-    ("outcome-measure", 2): (
-        "Same shape, 2026-09-17: round 2 applied five fixes and the churn gate returned "
-        "`churn 0.15 < 0.30` with an empty `dispatches`, so the round's voting set was the "
-        "round-1 merged set minus the five resolved ids — there was no reviewer reply to "
-        "persist. Round 1's merged payload is at "
-        "`outcome-measure/decaaceffd9e-round1-merged.json`; the two confirmation passes that "
-        "followed captured per-lens files under `.hm-lens-results/outcome-measure/decaaceffd9e/"
-        "confirm-1|confirm-2/` but are not rounds. Listed twice because both the round-2 row "
-        "and the terminal row carry `round: 2`. Nothing was reconstructed."
     ),
     ("probe-envelope-contract", 2): (
         "Round 2 dispatched no reviewers, so there was no merged payload to capture. The "
@@ -219,30 +216,6 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         )
         for n in (1, 2, 3)
     },
-    ("source-plan-steps", 2): (
-        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
-        "round-axis disagreement recorded above: the review's later work was a confirmation "
-        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
-        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
-        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
-        "nothing reconstructed."
-    ),
-    ("intent-layer-ops", 2): (
-        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
-        "round-axis disagreement recorded above: the review's later work was a confirmation "
-        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
-        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
-        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
-        "nothing reconstructed."
-    ),
-    ("assumption-entry-and-evidence-locator", 2): (
-        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
-        "round-axis disagreement recorded above: the review's later work was a confirmation "
-        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
-        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
-        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
-        "nothing reconstructed."
-    ),
     ("assumption-entry-and-evidence-locator", 3): (
         "the terminal telemetry row numbers a round that has no merged payload of its own — the "
         "round-axis disagreement recorded above: the review's later work was a confirmation "
@@ -250,60 +223,6 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
         "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
         "nothing reconstructed."
-    ),
-    ("mission-context-loop", 2): (
-        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
-        "round-axis disagreement recorded above: the review's later work was a confirmation "
-        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
-        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
-        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
-        "nothing reconstructed."
-    ),
-    ("ai-native-sdlc-vs-intent-world", 3): (
-        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
-        "round-axis disagreement recorded above: the review's later work was a confirmation "
-        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
-        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
-        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
-        "nothing reconstructed."
-    ),
-    ("dev-mode-removal", 2): (
-        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
-        "round-axis disagreement recorded above: the review's later work was a confirmation "
-        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
-        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
-        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
-        "nothing reconstructed."
-    ),
-    ("intent-vocabulary-and-owners", 3): (
-        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
-        "round-axis disagreement recorded above: the review's later work was a confirmation "
-        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
-        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
-        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
-        "nothing reconstructed."
-    ),
-    ("docs-release-sync", 2): (
-        "the terminal telemetry row numbers a round that has no merged payload of its own — the "
-        "round-axis disagreement recorded above: the review's later work was a confirmation "
-        "pass or a churn-skipped re-review, which write lens files under a pass-id directory or "
-        "nothing at all, never a `round<N>-merged.json`. Earlier rounds of the slug did "
-        "persist. Recorded in the 2026-09-27 sweep from the telemetry rows and the corpus; "
-        "nothing reconstructed."
-    ),
-    ("mutation-survivors-and-approval-p2s", 3): (
-        "no merged payload was persisted for ANY round of this slug (run efae9d5dd1a9): the "
-        "review ran — its REVIEW document and telemetry exist — but the Step 3.4 persist line "
-        "was skipped throughout, and no copy survives anywhere on disk. Recorded in the "
-        "2026-09-27 sweep; reconstructing from the REVIEW narrative would put post-hoc entries "
-        "in a corpus of captures."
-    ),
-    ("withdrawal-criterion-window", 2): (
-        "no merged payload was persisted for ANY round of this slug (run aeb96c3b0764): the "
-        "review ran — its REVIEW document and telemetry exist — but the Step 3.4 persist line "
-        "was skipped throughout, and no copy survives anywhere on disk. Recorded in the "
-        "2026-09-27 sweep; reconstructing from the REVIEW narrative would put post-hoc entries "
-        "in a corpus of captures."
     ),
     ("codex-plan-integration-repair", 1): (
         "no merged payload was persisted for ANY round of this slug (run 692c4c590fe5): the "
@@ -319,21 +238,6 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "67faab2c to clear this gate and removed the next commit: a reconstruction is exactly "
         "what this corpus excludes, whatever its content."
     ),
-    ("loop-opt-in", 2): (
-        "churn-skipped re-review (run de811b436e83): round 2's telemetry row records churn "
-        "0.07 < 0.30 and REVIEW-loop-opt-in-2026-09-27.md says 'Re-review: skipped', so no "
-        "reviewer ran and there was no merged payload. The terminal row carries the confirm-1 "
-        "pass, whose lens files are under `.hm-lens-results/loop-opt-in/de811b436e83/"
-        "confirm-1/`. Round 1 persisted. Recorded in the 2026-09-29 sweep; nothing reconstructed."
-    ),
-    ("sdlc-three-loops-gap", 2): (
-        "churn-skipped re-review in all three runs (6cb74c0a3f9f, a8bcd353b3b0, d5a96ec922f4): "
-        "the three terminal round-2 rows record churn 0.078, 0.052 and 0.063, all < 0.30, and "
-        "REVIEW-sdlc-three-loops-gap-2026-09-27.md records the skips. The confirmation passes "
-        "that followed are not rounds. Each run's round 1 persisted. Listed three times because "
-        "each run emitted a terminal `round: 2` row. Recorded in the 2026-09-29 sweep; nothing "
-        "reconstructed."
-    ),
     ("intent-feedback-continuity", 4): (
         "no round 4 dispatched in either run. Runs 01263f044f17 and 4ddd6e47b02f both ended on "
         "'Confirmation pass 2 — terminal' (REVIEW-intent-feedback-continuity-2026-09-28.md and "
@@ -342,31 +246,32 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "churn-skipped (0.077 < 0.30). Both runs' round 1 persisted. Recorded in the 2026-09-29 "
         "sweep; nothing reconstructed."
     ),
-    ("intent-layer-improvements", 2): (
-        "Round 2 dispatched no reviewers: the churn gate skipped the re-review "
-        "(`review_consensus plan` → empty `dispatches`, churn 0.22 < 0.30), so no merged payload "
-        "existed to capture. Run cda10095b67a's round 1 persisted; its 17 round-2 fixes were "
-        "reviewed by confirm-1 and confirm-2 instead (REVIEW-intent-layer-improvements-"
-        "2026-09-29.md). Nothing reconstructed."
-    ),
-    ("world-model-name", 2): (
-        "Round 2 dispatched no reviewers: it is the confirm-1 repair round, and the churn gate "
-        "skipped its re-review (`churn 0.09 < 0.30`), so no merged payload existed to capture. "
-        "The row's `pass1_n: 5` counts confirm-1's five new findings, not a round-2 dispatch. "
-        "Run 7d1123462b67's round 1 persisted; confirm-1/confirm-2 are in "
-        "REVIEW-world-model-name-2026-10-02.md. Nothing reconstructed."
-    ),
-    ("world-model-followups", 2): (
-        "Round 2 dispatched no reviewers: the churn gate skipped the re-review "
-        "(`churn 0.13 < 0.30`, `pass1_n: 0`), so no merged payload existed to capture. Run "
-        "70e2bb292bcf's round 1 persisted; the round-2 fixes were reviewed by confirm-1 instead "
-        "(REVIEW-world-model-followups-2026-10-02.md). Nothing reconstructed."
-    ),
 }
 
 
-def _telemetry_rounds() -> list[tuple[str, int, str]]:
-    out: list[tuple[str, int, str]] = []
+def _churn_skip_threshold() -> float | None:
+    """Below this churn the loop skips the re-review, so the round has no payload to persist.
+
+    Half the exemption list used to be this one shape, each entry hand-written after the gate
+    went red on a round that by construction dispatched nothing. The row records the measured
+    `churn_ratio` but not the threshold it was compared to, so the threshold comes from the
+    live config; a review run under a different threshold still needs an explicit exemption.
+    `None` = the gate is off and every repair round re-reviews.
+    """
+    from harness_maker.io_utils import load_harness_yaml
+    from harness_maker.review_churn import churn_gate_enabled, resolve_churn_threshold
+
+    reviewers = load_harness_yaml(_REPO / ".claude" / "harness.yaml").get("reviewers") or {}
+    return resolve_churn_threshold(reviewers) if churn_gate_enabled(reviewers) else None
+
+
+def _churn_skipped(churn: float | None) -> bool:
+    threshold = _churn_skip_threshold()
+    return threshold is not None and churn is not None and churn < threshold
+
+
+def _telemetry_rounds() -> list[tuple[str, int, str, float | None]]:
+    out: list[tuple[str, int, str, float | None]] = []
     for path in sorted(_OBS.glob("review-*.jsonl")):
         for line in path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
@@ -376,7 +281,15 @@ def _telemetry_rounds() -> list[tuple[str, int, str]]:
             except ValueError:
                 continue
             if isinstance(row, dict) and {"slug", "round", "ts"} <= row.keys():
-                out.append((str(row["slug"]), int(row["round"]), str(row["ts"])))
+                churn = row.get("churn_ratio")
+                out.append(
+                    (
+                        str(row["slug"]),
+                        int(row["round"]),
+                        str(row["ts"]),
+                        float(churn) if isinstance(churn, (int, float)) else None,
+                    )
+                )
     return out
 
 
@@ -408,11 +321,19 @@ def test_the_telemetry_is_readable() -> None:
 
 
 def test_every_round_since_the_step_landed_persisted_its_payload() -> None:
-    """The gate. A skipped persist is now a red test naming the round that skipped it."""
+    """The gate. A skipped persist is now a red test naming the round that skipped it.
+
+    A churn-skipped round is out of scope: no reviewer ran, so there was no merged payload to
+    persist. A round that DID dispatch (churn at or above the threshold) and skipped the persist
+    line is still caught — `render-observability-audit` round 2 is that case.
+    """
     missing = [
         (slug, rnd, ts)
-        for slug, rnd, ts in _telemetry_rounds()
-        if ts >= _STEP_LANDED and (slug, rnd) not in _KNOWN_MISSING and not _has_payload(slug, rnd)
+        for slug, rnd, ts, churn in _telemetry_rounds()
+        if ts >= _STEP_LANDED
+        and not _churn_skipped(churn)
+        and (slug, rnd) not in _KNOWN_MISSING
+        and not _has_payload(slug, rnd)
     ]
     assert not missing, (
         "review rounds with no persisted payload:\n"
@@ -427,6 +348,38 @@ def test_the_exemption_list_does_not_rot() -> None:
     """An entry naming a round that DID persist is a stale exemption hiding future skips."""
     stale = [k for k in _KNOWN_MISSING if _has_payload(*k)]
     assert not stale, f"exemptions for rounds that now have payloads: {stale}"
+
+
+def test_the_churn_rule_exempts_only_skipped_rounds(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Negative control on synthetic rows, so it binds in CI where the ledger is absent.
+
+    Without it the exclusion could swallow a dispatched round that skipped its persist — the
+    one miss this gate exists for — and every real-ledger run would still be green.
+    """
+    threshold = _churn_skip_threshold()
+    if threshold is None:
+        pytest.skip("rereview_churn_gate is off — no round is churn-skipped")
+    rows = [
+        ("zz-skipped", 2, "2099-01-01T00:00:00Z", threshold / 2),
+        ("zz-dispatched", 2, "2099-01-01T00:00:00Z", threshold),
+        ("zz-unmeasured", 2, "2099-01-01T00:00:00Z", None),
+    ]
+    monkeypatch.setattr(sys.modules[__name__], "_telemetry_rounds", lambda: rows)
+    with pytest.raises(AssertionError) as caught:
+        test_every_round_since_the_step_landed_persisted_its_payload()
+    msg = str(caught.value)
+    assert "zz-dispatched round 2" in msg
+    assert "zz-unmeasured round 2" in msg
+    assert "zz-skipped" not in msg
+
+
+def test_no_exemption_duplicates_the_churn_skip_rule() -> None:
+    """An entry the rule already covers is noise that makes the real waivers harder to audit."""
+    rows: dict[tuple[str, int], list[float | None]] = {}
+    for slug, rnd, _ts, churn in _telemetry_rounds():
+        rows.setdefault((slug, rnd), []).append(churn)
+    redundant = [k for k in _KNOWN_MISSING if k in rows and all(_churn_skipped(c) for c in rows[k])]
+    assert not redundant, f"exemptions the churn-skip rule already covers: {redundant}"
 
 
 def test_every_exemption_carries_a_reason() -> None:
