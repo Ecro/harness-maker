@@ -4,6 +4,19 @@
 
 ### Added
 
+- **World model follow-ups: a briefing digest instead of ledger greps.** `hm world_model digest`
+  is a read-only, at most 1.5 KB JSON briefing (newest tasks first, capped at 5) with an
+  artifact-derived `next_stage` (approved SPEC, then REVIEW exists, then REVIEW APPROVED, then a
+  fresh verify marker, then wrapup; a span `end` is a turn end, not stage completion) and an
+  `other_session` flag. It reads the autopilot marker file directly (never `autopilot.status`,
+  which migrates and GCs), matches slugs exactly (a sibling `demo-two` never leaks into `demo`) and
+  checks artifacts only for the shown tasks under a 5 s deadline. The router briefs via `!`
+  injection with a fallback (Codex: one bash line) and resumes from `next_stage`; `/hm:help`
+  lists the router; the always-loaded `## World model` pointer is shorter (at most 200 chars at the
+  max name/handle). Interactive name/handle messages follow the locale; `--add` / `--remove`
+  `skill:world-model|<handle>` are refused (the router is not a modular skill); `commands/make.md`
+  forwards `--world-model-name` / `--world-model-handle` on every dispatch; U+FFFE / U+FFFF are
+  rejected in names.
 - **Named world model.** `harness.yaml` gains `world_model: {name, handle}` (default `Maker` /
   `maker`, validated at load; a missing handle is derived from the name, an absent key equals the
   explicit default). One router skill renders at `skills/<handle>/SKILL.md` (and

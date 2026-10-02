@@ -27,6 +27,9 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-02, `world-model-followups`** — only `help` moved, in all four arms: its settings
+  table gained the world-model router row (`/<handle>`, `$<handle>` on Codex). Verified before
+  re-capture that `help` is the ONLY moved command in every arm and none was added or removed.
 - **2026-10-02, `world-model-name`** — only `configure` moved, in all four arms: its §1 lists
   `world_model`, §2 gained the "World model name" dimension and §4 forwards
   `--world-model-name` / `--world-model-handle`. Verified before re-capture that `configure` is

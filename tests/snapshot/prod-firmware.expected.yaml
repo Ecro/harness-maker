@@ -4,7 +4,7 @@ file_count: 59
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
-  body_sha256: 1479c42a2bb3aa491cb548a8056849c2db0269c7e5725bdd4d0d98e69fdcf732
+  body_sha256: f70b458bc8282186ac7597d3bf705f1239ff8529a2daa6eca436acca3056e749
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
   body_sha256: 37c6a5d761e169c3247145c71d451f988c3bb1608ee01b29cbb876eec392f154
@@ -61,7 +61,7 @@ files:
   body_sha256: b16b0c64191d45f0b5d01ffa6e3f68ff8f0cf46a6b361f0193fc57ad692db222
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: b221546be1df7f053e5d8da69602144902c4d4ba3e0188f7dfb4c979161fdc4d
+  body_sha256: 594b9d02baefffc9273eda2dd160efd04767a7f7356735a3652bb8cc173a224d
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 8cb01c899f55914258b01e856b75f0a36d0008f7c032c212af4faa174e6409d1
@@ -139,7 +139,7 @@ files:
   body_sha256: ad1b8ae99e2a60e2d6f8e9726635150e9e0de31231d85ef72385e956b0347999
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: b7411e4b91eb5d62d27f502ec6a98edea182584d6f7acb18a5435d045a3fc81a
+  body_sha256: ded387d27fadffb7799a3a9caab6e342a07a32c873ef6f54e682ab9ef20de6ef
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 12611c8e959f5e774908e01684d63bbac86c253a665a20a34ae47825eeb76315

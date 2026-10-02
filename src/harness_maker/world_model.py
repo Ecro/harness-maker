@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
 import re
+import sys
 import unicodedata
+from collections.abc import Sequence
+from pathlib import Path
 from typing import Literal
 
 DEFAULT_NAME = "Maker"
@@ -67,14 +71,60 @@ def derive_handle(name: str) -> str | None:
     return slug
 
 
-def name_error(name: str) -> str | None:
-    """Why a display name cannot be used, or None. It lands in YAML and an always-loaded line."""
+NameRule = Literal["whitespace", "length", "control"]
+
+_NAME_MESSAGES: dict[str, str] = {
+    "whitespace": "name must be non-empty with no leading or trailing whitespace",
+    "length": f"name must be at most {NAME_MAX} characters",
+    "control": "name must be a single line without control characters or noncharacters",
+}
+
+# U+FFFE/U+FFFF are outside YAML's printable set: a name carrying them renders a harness.yaml
+# the next load rejects (REVIEW a1a2d1c0).
+_NONCHARACTERS = frozenset("\ufffe\uffff")
+
+
+def name_rule(name: str) -> NameRule | None:
+    """The rule a display name breaks, or None — the code callers localize (SPEC S8)."""
     if not name or name != name.strip():
-        return "name must be non-empty with no leading or trailing whitespace"
+        return "whitespace"
     if len(name) > NAME_MAX:
-        return f"name must be at most {NAME_MAX} characters"
+        return "length"
     # Control characters and line/paragraph separators break the single YAML line and the
     # always-loaded pointer; format characters (emoji ZWJ) and unassigned points do not.
-    if any(unicodedata.category(c) in _FORBIDDEN_CATEGORIES for c in name):
-        return "name must be a single line without control characters"
+    if any(unicodedata.category(c) in _FORBIDDEN_CATEGORIES or c in _NONCHARACTERS for c in name):
+        return "control"
     return None
+
+
+def name_error(name: str) -> str | None:
+    """Why a display name cannot be used (English), or None.
+
+    It lands in YAML and in an always-loaded line.
+    """
+    rule = name_rule(name)
+    return None if rule is None else _NAME_MESSAGES[rule]
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """`hm world_model digest` — the Maker router's briefing. Always exits 0 (SPEC S1)."""
+    from harness_maker import command_registry
+
+    guard = command_registry.guard_or_none("world_model", argv)
+    if guard is not None:
+        return guard
+    parser = argparse.ArgumentParser(prog="hm world_model")
+    sub = parser.add_subparsers(dest="command", required=True)
+    digest_p = sub.add_parser("digest", help="Print the read-only task-state digest as JSON")
+    digest_p.add_argument("--root", default=".")
+    digest_p.add_argument("--session-id", default=None)
+    args = parser.parse_args(list(argv) if argv is not None else None)
+    from harness_maker import world_model_digest
+
+    payload = world_model_digest.digest(Path(args.root), session_id=args.session_id or None)
+    sys.stdout.write(world_model_digest.render(payload) + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

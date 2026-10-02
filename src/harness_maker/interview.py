@@ -31,7 +31,7 @@ from typing import Any, TextIO
 import yaml
 from pydantic import ValidationError
 
-from harness_maker import review_churn, world_model
+from harness_maker import i18n, review_churn, world_model
 from harness_maker.io_utils import denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.models import (
     _MODEL_ID_PATTERN,
@@ -204,7 +204,7 @@ def interview(
     )
     locale = _ask_locale()
     # SPEC-world-model-name S1: the name is the second question, right after locale.
-    world = _ask_world_model()
+    world = _ask_world_model(locale)
     targets = _ask_targets()
     preset = _ask_preset(recommended)
     worktree_enabled = _ask_worktree(preset)
@@ -273,25 +273,27 @@ def _ask_locale() -> str:
     return cleaned or _DEFAULT_LOCALE
 
 
-def _ask_world_model() -> WorldModelConfig:
-    """Name the world model; ask for a handle only when the name cannot yield one (S2)."""
+def _ask_world_model(locale: str = _DEFAULT_LOCALE) -> WorldModelConfig:
+    """Name the world model; ask for a handle only when the name cannot yield one (S2).
+
+    Rejections are printed in the interview's locale (SPEC-world-model-followups S8).
+    """
     while True:
         name = (
             _input_or_empty(
-                f"World model name — call it to brief, start or resume work "
-                f"({world_model.DEFAULT_NAME}): ",
+                i18n.t("world_model_prompt_name", locale, default=world_model.DEFAULT_NAME),
             ).strip()
             or world_model.DEFAULT_NAME
         )
-        err = world_model.name_error(name)
-        if err is None:
+        name_rule = world_model.name_rule(name)
+        if name_rule is None:
             break
-        print(f"  {err}")
+        print("  " + i18n.t(f"world_model_name_{name_rule}", locale, limit=world_model.NAME_MAX))
     handle = world_model.derive_handle(name)
     while handle is None:
         raw = (
             _input_or_empty(
-                f"Handle for /<handle> (a-z, 0-9, hyphens) ({world_model.DEFAULT_HANDLE}): ",
+                i18n.t("world_model_prompt_handle", locale, default=world_model.DEFAULT_HANDLE),
             ).strip()
             or world_model.DEFAULT_HANDLE
         )
@@ -299,7 +301,7 @@ def _ask_world_model() -> WorldModelConfig:
         if rule is None:
             handle = raw
         else:
-            print(f"  {raw!r} breaks the {rule} rule")
+            print("  " + i18n.t(f"world_model_handle_{rule}", locale, handle=raw))
     return WorldModelConfig(name=name, handle=handle)
 
 

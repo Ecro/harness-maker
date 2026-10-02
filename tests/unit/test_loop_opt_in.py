@@ -44,12 +44,23 @@ _OPT_IN_COMMIT = "18714dd1"
 # - 2026-10-02, `world-model-name`: CLAUDE.md gained the `## World model` pointer. Verified
 #   before capture that the loop-ON vs loop-OFF render of CLAUDE.md differs ONLY in the opt-in
 #   loop sentence, i.e. the new pointer is loop-independent.
+# - 2026-10-02, `world-model-followups`: the `## World model` pointer text was shortened
+#   (max-length budget). Re-verified the loop-ON/OFF CLAUDE.md diff is still only the loop
+#   sentence before re-capturing.
+#   `help.md` re-captured too: it gained the router row; its loop-ON/OFF diff is still only the
+#   `/hm:loop` table row and the chaining sentence.
 _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
+    "commands/hm/help.md": {
+        "side-python-cli": "7feb5335d127f43d9cf40c7ddeb00807d82822e6cf12cbd29effe06c6f03bbb2",
+        "side-tauri-app": "7feb5335d127f43d9cf40c7ddeb00807d82822e6cf12cbd29effe06c6f03bbb2",
+        "prod-tauri-app": "bda19830fef3ad2948b52d142aff1348d99c2a4a3c31f4501f455a8516f83c59",
+        "prod-firmware": "bda19830fef3ad2948b52d142aff1348d99c2a4a3c31f4501f455a8516f83c59",
+    },
     "../CLAUDE.md": {
-        "side-python-cli": "da2a62fe4d57ba70d8a1fc981c19ea9759bca2f4e66d1fe98916005a0726310b",
-        "side-tauri-app": "da2a62fe4d57ba70d8a1fc981c19ea9759bca2f4e66d1fe98916005a0726310b",
-        "prod-tauri-app": "9db5896146df9a9800d921a4a482f7822da32541f01d22aed743e429fa8eb724",
-        "prod-firmware": "9db5896146df9a9800d921a4a482f7822da32541f01d22aed743e429fa8eb724",
+        "side-python-cli": "e3606def5b85ea7d9ef10e5d4161ccf3456e1114d62a7e6cbf22983fdbdee76c",
+        "side-tauri-app": "e3606def5b85ea7d9ef10e5d4161ccf3456e1114d62a7e6cbf22983fdbdee76c",
+        "prod-tauri-app": "74a5b7efec5a49d6c97a6984268457567fb0280371bfae8cdf86410811e1e7ad",
+        "prod-firmware": "74a5b7efec5a49d6c97a6984268457567fb0280371bfae8cdf86410811e1e7ad",
     },
 }
 # Loop-sensitive but never hash-compared below (`strip`), so a later key addition may move it.

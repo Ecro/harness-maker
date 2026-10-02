@@ -36,6 +36,7 @@ import sys
 _DISPATCHABLE: frozenset[str] = frozenset(
     {
         "autopilot",
+        "world_model",
         "autopilot_caps",
         "codex_adapter",
         "autopilot_ledger",

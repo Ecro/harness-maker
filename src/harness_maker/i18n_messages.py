@@ -41,6 +41,17 @@ MESSAGES: dict[str, dict[str, str]] = {
             "no handle can be derived from world model name {name!r}; "
             "pass --world-model-handle (a-z, 0-9, single hyphens)."
         ),
+        "world_model_prompt_name": (
+            "World model name — call it to brief, start or resume work ({default}): "
+        ),
+        "world_model_prompt_handle": "Handle for /<handle> (a-z, 0-9, hyphens) ({default}): ",
+        "world_model_name_whitespace": (
+            "world model name must be non-empty with no leading or trailing spaces."
+        ),
+        "world_model_name_length": "world model name must be at most {limit} characters.",
+        "world_model_name_control": (
+            "world model name must be one line without control characters or noncharacters."
+        ),
         "world_model_handle_taken": (
             "{path} is a user-owned skill, kept as-is — the world model router is NOT "
             "installed at /{handle}. Choose another handle (/hm:configure)."
@@ -77,6 +88,17 @@ MESSAGES: dict[str, dict[str, str]] = {
         "world_model_handle_required": (
             "world model 이름 {name!r} 에서 핸들을 만들 수 없습니다. "
             "--world-model-handle 을 지정하세요 (a-z, 0-9, 단일 하이픈)."
+        ),
+        "world_model_prompt_name": (
+            "world model 이름 — 부르면 브리핑, 작업 시작·재개를 합니다 ({default}): "
+        ),
+        "world_model_prompt_handle": "/<handle> 로 쓸 핸들 (a-z, 0-9, 하이픈) ({default}): ",
+        "world_model_name_whitespace": (
+            "world model 이름은 비어 있으면 안 되고 앞뒤 공백도 쓸 수 없습니다."
+        ),
+        "world_model_name_length": "world model 이름은 최대 {limit}자입니다.",
+        "world_model_name_control": (
+            "world model 이름은 한 줄이어야 하며 제어 문자나 비문자를 쓸 수 없습니다."
         ),
         "world_model_handle_taken": (
             "{path} 는 사용자 소유 skill 이라 그대로 두었습니다 — world model router 는 "

@@ -1,0 +1,705 @@
+schema_version: 3
+spec_slug: world-model-followups
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: 'Tier-2: the new Python behaviour is the digest (artifact
+  classification, caps, degradation); render prose is pinned by golden render tests.
+  paths_to_mutate follows the execute placement ADR.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/world_model_digest.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: digest output never exceeds 1500 bytes
+  type: property
+  test_ids:
+  - tests/unit/test_world_model_digest.py::test_ac001_digest_size_bound
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: A size bound is an invariant over every input; it does not depend
+    on how the digest is assembled.
+  oracle_independence_waiver: null
+  input_domain: 0..20 task worktrees with slugs up to 64 chars; ledgers of 0..500
+    rows; 0..20 intent items with ids up to 80 chars; commit subjects up to 200 chars
+    incl. Hangul/emoji
+  transformation: run hm world_model digest on the generated project
+  expected_relation: len(stdout.encode('utf-8')) <= 1500
+  preconditions: []
+  observable_output: stdout bytes
+  generator_hint: st.text(alphabet with Hangul+emoji) for subjects
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: digest always exits 0 with one valid JSON object
+  type: property
+  test_ids:
+  - tests/unit/test_world_model_digest.py::test_ac002_digest_never_fails
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Totality over arbitrary ledger bytes and missing sources is implementation-independent.
+  oracle_independence_waiver: null
+  input_domain: arbitrary bytes as the span ledger incl. rows with empty/unknown stage
+    values; absent git; absent intent.yaml
+  transformation: run hm world_model digest
+  expected_relation: returncode == 0 and isinstance(json.loads(stdout), dict)
+  preconditions: []
+  observable_output: exit code + stdout
+  generator_hint: st.binary() plus st.sampled_from of malformed JSON rows
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: next stage is derived from artifacts
+  type: parametric
+  test_ids:
+  - tests/unit/test_world_model_digest.py::test_ac003_next_stage_from_artifacts
+  executable_predicate: null
+  golden_table:
+  - input:
+      artifacts: []
+      spans: []
+    expected:
+      next_stage: research
+    edge: false
+    note: ''
+  - input:
+      artifacts:
+      - research
+      spans: []
+    expected:
+      next_stage: spec
+    edge: false
+    note: ''
+  - input:
+      artifacts:
+      - research
+      - spec_draft
+      spans: []
+    expected:
+      next_stage: spec
+    edge: false
+    note: ''
+  - input:
+      artifacts:
+      - spec_approved
+      spans: []
+    expected:
+      next_stage: execute
+    edge: false
+    note: ''
+  - input:
+      artifacts:
+      - spec_approved
+      - plan
+      spans:
+      - - end
+        - hm:execute
+    expected:
+      next_stage: execute
+    edge: false
+    note: ''
+  - input:
+      artifacts:
+      - spec_approved
+      - plan
+      - review_in_progress
+      spans: []
+    expected:
+      next_stage: review
+    edge: false
+    note: ''
+  - input:
+      artifacts:
+      - spec_approved
+      - plan
+      - review_changes_requested
+      spans: []
+    expected:
+      next_stage: review
+    edge: false
+    note: ''
+  - input:
+      artifacts:
+      - spec_approved
+      - plan
+      - review_approved
+      spans:
+      - - start
+        - hm:review
+    expected:
+      next_stage: verify
+    edge: false
+    note: ''
+  - input:
+      artifacts:
+      - spec_approved
+      - plan
+      - review_approved
+      - verify_marker
+      spans: []
+    expected:
+      next_stage: wrapup
+    edge: false
+    note: ''
+  - input:
+      artifacts:
+      - spec_exempt
+      - plan
+      - review_approved
+      - verify_marker
+      spans: []
+    expected:
+      next_stage: wrapup
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected stages follow the pipeline order and the artifact signals
+    fixed in SPEC S2 (Round 4), not the code; span rows are deliberately included
+    to show they never advance.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: last stage and other-session flag
+  type: parametric
+  test_ids:
+  - tests/unit/test_world_model_digest.py::test_ac004_last_stage_and_session
+  executable_predicate: null
+  golden_table:
+  - input:
+      rows:
+      - - start
+        - hm:execute
+        - s1
+      session: s1
+    expected:
+      last_stage: execute
+      other_session: false
+    edge: false
+    note: ''
+  - input:
+      rows:
+      - - start
+        - hm:execute
+        - s2
+      session: s1
+    expected:
+      last_stage: execute
+      other_session: true
+    edge: false
+    note: ''
+  - input:
+      rows:
+      - - start
+        - hm:execute
+        - s2
+      session: null
+    expected:
+      last_stage: execute
+      other_session: null
+    edge: false
+    note: ''
+  - input:
+      rows:
+      - - start
+        - hm:execute
+        - null
+      session: s1
+    expected:
+      last_stage: execute
+      other_session: null
+    edge: false
+    note: ''
+  - input:
+      rows:
+      - - end
+        - hm:spec
+        - s1
+      - - TORN
+        - null
+        - null
+      session: s1
+    expected:
+      last_stage: spec
+      other_session: false
+    edge: false
+    note: ''
+  - input:
+      rows:
+      - - start
+        - ''
+        - s1
+      session: s1
+    expected:
+      last_stage: null
+      other_session: false
+    edge: false
+    note: ''
+  - input:
+      rows:
+      - - start
+        - hm:bogus
+        - s1
+      session: s1
+    expected:
+      last_stage: null
+      other_session: false
+    edge: false
+    note: ''
+  - input:
+      rows: []
+      session: s1
+    expected:
+      last_stage: null
+      other_session: null
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The session rule was fixed in SPEC S3 (Round 2/4); last_stage is
+    the newest well-formed row by definition.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: tasks are newest-first and capped at five
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_model_digest.py::test_ac_005_newest_first_capped
+  executable_predicate: '[t["slug"] for t in digest_with_tasks(7)["tasks"]] == ["t7",
+    "t6", "t5", "t4", "t3"] and digest_with_tasks(7)["more"] == 2'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Five, the remainder count and newest-first ordering are fixed in
+    SPEC S4.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: digest reads the base ledger from any root
+  type: property
+  test_ids:
+  - tests/unit/test_world_model_digest.py::test_ac006_root_resolves_to_base
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the digest run at the base root; equality across
+    roots holds regardless of implementation.
+  oracle_independence_waiver: null
+  input_domain: a git repo with one task worktree, a base subdirectory, and a span
+    ledger at the base
+  transformation: run the digest with --root set to base, base/sub, and the task worktree
+  expected_relation: the three outputs are equal and the task's last_stage is not
+    null
+  preconditions:
+  - git available
+  observable_output: JSON
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: router briefs from a single digest with a fallback
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_world_model_followups.py::test_ac_007_router_single_digest
+  executable_predicate: briefing_commands(render_router(codex=False)) == ["!digest",
+    "fallback:digest"] and briefing_commands(render_router(codex=True)) == ["bash:digest"]
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The single-injection-plus-fallback shape was fixed in SPEC S6 (Round
+    2/4).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: router resume acts on the digest fields
+  type: parametric
+  test_ids:
+  - tests/render/test_render_world_model_followups.py::test_ac008_router_resume_fields
+  executable_predicate: null
+  golden_table:
+  - input:
+      field: next_stage
+    expected:
+      phrase: next_stage
+    edge: false
+    note: ''
+  - input:
+      field: other_session
+    expected:
+      phrase: other_session
+    edge: false
+    note: ''
+  - input:
+      field: wrapup
+    expected:
+      phrase: ready to land
+    edge: false
+    note: ''
+  - input:
+      field: cap
+    expected:
+      phrase: at most 8 lines
+    edge: false
+    note: ''
+  - input:
+      field: never_read
+    expected:
+      phrase: Never Read
+    edge: false
+    note: ''
+  - input:
+      field: what_next
+    expected:
+      phrase: Start no stage
+    edge: false
+    note: ''
+  - input:
+      field: record_first
+    expected:
+      phrase: record first
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Required phrases come from SPEC S6's Resume clause and the carried
+    REVIEW findings 0248ff45/a62626dd, not from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: digest intent items match hm intent status
+  type: property
+  test_ids:
+  - tests/unit/test_world_model_digest.py::test_ac009_intents_match_status
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the shipped hm intent status --json; the digest
+    must agree on the actionable keys.
+  oracle_independence_waiver: null
+  input_domain: fixture intent states with conflicts / fired revisits / revalidation
+    / stale evidence
+  transformation: run digest and intent status on the same project
+  expected_relation: digest intents counts == counts of those keys in intent status,
+    and listed items[:3] are a subset of status items
+  preconditions:
+  - .claude/intent.yaml present
+  observable_output: JSON
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: interactive name and handle errors follow locale
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_world_model_followups.py::test_ac_010_interactive_messages_follow_locale
+  executable_predicate: ko_prompts(["", "x" * 41, "Atlas"]) != en_prompts(["", "x"
+    * 41, "Atlas"]) and i18n.t("world_model_handle_collision", "ko", handle="intent-layer")
+    in ko_prompts(["비비", "intent-layer", "bibi"])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Independence: the ko and en catalog strings must differ, so an
+    en fallback cannot satisfy it; both rejection kinds are exercised.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: modular add of the world-model skill is refused
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_world_model_followups.py::test_ac_011_modular_add_refused
+  executable_predicate: (r := run_make_add("skill:world-model")).exit_code != 0 and
+    "/hm:configure" in r.output and not (r.root / ".claude/skills/world-model").exists()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: SPEC-world-model-name ADR-004 keeps the router out of skills.enabled;
+    S9 fixes the three observables.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: accepted names round-trip and noncharacters are rejected
+  type: property
+  test_ids:
+  - tests/render/test_render_world_model_followups.py::test_ac012_names_round_trip
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Round-trip identity through YAML is implementation-independent;
+    the noncharacter rule comes from the YAML reader's printable set.
+  oracle_independence_waiver: null
+  input_domain: names accepted by name_error incl. emoji and astral chars; plus names
+    containing U+FFFE/U+FFFF
+  transformation: render the harness, load harness.yaml and the router frontmatter
+  expected_relation: accepted -> loaded name == input name in both files; noncharacter
+    -> name_error is not None
+  preconditions: []
+  observable_output: parsed YAML
+  generator_hint: st.text blacklisting only Cc/Cs/Zl/Zp
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-013
+  title: pointer stays within 200 characters with full tokens
+  type: parametric
+  test_ids:
+  - tests/render/test_render_world_model_followups.py::test_ac013_pointer_cap_full_tokens
+  executable_predicate: null
+  golden_table:
+  - input:
+      name: NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+      handle: hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+      locale: en
+    expected:
+      max_chars: 200
+      contains_full_tokens: true
+    edge: false
+    note: ''
+  - input:
+      name: 가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가
+      handle: hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+      locale: ko
+    expected:
+      max_chars: 200
+      contains_full_tokens: true
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The 200-char cap is the SPEC-world-model-name constraint; max lengths
+    come from NAME_MAX/HANDLE_MAX; the full-token rule comes from its S6.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-014
+  title: router body carries the display name and the Codex token
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_world_model_followups.py::test_ac_014_router_body_name
+  executable_predicate: '"# Atlas" in render_router(name="Atlas", codex=False) and
+    "Atlas —" in render_router(name="Atlas", codex=False) and "$atlas" in render_router(name="Atlas",
+    codex=True)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Name and token are the user's chosen values fixed in the test,
+    not derived from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-015
+  title: help lists the router under its handle
+  type: parametric
+  test_ids:
+  - tests/render/test_render_world_model_followups.py::test_ac015_help_lists_router
+  executable_predicate: null
+  golden_table:
+  - input:
+      handle: atlas
+      runtime: claude
+    expected:
+      token: /atlas
+    edge: false
+    note: ''
+  - input:
+      handle: atlas
+      runtime: codex
+    expected:
+      token: $atlas
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The handle is the user's value; help must name it per runtime.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: 'hm world_model digest: flags --root/--session-id, exit-0 contract, JSON
+    keys tasks[].{slug,next_stage,last_stage,last_seen,other_session}, more, autopilot,
+    intents, recent, unavailable; next_stage values = the six pipeline stages; lives
+    under world_model, not hm world'
+  category: public API/CLI contract
+  rationale: Rendered router skills and user scripts depend on the command, flags
+    and keys
+  source: spec
+approval:
+  kind: human
+  content_hash: 84d1e8433bc698af2ebea1373e0310bd0214ead814e391d78b3a390a1e32e993
+  approved_by: Ecro
+  approved_at: '2026-10-02T03:59:23Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 0d954059969e5b0a22a60e6984c491a2c5f7a620b24f077549c7fbb0f6592f0a
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: ecf931827adf506d07d5bdc05712f5255306040a2c44389af2e851bafc214af6
+    paths_to_mutate: 5efa2a6737e018fb92a708fceabfc965b73b8209a1ba16086a678eb5d89ca72a
+    irreversible_decisions: aa1711bb96855c6e7b60ecefeb21afbd0edb2cd836f1d5b12d28eb5fe4fa4ac0
+    AC-001: 0ec9a49190bffaaa04f845c873ab01fdc2d8f96b794e96892221df77cab66c40
+    AC-002: f852268269c9ca043afea8248739364d47d7e05294afce9ecb45d0b4bd1278d1
+    AC-003: dece1eddefc74ac59246ea0b33caa68e1eea222cf9e610ca1f5a532b3005bebc
+    AC-004: a86f4b1a686d5e74f7ce40e7053537e5eeac5cd7d9177ed1f637407be55a5cd4
+    AC-005: b8c6eda9be7a4249019632b91e0ad4e882274fdd7e051db40ebbf7000b7d6f93
+    AC-006: f836cd9a6497b5dd72550609c3aac36599cca424335e520fed6cb29e128ae997
+    AC-007: 099a2cc32827146e16b891b88ad5cb3c2cb9d3f45a8b6984bf3f59294a52b9c7
+    AC-008: b9a4aaa7582640a8f9d81a3ba9c976097d5173d4730f12fa0fb1ab76ebf8165f
+    AC-009: 8e4ae0c0093b705f255032b8a3c08376bb05f495203f7dc8048c208a5bccb21a
+    AC-010: 27411167d508489d1bd980f84d1ea6c139db63d47cb1f109dd9da4d118e28ec5
+    AC-011: 3299e237ae87e3d8f484984c18a5c6bf8d84cbc5165328ab5805d038e3d20689
+    AC-012: ff14d1f519ea1a8910e89b627437e2f937a04b27d4ffcb88f9e9ba69f18de202
+    AC-013: e66508ad719db06bd05e8afa67ddc06219dd766d023e98d6553983332a8ab634
+    AC-014: 219e8d31a4591ed57204447c20169db68fa3d20e52a500e34389ba9df9868648
+    AC-015: fb3b02d7bcb7d9e94df805363a0cad37273203f480624d25ffcede3fdb1caceb
+    ac_order: 7392c165d8d75b7c3ba689d1d7c0c5d8a0996aa4834be24b1296ed805361b439

@@ -438,12 +438,12 @@ the Proceed confirm, so they are NOT `!`-autorun lines:**
 
 ```bash
 # Preview (claude-code / cursor):
-uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --dry-run
+uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --dry-run ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # Apply — only after the user confirms Proceed (claude-code / cursor):
-uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)"
+uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
-harness-maker make "$(pwd)" --dry-run
-harness-maker make "$(pwd)"
+harness-maker make "$(pwd)" --dry-run ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
+harness-maker make "$(pwd)" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 CLI prints `reusing settings from .claude/harness.yaml` and applies new
@@ -454,9 +454,9 @@ run the **git disposition** step (section 6.5).
 
 ```bash
 # claude-code / cursor:
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --preset Production
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --preset Production ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)" --preset Production
+!harness-maker make "$(pwd)" --preset Production ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 (or `--preset Side` for the reverse). Other dimensions stay as before.
@@ -478,18 +478,18 @@ enables broader review and stricter gates; Side is lighter.
 
 ```bash
 # claude-code / cursor:
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --strictness block
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --strictness block ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)" --strictness block
+!harness-maker make "$(pwd)" --strictness block ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 #### Switch runtime targets
 
 ```bash
 # claude-code / cursor:
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --targets claude-code,cursor,codex
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --targets claude-code,cursor,codex ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)" --targets claude-code,cursor,codex
+!harness-maker make "$(pwd)" --targets claude-code,cursor,codex ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 (or `--targets cursor` for Cursor-only, `--targets codex` for Codex-only,
@@ -503,13 +503,13 @@ manually if you want a clean slate.
 
 ```bash
 # claude-code / cursor:
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add reviewer:security
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --remove skill:research-crawler
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add-domain tauri
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add reviewer:security ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --remove skill:research-crawler ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add-domain tauri ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)" --add reviewer:security
-!harness-maker make "$(pwd)" --remove skill:research-crawler
-!harness-maker make "$(pwd)" --add-domain tauri
+!harness-maker make "$(pwd)" --add reviewer:security ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
+!harness-maker make "$(pwd)" --remove skill:research-crawler ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
+!harness-maker make "$(pwd)" --add-domain tauri ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 Available reviewers: `code`, `security`, `performance`, `concurrency`, `ux`,
@@ -525,9 +525,9 @@ value shown from harness.yaml), then dispatch:
 ```bash
 # claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
-  --ref-folders "$REF_FOLDERS"
+  --ref-folders "$REF_FOLDERS" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)" --ref-folders "$REF_FOLDERS"
+!harness-maker make "$(pwd)" --ref-folders "$REF_FOLDERS" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 `$REF_FOLDERS` uses `::` between entries and `;` between path and glob within
@@ -541,9 +541,9 @@ value shown from harness.yaml), then dispatch:
 ```bash
 # claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
-  --sibling-repos "$SIBLING_REPOS"
+  --sibling-repos "$SIBLING_REPOS" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)" --sibling-repos "$SIBLING_REPOS"
+!harness-maker make "$(pwd)" --sibling-repos "$SIBLING_REPOS" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 `$SIBLING_REPOS` is semicolon-separated relative paths (e.g. `../backend;../mobile`).
@@ -658,10 +658,10 @@ setup, then ask:
 ```bash
 # claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
-  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" \
-  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
 Pass empty string `""` for `--second-brain-vault-path` to disable. Omit

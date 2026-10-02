@@ -683,7 +683,10 @@ def _normalize_expected_path(fe_path: Path) -> str:
 
 
 def _remove_emptied_skill_dir(deleted: Path) -> None:
-    """A renamed world-model router leaves `skills/<old>/` empty; remove only that shape.
+    """Remove a `skills/<name>/` directory the sweep just emptied — for ANY swept skill.
+
+    The motivating case is a renamed world-model router leaving `skills/<old>/` behind, but the
+    rule applies to every orphaned `skills/<name>/SKILL.md` (REVIEW a9402944).
 
     Restricted to a direct `skills/<name>/` parent so the sweep never removes a directory a
     user or another tool may still be filling (SPEC-world-model-name ADR-007).

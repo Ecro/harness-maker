@@ -1,7 +1,8 @@
 {#- Always-loaded pointer to the named world model (SPEC-world-model-name AC-007, ADR-005).
 
     Its own section so the project-knowledge AC-005 cap stays untouched; this one is capped at
-    200 characters per variant. Codex invokes skills as `$<handle>`. Cursor's slash listing of
+    200 characters per variant — at NAME_MAX 40 / HANDLE_MAX 64 too, with the full name and
+    token (SPEC-world-model-followups AC-013), which is why each arm is terse. Codex invokes skills as `$<handle>`. Cursor's slash listing of
     project skills is unverified, so its arm names the Claude Code form and the spoken name
     (`world_model_cursor` is set by harness.mdc.j2 before the include). -#}
 {#- Callers that render with a partial config (tests, direct AGENTS.md renders) get the default. -#}
@@ -9,11 +10,11 @@
 ## World model
 
 {% if is_codex is defined and is_codex -%}
-Address **{{ wm.name }}** or mention `${{ wm.handle }}` for a briefing, to start or resume work, record a project fact, or work on goals.
+**{{ wm.name }}** (`${{ wm.handle }}`): briefing, start or resume work, project facts, goals.
 {%- elif world_model_cursor is defined and world_model_cursor -%}
-Address **{{ wm.name }}** by name (`/{{ wm.handle }}` in Claude Code) for a briefing, to start or resume work, record a fact, or work on goals.
+**{{ wm.name }}** — by name, or `/{{ wm.handle }}` in Claude Code: briefing, start/resume, facts, goals.
 {%- elif (config.locale | default('en')) == 'ko' -%}
-**{{ wm.name }}** 를 부르거나 `/{{ wm.handle }}` 를 입력하면 브리핑, 작업 시작·재개, 프로젝트 사실 기록, 목표·지표 작업으로 연결됩니다.
+**{{ wm.name }}** (`/{{ wm.handle }}`): 브리핑, 작업 시작·재개, 프로젝트 사실 기록, 목표·지표.
 {%- else -%}
-Address **{{ wm.name }}** or type `/{{ wm.handle }}` for a briefing, to start or resume work, record a project fact, or work on goals.
+**{{ wm.name }}** (`/{{ wm.handle }}`): briefing, start or resume work, project facts, goals.
 {%- endif %}

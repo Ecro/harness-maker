@@ -1,12 +1,14 @@
 {#- SPEC-world-model-name: the named front door. Rendered at skills/<handle>/ from this one
     template; it routes to existing surfaces and never re-implements their gates (ADR-008). -#}
+{#- The description is YAML double-quoted by hand, not `tojson`: tojson escapes astral
+    characters as surrogate pairs that YAML decodes into lone surrogates (REVIEW 8a53a1be). -#}
 {#- Callers that render with a partial config (tests, direct AGENTS.md renders) get the default. -#}
 {%- set wm = config.world_model if (config is defined and config.world_model is defined and config.world_model) else {"name": "Maker", "handle": "maker"} -%}
 {%- set inv = ("$" if is_codex else "/") ~ wm.handle -%}
 {%- macro stage(s) -%}{% if is_codex %}`$hm-{{ s }}`{% else %}`/hm:{{ s }}`{% endif %}{%- endmacro -%}
 ---
 name: {{ name }}
-description: {{ (wm.name ~ " (" ~ inv ~ ") is this project's development front door: briefing, start or resume work, remember a project fact, goals and metrics. Use only when the operator addresses " ~ wm.name ~ " by name or types " ~ inv ~ "; do not trigger on the bare verbs make, build or fix.") | tojson }}
+description: "{{ (wm.name ~ " (" ~ inv ~ ") is this project's development front door: briefing, start or resume work, remember a project fact, goals and metrics. Use only when the operator addresses " ~ wm.name ~ " by name or types " ~ inv ~ "; do not trigger on the bare verbs make, build or fix.") | replace('\\', '\\\\') | replace('"', '\\"') }}"
 ---
 
 # {{ wm.name }}
@@ -35,28 +37,27 @@ Anything else: answer from the briefing data, or say which {% if is_codex %}`$hm
 
 ## Briefing — read-only
 
-Run these, skip any that fails, and write nothing. Every command is capped on purpose — the
-full intent status is ~17 KB and the span log grows without bound:
+{% if is_codex -%}
+Run this once — it is the whole briefing (read-only JSON, at most 1.5 KB, never fails):
 
 ```bash
-git worktree list --porcelain | grep '^branch refs/heads/hm/'
-git log -3 --format='%h %s'
-uv run --with {{ harness_maker_src_path }} hm autopilot status --root . --session-id "$HM_SESSION_ID"
-uv run --with {{ harness_maker_src_path }} hm intent status --json | uv run --with {{ harness_maker_src_path }} python -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps({k: d.get(k) for k in ("state","conflicts","fired_revisits","needs_revalidation","stale_evidence","withdrawal","active")}, separators=(",",":")))'
+uv run --with {{ harness_maker_src_path }} hm world_model digest --root . --session-id "$HM_SESSION_ID"
 ```
+{%- else -%}
+!`uv run --with {{ harness_maker_src_path }} hm world_model digest --root . --session-id "$HM_SESSION_ID"`
 
-Then, per task slug (at most 5; say "+N more" beyond that), its newest span. The ledger lives
-at the BASE root, never in a task worktree, so resolve it from git rather than from cwd:
+No JSON above (the injection did not run in this host)? Run `uv run --with {{ harness_maker_src_path }} hm world_model digest --root . --session-id "$HM_SESSION_ID"` once — it is the whole briefing.
+{%- endif %}
 
-```bash
-grep '"task_slug": "<slug>"' "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.claude/observability/stage-spans.jsonl" | tail -n 1
-```
+The digest is computed from the task's artifacts, not from chat memory:
 
-- **Tasks**: slug, last stage, and whether it ended (`"event": "end"`) or was interrupted
-  (`"start"` with no end). No span file or no row → "stage unknown".
-- **Autopilot**: armed or not, and its pipeline.
-- **Intents**: conflicts, fired revisits, items needing revalidation — only what needs a decision.
-- **Recent**: the last landed commits, for "what changed".
+- **tasks** (newest first, at most 5; `more` counts the rest): `next_stage` comes from the
+  task's artifacts (approved SPEC → REVIEW → APPROVED REVIEW → verify marker), so it is right on
+  every runtime; `last_stage` / `last_seen` are what was touched last; `other_session: true`
+  means another session touched it last.
+- **autopilot**, **intents** (only what needs a decision), **recent** commits.
+- Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`); with worktrees off,
+  say so and use the PLAN/SPEC files in `work-docs/` and `specs/` instead.
 
 Reply in at most 8 lines: changed or blocking items first. Never write a file, a marker or an
 intent here. Never Read `wiki.md`, `failures.md`, the span log or the full intent status —
@@ -64,11 +65,11 @@ grep them with `| head -50` when a question needs them.
 
 ## Resume
 
-1. Collect active tasks as in the briefing.
+1. Take the tasks from the digest.
 2. None → say so and offer **Start**.
-3. Exactly one → pick its stage from its newest span: **interrupted** → re-enter that same
-   stage; **ended** → the next stage in `research → spec → execute → review → verify → wrapup`;
-   wrapup ended → the task is done, say so. Enter it with its slug ({{ stage("<stage>") }} `<slug>`).
-4. Two or more → ask ONE closed question listing each slug with its last stage; then resume the chosen one.
+3. Exactly one → enter its `next_stage` with its slug ({{ stage("<stage>") }} `<slug>`). When
+   `other_session` is true, ask once first — another session may still be in that stage.
+   `next_stage: wrapup` → the task is ready to land: say so and let the operator run wrapup.
+4. Two or more → ask ONE closed question listing each slug with its `next_stage`; then resume the chosen one.
 
 Entering a stage hands control to that stage; its own gates and STOP rules decide what happens next.

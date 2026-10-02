@@ -145,8 +145,20 @@ def _available(prefix: str, suffix: str) -> list[str]:
     return sorted(
         t.removeprefix(prefix).removesuffix(suffix)
         for t in env.list_templates()
-        if t.startswith(prefix) and t.endswith(suffix)
+        if t.startswith(prefix) and t.endswith(suffix) and t != "skills/world-model/SKILL.md.j2"
     )
+
+
+def _refuse_world_model_router(name: str, config: dict[str, Any]) -> None:
+    """The router renders at the user-named `skills/<handle>/`, outside `skills.enabled`
+    (SPEC-world-model-name ADR-004); adding or removing it here would fork or delete it."""
+    wm = config.get("world_model") if isinstance(config, dict) else None
+    handle = wm.get("handle") if isinstance(wm, dict) else None
+    if name == "world-model" or name == (handle if isinstance(handle, str) else "maker"):
+        raise ModularEditError(
+            f"skill {name!r} is the world-model router, not a modular skill — "
+            "rename or change it with /hm:configure"
+        )
 
 
 def add(component: str, target_dir: Path) -> Path:
@@ -158,6 +170,8 @@ def add(component: str, target_dir: Path) -> Path:
     """
     kind, name = _parse_component(component)
     fm, config = _read_harness_yaml(target_dir)
+    if kind == "skill":
+        _refuse_world_model_router(name, config)
 
     if kind == "reviewer":
         # Activate `<name>-reviewer` in reviewers.enabled (idempotent). The
@@ -212,6 +226,8 @@ def remove(component: str, target_dir: Path) -> Path:
     """
     kind, name = _parse_component(component)
     fm, config = _read_harness_yaml(target_dir)
+    if kind == "skill":
+        _refuse_world_model_router(name, config)
 
     if kind == "reviewer":
         reviewer_full = f"{name}-reviewer" if not name.endswith("-reviewer") else name

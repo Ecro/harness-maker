@@ -277,7 +277,8 @@ def test_router_routes_resolve_to_rendered_surfaces(tmp_path: Path) -> None:
     assert {"hm-research", "hm-spec"} <= codex_skills
     for s in codex_skills:
         assert (repo / f".agents/skills/{s}/SKILL.md").is_file(), f"${s} not rendered"
-    assert "hm intent status --json" in claude
+    # SPEC-world-model-followups S6: the briefing is the digest, not the composed commands
+    assert "hm world_model digest" in claude
 
 
 def test_router_description_requires_the_name(tmp_path: Path) -> None:
@@ -315,8 +316,11 @@ def test_ac009_make_md_ci_parses_world_model_params() -> None:
 
 def test_ac009_every_dispatch_forwards_world_model_flags() -> None:
     blocks = re.findall(r"```bash\n(.*?)```", _make_md(), flags=re.S)
-    dispatch = [b for b in blocks if "--locale" in b]
-    assert dispatch, "no dispatch block found"
+    # Selected by the CLI invocation itself, not by a co-occurring flag (REVIEW 3749a9d7).
+    dispatch = [
+        b for b in blocks if re.search(r'(harness_maker\.cli|harness-maker) make "\$\(pwd\)"', b)
+    ]
+    assert len(dispatch) >= 6, f"expected every make dispatch block, found {len(dispatch)}"
     for b in dispatch:
         assert "--world-model-name" in b, b[:200]
         assert "--world-model-handle" in b, b[:200]
@@ -357,40 +361,3 @@ def test_handle_taken_by_user_skill_is_named(tmp_path: Path) -> None:
     assert "NOT installed at /deploy" in res.output
     # a generated router at the handle path is ours, not a collision
     assert "NOT installed" not in _cli(repo, "--update", "--world-model-handle", "maker").output
-
-
-def test_span_lookup_reads_the_base_ledger_from_inside_a_worktree(tmp_path: Path) -> None:
-    """REVIEW 6d3f14ad: stage spans are written at the BASE root (`stage_spans`), so the
-    router's lookup must find the same row whether it runs in the base or a task worktree."""
-    import subprocess
-
-    rendered = _bootstrap(tmp_path / "render")
-    skill = (rendered / ".claude/skills/maker/SKILL.md").read_text(encoding="utf-8")
-    line = next(ln for ln in skill.splitlines() if "stage-spans.jsonl" in ln and "grep" in ln)
-    cmd = line.replace("<slug>", "demo")
-
-    base = tmp_path / "base"
-    base.mkdir()
-
-    def git(*args: str, cwd: Path = base) -> None:
-        subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, timeout=30)
-
-    git("init", "-q")
-    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "i")
-    ledger = base / ".claude/observability/stage-spans.jsonl"
-    ledger.parent.mkdir(parents=True)
-    ledger.write_text(
-        '{"event": "start", "stage": "hm:execute", "task_slug": "demo"}\n'
-        '{"event": "end", "stage": "hm:execute", "task_slug": "demo"}\n',
-        encoding="utf-8",
-    )
-    git("worktree", "add", "-q", "-b", "hm/demo", str(base / ".worktrees/demo"))
-
-    outputs = {}
-    for where in (base, base / ".worktrees/demo"):
-        proc = subprocess.run(
-            ["bash", "-c", cmd], cwd=where, capture_output=True, text=True, timeout=30, check=False
-        )
-        outputs[where.name] = proc.stdout.strip()
-    assert outputs["base"] == '{"event": "end", "stage": "hm:execute", "task_slug": "demo"}'
-    assert outputs["demo"] == outputs["base"], outputs
