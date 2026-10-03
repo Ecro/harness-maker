@@ -47,6 +47,9 @@ Re-captures (append; never silently overwrite):
   (`mark-pass` kept only in the degraded block). Verified before re-capture that these three are
   the ONLY moved commands in every arm and that no command was added or removed.
 
+- **2026-10-03, release 0.62.0** — 52 commands across four arms moved only in their rendered
+  version: substituting `0.61.0` for `0.62.0` reproduced every prior hash before the golden was
+  updated. No command content changed.
 - **2026-10-02, release 0.61.0** — 52 commands across four arms moved only in their rendered
   version: substituting `0.60.7` for `0.61.0` reproduced every prior hash before the golden was
   updated. No command content changed.

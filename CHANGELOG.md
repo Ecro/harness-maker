@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.62.0] - 2026-10-03
+
 ### Changed
 
 - **Maker is the single front door.** The `intent-layer`, `project-knowledge` and `world-model`
