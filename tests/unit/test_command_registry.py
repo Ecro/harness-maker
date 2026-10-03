@@ -42,7 +42,7 @@ def test_autopilot_guarded_by_subcommands_not_shape() -> None:
     # subcommands are guarded regardless of parser shape. `status` joined in
     # PLAN-autopilot-advance-noop ADR-002 — it MUST be registered or misroute_guard
     # rejects it before argparse ever sees it.
-    assert cr.MODULES["autopilot"].subcommands == frozenset({"on", "off", "status"})
+    assert cr.MODULES["autopilot"].subcommands == frozenset({"on", "off", "status", "narrow"})
     assert cr.MODULES["autopilot"].guarded is True
 
 

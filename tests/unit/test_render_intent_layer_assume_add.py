@@ -105,4 +105,6 @@ def test_ac_011_skill_lists_add_and_locator(target: Target, path: str) -> None:
     skill = _render(target)[path]
     assert SKILL_ADD_FORM in skill
     assert SKILL_OBSERVE_FORM in skill
-    assert skill.count("\n") <= 120
+    # 120 → 121: SPEC-maker-front-door-improvements IRR-001 adds one frontmatter line
+    # (`disable-model-invocation: true`) on the Claude copy; the body is unchanged.
+    assert skill.count("\n") <= 121

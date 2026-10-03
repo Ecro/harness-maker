@@ -27,6 +27,12 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-03, `maker-front-door-improvements`** — `execute`, `help`, `research`, `review`,
+  `spec`, `verify` and `wrapup` moved, in all four arms: the six stage descriptions became
+  entrance-gated (`Only when typed, or via <Name>, autopilot or /hm:loop.`, AC-003), help's
+  intent-layer / project-knowledge rows say `typed only` (AC-004), and execute's retrieval note
+  describes the lexical-first floor (IRR-006). Verified before re-capture that these seven are
+  the ONLY moved commands in every arm and that no command was added or removed.
 - **2026-10-02, `world-model-followups`** — only `help` moved, in all four arms: its settings
   table gained the world-model router row (`/<handle>`, `$<handle>` on Codex). Verified before
   re-capture that `help` is the ONLY moved command in every arm and none was added or removed.

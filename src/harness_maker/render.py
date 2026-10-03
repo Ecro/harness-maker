@@ -805,9 +805,12 @@ def _render_pure_text(
 
 def _is_pure_text(fe: FileEntry) -> bool:
     """Files rendered without a YAML provenance prefix (interpreter would
-    choke on it). Currently shell wrappers under ``.claude/lib/``.
+    choke on it): shell wrappers under ``.claude/lib/``, and Codex's
+    ``.agents/skills/<n>/agents/openai.yaml`` — a preamble would make it a
+    multi-document YAML (PLAN-maker-front-door-improvements ADR-005).
     """
-    return str(fe.path).endswith(".sh")
+    p = fe.path
+    return str(p).endswith(".sh") or (p.name == "openai.yaml" and p.parent.name == "agents")
 
 
 def _render_pure_json(

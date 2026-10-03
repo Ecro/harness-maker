@@ -1,0 +1,5 @@
+{#- SPEC-maker-front-door-improvements AC-002 / PLAN ADR-005: Codex reads agents/openai.yaml beside
+    a skill; implicit invocation off keeps the skill typed-only (`$<name>`). Rendered as pure text —
+    a provenance preamble would make this a multi-document YAML. -#}
+policy:
+  allow_implicit_invocation: false

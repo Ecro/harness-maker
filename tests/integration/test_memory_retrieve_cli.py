@@ -150,7 +150,8 @@ def test_cli_byte_cap_enforced(tmp_path: Path) -> None:
     # 10KB cap; allow small overhead for fence + instruction line.
     # This fixture is wiki-tier with no `count:`, so the count floor's source set is empty
     # and the bound still describes the whole output. A floor-bearing corpus is covered by
-    # test_cli_count_floor_adds_its_own_budget below — do NOT loosen this one to make room.
+    # test_cli_one_cap_no_floor_when_hits_reach_k and test_cli_floor_fires_below_k_only_when_on
+    # below — do NOT loosen this one to make room.
     assert len(result.stdout.encode("utf-8")) <= 11 * 1024
 
 
@@ -182,21 +183,65 @@ def _floor_bearing_memdir(tmp_path: Path) -> Path:
     return memdir
 
 
-def test_cli_count_floor_adds_its_own_budget(tmp_path: Path) -> None:
-    """ADR-001: the floor is additive — its bytes come on top of `byte_cap`, not out of it."""
+def test_cli_one_cap_no_floor_when_hits_reach_k(tmp_path: Path) -> None:
+    """PLAN-maker-front-door-improvements ADR-004 / SPEC IRR-006 supersedes ADR-001's additive
+    floor: one 8,192-byte cap, and the floor only fills slots lexical hits leave.
+
+    Node history: was `test_cli_count_floor_adds_its_own_budget` — renamed in review round 2
+    (REVIEW f27254a5) because that name now contradicts the body."""
     memdir = _floor_bearing_memdir(tmp_path)
     off = _run_cli("--topic", "boundary parse", "--memory-dir", str(memdir), "--no-count-floor")
     on = _run_cli("--topic", "boundary parse", "--memory-dir", str(memdir))
     assert off.returncode == 0, off.stderr
     assert on.returncode == 0, on.stderr
-
     assert "recurring-00" not in off.stdout, "floor-off must not admit a zero-overlap entry"
-    assert "recurring-00" in on.stdout, "the highest-count entry was not admitted"
-    assert "high-recurrence" in on.stdout
+    assert len(on.stdout.encode("utf-8")) <= 8192
+    # The corpus has 20 eligible lexical hits (>= k), so the floor gets no slot even though the
+    # cap shows only a few of them — a cap-dropped hit is never replaced by a floor entry.
+    assert "high-recurrence" not in on.stdout, "floor admitted although eligible hits >= k"
+    assert "hit-00" in on.stdout
 
-    # Additive, and bounded by the floor's own budget — not by the lexical cap.
-    grew = len(on.stdout.encode("utf-8")) - len(off.stdout.encode("utf-8"))
-    assert 0 < grew <= 3 * (1000 + 256)
+
+def test_cli_floor_fires_below_k_only_when_on(tmp_path: Path) -> None:
+    """REVIEW f27254a5: the CLI wiring of the floor, exercised where it actually fires.
+
+    Two lexical hits (< k) leave free slots: with the floor on, the highest-count zero-overlap
+    failures fill them under the `high-recurrence` label; `--no-count-floor` admits none."""
+    memdir = tmp_path / "memory"
+    memdir.mkdir()
+    (memdir / "wiki.md").write_text(
+        "# Wiki\n\n---\n\n<!-- @hm:user:entries -->\n"
+        "## [wiki:pattern] hit-a | 2026-05-19\nboundary parse notes.\n\n"
+        "## [wiki:pattern] hit-b | 2026-05-18\nboundary parse more notes.\n\n"
+        "<!-- @hm:/user:entries -->\n",
+        encoding="utf-8",
+    )
+    (memdir / "failures.md").write_text(
+        "# Failures\n\n---\n\n<!-- @hm:user:entries -->\n"
+        + "".join(
+            f"## [fail:test] recurring-{i:02d} | 2026-06-0{i + 1} | count:{12 - i}\n"
+            f"- [2026-06-0{i + 1}] unrelated vocabulary entirely\n\n"
+            for i in range(4)
+        )
+        + "<!-- @hm:/user:entries -->\n",
+        encoding="utf-8",
+    )
+    args = ("--topic", "boundary parse", "--k", "6", "--memory-dir", str(memdir))
+    on = _run_cli(*args)
+    off = _run_cli(*args, "--no-count-floor")
+    assert on.returncode == 0, on.stderr
+    assert off.returncode == 0, off.stderr
+    for out in (on.stdout, off.stdout):
+        assert "hit-a" in out
+        assert "hit-b" in out
+        assert len(out.encode("utf-8")) <= 8192
+    # Floor cap 3 < k - hits (4): the three highest counts, never the fourth.
+    for i in range(3):
+        assert f"recurring-{i:02d}" in on.stdout, on.stdout
+    assert "recurring-03" not in on.stdout
+    assert "high-recurrence" in on.stdout
+    assert "recurring-" not in off.stdout
+    assert "high-recurrence" not in off.stdout
 
 
 def test_cli_no_count_floor_flag_is_equivalent_to_count_floor_zero(tmp_path: Path) -> None:
@@ -217,8 +262,10 @@ def test_cli_no_count_floor_flag_is_equivalent_to_count_floor_zero(tmp_path: Pat
 
 @pytest.mark.parametrize("value", ["0", "-5"])
 def test_cli_rejects_a_non_positive_floor_entry_budget(tmp_path: Path, value: str) -> None:
-    """Review 60a1e752: a zero budget used to render the whole body (`[-0:]`)."""
+    """Review 60a1e752 guarded a zero per-entry floor budget. PLAN-maker-front-door-improvements
+    ADR-004 / SPEC IRR-006 removed the separate floor budgets (one cap now), so the flag itself
+    is rejected rather than silently accepted and ignored."""
     memdir = _floor_bearing_memdir(tmp_path)
     r = _run_cli("--topic", "x", "--memory-dir", str(memdir), "--floor-entry-bytes", value)
     assert r.returncode == 2, r.stderr
-    assert "positive integer" in r.stderr
+    assert "unrecognized arguments" in r.stderr

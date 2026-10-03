@@ -137,6 +137,11 @@ class AutopilotMarker(BaseModel):
     # takeover; it gives `status` a factual "last active N minutes ago" for the picker to
     # put to the user, who is the only party that knows whether another session is open.
     last_seen: str | None = None
+    # PLAN-maker-front-door-improvements ADR-001: the armed pipeline saved by `narrow`, so a
+    # second narrow recomputes from it (never widens past what was armed) and the boundary at
+    # the narrowed end restores it instead of clearing (ADR-002). None = not narrowed — the
+    # absent-case default that keeps a pre-upgrade marker valid under `extra="forbid"`.
+    restore_pipeline: list[AtomicStage] | None = None
 
     @field_validator("task_slug")
     @classmethod
@@ -737,6 +742,104 @@ def set_task_slug(
     return _write_if_unchanged(root, before=before, updated=updated, session_id=session_id)
 
 
+def narrow(project_root: Path, *, until: str, session_id: str | None) -> dict[str, Any]:
+    """Shrink this session's pipeline to end at ``until`` (PLAN ADR-001). Never raises.
+
+    Recomputes from ``restore_pipeline`` when already narrowed, so narrowing can only ever
+    select a prefix of what was ARMED — it can neither widen past it nor arm a session. At
+    ``gated`` nothing is written (ADR-001 amendment): every boundary halts at kill_switch,
+    so the restore branch could never fire and the write would only leave a latent
+    ``restore_pipeline`` behind.
+    """
+    root = resolve_marker_root(project_root)
+    _takeover_legacy(root, session_id=session_id)
+    try:
+        before: bytes | None = marker_path(root, session_id=session_id).read_bytes()
+    except OSError:
+        return {"narrowed": False, "reason": "no autopilot marker for this session"}
+    marker = active_marker(root, session_id=session_id)
+    if marker is None:
+        return {"narrowed": False, "reason": "autopilot marker foreign/stale/invalid"}
+    if marker.level == GATED_LEVEL:
+        return {
+            "narrowed": False,
+            "reason": "level gated never auto-advances — end point announced only",
+        }
+    base = list(marker.restore_pipeline or marker.pipeline)
+    names = [s.value for s in base]
+    narrowed_now = marker.restore_pipeline is not None
+    # Asking for the armed end — or for `wrapup` when the armed pipeline lacks it, which is how
+    # Maker's fixed `--until wrapup` reaches a custom pipeline — on a narrowed marker is
+    # the undo path (REVIEW aea107e8, confirm-2): a run that stopped before its narrowed boundary
+    # otherwise leaves the session narrowed. It restores the ARMED pipeline, never beyond it.
+    # Only the literal `wrapup` Maker sends counts as the absent-stage undo: a typo or an
+    # invented stage must not silently undo a deliberate narrowing (post-review focused pass).
+    restoring = narrowed_now and (names[-1] == until or (until == "wrapup" and until not in names))
+    if until not in names and not restoring:
+        return {
+            "narrowed": False,
+            "reason": f"stage {until!r} is not in the armed pipeline {names}",
+        }
+    if names[-1] == until and not restoring:
+        return {"narrowed": False, "reason": f"pipeline already ends at {until!r}"}
+    fields: dict[str, Any] = (
+        {"pipeline": base, "restore_pipeline": None}
+        if restoring
+        else {"pipeline": base[: names.index(until) + 1], "restore_pipeline": base}
+    )
+    try:
+        updated = AutopilotMarker.model_validate({**marker.model_dump(), **fields}, strict=False)
+    except ValidationError as exc:
+        return {"narrowed": False, "reason": f"narrowed marker failed validation ({exc})"}
+    if not _write_if_unchanged(root, before=before, updated=updated, session_id=session_id):
+        return {"narrowed": False, "reason": "marker changed during update — not written"}
+    if restoring:
+        return {"narrowed": False, "restored": True, "reason": "pipeline restored to the armed one"}
+    return {"narrowed": True, "reason": f"pipeline now ends at {until!r}", "until": until}
+
+
+def restore_narrowed(
+    project_root: Path, *, session_id: str | None, expected_pipeline: list[str]
+) -> str | None:
+    """Put a narrowed marker's armed pipeline back (PLAN ADR-002). None on success, else why not.
+
+    Called by the boundary at the narrowed end INSTEAD of `clear`: the session stays armed
+    with its original pipeline, so the next unnarrowed run resumes the full chain.
+    ``expected_pipeline`` is the narrowed pipeline the caller decided on: a fresh marker
+    with a different one means a concurrent narrow won, and restoring would erase it
+    (REVIEW 46a3fe23). One retry absorbs a heartbeat/slug write landing in between
+    (REVIEW f336c238). The returned cause keeps those outcomes distinct (REVIEW 7a51c2b1).
+    """
+    root = resolve_marker_root(project_root)
+    _takeover_legacy(root, session_id=session_id)
+    for _attempt in range(2):
+        try:
+            before: bytes | None = marker_path(root, session_id=session_id).read_bytes()
+        except OSError:
+            return "no_marker"
+        marker = active_marker(root, session_id=session_id)
+        if marker is None:
+            return "no_marker"
+        if marker.restore_pipeline is None:
+            return "not_narrowed"
+        if [s.value for s in marker.pipeline] != list(expected_pipeline):
+            return "superseded"
+        try:
+            updated = AutopilotMarker.model_validate(
+                {
+                    **marker.model_dump(),
+                    "pipeline": marker.restore_pipeline,
+                    "restore_pipeline": None,
+                },
+                strict=False,
+            )
+        except ValidationError:
+            return "invalid"
+        if _write_if_unchanged(root, before=before, updated=updated, session_id=session_id):
+            return None
+    return "raced"
+
+
 def active_marker(
     project_root: Path, *, now: datetime | None = None, session_id: str | None = None
 ) -> AutopilotMarker | None:
@@ -1051,7 +1154,9 @@ def main(argv: list[str] | None = None) -> int:
     if guard is not None:
         return guard
     parser = argparse.ArgumentParser(add_help=False, prog="python -m harness_maker.autopilot")
-    parser.add_argument("action", choices=["on", "off", "status"])
+    parser.add_argument("action", choices=["on", "off", "status", "narrow"])
+    # `narrow` only (PLAN ADR-001): the stage the narrowed pipeline ends at.
+    parser.add_argument("--until", default=None)
     parser.add_argument("--level", default="auto_safe")
     parser.add_argument("--pipeline", default=None)
     parser.add_argument("--root", default=None)
@@ -1067,6 +1172,16 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(args.root) if args.root else Path.cwd()
     if args.action == "status":
         print(json.dumps(status(root, session_id=args.session_id)))
+        return 0
+    if args.action == "narrow":
+        if not args.until:
+            # A no-op like every other refusal: Maker calls this unattended and must never
+            # see a non-zero exit for a request it can simply skip.
+            print(json.dumps({"narrowed": False, "reason": "narrow requires --until <stage>"}))
+            return 0
+        # Every no-op (no marker, foreign, gated, E absent, already ending at E) is exit 0
+        # with a reason: a front door that cannot narrow must still let the stage run.
+        print(json.dumps(narrow(root, until=args.until, session_id=args.session_id)))
         return 0
     if args.action == "off":
 

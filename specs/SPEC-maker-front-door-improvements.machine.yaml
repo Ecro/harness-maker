@@ -1,0 +1,693 @@
+schema_version: 3
+spec_slug: maker-front-door-improvements
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: 'Tier-2: new Python behaviour is digest classification/caps/telemetry
+  row, autopilot narrow/restore and retrieval selection; render prose is pinned by
+  render tests.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/world_model_digest.py
+- src/harness_maker/memory_retrieve.py
+- src/harness_maker/autopilot.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Intent and knowledge skills are not model-invocable
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac001_skills_not_model_invocable
+  executable_predicate: all(skill_frontmatter(t, n).get('disable-model-invocation')
+    is True for t in ('claude-code', 'cursor') for n in ('intent-layer', 'project-knowledge'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Claude Code skills docs define disable-model-invocation as blocking
+    model invocation while keeping /name typing; the required value is the DRI decision
+    Q6 (2026-10-03), not derived from code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Codex implicit invocation is off for the same skills
+  type: parametric
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac002_codex_implicit_invocation_off
+  executable_predicate: null
+  golden_table:
+  - input:
+      targets:
+      - codex
+      skill: intent-layer
+    expected:
+      exists: true
+      policy.allow_implicit_invocation: false
+    edge: false
+    note: ''
+  - input:
+      targets:
+      - codex
+      skill: project-knowledge
+    expected:
+      exists: true
+      policy.allow_implicit_invocation: false
+    edge: false
+    note: ''
+  - input:
+      targets:
+      - claude-code
+      skill: intent-layer
+    expected:
+      exists: false
+    edge: false
+    note: ''
+  - input:
+      targets: codex then re-render with claude-code only
+      skill: intent-layer
+    expected:
+      exists: false
+      swept: true
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Key path quoted from the Codex skills docs (learn.chatgpt.com/docs/build-skills,
+    fetched 2026-10-03): ''policy:\n  allow_implicit_invocation: false'' in agents/openai.yaml.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Stage descriptions are entrance-gated
+  type: property
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac003_stage_descriptions_gated
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Quantifies over the pre-existing AtomicStage enum (not created
+    by this SPEC) with a fixed clause and a fixed trigger-phrase deny list, so wording
+    changes cannot shrink coverage.
+  oracle_independence_waiver: null
+  input_domain: stages ('research', 'spec', 'execute', 'review', 'verify', 'wrapup')
+    x targets (claude-code, cursor, codex)
+  transformation: render the harness and parse each stage description
+  expected_relation: GATE_CLAUSE tokens ('typed', 'Maker', 'autopilot', '/hm:loop')
+    all present, no TRIGGER_PHRASES match, and 'disable-model-invocation' absent for
+    every stage
+  preconditions: []
+  observable_output: rendered frontmatter
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Always-loaded pointers and help route to Maker
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac004_pointers_route_to_maker
+  executable_predicate: maker_invocation(t) in render_project_knowledge_pointer(t)
+    and all('typed only' in help_row(n) for n in ('intent-layer', 'project-knowledge'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The routing target and the literal 'typed only' come from the DRI
+    decision Q6 (only Maker is an entrance), an input outside the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Maker reads intent and knowledge procedures on demand
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac005_maker_reads_procedures
+  executable_predicate: all(read_before_edit(render_maker(t), procedure_path(t, n))
+    and CONSENT_SENTENCE in render_maker(t) and BRIEFING_FIRST_SENTENCE in render_maker(t)
+    and len(render_maker(t)) <= 4500 for t in ('claude-code', 'cursor', 'codex') for
+    n in ('intent-layer', 'project-knowledge'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: On-demand procedure loading, consent retention and briefing-first
+    read-only answers are DRI decisions (2026-10-03); 4,500 chars is a SPEC constraint
+    from the measured 3,745 baseline.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Briefing shows active intents within the byte cap
+  type: property
+  test_ids:
+  - tests/unit/test_maker_digest.py::test_ac006_active_intents_within_cap
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Metric fields are compared against hm intent status --json, a separate
+    existing implementation; the minimum of 3 intents and 3 task rows is fixed in
+    the SPEC, not read from code.
+  oracle_independence_waiver: null
+  input_domain: 0..20 active intents (ids up to 80 chars, Hangul titles), metrics
+    present/absent/partial, 0..8 tasks
+  transformation: run hm world_model digest and hm intent status --json on the same
+    project
+  expected_relation: len(out) <= 1500 and n_listed_intents >= min(3, n_active) and
+    n_task_rows >= min(3, n_tasks) and every listed (last, target, gap) == status.metrics[metric_id]
+    or '—' when absent
+  preconditions: []
+  observable_output: stdout JSON
+  generator_hint: hypothesis lists of intent dicts
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Maker maps the ask to an end stage
+  type: parametric
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac007_ask_to_end_stage
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: maker야 X 리서치해줘
+    expected:
+      end_stage: research
+    edge: false
+    note: ''
+  - input:
+      case: research X only
+    expected:
+      end_stage: research
+    edge: false
+    note: ''
+  - input:
+      case: maker X 스펙 잡자
+    expected:
+      end_stage: spec
+    edge: false
+    note: ''
+  - input:
+      case: maker X 만들어줘
+    expected:
+      end_stage: full
+    edge: false
+    note: ''
+  - input:
+      case: maker X 좀 봐줘 (ambiguous)
+    expected:
+      end_stage: research
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected end stages for operator phrasings are a DRI-owned table
+    (S4, Round 2), not derived from the template; ambiguity resolves to the narrower
+    end by SPEC rule.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Narrow stops at the end stage and restores the pipeline
+  type: property
+  test_ids:
+  - tests/unit/test_autopilot_narrow.py::test_ac008_narrow_stop_and_restore
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Proceed-before-E, stop-at-E and restore-equals-original are relations
+    over every E; an always-stop or never-narrow implementation fails the proceed-before-E
+    or restore half.
+  oracle_independence_waiver: null
+  input_domain: every E in (research, spec, execute, review, verify) with a full-pipeline
+    marker at an advancing level (auto_safe); at level gated narrow writes nothing
+    (AC-009 row)
+  transformation: hm autopilot narrow --until E, then boundary --current S for each
+    S up to E
+  expected_relation: all(boundary(S).proceed for S before E) and not boundary(E).proceed
+    and marker.pipeline == original and (level, created_at, session) unchanged
+  preconditions: []
+  observable_output: boundary JSON + marker file
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Narrow never widens autonomy
+  type: parametric
+  test_ids:
+  - tests/unit/test_autopilot_narrow.py::test_ac009_narrow_never_widens
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: no marker
+    expected:
+      marker: absent
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      case: foreign live marker
+    expected:
+      marker: unchanged
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      case: pipeline already ends before E
+    expected:
+      pipeline: unchanged
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      case: E already passed
+    expected:
+      pipeline: unchanged
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      case: full pipeline, level gated
+    expected:
+      level: gated
+      created_at: unchanged
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Each row''s expected state is fixed by S5 (DRI Round 2): narrowing
+    may only shrink; the table is authored from the SPEC, not from autopilot.py.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: Injected digest command never aborts Maker
+  type: parametric
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac010_injected_command_fail_soft
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: digest succeeds
+    expected:
+      exit: 0
+      json_objects: 1
+      unavailable: false
+    edge: false
+    note: ''
+  - input:
+      case: cache path missing
+    expected:
+      exit: 0
+      json_objects: 1
+      unavailable: true
+    edge: false
+    note: ''
+  - input:
+      case: uv missing from PATH
+    expected:
+      exit: 0
+      json_objects: 1
+      unavailable: true
+    edge: false
+    note: ''
+  - input:
+      case: partial stdout then non-zero
+    expected:
+      exit: 0
+      json_objects: 1
+      unavailable: true
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Claude Code docs: a non-zero exit in a ! command aborts the whole
+    skill; exit 0 and single-JSON output are fixed by that external contract.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: Every digest run records one maker_load row
+  type: mechanical
+  test_ids:
+  - tests/unit/test_maker_digest.py::test_ac011_maker_load_row
+  executable_predicate: rows_added(run_digest) == 1 and last_row()['event'] == 'maker_load'
+    and set(last_row()) == {'ts', 'event', 'session_id'} and run_digest(readonly_observability=True).returncode
+    == 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Row shape {ts, event, session_id} and 'no request text' are fixed
+    by the DRI Round 2 decision and ADR-107, not by the writer.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: Stale research-only tasks are parked last
+  type: property
+  test_ids:
+  - tests/unit/test_maker_digest.py::test_ac012_parked_sorted_last
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Classification and ordering are invariants over generated task
+    sets with the age source (frontmatter created) and artifact set fixed in the SPEC.
+  oracle_independence_waiver: null
+  input_domain: 0..8 task worktrees; artifact subsets of {RESEARCH, SPEC, PLAN, REVIEW};
+    created 0..30 days ago or absent; 0..2 commits beyond base
+  transformation: run hm world_model digest
+  expected_relation: parked == (artifacts == {RESEARCH} and created is not None and
+    age_days > 7 and commits_beyond_base == 0) for every listed task, and no parked
+    task precedes a non-parked one
+  preconditions: []
+  observable_output: digest tasks list
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-013
+  title: Memory retrieval is bounded and lexical-first
+  type: property
+  test_ids:
+  - tests/unit/test_memory_retrieve_bounded.py::test_ac013_memory_retrieve_bounded
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The eligible lexical set is computed by the test from the generated
+    corpus (token overlap with the topic), independent of the scorer; newest is the
+    max parsed date.
+  oracle_independence_waiver: null
+  input_domain: wiki/failures corpora of 0..200 entries, 0..30 dated bullets each
+    (incl. undated), count 1..30, Hangul text, topics with 0..10 eligible lexical
+    hits
+  transformation: run hm memory_retrieve --k 6 --pre-k 30
+  expected_relation: len(out.encode()) <= 8192 and out decodes as UTF-8 and first
+    min(6, |eligible|) entries are in eligible and floor entries only after them and
+    each dated entry shows exactly its max-date bullet and undated entries are not
+    dropped for lacking a date
+  preconditions: []
+  observable_output: stdout
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-014
+  title: Always-loaded pointer routes unnamed requests to Maker
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac014_pointer_routes_unnamed
+  executable_predicate: all(routes_unnamed_to_maker(v) and excludes_build_fix(v) and
+    len(v) <= 400 for v in pointer_variants(name='N' * NAME_MAX, handle='h' * HANDLE_MAX))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Routing scope (named or not, mid-stage) and the 400-char bound
+    are DRI Round 3 decisions, fixed outside the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-015
+  title: Digest reports each task's latest artifact
+  type: property
+  test_ids:
+  - tests/unit/test_maker_digest.py::test_ac015_latest_artifact
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The test computes the newest artifact by os.stat mtime itself from
+    the generated worktree; the relation holds for any artifact set.
+  oracle_independence_waiver: null
+  input_domain: 0..5 task worktrees, random subsets of RESEARCH/SPEC/PLAN/REVIEW with
+    random mtimes
+  transformation: run hm world_model digest
+  expected_relation: for every listed task, latest_artifact.name == max(artifacts,
+    key=mtime).name and latest_artifact.at == that mtime (ISO, seconds) and len(out)
+    <= 1500
+  preconditions: []
+  observable_output: digest tasks list
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-016
+  title: Decision capture is instructed on every entrance
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac016_decision_capture_instructed
+  executable_predicate: all(DECISION_CAPTURE_RULE in v for v in pointer_variants())
+    and all(DECISION_CAPTURE_RULE in render_maker(t) and RESUME_STATES_LATEST in render_maker(t)
+    for t in ('claude-code', 'cursor', 'codex'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The rule text is fixed by the DRI Round 3 decision (write before
+    replying; resume names the latest artifact), not derived from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-017
+  title: Mid-stage aside protocol is instructed
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac017_mid_stage_aside
+  executable_predicate: all(all(clause in text for clause in ASIDE_CLAUSES) for text
+    in [*pointer_variants(), *(render_maker(t) for t in ('claude-code', 'cursor',
+    'codex'))])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: ASIDE_CLAUSES (aside opener, 6-line bound, '## Queued asks', never
+    start mid-stage, resume line) are fixed by S12, a DRI request of 2026-10-03, not
+    derived from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: 'intent-layer and project-knowledge render with disable-model-invocation:
+    true; reachable only by typing or via Maker''s Read'
+  category: public API/CLI contract
+  rationale: changes how every rendered harness reaches these skills
+  source: spec
+- id: IRR-002
+  decision: 'New rendered file .agents/skills/<name>/agents/openai.yaml with policy.allow_implicit_invocation:
+    false'
+  category: schema/file format/storage layout
+  rationale: new owned path; orphan sweep and ownership must track it
+  source: spec
+- id: IRR-003
+  decision: hm world_model digest JSON gains intents.active[], task parked and task
+    latest_artifact
+  category: public API/CLI contract
+  rationale: consumed by rendered Maker templates
+  source: spec
+- id: IRR-004
+  decision: hm world_model digest appends a maker_load row to a local observability
+    jsonl
+  category: schema/file format/storage layout
+  rationale: digest stops being write-free; new persisted row shape
+  source: spec
+- id: IRR-005
+  decision: Maker may narrow the session's autopilot pipeline (reverses PLAN-world-model-name
+    ADR-008 routes-only)
+  category: security/permission boundary
+  rationale: the router now changes autonomy state
+  source: spec
+- id: IRR-006
+  decision: 'hm memory_retrieve: floor fills only slots lexical hits leave empty;
+    newest bullet per entry; 8,192-byte cap drops whole floor entries first'
+  category: public API/CLI contract
+  rationale: every stage's retrieval output changes
+  source: spec
+- id: IRR-007
+  decision: New CLI verb hm autopilot narrow --until <stage>
+  category: public API/CLI contract
+  rationale: new verb rendered templates call
+  source: spec
+- id: IRR-008
+  decision: Autopilot marker gains a restore-pipeline field
+  category: schema/file format/storage layout
+  rationale: every marker reader must accept it
+  source: spec
+approval:
+  kind: human
+  content_hash: ab5a987317f7547b75b99abd3850fbbf4444dc0c6c57fce688ef62a82cae1e81
+  approved_by: Ecro
+  approved_at: '2026-10-03T02:22:59Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 27e96dcefa94e2f81756a6e862ed6a115245b81ee3251f2c4508626a3aff645d
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: 4c5fbee92d310f48dc7fd04f20f9696374111f718ac98dab2c2ca2f99231f19a
+    paths_to_mutate: 7d3235494294bd08c8b6c6056cda1062648a21583b306154990f631ab9ddc37a
+    irreversible_decisions: fcec7d13264693fb0be11f3698402dbf71d4f44034784300f743b311fc0e50c8
+    AC-001: 25606a9d476eff313cac45e628bca8f00f6f008e1f1d05c2e0b2bb31534ba7df
+    AC-002: 306d7eebc222297fd63a913b7386d6189cdce60ada0a12bbc611d78c0b64c7f5
+    AC-003: a3c13a706553220cfcf9e24b4dc8950816765a083ac1d364852118f0e30eb8c5
+    AC-004: f68597c2349760985208a13e45ab9bed61e2ed416973eb3857f2ff7629423377
+    AC-005: 6841d34b90cc150d68dd2a6895797ff72a6eb1ca3290c35a944da5a0c56a11f7
+    AC-006: a08d07a9167bd2b14ffe537ebeb53ade12bfd348532eb4d609215963cf2361ce
+    AC-007: 9523535e46fd9ed93733776536f34c503e1789398e9f1421d72e0c40750e51c1
+    AC-008: 2bd95635f953d0734680d6cd6d1d4d65891646ce2db222f2afcd7c60faafd729
+    AC-009: c667cf1c2323f8e3123e3487cb09acb47a60ae1bdf3330ba4b3a799463614d31
+    AC-010: 7a3240229df495597a9a8d5b562350acf8673a35b45bf5aae1d25c67b3b9e9ad
+    AC-011: 5f595fecd8ae1fbce627c3f2b9e21c1bc88dde6f41b868be91658f2a49bfd808
+    AC-012: b0e4b49d3981754c7b125456c1f573b637ebeb2d2a01bf1541978ad0aae7cade
+    AC-013: c191b66781e5cf1252d4f68874b508e908a7d226298302f12a0776fd5fdcc156
+    AC-014: 938f42bdc0155a187015180d3d59cca9f88d290d4b9c7bfe4f596cfdabc4760f
+    AC-015: 28e919ff4bf8c695aece3ea9e8cf543e0f7e5d96b0b3e5557035cb0733424cb0
+    AC-016: d0892a36d3db9a7075c1a217ad8b18f96fffcf35d9b732bfd5e82edec2ef5242
+    AC-017: 837dbec199065cce04d1a1157f36426d052c436255e305b741e86873f8a00439
+    ac_order: 8345e880dc19dc733f60d154c7457a99f34c22971e18e88229034b51947b7620

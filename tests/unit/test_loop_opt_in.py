@@ -49,18 +49,22 @@ _OPT_IN_COMMIT = "18714dd1"
 #   sentence before re-capturing.
 #   `help.md` re-captured too: it gained the router row; its loop-ON/OFF diff is still only the
 #   `/hm:loop` table row and the chaining sentence.
+# - 2026-10-03, `maker-front-door-improvements`: CLAUDE.md's `## World model` and
+#   `## Project knowledge` pointers were rewritten (routing, decision capture, mid-stage aside)
+#   and help.md's intent-layer / project-knowledge rows became `typed only`. Re-verified the
+#   loop-ON/OFF diff of both files is still only the loop sentence / `/hm:loop` row.
 _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
     "commands/hm/help.md": {
-        "side-python-cli": "7feb5335d127f43d9cf40c7ddeb00807d82822e6cf12cbd29effe06c6f03bbb2",
-        "side-tauri-app": "7feb5335d127f43d9cf40c7ddeb00807d82822e6cf12cbd29effe06c6f03bbb2",
-        "prod-tauri-app": "bda19830fef3ad2948b52d142aff1348d99c2a4a3c31f4501f455a8516f83c59",
-        "prod-firmware": "bda19830fef3ad2948b52d142aff1348d99c2a4a3c31f4501f455a8516f83c59",
+        "side-python-cli": "1ec7c692208c633334d0443ab360d24ab6c5915a65de26a8233965bfe86c49c9",
+        "side-tauri-app": "1ec7c692208c633334d0443ab360d24ab6c5915a65de26a8233965bfe86c49c9",
+        "prod-tauri-app": "51b7ab6de6b2c52998cce575bc2d665ec81b4a602fb019cb74bf3b5bd5017664",
+        "prod-firmware": "51b7ab6de6b2c52998cce575bc2d665ec81b4a602fb019cb74bf3b5bd5017664",
     },
     "../CLAUDE.md": {
-        "side-python-cli": "e3606def5b85ea7d9ef10e5d4161ccf3456e1114d62a7e6cbf22983fdbdee76c",
-        "side-tauri-app": "e3606def5b85ea7d9ef10e5d4161ccf3456e1114d62a7e6cbf22983fdbdee76c",
-        "prod-tauri-app": "74a5b7efec5a49d6c97a6984268457567fb0280371bfae8cdf86410811e1e7ad",
-        "prod-firmware": "74a5b7efec5a49d6c97a6984268457567fb0280371bfae8cdf86410811e1e7ad",
+        "side-python-cli": "8050ae7b0f3821d6bfa9a5961038194e7cbc8c52da6928e629a34f31cabccaa2",
+        "side-tauri-app": "8050ae7b0f3821d6bfa9a5961038194e7cbc8c52da6928e629a34f31cabccaa2",
+        "prod-tauri-app": "2255501bd4e2586c9ea9594157b8b443231fbbb4d411f1258e3c379064c75fdb",
+        "prod-firmware": "2255501bd4e2586c9ea9594157b8b443231fbbb4d411f1258e3c379064c75fdb",
     },
 }
 # Loop-sensitive but never hash-compared below (`strip`), so a later key addition may move it.

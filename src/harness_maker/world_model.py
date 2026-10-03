@@ -121,9 +121,34 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(list(argv) if argv is not None else None)
     from harness_maker import world_model_digest
 
-    payload = world_model_digest.digest(Path(args.root), session_id=args.session_id or None)
+    root = Path(args.root)
+    payload = world_model_digest.digest(root, session_id=args.session_id or None)
     sys.stdout.write(world_model_digest.render(payload) + "\n")
+    _record_maker_load(root, args.session_id or None)
     return 0
+
+
+def _record_maker_load(root: Path, session_id: str | None) -> None:
+    """Makes Maker use countable (SPEC S7). Best-effort: a lost row never fails the briefing,
+    and a repo without `.claude/` is not a harness, so nothing is created there."""
+    import json
+    from datetime import UTC, datetime
+
+    from harness_maker import io_utils, world_model_digest
+
+    try:
+        base = world_model_digest.base_root(root)
+        if base is None or not (base / ".claude").is_dir():
+            return
+        row = {
+            "ts": datetime.now(UTC).isoformat(timespec="seconds"),
+            "event": "maker_load",
+            "session_id": session_id,
+        }
+        path = base / ".claude/observability/world-model.jsonl"
+        io_utils.append_atomic_line(path, json.dumps(row, ensure_ascii=False))
+    except Exception:  # noqa: BLE001
+        return
 
 
 if __name__ == "__main__":

@@ -337,7 +337,14 @@ def _atomic_command_files(
             (
                 "commands/hm/atomic_command.md.j2",
                 f"commands/hm/{s}.md",
-                {"stage": s, "stage_body": body},
+                {
+                    "stage": s,
+                    "stage_body": body,
+                    "stage_description": (
+                        f"{_STAGE_SUMMARIES.get(s, f'harness-maker {s} stage.')} "
+                        f"{_stage_gate(_world_model_name(config_dump), '$hm-loop')}"
+                    ),
+                },
             ),
         )
     return out
@@ -359,23 +366,26 @@ def _atomic_command_files(
 #
 # Each line is drawn from the command's own summary, condensed. Keep them DISTINCT — the
 # whole reason the field exists is that they were not.
+# SPEC-maker-front-door-improvements AC-003 / PLAN ADR-008: the six atomic stages are entered by
+# typing, by the world model's handoff, by autopilot or by the loop — never on the model's own
+# reading of a request. The description says so (a hard flag would break those model-side
+# invokers). Summaries are short so summary + gate stays within the 120-char cap at the default
+# name; the Codex `hm-<stage>` skills reuse them.
+_STAGE_SUMMARIES: dict[str, str] = {
+    "research": "Survey facts, prior art and alternatives into a RESEARCH doc.",
+    "spec": "Lock what and why: acceptance criteria into a SPEC doc.",
+    "execute": "Implement a PLAN's phases TDD-first. Stages, never commits.",
+    "review": "Multi-reviewer consensus review with a grade gate and auto-fix.",
+    "verify": "Pre-completion stop sign: regression, structure, security.",
+    "wrapup": "Close the work: final checks, memory capture, the single commit.",
+}
+
+
+def _stage_gate(world_model_name: str, loop: str) -> str:
+    return f"Only when typed, or via {world_model_name}, autopilot or {loop}."
+
+
 _COMMAND_DESCRIPTIONS: dict[str, str] = {
-    "commands/hm/research.md": (
-        "Survey the ground before deciding: facts, prior art and alternatives into a RESEARCH doc."
-    ),
-    "commands/hm/spec.md": (
-        "Lock what and why — acceptance criteria via a 6-category interview into a SPEC doc."
-    ),
-    "commands/hm/execute.md": ("Implement a PLAN's phases TDD-first. Stages, never commits."),
-    "commands/hm/review.md": (
-        "Multi-reviewer consensus review with a grade gate and an auto-fix loop."
-    ),
-    "commands/hm/verify.md": (
-        "Pre-completion stop sign — deterministic regression, structure and security checks."
-    ),
-    "commands/hm/wrapup.md": (
-        "Close the unit of work: final verification, memory capture, and the single commit."
-    ),
     "commands/hm/loop.md": (
         "Run a bounded autoloop over a master PLAN, iterating stages until convergence."
     ),
@@ -397,8 +407,12 @@ _COMMAND_DESCRIPTIONS: dict[str, str] = {
 }
 
 
-def _command_frontmatter(out_path: str) -> dict[str, Any]:
+def _command_frontmatter(out_path: str, world_model_name: str) -> dict[str, Any]:
     """ADR-016 description for a rendered command; empty for every other file kind."""
+    stage = out_path.removeprefix("commands/hm/").removesuffix(".md")
+    if out_path.startswith("commands/hm/") and stage in _STAGE_SUMMARIES:
+        gate = _stage_gate(world_model_name, "/hm:loop")
+        return {"description": f"{_STAGE_SUMMARIES[stage]} {gate}"}
     description = _COMMAND_DESCRIPTIONS.get(out_path)
     return {"description": description} if description else {}
 
@@ -592,6 +606,13 @@ def _world_model_handle(config_dump: dict[str, object] | None) -> str:
     wm = (config_dump or {}).get("world_model")
     handle = wm.get("handle") if isinstance(wm, dict) else None
     return handle if isinstance(handle, str) else world_model.DEFAULT_HANDLE
+
+
+def _world_model_name(config_dump: dict[str, object] | None) -> str:
+    """The router's spoken name; the default when no config names one."""
+    wm = (config_dump or {}).get("world_model")
+    name = wm.get("name") if isinstance(wm, dict) else None
+    return name if isinstance(name, str) else world_model.DEFAULT_NAME
 
 
 def _world_model_skill_files(
@@ -890,16 +911,29 @@ def _codex_skill_files() -> list[FileSpec]:
 
     ADR-0007 (0.22.3) removed research-crawler + relevance-filter; base count 11 → 9.
     """
-    return [
-        (f"skills/{n}/SKILL.md.j2", f".agents/skills/{n}/SKILL.md", {"name": n})
-        for n in _ALL_SKILLS
-    ] + [
-        (
-            "skills/intent-layer/references/workflow-feedback.md.j2",
-            ".agents/skills/intent-layer/references/workflow-feedback.md",
-            {},
-        )
-    ]
+    return (
+        [
+            (f"skills/{n}/SKILL.md.j2", f".agents/skills/{n}/SKILL.md", {"name": n})
+            for n in _ALL_SKILLS
+        ]
+        + [
+            (
+                "skills/intent-layer/references/workflow-feedback.md.j2",
+                ".agents/skills/intent-layer/references/workflow-feedback.md",
+                {},
+            )
+        ]
+        + [
+            ("skills/_codex/openai.yaml.j2", f".agents/skills/{n}/agents/openai.yaml", {})
+            for n in _TYPED_ONLY_SKILLS
+        ]
+    )
+
+
+# SPEC-maker-front-door-improvements IRR-001/002: reachable only by typing their name or through
+# the world model's Read. Claude Code/Cursor get `disable-model-invocation` in the template;
+# Codex gets `agents/openai.yaml` (policy.allow_implicit_invocation: false).
+_TYPED_ONLY_SKILLS: tuple[str, ...] = ("intent-layer", "project-knowledge")
 
 
 _CODEX_OUTPUT_ROOTS = (".codex", ".agents")
@@ -949,7 +983,14 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
             (
                 "codex/stage_skill.md.j2",
                 f".agents/skills/hm-{s}/SKILL.md",
-                {"stage": s, "stage_body": body},
+                {
+                    "stage": s,
+                    "stage_body": body,
+                    "stage_description": (
+                        f"{_STAGE_SUMMARIES.get(s, f'harness-maker {s} stage.')} "
+                        f"{_stage_gate(_world_model_name(config_dump), '$hm-loop')}"
+                    ),
+                },
             )
         )
     return out
@@ -1132,7 +1173,7 @@ def synthesize(
                 "feedback_enabled": feedback_enabled,
                 "is_codex": ctx.get("is_codex", _is_codex_output(out_path)),
             },
-            frontmatter=_command_frontmatter(out_path),
+            frontmatter=_command_frontmatter(out_path, _world_model_name(config_dump)),
         )
         for tpl, out_path, ctx in file_specs
     ]

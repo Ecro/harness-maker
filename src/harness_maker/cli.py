@@ -2748,7 +2748,10 @@ health = health_cmd
 def autopilot_cmd(
     action: str = typer.Argument(
         ...,
-        help="'on' enables autopilot this session; 'off' disables; 'status' prints the JSON.",
+        help=(
+            "'on' enables autopilot this session; 'off' disables; 'status' prints the JSON; "
+            "'narrow' shortens this session's pipeline to end at --until."
+        ),
     ),
     level: str = typer.Option(
         "auto_safe",
@@ -2769,6 +2772,11 @@ def autopilot_cmd(
         False,
         "--force",
         help="Take over a live marker owned by another session (ADR-010).",
+    ),
+    until: str | None = typer.Option(
+        None,
+        "--until",
+        help="With 'narrow': the last stage to auto-advance to.",
     ),
     session_id: str | None = typer.Option(
         None,
@@ -2810,9 +2818,16 @@ def autopilot_cmd(
         if rc:
             raise typer.Exit(rc)
         return
+    if action == "narrow":
+        if not until:
+            typer.echo(json.dumps({"narrowed": False, "reason": "narrow requires --until <stage>"}))
+            return
+        typer.echo(json.dumps(autopilot.narrow(root, until=until, session_id=session_id or None)))
+        return
     if action != "on":
         typer.echo(
-            f"autopilot: unknown action {action!r} (expected 'on', 'off' or 'status')", err=True
+            f"autopilot: unknown action {action!r} (expected 'on', 'off', 'status' or 'narrow')",
+            err=True,
         )
         raise typer.Exit(2)
 

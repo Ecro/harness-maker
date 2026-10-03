@@ -3,18 +3,21 @@
     ONE source for the four claude-md variants, AGENTS.md and the Cursor rule. Claude Code's
     documented default sends "remember X" to machine-local auto-memory; this line is what
     routes a shared project fact to the git-shared wiki instead, even when the skill does not
-    trigger. Codex starts skills only on an explicit mention, so its arm names the skill FILE.
-    AC-005 caps the rendered section at 300 characters per variant and requires the names
-    `project-knowledge` and `auto-memory` (plus the skill path on Codex): every always-loaded
+    trigger. SPEC-maker-front-door-improvements AC-004 / ADR-006: the skill is typed-only now
+    (not model-invocable), so every arm names the world-model invocation and the procedure FILE
+    instead of "follow the skill". AC-005 caps the rendered section at 300 characters per variant
+    (at HANDLE_MAX) and requires `project-knowledge` and `auto-memory`: every always-loaded
     byte is carried every turn. The heading stays English in both locales so the section is
     locatable, as `context_discipline.md.j2` does. `is_codex` is guarded because some callers
     render AGENTS.md.j2 directly without it (it is path-derived only inside `synthesize`). -#}
+{%- set wm = config.world_model if (config is defined and config.world_model is defined and config.world_model) else {"name": "Maker", "handle": "maker"} -%}
+{%- set codex = is_codex is defined and is_codex -%}
+{%- set inv = ("$" if codex else "/") ~ wm.handle -%}
+{%- set proc = (".agents" if codex else ".claude") ~ "/skills/project-knowledge/SKILL.md" -%}
 ## Project knowledge
 
-{% if is_codex is defined and is_codex -%}
-When the DRI asks you to remember or correct a project fact the code does not show, read `.agents/skills/project-knowledge/SKILL.md` and follow it: facts go to `.claude/memory/wiki.md`, not auto-memory.
-{%- elif (config.locale | default('en')) == 'ko' -%}
-DRI 가 코드에 없는 프로젝트 사실을 기억하라고 하거나 기록된 사실을 정정하면 `project-knowledge` skill 을 따른다. 사실은 host auto-memory 가 아니라 `.claude/memory/wiki.md` 에 기록한다 (auto-memory 는 개인 선호만).
+{% if not codex and (config.locale | default('en')) == 'ko' -%}
+코드에 없는 프로젝트 사실의 기록·정정은 `{{ inv }}` 로 — `{{ proc }}` 를 읽고 따른다. 사실은 auto-memory 가 아니라 `.claude/memory/wiki.md` 에 (auto-memory 는 개인 선호만).
 {%- else -%}
-When the DRI asks you to remember a project fact the code does not show, or corrects a recorded one, follow the `project-knowledge` skill: facts go to `.claude/memory/wiki.md`, not host auto-memory, which keeps personal preferences only.
+To remember or fix a project fact the code does not show, use `{{ inv }}`, which reads `{{ proc }}`: facts go to `.claude/memory/wiki.md`, not host auto-memory (personal preferences only).
 {%- endif %}

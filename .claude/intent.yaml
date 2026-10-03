@@ -237,3 +237,19 @@ open_questions:
       fingerprint: 0d5a2472857ffa2b23b4f118473fefcfbbdee5e7ce53da2bfdf502e152e5064b
       k: 18
   history: []
+- id: q_maker_owns_intents
+  claim: A single front door that owns the intent and project-knowledge procedures
+    (Maker reads them on demand; the skills are not model-invocable; unnamed goal/fact/status
+    requests are routed to Maker by the always-loaded pointer, mid-stage included)
+    lets a task's feedback reach the next decision without the operator re-instructing
+    the connection.
+  status: open
+  evidence: []
+  history: []
+- id: q_decision_capture_resume
+  claim: Writing a decision made in conversation into the in-flight task's most downstream
+    artifact before replying, and naming the task's latest artifact on resume, keeps
+    a pause, compaction or new session from losing progress.
+  status: open
+  evidence: []
+  history: []

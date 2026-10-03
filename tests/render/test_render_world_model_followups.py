@@ -83,7 +83,10 @@ def briefing_commands(text: str) -> list[str]:
             stripped = line.strip()
             if stripped.startswith("!") or "!`" in stripped:
                 found.append("!digest")
-            elif stripped.startswith(("uv run", "hm ")):
+            # SPEC-maker-front-door-improvements AC-010 (PLAN ADR-007 amendment): the Codex run
+            # block is `uv run … | tail -n 1 | grep '^{.*}$' || printf …`; `{ uv run` is the earlier
+            # grouped form, kept so an older render still classifies.
+            elif stripped.startswith(("uv run", "hm ", "{ uv run")):
                 found.append("bash:digest")
             else:
                 found.append("fallback:digest")
@@ -244,10 +247,11 @@ def test_ac012_noncharacters_rejected(bad: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# AC-013 — pointer stays within 200 characters with full tokens
+# AC-013 — pointer within its cap, full tokens (200 → 400: SPEC-maker-front-door-improvements)
 # ---------------------------------------------------------------------------
 
 _AC013 = load_golden_table(_SPEC_YAML, "AC-013")
+_POINTER_CAP_SUPERSEDED = 400
 
 
 @pytest.mark.parametrize("row", _AC013, ids=[r.input["locale"] for r in _AC013])
@@ -270,7 +274,11 @@ def test_ac013_pointer_cap_full_tokens(row: Any, tmp_path: Path) -> None:
         (".cursor/rules/harness.mdc", f"/{handle}"),
     ):
         section = _pointer((repo / rel).read_text(encoding="utf-8"))
-        assert len(section) <= row.expected["max_chars"], (rel, len(section))
+        # The golden row's 200 is the approved SPEC-world-model-followups AC-013 value; the
+        # SPEC-maker-front-door-improvements Constraints supersede it with 400 (the pointer now
+        # carries routing, decision capture and the aside protocol). The SPEC is left untouched.
+        assert row.expected["max_chars"] == 200
+        assert len(section) <= _POINTER_CAP_SUPERSEDED, (rel, len(section))
         assert name in section and token in section, rel  # noqa: PT018
 
 

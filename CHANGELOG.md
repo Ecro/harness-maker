@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Maker is the single front door.** The `intent-layer`, `project-knowledge` and `world-model`
+  skills are rendered not model-invocable (Codex: new `agents/openai.yaml` with implicit
+  invocation off); they are reached through Maker (it Reads their procedures) or by typing them.
+  Agent/skill pointers route to Maker without naming the skill, stage command descriptions are
+  gated, `/hm:help` lists them as typed-only rows, and `/hm:execute` instructs a mid-stage aside
+  (ask to end the stage) with decision capture. Allowed-tools are scoped per skill/stage.
+- **`hm world_model digest` fields.** Active intents are capped, parked intents sort last, the
+  latest artifact is reported, and each call appends a `maker_load` observability row (fail-soft
+  when the observability directory is unwritable).
+- **`memory_retrieve` is bounded to 8 KB, lexical-first.** The count floor admits entries only
+  when fewer than `k` lexical hits exist. The `--floor-entry-bytes` and `--floor-byte-cap` flags
+  are removed.
+
+### Added
+
+- `hm autopilot narrow` — stop the armed pipeline at an earlier stage and remember the original so
+  it can be restored; it never widens, and undo is re-arming with `--until wrapup`.
+
 ## [0.61.0] - 2026-10-02
 
 ### Added

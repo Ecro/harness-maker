@@ -28,7 +28,9 @@ from harness_maker.synthesize import synthesize
 _REPO = Path(__file__).resolve().parents[2]
 _SPEC_YAML = _REPO / "specs/SPEC-world-model-name.machine.yaml"
 _MAKE_MD = _REPO / "commands/make.md"
-_POINTER_CAP = 200
+# SPEC-maker-front-door-improvements Constraints: the pointer now carries routing, decision capture
+# and the aside protocol, so its per-variant cap is 400 (was 200).
+_POINTER_CAP = 400
 
 
 def _profile() -> ProjectProfile:
@@ -267,7 +269,9 @@ def test_router_routes_resolve_to_rendered_surfaces(tmp_path: Path) -> None:
     assert {"research", "spec"} <= commands
     for c in commands:
         assert (repo / f".claude/commands/hm/{c}.md").is_file(), f"/hm:{c} not rendered"
-    skills = set(re.findall(r"`([a-z]+(?:-[a-z]+)+)` skill", claude))
+    # SPEC-maker-front-door-improvements AC-005: the router names the procedure FILES it Reads
+    # (the skills are typed-only now), not "follow the `<name>` skill".
+    skills = set(re.findall(r"\.claude/skills/([a-z]+(?:-[a-z]+)+)/SKILL\.md", claude))
     assert {"project-knowledge", "intent-layer"} <= skills
     for s in skills:
         assert (repo / f".claude/skills/{s}/SKILL.md").is_file(), s

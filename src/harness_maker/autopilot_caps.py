@@ -376,6 +376,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         "steps": 0,
         "next_stage": None,
         "pipeline_complete": False,
+        "narrow_end": False,
         "task_slug": None,
         "task_slug_source": None,
         # Present on every response so a consumer can branch on the value rather than on
@@ -570,6 +571,23 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             "unauditable skip."
         )
     nxt = next_stage(marker.pipeline, args.current)
+    if nxt is None and marker.restore_pipeline is not None:
+        # PLAN-maker-front-door-improvements ADR-002: a NARROWED end is not pipeline
+        # completion. Restore the armed pipeline instead of clearing, so the session stays
+        # armed for its next run; stop here either way.
+        cause = autopilot.restore_narrowed(
+            root,
+            session_id=args.session_id,
+            expected_pipeline=[s.value for s in marker.pipeline],
+        )
+        out["narrow_end"] = True
+        out["reason"] = (
+            "narrowed end stage reached — pipeline restored"
+            if cause is None
+            else f"narrowed end stage reached — restore skipped: {cause}"
+        )
+        print(json.dumps(out))
+        return 0
     if nxt is None:
         # `current` IS the last stage → end the session (ADR-006).
         autopilot.clear(root, session_id=args.session_id)

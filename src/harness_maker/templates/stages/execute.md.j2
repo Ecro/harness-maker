@@ -73,9 +73,9 @@ Bash("uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic '<sl
 ```
 {% endif %}
 
-   The fence's `high-recurrence` section comes from the **count floor** — the repo's most
-   repeated failures, admitted regardless of vocabulary. Excerpts are tail-biased, so a
-   correction that superseded the entry's original guidance is the part you see. The fence
+   Lexical hits come first; the `high-recurrence` section (the **count floor** — the repo's most
+   repeated failures) fills only the slots they leave. Each entry shows its newest dated block,
+   so a correction that superseded the original guidance is the part you see. The fence
    carries `wiki.md` entries too, so there is no separate wiki skim.
 
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set cdwt = 'cd <WT> && ' if wt_on else '' %}

@@ -1,6 +1,8 @@
+{#- SPEC-maker-front-door-improvements AC-003: entrance-gated, never hard-flagged (the world model,
+    autopilot and $hm-loop invoke stages model-side). Built in synthesize._codex_stage_skills. -#}
 ---
 name: hm-{{ stage }}
-description: "harness-maker {{ stage }} stage. Invoke when the task requires the {{ stage }} stage of the harness-maker workflow."
+description: "{{ (stage_description | default('harness-maker ' ~ stage ~ ' stage.')) | replace('\\', '\\\\') | replace('"', '\\"') }}"
 ---
 
 {% include "agents/_partials/step_manifest.md.j2" %}

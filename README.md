@@ -157,7 +157,7 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Preset** | `Side` · `Production` | Reviewer count (1 vs 5), workflow stage count, security gate depth, verify-required flag |
 | **Targets** | `claude-code` · `cursor` · `codex` (multi-select) | Which IDE-native asset trees are rendered |
 | **Locale** | `en` · `ko` · any tag | Interview text + user-facing error messages |
-| **World model name** | Default `Maker` (`/maker`) · any name | Names the one router skill you start work from (`/<handle>`); stored as `world_model.name` / `world_model.handle` in `harness.yaml`, asked right after locale |
+| **World model name** | Default `Maker` (`/maker`) · any name | Names the one router skill you start work from (`/<handle>`); the single front door: the intent/knowledge skills are not model-invocable and are reached through it (or by typing them); stored as `world_model.name` / `world_model.handle` in `harness.yaml`, asked right after locale |
 | **Reviewers / skills** | Preset defaults + overrides | Which reviewers are active + agent model tiers (the full agent/skill set always installs) |
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
@@ -549,7 +549,8 @@ required, and stops at the ones where it is.
   harness-maker make . --update --autonomy-level auto_safe --autonomy-persistent
   ```
 - **To turn it off**, set `autonomy.level: gated` and `autopilot_persistent: false` in
-  `harness.yaml`. Per-session control is `harness-maker autopilot on|off`.
+  `harness.yaml`. Per-session control is `harness-maker autopilot on|off`; `autopilot narrow`
+  stops the armed pipeline earlier (it never widens — re-arm with `--until wrapup` to undo).
 - **Mandatory human gates always stop the chain** — a `/hm:spec` acceptance interview,
   a `/hm:review` `CHANGES_REQUESTED`, the `/hm:wrapup` commit/push, or a `/hm:verify`
   failure. These safety gates are non-negotiable at every level (`full` does **not**

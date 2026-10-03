@@ -4,7 +4,7 @@ file_count: 59
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
-  body_sha256: f70b458bc8282186ac7597d3bf705f1239ff8529a2daa6eca436acca3056e749
+  body_sha256: baf37613d09c12bce60eac31dca5e1698b393dc2d05ac23f0bbab2a39cb681c0
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
   body_sha256: 37c6a5d761e169c3247145c71d451f988c3bb1608ee01b29cbb876eec392f154
@@ -55,13 +55,13 @@ files:
   body_sha256: 21018297793864154d0b065fdd700302d101d6576fc503c3c65138255e901fc8
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 79cd6fc135a74febc2516ef2559af9d8b22dffede72ba71c61420b79ee16dbbc
+  body_sha256: 4c7be9f505d818d5ddbf887a4cb1b89665cebe04a6745f9234158a70f50512ac
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: b16b0c64191d45f0b5d01ffa6e3f68ff8f0cf46a6b361f0193fc57ad692db222
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: 594b9d02baefffc9273eda2dd160efd04767a7f7356735a3652bb8cc173a224d
+  body_sha256: 4ba9fdc0788b2ff278e7cb727f75f1bc68c353c808f9f86a9bd7beaf949f5705
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 8cb01c899f55914258b01e856b75f0a36d0008f7c032c212af4faa174e6409d1
@@ -139,7 +139,7 @@ files:
   body_sha256: ad1b8ae99e2a60e2d6f8e9726635150e9e0de31231d85ef72385e956b0347999
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: ded387d27fadffb7799a3a9caab6e342a07a32c873ef6f54e682ab9ef20de6ef
+  body_sha256: 0f2c78eac65d6a12510dcedc7aad534405f2a98c9c1df2e2ca83e8c2c4d05c50
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 12611c8e959f5e774908e01684d63bbac86c253a665a20a34ae47825eeb76315
@@ -163,7 +163,7 @@ files:
   body_sha256: b3ce34ea25321280d309fe3188fd757e1665aad75a95aa76ecd942bdcc128b47
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: 9334579b540db8c2ee779aeb664218cc7c378cdf467013aa16833a70a614d1ff
+  body_sha256: 3d22cafc58c306245aee21145bf7215b5f295bf0a2986e3990c60c88c2f3367e
 - path: stages/research.md
   template: stages/research.md.j2
   body_sha256: ec24c78b4584c0f37343acf20060d32133a4108b1527c782ca89a4dcd3126e28

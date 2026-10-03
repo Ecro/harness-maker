@@ -1,20 +1,19 @@
 {#- Always-loaded pointer to the named world model (SPEC-world-model-name AC-007, ADR-005).
 
-    Its own section so the project-knowledge AC-005 cap stays untouched; this one is capped at
-    200 characters per variant — at NAME_MAX 40 / HANDLE_MAX 64 too, with the full name and
-    token (SPEC-world-model-followups AC-013), which is why each arm is terse. Codex invokes skills as `$<handle>`. Cursor's slash listing of
-    project skills is unverified, so its arm names the Claude Code form and the spoken name
-    (`world_model_cursor` is set by harness.mdc.j2 before the include). -#}
+    Its own section so the project-knowledge cap stays untouched. Capped at 400 characters per
+    variant at NAME_MAX 40 / HANDLE_MAX 64 (SPEC-maker-front-door-improvements Constraints,
+    superseding SPEC-world-model-followups AC-013's 200): it now carries the routing of unnamed
+    goal/metric/fact/status asks (mid-stage too, build/fix excluded), decision capture and the
+    aside protocol (PLAN ADR-006/008), every turn — so the name appears at most twice and each arm
+    is terse. Codex invokes skills as `$<handle>`. Cursor's slash listing of project skills is
+    unverified; its arm shares the Claude Code form beside the spoken (bold) name, so
+    `world_model_cursor` (set by harness.mdc.j2) only keeps it English. Cursor and Codex arms stay English. -#}
 {#- Callers that render with a partial config (tests, direct AGENTS.md renders) get the default. -#}
 {%- set wm = config.world_model if (config is defined and config.world_model is defined and config.world_model) else {"name": "Maker", "handle": "maker"} -%}
 ## World model
 
-{% if is_codex is defined and is_codex -%}
-**{{ wm.name }}** (`${{ wm.handle }}`): briefing, start or resume work, project facts, goals.
-{%- elif world_model_cursor is defined and world_model_cursor -%}
-**{{ wm.name }}** — by name, or `/{{ wm.handle }}` in Claude Code: briefing, start/resume, facts, goals.
-{%- elif (config.locale | default('en')) == 'ko' -%}
-**{{ wm.name }}** (`/{{ wm.handle }}`): 브리핑, 작업 시작·재개, 프로젝트 사실 기록, 목표·지표.
+{% if (config.locale | default('en')) == 'ko' and not (is_codex is defined and is_codex) and not (world_model_cursor is defined and world_model_cursor) -%}
+**{{ wm.name }}** (`/{{ wm.handle }}`): 목표·지표·사실·현황 요청은 이름을 부르지 않아도, 단계 중에도 여기로 (만들기·고치기 제외). 진행 중 작업의 결정은 답하기 전 가장 하위 산출물에 쓴다. 곁답은 `{{ wm.name }} —`로 시작, 6줄 이내, 새 작업은 `## Queued asks` 에 쌓고 ↩ 단계·스텝으로 끝낸다.
 {%- else -%}
-**{{ wm.name }}** (`/{{ wm.handle }}`): briefing, start or resume work, project facts, goals.
+**{{ wm.name }}** ({% if is_codex is defined and is_codex %}`${{ wm.handle }}`{% else %}`/{{ wm.handle }}`{% endif %}): goal, metric, fact, status asks, named or not, mid-stage too; not build/fix. Live-task decisions → its PLAN/SPEC/RESEARCH before replying. Mid-stage asides start `{{ wm.name }} —`, ≤ 6 lines; new work → `## Queued asks`; end ↩ stage·step.
 {%- endif %}

@@ -1,0 +1,274 @@
+{
+  "findings": [
+    {
+      "lens": "functionality",
+      "severity": "P2",
+      "file": "src/harness_maker/templates/skills/world-model/SKILL.md.j2",
+      "line": 90,
+      "summary": "A narrowed marker is never restored if the narrowed run stops before its boundary, and a later full-pipeline ask does not undo it",
+      "suggestion": "Run hm autopilot narrow for every ask incl. the full pipeline; make narrow() restore when until equals the original last stage instead of returning 'already ends at' (autopilot.py:775).",
+      "reasoning": {
+        "observe": "Template calls narrow only when end is not full pipeline; narrow returns 'already ends at' for last stage without touching marker; only restore caller is the boundary at the narrowed end.",
+        "trace": "narrow --until research then research aborted/compacted before its boundary; later 'build X' skips narrow.",
+        "infer": "Full-pipeline run silently truncated; nothing but that boundary undoes it.",
+        "conclude": "No undo path outside the boundary; fail-safe but surprising."
+      },
+      "pass": 2,
+      "source": "functionality",
+      "id": "aea107e8b49b7c93",
+      "caused_by": "none"
+    },
+    {
+      "lens": "robustness",
+      "severity": "P2",
+      "file": "src/harness_maker/templates/skills/world-model/SKILL.md.j2",
+      "line": 21,
+      "summary": "Bash(uv run:*) pre-approves every uv run command whenever Maker is active",
+      "suggestion": "Narrow the grant to the digest/narrow invocations (uv run --with <src> hm ...); keep printf/tail only if the compound needs them.",
+      "reasoning": {
+        "observe": "Frontmatter grants Bash(uv run:*), printf, tail; comment says only for the injected briefing.",
+        "trace": "uv run python -c ... runs unprompted while Maker is active; digest carries contributor-controlled commit subjects.",
+        "infer": "Injected text could steer an unprompted uv run; removes prompt before hm intent/memory_md writes.",
+        "conclude": "Permission surface wider than needed."
+      },
+      "pass": 2,
+      "source": "robustness",
+      "id": "17052bb44a074efb",
+      "caused_by": "none"
+    },
+    {
+      "lens": "robustness",
+      "severity": "P2",
+      "file": "src/harness_maker/autopilot.py",
+      "line": 803,
+      "summary": "restore_narrowed does a single byte-identity attempt; a lost race leaves the marker narrowed and later stages halt as 'unknown_stage'",
+      "suggestion": "Retry restore_narrowed once after re-reading; unknown_stage reason mentions a narrowing leftover.",
+      "reasoning": {
+        "observe": "Single _write_if_unchanged; touch rewrites the marker concurrently.",
+        "trace": "Bytes change between read and compare -> restore skipped, marker stays narrowed.",
+        "infer": "Next typed stage halts as unknown_stage, looks like a typo.",
+        "conclude": "Fail-safe but misleading."
+      },
+      "pass": 2,
+      "source": "robustness",
+      "id": "f336c238172fcb50",
+      "caused_by": "none"
+    },
+    {
+      "lens": "consistency",
+      "severity": "P3",
+      "file": "src/harness_maker/autopilot_caps.py",
+      "line": 1094,
+      "summary": "The restore-failure reason always says 'changed concurrently', although restore_narrowed returns False for several other causes",
+      "suggestion": "Return a reason from restore_narrowed and report the real cause.",
+      "reasoning": {
+        "observe": "restore_narrowed returns False for OSError, missing marker, nothing to restore, ValidationError, byte mismatch.",
+        "trace": "Cleared/foreign/stale marker produces race text.",
+        "infer": "Ledger diagnosis wrong.",
+        "conclude": "Message claims an unestablished cause."
+      },
+      "pass": 2,
+      "source": "consistency",
+      "id": "091d480f58f10b19",
+      "caused_by": "none"
+    },
+    {
+      "lens": "robustness",
+      "severity": "P2",
+      "file": "src/harness_maker/world_model_digest.py",
+      "line": 297,
+      "summary": "Active-intent id and metric_id are not clipped, so one long non-ASCII id can push the digest over the cap and make it 'unavailable'",
+      "suggestion": "Clip active rows' id and metric_id to _ID_MAX in _render before sizing.",
+      "reasoning": {
+        "observe": "_active_rows copies ids verbatim; _render clips items but not active; tests use ASCII ids.",
+        "trace": "After trimming tasks output still over cap -> unavailable.",
+        "infer": "AC-006 holds only for short ASCII ids.",
+        "conclude": "Cap guarantee has an unclipped input."
+      },
+      "pass": 2,
+      "source": "robustness",
+      "id": "9df6b033df04fe24",
+      "caused_by": "none"
+    },
+    {
+      "lens": "consistency",
+      "severity": "P2",
+      "file": "src/harness_maker/synthesize.py",
+      "line": 343,
+      "summary": "stage_description is built in several places and the atomic-command ctx entry looks unused",
+      "suggestion": "Delete stage_description from _atomic_command_files ctx if unread; share one helper with the codex stage-skill path.",
+      "reasoning": {
+        "observe": "One reader (codex/stage_skill.md.j2:5), writers synthesize.py:343 and :989.",
+        "trace": "Same summary+gate expression repeated.",
+        "infer": "Dead parameter plus second source of truth.",
+        "conclude": "Consolidate to one helper."
+      },
+      "pass": 2,
+      "source": "consistency",
+      "id": "be4f288a685d0778",
+      "caused_by": "none"
+    },
+    {
+      "lens": "consistency",
+      "severity": "P3",
+      "file": "src/harness_maker/synthesize.py",
+      "line": 372,
+      "summary": "Comment says the description stays within a 120-char cap, but a long Maker name exceeds it",
+      "suggestion": "Reword to 'about 120 chars at the default name; a longer name lengthens it'.",
+      "reasoning": {
+        "observe": "Comment states an invariant; 40-char name gives ~150.",
+        "trace": "Reader takes the cap as enforced.",
+        "infer": "Guarantee not held.",
+        "conclude": "Misleading comment."
+      },
+      "pass": 2,
+      "source": "consistency",
+      "id": "1d10228fcc972527",
+      "caused_by": "none"
+    },
+    {
+      "lens": "security",
+      "severity": "P1",
+      "file": "src/harness_maker/templates/skills/world-model/SKILL.md.j2",
+      "line": 21,
+      "summary": "allowed-tools grants all `uv run`; the rendered rule is scoped to `hm`",
+      "suggestion": "allowed-tools: Bash(uv run --with {{ harness_maker_src_path }} hm *), Bash(printf:*), Bash(tail:*) — matching settings/Side.json.j2:11; never bare uv run:*.",
+      "reasoning": {
+        "observe": "SKILL.md.j2:21 grants Bash(uv run:*); settings templates already use Bash(uv run --with <src> hm *).",
+        "trace": "Any uv run (python -c, --with <pkg>) runs unprompted while Maker is active; digest carries contributor text.",
+        "infer": "Excess is arbitrary-code execution without a prompt; removes prompt before hm intent/memory_md.",
+        "conclude": "Narrow to the hm-scoped, --with-pinned form."
+      },
+      "pass": 2,
+      "source": "security",
+      "id": "24451777c57f24d6",
+      "caused_by": "none"
+    },
+    {
+      "lens": "concurrency",
+      "severity": "P2",
+      "file": "src/harness_maker/autopilot.py",
+      "line": 802,
+      "summary": "restore_narrowed authorizes restore from a fresh snapshot, not the caller's, so it can erase a concurrent re-narrowing",
+      "suggestion": "Add expected_pipeline argument (caller's marker.pipeline from autopilot_caps.py:578); return False if the fresh marker.pipeline differs.",
+      "reasoning": {
+        "observe": "Boundary decides from caller's marker; restore_narrowed re-reads and writes restore_pipeline; compare protects only its own snapshot.",
+        "trace": "Concurrent narrow between caller load and restore read is overwritten.",
+        "infer": "Newer narrowing discarded silently.",
+        "conclude": "Stale-caller authorization; low-probability P2."
+      },
+      "pass": 2,
+      "source": "concurrency",
+      "id": "46a3fe23f7cffd47",
+      "caused_by": "none"
+    },
+    {
+      "lens": "concurrency",
+      "severity": "P2",
+      "file": "src/harness_maker/autopilot_caps.py",
+      "line": 583,
+      "summary": "Every restore_narrowed False is reported as 'changed concurrently', which misattributes the cause",
+      "suggestion": "Return a reason enum (no_marker, not_narrowed, validation, raced) and emit matching text.",
+      "reasoning": {
+        "observe": "restore_narrowed returns False for several causes; boundary maps all to the race text.",
+        "trace": "Foreign/stale/cleared marker reported as a race.",
+        "infer": "Wrong diagnosis.",
+        "conclude": "Return the true cause."
+      },
+      "pass": 2,
+      "source": "concurrency",
+      "id": "7a51c2b150b26794",
+      "caused_by": "none"
+    },
+    {
+      "lens": "tests",
+      "severity": "P2",
+      "file": "tests/render/test_render_maker_front_door.py",
+      "line": 384,
+      "summary": "AC-007 never reads the 'Ends at' cell, so a row whose end stage is swapped can still pass",
+      "suggestion": "Split the matched row and compare the Ends-at cell to the golden expected end_stage; pin the unclear case to the exact research text.",
+      "reasoning": {
+        "observe": "Asserts cue membership over the whole row; no assertion isolates the end-stage cell.",
+        "trace": "Cue cell holds the words; Ends-at may say anything.",
+        "infer": "Mapping not pinned.",
+        "conclude": "Read the Ends-at cell directly."
+      },
+      "pass": 2,
+      "source": "tests",
+      "id": "f084ce96ef7255c0",
+      "caused_by": "none"
+    },
+    {
+      "lens": "tests",
+      "severity": "P2",
+      "file": "tests/unit/test_autopilot_narrow.py",
+      "line": 141,
+      "summary": "No test covers narrowing an already-narrowed marker; ADR-001 restore-source rule unpinned",
+      "suggestion": "Narrow twice (review then spec); assert restore_pipeline still original and boundary restore returns the original; pin the later-E case.",
+      "reasoning": {
+        "observe": "Every narrow test narrows once.",
+        "trace": "restore_pipeline = marker.pipeline unconditionally keeps all tests green.",
+        "infer": "Silent permanent truncation on re-narrow.",
+        "conclude": "Add a double-narrow test."
+      },
+      "pass": 2,
+      "source": "tests",
+      "id": "c5c46e752007225f",
+      "caused_by": "none"
+    },
+    {
+      "lens": "tests",
+      "severity": "P2",
+      "file": "tests/unit/test_maker_digest.py",
+      "line": 266,
+      "summary": "AC-006 never exercises the worst-case cap interaction; render() can trim tasks below the SPEC floor of 3",
+      "suggestion": "Add an @example with 20 ~80-char intents, 8 rich tasks, long recent; assert >=3 tasks, >=3 intents, within cap, not unavailable.",
+      "reasoning": {
+        "observe": "Generator builds tasks without artifacts/session history; render comment concedes trimming below MIN_TASKS.",
+        "trace": "Max-size path never generated.",
+        "infer": "S3 floor regression passes.",
+        "conclude": "Pin the worst case."
+      },
+      "pass": 2,
+      "source": "tests",
+      "id": "e84ee34f6adbea3e",
+      "caused_by": "none"
+    },
+    {
+      "lens": "tests",
+      "severity": "P2",
+      "file": "tests/integration/test_memory_retrieve_cli.py",
+      "line": 185,
+      "summary": "The edited integration test no longer shows the floor firing through the CLI; floor-on equals floor-off",
+      "suggestion": "Add a CLI case with fewer than k lexical hits; assert recurring-00 with floor on, absent with --no-count-floor, output <= 8192; rename contradicting tests.",
+      "reasoning": {
+        "observe": "Corpus has 20 lexical hits >= k so the floor is inert.",
+        "trace": "Dropping CLI plumbing keeps the test green.",
+        "infer": "Boundary wiring untested.",
+        "conclude": "Restore a below-k CLI case."
+      },
+      "pass": 2,
+      "source": "tests",
+      "id": "f27254a5598bbd14",
+      "caused_by": "none"
+    },
+    {
+      "lens": "tests",
+      "severity": "P3",
+      "file": "tests/unit/test_maker_digest.py",
+      "line": 315,
+      "summary": "AC-011 omits absent-case inputs (no --session-id, no .claude/); read-only check skipped as root",
+      "suggestion": "Add runs without --session-id and without .claude/; split the permission check with skipif-root.",
+      "reasoning": {
+        "observe": "Test always passes --session-id and pre-creates observability.",
+        "trace": "Absent branches never run.",
+        "infer": "Absent-case pattern.",
+        "conclude": "Cheap to close."
+      },
+      "pass": 2,
+      "source": "tests",
+      "id": "1159f620b5cf4562",
+      "caused_by": "none"
+    }
+  ]
+}

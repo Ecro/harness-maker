@@ -57,8 +57,8 @@
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
 | autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, re-armed every session{% endif %} |
-| intent-layer | skill — say what you observed, close / approve / drop an intent, record a metric value, or ask where the project stands{% if is_codex %} (mention `$intent-layer`){% endif %} |
-| project-knowledge | skill — ask to remember a project fact the code does not show, or correct a recorded one; it lands in the shared wiki, not auto-memory{% if is_codex %} (mention `$project-knowledge`){% endif %} |
+| intent-layer | skill, typed only{% if is_codex %} (`$intent-layer`){% endif %} — goals, metrics, observations; otherwise ask {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) |
+| project-knowledge | skill, typed only{% if is_codex %} (`$project-knowledge`){% endif %} — record or correct a project fact in the shared wiki, not auto-memory; otherwise ask {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) |
 | {{ (config.world_model or {}).get('name', 'Maker') }} | world model front door — {% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}: briefing, start or resume work, facts, goals |
 
 {% if not is_codex and "cursor" in config.targets -%}

@@ -1,6 +1,7 @@
 ---
 name: {{ name }}
-description: Deep-interview the creator before creating intents; improve intent quality, record what was observed, close/approve/drop, or report where things stand, what to do next and gaps. Ask before writes.
+description: Deep-interview the creator before creating intents; improve intent quality, record what was observed, close/approve/drop, or report where things stand, what to do next and gaps. Ask before writes.{% if not is_codex %}
+disable-model-invocation: true{% endif %}
 ---
 
 # {{ name }}

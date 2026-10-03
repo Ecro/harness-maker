@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import time
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,17 @@ PIPELINE: tuple[str, ...] = ("research", "spec", "execute", "review", "verify", 
 MAX_BYTES = 1500
 MAX_TASKS = 5
 MAX_INTENT_ITEMS = 3
+MIN_ACTIVE_INTENTS = 3
+MIN_TASKS = 3
+# Dropped per task, group by group, before the task floor gives way (REVIEW dbe5ddc7). Timing
+# goes first; `other_session` is never dropped — Maker reads its absence as "unknown, ask once",
+# so dropping it would cost a question on every resume (REVIEW confirm-1).
+_OPTIONAL_TASK_FIELDS: tuple[tuple[str, ...], ...] = (
+    ("last_seen", "last_stage"),
+    ("latest_artifact",),
+)
+PARK_DAYS = 7
+NO_DATA = "—"
 _SUBJECT_MAX = 60
 _ID_MAX = 40
 _REVIEW_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -149,19 +161,85 @@ def _has(directory: Path, pattern: str) -> bool:
     return directory.is_dir() and any(directory.glob(pattern))
 
 
+def _reviews(docs: Path, slug: str) -> list[Path]:
+    # Exact names only: a hyphen-prefix slug (`world-model` vs `world-model-name`) must not
+    # pick up a sibling task's committed REVIEW/SPEC (REVIEW a003ff68).
+    prefix = f"REVIEW-{slug}-"
+    return sorted(
+        p
+        for p in (docs.glob(f"{prefix}*.md") if docs.is_dir() else [])
+        if _REVIEW_DATE.fullmatch(p.name[len(prefix) : -len(".md")])
+    )
+
+
+def artifact_files(slug: str, wt: Path) -> list[Path]:
+    """The same artifact set `next_stage` reads, so `parked`/`latest_artifact` agree with it."""
+    docs, specs = wt / "work-docs", wt / "specs"
+    named = [
+        docs / f"RESEARCH-{slug}.md",
+        docs / f"PLAN-{slug}.md",
+        specs / f"SPEC-{slug}.md",
+        specs / f"SPEC-{slug}.machine.yaml",
+    ]
+    return [p for p in named if p.is_file()] + _reviews(docs, slug)
+
+
+def latest_artifact(files: list[Path]) -> dict[str, str] | None:
+    newest: tuple[float, str] | None = None
+    for p in files:
+        try:
+            mtime = p.stat().st_mtime
+        except OSError:
+            continue
+        if newest is None or mtime > newest[0]:
+            newest = (mtime, p.name)
+    if newest is None:
+        return None
+    at = datetime.fromtimestamp(int(newest[0]), UTC).isoformat(timespec="seconds")
+    return {"name": newest[1], "at": at}
+
+
+def _created(path: Path) -> date | None:
+    from harness_maker.frontmatter import split_frontmatter
+
+    try:
+        mapping = split_frontmatter(path.read_bytes()).mapping or {}
+    except OSError:
+        return None
+    value = mapping.get("created")
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value.strip()[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def parked(base: Path, slug: str, wt: Path, files: list[Path], deadline: float) -> bool:
+    """A research-only task left alone past PARK_DAYS (SPEC S8); unknown is never parked."""
+    research = wt / "work-docs" / f"RESEARCH-{slug}.md"
+    if files != [research]:
+        return False
+    created = _created(research)
+    if created is None or (date.today() - created).days <= PARK_DAYS:
+        return False
+    if time.monotonic() >= deadline:
+        return False
+    # Base HEAD, not a hardcoded `main`: the tip `task_land` squashes onto (_branch_drift).
+    ahead = _git(base, "rev-list", "--count", f"HEAD..hm/{slug}")
+    return ahead is not None and ahead.strip() == "0"
+
+
 def next_stage(base: Path, slug: str, wt: Path) -> str:
     """The first pipeline stage whose artifact signal is absent (SPEC S2). Spans never count."""
     docs = wt / "work-docs"
     research = _has(docs, f"RESEARCH-{slug}.md")
     plan = _has(docs, f"PLAN-{slug}.md")
-    # Exact names only: a hyphen-prefix slug (`world-model` vs `world-model-name`) must not
-    # pick up a sibling task's committed REVIEW/SPEC (REVIEW a003ff68).
-    prefix = f"REVIEW-{slug}-"
-    reviews = sorted(
-        p
-        for p in (docs.glob(f"{prefix}*.md") if docs.is_dir() else [])
-        if _REVIEW_DATE.fullmatch(p.name[len(prefix) : -len(".md")])
-    )
+    reviews = _reviews(docs, slug)
     specs = wt / "specs"
     spec_files = (specs / f"SPEC-{slug}.md").is_file() or (
         specs / f"SPEC-{slug}.machine.yaml"
@@ -221,7 +299,24 @@ def intent_items(base: Path) -> dict[str, Any] | None:
         for i in ids:
             if isinstance(i, str) and i not in items:
                 items.append(i)
-    return {"counts": counts, "items": items[:MAX_INTENT_ITEMS]}
+    return {"counts": counts, "items": items[:MAX_INTENT_ITEMS], "active": _active_rows(status)}
+
+
+def _active_rows(status: dict[str, Any]) -> list[dict[str, Any]]:
+    """Active intents in status order with their metric fields copied verbatim (SPEC S3)."""
+    records = status.get("intents") or {}
+    metrics = status.get("metrics") or {}
+    rows: list[dict[str, Any]] = []
+    for oid in status.get("active") or []:
+        record = records.get(oid) if isinstance(records, dict) else None
+        metric_id = record.get("metric_id") if isinstance(record, dict) else None
+        metric = metrics.get(metric_id) if isinstance(metrics, dict) and metric_id else None
+        row: dict[str, Any] = {"id": oid, "metric_id": metric_id}
+        for field in ("last", "target", "gap"):
+            value = metric.get(field) if isinstance(metric, dict) else None
+            row[field] = NO_DATA if value is None else value
+        rows.append(row)
+    return rows
 
 
 def recent_commits(base: Path) -> list[str]:
@@ -243,9 +338,16 @@ def digest(root: Path, session_id: str | None = None) -> dict[str, Any]:
             last_stage, last_seen, other = last_stage_and_session(mine, session_id)
             entries.append((slug, last_stage, last_seen, other))
         entries.sort(key=lambda e: e[2] or "", reverse=True)
-        # The artifact checks (git + tool-version subprocesses) run only for the tasks shown,
-        # and stop at DEADLINE_S — a slow host yields `null`, never a stalled briefing.
         deadline = time.monotonic() + DEADLINE_S
+        # `parked` decides the order, so it is computed for every task before the cut; its git
+        # call runs only for stale research-only candidates and shares the deadline.
+        files = {slug: artifact_files(slug, wt) for slug, wt in worktrees.items()}
+        park = {
+            slug: parked(base, slug, worktrees[slug], files[slug], deadline) for slug in worktrees
+        }
+        entries.sort(key=lambda e: park[e[0]])
+        # The stage checks (git + tool-version subprocesses) run only for the tasks shown, and
+        # stop at DEADLINE_S — a slow host yields `null`, never a stalled briefing.
         tasks = []
         for slug, last_stage, last_seen, other in entries[:MAX_TASKS]:
             stage = next_stage(base, slug, worktrees[slug]) if time.monotonic() < deadline else None
@@ -256,6 +358,8 @@ def digest(root: Path, session_id: str | None = None) -> dict[str, Any]:
                     "last_stage": last_stage,
                     "last_seen": last_seen,
                     "other_session": other,
+                    "parked": park[slug],
+                    "latest_artifact": latest_artifact(files[slug]),
                 }
             )
         payload: dict[str, Any] = {
@@ -280,27 +384,81 @@ def _dumps(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
+def _over(text: str) -> bool:
+    return len(text.encode("utf-8")) > MAX_BYTES
+
+
+def _clip_artifact(task: Any) -> Any:
+    art = task.get("latest_artifact") if isinstance(task, dict) else None
+    if not isinstance(art, dict) or not isinstance(art.get("name"), str):
+        return task
+    return {**task, "latest_artifact": {**art, "name": _clip(art["name"], _ID_MAX)}}
+
+
+def _clip_active(row: Any) -> Any:
+    if not isinstance(row, dict):
+        return row
+    return {
+        **row,
+        **{k: _clip(row[k], _ID_MAX) for k in ("id", "metric_id") if isinstance(row.get(k), str)},
+    }
+
+
 def render(payload: dict[str, Any]) -> str:
-    """Compact JSON within MAX_BYTES (ADR-005): clip fields, then drop `recent`, then trim tasks."""
+    """Compact JSON within MAX_BYTES (ADR-003): clip fields, then drop `recent`, then active
+    intents beyond 3, then clip artifact names, then tasks down to 3, then each task's optional
+    fields (`last_seen`/`last_stage`, then `latest_artifact`; `other_session` is kept) — past
+    that, the old last resort (fewer tasks, then `unavailable`). Never raises."""
+    try:
+        return _render(payload)
+    except Exception as e:  # noqa: BLE001
+        return _dumps({"unavailable": f"render failed: {type(e).__name__}"})
+
+
+def _render(payload: dict[str, Any]) -> str:
     p = dict(payload)
     if isinstance(p.get("recent"), list):
         p["recent"] = [_clip(str(s), _SUBJECT_MAX) for s in p["recent"]]
     intents = p.get("intents")
     if isinstance(intents, dict) and isinstance(intents.get("items"), list):
-        p["intents"] = {
+        intents = {
             **intents,
             "items": [_clip(str(i), _ID_MAX) for i in intents["items"][:MAX_INTENT_ITEMS]],
         }
+        p["intents"] = intents
+    # Active ids are sized like `items`: an unclipped id alone could push past the cap (9df6b033).
+    if isinstance(intents, dict) and isinstance(intents.get("active"), list):
+        intents = {**intents, "active": [_clip_active(r) for r in intents["active"]]}
+        p["intents"] = intents
     if isinstance(p.get("tasks"), list):
         p["tasks"] = list(p["tasks"])
     text = _dumps(p)
-    if len(text.encode("utf-8")) > MAX_BYTES and "recent" in p:
+    if _over(text) and "recent" in p:
         p.pop("recent")
         text = _dumps(p)
-    while len(text.encode("utf-8")) > MAX_BYTES and p.get("tasks"):
+    if _over(text) and isinstance(intents, dict) and isinstance(intents.get("active"), list):
+        p["intents"] = {**intents, "active": intents["active"][:MIN_ACTIVE_INTENTS]}
+        text = _dumps(p)
+    if _over(text) and isinstance(p.get("tasks"), list):
+        p["tasks"] = [_clip_artifact(t) for t in p["tasks"]]
+        text = _dumps(p)
+    while _over(text) and isinstance(p.get("tasks"), list) and len(p["tasks"]) > MIN_TASKS:
         p["tasks"].pop()
         p["more"] = int(p.get("more") or 0) + 1
         text = _dumps(p)
-    if len(text.encode("utf-8")) > MAX_BYTES:
+    for group in _OPTIONAL_TASK_FIELDS:
+        if not (_over(text) and isinstance(p.get("tasks"), list)):
+            break
+        p["tasks"] = [
+            {k: v for k, v in t.items() if k not in group} if isinstance(t, dict) else t
+            for t in p["tasks"]
+        ]
+        text = _dumps(p)
+    # Trimming below MIN_TASKS breaks S3's floor, but a short briefing still beats `unavailable`.
+    while _over(text) and isinstance(p.get("tasks"), list) and p["tasks"]:
+        p["tasks"].pop()
+        p["more"] = int(p.get("more") or 0) + 1
+        text = _dumps(p)
+    if _over(text):
         return _dumps({"unavailable": "digest too large"})
     return text

@@ -56,8 +56,8 @@
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
 | autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, 매 세션 자동 재무장{% endif %} |
-| intent-layer | skill — 관찰한 것을 말하거나, intent 를 close / approve / drop 하거나, metric 값을 기록하거나, 어디까지 왔는지 물을 때{% if is_codex %} (`$intent-layer` 언급){% endif %} |
-| project-knowledge | skill — 코드에 없는 프로젝트 사실을 기억시키거나 기록된 사실을 정정할 때. auto-memory 가 아니라 공유 wiki 에 남는다{% if is_codex %} (`$project-knowledge` 언급){% endif %} |
+| intent-layer | skill, typed only (직접 입력할 때만{% if is_codex %}, `$intent-layer`{% endif %}) — 목표·지표·관찰. 그 외엔 {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) 에게 |
+| project-knowledge | skill, typed only (직접 입력할 때만{% if is_codex %}, `$project-knowledge`{% endif %}) — 코드에 없는 프로젝트 사실 기록·정정, auto-memory 가 아니라 공유 wiki. 그 외엔 {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) 에게 |
 | {{ (config.world_model or {}).get('name', 'Maker') }} | world model 정면 입구 — {% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}: 브리핑, 작업 시작·재개, 사실 기록, 목표 |
 
 {% if not is_codex and "cursor" in config.targets -%}

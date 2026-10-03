@@ -26,7 +26,7 @@ from harness_maker.memory_retrieve import (
     top_candidates,
 )
 from harness_maker.memory_retrieve import (
-    _excerpt_recent_blocks as excerpt_recent_blocks,
+    _excerpt_newest as excerpt_newest,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -157,25 +157,56 @@ def test_binding_cap_is_actually_binding_in_this_fixture() -> None:
     )
 
 
+def _few_hits_plus_loud_failures() -> tuple[list[MemoryEntry], str]:
+    """3 lexical hits (< k) with ~3 kB newest blocks, plus 4 zero-overlap high-count failures."""
+    entries, topic = _binding_cap_corpus(3)
+    entries += [
+        _entry(f"unrelated-loud-{i}", count=50 - i, body="- [2026-02-01] " + ("q" * 2000) + "\n")
+        for i in range(4)
+    ]
+    return entries, topic
+
+
 def test_count_floor_is_additive_to_k() -> None:
-    """AC-006: the lexical section is byte-identical with the floor on and off."""
-    entries, topic = _binding_cap_corpus()
+    """The floor never evicts a lexical hit: the lexical section is identical on and off.
+
+    PLAN-maker-front-door-improvements ADR-004 / SPEC IRR-006: was "byte-identical because the
+    floor has its own budget"; under one cap it holds because overflow drops floor entries
+    first. Name kept for the node id. With k or more hits there is no free slot at all.
+    """
+    entries, topic = _few_hits_plus_loud_failures()
     ranked = top_candidates(entries, topic)
+    assert 0 < len(ranked) < 6, "precondition: fewer hits than k, so the floor has free slots"
     off = render_candidates_block(ranked, topic, all_entries=entries, count_floor=0)
     on = render_candidates_block(ranked, topic, all_entries=entries, count_floor=3)
     assert _lexical_entry_bodies(on) == _lexical_entry_bodies(off)
 
+    many, many_topic = _binding_cap_corpus()
+    many_ranked = top_candidates(many, many_topic)
+    full = render_candidates_block(many_ranked, many_topic, all_entries=many, count_floor=3)
+    assert _floor_slugs(full) == [], "the floor took a slot although lexical hits >= k"
+
 
 def test_sections_are_capped_separately_not_as_a_sum() -> None:
-    """W3: the sum form would go red on the pre-existing minimum-body clamp."""
-    entries, topic = _binding_cap_corpus()
+    """One cap bounds the whole output, and the floor section is the first to give way.
+
+    PLAN-maker-front-door-improvements ADR-004 / SPEC IRR-006: was "each section has its own
+    cap"; the sum of the two was unbounded by design. Name kept for the node id.
+    """
+    entries, topic = _few_hits_plus_loud_failures()
     ranked = top_candidates(entries, topic)
-    on = render_candidates_block(
-        ranked, topic, all_entries=entries, byte_cap=10240, count_floor=3, floor_entry_bytes=1000
-    )
+    on = render_candidates_block(ranked, topic, all_entries=entries, byte_cap=8192, count_floor=3)
+    assert len(on.encode("utf-8")) <= 8192
     lexical, floor = _sections(on)
-    assert len(lexical.encode("utf-8")) <= 10240
-    assert len(floor.encode("utf-8")) <= 3 * (1000 + 256)
+    shown = re.findall(r"^## \[[^\]]+\] (\S+) \|", lexical, re.M)
+    assert len(shown) < len(ranked), "precondition: the cap must bind on the lexical hits"
+    assert floor == "", "a floor entry survived while a lexical hit was dropped"
+
+    roomy = render_candidates_block(
+        ranked[:1], topic, all_entries=entries, byte_cap=8192, count_floor=3
+    )
+    assert len(roomy.encode("utf-8")) <= 8192
+    assert _floor_slugs(roomy), "with room to spare the floor should fill free slots"
 
 
 # --------------------------------------------------------------------------------------
@@ -201,45 +232,58 @@ def test_p7_exactly_n_admitted_under_a_long_topic() -> None:
 
 @pytest.mark.skipif(not (REAL_MEMORY_DIR / "failures.md").exists(), reason="no real corpus here")
 def test_p8_real_corpus_excerpt_carries_the_closing_text_of_the_newest_block() -> None:
-    """Head truncation would emit a SUPERSEDED entry's retracted guidance as authoritative.
+    """On the real corpus the top entry shows its newest block — whole — and nothing older.
 
-    Stated as *closing text* because the newest block of the top entry is ~2.7 kB — "contains
-    the whole block" is unsatisfiable at any sane budget. This assertion is false under both
-    head truncation and a whole-blocks-only rule.
+    PLAN-maker-front-door-improvements ADR-004 / SPEC IRR-006: was "the closing text of the
+    newest block survives a 1000-byte tail excerpt". Newest is now the max parsed date, and the
+    block fits the 8192-byte cap whole, so the assertion tightens to the full block.
     """
     entries = load_memory_dir(REAL_MEMORY_DIR)
     top = floor_candidates(entries, exclude_slugs=set(), n=1)
     assert top, "no fail-tier entry carries a count: — the floor's source set is empty"
-    newest_block = [
-        b for b in re.split(r"(?m)^(?=- \[\d{4}-\d{2}-\d{2}\])", top[0].body) if b.strip()
-    ][-1]
-    excerpt, dropped = excerpt_recent_blocks(top[0].body, 1000)
-    assert dropped > 0, "fixture assumption: the top entry's body exceeds the per-entry budget"
-    assert newest_block.rstrip()[-200:] in excerpt, "the newest block's closing text was cut"
+    blocks = [b for b in re.split(r"(?m)^(?=- \[\d{4}-\d{2}-\d{2}\])", top[0].body) if b.strip()]
+    dated = [(m.group(1), i) for i, b in enumerate(blocks) if (m := re.match(r"- \[(.{10})\]", b))]
+    assert len(dated) > 1, "fixture assumption: the top entry has more than one dated block"
+    newest_block = blocks[max(dated)[1]].rstrip()
+    excerpt, dropped = excerpt_newest(top[0].body, 8192)
+    assert dropped > 0, "older blocks must not be shown"
+    assert excerpt == newest_block, "the newest block was cut or another block was shown"
 
 
 def test_excerpt_prefers_whole_blocks_but_never_drops_the_newest() -> None:
-    """The rule ADR-002 was missing: a newest block over budget is tail-truncated, not dropped."""
-    body = "head prose\n" + "- [2026-01-01] old\n" + "- [2026-02-02] " + ("z" * 4000) + "\n"
-    excerpt, dropped = excerpt_recent_blocks(body, 500)
-    assert excerpt.strip(), "whole-blocks-only would return nothing here — the degenerate case"
-    assert excerpt.rstrip().endswith("z")
-    assert dropped > 0
+    """A newest block over budget is head-cut at a codepoint boundary, never dropped.
+
+    PLAN-maker-front-door-improvements ADR-004 / SPEC IRR-006: was tail-truncation of the
+    newest block; head-cut keeps its `- [date]` line, and Hangul pins the codepoint boundary.
+    """
+    body = "head prose\n" + "- [2026-01-01] old\n" + "- [2026-02-02] " + ("가" * 4000) + "\n"
+    excerpt, dropped = excerpt_newest(body, 500)
+    assert excerpt.startswith("- [2026-02-02] 가"), "the newest block was dropped or tail-cut"
+    assert len(excerpt.encode("utf-8")) <= 500
+    assert excerpt.encode("utf-8").decode("utf-8") == excerpt
+    assert "old" not in excerpt
+    assert dropped == len(body.encode("utf-8")) - len(excerpt.encode("utf-8"))
 
 
 def test_excerpt_keeps_multiple_whole_blocks_when_they_fit() -> None:
-    """The budget BINDS here (review 42e93551): the old 47-byte fixture under a 4000-byte cap
-    returned on the early exit and never entered the whole-block selection loop."""
+    """Only the newest block is shown even when older ones would fit; newest is by date.
+
+    PLAN-maker-front-door-improvements ADR-004 / SPEC IRR-006: was "the two newest whole blocks
+    survive in order". Name kept for the node id. The newest block sits FIRST on disk here, so
+    a position-based rule (last block wins) fails.
+    """
     a, b, c = (
         "- [2026-01-01] " + "a" * 900 + "\n",
         "- [2026-02-02] " + "b" * 900 + "\n",
         ("- [2026-03-03] " + "c" * 900 + "\n"),
     )
-    body = "head prose\n" + a + b + c
-    excerpt, dropped = excerpt_recent_blocks(body, 2000)
-    assert len(body.encode("utf-8")) > 2000, "precondition: the cap must bind"
-    assert excerpt == b + c, "the two newest blocks survive whole, in order"
+    body = "head prose\n" + c + a + b
+    excerpt, dropped = excerpt_newest(body, 8192)
+    assert excerpt == c.rstrip(), "only the max-date block is shown, whole"
     assert dropped == len(body.encode("utf-8")) - len(excerpt.encode("utf-8"))
+
+    undated = "first paragraph line one\nline two\n\nsecond paragraph\n"
+    assert excerpt_newest(undated, 8192)[0] == "first paragraph line one\nline two"
 
 
 @pytest.mark.parametrize("budget", [0, -2])
@@ -247,7 +291,7 @@ def test_excerpt_non_positive_budget_emits_nothing(budget: int) -> None:
     """Review 60a1e752: `[-0:]` is the WHOLE string, and a negative bound slices from the
     front — a zero or negative budget must yield an empty excerpt, never the full body."""
     body = "- [2026-01-01] abcdef\n"
-    excerpt, dropped = excerpt_recent_blocks(body, budget)
+    excerpt, dropped = excerpt_newest(body, budget)
     assert excerpt == ""
     assert dropped == len(body.encode("utf-8"))
 
@@ -308,16 +352,25 @@ def test_count_floor_zero_is_equivalent_to_off() -> None:
 
 
 def test_dedup_is_against_the_emitted_lexical_set_not_the_pool() -> None:
-    """W1: an entry pre-filtered in but popped by the cap stays eligible for the floor."""
-    entries, topic = _binding_cap_corpus()
-    ranked = top_candidates(entries, topic)
-    on = render_candidates_block(ranked, topic, all_entries=entries, byte_cap=4096, count_floor=3)
-    lexical, _floor = _sections(on)
+    """A lexical hit is never re-admitted under the floor label — dedup runs against the POOL.
+
+    PLAN-maker-front-door-improvements ADR-004 / SPEC IRR-006: inverted from W1's emitted-set
+    rule, which let a cap-dropped hit return labelled `high-recurrence`. Name kept for the node
+    id. Under one cap a dropped hit and a surviving floor entry cannot coexist (floor goes
+    first), so the non-vacuous case is the hit ranked out by `pre_k`: it has the highest
+    `count`, so an emitted-set rule would pick it first.
+    """
+    entries, topic = _binding_cap_corpus(3)  # 3 hits, counts 20/19/18
+    entries.append(_entry("unrelated-quiet", count=2, body="- [2026-02-01] other words\n"))
+    capped = render_candidates_block(
+        top_candidates(entries, topic), topic, all_entries=entries, byte_cap=4096, count_floor=3
+    )
+    lexical, _floor = _sections(capped)
     # Slug-set comparison, not substring: `...-stash-2` is a substring of `...-stash-27`.
     lexical_slugs = {m.group(1) for m in re.finditer(r"^## \[[^\]]+\] (\S+) \|", lexical, re.M)}
-    assert set(_floor_slugs(on)).isdisjoint(lexical_slugs), (
-        "a floor entry was also emitted lexically"
-    )
-    assert _floor_slugs(on), "nothing was admitted — the cap should have evicted eligible entries"
-    # The point of the emitted-set rule: an entry the cap evicted IS still floor-eligible.
-    assert len(lexical_slugs) < len(ranked), "cap did not evict anything — test is vacuous"
+    assert len(lexical_slugs) < 3, "cap did not evict anything — test is vacuous"
+    assert _floor_slugs(capped) == [], "a cap-dropped hit or a floor entry outlived a hit"
+
+    ranked = top_candidates(entries, topic, pre_k=1)
+    out = render_candidates_block(ranked, topic, all_entries=entries, byte_cap=8192, count_floor=3)
+    assert _floor_slugs(out) == ["unrelated-quiet"], "a lexical hit wore the floor label"

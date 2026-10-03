@@ -390,3 +390,12 @@ values:
   evidence: 'auto: measure#82611f0fd3e4 @ 7aeb2f47 exit=0 cwd=base'
   definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
   metric_id: dead_rendered_bytes
+- value: 3
+  observed_at: '2026-10-03T05:13:32.222986Z'
+  evidence: 'DRI verdict 2026-10-03 for task maker-front-door-improvements (wrapup
+    Step 5.7): feedback reached the next decision without re-instructing the connection
+    — yes. Prior value 2 -> 3. Evidence: work-docs/PLAN-maker-front-door-improvements.md
+    ## Feedback rows (intent_world_closed_loop_cycles, WORLD-INTENT-CLOSED-LOOP),
+    specs/SPEC-maker-front-door-improvements.md ## Feedback.'
+  definition_hash: 2b39a4ca6a48bfccff7525568dfcf5136f0a793a02d74556bfb8e726646fa6d6
+  metric_id: intent_world_closed_loop_cycles
