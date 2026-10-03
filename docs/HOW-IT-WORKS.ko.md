@@ -844,6 +844,14 @@ EOF
 스테이지가 선택지를 제시하고 그것을 고르기 전까지는 아무것도 자동 진행하지 않습니다. `/hm:loop`
 전문은 §5, autopilot 픽커는 §6 에 있습니다.
 
+**좁히기 (narrow)**: 무장된 autopilot 세션은 `hm autopilot narrow --until <stage>` 로 특정
+스테이지에서 끝나도록 줄일 수 있습니다 — Maker (§7.12) 가 매 요청마다 실행하므로 "X 리서치해줘"
+요청은 research 뒤에서 멈춥니다. 마커는 무장된 파이프라인을 `restore_pipeline` 에 보관합니다.
+경계가 좁혀진 파이프라인의 마지막 스테이지에 도달하면 마커를 지우지 **않고**
+(`pipeline_complete` 아님) 무장된 파이프라인을 복원한 뒤 멈춥니다 (`narrow_end: true`). 그래서
+세션은 다음 실행을 위해 무장 상태로 남습니다. 복원을 건너뛰면 원인을 보고합니다: `no_marker`,
+`not_narrowed`, `superseded` (더 새로운 narrow 가 이김), `invalid`, `raced` (바이트 동일성 불일치 2회).
+
 여러 스테이지를 한 단위로 실행하는 **단일 결합 명령은 없습니다.** 그 축은 0.47.0 까지
 존재했고 제거됐습니다 — PLAN-harness-diet ADR-001/002/014 참조. <!-- @hm:axis-removed -->
 
@@ -1294,6 +1302,99 @@ worktree:
 
 ---
 
+### 7.12 Maker — 세계 모델 라우터
+
+**역할**: 세계 모델 = intent 레이어 (목표·지표·질문) + 프로젝트 지식 (코드에 없는 사실) + 작업
+상태. 그 단일 정문은 온보딩에서 locale 바로 다음에 이름을 정하는 라우터 스킬 하나다. 라우팅만
+하고, 대상의 게이트·동의 규칙·승인은 모두 그대로 유효하다.
+
+**이름과 렌더**: `harness.yaml` 에 `world_model: {name, handle}`; 없으면 `Maker` / `maker`.
+handle 은 이름의 NFKD→ASCII slug 이고, ASCII slug 가 없는 이름 (예: 비비) 은 handle 을 따로 묻는다.
+예약 handle (출하된 스킬 이름 전부, `hm-` 접두사 전부) 은 거부된다. 템플릿 하나
+(`templates/skills/world-model/SKILL.md.j2`) 가 `.claude/skills/<handle>/SKILL.md` (Claude Code +
+Cursor) 와 `.agents/skills/<handle>/SKILL.md` (Codex) 로 렌더된다. 호출은 `/maker`, Codex 에선
+`$maker`, 또는 이름으로 부르기 ("maker야 …"). 모든 답은 `<Name> —` 로 시작한다.
+
+**라우트**:
+
+| 요청 | 라우트 |
+|---|---|
+| 빈 입력, "status", "where are we" | **Briefing** — 읽기 전용 |
+| "add / fix / investigate X", "research / spec / build X" | **Start** |
+| "continue", "이어서", "resume" | **Resume** |
+| 목표, 지표, 가정, intent; 코드에 없는 사실 | **Goals and facts** |
+| "what next?", "뭐 하지?" | **Briefing** + 한 줄짜리 선택지 2–4개; 스테이지는 시작하지 않음 |
+
+읽기 전용 목표·현황 질문은 브리핑으로 답하고, 절차 파일은 무언가를 바꿀 때만 읽는다.
+
+**유일한 입구**: `intent-layer` 와 `project-knowledge` 는 모델이 스스로 호출할 수 없다 —
+Claude Code/Cursor 는 `disable-model-invocation: true`, Codex 는
+`.agents/skills/<name>/agents/openai.yaml` 의 `policy: allow_implicit_invocation: false`.
+`/intent-layer` (또는 `$intent-layer`) 를 직접 입력하면 여전히 실행된다. Maker 는 쓰기 전에 그
+`SKILL.md` 를 Read 해서 도달하며, 동의 규칙은 바뀌지 않는다. `/hm:help` 는 둘을 `typed only` 로
+표시한다. 모든 `/hm:` 스테이지 description 은
+`Only when typed, or via <Name>, autopilot or /hm:loop.` (Codex 는 `$hm-loop`) 로 끝난다 — Maker 의 handoff, autopilot 진행, `/hm:loop` 가 모델
+쪽에서 스테이지를 호출하므로 권고 수준의 게이트일 뿐이다. 항상 로드되는 포인터 둘 (`CLAUDE.md`,
+`AGENTS.md`, `.cursor/rules/harness.mdc`) 이 라우팅을 싣는다: `## World model` (변형당 ≤ 400자) 은
+목표·지표·사실·현황 요청을 이름을 부르지 않아도, 스테이지 중에도 Maker 로 보내고 (일반적인
+만들기·고치기 요청은 제외) 결정 기록·곁답 규칙을 담는다. `## Project knowledge` (≤ 300자) 는 Maker
+호출과 절차 파일 경로를 적는다.
+
+**브리핑 (digest)**: `hm world_model digest --root . --session-id "$HM_SESSION_ID"` 는 세계 상태에
+대해 읽기 전용이고, ≤ 1,500바이트이며, 항상 exit 0 이다. Claude Code 는 스킬 로드 시 `!` 로 이를
+fail-soft 체인을 통해 주입한다 —
+`… 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{"unavailable":"digest"}\n'` — 그래서 실패해도
+JSON 한 줄이 정확히 하나 도착한다 (`{ …; }` 그룹 없음: permission matcher 는 `|`/`||` 로 나누고,
+`{` 로 시작하는 조각은 어떤 규칙에도 맞지 않는다). 스킬의 `allowed-tools` 는
+`Bash(<hm> world_model:*)`, `Bash(<hm> autopilot narrow:*)`, `Bash(tail:*)`, `Bash(grep:*)`,
+`Bash(printf:*)` 만 사전 승인하며, `<hm>` 은 `uv run --with <plugin path> hm` 이다. Codex 는 같은
+명령을 bash 블록으로 실행한다. Cursor 의 `!` 지원은 미검증이라, JSON 이 보이지 않으면 모델이 직접
+digest 를 실행하라고 스킬이 지시한다.
+
+| 필드 | 내용 |
+|---|---|
+| `tasks` | ≤ 5, 최신순: `slug`, `next_stage` (산출물에서 도출: 승인된 SPEC → REVIEW → APPROVED REVIEW → verify 마커), `last_stage`, `last_seen`, `other_session`, `parked`, `latest_artifact {name, at}` |
+| `more` | 다섯 개를 넘는 작업 |
+| `autopilot` | 이 세션의 autopilot 상태 |
+| `intents` | `counts`, `items`, `active[] {id, metric_id, last, target, gap}` — 값은 `hm intent status` 에서, 없으면 `—` |
+| `recent` | 최근 커밋 |
+
+`hm/<slug>` 작업 워크트리만 나열된다 (`worktree.enabled: true`). RESEARCH 가 유일한 산출물이고, 그
+RESEARCH frontmatter 의 `created` 가 7일보다 오래됐고, base 너머 커밋이 없으면 `parked` 다. parked
+작업은 맨 뒤로 정렬되고, `created` 가 없으면 parked 가 아니다. 바이트 상한을 넘으면 순서대로 버린다:
+`recent` → 3개를 넘는 intents → 작업을 3개로 → `last_seen`/`last_stage` → `latest_artifact`;
+`other_session` 은 절대 버리지 않는다. 매 실행은 `.claude/observability/world-model.jsonl` 에
+`{ts, event: "maker_load", session_id}` 를 덧붙인다 (best-effort, 요청 본문 없음) — 그래서 모든
+런타임에서 Maker 사용량을 셀 수 있다.
+
+**Start → 범위**: Maker 는 요청에서 끝 스테이지를 고른다 — research 신호 → research, spec 신호 →
+spec, build/만들어/고쳐 → 전체 파이프라인, 불분명 → research — 그리고 진입점과 끝을 한 줄로 밝힌다.
+research 만 요청하면 research 로 들어가고, spec 으로는 절대 가지 않는다. autopilot 이 활성일 때 Maker
+는 매 요청마다 `hm autopilot narrow --until <end> --root . --session-id "$HM_SESSION_ID"` 를 실행한다
+(전체 파이프라인은 `wrapup`). autopilot 을 무장하지는 않는다. `narrow` 는 `restore_pipeline` (좁혀져
+있지 않으면 `pipeline`) 을 base 로 삼아 `pipeline = base[..end]`, `restore_pipeline = base` 를 쓰며,
+level·`created_at`·세션은 바꾸지 않는다. `gated` 이거나, 마커가 없거나, 남의/낡은 마커면 아무것도 쓰지
+않는다 (exit 0, JSON reason). 좁혀진 마커에서 `--until <무장된 끝>` — 또는 무장된 파이프라인에 wrapup
+이 없을 때 `--until wrapup` — 은 무장된 파이프라인을 복원한다 (되돌리기 경로). 그 밖의 모르는
+스테이지는 그대로 둔다. 같은 동사는 `harness-maker autopilot narrow --until <stage>` 로도 쓸 수 있다.
+마커의 `restore_pipeline` 필드는 선택 사항이라 업그레이드 이전 마커도 그대로 로드된다.
+
+**Resume**: `next_stage` 로 들어가기 전에 작업의 `latest_artifact` 와 그 시각을 밝힌다. 산출물이 없거나
+null 이면 "no artifact recorded" 와 함께 그 작업의 `work-docs/`/`specs/` 파일을 나열한다.
+`other_session` 이 없으면 false 가 아니라 "unknown" 이므로 한 번 묻는다. autopilot 이 활성이면 먼저
+`narrow --until wrapup` 을 실행해 남은 좁히기를 되돌린다. 작업이 둘 이상이면 각 slug 와 `next_stage`
+를 나열한 닫힌 질문 하나.
+
+**결정 기록**: 진행 중 작업에 대해 대화에서 내린 결정이나 범위 변경은 답하기 전에 그 작업의 가장 하위
+산출물 (PLAN, 없으면 SPEC, 없으면 RESEARCH) 에 기록한다.
+
+**스테이지 중 곁답**: 스테이지 실행 중 Maker 에게 말하면 `<Name> —` 로 시작하는 6줄 이내의 곁답이
+오고, 결정은 위와 같이 기록된다. 새 작업은 그 산출물의 `## Queued asks` 에 쌓였다가 스테이지의 STOP
+에서 제안된다 — 스테이지 중간에 시작하지 않는다. 곁답은 `↩ <stage> · <step>` 한 줄로 끝나고
+스테이지가 이어진다.
+
+---
+
 ## 8. 에이전트 참조
 
 에이전트는 독립된 컨텍스트를 가진 서브-에이전트이다. 주 Claude 컨텍스트가 Task 도구로 호출하면 별도 LLM 호출이 발생하고 결과를 반환한다.
@@ -1691,6 +1792,11 @@ hooks.json 은 security-auditor 의 **게이트 3** 검사 대상:
 # 언어 설정 (인터뷰 및 문서 출력 언어)
 locale: ko               # en | ko | ja | 기타 → en fallback
 
+# 세계 모델 라우터 (§7.12) — locale 바로 다음에 묻는다; 없으면 Maker / maker
+world_model:
+  name: Maker
+  handle: maker          # .claude/skills/maker/ 와 .agents/skills/maker/ 로 렌더
+
 # 타깃 IDE (멀티 선택)
 targets:
   - claude-code
@@ -1846,7 +1952,7 @@ Cold tier → git log, work-docs/PLAN-*.md       (결정 이력)
 - `wiki.md`: `[wiki:pattern]`, `[wiki:convention]` 등 카테고리 태그로 분류. `rg -F "[wiki:" wiki.md` 로 즉시 검색.
 - `failures.md`: `[fail:import]`, `[fail:hook]` 등. **같은 slug 는 중복 섹션 대신 count 를 증가**시킨다. `rg -F "[fail:" failures.md` 로 반복 패턴 추적.
 
-다음 세션의 execute 가 Warm tier 를 로드할 때는 `rg -F "[fail:" failures.md` 로 현재 작업 영역과 관련된 실패 패턴만 타깃 검색한다. 전체 파일을 읽지 않아도 된다.
+이후 스테이지가 Warm tier 를 로드할 때는 `memory_retrieve` 가 현재 주제와 관련된 항목만 꺼낸다 — 전체 파일을 읽지 않아도 된다. 출력 전체에 8,192바이트 상한 하나가 걸린다. lexical 히트가 먼저이고, count floor (최대 3개의 고빈도 실패) 는 적격 lexical 히트가 k 개보다 적을 때 남은 슬롯만 채우며, 상한 때문에 빠진 lexical 히트는 floor 로 다시 들어오지 않는다. 날짜가 있는 항목은 가장 최근 날짜 bullet 하나만 (날짜 없는 항목은 첫 문단), fence 안의 topic 은 200 codepoint 로 자른다. 옛 `--floor-entry-bytes` / `--floor-byte-cap` 플래그는 제거됐다.
 
 ---
 

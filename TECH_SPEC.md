@@ -45,6 +45,34 @@ partial publication or retirement blocks subsequent writes until migration
 completes. Governing contracts are SPEC-intent-owners-role-map and
 SPEC-intent-vocabulary-rename.
 
+## World-model front door (Maker) (2026-10-03)
+
+One router skill, named at onboarding right after locale (`harness.yaml`
+`world_model: {name, handle}`, default `Maker` / `maker`), is the only entrance to
+the intent layer, project knowledge and task state. It renders from
+`templates/skills/world-model/SKILL.md.j2` at `.claude/skills/<handle>/` and
+`.agents/skills/<handle>/` (≤ 4,500 chars). `intent-layer` and `project-knowledge`
+render with `disable-model-invocation: true` (Codex: `agents/openai.yaml`
+`policy.allow_implicit_invocation: false`); Maker Reads their SKILL.md before any
+write. Always-loaded pointers: `## World model` ≤ 400 chars, `## Project knowledge`
+≤ 300 chars per variant.
+
+CLI surface:
+
+- `hm world_model digest --root <dir> --session-id <id>` — read-only on world
+  state; one JSON object (`tasks`, `more`, `autopilot`, `intents`, `recent`, or
+  `unavailable`), ≤ 1,500 bytes with a fixed trim order, always exit 0. Each run
+  appends a `maker_load` row to `.claude/observability/world-model.jsonl`.
+- `hm autopilot narrow --until <stage> --root <dir> --session-id <id>` (also
+  `harness-maker autopilot narrow`) — shrinks this session's armed pipeline to end
+  at `<stage>`, saving the armed one in the marker's optional `restore_pipeline`.
+  Never arms or widens; no-op at `gated` or without an own marker. The boundary
+  restores the armed pipeline at the narrowed end.
+
+Governing contracts: SPEC-world-model-name, SPEC-world-model-followups and
+SPEC-maker-front-door-improvements. Maintainer reference:
+`docs/reference/world-model.md`.
+
 ## Codex invocation guidance (2026-09-22)
 
 Generated Codex guidance uses `$hm-<stage>` skill mentions for the six stages:

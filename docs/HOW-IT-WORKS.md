@@ -953,6 +953,14 @@ The default is neither: a fresh harness renders `autonomy.level: ask`, so the fi
 stage of each session offers the choice and nothing advances until you take it. §5 covers
 `/hm:loop` in full; the autopilot picker is described in §6.
 
+**Narrowing**: an armed autopilot session can be shortened to end at a given stage with
+`hm autopilot narrow --until <stage>` — Maker (§7.15) runs it on every ask so a "research X"
+request stops after research. The marker keeps the armed pipeline in `restore_pipeline`. When the
+boundary reaches the last stage of a narrowed pipeline it does **not** clear the marker
+(`pipeline_complete`); it restores the armed pipeline and stops (`narrow_end: true`), so the
+session stays armed for its next run. A skipped restore reports its cause: `no_marker`,
+`not_narrowed`, `superseded` (a newer narrow won), `invalid`, or `raced` (two byte-identity misses).
+
 There is **no single fused command** that runs several stages as one unit. That axis existed
 until 0.47.0 and was removed — see PLAN-harness-diet ADR-001/002/014. <!-- @hm:axis-removed -->
 
@@ -1451,8 +1459,9 @@ worktree:
 
 ### 7.13 intent-layer
 
-Mention-triggered skill (`$intent-layer` on Codex, natural discovery on Claude Code/Cursor)
-for `hm intent`. It connects project purpose, measured metrics and explicit work commitments.
+Typed-only skill for `hm intent` (`/intent-layer`; `$intent-layer` on Codex). It is not
+model-invocable: an unnamed goal or metric request goes to the world model router, Maker (§7.15),
+which Reads this skill's `SKILL.md` before any write. It connects project purpose, measured metrics and explicit work commitments.
 An **intent serves one or more SPECs (1:N)**; this is broader than Playbook's 1:1 usage.
 
 The project definition and question records live in `.claude/intent.yaml`:
@@ -1651,12 +1660,108 @@ existing `[wiki:fact]` entries first and writes via `hm memory_md upsert-wiki --
 It reuses only a `[wiki:fact]` slug (never a dev pattern/gotcha/convention slug, and vice versa),
 never records an inferred fact, and surfaces the CLI's stderr on failure rather than falling back
 to auto-memory. A correction replaces the entry in place and appends `Supersedes: <old claim>
-(first recorded <date>)`. A ≤300-char pointer in `CLAUDE.md`, `AGENTS.md`, and
-`.cursor/rules/harness.mdc` routes facts to the skill even when it does not auto-trigger.
+(first recorded <date>)`. The skill is typed-only (`/project-knowledge`, `$project-knowledge`
+on Codex) and never auto-triggers; a ≤300-char `## Project knowledge` pointer in `CLAUDE.md`,
+`AGENTS.md`, and `.cursor/rules/harness.mdc` sends facts to Maker (§7.15) and names this
+procedure's file path, which Maker Reads before writing.
 
 **Withdrawal (pre-registered)**: `scripts/measure_wiki_fact_window.py` counts `[wiki:fact]`
 entries over a 28-day window from first release; the criterion and outcome are anchored in this
 repo's own `intent.yaml` as `wiki_fact_entries_28d`.
+
+---
+
+### 7.15 Maker — the world model router
+
+**Role**: The world model is the intent layer (goals, metrics, questions) + project knowledge
+(code-absent facts) + task state. Its single front door is one router skill, named at onboarding
+right after locale. It routes; every gate, consent rule and approval of the target stays in force.
+
+**Naming and rendering**: `harness.yaml` carries `world_model: {name, handle}`; absent → `Maker` /
+`maker`. The handle is the NFKD→ASCII slug of the name; a name with no ASCII slug (e.g. 비비) asks
+for a handle, and reserved handles (any shipped skill name, any `hm-` prefix) are refused. One
+template (`templates/skills/world-model/SKILL.md.j2`) renders to `.claude/skills/<handle>/SKILL.md`
+(Claude Code + Cursor) and `.agents/skills/<handle>/SKILL.md` (Codex). Invoke it as `/maker`, `$maker`
+on Codex, or by addressing it by name. Every reply opens with `<Name> —`.
+
+**Routes**:
+
+| Request | Route |
+|---|---|
+| empty, "status", "where are we" | **Briefing** — read-only |
+| "add / fix / investigate X", "research / spec / build X" | **Start** |
+| "continue", "이어서", "resume" | **Resume** |
+| goal, metric, assumption, intent; a fact the code does not show | **Goals and facts** |
+| "what next?" | **Briefing** + 2–4 one-line options; starts no stage |
+
+Read-only goal and status questions are answered from the briefing; a procedure is read only to
+change something.
+
+**The only entrance**: `intent-layer` and `project-knowledge` are not model-invocable —
+`disable-model-invocation: true` on Claude Code/Cursor, and on Codex an
+`.agents/skills/<name>/agents/openai.yaml` with `policy: allow_implicit_invocation: false`. Typing
+`/intent-layer` (or `$intent-layer`) still runs them; Maker reaches them by Reading their
+`SKILL.md` before any write, with their consent rules unchanged. `/hm:help` lists both as
+`typed only`. Every `/hm:` stage description ends with
+`Only when typed, or via <Name>, autopilot or /hm:loop.` (`$hm-loop` on Codex) — advisory gating only, because Maker handoff, autopilot
+advance and `/hm:loop` invoke stages model-side. Two always-loaded pointers (in `CLAUDE.md`,
+`AGENTS.md` and `.cursor/rules/harness.mdc`) carry the routing: `## World model` (≤ 400 chars per
+variant) sends goal, metric, fact and status asks to Maker even unnamed or mid-stage — not
+ordinary build/fix asks — and carries the decision-capture and aside rules; `## Project knowledge`
+(≤ 300 chars) names the Maker invocation and the procedure file path.
+
+**Briefing (the digest)**: `hm world_model digest --root . --session-id "$HM_SESSION_ID"` is
+read-only on world state, ≤ 1,500 bytes, and always exits 0. Claude Code injects it at skill load
+with `!` through a fail-soft chain —
+`… 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{"unavailable":"digest"}\n'` — so exactly one JSON line arrives even on failure (no `{ …; }`
+group: a permission matcher splits on `|`/`||`, and a piece starting with `{` matches no rule).
+The skill's `allowed-tools` pre-approves only `Bash(<hm> world_model:*)`,
+`Bash(<hm> autopilot narrow:*)`, `Bash(tail:*)`, `Bash(grep:*)` and `Bash(printf:*)`, where `<hm>`
+is `uv run --with <plugin path> hm`. Codex runs the same command as a bash block; Cursor's `!` support is
+unverified, so the skill tells the model to run the digest itself when no JSON appears.
+
+| Field | Content |
+|---|---|
+| `tasks` | ≤ 5, newest first: `slug`, `next_stage` (derived from artifacts: approved SPEC → REVIEW → APPROVED REVIEW → verify marker), `last_stage`, `last_seen`, `other_session`, `parked`, `latest_artifact {name, at}` |
+| `more` | tasks beyond the five |
+| `autopilot` | this session's autopilot state |
+| `intents` | `counts`, `items`, `active[] {id, metric_id, last, target, gap}` — values from `hm intent status`, `—` when absent |
+| `recent` | recent commits |
+
+Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`). A task is `parked` when
+RESEARCH is its only artifact, that RESEARCH's frontmatter `created` is more than 7 days old and it
+has no commit beyond base; parked tasks sort last, and an absent `created` is never parked. Over
+the byte cap the digest drops, in order: `recent` → intents beyond 3 → tasks down to 3 →
+`last_seen`/`last_stage` → `latest_artifact`; `other_session` is never dropped. Each run appends
+`{ts, event: "maker_load", session_id}` to `.claude/observability/world-model.jsonl`
+(best-effort, no request text), so Maker use is countable on every runtime.
+
+**Start → scope**: Maker picks the end stage from the ask — research cues → research, spec cues →
+spec, build/만들어/고쳐 → the full pipeline, unclear → research — and names entry and end in one
+route line. A research-only ask enters research, never spec. While autopilot is active, Maker runs
+`hm autopilot narrow --until <end> --root . --session-id "$HM_SESSION_ID"` on every ask (`wrapup`
+for the full pipeline); it never arms autopilot. `narrow` takes `restore_pipeline` (or `pipeline`
+when not narrowed) as its base and writes `pipeline = base[..end]`, `restore_pipeline = base`; it
+never changes level, `created_at` or session. At `gated`, with no marker, or with a foreign/stale
+marker it writes nothing (exit 0, JSON reason). On a narrowed marker, `--until <armed end>` — or
+`--until wrapup` when the armed pipeline lacks wrapup — restores the armed pipeline (the undo
+path); any other unknown stage leaves it. The same verb is available as
+`harness-maker autopilot narrow --until <stage>`. The marker's `restore_pipeline` field is optional, so pre-upgrade markers
+still load.
+
+**Resume**: names the task's `latest_artifact` and its time before entering `next_stage`; a
+missing or null artifact → "no artifact recorded" plus a listing of its `work-docs/`/`specs/`
+files. A missing `other_session` is "unknown", not false → ask once. With autopilot active, Resume
+first runs `narrow --until wrapup` to undo a leftover narrowing. Two or more tasks → one closed
+question listing each slug with its `next_stage`.
+
+**Decision capture**: a decision or scope change made in conversation about an in-flight task is
+written into its most downstream artifact (PLAN, else SPEC, else RESEARCH) before replying.
+
+**Mid-stage asides**: talking to Maker while a stage runs gets an aside that opens `<Name> —`,
+is at most 6 lines and records decisions as above. New work goes under `## Queued asks` in that
+artifact and is offered at the stage's STOP — never started mid-stage. The aside ends with one
+`↩ <stage> · <step>` line and the stage continues.
 
 ---
 
@@ -2074,6 +2179,11 @@ Always recommended to review with the security-scanner skill (or `/hm:verify` Ch
 # Language settings (language for interview and document output)
 locale: ko               # en | ko | ja | others → en fallback
 
+# World model router (§7.15) — asked right after locale; absent = Maker / maker
+world_model:
+  name: Maker
+  handle: maker          # renders .claude/skills/maker/ and .agents/skills/maker/
+
 # Target IDEs (multi-select)
 targets:
   - claude-code
@@ -2244,7 +2354,7 @@ Cold tier → git log, work-docs/PLAN-*.md       (decision history)
 - `wiki.md`: Classified with category tags like `[wiki:pattern]`, `[wiki:convention]`. Instantly searchable with `rg -F "[wiki:" wiki.md`. `[wiki:fact]` is a distinct category for code-absent project facts (external-system behavior, ops quirks, corrected assumptions) captured by the `project-knowledge` skill, never overwritten by a dev-pattern entry and vice versa.
 - `failures.md`: Tags like `[fail:import]`, `[fail:hook]`. **Same slug increments count instead of creating duplicate section**. Track repeated patterns with `rg -F "[fail:" failures.md`.
 
-When the next session's execute loads the Warm tier, it uses `rg -F "[fail:" failures.md` to target-search only failure patterns relevant to the current work area. No need to read the entire file.
+When a later stage loads the Warm tier, `memory_retrieve` surfaces only the entries relevant to the current topic — no need to read the entire file. The whole output has one 8,192-byte cap. Lexical hits come first; the count floor (at most 3 high-recurrence failures) only fills the slots left when eligible lexical hits number fewer than k, and a lexical hit the cap dropped is never re-admitted as floor. Each dated entry shows only its newest dated bullet (undated entries their first paragraph), and the fenced topic is clipped to 200 codepoints. The old `--floor-entry-bytes` / `--floor-byte-cap` flags were removed.
 
 ---
 

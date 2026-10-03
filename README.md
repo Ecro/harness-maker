@@ -30,6 +30,8 @@
 > **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
+> `world-model` renders as Maker (`.claude/skills/<handle>/`). `intent-layer` and `project-knowledge` are typed-only — not model-invocable — and are otherwise reached through Maker ([below](#maker--the-world-models-front-door)).
+>
 > <!-- hm-doc-contract:mechanisms:start -->
 > **Current mechanisms:** M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, M17, M18, M19
 > <!-- hm-doc-contract:mechanisms:end -->
@@ -58,6 +60,7 @@ Design notes and field reports live on [EdgeLog][edgelog], the maintainer's embe
 [Why](#why-harness-maker) ·
 [How it fits](#how-it-fits-your-project) ·
 [Quickstart](#quickstart) ·
+[Maker](#maker--the-world-models-front-door) ·
 [Features](#features) ·
 [How it works](#how-it-works) ·
 [Slash commands](#slash-commands-the-harness-exposes) ·
@@ -157,7 +160,7 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Preset** | `Side` · `Production` | Reviewer count (1 vs 5), workflow stage count, security gate depth, verify-required flag |
 | **Targets** | `claude-code` · `cursor` · `codex` (multi-select) | Which IDE-native asset trees are rendered |
 | **Locale** | `en` · `ko` · any tag | Interview text + user-facing error messages |
-| **World model name** | Default `Maker` (`/maker`) · any name | Names the one router skill you start work from (`/<handle>`); the single front door: the intent/knowledge skills are not model-invocable and are reached through it (or by typing them); stored as `world_model.name` / `world_model.handle` in `harness.yaml`, asked right after locale |
+| **World model name** | Default `Maker` (`/maker`) · any name | Names the one skill you start work from — `/<handle>` (Claude Code, Cursor), `$<handle>` (Codex), or by name. It is the only entrance to `intent-layer` / `project-knowledge`, which run otherwise only when typed. Asked right after locale; stored as `world_model.name` / `world_model.handle` in `harness.yaml` (absent → `Maker` / `maker`). See [Maker](#maker--the-world-models-front-door) |
 | **Reviewers / skills** | Preset defaults + overrides | Which reviewers are active + agent model tiers (the full agent/skill set always installs) |
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
@@ -223,6 +226,7 @@ For the mechanics behind each step — full procedures, decision paths, internal
 - [Why harness-maker?](#why-harness-maker)
 - [How it fits your project](#how-it-fits-your-project)
 - [Quickstart](#quickstart)
+- [Maker — the world model's front door](#maker--the-world-models-front-door)
 - [Requirements](#requirements)
 - [Features](#features)
 - [How it works](#how-it-works)
@@ -390,6 +394,36 @@ harness-maker make . --promote NAME    # move an ad-hoc artifact into the harnes
 
 ---
 
+## Maker — the world model's front door
+
+The world model is what the harness keeps between sessions: **intents** (goals, metrics, open questions), **project facts** the code does not show, and **task state** (which task is at which stage). Maker is the one skill you start from. The interview names it right after locale; the default is `Maker`, invoked as `/maker` (Claude Code, Cursor), `$maker` (Codex), or by addressing it by name.
+
+| You say | Route |
+|---|---|
+| nothing, "status", "where are we" | **Briefing** — read-only |
+| "add / fix / investigate X", "research X", "spec X", "build X" | **Start** — one line naming the entry stage and end point, then `/hm:research` or `/hm:spec` |
+| "continue", "resume" | **Resume** the task where it stopped |
+| a goal, metric, assumption or intent; a project fact | **Goals and facts** — recorded through the intent or knowledge procedure |
+| "what next?" | **Briefing** plus 2–4 options; starts no stage |
+
+**The only entrance.** `intent-layer` and `project-knowledge` are not model-invocable. Typing `/intent-layer` or `/project-knowledge` (`$…` on Codex) still runs them; otherwise Maker reads their procedure before any write, and their ask-before-write rule is unchanged. An always-loaded `## World model` pointer in `CLAUDE.md` / `AGENTS.md` / `.cursor/rules/harness.mdc` sends goal, metric, fact and status requests to Maker even when you don't name it, and even mid-stage. Ordinary build and fix requests are not rerouted. `/hm:` stages still run when typed, or via Maker, autopilot or `/hm:loop`.
+
+**Scope follows the ask.** "research X" ends at research, "spec X" at spec, "build X" / "fix X" runs the full pipeline; an unclear ask starts at research. With autopilot armed, Maker runs `hm autopilot narrow --until <end>` on every ask, so "research X" stops after research and the armed pipeline is restored at that boundary. Maker never arms autopilot.
+
+**Talking to Maker while a stage runs.** An aside opens with `Maker —` and is at most 6 lines. A decision or scope change about an in-flight task is written into its most downstream artifact (PLAN, else SPEC, else RESEARCH) before Maker replies. New work goes under `## Queued asks` in that artifact and is offered at the stage's STOP — never started mid-stage. The aside ends with one `↩ <stage> · <step>` line and the stage continues.
+
+**Resume** names the task's latest artifact and its time before entering the next stage, or says "no artifact recorded" and lists the task's files. If another session touched the task last, or that is unknown, Maker asks once first; with several open tasks it asks one closed question. Under autopilot it first undoes any leftover narrowing.
+
+**The briefing** is one digest (`hm world_model digest`), at most 1.5 KB and read-only on project state. It shows:
+
+- up to 5 tasks, newest first: next stage (derived from the task's artifacts), last stage, latest artifact, whether another session touched it last, and `parked` (only a RESEARCH older than 7 days, no commits; sorted last);
+- active intents with their metric's `last` / `target` / `gap`;
+- autopilot state and recent commits.
+
+Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`). Claude Code injects the digest when Maker loads; on Codex, and wherever no digest appears, Maker runs the command itself. Each briefing appends one `maker_load` line (timestamp and session id, no request text) to `.claude/observability/world-model.jsonl`.
+
+---
+
 ## Requirements
 
 | Dependency | Notes |
@@ -435,7 +469,7 @@ Grouped by what they do for your project, not by component.
 
 - **Block-merge preservation.** Hand-tune any agent, skill, CLAUDE.md section. Survives `--update` because content hashes per file plus `@hm:user:*` markers separate your edits from template-owned regions. `@hm:harness:*` inverted markers do the opposite for foreign config absorption.
 - **Accumulating memory.** `wiki.md` (patterns) · `failures.md` (recurring mistakes deduplicated by slug) are written automatically by each `/hm:wrapup` and surfaced by later stages. `session/<date>.md` holds compaction checkpoints only — written by the `flush_session` hook for interrupted-session resume.
-- **Code-absent project facts.** The `project-knowledge` skill captures things no diff reveals — external-system behavior, ops quirks, corrected assumptions — as a `[wiki:fact]` entry, distinct from the dev-only wiki categories above. It reuses only a `[wiki:fact]` slug (never overwrites a dev pattern/gotcha) and never records an inferred fact. A ≤300-char pointer in `CLAUDE.md`/`AGENTS.md`/`.cursor/rules/harness.mdc` routes facts to it even when the skill doesn't auto-trigger.
+- **Code-absent project facts.** The `project-knowledge` skill captures things no diff reveals — external-system behavior, ops quirks, corrected assumptions — as a `[wiki:fact]` entry, distinct from the dev-only wiki categories above. It reuses only a `[wiki:fact]` slug (never overwrites a dev pattern/gotcha) and never records an inferred fact. It is typed-only: reach it through Maker ("remember that …") or by typing `/project-knowledge`. A ≤300-char pointer in `CLAUDE.md`/`AGENTS.md`/`.cursor/rules/harness.mdc` names the Maker invocation and the procedure file, so a project fact lands in the shared wiki, not host auto-memory.
 - **Self-improving failure proposals.** When a `[fail:*]` slug recurs 3× across sessions, wrapup writes a proposal to `pending-proposals.md` — a new skill, rule, or hook that would have prevented the recurrence. You review and decide whether to ingest.
 - **ADR system as binding execute constraints.** The SPEC's `irreversible_decisions` and the ADRs `/hm:execute` Step 0 records while authoring the PLAN are hard constraints on the implementation. Conflicts surface as blockers, never silently proceed. Future sessions don't re-litigate settled decisions.
 - **Refdocs search.** Register architecture docs, API specs, design docs in `harness.yaml`. `refdocs-search` skill gives lossless full-text search — no chunking, no RAG index.
@@ -452,9 +486,9 @@ Grouped by what they do for your project, not by component.
 
 - **Deep interview before every implementation.** `/hm:spec` runs a 6-category interview (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification) scored for completeness. The decisions that cannot be cheaply undone are locked in that same interview as `irreversible_decisions`; the *how* — phases, ordering, risk — is authored by `/hm:execute` Step 0 with no human gate.
 - **Autoloop with adaptive interview + 4-gate convergence.** `/hm:loop` runs time-and-iteration-bounded loops. `autoloop-driver` reads the goal, asks only what's missing, locks intensity + exit checklist, then requires mechanical checks + LLM judgment + regression comparison + 2-iter convergence streak before accepting completion.
-- **3-tier context loading + compaction recovery.** Hot tier (today's session) · Warm tier (failures + wiki first 60/40 lines) · Cold tier (git log / PLANs on demand). `PreCompact` hook flushes session before context compaction; next turn detects the marker and resumes from the last in-progress phase.
+- **3-tier context loading + compaction recovery.** Hot tier (today's session) · Warm tier (wiki/failures entries matched to the stage topic — lexical hits first, up to 3 high-recurrence failures only in slots left over, one 8 KB cap for the whole block) · Cold tier (git log / PLANs on demand). `PreCompact` hook flushes session before context compaction; next turn detects the marker and resumes from the last in-progress phase.
 - **Cross-process memory safety.** `.claude/memory/` writers serialise via re-entrant POSIX flock. Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤PIPE_BUF) so concurrent Claude Code + Cursor sessions cannot interleave JSONL lines.
-- **Intent layer — purpose, metrics and accountable work.** `.claude/intent.yaml` holds purpose, metrics, open questions and optional owner/dri/team roles; `intent/<ID>.md` records each intent across one or more SPECs. `hm intent status` combines gaps, revisits and withdrawal; writes remain answer-gated. Owners warnings are advisory, and `hm intent migrate` preserves legacy approvals and history. `hm world` remains a deprecated alias for one release.
+- **Intent layer — purpose, metrics and accountable work.** `.claude/intent.yaml` holds purpose, metrics, open questions and optional owner/dri/team roles; `intent/<ID>.md` records each intent across one or more SPECs. `hm intent status` combines gaps, revisits and withdrawal; writes remain answer-gated. Reached through Maker or by typing `/intent-layer`. Owners warnings are advisory, and `hm intent migrate` preserves legacy approvals and history. `hm world` remains a deprecated alias for one release.
 
 ### 🔧 Advanced features — *background mechanisms, tunable but not in the way*
 
@@ -550,7 +584,8 @@ required, and stops at the ones where it is.
   ```
 - **To turn it off**, set `autonomy.level: gated` and `autopilot_persistent: false` in
   `harness.yaml`. Per-session control is `harness-maker autopilot on|off`; `autopilot narrow`
-  stops the armed pipeline earlier (it never widens — re-arm with `--until wrapup` to undo).
+  stops the armed pipeline earlier and restores it at that boundary (it never widens; `narrow --until wrapup`,
+  or the armed end stage, undoes it). Maker runs it on every ask while autopilot is armed.
 - **Mandatory human gates always stop the chain** — a `/hm:spec` acceptance interview,
   a `/hm:review` `CHANGES_REQUESTED`, the `/hm:wrapup` commit/push, or a `/hm:verify`
   failure. These safety gates are non-negotiable at every level (`full` does **not**

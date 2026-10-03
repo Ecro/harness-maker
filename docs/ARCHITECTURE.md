@@ -15,7 +15,8 @@ Three design commitments shape every decision below:
 ### Feedback and host-specific continuation
 
 Stage entry/resume, material observations and closeout follow the existing
-intent-layer workflow-feedback reference. Authoritative records stay in
+intent-layer workflow-feedback reference (a file stages read; the `intent-layer`
+skill itself is typed-only and is reached through Maker, below). Authoritative records stay in
 `intent/`, `specs/`, `work-docs/` and shared intent state; PLAN Feedback holds
 evidence locators, write/readback or pending dispositions and the next decision.
 Measurements precede closure; existing consent applies only to the same scope.
@@ -29,6 +30,26 @@ Real-use validation has a separate activation and three first-start-ordered task
 rows. One named collector writes the authoritative base-root trial PLAN; other
 agents provide local source events. Aborts, failures and missing evidence remain
 visible. Implementation completion and trial outcome are separate.
+
+### World model front door (Maker)
+
+The world model (intent layer + project knowledge + task state) has one front
+door: a router skill named at onboarding (default `Maker`, handle `maker`),
+rendered from `templates/skills/world-model/SKILL.md.j2` at
+`.claude/skills/<handle>/` and `.agents/skills/<handle>/`. `intent-layer` and
+`project-knowledge` are not model-invocable (`disable-model-invocation: true`;
+Codex `agents/openai.yaml` with `allow_implicit_invocation: false`); Maker Reads
+their SKILL.md before any write, and typing their names still runs them. The
+always-loaded `## World model` pointer routes unnamed goal, metric, fact and
+status asks to Maker.
+
+Maker briefs from `world_model_digest.py` (`hm world_model digest`): one JSON
+object, ≤ 1,500 bytes, always exit 0, injected at skill load on Claude Code. On
+a start it scopes an armed autopilot session with `hm autopilot narrow --until
+<stage>` (`autopilot.narrow`), which only shrinks the armed pipeline (never
+arms or widens) and saves it in the marker's `restore_pipeline`; the stage
+boundary restores it at the narrowed end. Details:
+[`docs/reference/world-model.md`](reference/world-model.md).
 
 ### Codex-native setup and independent Claude review
 
@@ -123,12 +144,16 @@ the final replacement.
         │    refresh.md       ◀── M4 anti-rot, manual confirm │
         │  second_brain       ◀── typed Obsidian R/W memory    │
         │                          with project namespaces     │
-        │  skills/  (14)      ◀── including verify-before,    │
+        │  skills/            ◀── including verify-before,    │
         │                          conditional-router,        │
         │                          refdocs-search,            │
         │                          targeted-test-selection,   │
-        │                          project-knowledge,         │
         │                          worktree-isolator, ...     │
+        │  skills/<handle>/   ◀── Maker world-model router:   │
+        │                          the only entrance to       │
+        │                          intent-layer and           │
+        │                          project-knowledge (both    │
+        │                          typed-only)                │
         │  agents/            ◀── M12 reviewer/executor       │
         │                          privilege separation       │
         │  settings.json      ◀── permissions + HOOKS         │

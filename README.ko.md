@@ -30,6 +30,8 @@
 > **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
+> `world-model` 은 Maker 로 렌더된다 (`.claude/skills/<handle>/`). `intent-layer` 와 `project-knowledge` 는 직접 입력해야만 실행되고 (모델이 스스로 호출하지 않음), 그 외에는 Maker 를 거쳐 도달한다 ([아래](#maker--world-model-입구)).
+>
 > <!-- hm-doc-contract:mechanisms:start -->
 > **현재 메커니즘:** M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, M17, M18, M19
 > <!-- hm-doc-contract:mechanisms:end -->
@@ -43,6 +45,7 @@
 [왜?](#왜-harness-maker) ·
 [어떻게 맞춰지나](#어떻게-내-프로젝트에-맞춰지나) ·
 [빠른 시작](#빠른-시작) ·
+[Maker](#maker--world-model-입구) ·
 [특장점](#특장점) ·
 [Comparison](README.md#how-it-compares) ·
 [Configuration](README.md#configuration) ·
@@ -138,7 +141,7 @@ action items).
 | **Preset** | `Side` · `Production` | Reviewer 개수 (1 vs 5), 워크플로 stage 수, 보안 게이트 깊이, verify-required 플래그 |
 | **Targets** | `claude-code` · `cursor` · `codex` (다중 선택) | 어떤 IDE-native 자산 트리가 렌더되나 |
 | **Locale** | `en` · `ko` · 임의 태그 | 인터뷰 텍스트 + 사용자 대면 에러 메시지 |
-| **World model 이름** | 기본 `Maker` (`/maker`) · 임의 이름 | 작업을 시작하는 단일 라우터 skill 이름 (`/<handle>`). `harness.yaml` 의 `world_model.name` / `world_model.handle` 에 저장되며 locale 직후에 묻는다 |
+| **World model 이름** | 기본 `Maker` (`/maker`) · 임의 이름 | 작업을 시작하는 단 하나의 skill 이름 — `/<handle>` (Claude Code, Cursor), `$<handle>` (Codex), 또는 이름으로 부르기. `intent-layer` / `project-knowledge` 로 가는 유일한 입구이며, 두 skill 은 그 외엔 직접 입력할 때만 실행된다. locale 직후에 묻고 `harness.yaml` 의 `world_model.name` / `world_model.handle` 에 저장 (없으면 `Maker` / `maker`). [Maker](#maker--world-model-입구) 참조 |
 | **Reviewers / skills** | Preset default + 오버라이드 | 어떤 reviewer가 활성화되고 agent model tier가 어떻게 되나 (agent·skill 전량은 항상 설치) |
 | **Ref folders** | 경로 + glob 쌍 | `refdocs-search` skill로 검색 가능한 외부 문서 |
 | **Sibling repos** | 상대 경로 | 같은 하네스 세션을 공유할 인접 repo |
@@ -347,6 +350,36 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 
 ---
 
+## Maker — world model 입구
+
+World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent** (목표·지표·열린 질문), 코드에 드러나지 않는 **프로젝트 사실**, 그리고 **작업 상태** (어떤 작업이 어느 단계에 있는지). Maker 는 작업을 시작하는 단 하나의 skill 이다. 인터뷰가 locale 직후에 이름을 정하고, 기본값은 `Maker` — `/maker` (Claude Code, Cursor), `$maker` (Codex), 또는 이름으로 불러서 호출한다.
+
+| 이렇게 말하면 | 경로 |
+|---|---|
+| 빈 입력, "status", "어디까지 됐어" | **Briefing** — 읽기 전용 |
+| "X 추가 / 수정 / 조사", "X 리서치해줘", "X 스펙 잡자", "X 만들어줘" | **Start** — 진입 단계와 종료 지점을 한 줄로 밝히고 `/hm:research` 또는 `/hm:spec` 진입 |
+| "이어서", "continue", "resume" | **Resume** — 멈춘 곳에서 작업 재개 |
+| 목표·지표·가정·intent; 프로젝트 사실 | **Goals and facts** — intent 또는 knowledge 절차로 기록 |
+| "뭐 하지?", "what next?" | **Briefing** + 선택지 2–4개; 어떤 단계도 시작하지 않음 |
+
+**유일한 입구.** `intent-layer` 와 `project-knowledge` 는 모델이 스스로 호출하지 않는다. `/intent-layer` 나 `/project-knowledge` (Codex 는 `$…`) 를 직접 입력하면 여전히 실행되고, 그 외에는 Maker 가 쓰기 전에 해당 절차를 읽는다. 쓰기 전에 묻는 규칙은 그대로다. `CLAUDE.md` / `AGENTS.md` / `.cursor/rules/harness.mdc` 에 항상 로드되는 `## World model` 포인터가 목표·지표·사실·현황 요청을 이름을 부르지 않아도, 단계 진행 중에도 Maker 로 보낸다. 일반적인 만들기·고치기 요청은 경로가 바뀌지 않는다. `/hm:` 단계는 여전히 직접 입력하거나 Maker, autopilot, `/hm:loop` 를 통해 실행된다.
+
+**범위는 요청을 따른다.** "X 리서치해줘" 는 research 에서, "X 스펙 잡자" 는 spec 에서 끝나고, "만들어줘" / "고쳐줘" 는 전체 파이프라인을 돈다. 불분명한 요청은 research 에서 시작한다. autopilot 이 켜져 있으면 Maker 는 매 요청마다 `hm autopilot narrow --until <end>` 를 실행한다 — "X 리서치해줘" 는 research 후 멈추고, 그 경계에서 원래 armed 파이프라인이 복원된다. Maker 는 autopilot 을 켜지 않는다.
+
+**단계 진행 중 Maker 에게 말하기.** 곁답은 `Maker —` 로 시작하고 6줄 이내다. 진행 중인 작업에 대한 결정이나 범위 변경은 답하기 전에 그 작업의 가장 하위 산출물 (PLAN, 없으면 SPEC, 없으면 RESEARCH) 에 기록된다. 새 작업은 그 산출물의 `## Queued asks` 에 쌓이고 단계의 STOP 에서 제안된다 — 단계 도중에 시작하지 않는다. 곁답은 `↩ <stage> · <step>` 한 줄로 끝나고 단계는 계속된다.
+
+**Resume** 은 다음 단계에 들어가기 전에 작업의 최신 산출물과 그 시각을 밝히거나, "no artifact recorded" 라고 말하고 작업 파일 목록을 보여준다. 다른 세션이 마지막으로 손댔거나 그 여부를 모르면 먼저 한 번 묻고, 열린 작업이 여럿이면 닫힌 질문 하나로 고르게 한다. autopilot 아래에서는 남은 narrowing 을 먼저 되돌린다.
+
+**Briefing** 은 digest 하나 (`hm world_model digest`) 로, 최대 1.5 KB 이며 프로젝트 상태를 바꾸지 않는다. 보여주는 것:
+
+- 작업 최대 5개, 최신순: 다음 단계 (산출물에서 도출), 마지막 단계, 최신 산출물, 다른 세션이 마지막으로 손댔는지, `parked` (7일 넘은 RESEARCH 하나뿐이고 커밋 없음; 맨 뒤로 정렬);
+- 활성 intent 와 그 지표의 `last` / `target` / `gap`;
+- autopilot 상태와 최근 커밋.
+
+`hm/<slug>` 작업 worktree 만 나열된다 (`worktree.enabled: true`). Claude Code 는 Maker 가 로드될 때 digest 를 주입하고, Codex 나 digest 가 보이지 않는 곳에서는 Maker 가 명령을 직접 실행한다. briefing 마다 `.claude/observability/world-model.jsonl` 에 `maker_load` 한 줄 (타임스탬프와 session id, 요청 본문 없음) 이 추가된다.
+
+---
+
 ## 특장점
 
 무엇이 컴포넌트인지가 아니라, 그것이 **당신의 프로젝트에 무엇을 해주는지**로 그룹화.
@@ -403,7 +436,7 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 - **권장 순서.** 사소하지 않은 변경은 6-stage 시퀀스를 순서대로 따르는 것을 권장합니다 — `/hm:research` → `/hm:spec` → `/hm:execute` → `/hm:review` → `/hm:verify` → `/hm:wrapup`. 각 stage의 출력이 다음 stage로 이어지며, `/hm:execute`로 바로 건너뛰면 SPEC 게이트·consensus 리뷰·verify 체크를 잃습니다. stage 사이 hand-off 없이 이어가려면 `/hm:loop`(경계 있는 autoloop) 또는 autopilot 을 사용하세요.
 - **구현 전 깊은 인터뷰.** `/hm:spec`이 6-카테고리 인터뷰 (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification)를 완전성 점수화하여 실행. 되돌리기 어려운 결정은 같은 인터뷰의 `irreversible_decisions` 로 잠기고, phase·순서·위험 같은 *how* 는 `/hm:execute` Step 0 이 사람 게이트 없이 직접 씁니다.
 - **적응형 인터뷰 + 4-게이트 수렴 autoloop.** `/hm:loop`이 time-and-iteration-bounded 루프 실행. `autoloop-driver`가 goal을 읽고 누락된 것만 질문, loop intensity + exit checklist lock, 그 후 mechanical check + LLM judgment + regression 비교 + 2-iter convergence streak가 완료 수락 전 모두 필요.
-- **3-tier 컨텍스트 로딩 + compaction 복구.** Hot tier (오늘 session) · Warm tier (failures + wiki 첫 60/40줄) · Cold tier (git log / PLAN on demand). `PreCompact` hook이 context compaction 전에 session flush; 다음 turn이 마커를 감지하고 마지막 in-progress phase에서 resume.
+- **3-tier 컨텍스트 로딩 + compaction 복구.** Hot tier (오늘 session) · Warm tier (stage 주제에 맞는 wiki/failures 항목 — lexical 매치 우선, 남는 슬롯에만 고재발 failure 최대 3개, 블록 전체에 8 KB 상한 하나) · Cold tier (git log / PLAN on demand). `PreCompact` hook이 context compaction 전에 session flush; 다음 turn이 마커를 감지하고 마지막 in-progress phase에서 resume.
 - **Cross-process 메모리 안전성.** `.claude/memory/` 쓰기는 re-entrant POSIX flock으로 serialize. Telemetry hook이 `O_APPEND`에 raw `os.write()`로 원자적 append (single-syscall, ≤PIPE_BUF) — concurrent Claude Code + Cursor 세션이 JSONL 라인을 interleave 불가.
 
 각 기능의 완전한 메커니즘 — 모든 절차, 결정 경로, 내부 invariant — 는 [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md) 참조.
