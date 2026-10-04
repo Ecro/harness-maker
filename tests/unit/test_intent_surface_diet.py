@@ -288,7 +288,7 @@ S57_RULES = (
     r"re-offer a `failed` one once",
     r"fails again[^.;]{0,30}`declined`",
     r"the Step 1 read is the readback",
-    r"a row taken from a SPEC or RESEARCH table in that table too",
+    r"a row taken from a SPEC or RESEARCH table in its own table as well as in the PLAN table",
 )
 
 

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Wrapup Step 5.7 hardening.** Step 5 now marks SPEC/RESEARCH source rows in their own table (not only
+  the PLAN table) for recorded, failed and declined outcomes. Every non-file argument on a 5.7 or close
+  shell line gets a whole-value format check just before the write (question/metric id `[a-z0-9_]+`,
+  intent id `[A-Z0-9][A-Z0-9-]*`, `--value` numeric, `--locator` `path:N-M`, enums from the listed values).
+  A malformed value skips only its item, the printed line names the argument and item kind and never the
+  value, and the row goes through the existing re-offer rule. The close block skips the question when the
+  intent id is malformed. Wrapup grows by 1018 chars (Claude) and 1017 (Codex).
+
 ### Removed
 
 - **Intent trial machinery.** `hm intent trial`, `hm intent reconcile` and `hm intent record-decision`

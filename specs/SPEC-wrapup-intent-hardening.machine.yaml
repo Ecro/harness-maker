@@ -1,0 +1,200 @@
+schema_version: 3
+spec_slug: wrapup-intent-hardening
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Template-prose change; no Python behaviour under test,
+  so mutation testing does not apply. Render tests pin the outcome.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Source rows are marked in their own table
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_intent_hardening.py::test_ac001_source_rows_marked_in_own_table
+  executable_predicate: all(w in sentence_with('in its own table as well as in the
+    PLAN table', step(rendered_57(arm), 5)) for w in ('recorded', 'failed', 'declined'))
+    and 'in that table too' not in rendered_57(arm)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The required meaning (mark a SPEC/RESEARCH row in the table it
+    lives in) and the banned phrase were fixed by the intent-surface-diet confirm-1
+    core finding and this SPEC's S1 before any template edit; checked on every arm.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Every non-file shell argument has a stated format
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_intent_hardening.py::test_ac002_every_arg_has_a_format
+  - tests/unit/test_wrapup_intent_hardening.py::test_ac002_inventory_kept
+  executable_predicate: all(p in rendered_57_and_close(arm) for p in FORMAT_PATTERNS)
+    and 'whole value' in rendered_57(arm) and set(placeholders(golden_57(arm))) <=
+    set(placeholders(rendered_57(arm))) and all(ruled(a) for a in placeholders(rendered_57_and_close(arm)))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The rule set comes from the CLI's own id regexes (intent.py:45
+    [a-z0-9_]+, world.py:75 [A-Z0-9-]+); the five whole-value patterns are fixed literally
+    in SPEC S3 before the edit. The argument inventory is taken from the pre-change
+    golden render (f57cef3b), so a dropped argument fails the superset check.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: A malformed argument skips only its item
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_intent_hardening.py::test_ac003_malformed_skips_item
+  executable_predicate: MALFORMED_LINE in step(rendered_57(arm), 5) and all(w in malformed_clause(arm)
+    for w in ('run nothing', 'continue', 'failed', 'declined', 'name')) and edit_step_index(arm)
+    < check_index(arm) < run_index(arm)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The skip-item policy and the printed line were chosen by the DRI
+    in round 1 (skip + one line, matching review 3.3); the re-offer rule and name-only
+    logging were fixed in SPEC S2 before implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Close refuses a malformed intent id
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_intent_hardening.py::test_ac004_close_rejects_malformed_id
+  executable_predicate: CLOSE_SKIP_LINE in close_block(arm) and close_block(arm).index(CLOSE_SKIP_LINE)
+    < close_block(arm).index('Close intent')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The skip line is fixed by this SPEC's S4; position before the close
+    question is required so no question is asked for a malformed id.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Wrapup text outside 5.7 is unchanged
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_intent_hardening.py::test_ac005_render_outside_57_unchanged
+  executable_predicate: strip_57(normalized(render_wrapup(arm))) == strip_57(golden_wrapup(arm))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Goldens are the pre-change wrapup renders captured from commit
+    f57cef3b templates in a detached worktree, install path normalized to <SRC>, never
+    regenerated after the template edit. strip_57 removes from the '#### 5.7' heading
+    up to the '### Steps 6' heading only.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Moved budgets carry attribution and the suite is green
+  type: mechanical
+  test_ids:
+  - tests/structural/test_baseline_delta_attribution.py::test_every_changed_key_has_an_attribution_row
+  - tests/structural/test_surface_baseline.py::test_the_committed_numbers_carry_the_generators_digest
+  - tests/structural/test_roundtrip_budget.py::test_the_shipped_total_is_not_higher_than_the_table
+  executable_predicate: structural_suite_exit_code() == 0 and baseline_delta_rows('wrapup-intent-hardening')
+    >= 1
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The structural ratchets (surface baseline, snapshots, gate golden,
+    line pin) are pre-existing independent oracles; the attribution-row requirement
+    is enforced by test_baseline_delta_attribution, not by this task.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 6f1ebac51d333abffcc87d4810946a5b4d77e53b4f513619b98b3b028ae31d59
+  approved_by: Ecro
+  approved_at: '2026-10-04T10:18:52Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 28bd0decbb54f0999f14a39f8fb1df3d0c0b66c414ab8349c67b7ad9ce495f70
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 4efe2d159ce71717c8ec286ac2bda476174ab016f21fc1ff6a9113d42cb46f85
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 99cd1650b87b939bcd600ace0e96a6a0a50e552c5720e1d194bd11a61a9186d9
+    AC-002: b7fe2e76eafbdfc08f6c057c7c9c70d501fcabdc73d3128698391613f51ed1e9
+    AC-003: 282b19b5710347d52d2e2b10226ebdc85f3796b47fa18e85a6bbd95bf2fb7f12
+    AC-004: c8bee142fa5e26cee8e63886008e1f1185813d44e655ab087c513145135684ec
+    AC-005: dc3e3b109f291a892b5023a73032cb3b46f18bfc2cbb844341751632e6cbcc45
+    AC-006: 39f1d8065757f5a86506b80bbd78bec667e71773498765197b9fda6462358f07
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923

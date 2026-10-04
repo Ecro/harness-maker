@@ -25,6 +25,11 @@ diff (still offering any `pending` rows written before the change) and creates t
 the Step 4.9 draft and the `rejected[]`/`revisits` check were removed. (The trial itself was
 deleted in intent-layer-diet.)
 
+Update (2026-10-04, wrapup-intent-hardening): Step 5.7 marks SPEC/RESEARCH source rows in
+their own table, and every non-file shell argument (ids, `--value`, `--locator`, enums) gets a
+whole-value format check just before the write; a malformed value skips only its item and is
+never echoed.
+
 Codex executes the next local stage skill after the shared boundary authorizes
 it. Auto-answered judgments are recorded before a terminal halt, and missing
 skills produce a handoff. Claude retains Skill dispatch; Cursor keeps handoff.

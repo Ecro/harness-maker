@@ -1,0 +1,166 @@
+{
+  "Production-claude": {
+    "outside_57_sha256": "05d6ffeb7fbacc09974256f89ad1e544b316db12df4a8408e5ff878260ef562e",
+    "placeholders": [
+      [
+        "--locator",
+        "<path:A-B>"
+      ],
+      [
+        "--observed",
+        "<met|missed|no_data>"
+      ],
+      [
+        "--relation",
+        "<confirms|supersedes|contradicts>"
+      ],
+      [
+        "--status",
+        "<open|confirmed|wrong>"
+      ],
+      [
+        "--value",
+        "<value>"
+      ],
+      [
+        "close",
+        "<id>"
+      ],
+      [
+        "metric record",
+        "<metric-id>"
+      ],
+      [
+        "question add",
+        "<id>"
+      ],
+      [
+        "question observe",
+        "<id>"
+      ]
+    ]
+  },
+  "Production-codex": {
+    "outside_57_sha256": "2d350c1f31f469e4a3383b99b0e75e5ebba72685bdf62cced1c6665a97c80299",
+    "placeholders": [
+      [
+        "--locator",
+        "<path:A-B>"
+      ],
+      [
+        "--observed",
+        "<met|missed|no_data>"
+      ],
+      [
+        "--relation",
+        "<confirms|supersedes|contradicts>"
+      ],
+      [
+        "--status",
+        "<open|confirmed|wrong>"
+      ],
+      [
+        "--value",
+        "<value>"
+      ],
+      [
+        "close",
+        "<id>"
+      ],
+      [
+        "metric record",
+        "<metric-id>"
+      ],
+      [
+        "question add",
+        "<id>"
+      ],
+      [
+        "question observe",
+        "<id>"
+      ]
+    ]
+  },
+  "Side-claude": {
+    "outside_57_sha256": "9adfc75919ecb1a4279358bac753213e1d3ca818b8e10848821a08b097daf4ee",
+    "placeholders": [
+      [
+        "--locator",
+        "<path:A-B>"
+      ],
+      [
+        "--observed",
+        "<met|missed|no_data>"
+      ],
+      [
+        "--relation",
+        "<confirms|supersedes|contradicts>"
+      ],
+      [
+        "--status",
+        "<open|confirmed|wrong>"
+      ],
+      [
+        "--value",
+        "<value>"
+      ],
+      [
+        "close",
+        "<id>"
+      ],
+      [
+        "metric record",
+        "<metric-id>"
+      ],
+      [
+        "question add",
+        "<id>"
+      ],
+      [
+        "question observe",
+        "<id>"
+      ]
+    ]
+  },
+  "Side-codex": {
+    "outside_57_sha256": "0b3d148a364dc13ba1ac80f96b51ed6ac2f17a9d3ccc32102fbd13c9b93fe001",
+    "placeholders": [
+      [
+        "--locator",
+        "<path:A-B>"
+      ],
+      [
+        "--observed",
+        "<met|missed|no_data>"
+      ],
+      [
+        "--relation",
+        "<confirms|supersedes|contradicts>"
+      ],
+      [
+        "--status",
+        "<open|confirmed|wrong>"
+      ],
+      [
+        "--value",
+        "<value>"
+      ],
+      [
+        "close",
+        "<id>"
+      ],
+      [
+        "metric record",
+        "<metric-id>"
+      ],
+      [
+        "question add",
+        "<id>"
+      ],
+      [
+        "question observe",
+        "<id>"
+      ]
+    ]
+  }
+}

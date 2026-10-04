@@ -27,6 +27,10 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-04, `wrapup-intent-hardening`** — only `wrapup` moved, in all four arms: Step 5.7
+  step 5 gained the whole-value argument check and source-row marking in their own table, and the
+  close block gained the intent-id check (SPEC-wrapup-intent-hardening). Verified before
+  re-capture that `wrapup` is the ONLY moved command in every arm and none was added or removed.
 - **2026-10-04, `intent-surface-diet`** — `execute`, `research`, `review`, `spec`, `verify` and
   `wrapup` moved, in all four arms: the `feedback-entry`/`feedback-close` partial blocks left
   every stage, execute lost its PLAN Feedback-section instruction, spec Step 0.5 lost the
