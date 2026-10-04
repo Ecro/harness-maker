@@ -919,20 +919,10 @@ def _fenced_restore_base_dirty(base: Path, ref_sha: str) -> tuple[bool, str, lis
     already SHA-targeted (wrong-entry-safe), so the unfenced path is exactly the
     pre-change behavior.
     """
-    from harness_maker import intent_trial
-
-    trial_stash = intent_trial.stash_contains_protected_trial(base, ref_sha)
     try:
-        with _acquire_merge_fence(base, timeout=5.0 if trial_stash else _FENCE_TIMEOUT):
-            # Re-check under the fence: a trial may have been activated while we waited.
-            if intent_trial.stash_contains_protected_trial(base, ref_sha):
-                return (False, "protected_trial_pending", [])
+        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
             return _restore_base_dirty(base, ref_sha)
     except (RuntimeError, TimeoutError):
-        # Re-check: a trial may have been activated during the wait, and the fallback
-        # below runs outside every fence.
-        if trial_stash or intent_trial.stash_contains_protected_trial(base, ref_sha):
-            return (False, "protected_trial_pending", [])
         return _restore_base_dirty(base, ref_sha)
 
 
@@ -3650,40 +3640,7 @@ def _cli_finalize(args: list[str]) -> int:
                 # then the squash merge. The fence (a context manager) releases
                 # on every exit, INCLUDING the stash-failure path below.
                 try:
-                    from harness_maker import intent_trial
-
-                    trial_paths = intent_trial.protected_trial_paths(base_repo)
-                    with _acquire_merge_fence(
-                        base_repo, timeout=5.0 if trial_paths else _FENCE_TIMEOUT
-                    ):
-                        trial_paths = intent_trial.protected_trial_paths(base_repo)
-                        if trial_paths:
-                            pending_trial = intent_trial.pending_trial_stashes(base_repo)
-                            if pending_trial:
-                                raise RuntimeError(
-                                    "protected trial stash recovery is pending: "
-                                    + str(pending_trial)
-                                )
-                            dirty_trial = [
-                                relative
-                                for relative in trial_paths
-                                if _run(
-                                    ["git", "status", "--porcelain", "--", relative],
-                                    cwd=base_repo,
-                                ).stdout.strip()
-                            ]
-                            branch_name = _run(
-                                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                                cwd=current_wt,
-                            ).stdout.strip()
-                            branch_trial = (
-                                set(_squash_path_set(base_repo, branch_name)) & trial_paths
-                            )
-                            if dirty_trial or branch_trial:
-                                raise RuntimeError(
-                                    "protected trial would be hidden or overwritten by finalize: "
-                                    + str(sorted(set(dirty_trial) | branch_trial))
-                                )
+                    with _acquire_merge_fence(base_repo, timeout=_FENCE_TIMEOUT):
                         stash_ref = _stash_base_dirty(base_repo, current_wt.name)
                         staged_before = _snapshot_staged_paths(base_repo)
                         merge(current_wt, strategy=strategy, commit=auto_commit)
@@ -3993,13 +3950,6 @@ def _cli_post_commit_pop(args: list[str]) -> int:
 
             # Live session match — pop and clean up.
             wt_name = ref_file.name[len(_STASH_REF_PREFIX) :]
-            from harness_maker import intent_trial
-
-            if intent_trial.stash_contains_protected_trial(target_base, ref_sha):
-                # A trial activated since the stash was taken: never pop over its PLAN.
-                _emit_pop_failure_signal("protected_trial_pending", ref_sha, [], wt_name)
-                overall_rc = 1
-                continue
             ok, klass, files = _restore_base_dirty(target_base, ref_sha)
             if not ok:
                 _emit_pop_failure_signal(klass, ref_sha, files, wt_name)
@@ -4938,9 +4888,8 @@ def task_create(
                 if _branch_exists(base, branch)
                 else ["git", "worktree", "add", "-b", branch, str(wt)]
             )
-            # Trial collection inventories Git-registered worktrees while
-            # holding this same fence. Registration must not appear between
-            # its final source check and publication.
+            # Serialize worktree registration against the other merge-fence
+            # holders (finalize, land) so the registry never changes mid-operation.
             with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
                 _run(add, cwd=base)
         if include and copy_pending.exists():
@@ -5121,16 +5070,6 @@ def task_preflight(
     return wt, warnings
 
 
-def _trial_active(base: Path) -> bool:
-    """ADR-006: an unreadable trial directory counts as active, so evidence is never skipped."""
-    try:
-        from harness_maker import intent_trial
-
-        return bool(intent_trial.active_trials(base))
-    except Exception:
-        return True
-
-
 def _emit_stage_span(
     base: Path,
     *,
@@ -5139,13 +5078,12 @@ def _emit_stage_span(
     task_slug: str | None = None,
     claude_session_id: str | None = None,
 ) -> None:
-    """Require a task start while a trial is active; otherwise telemetry failures only warn.
+    """Telemetry failures only warn — a span never blocks the stage it measures.
 
     `stage=None` writes an EMPTY stage on purpose — see ADR-008: the reader maps it
     to `(unknown-stage)` and counts it, whereas normalising here would leave the
     absent-case counter at 0 forever.
     """
-    required = task_slug is not None and _trial_active(base)
     try:
         from .stage_spans import emit_event
 
@@ -5156,15 +5094,9 @@ def _emit_stage_span(
             session_id=claude_session_id or os.environ.get("HM_SESSION_ID") or None,
             git_branch=git_branch,
             task_slug=task_slug,
-            # Required trial evidence waits as long as a land or finalize may hold the same
-            # fence; a 5 s try failed preflight on normal contention.
-            fence_timeout=_FENCE_TIMEOUT if required else 5.0,
+            fence_timeout=5.0,
         )
     except Exception as exc:
-        if required:
-            raise RuntimeError(
-                f"task start was not recorded for {task_slug}; retry task preflight"
-            ) from exc
         print(f"[span] emission failed (non-fatal): {exc}", file=sys.stderr)
 
 
@@ -5442,12 +5374,7 @@ def task_land(
     # `_capture_pending_in_worktree`, so the tip is the wrapup commit.
     msg = message or _branch_tip_message(base, branch) or f"chore({slug}): squash-land {branch}"
     try:
-        from harness_maker import intent_trial
-
-        with _acquire_merge_fence(
-            base,
-            timeout=5.0 if intent_trial.protected_trial_paths(base) else _FENCE_TIMEOUT,
-        ):
+        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
             # In-fence re-check: a concurrent winner may have deleted the branch
             # since the pre-fence check (TOCTOU). Converge instead of re-squashing.
             if not _branch_exists(base, branch):
@@ -5460,13 +5387,6 @@ def task_land(
                     return 1
                 _converge_landed()
                 return 0
-
-            trial_protected = intent_trial.protected_trial_paths(base)
-            try:
-                trial_runtime = intent_trial.verified_trial_landing_paths(base)
-            except (OSError, ValueError) as exc:
-                print(f"[land] trial publication conflict: {exc}", file=sys.stderr)
-                return 1
 
             if _has_user_dirty_state(base):
                 dirty = _list_user_dirty_files(base)
@@ -5507,7 +5427,6 @@ def task_land(
             already = _read_landed_marker(base, branch) == _branch_tip(
                 base, branch
             ) or _branch_content_in_head(base, branch)
-            runtime_committed = False
 
             # SPEC-ai-native-sdlc ADR-005 — AFTER the capture (a late edit is on the branch,
             # so it is checked too) and BEFORE the squash. The branch and worktree survive.
@@ -5531,13 +5450,6 @@ def task_land(
                 )
             else:
                 touched = _squash_path_set(base, branch)
-                if set(touched) & trial_protected:
-                    print(
-                        f"[land] stale branch edits protected trial: "
-                        f"{sorted(set(touched) & trial_protected)}",
-                        file=sys.stderr,
-                    )
-                    return 1
                 if not touched:
                     # Empty path set in the NOT-already branch means the merge-base
                     # probe failed (unrelated histories) — `_branch_content_in_head`
@@ -5619,55 +5531,18 @@ def task_land(
                                 file=sys.stderr,
                             )
                             return 1
-                        if trial_runtime:
-                            _run(["git", "add", "--", *sorted(trial_runtime)], cwd=base)
-                            staged_after = _staged_files(base)
-                        to_unstage = sorted(staged_after - (set(touched) | trial_runtime))
+                        to_unstage = sorted(staged_after - set(touched))
                         if to_unstage:
                             _run(["git", "reset", "-q", "HEAD", "--", *to_unstage], cwd=base)
                         _run(["git", "commit", "-m", msg], cwd=base)
                         landed_sha = _run(["git", "rev-parse", "HEAD"], cwd=base).stdout.strip()
-                        runtime_committed = True
                 except RuntimeError as e:
                     _scoped_conflict_cleanup(base, touched, pre_untracked, preserve=pre_staged)
-                    newly_staged_trial = sorted(trial_runtime - pre_staged)
-                    if newly_staged_trial:
-                        with contextlib.suppress(RuntimeError):
-                            _run(
-                                ["git", "reset", "-q", "HEAD", "--", *newly_staged_trial],
-                                cwd=base,
-                            )
                     print(
                         f"[land] squash-merge of {branch} failed (conflict?); base "
                         f"reset clean, branch preserved for manual resolution: {e}",
                         file=sys.stderr,
                     )
-                    return 1
-
-            # An already-landed branch or an empty squash can still coincide with
-            # a newly published trial record. Persist that verified runtime delta
-            # before the branch is torn down, with unrelated staged files excluded.
-            if trial_runtime and not runtime_committed:
-                pre_staged_runtime = _staged_files(base)
-                try:
-                    _run(["git", "add", "--", *sorted(trial_runtime)], cwd=base)
-                    unrelated = sorted(_staged_files(base) - trial_runtime)
-                    if unrelated:
-                        _run(["git", "reset", "-q", "HEAD", "--", *unrelated], cwd=base)
-                    _run(
-                        ["git", "commit", "-m", "chore(intent): persist trial collection"],
-                        cwd=base,
-                    )
-                    landed_sha = _run(["git", "rev-parse", "HEAD"], cwd=base).stdout.strip()
-                except RuntimeError as e:
-                    newly_staged_trial = sorted(trial_runtime - pre_staged_runtime)
-                    if newly_staged_trial:
-                        with contextlib.suppress(RuntimeError):
-                            _run(
-                                ["git", "reset", "-q", "HEAD", "--", *newly_staged_trial],
-                                cwd=base,
-                            )
-                    print(f"[land] trial publication commit failed: {e}", file=sys.stderr)
                     return 1
 
             # Recovery anchor BEFORE teardown — NOT best-effort: without it a

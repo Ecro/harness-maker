@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **Intent trial machinery.** `hm intent trial`, `hm intent reconcile` and `hm intent record-decision`
+  are gone, along with the frozen `intent_trial.py` module and its `worktree.py` hooks.
+- `hm intent new --from-proposal` no longer appends an `objective_proposed` ledger row. The event
+  type stays registered so existing ledgers still parse.
+
+### Changed
+
+- Stage-span emission is always warn-only: a failed span append warns and never blocks preflight.
+- The objective gate remediation names `hm intent approve` / `hm intent activate`.
+
 ## [0.62.0] - 2026-10-03
 
 ### Changed

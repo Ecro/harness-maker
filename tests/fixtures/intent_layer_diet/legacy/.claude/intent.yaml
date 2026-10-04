@@ -1,0 +1,14 @@
+# Legacy-layout fixture (pre-vocabulary-rename shape: mission/outcomes). Hand-written.
+schema_version: 1
+mission: "A legacy fixture project that still uses the mission/outcomes vocabulary."
+vision: ""
+outcomes:
+  - id: fixture_minutes
+    description: minutes a fixture task takes
+    target: 10
+    higher_is_better: false
+    how_measured: "hand-counted from the fixture log"
+non_negotiables: []
+non_scope: []
+unknowns: []
+owners: []

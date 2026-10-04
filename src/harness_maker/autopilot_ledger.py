@@ -60,9 +60,9 @@ LedgerEvent = Literal[
     # how many human decisions the widest level skipped.
     "gate_auto_answered",
     "halted_cap",
-    # One row per ACCEPTED objective proposal, written by `hm world objective new
-    # --from-proposal` (PLAN-objective-gap-proposal ADR-003/004). Adoption is read as rows ÷
-    # `proposed`+approved records; a declined-everything turn leaves no row by design.
+    # Historical only: one row per accepted objective proposal (PLAN-objective-gap-proposal
+    # ADR-003/004). No writer remains since SPEC-intent-layer-diet (the row had no reader);
+    # the name stays registered so existing ledgers keep parsing.
     "objective_proposed",
 ]
 # DERIVED from LedgerEvent (not a hand-maintained copy) so the typed signature and the

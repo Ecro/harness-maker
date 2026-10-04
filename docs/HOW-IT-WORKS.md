@@ -1525,8 +1525,8 @@ callers only — rendered recipes use Write-tool files).
 results, cited-code staleness, and withdrawal. It is read-only and LLM-free. Proposals are at
 most three unranked candidates; collect all answers before `new --from-proposal --candidates N
 --declined <title>`, so each accepted record retains declined alternatives in `rejected[]`.
-The proposer does not approve its own proposal. The historical adoption ledger event remains
-`objective_proposed`; its spelling is an internal compatibility contract.
+The proposer does not approve its own proposal. No ledger row is written for a proposal; the
+historical `objective_proposed` event name stays registered only so older ledgers still parse.
 
 **Measurement**: a metric may add `measure: {cmd, select, cwd?, timeout_s?}`. Commands use
 argv splitting, never a shell. Selectors are `json:<dotted.path>`, `regex:<one capturing group>`,

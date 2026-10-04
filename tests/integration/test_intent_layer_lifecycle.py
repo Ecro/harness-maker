@@ -187,8 +187,9 @@ def test_gap_proposal_lifecycle_from_an_unmeasured_world(project: Path) -> None:
     mid = world.gap_report(project)
     assert mid["objectives"]["OBJ-9"]["rejected"] == ["the other candidate"]
     assert world.derive(world.load_world(project), "OBJ-9").approval_valid is not True
-    rows = (project / ".claude" / "observability" / "auto-advance.jsonl").read_text().splitlines()
-    assert sum('"objective_proposed"' in ln and '"OBJ-9"' in ln for ln in rows) == 1
+    ledger = project / ".claude" / "observability" / "auto-advance.jsonl"
+    rows = ledger.read_text().splitlines() if ledger.exists() else []
+    assert sum('"objective_proposed"' in ln for ln in rows) == 0  # SPEC-intent-layer-diet AC-006
     world.approve(project, "OBJ-9")
     world.activate(project, "OBJ-9")
     after = world.gap_report(project)

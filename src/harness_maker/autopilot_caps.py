@@ -350,7 +350,8 @@ def _objective_check(root: Path, *, cwd: Path, slug: str | None, stage: str) -> 
     )
     return (
         f"objective gate: PLAN-{slug} links objective {display_ref} but it is {reason} — "
-        "approve/activate it (hm world objective …) or drop the `objective:` link; "
+        "approve/activate it (hm intent approve <id>, then hm intent activate <id>) or drop "
+        "the `objective:` link; "
         "no advance was authorized. Marker preserved."
     )
 

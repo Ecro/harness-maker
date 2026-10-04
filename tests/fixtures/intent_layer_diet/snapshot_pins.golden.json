@@ -1,0 +1,6 @@
+{
+  "prod-firmware.expected.yaml": "4b16ec354e298fa0f870570714ad6e8d4cfeccd6cd3841dfaba9069d46210738",
+  "prod-tauri-app.expected.yaml": "4b16ec354e298fa0f870570714ad6e8d4cfeccd6cd3841dfaba9069d46210738",
+  "side-python-cli.expected.yaml": "6e421ba521b80f8e767e6daad774715b903d2a1c0b174c3f9033ca36de397631",
+  "side-tauri-app.expected.yaml": "6e421ba521b80f8e767e6daad774715b903d2a1c0b174c3f9033ca36de397631"
+}

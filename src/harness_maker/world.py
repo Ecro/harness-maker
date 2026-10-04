@@ -30,7 +30,7 @@ from typing import Any, cast
 
 import yaml
 
-from harness_maker import autopilot_ledger, command_registry, evidence_locator, stage_spans
+from harness_maker import command_registry, evidence_locator, stage_spans
 from harness_maker import intent as intent_mod
 from harness_maker.evidence_locator import Freshness
 from harness_maker.frontmatter import split_frontmatter
@@ -1873,9 +1873,10 @@ def new_objective(
 
     `from_proposal` is the proposer's path (PLAN-objective-gap-proposal ADR-003): the declined
     candidates of the same turn pre-fill `rejected[]` — the only provenance a declined candidate
-    gets, so the next gap pass does not re-propose it — and exactly one `objective_proposed`
-    ledger row is appended AFTER the record write. `candidates`/`declined` are proposal-only;
-    accepting them without the flag would let a wrong combination pass silently.
+    gets, so the next gap pass does not re-propose it. The `objective_proposed` ledger row it
+    used to append had no reader and was removed (SPEC-intent-layer-diet AC-006).
+    `candidates`/`declined` are proposal-only; accepting them without the flag would let a wrong
+    combination pass silently.
     """
     if not _OBJECTIVE_ID_RE.match(objective_id):
         raise WorldError("id", f"{objective_id!r} must match [A-Z0-9-]+")
@@ -1923,29 +1924,7 @@ def new_objective(
     if errs:
         raise WorldError(errs[0].field, errs[0].message)
     _dump_intent(path, rec, PLAYBOOK_BODY.encode("utf-8"))
-    if from_proposal:
-        assert candidates is not None  # guarded above
-        _record_proposal(root, objective_id, candidates=candidates)
     return rec
-
-
-def _record_proposal(root: Path, objective_id: str, *, candidates: int) -> None:
-    """The adoption row, at the BASE root's ledger — a worktree's ledger dies with `task-land`.
-
-    A failed append is a warning, not a retry: the record already exists and `new_objective`
-    refuses to overwrite, so retrying would fail on the id. Exit 0 keeps the verb's contract
-    ("the record stands"); the stderr line is what makes the missing row visible.
-    """
-    base = resolve_base_root(root)
-    try:
-        autopilot_ledger.append_event(
-            base,
-            event="objective_proposed",
-            fields={"objective": objective_id, "candidates": candidates, "accepted": 1},
-            observability_dir=base / ".claude" / "observability",
-        )
-    except (OSError, ValueError) as exc:
-        print(f"[world] objective_proposed NOT recorded: {exc}", file=sys.stderr)
 
 
 def validate_objective_record(

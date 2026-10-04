@@ -1,0 +1,13 @@
+{
+  "current": {
+    ".claude/intent/metrics.yaml": "aeb422620fd90a9a64dd72aaf3f5b5cc13b23fa18b8bdff47820b009af1fc274",
+    ".claude/intent.yaml": "19f650a692c67c6dd185f7c38a8fa1229dc37d4ffaaa8e2c6d07cff19d8068e3",
+    "intent/LOOP-OPT-IN.md": "9095706f935941eb45f6b67efc1b60628652a9c4ff2076d81b71df34ce9c2b91",
+    "intent/SOURCE-PLAN-STEPS.md": "7d168ed34d3c5836ae03e5c869442fa4ac0feb9d7cd182bebaf3af3e8255741b",
+    "intent/UNDERSTANDING-HANDOFF.md": "f6657c801c071616c84cc28d9bc210183fcbe0e3a5514a5bb91bd5799ad6440a",
+    "intent/WORLD-INTENT-CLOSED-LOOP.md": "cb1de71d5379eeb83274fb4ae0fbd7e505f9e3db106dc29d153ddc42c3753554"
+  },
+  "legacy": {
+    ".claude/intent.yaml": "5753b0d2a9a96a43d178ab60fb172d1d6629f6551b268a75bee17c045f7d44c6"
+  }
+}

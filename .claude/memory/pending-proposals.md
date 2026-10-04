@@ -610,6 +610,6 @@ threshold (count: 2).
 
 ## Proposal: local verify takes gate commands from CI, incl. mypy path args (2026-10-02)
 
-**Triggered by:** [fail:type] mypy-strict-local-scope-narrower-than-ci (count: 3; crossed the threshold this unit)
+**Triggered by:** [fail:type] mypy-strict-local-scope-narrower-than-ci (count: 5 as of 2026-10-04; recurred in intent-layer-diet, local mypy covered src only)
 **Proposed mechanism:** rule update (stage text) — `hm observability.verification_cache run` already derives commands from CI; make the degraded `mypy --strict` fallback in execute/verify/wrapup name `src tests` (or read it from the CI workflow) instead of bare `mypy --strict`.
 **Rationale:** world-model-name again reached /hm:verify with 11 unused `type: ignore` in a test file because the local check covered `src` only; same family as `phase-verification-narrower-than-gate` (count 3), so the existing proposal for that slug should absorb this one.

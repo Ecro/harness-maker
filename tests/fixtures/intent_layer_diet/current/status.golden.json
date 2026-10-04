@@ -1,0 +1,350 @@
+{
+  "active": {
+    "UNDERSTANDING-HANDOFF": {
+      "approval_valid": true,
+      "needs_revalidation": false
+    }
+  },
+  "broken_references": [],
+  "conflicts": [],
+  "fired_revisits": [],
+  "intents": {
+    "LOOP-OPT-IN": {
+      "metric_id": "dead_rendered_bytes",
+      "observed": "met",
+      "out_of_scope": [
+        "loop \ubcf8\ubb38 \uc0ad\uc81c\u00b7\ucd95\uc18c, \ub2e4\ub978 \ubb34\ud638\ucd9c \uba85\ub839"
+      ],
+      "rejected": [],
+      "scope": [
+        "synthesize \uc870\uac74\ubd80 \ub80c\ub354, \uc0c8 \uc124\uc815 \ud0a4, \uae30\uc874 \ud558\ub124\uc2a4 \ubcf4\uc874 \ub9c8\uc774\uadf8\ub808\uc774\uc158"
+      ],
+      "state": "closed",
+      "statement": "loop\u00b7loop-p5-batch \ub97c \uc635\ud2b8\uc778\uc73c\ub85c \ubc14\uafb8\uace0 \uc774 repo \uc5d0\uc11c \ub044\uba74 dead_rendered_bytes \uac00 21.7 \u2192 \uc57d 9.2 \ub85c \ub0b4\ub824\uac04\ub2e4 (2026-09-27 \uc2e4\uce21 \uae30\uc900, \ub450 \ud30c\uc77c 56,526B \uc81c\uc678)",
+      "title": "/hm:loop \uacc4\uc5f4\uc744 harness.yaml \uc635\ud2b8\uc778 \ub80c\ub354\ub85c"
+    },
+    "SOURCE-PLAN-STEPS": {
+      "metric_id": "unsourced_step_share",
+      "observed": "missed",
+      "out_of_scope": [
+        "step \uc0ad\uc81c, \uac8c\uc774\ud2b8 \ucd95\uc18c, TUNE \uac12 \ubcc0\uacbd, \uadfc\uac70 \uc5c6\ub294 \ub4f1\uae09 \uc0c1\ud5a5(* \ud3ec\ud568)"
+      ],
+      "rejected": [],
+      "scope": [
+        "13\uac1c step \uc758 \ucf54\ub4dc\u00b7\uacc4\uc57d\u00b7\uad00\uce21 \uadfc\uac70\uc640 \ubc18\ub840\ub97c RESEARCH \uc5d0 \uae30\ub85d\ud558\uace0 \ub808\uc9c0\uc2a4\ud2b8\ub9ac \ub4f1\uae09 \uac31\uc2e0"
+      ],
+      "state": "closed",
+      "statement": "plan \uc758 unsourced 13\uac1c step \uc5d0 \uac80\uc99d \uac00\ub2a5\ud55c \uadfc\uac70\ub97c \uc5f0\uacb0\ud558\uba74 unsourced_step_share \uac00 47.1 \u2192 31.8 \uc774\ud558\ub85c \ub0b4\ub824\uac04\ub2e4",
+      "title": "plan \ub2e8\uacc4\uc758 \uc0c1\uc18d \ubd84\ub958\ub97c \uc9c1\uc811 \uadfc\uac70\ub85c \uac80\uc99d"
+    },
+    "UNDERSTANDING-HANDOFF": {
+      "metric_id": "understanding_handoff_rate",
+      "observed": null,
+      "out_of_scope": [
+        "\ud559\uc2b5\u00b7\ucf54\uce6d \ubaa8\ub4dc, \uc5ed\ub7c9 \ud3c9\uac00, \ud300\u00b7\ub9ac\ubdf0\uc5b4\uc6a9 \uc778\uacc4 \uae30\ub2a5",
+        "decided_by \ub204\ub77d\uc744 verify \uac8c\uc774\ud2b8\ub85c \ucc28\ub2e8",
+        "\uc694\uc57d \ud488\uc9c8\uc758 \uc790\ub3d9 \ucc44\uc810, wrapup \ub9c8\ub2e4 \ud310\uc815 \uc9c8\ubb38",
+        "README \uc2ac\ub85c\uac74 \ubcc0\uacbd (met \uc774\ud6c4 \ubcc4\ub3c4)"
+      ],
+      "rejected": [],
+      "scope": [
+        "wrapup \ud15c\ud50c\ub9bf(\uc778\ub77c\uc778 \uacbd\ub85c\uc640 stage-delegate \uacbd\ub85c \ubaa8\ub450)\uc758 \uc694\uc57d \ube14\ub85d: \ucd5c\ub300 5\uc904, \uc774\uc804\u2192\uc774\ud6c4 \ud615\uc2dd, \ud30c\uc77c \ubaa9\ub85d\u00b7diff \uc7ac\uc11c\uc220 \uae08\uc9c0, \ubcc0\ud654\uac00 \uc5c6\uc73c\uba74 '\uc5c6\uc74c' \ud55c \uc904",
+        "\uc694\uc57d\uc744 \ud130\ubbf8\ub110 \ucd5c\uc885 \ucd9c\ub825\uacfc wrapup \ucee4\ubc0b(squash \ud3ec\ud568) \ubcf8\ubb38\uc5d0 \ub3d9\uc77c\ud558\uac8c \ub0a8\uae34\ub2e4",
+        "execute Step 0 ADR \uc5d0 decided_by: user|agent, agent \uac00 \uacb0\uc815\ud55c ADR \uc744 \uc694\uc57d\uc5d0 \ud55c \uc904\ub85c \ub178\ucd9c",
+        "preset \ubb34\uad00 \uae30\ubcf8 \ub80c\ub354, \uc0c8 \uc124\uc815 \ud0a4\u00b7\uc0c8 \ud30c\uc77c \uc5c6\uc74c",
+        "\ucd9c\ud558 \ud6c4 \uc774 repo \ub97c \uc7ac\ub80c\ub354\ud55c \ub4a4\uc758 wrapup 10\uac74\uc744 \uc0ac\uc6a9\uc790\uac00 git log \ub85c \uc77c\uad04 \ud310\uc815"
+      ],
+      "state": "active",
+      "statement": "\ubaa8\ub4e0 \ub80c\ub354 \ud558\ub124\uc2a4\uc758 /hm:wrapup \uc774 \ucd5c\ub300 5\uc904\uc758 \uc774\ud574 \ubcc0\ud654 \uc694\uc57d(\ubc14\ub010 \uac00\uc815\u00b7\ubd88\ubcc0\uc870\uac74\u00b7\uacbd\uacc4\uc758 \uc774\uc804\u2192\uc774\ud6c4, \ub0a8\uc740 \ubbf8\uc9c0, agent \uac00 \uacb0\uc815\ud55c ADR)\uc744 \ud130\ubbf8\ub110 \ucd9c\ub825\uacfc \ucee4\ubc0b \ubcf8\ubb38\uc5d0 \ub0a8\uae30\uace0, PLAN ADR \uc5d0 decided_by: user|agent \ub97c \uae30\ub85d\ud558\uba74, \uc0ac\uc6a9\uc790\ub294 diff \ub97c \uc77d\uc9c0 \uc54a\uace0 \ubcc0\uacbd\uc744 \uc124\uba85\ud560 \uc218 \uc788\uace0 \ubaa8\ub974\ub294 \uc0ac\uc774 \ub0b4\ub824\uc9c4 \ubc94\uc704 \ubc16 \uacb0\uc815\uc774 \uc5c6\uc5b4\uc838 understanding_handoff_rate \uac00 \ubbf8\uce21\uc815 \u2192 80% \uc774\uc0c1\uc774 \ub41c\ub2e4",
+      "title": "wrapup \uc774\ud574 \ubcc0\ud654 \uc694\uc57d\uacfc ADR \uacb0\uc815 \uc8fc\uccb4 \ud45c\uc2dc"
+    },
+    "WORLD-INTENT-CLOSED-LOOP": {
+      "metric_id": "intent_world_closed_loop_cycles",
+      "observed": "met",
+      "out_of_scope": [
+        "Detailed implementation, task-unit and observation-window definitions, and concrete acceptance criteria are deferred to a subsequent SPEC.",
+        "Automatic approval, expansion beyond agreed goals or scope, or removal of existing human decision authority and quality gates.",
+        "Continuing to invent work after agreed-work completion or goal attainment."
+      ],
+      "rejected": [],
+      "scope": [
+        "Connect observations, world-state updates, intent decisions, and authorized execution without repeated user instructions to connect the feedback; define the trigger, responsible role, evidence, and recorded disposition for each handoff.",
+        "Continue execution within agreed scope; consult the user for goal or scope changes and unresolved uncertainty. On agreed-work completion or goal attainment, record results and termination rationale and stop.",
+        "For missed targets, missing measurements, or conflicting assumptions, perform additional measurement and diagnosis within existing scope and authority before deciding the next action.",
+        "Keep observations, intents, one or more SPEC/PLAN executions, outcomes, and subsequent decisions traceable through stable references and explicit authoritative records.",
+        "Evaluate existing specs/ and work-docs/ conventions first; justify alternative artifact locations by role, lifetime, and operator navigation. Verify discoverability and preserve history and references if paths change.",
+        "Demonstrate successful feedback-to-decision continuity in all three consecutive real tasks using execution and conversation evidence, with final assessment by the user. Normal approval questions and justified termination are not failures."
+      ],
+      "state": "closed",
+      "statement": "The world model and intent workflow carry observations through state updates into the next decision across three consecutive real tasks without the user having to re-instruct the connection, proceeding to the next execution within the agreed scope. Changes to goals or scope and unresolved uncertainty are referred to the user. The visible artifact layout follows existing workflow conventions, with explicit rationale for any alternative placement.",
+      "title": "Close the loop between the world model and intent workflow"
+    }
+  },
+  "metrics": {
+    "change_failure_rate": {
+      "gap": "at_or_better",
+      "higher_is_better": false,
+      "how_measured": "\ucd5c\uc2e0 delivery_metrics \uc2a4\ub0c5\uc0f7\uc758 100 * cfr.failed / cfr.total. \uc2a4\ub0c5\uc0f7 \uac31\uc2e0\uc740 /hm:metrics (\ud310\uc815 \ud544\uc694, ~25\ubd84) \u2014 7\uc77c\ubcf4\ub2e4 \uc624\ub798\ub41c \uc2a4\ub0c5\uc0f7\uc774\uba74 \uce21\uc815\uc774 \uc2e4\ud328\ud55c\ub2e4. \ubd84\ubaa8\uac00 \uc791\uc544 \ud0dc\uadf8 \ud558\ub098\ub85c \ud06c\uac8c \uc6c0\uc9c1\uc778\ub2e4.",
+      "last": 0,
+      "measure": true,
+      "observed_at": "2026-10-04T00:32:53Z",
+      "reason": "measured",
+      "stale_definition": false,
+      "target": 10
+    },
+    "dead_rendered_bytes": {
+      "gap": "at_or_better",
+      "higher_is_better": false,
+      "how_measured": "economics stages \uc5d0\uc11c turn \uc774 0 \uc778 .claude/commands/hm/*.md \ubc14\uc774\ud2b8 / \uc804\uccb4. \ud638\ucd9c 0\ud68c\ub294 \uc0ad\uc81c \ud6c4\ubcf4\uc774\uc9c0 \ubb34\uac00\uce58\uc758 \uc99d\uba85\uc774 \uc544\ub2c8\ub2e4.",
+      "last": 7.5,
+      "measure": true,
+      "observed_at": "2026-10-04T00:33:08Z",
+      "reason": "measured",
+      "stale_definition": false,
+      "target": 10
+    },
+    "intent_world_closed_loop_cycles": {
+      "gap": "at_or_better",
+      "higher_is_better": true,
+      "how_measured": "Review execution and conversation records for consecutive real tasks, tracing observations through world-state updates to the next decision and, when work remains within the agreed scope, the next execution. Count consecutive tasks meeting this criterion without the user having to re-instruct that connection; the target is three tasks, all successful. Normal approval or decision questions and evidence-backed termination on completion or goal attainment are not failures. The user makes the final assessment from the linked records. Record evidence with each measurement; document the task unit and observation window in the subsequent SPEC. The baseline is unmeasured; no result is asserted yet.",
+      "last": 3,
+      "measure": false,
+      "observed_at": "2026-10-03T05:13:32.222986Z",
+      "reason": "measured",
+      "stale_definition": false,
+      "target": 3
+    },
+    "post_merge_churn": {
+      "gap": "at_or_better",
+      "higher_is_better": false,
+      "how_measured": "\ucd5c\uc2e0 delivery_metrics \uc2a4\ub0c5\uc0f7\uc758 100 * churn.ratio. 14\u201328\uc77c \uc804\uc5d0 \uba38\uc9c0\ub41c \ucf54\ub4dc\ub97c \ubcf8\ub2e4 (\uc131\uc219 \uc9c0\uc5f0) \u2014 \uc9c0\uae08 \uc791\uc5c5\uc758 \uacb0\uacfc\ub294 2\uc8fc \ub4a4\uc5d0 \ub098\ud0c0\ub09c\ub2e4. \uc2a4\ub0c5\uc0f7 \uac31\uc2e0\uc740 /hm:metrics, 7\uc77c \ucd08\uacfc\uba74 \uce21\uc815 \uc2e4\ud328.",
+      "last": 8.3,
+      "measure": true,
+      "observed_at": "2026-10-04T00:32:54Z",
+      "reason": "measured",
+      "stale_definition": false,
+      "target": 12
+    },
+    "task_lead_time_hours": {
+      "gap": "at_or_better",
+      "higher_is_better": false,
+      "how_measured": "stage-spans.jsonl: task_slug \ubcc4 \uccab start \u2192 \uc9dd\uc9c0\uc740 hm:wrapup end (6h \uc774\ub0b4 \uc778\uc811 end, 09-12 \uc774\uc804 end \ub294 slug null). task \ud06c\uae30\uc5d0 \uc88c\uc6b0\ub418\ubbc0\ub85c \uc624\ub984\uc138\ub97c \uace7\ubc14\ub85c \ud558\ub124\uc2a4 \ud0d3\uc73c\ub85c \uc77d\uc9c0 \ub9d0 \uac83.",
+      "last": 2.5,
+      "measure": true,
+      "observed_at": "2026-10-04T00:32:53Z",
+      "reason": "measured",
+      "stale_definition": false,
+      "target": 6
+    },
+    "understanding_handoff_rate": {
+      "gap": "unevaluable",
+      "higher_is_better": true,
+      "how_measured": "\ucd5c\uadfc /hm:wrapup 10\uac74 \uac01\uac01\uc744 \uc0ac\uc6a9\uc790\uac00 \ud310\uc815\ud55c\ub2e4. (1) \uc644\ub8cc \uc2dc \ub0a8\uc740 \uc774\ud574 \ubcc0\ud654 \uc694\uc57d (\ubc14\ub010 \uac00\uc815\u00b7\ubd88\ubcc0\uc870\uac74\u00b7\uacbd\uacc4, \uc544\uc9c1 \ubaa8\ub974\ub294 \uac83) \ub9cc\uc73c\ub85c diff \ub97c \uc77d\uc9c0 \uc54a\uace0 \ubcc0\uacbd\uc744 \uc124\uba85\ud560 \uc218 \uc788\uc5c8\ub294\uac00, (2) \uc0ac\uc6a9\uc790 \ubaa8\ub974\uac8c \ub0b4\ub824\uc9c4 \ud569\uc758 \ubc94\uc704 \ubc16 WHY\u00b7WHAT \uacb0\uc815\uc774 \uc5c6\uc5c8\ub294\uac00. \ub458 \ub2e4 \uc608\uc778 \uac74\uc218 / \ud310\uc815 \uac74\uc218 \u00d7 100. \uc694\uc57d \uc139\uc158\uc774 \uc874\uc7ac\ud55c\ub2e4\ub294 \uac83\ub9cc\uc73c\ub85c\ub294 \ud1b5\uacfc\ud558\uc9c0 \uc54a\ub294\ub2e4. \uac01 \uce21\uc815\uc5d0 \ud310\uc815\ud55c wrapup \uc744 \uadfc\uac70\ub85c \ub0a8\uae34\ub2e4. \uc694\uc57d \uae30\ub2a5\uc740 \uc544\uc9c1 \uc5c6\uace0 baseline \uc740 \ubbf8\uce21\uc815\uc774\ub2e4 \u2014 \uacb0\uacfc\ub97c \uc8fc\uc7a5\ud558\uc9c0 \uc54a\ub294\ub2e4. \uc694\uc57d\uc758 \ud615\uc2dd\u00b7\uc704\uce58\u00b7\uae38\uc774\uc640 \ud45c\ubcf8 \ub2e8\uc704\ub294 \ud6c4\uc18d SPEC \uc5d0\uc11c \uc815\ud55c\ub2e4.",
+      "last": null,
+      "measure": false,
+      "observed_at": null,
+      "reason": "never_measured",
+      "stale_definition": false,
+      "target": 80
+    },
+    "unsourced_step_share": {
+      "gap": "above_target",
+      "higher_is_better": false,
+      "how_measured": "step_sensitivity.unsourced_count(REGISTRY) / len(REGISTRY)",
+      "last": 45.2,
+      "measure": true,
+      "observed_at": "2026-10-04T00:32:54Z",
+      "reason": "measured",
+      "stale_definition": false,
+      "target": 20
+    },
+    "wiki_fact_entries_28d": {
+      "gap": "unevaluable",
+      "higher_is_better": true,
+      "how_measured": "scripts/measure_wiki_fact_window.py (PLAN-mission-context-loop ADR-005). \ucc3d\uc740 \uadf8 skill \uc774 \ucc98\uc74c \ub4e4\uc5b4\uac04 \uac00\uc7a5 \uc774\ub978 v* \ub9b4\ub9ac\uc2a4 tag \uc758 UTC \ub0a0\uc9dc\ubd80\ud130 +28\uc77c\uae4c\uc9c0(\ud3ec\ud568, UTC \ub0a0\uc9dc \ub2e8\uc704). slug \ub9c8\ub2e4 git \uc774\ub825\uacfc working tree \ub97c \ud1b5\ud2c0\uc5b4 \uac00\uc7a5 \uc774\ub978 \ub0a0\uc9dc\ub85c \uc13c\ub2e4. \ucc3d\uc774 \ub2eb\ud788\uae30 \uc804\uc5d0\ub294 \uce21\uc815\ud558\uc9c0 \uc54a\ub294\ub2e4 (not released \u2192 exit 2, window open \u2192 exit 3). \ud310\uc815\uc740 \uc0ac\uc804 \ub4f1\ub85d\ub41c \uadf8\ub300\ub85c \uc801\uc6a9\ud558\uace0 \ubc1c\ub3d9 \ud6c4 \uc7ac\ud574\uc11d\ud558\uc9c0 \uc54a\ub294\ub2e4: 5\uac1c \uc774\uc0c1 \u2192 S1(\uc8fc\uc81c\ubcc4 \ud30c\uc77c) \uc744 \ud6c4\ubcf4 task \ub85c \ub4f1\ub85d, 0\uac1c \u2192 project-knowledge skill \uacfc \ud3ec\uc778\ud130 \uc81c\uac70, 1\u20134\uac1c \u2192 S0 \uc720\uc9c0. \ucc3d\uc774 \ub2eb\ud78c \ub4a4 \uccab /hm:wrapup 5.7 \"Measure outcomes now?\" \uc5d0\uc11c \uc6b4\uc601\uc790\uac00 \uce21\uc815\ud558\uace0, \uc120\ud0dd\ud55c \uc870\uce58\ub294 \ud6c4\uc18d task \uc758 RESEARCH/PLAN \uc5d0 \ub0a8\uae34\ub2e4. \uc218\ub3d9 S1\u2013S3 \ud655\uc778\uc740 \uc77c\ud68c\uc6a9 clone \uc5d0\uc11c\ub9cc \ud55c\ub2e4 (\uc774 wiki \ub97c \uc624\uc5fc\uc2dc\ud0a4\uc9c0 \uc54a\ub3c4\ub85d).",
+      "last": null,
+      "measure": true,
+      "observed_at": null,
+      "reason": "never_measured",
+      "stale_definition": false,
+      "target": 5
+    }
+  },
+  "moved_evidence": {},
+  "needs_revalidation": [],
+  "open_questions": [
+    {
+      "claim": "task \uc644\ub8cc\uc728 \u2014 09-12 \uc774\uc804 wrapup end \uc5d0 slug \uac00 \uc5c6\uc5b4 \ubcf5\uc6d0\uc774 \ubd80\uc815\ud655; \uae68\ub057\ud55c \ud45c\ubcf8 10\uac1c \uc774\uc0c1\uc774\uba74 outcome \uc73c\ub85c \uc2b9\uaca9",
+      "evidence": [],
+      "history": [],
+      "id": "q_d406945c84bff19f",
+      "status": "open"
+    },
+    {
+      "claim": "'\ub2e8\uacc4\ubcc4 \uc9c0\uc2dc \uc5c6\uc774' \u2014 task \ubcc4 \uc0ac\ub78c \uac1c\uc785 \ud69f\uc218\ub97c \uae30\ub85d\ud558\ub294 \ub370\uc774\ud130\uac00 \uc5c6\ub2e4",
+      "evidence": [],
+      "history": [],
+      "id": "q_5b76c045531329f1",
+      "status": "open"
+    },
+    {
+      "claim": "\uc804 \uc778\ubca4\ud1a0\ub9ac \uc124\uce58 \uc911 \uc2e4\uc81c\ub85c \uc548 \uc4f0\uc774\ub294 \ubd80\ubd84\uc740 \ud504\ub85c\uc81d\ud2b8\ub9c8\ub2e4 \uc5bc\ub9c8\uc778\uac00 (\uc774 repo \ub9cc \uc7ac\ubd04)",
+      "evidence": [],
+      "history": [],
+      "id": "q_d36a71025d233e69",
+      "status": "open"
+    },
+    {
+      "claim": "unsourced 40\uac1c \uc911 INV \ub85c \uc228\uc740 COMP \uac00 \uba87 \uac1c\uc778\uac00",
+      "evidence": [],
+      "history": [],
+      "id": "q_64503c3ef30c176e",
+      "status": "open"
+    },
+    {
+      "claim": "\uc0c8 \ubaa8\ub378 \ub9b4\ub9ac\uc2a4 \ud6c4 TUNE \uc7ac\uce21\uc815\uae4c\uc9c0 \uac78\ub9ac\ub294 \uc2dc\uac04 \u2014 \uae30\ub85d \ud544\ub4dc \uc5c6\uc74c",
+      "evidence": [],
+      "history": [],
+      "id": "q_fe8d71f72d240ed4",
+      "status": "open"
+    },
+    {
+      "claim": "7\ub80c\uc988 \ud32c\uc544\uc6c3\uc774 \ube44\uc6a9\ub9cc\ud07c \uc7ac\ud604\uc728\uc744 \uc62c\ub9ac\ub294\uac00; plan-validator \ub294 \ubcc0\ubcc4\ub825\uc774 \uc788\ub294\uac00",
+      "evidence": [
+        {
+          "observed_at": "2026-09-27T22:05:00Z",
+          "relation": "confirms",
+          "text": "sdlc-three-loops-gap (Python diff), 3 review runs x 4 dispatches: the security lens alone raised every P1 at the wrapup Step 5.7 shell-quoting seam, 5 across runs; core raised distinct consistency and robustness P1s; tests-lens Pass-1 items were dropped at Pass 2 in 2 of 3 runs; concurrency returned 0 findings in all 12 dispatches"
+        },
+        {
+          "observed_at": "2026-09-28T04:04:18Z",
+          "relation": "confirms",
+          "text": "intent-file-inputs review (run f8dec5471aad, 2026-09-28): round 1 dispatched 7 lenses in 4 dispatches plus codex. The one functional recipe failure (intent-layer proposal path always passing --declined-file, which the CLI refuses when every candidate is accepted) came from codex alone; no Claude lens raised it. The tests lens alone found that the AC-001 property could not tell rstrip from strip. Concurrency returned 0 findings in round 1 and in confirm-1, as on sdlc-three-loops-gap. Distinct lenses and the heterogeneous model each contributed findings no other voter raised; the concurrency lens contributed none on this CLI-parsing diff."
+        },
+        {
+          "observed_at": "2026-09-28T22:22:33Z",
+          "relation": "confirms",
+          "text": "intent-feedback-continuity (2026-09-28/29): four /hm:review runs on a Python task. The concurrency lens and the Codex voter each surfaced P0/P1 defects no other lens raised (post-commit-pop trial guard, fence re-check on the success path, publish revalidation), while the tests lens mostly repeated standing P2s. Supports the fan-out recall gain on Python; cost was 4 dispatches x 2 passes per run plus confirmation passes."
+        },
+        {
+          "observed_at": "2026-09-29T15:00:00Z",
+          "relation": "confirms",
+          "text": "intent-layer-improvements (2026-09-29): /hm:review run cda10095b67a on a Python + template diff, 4 dispatches x 2 passes + codex, then two confirmation passes. The security lens alone found the heredoc-sentinel injection channel (P1 in Pass 1, P2 after Pass 2). The core lens alone found the confirm-1 P1 (verdict skip rule keyed on a row no step wrote). Codex contributed three findings no Claude lens raised (PIDA accepted), one corroborating security. The concurrency lens dropped all three of its Pass 1 findings in Pass 2 and returned 0 at confirm-2. Distinct lenses and the heterogeneous model again each contributed findings no other voter raised; the concurrency lens contributed none that survived."
+        }
+      ],
+      "history": [],
+      "id": "q_825d374c6331ed22",
+      "status": "open"
+    },
+    {
+      "claim": "needs_revalidation is a report only: the autopilot objective gate reads approval_valid from derive() without a staleness map, so stale cited code never halts autopilot",
+      "evidence": [
+        {
+          "locator": {
+            "fingerprint": "0046f96eb439b879d96f5dfaac80b4b967ba141aa1833d57042b79138d889e68",
+            "k": 3,
+            "lines": [
+              316,
+              318
+            ],
+            "path": "src/harness_maker/autopilot_caps.py"
+          },
+          "observed_at": "2026-09-18T21:54:00Z",
+          "relation": "confirms",
+          "text": "verified during the assumption-entry-and-evidence-locator review: autopilot_caps calls world.derive(loaded, raw) and reads only approval_valid"
+        }
+      ],
+      "history": [],
+      "id": "revalidation_is_report_only",
+      "status": "confirmed"
+    },
+    {
+      "claim": "A fresh verification-cache marker asserts that a fingerprint is unchanged, not that the suite ran or passed; the two diverge silently.",
+      "evidence": [
+        {
+          "locator": {
+            "fingerprint": "0d5a2472857ffa2b23b4f118473fefcfbbdee5e7ce53da2bfdf502e152e5064b",
+            "k": 18,
+            "lines": [
+              352,
+              372
+            ],
+            "path": "src/harness_maker/observability/verification_cache.py"
+          },
+          "observed_at": "2026-09-20T09:40:00Z",
+          "relation": "confirms",
+          "text": "Observed 2026-09-20: a wrapup accepted a fresh marker and skipped the suite, landing tests/unit/test_land_hold.py on main in a state that could not be COLLECTED - the module raised at import so the suite aborted rather than reporting a failure, and it sat on main until an unrelated task ran the suite. The commit changed both source and tests, which the cache claims to invalidate on."
+        }
+      ],
+      "history": [],
+      "id": "verification_marker_is_not_evidence",
+      "status": "confirmed"
+    },
+    {
+      "claim": "A single front door that owns the intent and project-knowledge procedures (Maker reads them on demand; the skills are not model-invocable; unnamed goal/fact/status requests are routed to Maker by the always-loaded pointer, mid-stage included) lets a task's feedback reach the next decision without the operator re-instructing the connection.",
+      "evidence": [],
+      "history": [],
+      "id": "q_maker_owns_intents",
+      "status": "open"
+    },
+    {
+      "claim": "Writing a decision made in conversation into the in-flight task's most downstream artifact before replying, and naming the task's latest artifact on resume, keeps a pause, compaction or new session from losing progress.",
+      "evidence": [],
+      "history": [],
+      "id": "q_decision_capture_resume",
+      "status": "open"
+    }
+  ],
+  "proposed": [],
+  "purpose": {
+    "statement": "\ud504\ub85c\uc81d\ud2b8\uc5d0 \ub9de\ucd98 \uac1c\ubc1c \ud558\ub124\uc2a4\ub85c, \uae30\ubcf8 \ud488\uc9c8\uc744 \uc9c0\ud0a4\uba74\uc11c \uc791\uc5c5\uc744 \ube60\ub974\uace0 \ud6a8\uc728\uc801\uc73c\ub85c \uc644\uc218\ud558\uac8c \ud55c\ub2e4. HOW \ub294 AI \uac00 \ucd5c\ub300\ud55c \uac00\uc838\uac00\uace0, WHY\u00b7WHAT\u00b7\ud2b8\ub808\uc774\ub4dc\uc624\ud504\ub294 \uc0ac\ub78c\uc774 \uc18c\uc720\ud558\uba70, \uc791\uc5c5\uc774 \ub05d\ub098\uba74 \ucf54\ub4dc\uc640 \ud568\uaed8 \uc0ac\ub78c\uc758 \uc2dc\uc2a4\ud15c \uc774\ud574\ub3c4 \uac31\uc2e0\ub418\uac8c \ud55c\ub2e4. \ubaa8\ub378\uacfc \ud638\uc2a4\ud2b8\uc758 \ubc1c\uc804\uc744 \ube60\ub974\uac8c \uce21\uc815\ud574 \ubc18\uc601\ud558\uace0, \uc81c\uac12\uc744 \ubabb \ud558\ub294 \uc7a5\uce58\ub294 \uac77\uc5b4\ub0b8\ub2e4.",
+    "vision": "\uc0ac\uc6a9\uc790\uac00 \uc758\ub3c4\uc640 \ud544\uc694\ud55c \uacb0\uc815\ub9cc \uc8fc\uba74, \ud569\uc758\ub41c \ubc94\uc704\uc640 \uad8c\ud55c \uc548\uc5d0\uc11c /hm: \uac00 \ub2e8\uacc4\ubcc4 \uc9c0\uc2dc \uc5c6\uc774 \uc791\uc5c5\uc744 \uac80\uc99d\ub41c \uc644\ub8cc\uae4c\uc9c0 \uc774\ub048\ub2e4. \uc0ac\uc6a9\uc790\uc5d0\uac8c \uc624\ub294 \uc9c8\ubb38\uc740 WHY\u00b7WHAT\u00b7\ub418\ub3cc\ub9ac\uae30 \uc5b4\ub824\uc6b4 \ud2b8\ub808\uc774\ub4dc\uc624\ud504\ub85c \ud55c\uc815\ub41c\ub2e4. \uc644\ub8cc \uc2dc\uc810\uc5d0 \uc0ac\uc6a9\uc790\ub294 diff \ub97c \uc77d\uc9c0 \uc54a\uace0\ub3c4 \uc2dc\uc2a4\ud15c\uc758 \uac00\uc815\u00b7\ubd88\ubcc0\uc870\uac74\u00b7\uacbd\uacc4\uac00 \uc5b4\ub5bb\uac8c \ubc14\ub00c\uc5c8\ub294\uc9c0, \ubb34\uc5c7\uc774 \uc544\uc9c1 \ubaa8\ub974\ub294 \ucc44\ub85c \ub0a8\uc558\ub294\uc9c0 \uc124\uba85\ud560 \uc218 \uc788\ub2e4. \uac01 \ud504\ub85c\uc81d\ud2b8\uc5d0\ub294 \ud544\uc694\ud55c \uad6c\uc131\ub9cc \ub80c\ub354\ub418\uace0, \ubaa8\ub378\u00b7\ud638\uc2a4\ud2b8\uac00 \ub300\uccb4\ud55c \uc7a5\uce58\ub294 \uac80\uc99d\uc744 \uac70\uccd0 \uc81c\uac70\ub41c\ub2e4."
+  },
+  "revisits": {
+    "LOOP-OPT-IN": {
+      "blocked": false,
+      "condition": null,
+      "intent": "LOOP-OPT-IN",
+      "last_value": null,
+      "result": "unevaluable",
+      "title": "/hm:loop \uacc4\uc5f4\uc744 harness.yaml \uc635\ud2b8\uc778 \ub80c\ub354\ub85c"
+    },
+    "SOURCE-PLAN-STEPS": {
+      "blocked": false,
+      "condition": null,
+      "intent": "SOURCE-PLAN-STEPS",
+      "last_value": null,
+      "result": "unevaluable",
+      "title": "plan \ub2e8\uacc4\uc758 \uc0c1\uc18d \ubd84\ub958\ub97c \uc9c1\uc811 \uadfc\uac70\ub85c \uac80\uc99d"
+    },
+    "UNDERSTANDING-HANDOFF": {
+      "blocked": false,
+      "condition": null,
+      "intent": "UNDERSTANDING-HANDOFF",
+      "last_value": null,
+      "result": "unevaluable",
+      "title": "wrapup \uc774\ud574 \ubcc0\ud654 \uc694\uc57d\uacfc ADR \uacb0\uc815 \uc8fc\uccb4 \ud45c\uc2dc"
+    },
+    "WORLD-INTENT-CLOSED-LOOP": {
+      "blocked": false,
+      "condition": null,
+      "intent": "WORLD-INTENT-CLOSED-LOOP",
+      "last_value": null,
+      "result": "unevaluable",
+      "title": "Close the loop between the world model and intent workflow"
+    }
+  },
+  "stale_evidence": {
+    "revalidation_is_report_only": "missing",
+    "verification_marker_is_not_evidence": "missing"
+  },
+  "state": "ok",
+  "withdrawal": {
+    "due": false,
+    "filled_at": null,
+    "last_signal_at": "2026-10-03T05:13:32.222986Z",
+    "quiet_wrapups": null,
+    "reason": "no_stage_spans",
+    "revisit_candidates_now": 0
+  }
+}

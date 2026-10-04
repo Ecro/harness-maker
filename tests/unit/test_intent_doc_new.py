@@ -151,11 +151,12 @@ def test_ac_006_the_python_api_matches_the_cli(tmp_path: Path) -> None:
 
 # ── AC-003 (SPEC-objective-gap-proposal) — `--from-proposal` ──────────────────
 #
-# The expected ledger line is written by hand from SPEC S3 (objective / candidates / accepted);
-# the record is re-read through `load_world`, never from the verb's return value. The base/worktree
-# split is exercised with a LINKED worktree of a throwaway base (never a before/after count on this
-# checkout's live ledger — the shape `test_ledger_isolation.py` rejects for a shared append-only
-# file): the row must land under that base and the record in the worktree.
+# SPEC-intent-layer-diet AC-006 removed the `objective_proposed` row (it had no reader), so these
+# tests now assert that no row is written. The record is re-read through `load_world`, never from
+# the verb's return value. The base/worktree split is exercised with a LINKED worktree of a
+# throwaway base (never a before/after count on this checkout's live ledger — the shape
+# `test_ledger_isolation.py` rejects for a shared append-only file): the record lands in the
+# worktree and neither ledger gains a row.
 
 
 def _ledger_rows(root: Path) -> list[dict[str, Any]]:
@@ -173,7 +174,7 @@ def _proposal_rows(root: Path) -> list[dict[str, Any]]:
     ]
 
 
-def test_ac_003_from_proposal_prefills_rejected_and_emits_one_event(tmp_path: Path) -> None:
+def test_ac_003_from_proposal_prefills_rejected_and_emits_no_event(tmp_path: Path) -> None:
     root = fx.build_root(tmp_path)
     rc, out, err = _new(
         root,
@@ -191,9 +192,7 @@ def test_ac_003_from_proposal_prefills_rejected_and_emits_one_event(tmp_path: Pa
     rec = world.load_world(root).objectives["OBJ-9"]
     assert rec["state"] == "proposed"
     assert rec["rejected"] == ["P1 title", "P3 title"]
-    assert _proposal_rows(root) == [
-        {"event": "objective_proposed", "objective": "OBJ-9", "candidates": 3, "accepted": 1}
-    ]
+    assert _proposal_rows(root) == []  # SPEC-intent-layer-diet AC-006: no writer remains
 
 
 def test_ac_003_a_call_without_proposal_flags_writes_the_record_and_no_event(
@@ -237,7 +236,7 @@ def test_ac_003_bad_proposal_flag_combinations_are_refused_before_any_write(
     assert _ledger_rows(root) == []
 
 
-def test_ac_003_two_accepted_candidates_share_the_declined_list_and_emit_two_events(
+def test_ac_003_two_accepted_candidates_share_the_declined_list(
     tmp_path: Path,
 ) -> None:
     root = fx.build_root(tmp_path)
@@ -247,34 +246,14 @@ def test_ac_003_two_accepted_candidates_share_the_declined_list_and_emit_two_eve
     w = world.load_world(root)
     assert w.objectives["OBJ-1"]["rejected"] == ["P3 title"]
     assert w.objectives["OBJ-2"]["rejected"] == ["P3 title"]
-    rows = _proposal_rows(root)
-    assert [r["objective"] for r in rows] == ["OBJ-1", "OBJ-2"]
-    assert all(r["candidates"] == 3 and r["accepted"] == 1 for r in rows)
-
-
-def test_ac_003_a_failed_ledger_append_keeps_the_record_and_warns(tmp_path: Path) -> None:
-    """Fault injection at the filesystem, through the shipped CLI: the ledger path is a
-    directory, so the append raises after the record write. The verb must exit 0, keep the
-    record, and say on stderr that the row was NOT recorded (never retry — the id now exists)."""
-    root = fx.build_root(tmp_path)
-    ledger = root / ".claude" / "observability" / "auto-advance.jsonl"
-    ledger.mkdir(parents=True)
-    rc, out, err = _new(
-        root, "OBJ-7", "--from-proposal", "--candidates", "2", "--declined", "P2", "--json"
-    )
-    assert rc == 0, out + err
-    rec = world.load_world(root).objectives["OBJ-7"]
-    assert rec["rejected"] == ["P2"]
-    assert (root / "work-docs" / "INTENT-OBJ-7.md").exists()
-    assert "objective_proposed NOT recorded" in err
-    assert ledger.is_dir()  # nothing was written around the fault
+    assert _proposal_rows(root) == []  # SPEC-intent-layer-diet AC-006: no writer remains
 
 
 def _git(root: Path, *args: str) -> None:
     subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, timeout=60)
 
 
-def test_ac_003_a_linked_worktree_writes_the_row_at_base_and_the_record_in_the_worktree(
+def test_ac_003_a_linked_worktree_writes_the_record_in_the_worktree_and_no_row(
     tmp_path: Path,
 ) -> None:
     """`resolve_base_root` only diverges from `root` inside a linked worktree, so this is the one
@@ -288,7 +267,5 @@ def test_ac_003_a_linked_worktree_writes_the_row_at_base_and_the_record_in_the_w
     assert rc == 0, out + err
     assert (wt / "work-docs" / "INTENT-OBJ-5.md").exists()
     assert not (base / "work-docs" / "INTENT-OBJ-5.md").exists()
-    assert _proposal_rows(base) == [
-        {"event": "objective_proposed", "objective": "OBJ-5", "candidates": 1, "accepted": 1}
-    ]
+    assert _ledger_rows(base) == []  # SPEC-intent-layer-diet AC-006: no writer remains
     assert _ledger_rows(wt) == []

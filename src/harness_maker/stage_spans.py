@@ -116,10 +116,9 @@ def emit_event(
     now: datetime | None = None,
     fence_timeout: float = 5.0,
 ) -> Path:
-    """Append one event under the trial source fence.
+    """Append one event under the merge fence so concurrent writers do not interleave.
 
-    `fence_timeout` is short by default because optional telemetry must not stall a stage;
-    a caller whose event is required evidence passes the budget of the fence's holders.
+    `fence_timeout` is short by default because optional telemetry must not stall a stage.
     """
     from .loop_marker import sanitize_session_id
     from .worktree import _acquire_merge_fence

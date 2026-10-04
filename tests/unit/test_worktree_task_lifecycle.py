@@ -9,9 +9,13 @@ they never land in the squash). `_path_owner` is the code form of the ADR-010 ma
 from __future__ import annotations
 
 import subprocess
+import threading
+import time
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -235,6 +239,98 @@ def test_copy_secrets_excludes_metachar_filename(tmp_path: Path) -> None:
     wt = worktree.task_create(repo, "feat", session_uuid="u-1", include=["secret[p].env"])
     assert (wt / "secret[p].env").read_text() == "K=1\n"
     assert "secret[p].env" not in _git(["status", "--porcelain"], wt)
+
+
+def test_copy_secrets_removes_unignored_copy_before_the_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Whichever task-create path retries it, a copied secret that git would not ignore
+    must not stay on disk after the failure. (Re-homed from the deleted trial suite,
+    SPEC-intent-layer-diet review; the behaviour is not trial-specific.)"""
+    repo = _repo(tmp_path)  # .env is gitignored in base
+    (repo / ".env").write_text("TOKEN=secret\n")
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    _git(["init", "-q"], wt)
+    real_run = worktree._run
+
+    def refuse_check_ignore(args: list[str], *a: Any, **kw: Any) -> Any:
+        if args[:2] == ["git", "check-ignore"] and kw.get("cwd") == wt:
+            raise RuntimeError("not ignored")
+        return real_run(args, *a, **kw)
+
+    monkeypatch.setattr(worktree, "_run", refuse_check_ignore)
+    with pytest.raises(RuntimeError, match="copied include is not ignored"):
+        worktree._copy_and_exclude_secrets(repo, wt, [".env"])
+    assert not (wt / ".env").exists()
+
+
+def test_task_create_registration_waits_for_the_merge_fence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`git worktree add` runs under the merge fence, so registration never lands while
+    a finalize or land holds it. (Re-homed from the deleted trial suite; not trial-specific.)"""
+    root = _repo(tmp_path)
+    claimed = threading.Event()
+    original_claim = worktree.claim_task_branch
+
+    def claim_then_signal(*args: Any, **kwargs: Any) -> Any:
+        result = original_claim(*args, **kwargs)
+        claimed.set()
+        return result
+
+    monkeypatch.setattr(worktree, "claim_task_branch", claim_then_signal)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with worktree._acquire_merge_fence(root):
+            future = pool.submit(worktree.task_create, root, "late", session_uuid="late-session")
+            assert claimed.wait(5)
+            # Observe a window, not an instant: a single check races `git worktree add`
+            # and passes even with the fence removed.
+            for _ in range(20):
+                assert "hm/late" not in _git(["worktree", "list", "--porcelain"], root)
+                time.sleep(0.05)
+            assert not future.done()
+        created = future.result(timeout=10)
+    assert created == root / ".worktrees/late"
+    assert "hm/late" in _git(["worktree", "list", "--porcelain"], root)
+
+
+def test_task_refresh_waits_for_the_merge_fence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A refresh never rebases while a land or finalize holds the merge fence.
+    (Re-homed from the deleted trial suite; not trial-specific.)"""
+    root = _repo(tmp_path)
+    wt = worktree.task_create(root, "refresh", session_uuid="refresh-session")
+    assert wt.is_dir()
+    (wt / "feature.txt").write_text("task feature\n")
+    _git(["add", "feature.txt"], wt)
+    _git(["commit", "-qm", "task feature"], wt)
+    (root / "base.txt").write_text("base change\n")
+    _git(["add", "base.txt"], root)
+    _git(["commit", "-qm", "base change"], root)
+    before_head = _git(["rev-parse", "HEAD"], wt)
+    base_head = _git(["rev-parse", "HEAD"], root)
+    entered = threading.Event()
+    original_fence = worktree._acquire_merge_fence
+
+    def instrumented_fence(*args: Any, **kwargs: Any) -> Any:
+        entered.set()
+        return original_fence(*args, **kwargs)
+
+    monkeypatch.setattr(worktree, "_acquire_merge_fence", instrumented_fence)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with original_fence(root):
+            future = pool.submit(worktree.task_refresh, root, "refresh")
+            assert entered.wait(5)
+            assert not future.done()
+            assert _git(["rev-parse", "HEAD"], wt) == before_head
+            assert not (wt / "base.txt").exists()
+        assert future.result(timeout=10) == 0
+    assert _git(["rev-parse", "HEAD"], wt) != before_head
+    assert _git(["merge-base", "HEAD", base_head], wt) == base_head
+    assert (wt / "base.txt").read_text() == "base change\n"
+    assert (wt / "feature.txt").read_text() == "task feature\n"
 
 
 def test_path_owner_machine_memory_tiers_are_operational() -> None:

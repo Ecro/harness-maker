@@ -1,0 +1,239 @@
+schema_version: 3
+spec_slug: intent-layer-diet
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: 'Tier-2: the change is a deletion; the only new behaviour
+  is warn-only span emission in worktree.py, which is the mutation target.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/worktree.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Trial verbs and module are removed
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_layer_diet.py::test_ac001_trial_verbs_removed
+  - tests/unit/test_intent_layer_diet.py::test_ac001_trial_verb_is_rejected_by_the_shipped_entrypoint
+  executable_predicate: not any(v in intent_verbs() for v in ('trial', 'reconcile',
+    'record-decision')) and not module_importable('harness_maker.intent_trial')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The removal list was fixed in RESEARCH-intent-layer-diet Approach
+    A and approved by the DRI in round 1, before any code change; it is not derived
+    from the trimmed code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Worktree non-trial paths pass pre-existing tests unmodified
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_layer_diet.py::test_ac002_worktree_has_no_trial_reference
+  executable_predicate: preexisting_worktree_tests_pass(unmodified=True) and 'intent_trial'
+    not in worktree_source()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The worktree stash/finalize/land/landed-marker tests were written
+    before this change against the full module; running them unmodified compares the
+    trimmed module to the original behaviour.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Stage-span emission failure warns and never blocks preflight
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_layer_diet.py::test_ac003_span_failure_warns_not_blocks
+  - tests/unit/test_intent_layer_diet.py::test_ac003_span_success_still_emits_the_task_start
+  executable_predicate: preflight_with_failing_span(task_slug='t').returncode == 0
+    and 'span' in preflight_with_failing_span(task_slug='t').stderr
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Warn-only is the pre-trial contract documented in the _emit_stage_span
+    docstring ("otherwise telemetry failures only warn") and the DRI's round-1 choice;
+    the injected failure is external to the code under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Intent tests pass with enumerated edits only and the gate names hm intent
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_layer_diet.py::test_ac004_gate_remediation_names_hm_intent
+  executable_predicate: preexisting_intent_test_edits() <= ENUMERATED_OBJECTIVE_PROPOSED_EDITS
+    and 'hm intent approve' in objective_gate_remediation() and 'hm world' not in
+    objective_gate_remediation()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The intent and world tests predate this change; the only allowed
+    edits are the objective_proposed assertions enumerated in the SPEC before implementation,
+    so every other assertion compares surviving behaviour to the original. The remediation
+    wording is fixed by the SPEC (round 4), not derived from the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Fresh renders match the pre-change snapshot pins
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_layer_diet.py::test_ac005_snapshot_pins_not_regenerated
+  executable_predicate: fresh_render_hashes(arms=ALL_FOUR) == pinned_hashes_before_change()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The four tests/snapshot/*.expected.yaml body_sha256 pins were generated
+    by regenerate.py before this change and are not regenerated; test_synthesize_snapshot.py
+    renders fresh and compares, so the render is checked against a pre-change reference.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: From-proposal creates the record and leaves both ledgers untouched
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_layer_diet.py::test_ac006_from_proposal_ledgers_untouched
+  executable_predicate: run_new_from_proposal_in_worktree('X').record_state == 'proposed'
+    and base_ledger_bytes_after() == base_ledger_bytes_before() and worktree_ledger_bytes_after()
+    == worktree_ledger_bytes_before() and historical_rows_parse()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: RESEARCH found no reader of objective_proposed in src (caller map
+    2026-10-04); the expected record state comes from the intent-layer skill contract
+    (proposer never approves).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Intent status JSON and fixture files are identical before and after
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_layer_diet.py::test_ac007_status_json_identical
+  - tests/unit/test_intent_layer_diet.py::test_ac007_fixture_inputs_byte_unchanged
+  executable_predicate: all(status_json(f, now=PINNED) == golden_status(f) and fixture_bytes_unchanged(f)
+    for f in ('current_layout_questions_owners', 'legacy_mission_outcomes'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Goldens for a current-layout fixture (questions, owners) and a
+    legacy mission/outcomes fixture are captured with a pinned clock and isolated
+    ledger and committed before any code change, never regenerated after it; equality
+    compares the trimmed engine to the original engine.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Remove hm intent trial/reconcile/record-decision from the CLI with no
+    compatibility stub
+  category: public API/CLI contract
+  rationale: Hand-typed invocations get an argparse invalid-choice error; restoring
+    means re-adding about 1.5k LOC. Rendered harnesses never call them and old harnesses
+    run their own pinned plugin cache.
+  source: spec
+approval:
+  kind: human
+  content_hash: f7c4636f8d6e6637d244cc9d29b1a254e589ffb94912a23953a68946b0bbf94b
+  approved_by: Ecro
+  approved_at: '2026-10-04T01:28:26Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 384adc6c21b16f23d311690be7bf8e8dbeefba2bb5cb814dae3cf5b7d3eb05d3
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
+    mutation_threshold_rationale: 90bb3d55b5c4389b97e2fc3807a7e5bc041a23380bba0a510ec9354d45b02874
+    paths_to_mutate: af9d3e98228748ba8f76d335fb92fffdb907db1eb6f81f07bf693b11a011f22f
+    irreversible_decisions: 79f5e47b3676883d303de4a98e581c55435a0eeb747cb975f7398d2a74f9aee3
+    AC-001: 4c404d9dcbe5783039dab65de95b59dadb86c3dcabb4e2eb509f7d9975f9c2d0
+    AC-002: 38343741cc601e504956e4d03b2716c67aa6fd14805d2b0ee1c7e03c430f787b
+    AC-003: dc3781a3a6078bb4d0adbf14a51af9afe769cc3a7e5ecce4b3a2ed1c1133291d
+    AC-004: 2ed0d582b9e81423f3ddef5540bd5651cc6510d93928b79f11f96d29af6dd9b5
+    AC-005: 2e1006d4df6d6b0f8c0b78a16d64b27c76d55d474fd90418de3430aa1e22232c
+    AC-006: d87b90033448e02094949c97fc1dc9718851f26f2b0a87bef27975fc176f67f9
+    AC-007: 629a994ae64926f75608e0a88b1a49dab15740d3f71fe2f831870e77d59e426f
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c

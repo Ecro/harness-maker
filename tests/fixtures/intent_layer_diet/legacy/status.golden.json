@@ -1,0 +1,39 @@
+{
+  "active": {},
+  "broken_references": [],
+  "conflicts": [],
+  "fired_revisits": [],
+  "intents": {},
+  "metrics": {
+    "fixture_minutes": {
+      "gap": "unevaluable",
+      "higher_is_better": false,
+      "how_measured": "hand-counted from the fixture log",
+      "last": null,
+      "measure": false,
+      "observed_at": null,
+      "reason": "never_measured",
+      "stale_definition": false,
+      "target": 10
+    }
+  },
+  "moved_evidence": {},
+  "needs_revalidation": [],
+  "open_questions": [],
+  "proposed": [],
+  "purpose": {
+    "statement": "A legacy fixture project that still uses the mission/outcomes vocabulary.",
+    "vision": ""
+  },
+  "revisits": {},
+  "stale_evidence": {},
+  "state": "ok",
+  "withdrawal": {
+    "due": false,
+    "filled_at": null,
+    "last_signal_at": null,
+    "quiet_wrapups": null,
+    "reason": "no_git",
+    "revisit_candidates_now": 0
+  }
+}
