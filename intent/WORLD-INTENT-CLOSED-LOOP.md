@@ -19,7 +19,7 @@ scope:
 - Demonstrate successful feedback-to-decision continuity in all three consecutive
   real tasks using execution and conversation evidence, with final assessment by the
   user. Normal approval questions and justified termination are not failures.
-state: active
+state: closed
 created_at: '2026-09-22T00:02:18Z'
 schema_version: 1
 rejected: []
@@ -30,9 +30,16 @@ approval:
   approved_at: '2026-09-22T00:47:20Z'
   approved_target: 3
 revisit_when: null
-observed: null
-note: null
-closed_at: null
+observed: met
+note: 'intent_world_closed_loop_cycles 0 -> 3 (target 3). Three consecutive real tasks,
+  each assessed "yes" by the operator at wrapup Step 5.7: world-model-name (2026-10-02,
+  work-docs/PLAN-world-model-name.md ## Feedback), world-model-followups (2026-10-02,
+  work-docs/PLAN-world-model-followups.md ## Feedback), maker-front-door-improvements
+  (2026-10-03, work-docs/PLAN-maker-front-door-improvements.md ## Feedback). Evidence
+  rows are in .claude/intent/metrics.yaml. Limit: all three tasks were on the world-model/Maker
+  area itself, so continuity on unrelated feature work is not shown. Closed 2026-10-04
+  to stop carrying a met meta-intent in the active set.'
+closed_at: '2026-10-04T00:44:59Z'
 statement: The world model and intent workflow carry observations through state updates
   into the next decision across three consecutive real tasks without the user having
   to re-instruct the connection, proceeding to the next execution within the agreed

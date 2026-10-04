@@ -399,3 +399,28 @@ values:
     specs/SPEC-maker-front-door-improvements.md ## Feedback.'
   definition_hash: 2b39a4ca6a48bfccff7525568dfcf5136f0a793a02d74556bfb8e726646fa6d6
   metric_id: intent_world_closed_loop_cycles
+- value: 2.5
+  observed_at: '2026-10-04T00:32:53Z'
+  evidence: 'auto: measure#754a4e8cf656 @ dcbc7678 exit=0 cwd=base'
+  definition_hash: 754a4e8cf65695fd99ede671a80587600f565474a4a388a5122ee97ee5d7b866
+  metric_id: task_lead_time_hours
+- value: 0
+  observed_at: '2026-10-04T00:32:53Z'
+  evidence: 'auto: measure#0a15fd8a1350 @ dcbc7678 exit=0 cwd=base'
+  definition_hash: 0a15fd8a1350b885c8ed3e738f1d252e15f1f66b4b0dee532990a5c2eb35b952
+  metric_id: change_failure_rate
+- value: 8.3
+  observed_at: '2026-10-04T00:32:54Z'
+  evidence: 'auto: measure#2fb56618dd65 @ dcbc7678 exit=0 cwd=base'
+  definition_hash: 2fb56618dd65935c7a801bc949d423b46ee63946579dab955309d04eaca17ae4
+  metric_id: post_merge_churn
+- value: 45.2
+  observed_at: '2026-10-04T00:32:54Z'
+  evidence: 'auto: measure#9213740d0ae8 @ dcbc7678 exit=0 cwd=checkout'
+  definition_hash: 9213740d0ae88c6690466a2d059f646096649288f6bd1b64ee33bdbfd31939b5
+  metric_id: unsourced_step_share
+- value: 7.5
+  observed_at: '2026-10-04T00:33:08Z'
+  evidence: 'auto: measure#82611f0fd3e4 @ dcbc7678 exit=0 cwd=base'
+  definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
+  metric_id: dead_rendered_bytes
