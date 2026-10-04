@@ -1,0 +1,79 @@
+{
+  "findings": [
+    {
+      "severity": "P2",
+      "lens": "functionality",
+      "file": "src/harness_maker/freeze.py",
+      "line": 46,
+      "summary": "Default base branch loses its path (rsplit), so a slash-containing default base like release/1.0 is misclassified as a task branch",
+      "suggestion": "In _default_base_branch strip only refs/remotes/origin/ (via _branch_name) instead of rsplit('/',1)[-1].",
+      "evidence": "freeze.py:48 head.rsplit('/', 1)[-1] feeds the on_task_branch comparison at freeze.py:83",
+      "reasoning": {
+        "observe": "_default_base_branch returns the last path segment",
+        "trace": "origin/HEAD -> origin/release/1.0 gives branch '1.0'; current 'release/1.0' != '1.0'",
+        "infer": "merge-base == HEAD is accepted on the base branch itself",
+        "conclude": "rare config; scope collapse on that base branch"
+      },
+      "source": "functionality",
+      "reviewer": "code-reviewer",
+      "message": "Default base branch loses its path (rsplit), so a slash-containing default base like release/1.0 is misclassified as a task branch",
+      "id": "07fb750cfd781154",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "design",
+      "file": "src/harness_maker/freeze.py",
+      "line": 82,
+      "summary": "on_task_branch compares against a guessed base name; an unconfigured master repo with a stray main ref classifies master as a task branch",
+      "suggestion": "Pin the master-without-origin case with a test or comment; only treat current != branch as task when branch resolves.",
+      "evidence": "freeze.py:49 falls back to literal main; freeze.py:83 compares against it",
+      "reasoning": {
+        "observe": "fallback base name is the literal main",
+        "trace": "master checked out, stray main ref exists, merge-base HEAD main == HEAD",
+        "infer": "HEAD accepted on the real trunk",
+        "conclude": "masked today (no main ref -> candidates fail), fragile and untested"
+      },
+      "source": "design",
+      "reviewer": "code-reviewer",
+      "message": "on_task_branch compares against a guessed base name; an unconfigured master repo with a stray main ref classifies master as a task branch",
+      "id": "bac5677451d25b42",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "tests",
+      "file": "tests/unit/test_freeze_commit.py",
+      "line": 211,
+      "summary": "No test uses a base branch other than main, so a hard-coded current != 'main' implementation passes every freeze test.",
+      "suggestion": "Add a case with base_branch='develop' on develop (expect HEAD~1) and on a zero-commit task branch off develop (expect HEAD).",
+      "evidence": "Every topology in the diff uses main as the base branch; freeze.py:83 compares against the resolved branch.",
+      "reasoning": {
+        "observe": "tests only set base branch to main or a spelling of it",
+        "trace": "mutant current != 'main' behaves identically for every test",
+        "infer": "resolved-base comparison is unpinned for non-main bases",
+        "conclude": "oracle gap; non-main repos could regress to the original defect"
+      },
+      "source": "tests",
+      "reviewer": "test-reviewer",
+      "message": "No test uses a base branch other than main, so a hard-coded current != 'main' implementation passes every freeze test.",
+      "id": "c7c823c855629ece",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "file": "src/harness_maker/freeze.py",
+      "line": 83,
+      "source": "codex",
+      "reviewer": "codex",
+      "summary": "A tag named like the base branch makes symbolic-ref --short return heads/main, so the base branch is misclassified as a task branch and HEAD is accepted",
+      "message": "A tag named like the base branch makes symbolic-ref --short return heads/main, so the base branch is misclassified as a task branch and HEAD is accepted",
+      "suggestion": "Read the full symbolic ref and strip refs/heads/; add a same-named-tag regression test.",
+      "evidence": "Reproduced: 2-commit main with tag main -> symbolic-ref --short = heads/main; resolve_review_base returned HEAD (310aee64) instead of HEAD~1 (7dbe8abc).",
+      "oracle_result": "reproduced in scratch repo tagprobe2",
+      "pida": "accepted",
+      "id": "200c0ebbc3821179",
+      "caused_by": "none"
+    }
+  ]
+}
