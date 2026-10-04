@@ -253,3 +253,18 @@ open_questions:
   status: open
   evidence: []
   history: []
+- id: q_intent_layer_unfired_paths
+  claim: As of 2026-10-04 the intent layer's revisit, revalidation, conflict and autopilot
+    objective-halt paths have never fired in this repo or its consumer projects; only
+    status, auto-measure, question evidence and the record lifecycle are used.
+  status: confirmed
+  evidence:
+  - text: 'Usage census in work-docs/RESEARCH-intent-layer-diet.md (section "Usage
+      evidence"): the trial was frozen at 0/3 and never produced a verdict (now deleted
+      by intent-layer-diet); fired_revisits, needs_revalidation and conflicts show
+      0 real firings; 0 of 135 gate_blocked rows came from the objective gate; consumers
+      spoton, neuroTerm and edgelog also show 0. This bears on a future Approach B
+      (core simplification) decision.'
+    observed_at: '2026-10-04T04:37:47.304600Z'
+    relation: confirms
+  history: []

@@ -1,0 +1,141 @@
+{
+  "findings": [
+    {
+      "severity": "P2",
+      "lens": "consistency",
+      "reviewer": "code-reviewer",
+      "file": "src/harness_maker/worktree.py",
+      "line": 4891,
+      "summary": "Comment says the merge fence guards trial collection, which is deleted",
+      "suggestion": "# Serialize worktree registration against other merge-fence holders (finalize/land) so the registry is never mutated mid-operation.",
+      "reasoning": {
+        "observe": "worktree.py:4891-4893 names trial collection; diff deletes it",
+        "trace": "fence around git worktree add stays",
+        "infer": "reader believes a removed consumer depends on it",
+        "conclude": "stale comment is false after this change"
+      },
+      "pass": 2,
+      "id": "b2c76db280432503",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "consistency",
+      "reviewer": "code-reviewer",
+      "file": "src/harness_maker/stage_spans.py",
+      "line": 119,
+      "summary": "emit_event docstring still says 'under the trial source fence'",
+      "suggestion": "Append one event under the merge fence so concurrent writers do not interleave.",
+      "reasoning": {
+        "observe": "stage_spans.py:119-122 name trial source fence and required-evidence callers",
+        "trace": "only caller passes optional telemetry",
+        "infer": "docstring names a deleted concept",
+        "conclude": "false docstring"
+      },
+      "pass": 2,
+      "id": "8e8ce3c1386fcbca",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "design",
+      "reviewer": "code-reviewer",
+      "file": "src/harness_maker/stage_spans.py",
+      "line": 117,
+      "summary": "fence_timeout parameter is dead generality",
+      "suggestion": "Replace the parameter with a module constant _SPAN_FENCE_TIMEOUT = 5.0 and drop fence_timeout=5.0 at worktree.py:5098.",
+      "reasoning": {
+        "observe": "only one caller passes the default 5.0",
+        "trace": "required-evidence caller deleted",
+        "infer": "knob has a single value",
+        "conclude": "inline as constant"
+      },
+      "pass": 2,
+      "id": "21d0cbd1b7d6b493",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/integration/test_intent_trial_concurrency.py",
+      "line": 710,
+      "summary": "Deleted test was the only direct coverage of worktree._copy_and_exclude_secrets fail-closed cleanup; not trial-specific",
+      "suggestion": "Re-home test_s2_unignored_secret_copy_is_removed_before_the_error into tests/unit/test_worktree_task_lifecycle.py",
+      "reasoning": {
+        "observe": "HEAD test 710-733 calls _copy_and_exclude_secrets directly",
+        "trace": "deleted with its file",
+        "infer": "removing the cleanup unlink would pass the suite",
+        "conclude": "re-home the test"
+      },
+      "pass": 2,
+      "id": "32a572ca43d27305",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/unit/test_intent_layer_diet.py",
+      "line": 161,
+      "summary": "Span success test does not pin fence_timeout=5.0",
+      "suggestion": "assert calls[0][\"fence_timeout\"] == 5.0",
+      "reasoning": {
+        "observe": "lambda records kwargs; fence_timeout unasserted",
+        "trace": "prior P1 regression was a long fence",
+        "infer": "wrong impl passes",
+        "conclude": "add one assertion"
+      },
+      "pass": 2,
+      "id": "fa8eaa468022aec2",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/unit/test_intent_layer_diet.py",
+      "line": 296,
+      "summary": "AC-007 does not detect status_report mutating the copy it reads",
+      "suggestion": "digest the copy before/after status_report in _status_of",
+      "reasoning": {
+        "observe": "_status_of copies then reads; only originals digested",
+        "trace": "writes to the copy unobserved",
+        "infer": "pure-read property unguarded",
+        "conclude": "digest the copy"
+      },
+      "pass": 2,
+      "id": "60848a39643c7fc4",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/unit/test_intent_layer_diet.py",
+      "line": 229,
+      "summary": "test_ac005_fresh_render_matches_pins only hashes pin files; rename",
+      "suggestion": "Rename to test_ac005_snapshot_pins_not_regenerated",
+      "reasoning": {
+        "observe": "no rendering in the test",
+        "trace": "render oracle lives in test_synthesize_snapshot.py",
+        "infer": "name misleads",
+        "conclude": "rename"
+      },
+      "pass": 2,
+      "id": "70f532c2663c2b21",
+      "caused_by": "none"
+    },
+    {
+      "id": "1ba5cde4c42d657c",
+      "severity": "P2",
+      "file": "tests/unit/test_intent_layer_diet.py",
+      "line": 296,
+      "summary": "AC-007이 실제 조회 대상의 파일 변경을 감지하지 못합니다. status_report()가 임시 복사본의 intent 파일을 수정해도 반환 JSON만 같으면 두 테스트 모두 통과합니다. _status_of()에서 status_report() 호출 전후 동일한 임시 root의 파일 해시를 비교해야 상태 조회의 비변경성을 검증할 수 있습니다.",
+      "evidence": "_status_of()는 tmp / fixture에서 status_report()를 실행하지만, 파일 보존 검사는 FIXTURES / fixture의 해시만 비교합니다.",
+      "source": "codex",
+      "needs_relaxation": false,
+      "caused_by": "none"
+    }
+  ]
+}
