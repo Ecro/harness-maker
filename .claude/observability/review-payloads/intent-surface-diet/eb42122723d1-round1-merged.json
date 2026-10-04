@@ -1,0 +1,207 @@
+{
+  "findings": [
+    {
+      "severity": "P1",
+      "lens": "consistency",
+      "reviewer": "code-reviewer",
+      "file": "specs/SPEC-intent-layer-diet.machine.yaml",
+      "line": 131,
+      "summary": "Landed machine specs list retired test ids in test_ids[] (also SPEC-intent-layer-improvements.machine.yaml:51,:317)",
+      "suggestion": "Remove the retired ids; mark the ACs superseded when no test remains",
+      "reasoning": {
+        "observe": "test_ids name deleted tests",
+        "trace": "spec_machine rule-3 resolves test_ids",
+        "infer": "coverage claim false",
+        "conclude": "prune ids"
+      },
+      "id": "e6e55fbe5e140849",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "functionality",
+      "reviewer": "code-reviewer",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 592,
+      "summary": "Deferred items 'stay pending' with no row; SPEC/RESEARCH source rows marked only in the PLAN",
+      "suggestion": "deferred items re-derive next wrapup; mark source rows in their own table",
+      "reasoning": {
+        "observe": "cap clause + step 5 PLAN-only marks",
+        "trace": "derived items rowless; source rows stay pending",
+        "infer": "re-offered forever",
+        "conclude": "fix wording + mark source"
+      },
+      "id": "e9f17bbb90feadeb",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "functionality",
+      "reviewer": "code-reviewer",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 590,
+      "summary": "Empty-list path skips the readback the close question requires",
+      "suggestion": "restore '(nothing was written, so the Step 1 read is the readback)'",
+      "reasoning": {
+        "observe": "step 3 vs :597",
+        "trace": "no readback on empty path",
+        "infer": "close skipped",
+        "conclude": "restore clause"
+      },
+      "id": "8979e1e152a731b0",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/unit/test_intent_surface_diet.py",
+      "line": 234,
+      "summary": "No test pins spec 0.5's hm intent status --json read before the question",
+      "suggestion": "pin STATUS mandated line per target before gate",
+      "reasoning": {
+        "observe": "AC-011 retired",
+        "trace": "status read survives",
+        "infer": "unpinned",
+        "conclude": "re-pin in AC-002"
+      },
+      "id": "747e6d68b1078a22",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/unit/test_intent_surface_diet.py",
+      "line": 222,
+      "summary": "AC-001 checks marker comments only, not collection prose",
+      "suggestion": "no_collection_prose for non-wrapup stages",
+      "reasoning": {
+        "observe": "marker-only predicate",
+        "trace": "prose could survive",
+        "infer": "wrong impl passes",
+        "conclude": "extend"
+      },
+      "id": "2ffe796dc68e26ba",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/unit/test_intent_surface_diet.py",
+      "line": 64,
+      "summary": "S33_CONTRACT omits drift criteria; control is synthetic",
+      "suggestion": "add criteria tokens; loop deletion control on real renders",
+      "reasoning": {
+        "observe": "criteria unpinned",
+        "trace": "delete passes",
+        "infer": "weak oracle",
+        "conclude": "add + control"
+      },
+      "id": "b59f7c28a4827b7a",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/unit/test_intent_surface_diet.py",
+      "line": 66,
+      "summary": "S33_CONTRACT lacks file=PLAN, never edit the record, intent trigger and skip lines",
+      "suggestion": "add tokens",
+      "reasoning": {
+        "observe": "unpinned clauses",
+        "trace": "mutations pass",
+        "infer": "contract gaps",
+        "conclude": "add"
+      },
+      "id": "53cf9637b0354b60",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/unit/test_intent_surface_diet.py",
+      "line": 275,
+      "summary": "5.7 skip recorded/declined and failed-once rules unpinned",
+      "suggestion": "S57_RULES regexes + controls",
+      "reasoning": {
+        "observe": "guards miss rules",
+        "trace": "delete passes",
+        "infer": "idempotency unguarded",
+        "conclude": "pin"
+      },
+      "id": "25884309654a6994",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "tests",
+      "reviewer": "test-reviewer",
+      "file": "tests/unit/test_intent_surface_diet.py",
+      "line": 447,
+      "summary": "AC-008 phrase has no position or control",
+      "suggestion": "tie to item 1 + control",
+      "reasoning": {
+        "observe": "substring only",
+        "trace": "negation passes",
+        "infer": "weak",
+        "conclude": "position"
+      },
+      "id": "44d10bae33c038a7",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "concurrency",
+      "reviewer": "concurrency-reviewer",
+      "file": "tests/unit/test_intent_surface_diet.py",
+      "line": 90,
+      "summary": "@cache _root() mkdtemp render never removed",
+      "suggestion": "session fixture on tmp_path_factory",
+      "reasoning": {
+        "observe": "mkdtemp no cleanup",
+        "trace": "per worker",
+        "infer": "leak",
+        "conclude": "fixture"
+      },
+      "id": "b9a1b8da4b93e74a",
+      "caused_by": "none"
+    },
+    {
+      "id": "aeca8f3216f89248",
+      "severity": "P2",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 593,
+      "summary": "기존 SPEC/RESEARCH 행의 처리 상태가 갱신되지 않습니다. 진행 중이던 작업의 pending 행을 성공적으로 처리하거나 거절해도 원본은 pending으로 남아 다음 wrapup에서 다시 후보가 됩니다. 원본 행을 갱신하거나 PLAN의 disposition으로 연결하고, 재수집 시 이를 확인하도록 명시해야 합니다.",
+      "evidence": "Step 1은 PLAN/SPEC/RESEARCH의 pending 행을 수집하지만, Step 5는 이제 결과를 PLAN에만 기록하도록 지시합니다.",
+      "source": "codex",
+      "needs_relaxation": false,
+      "caused_by": "none"
+    },
+    {
+      "id": "92256a2c9eaaee85",
+      "severity": "P3",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 590,
+      "summary": "빈 배치 경로의 지시가 서로 충돌합니다. Step 3은 readback이 있는 Step 5를 건너뛰고 close로 이동시키지만, close는 readback 이후에만 허용됩니다. 쓰기가 없는 경우 최초 status 읽기를 readback으로 인정하던 규칙을 복원해야 합니다.",
+      "evidence": "Step 3에서 'Step 1 read is the readback' 예외가 삭제됐지만, close는 여전히 'after the record batch’s readback'을 요구합니다.",
+      "source": "codex",
+      "needs_relaxation": false,
+      "caused_by": "none"
+    },
+    {
+      "id": "c6252f79c08f586c",
+      "severity": "P2",
+      "file": "tests/unit/test_intent_surface_diet.py",
+      "line": 285,
+      "summary": "3.3 보존 테스트가 실제 판정 규칙을 보호하지 않습니다. S33_CONTRACT에는 scope/out_of_scope/statement 판정, PLAN 파일 지정, record 수정 금지가 빠져 있어 핵심 동작을 삭제해도 검사가 통과합니다. 해당 규칙과 각각의 삭제 control을 추가해야 합니다.",
+      "evidence": "읽기 전용 mutation 확인에서 세 drift 조건 전체를 삭제하거나 'never edit the record'를 삭제해도 s33_ok가 True를 반환했습니다.",
+      "source": "codex",
+      "needs_relaxation": false,
+      "caused_by": "none"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "findings": [
+    {
+      "severity": "P2",
+      "lens": "design",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 593,
+      "summary": "Shell-injection seam closed by ~940 chars of prose regexes the agent must self-apply",
+      "suggestion": "Long-term: stop composing authored values onto a shell line (temp files or argv-free record); keep prose as stopgap",
+      "source": "design",
+      "reviewer": "core",
+      "message": "Shell-injection seam closed by ~940 chars of prose regexes the agent must self-apply",
+      "id": "ea249543351b400e",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "consistency",
+      "file": "specs/SPEC-wrapup-intent-hardening.machine.yaml",
+      "line": 23,
+      "summary": "All six ACs have empty test_ids and pending_test true though tests exist; AC-003 predicate words differ from the test",
+      "suggestion": "Bind test_ids (wrapup Step 3.5 mark-tested) and record the AC-003 predicate/test divergence",
+      "source": "consistency",
+      "reviewer": "core",
+      "message": "All six ACs have empty test_ids and pending_test true though tests exist; AC-003 predicate words differ from the test",
+      "id": "0f00b443a314b98e",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "design",
+      "file": "tests/unit/test_wrapup_intent_hardening.py",
+      "line": 840,
+      "summary": "Regex heuristics pin exact prose; rewording breaks landed tests",
+      "suggestion": "Keep only the load-bearing pins",
+      "source": "design",
+      "reviewer": "core",
+      "message": "Regex heuristics pin exact prose; rewording breaks landed tests",
+      "id": "f5b046b2f255a0e5",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "concurrency",
+      "file": "tests/unit/test_wrapup_intent_hardening.py",
+      "line": 95,
+      "summary": "@cache'd mkdtemp render roots are never removed; each pytest run leaks temp dirs",
+      "suggestion": "session-scoped tmp_path_factory fixture",
+      "reasoning": {
+        "observe": "_root() mkdtemp under @cache, no cleanup; same pattern as test_intent_surface_diet.py:104",
+        "trace": "each xdist worker renders 2 roots",
+        "infer": "2xN render trees leak per run",
+        "conclude": "resource-lifetime leak, low severity, copies existing convention"
+      },
+      "source": "concurrency",
+      "reviewer": "concurrency",
+      "message": "@cache'd mkdtemp render roots are never removed; each pytest run leaks temp dirs",
+      "id": "99031332b60fabf2",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "tests",
+      "file": "tests/unit/test_wrapup_intent_hardening.py",
+      "line": 228,
+      "summary": "AC-002 enum binding is a proximity heuristic; a stray mention can satisfy another name",
+      "source": "tests",
+      "reviewer": "tests",
+      "message": "AC-002 enum binding is a proximity heuristic; a stray mention can satisfy another name",
+      "id": "a018ab28415fbe34",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "functionality",
+      "file": "specs/SPEC-wrapup-intent-hardening.machine.yaml",
+      "line": 53,
+      "summary": "Oracle evidence still cites world.py:75 [A-Z0-9-]+ as the source of the id pattern",
+      "suggestion": "note the stricter pattern supersedes the cited regex",
+      "source": "functionality",
+      "reviewer": "core",
+      "message": "Oracle evidence still cites world.py:75 [A-Z0-9-]+ as the source of the id pattern",
+      "id": "615c9eaa3e5b4135",
+      "caused_by": "none"
+    }
+  ]
+}

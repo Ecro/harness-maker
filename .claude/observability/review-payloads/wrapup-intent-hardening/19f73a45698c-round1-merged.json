@@ -1,0 +1,168 @@
+{
+  "findings": [
+    {
+      "severity": "P2",
+      "lens": "design",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 593,
+      "summary": "Shell-injection seam closed by ~940 chars of prose regexes the agent must self-apply",
+      "suggestion": "Long-term: stop composing authored values onto a shell line (temp files or argv-free record); keep prose as stopgap",
+      "source": "design",
+      "reviewer": "core",
+      "message": "Shell-injection seam closed by ~940 chars of prose regexes the agent must self-apply",
+      "id": "ea249543351b400e",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "consistency",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 597,
+      "summary": "Close paragraph lost its predicate; 'Only when ...' now reads as a fragment and the skip line's gating is ambiguous",
+      "suggestion": "Rewrite as one sentence: Only when ... and after readback: if ..., print ... and ask nothing; otherwise ask ...",
+      "source": "consistency",
+      "reviewer": "core",
+      "message": "Close paragraph lost its predicate; 'Only when ...' now reads as a fragment and the skip line's gating is ambiguous",
+      "id": "b14672d1f0b03f4e",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "consistency",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 593,
+      "summary": "Re-offer rule stated twice with different wording; <item> undefined and can leak the value",
+      "suggestion": "Define <item> as kind plus argument name, never its arguments",
+      "source": "consistency",
+      "reviewer": "core",
+      "message": "Re-offer rule stated twice with different wording; <item> undefined and can leak the value",
+      "id": "13dfd3c43a78647d",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "robustness",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 597,
+      "summary": "Whole-value patterns admit option-shaped tokens (--, -1, locator starting with -)",
+      "suggestion": "Require alphanumeric first char or put -- before positionals",
+      "source": "robustness",
+      "reviewer": "core",
+      "message": "Whole-value patterns admit option-shaped tokens (--, -1, locator starting with -)",
+      "id": "f2bb8a6829a5ccd7",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "consistency",
+      "file": "specs/SPEC-wrapup-intent-hardening.machine.yaml",
+      "line": 23,
+      "summary": "All six ACs have empty test_ids and pending_test true though tests exist; AC-003 predicate words differ from the test",
+      "suggestion": "Bind test_ids (wrapup Step 3.5 mark-tested) and record the AC-003 predicate/test divergence",
+      "source": "consistency",
+      "reviewer": "core",
+      "message": "All six ACs have empty test_ids and pending_test true though tests exist; AC-003 predicate words differ from the test",
+      "id": "0f00b443a314b98e",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "design",
+      "file": "tests/unit/test_wrapup_intent_hardening.py",
+      "line": 840,
+      "summary": "Regex heuristics pin exact prose; rewording breaks landed tests",
+      "suggestion": "Keep only the load-bearing pins",
+      "source": "design",
+      "reviewer": "core",
+      "message": "Regex heuristics pin exact prose; rewording breaks landed tests",
+      "id": "f5b046b2f255a0e5",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "security",
+      "file": "src/harness_maker/templates/stages/wrapup.md.j2",
+      "line": 597,
+      "summary": "Intent id pattern [A-Z0-9-]+ admits a leading dash, so the id can become an option token",
+      "suggestion": "Require a leading alphanumeric, e.g. [A-Z0-9][A-Z0-9-]*, or put -- before the positional <id>",
+      "reasoning": {
+        "observe": "close checks [A-Z0-9-]+ (597); <id> positional on 598; CLI regex identical (world.py:75)",
+        "trace": "intent: '--' passes whole-value check and lands unquoted as a positional",
+        "infer": "parser may read it as end-of-options/option; impact limited by uppercase-only and CLI regex",
+        "conclude": "whole-value guarantee slightly weaker than claimed; low severity"
+      },
+      "source": "security",
+      "reviewer": "security",
+      "message": "Intent id pattern [A-Z0-9-]+ admits a leading dash, so the id can become an option token",
+      "id": "89eebe5edccfd8fc",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "concurrency",
+      "file": "tests/unit/test_wrapup_intent_hardening.py",
+      "line": 95,
+      "summary": "@cache'd mkdtemp render roots are never removed; each pytest run leaks temp dirs",
+      "suggestion": "session-scoped tmp_path_factory fixture",
+      "reasoning": {
+        "observe": "_root() mkdtemp under @cache, no cleanup; same pattern as test_intent_surface_diet.py:104",
+        "trace": "each xdist worker renders 2 roots",
+        "infer": "2xN render trees leak per run",
+        "conclude": "resource-lifetime leak, low severity, copies existing convention"
+      },
+      "source": "concurrency",
+      "reviewer": "concurrency",
+      "message": "@cache'd mkdtemp render roots are never removed; each pytest run leaks temp dirs",
+      "id": "99031332b60fabf2",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "tests",
+      "file": "tests/unit/test_wrapup_intent_hardening.py",
+      "line": 216,
+      "summary": "AC-001 three-outcome check cannot fail on the new clause: the old tail of the same sentence already holds all three tokens",
+      "source": "tests",
+      "reviewer": "tests",
+      "message": "AC-001 three-outcome check cannot fail on the new clause: the old tail of the same sentence already holds all three tokens",
+      "id": "4c519a0bc72d1d85",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P2",
+      "lens": "tests",
+      "file": "tests/unit/test_wrapup_intent_hardening.py",
+      "line": 246,
+      "summary": "AC-003 edit-then-check order is vacuous (step 4 always precedes step 5); 'after any edit' never asserted; malformed words are a bag over step 5",
+      "source": "tests",
+      "reviewer": "tests",
+      "message": "AC-003 edit-then-check order is vacuous (step 4 always precedes step 5); 'after any edit' never asserted; malformed words are a bag over step 5",
+      "id": "7c2a70dcd96012f6",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "tests",
+      "file": "tests/unit/test_wrapup_intent_hardening.py",
+      "line": 259,
+      "summary": "AC-004 never asserts 'ask nothing' on a malformed id, only textual order",
+      "source": "tests",
+      "reviewer": "tests",
+      "message": "AC-004 never asserts 'ask nothing' on a malformed id, only textual order",
+      "id": "63cf894101f1d5de",
+      "caused_by": "none"
+    },
+    {
+      "severity": "P3",
+      "lens": "tests",
+      "file": "tests/unit/test_wrapup_intent_hardening.py",
+      "line": 228,
+      "summary": "AC-002 enum binding is a proximity heuristic; a stray mention can satisfy another name",
+      "source": "tests",
+      "reviewer": "tests",
+      "message": "AC-002 enum binding is a proximity heuristic; a stray mention can satisfy another name",
+      "id": "a018ab28415fbe34",
+      "caused_by": "none"
+    }
+  ]
+}

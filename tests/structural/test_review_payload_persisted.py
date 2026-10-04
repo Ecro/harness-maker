@@ -56,6 +56,12 @@ _STEP_LANDED = "2026-08-05"
 #: `mutation-survivors-and-approval-p2s` (run efae9d5dd1a9) and `withdrawal-criterion-window`
 #: (run aeb96c3b0764). No copy survives on disk; nothing was reconstructed (2026-09-27 sweep).
 _KNOWN_MISSING: dict[tuple[str, int], str] = {
+    ("intent-surface-diet", 2): (
+        "Round 2 applied seven fixes and re-reviewed with one functionality dispatch, but the "
+        "Step 3.4 `persist-payload` line was not run for that round — an operator omission, "
+        "found by this gate on 2026-10-04. Round 1's merged payload IS on disk "
+        "(`intent-surface-diet/eb42122723d1-round1-merged.json`). Nothing was reconstructed."
+    ),
     ("objective-gap-proposal", 2): (
         "Round 2 dispatched no reviewers: the churn gate skipped the re-review "
         "(`review_consensus plan` → empty `dispatches`, `churn < 0.30`), so no merged payload "
