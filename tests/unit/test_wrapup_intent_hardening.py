@@ -360,7 +360,8 @@ def test_ac003_order_control() -> None:
     assert not malformed_ok(s57.replace(MALFORMED_LINE, "[intent] skipped"), "codex")
     # The run instruction moved ahead of the whole-value check inside step 5 → order broken.
     five = step(s57, 5)
-    early = s57.replace(five, five.replace("5. ", "5. Run only the selected writes. ", 1))
+    marker, _, rest = five.partition(" ")
+    early = s57.replace(five, f"{marker} Run only the selected writes. {rest}")
     assert not malformed_ok(early, "codex")
     # The post-edit timing dropped from the check → fails.
     assert not malformed_ok(s57.replace(five, five.replace(EDIT_CLAUSE["codex"], "")), "codex")
