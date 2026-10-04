@@ -221,7 +221,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # removed plan stage. Attributed in work-docs/BASELINE-DELTA-plan-stage-absorption.md.
     # 9 → 12 (same task, second fold): the relocated cross-model second-opinion main loop
     # brings `second_opinion_invoke` and its fenced call sites with it.
-    "spec": 12,
+    # 12 → 10 (intent-surface-diet, 2026-10-04): Step 0.5 drops the second `hm intent status`
+    # read (the `rejected[]`/`revisits` check) and Step 4.9's `hm intent new --from-proposal`
+    # went with the step. Attributed in work-docs/BASELINE-DELTA-intent-surface-diet.md.
+    "spec": 10,
     "uninstall": 3,
     # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.
     # 15 → 12: SPEC-ci-derived-verification-plan replaces the four EXAMPLE gate commands

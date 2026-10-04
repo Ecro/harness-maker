@@ -21,16 +21,6 @@
     StrictUndefined, so a stage can never pass `--current ""` (which the CLI would treat as
     an unknown stage and clear the marker). `summary_autopilot_gate` (the stage's
     mandatory-gate predicate prose) defaults STOP-biased. -#}
-<!-- @hm:feedback-close -->
-{% if summary_stage == "wrapup" -%}
-When `.claude/intent.yaml` exists, Step 5.7 was this task's cutoff for `pending` Feedback rows:
-report any later observation in the final summary only and add no row.
-{% else -%}
-Before handoff, append a `pending` row to the `## Feedback` table of this task's most downstream
-artifact — PLAN, else SPEC, else RESEARCH — for each intent observation not yet recorded.
-When `.claude/intent.yaml` is absent there is nothing to do.
-{% endif -%}
-<!-- @hm:/feedback-close -->
 {% if is_codex is defined and is_codex and config.autonomy.level != "gated" %}
 {% include "agents/_partials/codex_autopilot_advance.md.j2" %}
 {% endif %}

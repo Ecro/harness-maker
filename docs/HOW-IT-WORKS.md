@@ -479,7 +479,7 @@ Content moved by owner:
 | What the plan stage held | Where it is now |
 |---|---|
 | Irreversible decisions (schema · public API/CLI · file format · migration · security boundary · new dependency) | **`/hm:spec`** — `irreversible_decisions`, which is also the land-hold criterion |
-| Objective link (Step 0.5) and the objective draft (Step 4.9) | **`/hm:spec`** Step 0.5 / 4.9, plus SPEC frontmatter `objective:` |
+| Objective link (Step 0.5) | **`/hm:spec`** Step 0.5, plus SPEC frontmatter `intent:`. Intents are drafted only through Maker / the intent-layer skill (the Step 4.9 draft was removed in intent-surface-diet) |
 | Phases, file lists, order, risks, exit criteria | **`/hm:execute` Step 0**, authored with no human gate |
 | SPEC-need verdict (`spec_need_verdict` / `spec_need_target`) | **`/hm:execute` Step 0.1** — `prefilter` + `record` + a presence-preserving write. The *halt* was dropped on purpose; `/hm:verify` Check 6 is the enforcement point |
 | Loop per-iter PLAN | **`/hm:execute` Step 0.2** |

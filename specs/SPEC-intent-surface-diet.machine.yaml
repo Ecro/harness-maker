@@ -1,0 +1,293 @@
+schema_version: 3
+spec_slug: intent-surface-diet
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Template-prose change; no Python behaviour under test,
+  so mutation testing does not apply. Render tests pin the outcome.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: No stage renders a Feedback collection block
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_surface_diet.py::test_ac001_no_feedback_blocks
+  - tests/unit/test_intent_surface_diet.py::test_ac001_control
+  executable_predicate: all('@hm:feedback-entry' not in r and '@hm:feedback-close'
+    not in r for r in rendered_stages()) and 'Feedback section' not in rendered_stage('execute')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The marker names and the execute instruction to remove were fixed
+    by the DRI in rounds 2 and 4 of this SPEC, before any template edit; all six stages
+    including wrapup, every target.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Spec renders only the intent link step
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_surface_diet.py::test_ac002_spec_link_only
+  - tests/unit/test_intent_surface_diet.py::test_ac002_control
+  executable_predicate: '''Step 4.9'' not in rendered_stage(''spec'') and ''Draft
+    an intent for this task?'' not in rendered_stage(''spec'') and ''revisits['' not
+    in rendered_stage(''spec'') and ''rejected[]'' not in rendered_stage(''spec'')
+    and ''Which intent does this task serve?'' in rendered_stage(''spec'')'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The removed phrases and the surviving link question are the exact
+    strings in today's spec template, enumerated by the DRI decision in round 2.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Wrapup 5.7 keeps its verbs, guards and target-specific consent
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_surface_diet.py::test_ac003_wrapup_57_guards_and_consent
+  - tests/unit/test_intent_surface_diet.py::test_ac003_control
+  - tests/unit/test_intent_surface_diet.py::test_ac003_consent_controls
+  - tests/unit/test_intent_surface_diet.py::test_ac003_gates_hold_on_the_pre_change_render
+  - tests/unit/test_intent_surface_diet.py::test_ac003_gate_controls
+  executable_predicate: all(intent_verbs(s57(t)) >= GOLDEN_57_VERBS and all(g in s57(t)
+    for g in GOLDEN_57_GUARDS) and consent_token(t) in s57(t) and 'pending' in s57(t)
+    and '## Feedback' in s57(t) for t in TARGETS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: GOLDEN_57_VERBS and GOLDEN_57_GUARDS (recorded/declined skip, failed-once,
+    verdict-skip, empty-list, withdrawal notice) are extracted from the pre-change
+    wrapup render and committed, non-empty, before any template edit; consent tokens
+    per target (multiSelect for Claude, numbered reply for Codex) are today's text.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Understanding and decided_by instructions are byte-identical
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_surface_diet.py::test_ac004_understanding_byte_identical
+  - tests/unit/test_intent_surface_diet.py::test_ac004_control
+  executable_predicate: understanding_extracts(rendered_all()) == GOLDEN_UNDERSTANDING_EXTRACTS
+    and len(GOLDEN_UNDERSTANDING_EXTRACTS) == EXPECTED_EXTRACT_COUNT and all(GOLDEN_UNDERSTANDING_EXTRACTS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The Understanding block and decided_by instruction text are extracted
+    from the pre-change wrapup/execute renders and committed before any template edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Review 3.3 keeps its contract at no more than 60 percent of its bytes
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_surface_diet.py::test_ac005_review_33_contract_and_size
+  - tests/unit/test_intent_surface_diet.py::test_ac005_control
+  executable_predicate: all(all(tok in s33(t) for tok in GOLDEN_S33_CONTRACT) and
+    len(s33(t).encode()) <= 0.6 * GOLDEN_S33_BYTES[t] for t in TARGETS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: GOLDEN_S33_CONTRACT (regex, skip-on-mismatch, hm intent show, objective:,
+    P2, main-loop, scope_drift, Step 3.4, no halt) and GOLDEN_S33_BYTES are extracted
+    from the pre-change review render per target and committed, non-empty, before
+    any template edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Whole-render shrink per target covers at least half of the intent-block bytes
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_surface_diet.py::test_ac006_whole_render_shrink_per_target
+  executable_predicate: all(GOLDEN_TOTAL_BYTES[t] - total_render_bytes(t) >= 0.5 *
+    GOLDEN_INTENT_BLOCK_BYTES[t] for t in TARGETS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Per target, GOLDEN_TOTAL_BYTES (six stage renders plus the intent-layer
+    reference) and GOLDEN_INTENT_BLOCK_BYTES (named intent blocks, non-empty) are
+    measured on the pre-change render and committed before any template edit; measuring
+    the whole render means moved text still counts.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Moved budgets carry attribution and the suite is green
+  type: mechanical
+  test_ids:
+  - tests/structural/test_baseline_delta_attribution.py::test_every_changed_key_has_an_attribution_row
+  - tests/structural/test_surface_baseline.py::test_the_committed_numbers_carry_the_generators_digest
+  - tests/structural/test_roundtrip_budget.py::test_the_shipped_total_is_not_higher_than_the_table
+  executable_predicate: structural_suite_exit_code() == 0 and baseline_delta_rows('intent-surface-diet')
+    >= 1
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The ratchet tests (surface baseline, roundtrip budget, instruction
+    preservation, command size, snapshot, step-sensitivity registry) predate this
+    change and encode the attribution rule independently of it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Wrapup 5.7 derives question candidates from task evidence
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_surface_diet.py::test_ac008_57_derives_from_evidence
+  executable_predicate: all("from this task's PLAN, SPEC, REVIEW and diff" in s57(t)
+    for t in TARGETS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The pinned phrase was fixed in this SPEC (round 4) before any template
+    edit; the pre-change 5.7 does not contain it, so the test is red until the replacement
+    source exists.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: The intent-layer skill no longer prescribes per-stage collection
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_surface_diet.py::test_ac009_skill_no_stage_collection
+  - tests/unit/test_intent_surface_diet.py::test_ac009_control
+  executable_predicate: all(all(p not in r for p in ('stages only collect', 'in every
+    stage', 'where it was observed')) for r in rendered_intent_layer_skill_files())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The three phrases are today's collection instructions in SKILL.md.j2
+    and references/workflow-feedback.md.j2, enumerated by spec-validator and accepted
+    in round 4 before any edit; checked on Claude and .agents copies.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 11d6cd3b72bcab9a21c55dcde5547dbbcb3b1c083655a8160bdca956ce961738
+  approved_by: Ecro
+  approved_at: '2026-10-04T07:40:02Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: c7bfacc6581a03bc339011411e58ef62759181edb2099e7833928fb26eecb88c
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 4efe2d159ce71717c8ec286ac2bda476174ab016f21fc1ff6a9113d42cb46f85
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: f617a7633c694fcfb726fba887c39d82d9ce796cfcf274a5b11bdcb20cb0f83e
+    AC-002: 6b57783ed234dcc072cc36979279494a0a4b490286186cba92ef4c4a2cc71953
+    AC-003: 1f20298bb2a3096ea29d85fa4c696534557742e577415ebc9bda6ceb61681b9f
+    AC-004: 080dc9b26564eac821f6a48f1df6e958b53b965a91f656ce156e725a33584aea
+    AC-005: b0b61b319aa414251d1ed84e0fe0a74919ab7261760d2369e2260f87f1de95d2
+    AC-006: 1e1f11ed756b1483e874cd451a558810b3c4c2d47c87587c9c3ae86b27570deb
+    AC-007: 157173d857a697a94457d56f79c02169a91e130c472c9dc6b6357ee5046d0412
+    AC-008: ed715689711609f5e923313fe728cddb1896ae06541a792177f3ff4946267117
+    AC-009: 8c4591ad3a11639c474b14cc9608e0a488556865977e563a5b2580b643a38777
+    ac_order: 164396d6c2494dc69325356de9d2f12b5629b3c0c73cb6ef656e4acf0aad5ff4

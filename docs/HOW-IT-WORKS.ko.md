@@ -410,7 +410,7 @@ auto-advance 게이트를 제거했다. **PLAN 문서는 남는다** — 컨텍�
 | plan 스테이지가 담던 것 | 지금 위치 |
 |---|---|
 | 되돌리기 어려운 결정 (스키마 · 공개 API/CLI · 파일 포맷 · 마이그레이션 · 보안 경계 · 새 의존성) | **`/hm:spec`** 의 `irreversible_decisions` — land hold 기준이기도 하다 |
-| objective 연결 (Step 0.5) 과 objective 초안 (Step 4.9) | **`/hm:spec`** Step 0.5 / 4.9, 그리고 SPEC frontmatter `objective:` |
+| objective 연결 (Step 0.5) | **`/hm:spec`** Step 0.5, 그리고 SPEC frontmatter `intent:`. intent 초안은 Maker / intent-layer skill 로만 만든다 (Step 4.9 초안은 intent-surface-diet 에서 제거됨) |
 | phase · 파일 목록 · 순서 · 위험 · exit criteria | **`/hm:execute` Step 0** 이 사람 게이트 없이 작성 |
 | SPEC-need 판정 (`spec_need_verdict` / `spec_need_target`) | **`/hm:execute` Step 0.1** — `prefilter` + `record` + 선존재 보존 쓰기. *멈춤* 은 의도적으로 버렸고 집행은 `/hm:verify` Check 6 이 맡는다 |
 | loop per-iter PLAN | **`/hm:execute` Step 0.2** |

@@ -1,0 +1,166 @@
+{
+  "Production-claude": {
+    "verbs_57": [
+      "close",
+      "metric measure",
+      "metric record",
+      "question add",
+      "question observe",
+      "status"
+    ],
+    "guards_57": [
+      "each with its exact arguments",
+      "`pending` rows",
+      "previous attempt failed",
+      "that bears on a metric",
+      "`## Feedback`",
+      "PLAN, SPEC and RESEARCH",
+      "Read `hm intent status --json` once",
+      "only the selected",
+      "read status back",
+      "`declined`",
+      "`failed`",
+      "do not retry",
+      "ask nothing",
+      "measure: false",
+      "`how_measured`",
+      "proposing a value from its `last`",
+      "names this task's slug",
+      "already has a `recorded` verdict row",
+      "one single-choice question",
+      "keep open",
+      "withdrawal criterion met"
+    ],
+    "s33_bytes": 1265,
+    "understanding": [
+      "**End the body with the `Understanding:` block**, in English, before the trailers. It is what\nlets the user explain this change without reading the diff:\n\n```\nUnderstanding:\n- <assumption, invariant or boundary>: <before> -> <after>\n- unknown: <what this task left open>\n- agent-decided: ADR-002, ADR-004 (unmarked: N)\n```\n\nKeep it to at most 5 bullets, the `agent-decided:` one included. Write before -> after for\nwhat moved in the system's assumptions, invariants or ownership boundaries, and `unknown:` for\nwhat is still not known. Do not list files or restate the diff. Whenever the PLAN has ADRs, add\nthe `- agent-decided:` bullet: the ids marked `**Decided by:** agent` (or `none`), plus\n`(unmarked: N)` for ADRs with no `Decided by` line — never count those as agent. Nothing moved\nand no ADRs → the single line `Understanding: none`. `wrapup_land` warns, never blocks, when the\nblock is missing or malformed.",
+      "**Immediately before the stage summary banner, show the Understanding result** from the\n`wrapup_land` receipt. `steps.understanding.status` is `ok` or `none` → print\n`steps.understanding_block` verbatim: it is the block as committed, HEAD's on a resume — take it\nfrom the receipt, never from memory, the message file or `HEAD` (a peer's land moves `HEAD`, and\na resumed run's message file can differ from what landed). Any other status → print the\n`[wrapup_land] understanding:` warning and say the commit carries no usable block. The receipt\nhas no `understanding` key (an older `wrapup_land`) → say the block was not checked and print\nnone; never present a block that did not land.",
+      "Every ADR\n   carries a provenance line: `**Decided by:** user (source: <SPEC section or conversation>)`\n   only when the user explicitly made that call, otherwise `**Decided by:** agent`."
+    ],
+    "total_bytes": 290798,
+    "intent_block_bytes": 13794
+  },
+  "Production-codex": {
+    "verbs_57": [
+      "close",
+      "metric measure",
+      "metric record",
+      "question add",
+      "question observe",
+      "status"
+    ],
+    "guards_57": [
+      "each with its exact arguments",
+      "`pending` rows",
+      "previous attempt failed",
+      "that bears on a metric",
+      "`## Feedback`",
+      "PLAN, SPEC and RESEARCH",
+      "Read `hm intent status --json` once",
+      "only the selected",
+      "read status back",
+      "`declined`",
+      "`failed`",
+      "do not retry",
+      "ask nothing",
+      "measure: false",
+      "`how_measured`",
+      "proposing a value from its `last`",
+      "names this task's slug",
+      "already has a `recorded` verdict row",
+      "one single-choice question",
+      "keep open",
+      "withdrawal criterion met"
+    ],
+    "s33_bytes": 1272,
+    "understanding": [
+      "**End the body with the `Understanding:` block**, in English, before the trailers. It is what\nlets the user explain this change without reading the diff:\n\n```\nUnderstanding:\n- <assumption, invariant or boundary>: <before> -> <after>\n- unknown: <what this task left open>\n- agent-decided: ADR-002, ADR-004 (unmarked: N)\n```\n\nKeep it to at most 5 bullets, the `agent-decided:` one included. Write before -> after for\nwhat moved in the system's assumptions, invariants or ownership boundaries, and `unknown:` for\nwhat is still not known. Do not list files or restate the diff. Whenever the PLAN has ADRs, add\nthe `- agent-decided:` bullet: the ids marked `**Decided by:** agent` (or `none`), plus\n`(unmarked: N)` for ADRs with no `Decided by` line — never count those as agent. Nothing moved\nand no ADRs → the single line `Understanding: none`. `wrapup_land` warns, never blocks, when the\nblock is missing or malformed.",
+      "**Immediately before the stage summary banner, show the Understanding result** from the\n`wrapup_land` receipt. `steps.understanding.status` is `ok` or `none` → print\n`steps.understanding_block` verbatim: it is the block as committed, HEAD's on a resume — take it\nfrom the receipt, never from memory, the message file or `HEAD` (a peer's land moves `HEAD`, and\na resumed run's message file can differ from what landed). Any other status → print the\n`[wrapup_land] understanding:` warning and say the commit carries no usable block. The receipt\nhas no `understanding` key (an older `wrapup_land`) → say the block was not checked and print\nnone; never present a block that did not land.",
+      "Every ADR\n   carries a provenance line: `**Decided by:** user (source: <SPEC section or conversation>)`\n   only when the user explicitly made that call, otherwise `**Decided by:** agent`."
+    ],
+    "total_bytes": 290936,
+    "intent_block_bytes": 13707
+  },
+  "Side-claude": {
+    "verbs_57": [
+      "close",
+      "metric measure",
+      "metric record",
+      "question add",
+      "question observe",
+      "status"
+    ],
+    "guards_57": [
+      "each with its exact arguments",
+      "`pending` rows",
+      "previous attempt failed",
+      "that bears on a metric",
+      "`## Feedback`",
+      "PLAN, SPEC and RESEARCH",
+      "Read `hm intent status --json` once",
+      "only the selected",
+      "read status back",
+      "`declined`",
+      "`failed`",
+      "do not retry",
+      "ask nothing",
+      "measure: false",
+      "`how_measured`",
+      "proposing a value from its `last`",
+      "names this task's slug",
+      "already has a `recorded` verdict row",
+      "one single-choice question",
+      "keep open",
+      "withdrawal criterion met"
+    ],
+    "s33_bytes": 1265,
+    "understanding": [
+      "**End the body with the `Understanding:` block**, in English, before the trailers. It is what\nlets the user explain this change without reading the diff:\n\n```\nUnderstanding:\n- <assumption, invariant or boundary>: <before> -> <after>\n- unknown: <what this task left open>\n- agent-decided: ADR-002, ADR-004 (unmarked: N)\n```\n\nKeep it to at most 5 bullets, the `agent-decided:` one included. Write before -> after for\nwhat moved in the system's assumptions, invariants or ownership boundaries, and `unknown:` for\nwhat is still not known. Do not list files or restate the diff. Whenever the PLAN has ADRs, add\nthe `- agent-decided:` bullet: the ids marked `**Decided by:** agent` (or `none`), plus\n`(unmarked: N)` for ADRs with no `Decided by` line — never count those as agent. Nothing moved\nand no ADRs → the single line `Understanding: none`. `wrapup_land` warns, never blocks, when the\nblock is missing or malformed.",
+      "**Immediately before the stage summary banner, show the Understanding result** from the\n`wrapup_land` receipt. `steps.understanding.status` is `ok` or `none` → print\n`steps.understanding_block` verbatim: it is the block as committed, HEAD's on a resume — take it\nfrom the receipt, never from memory, the message file or `HEAD` (a peer's land moves `HEAD`, and\na resumed run's message file can differ from what landed). Any other status → print the\n`[wrapup_land] understanding:` warning and say the commit carries no usable block. The receipt\nhas no `understanding` key (an older `wrapup_land`) → say the block was not checked and print\nnone; never present a block that did not land.",
+      "Every ADR\n   carries a provenance line: `**Decided by:** user (source: <SPEC section or conversation>)`\n   only when the user explicitly made that call, otherwise `**Decided by:** agent`."
+    ],
+    "total_bytes": 272226,
+    "intent_block_bytes": 13794
+  },
+  "Side-codex": {
+    "verbs_57": [
+      "close",
+      "metric measure",
+      "metric record",
+      "question add",
+      "question observe",
+      "status"
+    ],
+    "guards_57": [
+      "each with its exact arguments",
+      "`pending` rows",
+      "previous attempt failed",
+      "that bears on a metric",
+      "`## Feedback`",
+      "PLAN, SPEC and RESEARCH",
+      "Read `hm intent status --json` once",
+      "only the selected",
+      "read status back",
+      "`declined`",
+      "`failed`",
+      "do not retry",
+      "ask nothing",
+      "measure: false",
+      "`how_measured`",
+      "proposing a value from its `last`",
+      "names this task's slug",
+      "already has a `recorded` verdict row",
+      "one single-choice question",
+      "keep open",
+      "withdrawal criterion met"
+    ],
+    "s33_bytes": 1272,
+    "understanding": [
+      "**End the body with the `Understanding:` block**, in English, before the trailers. It is what\nlets the user explain this change without reading the diff:\n\n```\nUnderstanding:\n- <assumption, invariant or boundary>: <before> -> <after>\n- unknown: <what this task left open>\n- agent-decided: ADR-002, ADR-004 (unmarked: N)\n```\n\nKeep it to at most 5 bullets, the `agent-decided:` one included. Write before -> after for\nwhat moved in the system's assumptions, invariants or ownership boundaries, and `unknown:` for\nwhat is still not known. Do not list files or restate the diff. Whenever the PLAN has ADRs, add\nthe `- agent-decided:` bullet: the ids marked `**Decided by:** agent` (or `none`), plus\n`(unmarked: N)` for ADRs with no `Decided by` line — never count those as agent. Nothing moved\nand no ADRs → the single line `Understanding: none`. `wrapup_land` warns, never blocks, when the\nblock is missing or malformed.",
+      "**Immediately before the stage summary banner, show the Understanding result** from the\n`wrapup_land` receipt. `steps.understanding.status` is `ok` or `none` → print\n`steps.understanding_block` verbatim: it is the block as committed, HEAD's on a resume — take it\nfrom the receipt, never from memory, the message file or `HEAD` (a peer's land moves `HEAD`, and\na resumed run's message file can differ from what landed). Any other status → print the\n`[wrapup_land] understanding:` warning and say the commit carries no usable block. The receipt\nhas no `understanding` key (an older `wrapup_land`) → say the block was not checked and print\nnone; never present a block that did not land.",
+      "Every ADR\n   carries a provenance line: `**Decided by:** user (source: <SPEC section or conversation>)`\n   only when the user explicitly made that call, otherwise `**Decided by:** agent`."
+    ],
+    "total_bytes": 272271,
+    "intent_block_bytes": 13707
+  }
+}

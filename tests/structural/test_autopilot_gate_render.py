@@ -27,6 +27,15 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-04, `intent-surface-diet`** — `execute`, `research`, `review`, `spec`, `verify` and
+  `wrapup` moved, in all four arms: the `feedback-entry`/`feedback-close` partial blocks left
+  every stage, execute lost its PLAN Feedback-section instruction, spec Step 0.5 lost the
+  draft-consent and `rejected[]`/`revisits` check and Step 4.9 was removed, review Step 3.3 and
+  wrapup Step 5.7 were compressed (SPEC-intent-surface-diet). Verified before re-capture that
+  these six are the ONLY moved commands in every arm and that no command was added or removed.
+  Re-captured again in the same task after `/hm:review` round 2 edited wrapup Step 5.7 (empty-list
+  readback clause restored, source-row marking, deferred-item wording): only `wrapup` moved, in
+  all four arms.
 - **2026-10-03, `maker-front-door-improvements`** — `execute`, `help`, `research`, `review`,
   `spec`, `verify` and `wrapup` moved, in all four arms: the six stage descriptions became
   entrance-gated (`Only when typed, or via <Name>, autopilot or /hm:loop.`, AC-003), help's

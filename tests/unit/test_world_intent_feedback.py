@@ -8,6 +8,10 @@ Superseded by SPEC-intent-layer-improvements (2026-09-29): the S1 "three trigger
 protocol" test and the three Real-task trial tests asserted prose that the approved SPEC removes
 (stages now only collect `pending` rows; the trial is frozen and its duty prose is gone). Their
 replacements are AC-002 and AC-007 in `test_render_intent_feedback_batch.py`.
+
+SPEC-intent-surface-diet (2026-10-04) removed execute's PLAN Feedback-section instruction: wrapup
+5.7 now creates the table when it records a disposition, so the execute-authoring assertions in
+the S5 test were retired; the reference's record map and disposition table are still pinned.
 """
 
 from __future__ import annotations
@@ -77,13 +81,6 @@ def test_s5_authoritative_map_and_plan_feedback(roots: dict[str, Path], host: st
         "Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action"
         in block
     )
-    path = roots[host] / (
-        "skills/hm-execute/SKILL.md" if host == "codex" else "commands/hm/execute.md"
-    )
-    authoring = _section(path.read_text(), "### Step 0 — Author the PLAN")
-    assert "Add a Feedback section using the intent-layer record map" in authoring
-    assert "link the SPEC, intent, evidence and next decision" in authoring
-    assert "Do not copy shared current state into the PLAN" in authoring
 
 
 @pytest.mark.parametrize("host", ["codex", "claude"])

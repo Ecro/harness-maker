@@ -77,21 +77,9 @@ def _in_order(text: str, needles: tuple[str, ...] | list[str]) -> bool:
 # ── AC-011 render half ────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("target", ["claude", "codex"])
-def test_ac_011_spec_loads_state_matches_rejected_and_loops_the_revisit_before_step_1(
-    surface: dict[str, dict[str, str]], target: str
-) -> None:
-    plan = _command(surface, target, "spec")
-    before = plan[: plan.index("Step 1 — Knowledge retrieval")]
-    lines = _mandated_lines(before, target)
-    assert any("hm intent status --json" in ln and "intent.yaml" in ln for ln in lines), lines
-    assert "rejected" in before
-    assert "For each matching intent:" in before
-    assert "revisits[id]" in before
-    assert before.index("rejected") < before.index("For each matching intent:")
-    assert before.index("For each matching intent:") < before.index(
-        "hm intent status --json", before.index("For each matching intent:")
-    )
+# Retired by SPEC-intent-surface-diet (AC-002): spec Step 0.5 no longer compares against
+# `rejected[]` or reads `revisits` (the revisit path never fired); it only links an intent.
+# tests/unit/test_intent_surface_diet.py::test_ac002_spec_link_only owns that contract.
 
 
 # ── AC-015 render half ────────────────────────────────────────────────────────
@@ -272,35 +260,9 @@ def test_ac_004_skill_renders_gap_situation_and_candidate_rules(target: Target, 
     ), body
 
 
-@pytest.mark.parametrize("target", ["claude", "codex"])
-def test_ac_005_spec_offers_draft_after_none_and_creates_at_step_4_9(
-    surface: dict[str, dict[str, str]], target: str
-) -> None:
-    plan = _command(surface, target, "spec")
-    q_pick = plan.index("Which intent does this task serve?")
-    q_draft = plan.index("Draft an intent for this task?", q_pick)  # the "none" bullet
-    step_49 = plan.index("Step 4.9")
-    call = plan.index("--from-proposal --candidates 1")
-    step_5 = plan.index("Step 5 —")
-    assert q_pick < q_draft < step_49 < call < step_5, (q_pick, q_draft, step_49, call, step_5)
-    # the consent question sits inside Step 0.5 (before Step 1's heading)
-    assert q_draft < plan.index("Step 1 —")
-    # cold start: a filled-in intent with zero objectives skips the pick, not the consent
-    step_05 = plan[plan.index("Step 0.5") : plan.index("Step 1 —")]
-    assert "no `active` and no `proposed` intent" in step_05
-    assert step_05.count("Draft an intent for this task?") == 2
-    assert step_05.index("no `active` and no `proposed` intent") < step_05.index(
-        "Draft an intent for this task?"
-    )
-    after_draft = plan[q_draft:]
-    assert "write nothing" in after_draft
-    assert "print the refusal and continue" in plan[step_49:step_5]
-    # the call is a mandated line in this target's call form, exactly once
-    call_lines = [
-        ln for ln in plan[step_49:step_5].splitlines() if "--from-proposal --candidates 1" in ln
-    ]
-    assert len(call_lines) == 1, call_lines
-    assert call_lines[0].lstrip().startswith(MANDATED_CALL_PREFIXES[target]), call_lines[0]
+# test_ac_005_spec_offers_draft_after_none_and_creates_at_step_4_9 was retired by
+# SPEC-intent-surface-diet (AC-002): spec Step 4.9 and its draft-consent question are gone;
+# intents are created only through Maker / the intent-layer skill.
 
 
 # ── AC-007 (SPEC-outcome-measure) — the prose calls the verb ─────────────────

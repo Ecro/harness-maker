@@ -1,38 +1,29 @@
 ## Workflow feedback
 
-Two moments own this connection. **Collect** — in every stage, an observation that bears
-on an intent question or metric becomes a `pending` row in the Feedback table of the task's
-most downstream existing artifact (PLAN, else SPEC, else RESEARCH); collecting reads and writes
-no intent state and asks nothing. **Decide** — wrapup Step 5.7 reads `hm intent status --json`
-once, offers every pending row and the measurable metrics as one batch, reads status back, and
-only then asks the close question. If status is not_filled_in, skip feedback; if invalid, report
-the error and do not make a dependent intent decision. An absent intent layer costs no record or
-prompt.
+One moment owns this connection: wrapup Step 5.7. It reads `hm intent status --json` once,
+proposes the observations it derives from this task's PLAN, SPEC, REVIEW and diff (plus any
+`pending` Feedback rows already written) and the measurable metrics as one batch, reads status
+back, and only then asks the close question. If status is not_filled_in, skip feedback; if
+invalid, report the error and do not make a dependent intent decision. An absent intent layer
+costs no record or prompt.
 
-1. Identify the relevant observation, source locator/time, affected question or
-   metric ID, and task/intent link. For code-absent facts, use project-knowledge.
-   Record it as a `pending` row where it was observed; when execute creates the PLAN,
-   carry earlier rows into it. Never create a competing state store.
-2. Reuse existing authorization only for the same operation and agreed scope.
-   Workflow writes are consented once, as a batch, at wrapup Step 5.7.
-   Follow the write rule below for unapproved mutations. If consent is pending or
-   declined, write nothing and mark the update pending or declined. A question or
-   proposal is not a recorded update. Never treat silence as consent or missing
-   evidence as success. Do not ask again for the same confirmed operation.
+1. Name the observation, its source locator/time, the affected question or metric ID, and the
+   task/intent link. For code-absent facts, use project-knowledge. Never create a competing
+   state store.
+2. Reuse existing authorization only for the same operation and agreed scope. Workflow writes
+   are consented once, as a batch, at wrapup Step 5.7. If consent is pending or declined, write
+   nothing and mark the update pending or declined. A question or proposal is not a recorded
+   update; never treat silence as consent or missing evidence as success.
 3. After an authorized write, read back status; use that readback in the next decision.
    For missing, stale or conflicting evidence, diagnose within scope before the dependent decision.
    If the observation window is open, record its closing date and next eligible trigger; do not retry now.
-   If uncertainty remains, ask the specific unresolved decision and continue only
-   independent authorized work. A missed target is not automatically a new task.
+   A missed target is not automatically a new task.
 4. On replay, link the existing disposition and follow-up; do not create duplicate work.
    Never rewrite terminal intent records; link delayed evidence to a consented new proposal.
-   Distinguish completed task work from achieved intent outcomes. Measurements and
-   their absence must inform the closure decision, not follow it.
-5. Record the supported next decision and its authority. Continue agreed work only
-   through the host's authorized stage/loop procedure. Goal/scope changes require
-   the user. When no authorized work remains, record the stop reason and stop.
-   If the host cannot invoke the next procedure, give an actionable handoff and
-   explain the missing capability; never claim a stage ran from a suggested command.
+   Task completion is not intent attainment: measurements and their absence inform the closure
+   decision, not follow it.
+5. Continue agreed work only through the host's authorized stage/loop procedure; goal/scope
+   changes require the user. When no authorized work remains, record the stop reason and stop.
 
 Authoritative record map (link to these; do not copy their current state):
 
@@ -45,9 +36,8 @@ Authoritative record map (link to these; do not copy their current state):
 | Criteria | `{{ config.spec.dir }}SPEC-<slug>.md` and its machine companion |
 | Execution and disposition | `{{ config.work_docs.dir }}PLAN-<slug>.md`, Feedback section |
 
-Use working links from SPEC/PLAN to the intent, relevant state IDs, source evidence
-and prior/next task; preserve existing IDs, paths, history and approvals. The agent
-records each disposition in the task PLAN's Feedback table:
+Link SPEC/PLAN to the intent and state IDs; preserve existing IDs, paths, history and approvals.
+Wrapup records each disposition in the task PLAN's Feedback table, creating it when absent:
 
 | Evidence | Affected ID | Update status | Decision | Owner | Authority | Next action |
 |---|---|---|---|---|---|---|

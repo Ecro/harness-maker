@@ -18,6 +18,13 @@ real-task trial is frozen by a recorded user policy decision (`active_trials` tr
 it as inactive only when the latest decision is a user disable named by
 `policy.authority` in both working copy and HEAD).
 
+Update (2026-10-04, intent-surface-diet): stages no longer collect `pending` Feedback
+rows at all. Wrapup Step 5.7 derives observations from the task's PLAN, SPEC, REVIEW and
+diff (still offering any `pending` rows written before the change) and creates the PLAN's
+`## Feedback` table when it records a disposition. `/hm:spec` only links an existing intent;
+the Step 4.9 draft and the `rejected[]`/`revisits` check were removed. (The trial itself was
+deleted in intent-layer-diet.)
+
 Codex executes the next local stage skill after the shared boundary authorizes
 it. Auto-answered judgments are recorded before a terminal halt, and missing
 skills produce a handoff. Claude retains Skill dispatch; Cursor keeps handoff.

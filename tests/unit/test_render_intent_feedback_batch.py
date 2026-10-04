@@ -5,14 +5,9 @@ synthesized output, never to the whole file, and every clause has a deletion con
 predicate applied to a copy of the block with that clause removed must turn false. A predicate
 that stays true on the mutated copy is the assertion-invariant defect this module exists to avoid.
 
-Phase A.4 (after the round-2 repair, measured 78 failed, 8 passed): `test_resume_predicate_controls`
-and `test_trial_duty_control` test the predicates on literal strings, independent of the
-templates, and go red if a predicate is weakened. `test_collect_only_controls_forbidden[*]` (3),
-`test_wrapup_close_collects_nothing_control[*]` (2) and `test_id_derivation_controls[upper-cased]`
-are vacuous until the new blocks render (the clauses they need are absent today, so the predicate
-is already false). Their RED siblings are the arm tests
-(`test_wrapup_delegated_path_resumes_at_5_7`, `test_feedback_blocks_collect_only`,
-`test_no_trial_duty_in_rendered_prose`, `test_spec_intent_id_derivation`).
+AC-002 (feedback blocks) and AC-011 (spec Step 4.9 id derivation) were retired by
+SPEC-intent-surface-diet, which removed that prose; the 5.7 record-batch, verdict and close
+tests below are kept as that SPEC's AC-003 guard oracle.
 """
 
 from __future__ import annotations
@@ -138,67 +133,11 @@ def test_resume_predicate_controls() -> None:
     assert not resumes_at_5_7("no directive at all")
 
 
-# ── AC-002 ───────────────────────────────────────────────────────────────────
-
-_FORBIDDEN = re.compile(r"intent status|skill\.md|trial", re.I)
-_ENTRY_CLAUSES = (
-    "`.claude/intent.yaml` is absent",
-    "nothing to do",
-    "append a `pending` row",
-    "`## Feedback`",
-    "PLAN, else SPEC, else RESEARCH",
-)
-_COLLECTING = ("append a `pending` row", "`## Feedback`")
-_WRAPUP_CLOSE_CLAUSES = (
-    "`.claude/intent.yaml`",
-    "`pending`",
-    "Step 5.7",
-    "cutoff",
-    "final summary",
-)
-
-
-def collect_only(block: str, *, wrapup_close: bool) -> bool:
-    clauses = _WRAPUP_CLOSE_CLAUSES if wrapup_close else _ENTRY_CLAUSES
-    if not all(c in block for c in clauses) or _FORBIDDEN.search(block):
-        return False
-    # Wrapup's close block is the cutoff: it must not itself instruct collecting a row.
-    return not (wrapup_close and any(c in block for c in _COLLECTING))
-
-
-@pytest.mark.parametrize("stage", STAGES)
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_feedback_blocks_collect_only(preset: Preset, host: str, stage: str) -> None:
-    text = _stage(preset, host, stage)
-    entry, close = _block(text, "feedback-entry"), _block(text, "feedback-close")
-    assert entry
-    assert close
-    assert collect_only(entry, wrapup_close=False)
-    assert collect_only(close, wrapup_close=stage == "wrapup")
-
-
-@pytest.mark.parametrize("clause", _ENTRY_CLAUSES)
-def test_collect_only_controls_entry(clause: str) -> None:
-    entry = _block(_stage(Preset.PRODUCTION, "claude", "execute"), "feedback-entry")
-    assert not collect_only(_without(entry, clause), wrapup_close=False)
-
-
-@pytest.mark.parametrize("injected", ["read hm intent status first", "see SKILL.md", "the Trial"])
-def test_collect_only_controls_forbidden(injected: str) -> None:
-    entry = _block(_stage(Preset.PRODUCTION, "claude", "execute"), "feedback-entry")
-    assert not collect_only(entry + injected, wrapup_close=False)
-
-
-@pytest.mark.parametrize("clause", _WRAPUP_CLOSE_CLAUSES)
-def test_collect_only_controls_wrapup_close(clause: str) -> None:
-    close = _block(_stage(Preset.PRODUCTION, "claude", "wrapup"), "feedback-close")
-    assert not collect_only(_without(close, clause), wrapup_close=True)
-
-
-@pytest.mark.parametrize("injected", _COLLECTING)
-def test_wrapup_close_collects_nothing_control(injected: str) -> None:
-    close = _block(_stage(Preset.PRODUCTION, "claude", "wrapup"), "feedback-close")
-    assert not collect_only(close + " " + injected, wrapup_close=True)
+# ── AC-002 (retired) ─────────────────────────────────────────────────────────
+#
+# The per-stage feedback-entry/close blocks were removed by SPEC-intent-surface-diet (AC-001):
+# no stage collects Feedback rows before wrapup any more, and 5.7 derives candidates itself.
+# tests/unit/test_intent_surface_diet.py owns the absence check.
 
 
 # ── AC-003 / AC-004 / AC-012 ─────────────────────────────────────────────────
@@ -393,24 +332,7 @@ def test_trial_duty_control() -> None:
     assert not has_trial_duty("record the close decision after readback")
 
 
-# ── AC-011 ───────────────────────────────────────────────────────────────────
-
-_ID_CLAUSES = ("`FOO-BAR`", "upper-cased")
-
-
-def id_derivation_ok(section: str) -> bool:
-    return all(c in section for c in _ID_CLAUSES) and "OBJ-" not in section
-
-
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_spec_intent_id_derivation(preset: Preset, host: str) -> None:
-    section = _section(_stage(preset, host, "spec"), "Step 4.9")
-    assert section
-    assert id_derivation_ok(section)
-
-
-@pytest.mark.parametrize("clause", _ID_CLAUSES)
-def test_id_derivation_controls(clause: str) -> None:
-    section = _section(_stage(Preset.PRODUCTION, "claude", "spec"), "Step 4.9")
-    assert not id_derivation_ok(_without(section, clause))
-    assert not id_derivation_ok(section + " `OBJ-` + slug")
+# ── AC-011 (retired) ─────────────────────────────────────────────────────────
+#
+# spec Step 4.9 (intent draft) was removed by SPEC-intent-surface-diet (AC-002): intents are
+# created only through Maker / the intent-layer skill, so there is no id derivation to pin.

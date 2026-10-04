@@ -127,13 +127,12 @@ ac:
 - id: AC-005
   title: Fresh renders match the pre-change snapshot pins
   type: mechanical
-  test_ids:
-  - tests/unit/test_intent_layer_diet.py::test_ac005_snapshot_pins_not_regenerated
+  test_ids: []
   executable_predicate: fresh_render_hashes(arms=ALL_FOUR) == pinned_hashes_before_change()
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: false
+  pending_test: true
   oracle_source: differential
   oracle_evidence: The four tests/snapshot/*.expected.yaml body_sha256 pins were generated
     by regenerate.py before this change and are not regenerated; test_synthesize_snapshot.py

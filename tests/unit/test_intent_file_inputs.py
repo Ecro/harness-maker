@@ -491,15 +491,15 @@ _WRITE_VERB = re.compile(r"hm intent (question (?:add|observe|resolve)|metric re
 _COVERED_INLINE = re.compile(
     r"--(claim|text|note|evidence|title|statement|scope|out-of-scope|declined)(?![-\w])"
 )
+#: `spec` left this table with Step 4.9 (SPEC-intent-surface-diet AC-002): it no longer runs
+#: `hm intent new`, so it has no free-text write recipe to check.
 SURFACES = {
     Target.CLAUDE_CODE: {
         "wrapup": ".claude/commands/hm/wrapup.md",
-        "spec": ".claude/commands/hm/spec.md",
         "intent-layer": ".claude/skills/intent-layer/SKILL.md",
     },
     Target.CODEX: {
         "wrapup": ".agents/skills/hm-wrapup/SKILL.md",
-        "spec": ".agents/skills/hm-spec/SKILL.md",
         "intent-layer": ".agents/skills/intent-layer/SKILL.md",
     },
 }
@@ -510,7 +510,6 @@ CALL_SITES: tuple[tuple[tuple[str, str, str], tuple[str, ...]], ...] = (
     (("wrapup", "question observe", "observe"), ("--text-file", "--claim-file")),
     (("wrapup", "question add", "add"), ("--claim-file", "--text-file")),
     (("wrapup", "close", "close"), ("--note-file",)),
-    (("spec", "new", "new"), ("--title-file", "--statement-file", "--scope-file")),
     (("intent-layer", "question add", "synopsis"), ("--claim-file", "--text-file")),
     (("intent-layer", "question observe", "synopsis"), ("--text-file", "--claim-file")),
     (("intent-layer", "question resolve", "synopsis"), ("--claim-file",)),
@@ -529,7 +528,6 @@ EXPECTED_CALL_SITES = {key for key, _ in CALL_SITES}
 #: describes arguments (a preview the operator confirms) cannot name an inline form either.
 _SCAN = {
     "wrapup": re.compile(r"#### 5\.7.*?(?=\n#{2,4} )", re.S),
-    "spec": re.compile(r"### Step 4\.9.*?(?=\n### )", re.S),
     "intent-layer": re.compile(r".*", re.S),
 }
 _SECTION = {

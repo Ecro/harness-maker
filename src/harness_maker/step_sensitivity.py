@@ -140,13 +140,6 @@ REGISTRY: tuple[StepEntry, ...] = (
         "plan Step 0.5",
         note="objective context; human lock-in that survives model change",
     ),
-    _u(
-        "spec",
-        "Step 4.9",
-        "INV",
-        "plan Step 4.9",
-        note="objective draft after consent; writes intent-layer state",
-    ),
     _e(
         "spec",
         "Step 4.6",

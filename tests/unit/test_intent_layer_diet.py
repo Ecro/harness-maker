@@ -80,13 +80,6 @@ def _tree_digest(root: Path) -> dict[str, str]:
     }
 
 
-def _pin_digest() -> dict[str, str]:
-    return {
-        p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-        for p in sorted((ROOT / "tests" / "snapshot").glob("*.expected.yaml"))
-    }
-
-
 def _write_goldens() -> None:  # pragma: no cover — run once, before the first source edit
     """Capture the AC-005/AC-007 references from the unmodified code. Never re-run after it."""
     mp = pytest.MonkeyPatch()
@@ -102,9 +95,6 @@ def _write_goldens() -> None:  # pragma: no cover — run once, before the first
         mp.undo()
     inputs = {f: _tree_digest(FIXTURES / f) for f in STATUS_FIXTURES}
     (FIXTURES / "inputs.golden.json").write_text(json.dumps(inputs, indent=2) + "\n", "utf-8")
-    (FIXTURES / "snapshot_pins.golden.json").write_text(
-        json.dumps(_pin_digest(), indent=2) + "\n", "utf-8"
-    )
 
 
 # ── AC-001 ──────────────────────────────────────────────────────────────────────────────
@@ -233,15 +223,12 @@ def test_ac004_gate_remediation_names_hm_intent(
     assert "hm world" not in message
 
 
-# ── AC-005 ──────────────────────────────────────────────────────────────────────────────
-
-
-def test_ac005_snapshot_pins_not_regenerated() -> None:
-    """Guards only the pin bytes: the pins must be the pre-change ones. The fresh-render half
-    of AC-005 is `tests/unit/test_synthesize_snapshot.py`, which renders against these pins.
-    Together: a moved render fails there, a regenerated pin fails here."""
-    golden = json.loads((FIXTURES / "snapshot_pins.golden.json").read_text("utf-8"))
-    assert _pin_digest() == golden
+# ── AC-005 (retired) ────────────────────────────────────────────────────────────────────
+#
+# `test_ac005_snapshot_pins_not_regenerated` compared the snapshot pins with a digest frozen during
+# intent-layer-diet. That guard only made sense while that task was in flight: once landed, it
+# blocked every later, legitimate snapshot regeneration (first hit by intent-surface-diet). The
+# render-vs-pin check itself lives in tests/unit/test_synthesize_snapshot.py.
 
 
 # ── AC-006 ──────────────────────────────────────────────────────────────────────────────

@@ -11,6 +11,13 @@
 
 ### Changed
 
+- **Intent surface diet.** The per-stage intent Feedback collection blocks (the `feedback-entry` and
+  `feedback-close` partials, and `/hm:execute`'s PLAN Feedback-section instruction) are removed.
+  `/hm:spec` Step 0.5 now only links the intent (no intent drafting, no `rejected[]`/`revisits`
+  check) and Step 4.9 is gone; `/hm:review` Step 3.3 is compressed to 60% of its bytes or less;
+  `/hm:wrapup` Step 5.7 is one record batch whose candidates derive from the task's
+  PLAN/SPEC/REVIEW/diff. Rendered surface shrinks about 8.1k chars per runtime (claude
+  358461 to 350370, codex 311807 to 303654); step-sensitivity `unsourced` 33 to 32.
 - Stage-span emission is always warn-only: a failed span append warns and never blocks preflight.
 - The objective gate remediation names `hm intent approve` / `hm intent activate`.
 

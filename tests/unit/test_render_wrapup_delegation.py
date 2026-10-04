@@ -272,7 +272,11 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # only in the degraded block. Both arms, same delta; delegation remains OFF. Then 828/830 →
 # 829/831 at the task's /hm:verify: the run call lifts its budget and says to run in the
 # background (a real suite outlives the 10-minute foreground cap).
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 829), ("Production", 831)])
+# 829/831 → 817/819 (intent-surface-diet, 2026-10-04): −12, the feedback-entry/close partial
+# blocks left every stage (wrapup's one-line 5.7 cutoff with them) and Step 5.7 was compressed
+# around its guard phrases (its two question calls kept on their own lines, so both still count
+# as mandated calls). Both arms, same delta; delegation remains OFF.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 817), ("Production", 819)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:
