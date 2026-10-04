@@ -122,15 +122,16 @@ def scan(specs_dir: Path) -> SpecDriftReport:
             continue
         # coverage gaps
         for ac in machine.ac:
+            # Advisory migration nudge (ADR-006): a v1 AC predates the oracle axis. An
+            # authored-content check, so it applies to a superseded AC too.
+            if ac.oracle_source == "legacy-unspecified":
+                report.missing_oracle_source.append(f"{machine.spec_slug}::{ac.id}")
             if ac.superseded_by is not None:
                 continue  # owes no test, and its history ids reference nothing live
             if not ac.test_ids and not ac.pending_test:
                 report.coverage_gaps.append(f"{machine.spec_slug}::{ac.id}")
             if ac.pending_test and ac.test_ids:
                 pending_with_ids.append((machine.spec_slug, ac.id, tuple(ac.test_ids)))
-            # Advisory migration nudge (ADR-006): a v1 AC predates the oracle axis.
-            if ac.oracle_source == "legacy-unspecified":
-                report.missing_oracle_source.append(f"{machine.spec_slug}::{ac.id}")
             referenced_test_ids.update(ac.test_ids)
         # stale mutations
         if machine.mutation_threshold is not None and _is_stale(

@@ -1,4 +1,4 @@
-"""Phase 3 — the freeze is faithful, and review_base never degenerates to HEAD."""
+"""Phase 3 — the freeze is faithful, and review_base is HEAD only on a zero-commit task branch."""
 
 from __future__ import annotations
 
@@ -61,10 +61,79 @@ def test_review_base_never_resolves_to_head_on_the_base_branch(repo: Path) -> No
     assert base == _git(repo, "rev-parse", "HEAD~1")
 
 
-def test_review_base_never_resolves_to_head_on_a_branch_with_no_own_commits(repo: Path) -> None:
+def _commit(repo: Path, name: str, msg: str) -> None:
+    (repo / name).write_text(f"{msg}\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-m", msg)
+
+
+def test_review_base_is_head_on_a_task_branch_with_no_own_commits(repo: Path) -> None:
+    """The per-task model commits only at wrapup, so the task's whole diff is uncommitted.
+
+    `HEAD~1` here is the previously landed task — reviewing it as part of this one is
+    `[fail:runtime] resolve-base-head-parent-empty-branch` (count 4). The base branch is left
+    to default resolution, which is what the shipped CLI does.
+    """
+    _commit(repo, "b.txt", "second")
     _git(repo, "checkout", "-b", "hm/task")
+    (repo / "untracked.txt").write_text("wip\n", encoding="utf-8")
+
     head = _git(repo, "rev-parse", "HEAD")
-    assert resolve_review_base(repo, base_branch="main") != head
+    base = resolve_review_base(repo)
+    assert base == head == _git(repo, "merge-base", "HEAD", "main")
+
+    sha = create_freeze_commit(repo, "s1", "confirm-1", base)
+    changed = set(_git(repo, "diff", "--name-only", base, sha).splitlines())
+    assert changed == {"untracked.txt"}, "the freeze diff pulled in an already-landed commit"
+
+
+def test_review_base_is_the_fork_point_when_a_zero_commit_task_branch_fell_behind(
+    repo: Path,
+) -> None:
+    _commit(repo, "b.txt", "second")
+    fork = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-b", "hm/task")
+    _git(repo, "checkout", "main")
+    _commit(repo, "peer.txt", "peer landed")
+    _git(repo, "checkout", "hm/task")
+
+    base = resolve_review_base(repo)
+    assert base == fork
+    assert base != _git(repo, "rev-parse", "main"), "took the base tip, not the fork point"
+    assert base != _git(repo, "rev-parse", "HEAD~1")
+
+
+@pytest.mark.parametrize("topology", ["main", "main-with-origin", "detached"])
+def test_review_base_keeps_the_fallback_on_the_base_branch_and_detached_head(
+    repo: Path, topology: str
+) -> None:
+    """Negative control for the task-branch rule, on the default-resolution path the CLI takes.
+
+    Passes before and after the change by design: it goes red the moment the task-branch test
+    misclassifies `main` or a detached HEAD, and its RED sibling is
+    `test_review_base_is_head_on_a_task_branch_with_no_own_commits`.
+    """
+    _commit(repo, "b.txt", "second")
+    if topology == "main-with-origin":
+        _git(repo, "update-ref", "refs/remotes/origin/main", _git(repo, "rev-parse", "HEAD"))
+    if topology == "detached":
+        _git(repo, "checkout", "--detach", "HEAD")
+
+    assert resolve_review_base(repo) == _git(repo, "rev-parse", "HEAD~1")
+
+
+@pytest.mark.parametrize(
+    "qualified", ["refs/heads/main", "origin/main", "refs/remotes/origin/main"]
+)
+def test_a_qualified_base_branch_is_normalised(repo: Path, qualified: str) -> None:
+    _commit(repo, "b.txt", "second")
+    _git(repo, "update-ref", "refs/remotes/origin/main", _git(repo, "rev-parse", "HEAD"))
+
+    assert resolve_review_base(repo, base_branch=qualified) == _git(repo, "rev-parse", "HEAD~1"), (
+        f"{qualified!r} made the base branch look like a task branch"
+    )
+    _git(repo, "checkout", "-b", "hm/task")
+    assert resolve_review_base(repo, base_branch=qualified) == _git(repo, "rev-parse", "HEAD")
 
 
 def test_review_base_falls_back_to_the_empty_tree_on_a_single_commit_repo(repo: Path) -> None:
@@ -169,6 +238,49 @@ def test_the_shipped_cli_resolves_and_stores_in_one_call(
         "the CLI printed a base it did not store; a later pass would re-resolve and drift"
     )
     assert payload["review_base"] != _git(repo, "rev-parse", "HEAD")
+
+
+def test_a_tag_named_like_the_base_branch_does_not_make_it_a_task_branch(repo: Path) -> None:
+    """`symbolic-ref --short` answers `heads/main` when a `main` tag exists (review r1, codex)."""
+    _commit(repo, "b.txt", "second")
+    _git(repo, "tag", "main")
+    assert resolve_review_base(repo) == _git(repo, "rev-parse", "HEAD~1")
+
+
+@pytest.mark.parametrize("base_name", ["develop", "release/1.0"])
+def test_a_non_main_base_branch_is_honoured(repo: Path, base_name: str) -> None:
+    """The comparison is against the resolved base, not the literal `main` (review r1)."""
+    _git(repo, "checkout", "-b", base_name)
+    _commit(repo, "b.txt", "second")
+    tip = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "update-ref", f"refs/remotes/origin/{base_name}", tip)
+    _git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{base_name}")
+
+    assert resolve_review_base(repo) == _git(repo, "rev-parse", "HEAD~1"), (
+        f"the default base {base_name!r} was classified as a task branch"
+    )
+    _git(repo, "checkout", "-b", "hm/task")
+    assert resolve_review_base(repo) == tip
+
+
+@pytest.mark.parametrize("on_task_branch", [True, False], ids=["task-branch", "main"])
+def test_the_cli_stores_head_on_a_zero_commit_task_branch_and_head_parent_on_main(
+    repo: Path, capsys: pytest.CaptureFixture[str], on_task_branch: bool
+) -> None:
+    _commit(repo, "b.txt", "second")
+    if on_task_branch:
+        _git(repo, "checkout", "-b", "hm/task")
+    expected = _git(repo, "rev-parse", "HEAD" if on_task_branch else "HEAD~1")
+    (repo / "untracked.txt").write_text("wip\n", encoding="utf-8")
+
+    assert freeze_main(["resolve-base", "--slug", "s7", "--root", str(repo)]) == 0
+    stored = load_review_base(repo, "s7")
+    assert stored == expected
+    capsys.readouterr()
+
+    assert freeze_main(["commit", "--slug", "s7", "--pass", "confirm-1", "--root", str(repo)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert _git(repo, "rev-parse", payload["freeze_commit"] + "^") == stored
 
 
 def test_the_cli_rejects_an_unknown_verb_without_writing_a_ref(repo: Path) -> None:

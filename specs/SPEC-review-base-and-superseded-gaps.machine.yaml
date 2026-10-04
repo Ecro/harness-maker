@@ -1,0 +1,328 @@
+schema_version: 3
+spec_slug: review-base-and-superseded-gaps
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: T2 — mutation testing is deferred to sampling; each
+  changed branch is pinned by a negative control (base branch, detached HEAD, live
+  AC) instead.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/freeze.py
+- src/harness_maker/spec_machine.py
+- src/harness_maker/observability/spec_drift.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: A zero-commit task branch resolves review_base to HEAD
+  type: mechanical
+  test_ids:
+  - tests/unit/test_freeze_commit.py::test_review_base_is_head_on_a_task_branch_with_no_own_commits
+  executable_predicate: resolve_review_base(repo) == git('rev-parse', 'HEAD') == git('merge-base',
+    'HEAD', 'main') and frozen_diff_paths(repo) == {'untracked.txt'}
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The per-task model commits only at wrapup (one squash commit per
+    task), so a zero-commit task branch's whole diff is its working tree against the
+    fork point; The expected commit is computed by git itself (`git rev-parse HEAD`,
+    `git merge-base HEAD main`, `HEAD~1`) over a throwaway repo whose topology the
+    test builds by hand, so the assertion is not read back out of resolve_review_base.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: A zero-commit task branch that fell behind still resolves to its fork point
+  type: mechanical
+  test_ids:
+  - tests/unit/test_freeze_commit.py::test_review_base_is_the_fork_point_when_a_zero_commit_task_branch_fell_behind
+  executable_predicate: resolve_review_base(repo, base_branch='main') == fork_sha
+    and fork_sha != git('rev-parse', 'main') and fork_sha != git('rev-parse', 'HEAD~1')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fork point is recorded by the test before main advances, so
+    its identity comes from the fixture's construction, not from the resolver. The
+    expected commit is computed by git itself (`git rev-parse HEAD`, `git merge-base
+    HEAD main`, `HEAD~1`) over a throwaway repo whose topology the test builds by
+    hand, so the assertion is not read back out of resolve_review_base.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: The base branch and a detached HEAD keep the HEAD~1 and empty-tree fallback
+  type: mechanical
+  test_ids:
+  - tests/unit/test_freeze_commit.py::test_review_base_keeps_the_fallback_on_the_base_branch_and_detached_head
+  - tests/unit/test_freeze_commit.py::test_review_base_falls_back_to_the_empty_tree_on_a_single_commit_repo
+  - tests/unit/test_freeze_commit.py::test_a_tag_named_like_the_base_branch_does_not_make_it_a_task_branch
+  executable_predicate: resolve_review_base(on_main) == git('rev-parse', 'HEAD~1')
+    and resolve_review_base(on_main_with_origin) == git('rev-parse', 'HEAD~1') and
+    resolve_review_base(detached_at_main_tip) == git('rev-parse', 'HEAD~1') and resolve_review_base(single_commit_repo)
+    == EMPTY_TREE
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fallback chain is fixed by SPEC-ai-review-exit-criteria rules
+    (3) and (4) and by the DRI's round-1 decision for detached HEAD, before any code
+    changes; The expected commit is computed by git itself (`git rev-parse HEAD`,
+    `git merge-base HEAD main`, `HEAD~1`) over a throwaway repo whose topology the
+    test builds by hand, so the assertion is not read back out of resolve_review_base.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: A task branch with its own commits still resolves to the fork point
+  type: mechanical
+  test_ids:
+  - tests/unit/test_freeze_commit.py::test_review_base_is_the_fork_point_on_a_task_branch
+  executable_predicate: resolve_review_base(repo, base_branch='main') == fork_sha
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Regression control: the fork point is the main tip recorded before
+    the task commit, a value the fixture fixes independently of the resolver.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: spec_drift reports the oracle advisory for a superseded AC
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_base_and_superseded_gaps.py::test_ac005_spec_drift_keeps_oracle_advisory_for_superseded
+  executable_predicate: '''fixture::AC-001'' in report.missing_oracle_source and ''fixture::AC-003''
+    in report.missing_oracle_source and not {''fixture::AC-001'', ''fixture::AC-002''}
+    & set(report.coverage_gaps) and not any(''AC-002'' in r for r in report.resolved_but_pending)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: SPEC-spec-ac-superseded line 22, approved before this task, states
+    that every authored-content check (predicate, oracle, rubric) still applies to
+    a superseded AC; the fixture SPEC is hand-written in tmp_path.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Mark-judged refuses superseded ACs atomically
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_base_and_superseded_gaps.py::test_ac006_mark_judged_refuses_superseded
+  - tests/unit/test_review_base_and_superseded_gaps.py::test_ac006_live_judgment_ac_still_reaches_the_subject_hash
+  executable_predicate: errors != [] and 'AC-001' in errors[0] and 'superseded' in
+    errors[0] and file_bytes_after == file_bytes_before and cli_exit_code != 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The refusal contract comes from SPEC-spec-ac-superseded (line 22
+    and mark-tested's AC-006), approved before this task; the fixture's unhashable
+    subject path makes the refusal-before-hash ordering observable through the error
+    text, and byte identity is read from the file, not the return value.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: The resolve-base CLI stores the right base on both topologies
+  type: mechanical
+  test_ids:
+  - tests/unit/test_freeze_commit.py::test_the_cli_stores_head_on_a_zero_commit_task_branch_and_head_parent_on_main
+  executable_predicate: stored_base(task_repo) == git(task_repo, 'rev-parse', 'HEAD')
+    and stored_base(main_repo) == git(main_repo, 'rev-parse', 'HEAD~1') and freeze_parent(task_repo)
+    == stored_base(task_repo)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The shipped /hm:review calls `hm freeze resolve-base` without --base-branch;
+    The expected commit is computed by git itself (`git rev-parse HEAD`, `git merge-base
+    HEAD main`, `HEAD~1`) over a throwaway repo whose topology the test builds by
+    hand, so the assertion is not read back out of resolve_review_base.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: A qualified base branch is normalised to its name
+  type: mechanical
+  test_ids:
+  - tests/unit/test_freeze_commit.py::test_a_qualified_base_branch_is_normalised
+  - tests/unit/test_freeze_commit.py::test_a_non_main_base_branch_is_honoured
+  executable_predicate: all(resolve_review_base(main_repo, base_branch=v) == git(main_repo,
+    'rev-parse', 'HEAD~1') and resolve_review_base(task_repo, base_branch=v) == git(task_repo,
+    'rev-parse', 'HEAD') for v in ('refs/heads/main', 'origin/main', 'refs/remotes/origin/main'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The three qualified spellings were fixed by the DRI in round 2;
+    The expected commit is computed by git itself (`git rev-parse HEAD`, `git merge-base
+    HEAD main`, `HEAD~1`) over a throwaway repo whose topology the test builds by
+    hand, so the assertion is not read back out of resolve_review_base.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: The legacy SPEC states the task-branch exception
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_base_and_superseded_gaps.py::test_ac009_legacy_spec_states_the_task_branch_exception
+  executable_predicate: '''no commits of its own'' not in legacy_skip_cases(md_text)
+    and legacy_ac004.superseded_by is None and ''freeze_commit_parent == review_base''
+    in legacy_ac004.executable_predicate and ''review_base != head_sha'' not in legacy_ac004_unconditional_clauses'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The required content was fixed by the DRI in round 2 (edit, not
+    retire) and by the spec-validator finding that retiring would waive the freeze-fidelity
+    clauses; the test reads the committed legacy files.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: The full suite stays green
+  type: mechanical
+  test_ids:
+  - tests/unit/test_freeze_commit.py::test_base_resolution_prefers_the_remote_tracking_ref
+  - tests/unit/test_spec_ac_superseded.py::test_ac005_spec_drift_skips_superseded
+  executable_predicate: full_suite_exit_code() == 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Regression gate: the existing suite (freeze, spec_machine, spec_drift,
+    approval and structural tests) predates this change, and only test_review_base_never_resolves_to_head_on_a_branch_with_no_own_commits
+    may have its assertion inverted.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: b59820b2935560a852e5faed52bb10b1faa69f0a4986bf02efc123dacbca54de
+  approved_by: Ecro
+  approved_at: '2026-10-04T14:46:16Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: de3c23f31b9014956d62e3ba2206e5d9f2757712791f36bd860404fab4eede87
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 8bc8b40e7fa167191de18dd216ab6ca99bf1e1c555a46e7bcc7f44546b68eb54
+    paths_to_mutate: 88a44281e87c2da0ba8385f8ca5cca10d90152cd701b13ab981f6c0cf441b9d7
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 0cd6a2e200abc73784b48d578b9e67c6b9ebac973a5d5cf4d8dbe10fd0193e42
+    AC-002: cc13b3322b847f49d7482a97bed4115ff887f19f45a704489721a1dc8dfcd6b4
+    AC-003: 4e06c6e3e652c2994d7085be7f59bccdf5ad0f3a5358c3f3938a4ce9fa4f58be
+    AC-004: 8060fb0cb375fd60a4efbef16dd064648a9dd0bfdb189384136736aef7e3431c
+    AC-005: 765b97b8f5150485ec1f644d8b044e065e6a25d6c3825f383597d41583358810
+    AC-006: 301705d8862a367ff23a3ce188fa0d9103f6b708c78bfde17b875825f6617df0
+    AC-007: 857e59f43f5292e2e0fab4a6e8c6827714bf57de7f9bb343f81559cca086dc6a
+    AC-008: b78d3f29f775bb4c469dd3c014f47fc43ed4910a3aae41fda1ee261d31583e03
+    AC-009: c413a4bbb75caf28ff6d163a1cbb0343e6684e70a607b4267552c496c3fc64ec
+    AC-010: 4a7b921dd63542ac049e6127e53ff351197acb285659b7836a4e0f69c8358c90
+    ac_order: 9197b2c918245ab06ace42d9ff4679ea85b92fa0c38b4938b0bc74e8d2d86aab

@@ -15,6 +15,13 @@
 
 ### Fixed
 
+- **`hm freeze resolve-base` no longer pulls the previously landed task into a zero-commit task branch's review.**
+  On a named non-base branch a merge-base equal to HEAD is now accepted (the per-task model commits only at
+  wrapup, so HEAD is the right base); on the base branch and a detached HEAD the HEAD~1 fallback is kept.
+  The branch is read from the full `symbolic-ref HEAD` and normalised (a tag named like the base branch makes
+  `--short` answer `heads/main`). Fixes `resolve-base-head-parent-empty-branch` (five occurrences); the pinned
+  plugin keeps the old rule until the next release. Also: `spec_drift` keeps its oracle check advisory for
+  superseded ACs and `spec_machine mark-judged` refuses a superseded AC.
 - **Wrapup Step 5.7 hardening.** Step 5 now marks SPEC/RESEARCH source rows in their own table (not only
   the PLAN table) for recorded, failed and declined outcomes. Every non-file argument on a 5.7 or close
   shell line gets a whole-value format check just before the write (question/metric id `[a-z0-9_]+`,

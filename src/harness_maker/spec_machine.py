@@ -1218,7 +1218,8 @@ def _mark_judged_locked(
 ) -> list[str]:
     """Record an independent rubric-reviewer's verdict (ADR-005). Pure storage, NO LLM call.
 
-    Validates the AC is type=judgment, the verdict is exactly ``pass``/``fail``, and
+    Refuses a superseded AC (it owes no verdict, as mark-tested refuses it a test), then
+    validates the AC is type=judgment, the verdict is exactly ``pass``/``fail``, and
     the evidence is non-empty; computes the canonical subject hash; stores
     verdict/evidence/judged_at/hash. Returns an error list (empty = clean); the
     file is left UNTOUCHED on any error.
@@ -1231,6 +1232,8 @@ def _mark_judged_locked(
     ac = next((a for a in model.ac if a.id == ac_id), None)
     if ac is None:
         return [f"mark-judged: unknown ac id: {ac_id}"]
+    if ac.superseded_by is not None:
+        return [f"mark-judged: {ac_id} is superseded by {ac.superseded_by}; it owes no verdict"]
     if ac.type != "judgment":
         return [f"mark-judged: {ac_id} is type={ac.type!r}, not judgment"]
     try:

@@ -45,22 +45,45 @@ def _default_base_branch(base: Path) -> str:
     """The branch a review is measured against when harness.yaml does not name one."""
     head = _try_git(base, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
     if head:
-        return head.rsplit("/", 1)[-1]
+        # Strip the prefix, not everything up to the last `/`: `release/1.0` is one branch.
+        return _branch_name(head)
     return "main"
 
 
-def resolve_review_base(base: Path, base_branch: str | None = None) -> str:
-    """Resolve the commit the whole review is measured against — never HEAD.
+_BRANCH_PREFIXES = ("refs/heads/", "refs/remotes/origin/", "origin/")
 
-    The naive definition (merge-base with the base branch) silently degenerates to HEAD in two
-    ordinary configurations: a review running directly on the base branch (worktree OFF / Side
-    preset, a supported mode) and a branch with no commits of its own. In both, the confirmation
-    pass would then diff only the uncommitted working state — i.e. only the last round's fixes —
-    which is precisely the scope-selective re-review the pass exists to replace. So each rule
-    that returns HEAD is skipped rather than accepted.
+
+def _branch_name(branch: str) -> str:
+    """`refs/heads/main`, `origin/main` and `main` name one base branch.
+
+    Compared against the checked-out branch's short name, a qualified spelling would make the
+    base branch itself look like a task branch, and HEAD would be accepted there.
+    """
+    for prefix in _BRANCH_PREFIXES:
+        if branch.startswith(prefix):
+            return branch[len(prefix) :]
+    return branch
+
+
+def resolve_review_base(base: Path, base_branch: str | None = None) -> str:
+    """Resolve the commit the whole review is measured against.
+
+    On the base branch itself (worktree OFF / Side preset) the merge-base is HEAD, and nothing
+    tells the task's own commits from earlier ones, so a rule returning HEAD is skipped and the
+    chain falls through to `HEAD~1` — over-scoping is the safer error there. A detached HEAD
+    gets the same treatment, having no branch to judge by.
+
+    On a task branch with no commits of its own the merge-base is also HEAD, but there it is
+    the right answer: the per-task model commits only at wrapup, so the whole task is the
+    uncommitted working state on top of it. Skipping it reviewed the previously landed task
+    as part of this one (`resolve-base-head-parent-empty-branch`, four occurrences).
     """
     head = _git(base, "rev-parse", "HEAD")
-    branch = base_branch or _default_base_branch(base)
+    branch = _branch_name(base_branch or _default_base_branch(base))
+    # The full ref, not `--short`: a tag named like the branch makes `--short` answer
+    # `heads/main`, which would misclassify the base branch as a task branch.
+    current = _try_git(base, "symbolic-ref", "--quiet", "HEAD")
+    on_task_branch = current is not None and _branch_name(current) != branch
 
     # Try the remote-tracking ref FIRST. `_default_base_branch` reads
     # `refs/remotes/origin/HEAD` and returns its short name, but using that as a LOCAL branch
@@ -87,7 +110,7 @@ def resolve_review_base(base: Path, base_branch: str | None = None) -> str:
         ("rev-parse", "HEAD~1"),
     ):
         candidate = _try_git(base, *args)
-        if candidate and candidate != head:
+        if candidate and (candidate != head or on_task_branch):
             return candidate
     return EMPTY_TREE
 

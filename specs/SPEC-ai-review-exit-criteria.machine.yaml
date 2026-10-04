@@ -110,7 +110,7 @@ ac:
     title: "The freeze is faithful, and the pass diffs from review_base"
     type: mechanical
     test_ids: []
-    executable_predicate: "frozen_tree_hash == working_tree_hash and freeze_commit_parent == review_base and review_base != head_sha"
+    executable_predicate: "frozen_tree_hash == working_tree_hash and freeze_commit_parent == review_base and (on_task_branch or review_base != head_sha)"
     golden_table: []
     rubric_id: null
     pending_test: true
