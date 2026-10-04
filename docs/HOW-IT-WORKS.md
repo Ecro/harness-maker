@@ -437,7 +437,7 @@ The human who owns the task (the DRI) accepts a SPEC; agents write it. The inter
 option is **"Approve this SPEC and end interview"** — choosing it runs
 `hm spec_machine approve`, which stamps `approval: {kind: human, content_hash, approved_by,
 approved_at}` into the machine SPEC. The hash covers every authored field (tooling fields such as
-`test_ids` / `pending_test` are excluded), so editing an AC, an oracle or the list below
+`test_ids` / `pending_test` / `superseded_by` are excluded), so editing an AC, an oracle or the list below
 invalidates the stamp. A Step 0 skip is stamped `kind: exempt`, valid only while nothing
 irreversible is listed.
 
@@ -445,6 +445,10 @@ From `schema_version: 3` every SPEC declares `irreversible_decisions` (possibly 
 schema/file format/storage layout · public API/CLI contract · data migration ·
 security/permission boundary · new external dependency. `/hm:execute` appends a decision it
 discovers (`source: execute`), which invalidates the approval by design.
+
+A stand-in AC whose obligation moved to another approved SPEC is retired with
+`hm spec_machine retire --yaml <f> --ac <id> --by <slug>` (`--clear` re-pends it); retired ACs no
+longer owe a test.
 
 `hm spec_machine approval-status --root . --slug <slug>` reports the state
 (`approved / exempt / missing / invalid / malformed / legacy / no_spec`). Autopilot stops at

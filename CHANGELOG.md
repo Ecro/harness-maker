@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`hm spec_machine retire` — supersede a stand-in AC without voiding the approval.** A machine SPEC AC
+  gains a hash-excluded `superseded_by` (spec slug), written only by `retire --yaml --ac (--by <slug>|--clear)`.
+  retire refuses a malformed slug, a missing / unapproved / other-checkout-only target, self, an unknown AC,
+  both-or-neither flags and retargeting; a same-target re-run is a no-op and `--clear` re-pends. Every
+  owes-a-test reader skips superseded ACs: validate (binding error only), cross-validate rule 3, coverage
+  (now returns total), find-unbound / find-unjudged / stale verdicts, spec_drift and batch_refiner;
+  mark-tested refuses atomically. Four landed stand-ins were retired (intent-layer-improvements AC-002 /
+  AC-006 / AC-011, intent-layer-diet AC-005). Authored fields are never edited, so approvals stay valid.
+
 ### Fixed
 
 - **Wrapup Step 5.7 hardening.** Step 5 now marks SPEC/RESEARCH source rows in their own table (not only

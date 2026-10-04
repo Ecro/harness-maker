@@ -136,6 +136,10 @@ class AcceptanceCriterion(BaseModel):
     rubric_id: str | None = None
     note: str = ""
     pending_test: bool = False  # Phase 3 cap escape per PLAN
+    #: Slug of the approved SPEC that removed this AC's behaviour (SPEC-spec-ac-superseded).
+    #: A tooling field written only by `retire`: hash-excluded, so retiring never voids the
+    #: approval, and every owes-a-test reader skips the AC. None = live.
+    superseded_by: str | None = None
     # --- oracle axis (ADR-001/007) -----------------------------------------
     #: Default ``legacy-unspecified`` = model-level backward compat for v1 ACs;
     #: ``validate`` enforces an explicit non-legacy source only at schema_version>=2.
@@ -382,11 +386,30 @@ def _predicate_error(ac_id: str, predicate: str | None) -> str | None:
     return None
 
 
-def validate(model: SpecMachine) -> list[str]:
+_SPEC_SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+
+def _superseded_errors(ac: AcceptanceCriterion, spec_dir: Path | None) -> list[str]:
+    """Grammar always; target existence only when the caller knows the SPEC's directory."""
+    target = ac.superseded_by
+    if target is None:
+        return []
+    if not _SPEC_SLUG_RE.fullmatch(target):
+        return [
+            f"{ac.id}: superseded_by {target!r} is not a spec slug (must match [a-z0-9][a-z0-9-]*)"
+        ]
+    if spec_dir is not None and not (spec_dir / f"SPEC-{target}.machine.yaml").is_file():
+        return [f"{ac.id}: superseded_by target {target!r} not found in {spec_dir}"]
+    return []
+
+
+def validate(model: SpecMachine, *, spec_dir: Path | None = None) -> list[str]:
     """Return a list of validation error strings (empty = valid).
 
     Catches issues pydantic alone can't, such as mechanical AC missing a
-    predicate or parametric AC with empty golden table.
+    predicate or parametric AC with empty golden table. ``spec_dir`` (the directory
+    holding this SPEC) enables the superseded_by target-existence check; without it
+    only the slug grammar is checked.
     """
     errors: list[str] = []
     is_v2 = model.schema_version >= 2
@@ -416,9 +439,16 @@ def validate(model: SpecMachine) -> list[str]:
                     f"{ac.id}: type=property requires schema_version: 2 "
                     f"(declare it to use property/oracle_source)"
                 )
-        # judgment ACs bind via a recorded verdict, not test_ids/pending_test (ADR-001).
-        if ac.type != "judgment" and not ac.test_ids and not ac.pending_test:
+        # judgment ACs bind via a recorded verdict, not test_ids/pending_test (ADR-001); a
+        # superseded AC owes no test, but every authored-content check above still applies.
+        if (
+            ac.type != "judgment"
+            and ac.superseded_by is None
+            and not ac.test_ids
+            and not ac.pending_test
+        ):
             errors.append(f"{ac.id}: needs >=1 test_ids OR pending_test=true")
+        errors.extend(_superseded_errors(ac, spec_dir))
         if is_v2:
             errors.extend(_oracle_errors(ac))
     errors.extend(_irreversible_errors(model))
@@ -531,7 +561,7 @@ def cross_validate(md_path: Path, yaml_path: Path) -> list[str]:
     # spec_drift can pick it up once the stub is written.
     all_test_ids: list[str] = []
     for ac in machine.ac:
-        if ac.pending_test:
+        if ac.pending_test or ac.superseded_by is not None:
             continue
         all_test_ids.extend(ac.test_ids)
     if all_test_ids:
@@ -650,21 +680,23 @@ def _rubric_exists(rubric_id: str, repo_root: Path) -> bool:
 def evaluate_coverage(yaml_path: Path, pytest_collect_json: str | None = None) -> dict[str, Any]:
     """Compute AC↔test mapping coverage.
 
-    coverage = (AC with non-empty test_ids OR pending_test) / total_AC
-    Returns ``{coverage: float, missing: [ac_id, ...]}``.
+    coverage = (live AC with non-empty test_ids OR pending_test) / live AC
+    Returns ``{coverage: float, missing: [ac_id, ...], total: live AC count}``. A
+    superseded AC owes nothing, so an all-superseded SPEC reports like a SPEC with no AC.
     """
     machine = load(yaml_path)
-    total = len(machine.ac)
+    live = [ac for ac in machine.ac if ac.superseded_by is None]
+    total = len(live)
     if total == 0:
-        return {"coverage": 0.0, "missing": []}
+        return {"coverage": 0.0, "missing": [], "total": 0}
     missing: list[str] = []
     covered = 0
-    for ac in machine.ac:
+    for ac in live:
         if ac.pending_test or ac.test_ids:
             covered += 1
         else:
             missing.append(ac.id)
-    return {"coverage": covered / total, "missing": missing}
+    return {"coverage": covered / total, "missing": missing, "total": total}
 
 
 # ---------------------------------------------------------------------------
@@ -710,6 +742,9 @@ def _dump_machine_yaml(yaml_path: Path, model: SpecMachine) -> None:
     for key in ("approval", "irreversible_decisions"):
         if payload.get(key) is None:
             payload.pop(key, None)
+    for ac in payload.get("ac", []):
+        if ac.get("superseded_by") is None:
+            ac.pop("superseded_by", None)
     text = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     atomic_write(yaml_path, text)
 
@@ -767,6 +802,16 @@ def _mark_tested_locked(
     unknown = sorted(a for a in ac_test_ids if a not in known)
     if unknown:
         return [f"mark-tested: unknown ac id(s): {', '.join(unknown)}"]
+    # A superseded AC owes no test; binding one would resurrect it. Refuse the whole request
+    # before any collect or write, so a mixed request never half-applies.
+    superseded = sorted(
+        ac.id for ac in model.ac if ac.id in ac_test_ids and ac.superseded_by is not None
+    )
+    if superseded:
+        return [
+            f"mark-tested: {ac_id} is superseded; run `retire --clear` first to bind it"
+            for ac_id in superseded
+        ]
 
     # Compute the post-merge test_ids per named AC without mutating yet.
     merged_by_ac: dict[str, list[str]] = {}
@@ -797,6 +842,70 @@ def _mark_tested_locked(
         ac.pending_test = False
     _dump_machine_yaml(yaml_path, model)
     return []
+
+
+def retire(yaml_path: Path, ac_id: str, *, by: str | None = None, clear: bool = False) -> list[str]:
+    """Mark one AC superseded by an approved SPEC, or undo it (SPEC-spec-ac-superseded).
+
+    Every refusal returns before the write, so a refused call leaves the file byte-identical.
+    The target is resolved beside ``yaml_path`` only: an approved copy in another checkout
+    (the per-task worktree `approval_state` would prefer) must not authorize a retirement here.
+    """
+    with _spec_write_lock(yaml_path):
+        return _retire_locked(yaml_path, ac_id, by=by, clear=clear)
+
+
+def _retire_locked(yaml_path: Path, ac_id: str, *, by: str | None, clear: bool) -> list[str]:
+    if (by is None) == (not clear):
+        return ["retire: pass exactly one of --by <slug> or --clear"]
+    model = load(yaml_path)
+    ac = next((a for a in model.ac if a.id == ac_id), None)
+    if ac is None:
+        return [f"retire: unknown ac id {ac_id!r}"]
+    if clear:
+        if ac.superseded_by is None:
+            return [f"retire: {ac_id} is not superseded; nothing to clear"]
+        ac.superseded_by = None
+        ac.pending_test = True  # unbound again: the next wrapup's mark-tested re-binds it
+        _dump_machine_yaml(yaml_path, model)
+        return []
+    assert by is not None
+    if not _SPEC_SLUG_RE.fullmatch(by):
+        return [f"retire: --by {by!r} is not a spec slug (must match [a-z0-9][a-z0-9-]*)"]
+    if by == model.spec_slug:
+        return [f"retire: cannot supersede {ac_id} by its own spec {by!r}"]
+    if ac.superseded_by == by:
+        return []  # same target again: a no-op, file untouched
+    if ac.superseded_by is not None:
+        return [
+            f"retire: {ac_id} is already superseded by {ac.superseded_by!r}; "
+            f"run --clear before retargeting"
+        ]
+    spec_dir = yaml_path.parent
+    if not (spec_dir / f"SPEC-{by}.machine.yaml").is_file():
+        return [f"retire: target SPEC {by!r} not found in {spec_dir}"]
+    target = _state_at(by, spec_dir)
+    if target.state not in ("approved", "exempt"):
+        return [f"retire: target SPEC {by!r} is not approved (state={target.state})"]
+    ac.superseded_by = by
+    ac.pending_test = False
+    _dump_machine_yaml(yaml_path, model)
+    return []
+
+
+def _run_retire(args: argparse.Namespace) -> int:
+    try:
+        errors = retire(args.yaml_path, args.ac, by=args.by, clear=args.clear)
+    except (ApprovalError, OSError, yaml.YAMLError, ValidationError) as exc:
+        # Lock timeout (surfaced as ApprovalError) or an unreadable SPEC: refuse like approve.
+        print(f"retire: {exc}", file=sys.stderr)
+        return 1
+    for err in errors:
+        print(err, file=sys.stderr)
+    if errors:
+        return 1
+    print(f"retire: {args.ac} {'cleared' if args.clear else 'superseded by ' + str(args.by)}")
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -835,7 +944,9 @@ def select_pytest_bindable(
     return [
         ac
         for ac in model.ac
-        if ac.type in _PYTEST_BINDABLE_TYPES and (not pending_only or ac.pending_test)
+        if ac.type in _PYTEST_BINDABLE_TYPES
+        and ac.superseded_by is None
+        and (not pending_only or ac.pending_test)
     ]
 
 
@@ -1002,7 +1113,9 @@ def select_judgment(model: SpecMachine, *, unbound_only: bool = False) -> list[A
     return [
         ac
         for ac in model.ac
-        if ac.type == "judgment" and (not unbound_only or ac.judgment_verdict != "pass")
+        if ac.type == "judgment"
+        and ac.superseded_by is None
+        and (not unbound_only or ac.judgment_verdict != "pass")
     ]
 
 
@@ -1463,7 +1576,7 @@ def _run_check_all(args: argparse.Namespace) -> int:
     }
 
     try:
-        validate_errors = validate(load(args.yaml_path))
+        validate_errors = validate(load(args.yaml_path), spec_dir=args.yaml_path.parent)
     except Exception as e:  # noqa: BLE001 — an unloadable yaml is a reportable verdict
         validate_errors = [f"yaml load failed: {type(e).__name__}: {e}"]
     payload["validate"] = {"ok": not validate_errors, "errors": validate_errors}
@@ -1516,6 +1629,7 @@ HASH_DENYLIST_TOP: tuple[str, ...] = (
 HASH_DENYLIST_AC: tuple[str, ...] = (
     "test_ids",
     "pending_test",
+    "superseded_by",
     "judgment_verdict",
     "judged_at",
     "judgment_evidence",
@@ -2053,6 +2167,14 @@ def main(argv: list[str] | None = None) -> int:
         help="AC-ID=test_node to record (repeatable)",
     )
 
+    p_retire = sub.add_parser(
+        "retire", help="mark one AC superseded by an approved SPEC (or --clear it)"
+    )
+    p_retire.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_retire.add_argument("--ac", required=True, help="AC id, e.g. AC-002")
+    p_retire.add_argument("--by", default=None, help="slug of the approved superseding SPEC")
+    p_retire.add_argument("--clear", action="store_true", help="undo a retirement")
+
     p_waiver = sub.add_parser(
         "waiver-check",
         help="tri-state oracle-waiver advisory at warn strictness (never blocks; exits 0)",
@@ -2107,6 +2229,8 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
+    if args.cmd == "retire":
+        return _run_retire(args)
     if args.cmd == "approve":
         return _run_approve(args)
 
@@ -2129,7 +2253,7 @@ def main(argv: list[str] | None = None) -> int:
         return _run_find_unjudged(args)
 
     if args.cmd == "validate":
-        errors = validate(load(args.yaml_path))
+        errors = validate(load(args.yaml_path), spec_dir=args.yaml_path.parent)
     elif args.cmd == "cross-validate":
         errors = cross_validate(args.md_path, args.yaml_path)
     else:  # mark-tested
@@ -2187,6 +2311,7 @@ __all__ = [
     "main",
     "mark_judged",
     "mark_tested",
+    "retire",
     "migrate",
     "resolve_pytest_selector",
     "score_ac_oracle_evidence",

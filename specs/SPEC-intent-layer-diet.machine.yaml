@@ -132,7 +132,8 @@ ac:
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
+  superseded_by: intent-surface-diet
   oracle_source: differential
   oracle_evidence: The four tests/snapshot/*.expected.yaml body_sha256 pins were generated
     by regenerate.py before this change and are not regenerated; test_synthesize_snapshot.py

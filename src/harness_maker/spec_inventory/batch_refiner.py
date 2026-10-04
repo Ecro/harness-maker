@@ -138,6 +138,8 @@ def refine_spec(
     new_body_lines = body.splitlines()
     body_dirty = False
     for ac in ac_list:
+        if ac.get("superseded_by"):
+            continue  # retired: its test_ids are history, not bindings to re-resolve
         test_ids = ac.get("test_ids") or []
         total_test_ids += len(test_ids)
         if not test_ids:
@@ -162,7 +164,10 @@ def refine_spec(
 
     # 4) Mark status=verified if every AC has either pending_test=true or
     #    test_ids resolved (i.e., no dangling unverified non-pending AC).
-    all_clean = all((ac.get("pending_test") is True) or bool(ac.get("test_ids")) for ac in ac_list)
+    all_clean = all(
+        bool(ac.get("superseded_by")) or ac.get("pending_test") is True or bool(ac.get("test_ids"))
+        for ac in ac_list
+    )
     if all_clean:
         fm["status"] = "verified-skeleton"
     yaml_data["ac"] = ac_list

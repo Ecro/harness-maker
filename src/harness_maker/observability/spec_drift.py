@@ -122,6 +122,8 @@ def scan(specs_dir: Path) -> SpecDriftReport:
             continue
         # coverage gaps
         for ac in machine.ac:
+            if ac.superseded_by is not None:
+                continue  # owes no test, and its history ids reference nothing live
             if not ac.test_ids and not ac.pending_test:
                 report.coverage_gaps.append(f"{machine.spec_slug}::{ac.id}")
             if ac.pending_test and ac.test_ids:

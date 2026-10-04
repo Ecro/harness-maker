@@ -119,6 +119,7 @@ def _independent_hash(raw: dict[str, Any]) -> str:
         for key in (
             "test_ids",
             "pending_test",
+            "superseded_by",
             "judgment_verdict",
             "judged_at",
             "judgment_evidence",
@@ -190,6 +191,8 @@ _DENY = {
     "last_mutation_run",
     "ac.test_ids",
     "ac.pending_test",
+    # SPEC-spec-ac-superseded IRR-001: a retirement must not void the approval.
+    "ac.superseded_by",
     "ac.judgment_verdict",
     "ac.judged_at",
     "ac.judgment_evidence",
@@ -218,6 +221,7 @@ _REPLACEMENTS: dict[str, Any] = {
     "ac.rubric_id": "rubric-x",
     "ac.note": "a note",
     "ac.pending_test": False,
+    "ac.superseded_by": "other-spec",
     "ac.oracle_source": "property",
     "ac.oracle_evidence": "a different justification",
     "ac.oracle_independence_waiver": "waived for a reason",

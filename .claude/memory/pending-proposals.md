@@ -615,6 +615,6 @@ threshold (count: 2).
 **Rationale:** world-model-name again reached /hm:verify with 11 unused `type: ignore` in a test file because the local check covered `src` only; same family as `phase-verification-narrower-than-gate` (count 3), so the existing proposal for that slug should absorb this one.
 
 ## Proposal: resolve-base guard for zero-commit task branches (2026-10-04)
-**Triggered by:** [fail:runtime] resolve-base-head-parent-empty-branch (count: 3)
+**Triggered by:** [fail:runtime] resolve-base-head-parent-empty-branch (count: 4)
 **Proposed mechanism:** rule update (fix `hm freeze resolve-base` to anchor on HEAD/merge-base when the task branch has no own commits) plus a regression test
 **Rationale:** three tasks in three days had `review_base` set to HEAD~1, pulling the previously landed task into the review span until corrected by hand; a code fix removes the manual `git update-ref` step.

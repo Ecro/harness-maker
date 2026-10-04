@@ -52,7 +52,8 @@ ac:
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
+  superseded_by: intent-surface-diet
   oracle_source: property
   oracle_evidence: The forbidden tokens come from the RESEARCH F3 cost audit (what
     the old block made the model load), not from the new template; the relation must
@@ -173,7 +174,8 @@ ac:
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
+  superseded_by: intent-layer-diet
   oracle_source: golden
   oracle_evidence: The expected state is the DRI's recorded interview decision (freeze,
     2026-09-29); preserved compares member, event and decision ids against a snapshot
@@ -318,7 +320,8 @@ ac:
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
+  superseded_by: intent-surface-diet
   oracle_source: golden
   oracle_evidence: The golden is the id shape of the four existing records in intent/
     (bare upper-case ids), which predate this change; the positive example must be

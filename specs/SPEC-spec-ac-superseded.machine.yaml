@@ -1,0 +1,348 @@
+schema_version: 3
+spec_slug: spec-ac-superseded
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: T2 — mutation testing is deferred to sampling per ADR-003;
+  the refusal/skip predicates are pinned by explicit negative controls instead.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/spec_machine.py
+- src/harness_maker/observability/spec_drift.py
+- src/harness_maker/spec_inventory/batch_refiner.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Retire records superseded_by and clears pending_test
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_ac_superseded.py::test_ac001_retire_records_superseded_by
+  executable_predicate: after.superseded_by == 'intent-surface-diet' and after.pending_test
+    is False and after.test_ids == before.test_ids
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected post-state was fixed by the DRI in round 1 before
+    any code; the fixture SPEC and the approved target live in one hand-written tmp
+    specs dir.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Retire refuses unsafe or ambiguous calls and leaves the file unchanged
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_ac_superseded.py::test_ac002_retire_refuses_unsafe
+  - tests/unit/test_spec_ac_superseded.py::test_ac002_retire_accepts_exempt_target
+  - tests/unit/test_spec_ac_superseded.py::test_ac002_same_target_rerun_is_noop
+  - tests/unit/test_spec_ac_superseded.py::test_ac002_retire_cli_unreadable_spec_exits_cleanly
+  executable_predicate: all(exit_code(case) != 0 and file_bytes_after(case) == file_bytes_before(case)
+    for case in REFUSAL_CASES) and exit_code(SAME_TARGET_RERUN) == 0 and file_bytes_after(SAME_TARGET_RERUN)
+    == file_bytes_before(SAME_TARGET_RERUN)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'REFUSAL_CASES is the SPEC S2 list fixed in round 2 before implementation:
+    bad slug, missing target, each non-approved state, approved-only-in-another-checkout,
+    self, unknown AC, both/neither flags, retarget; bytes compared to the file read
+    before the call.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Retire and clear never change the approval content hash
+  type: property
+  test_ids:
+  - tests/unit/test_spec_ac_superseded.py::test_ac003_retire_keeps_approval_hash
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Approval is a hash of authored fields; a tooling-only edit must
+    leave it invariant whatever the AC content, so the relation holds independently
+    of how retire is implemented. The pre-operation hash is captured from the stored
+    stamp, not recomputed by the code under test.
+  oracle_independence_waiver: null
+  input_domain: approved machine SPECs with one to five ACs of mixed types and an
+    approved target in the same specs dir
+  transformation: retire one AC --by target, then retire --clear the same AC
+  expected_relation: stamped_hash(before) == approval_content_hash(after_retire) ==
+    approval_content_hash(after_clear) and approval_state(after_retire) == approval_state(after_clear)
+    == 'approved'
+  preconditions:
+  - the SPEC is approved before the operation
+  observable_output: approval content hash and approval state
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Validate exempts only the binding obligation and checks superseded_by
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_ac_superseded.py::test_ac004_validate_exempts_only_binding
+  - tests/unit/test_spec_ac_superseded.py::test_ac004_validate_does_not_check_target_approval
+  executable_predicate: BINDING_ERROR not in validate_errors_for(superseded) and ORACLE_ERROR
+    in validate_errors_for(superseded_bad_oracle) and any(GRAMMAR_ERROR in e for e
+    in validate_errors_for(bad_slug)) and any(TARGET_ERROR in e for e in validate_errors_for(dangling))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The exemption scope (binding error only) and the two read-time
+    checks were fixed by the DRI in round 2; the error substrings are matched against
+    the existing validate messages and the SPEC S3 wording, with a live-AC control
+    that must still raise the binding error.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Every owes-a-test reader skips superseded ACs
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_ac_superseded.py::test_ac005_rule3_skips_superseded
+  - tests/unit/test_spec_ac_superseded.py::test_ac005_coverage_counts_live_only
+  - tests/unit/test_spec_ac_superseded.py::test_ac005_all_superseded_matches_zero_ac
+  - tests/unit/test_spec_ac_superseded.py::test_ac005_find_unbound_skips_superseded
+  - tests/unit/test_spec_ac_superseded.py::test_ac005_judgment_readers_skip_superseded
+  - tests/unit/test_spec_ac_superseded.py::test_ac005_spec_drift_skips_superseded
+  - tests/unit/test_spec_ac_superseded.py::test_ac005_batch_refiner_leaves_superseded_untouched
+  executable_predicate: superseded_ids.isdisjoint(rule3_checked(spec)) and evaluate_coverage(spec)
+    == EXPECTED_MIXED and evaluate_coverage(all_superseded) == evaluate_coverage(zero_ac)
+    and superseded_ids.isdisjoint(find_unbound(spec) + find_unjudged(spec) + stale_judgment_verdicts(spec))
+    and superseded_ids.isdisjoint(spec_drift_gaps(spec)) and superseded_test_ids.isdisjoint(spec_drift_referenced(spec))
+    and refined(spec).ac_fields(superseded_ids) == spec.ac_fields(superseded_ids)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: EXPECTED_MIXED is a literal dict for a hand-built fixture (2 live,
+    1 bound, 1 superseded); the reader inventory came from grep plus the spec-validator
+    review (stale_judgment_verdicts, spec_drift orphan set, batch_refiner), and every
+    reader has a live-AC control that must still fire.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Mark-tested refuses superseded ACs atomically
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_ac_superseded.py::test_ac006_mark_tested_refuses_atomically
+  executable_predicate: all(mark_tested(req, validate_after=v) and file_bytes_after(req,
+    v) == file_bytes_before(req, v) for req in (ONLY_SUPERSEDED, MIXED) for v in (True,
+    False)) and not pytest_collect_called
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The atomicity contract (whole request refused before collect or
+    write, both validate_after values) was fixed in SPEC S5 from the codex P1 finding
+    before implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Clear removes the field and re-pends the AC
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_ac_superseded.py::test_ac007_clear_repends
+  - tests/unit/test_spec_ac_superseded.py::test_ac007_clear_on_live_refused
+  executable_predicate: cleared.superseded_by is None and cleared.pending_test is
+    True and exit_code(CLEAR_LIVE) != 0 and file_bytes_after(CLEAR_LIVE) == file_bytes_before(CLEAR_LIVE)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The re-pend rule was fixed by the DRI in round 2 (always pending_test
+    true); checked on a stale-history-ids fixture and an empty-test_ids fixture.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: An absent superseded_by is never serialised
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_ac_superseded.py::test_ac008_absent_field_not_serialised
+  executable_predicate: '"superseded_by" not in rewritten_text(spec_without_field)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The absent-stays-absent rule comes from SPEC S7 and the existing
+    approval/irreversible_decisions pop convention; checked by rewriting a field-free
+    fixture through mark-tested.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: The four landed stand-ins are retired and their SPECs stay approved
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_ac_superseded.py::test_ac009_landed_stand_ins_retired
+  executable_predicate: all(ac_of(spec, ac).superseded_by == target for spec, ac,
+    target in STAND_INS) and all(approval_state(s) == 'approved' and find_unbound(s)
+    == [] for s in ('intent-layer-improvements', 'intent-layer-diet'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: STAND_INS (spec, AC, target) is fixed by the intent-surface-diet
+    REVIEW and the round-2 DRI answer for AC-006 — not derived from the code; the
+    test reads committed files only.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: The full suite stays green
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_approval.py::test_ac_002_every_model_field_has_a_mutation
+  - tests/unit/test_spec_ac_superseded.py::test_ac001_retire_records_superseded_by
+  executable_predicate: full_suite_exit_code() == 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The existing suite (spec_machine, spec_drift, approval, batch_refiner
+    and structural tests) predates this change and is an independent regression oracle.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Add an optional AC field superseded_by (a spec slug) to .machine.yaml,
+    excluded from the approval hash and checked at validate time for grammar and target
+    existence
+  category: schema/file format/storage layout
+  rationale: Landed SPECs will carry it, and it moves waiver authority — a tooling
+    field removes an approved obligation without re-approval. Validate catches malformed
+    or dangling values; "only retire writes it" stays a convention a hand edit naming
+    an existing SPEC can still pass.
+  source: spec
+- id: IRR-002
+  decision: Add the CLI verb `hm spec_machine retire --yaml --ac (--by <slug> | --clear)`
+  category: public API/CLI contract
+  rationale: Operators and later stage templates call it by name with these refusal
+    and no-op semantics; renaming it or changing its flags breaks them.
+  source: spec
+approval:
+  kind: human
+  content_hash: 72def2fc49824ab6320c972347c59eb29bc1d18e003101fe4c77b0756e3c12af
+  approved_by: Ecro
+  approved_at: '2026-10-04T12:09:47Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: eb27d8201927b61f167ed016eed6ac5f1b13a38c9a20aee8906be0fe3a0bb0a9
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 52f32183341b74fe9a1a7abc04eba007771ae5c2c2457fa205d4a0368af0f3f4
+    paths_to_mutate: eda30dee27e032b022ef6382f10125cc18789dde8196f8fd34e68df86ebcc519
+    irreversible_decisions: bdfa101df9344eecd2df26c3ba0266742ea35aad9f58b846fa7dee77f74cf293
+    AC-001: 6e89b3d7bb1104706690746ee10df027c002a5fff535fb3712359a96b97b9321
+    AC-002: db2bd62dd2cb989a75c609e5372750548bbcdccf2bab392ff87efd83b1209079
+    AC-003: 6b3f41486266fdcba36162c3439fe0cc24a9f8ada9bd4872194cd36ef0aeeeb8
+    AC-004: c6f9bf2c56ca7376447457651fd267b25c921790609fc3ec3504aa2921302032
+    AC-005: 38fc2dc736861dad31e8cedec24463c8b4d3e3469e8045ecd77e82784eef4eb7
+    AC-006: eea9a5001df829452117388f0f929026172f072572e115b5f3712f6291521c9e
+    AC-007: 198eaae4ee5644f09779f7ac10260f0f9687d6107ee8a2d0b51794daa3126ff1
+    AC-008: f819e9ac5dc85040b9038ed90b603d148f13ffd47946dbc82c48cb967c4bb8df
+    AC-009: cead7a215b8838b4061b73000ff36c211d99d62e6168465ff5f517e3033958e6
+    AC-010: 04a124dac8f975f47cdf71a647f79c6c02d7e64bbc818a52a227fd4e3fd9fdfd
+    ac_order: 9197b2c918245ab06ace42d9ff4679ea85b92fa0c38b4938b0bc74e8d2d86aab
