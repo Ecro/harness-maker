@@ -15,3 +15,19 @@ Measured across two tasks: eleven Phase A.5 findings were the single sentence "t
 ## `templates/stages/review.md.j2`
 
 > Why: the results directory is keyed by slug and round, so re-running `/hm:review` on the same > slug lands in the **same** directory. Without the run id, a previous invocation's files > vouch for every lens in an invocation where only one returned — `blocks_approval: false`, > four dead lenses reported as exercised. Measured. The round keying separates a pass from a > round; it does not separate one invocation from the next.
+
+## `templates/stages/review.md.j2`
+
+**True per-reviewer payloads need a per-reviewer source**, which exists only at Pass 1 / Pass 2 — before the merge. Persisting them is a **known gap**: capturing each reviewer's raw reply to its own file is a change to the dispatch steps above, not to this one. Until that lands, the corpus holds one honest merged payload per round rather than N dishonest per-reviewer ones. Replay of the consensus stage is possible; replay of the reviewer stage is not yet.
+
+## `templates/stages/review.md.j2`
+
+**This buys nothing today and everything afterwards.** The detection check for pipeline changes has failed twice, the second time because no per-reviewer finding payload has ever been persisted anywhere in this repo — REVIEW documents are post-consensus narrative and `review-*.jsonl` holds only counts, so there was no artifact to replay against. Every round that skips this line is a round no future pipeline change can be tested on. It writes to the **base** root, so it survives `task-land`.
+
+## `templates/stages/review.md.j2`
+
+This was three chained verbs that rewrote the findings file so each could see the last one's column. That chaining was the defect generator: `tag --file <any JSON object>` silently destroyed that file, the envelope was dropped on write-back, the write had no containment check, `record` went green on a blind retry, and the order dependence could only be expressed as prose naming one path three times. A function that reads once and returns a value has none of those. The rules are unchanged — same tag table, same disposition column, same grade.
+
+## `templates/stages/review.md.j2`
+
+Round 2 of this change's own review rejected the earlier wording, which told you to take the union yourself: the Grade Gate branches on the CLI's `blocks_approval` field, and this stage separately forbids substituting your own judgement for it — so a prose union asked you to override a field you may not override. With a single `--round`, a round that re-dispatched one lens reported the other four missing and the review could never be approved.

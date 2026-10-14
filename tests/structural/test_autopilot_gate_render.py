@@ -29,7 +29,7 @@ original proof — it only stops every future edit to any rendered command.
 Re-captures (append; never silently overwrite):
 - **2026-10-14, `hm-light-lane`** — `spec`, `execute` and `review` moved in all four arms: the
   light lane (spec Step 0 picks `lane: light|full`, execute skips Phase A.5 on light, review cuts
-  repetition on light) and three rationale paragraphs moved to `docs/reference/stage-rationale.md`.
+  repetition on light) and seven rationale paragraphs moved to `docs/reference/stage-rationale.md`.
   `configure`, `help`, `make`, `metrics`, `uninstall` (and `loop`, `loop-p5-batch` in the `ask`
   arms, which render them) moved by one frontmatter line, `disable-model-invocation: true`
   (lever 5). Verified before re-capture that these are the ONLY moved commands in every arm and

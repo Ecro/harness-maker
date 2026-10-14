@@ -1,0 +1,219 @@
+schema_version: 3
+spec_slug: hm-light-lane
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Mostly template prose plus one output-shape branch; render and
+  unit tests pin the outcome, mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Spec Step 0 decides the lane and writes it
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane.py::test_spec_step_0_decides_the_lane_and_writes_it
+  executable_predicate: 'all(w in step0 for w in (''`light`'', ''`full`'', ''irreversible'',
+    ''in doubt, `full`'', ''Refinement Decisions'', ''`lane: light`''))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The three light-lane conditions and the in-doubt default come from intent
+    HM-LIGHT-LANE scope item 1, fixed before the template edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: The SPEC frontmatter carries the lane
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane.py::test_spec_frontmatter_carries_the_lane
+  executable_predicate: '''lane: {light | full}'' in step3'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Field name and values fixed by the intent record before the edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Execute skips only Phase A.5 on the light lane
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane.py::test_execute_skips_only_a5_on_light
+  executable_predicate: '''`lane: light` → skip to Phase B'' in a5 and ''lane'' not in a4
+    and ''lane'' not in phase_b'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Intent scope item 2 names A.5 as the only removed phase; A, A.4 and B are
+    registered INV in step_sensitivity.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: A SPEC without a lane reads as full
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane.py::test_execute_reads_a_missing_lane_as_full
+  executable_predicate: '''missing → `full`'' in step2'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Backward compatibility rule from the intent Constraints section.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Review keeps the lens axis and caps repetition on light
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane.py::test_review_light_lane_keeps_the_lens_axis_and_gate
+  executable_predicate: '''keeps the lens axis, coverage check and'' in config and ''`max_review_rounds`
+    caps at 2'' in config'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Intent scope item 3; the research thread measured lenses at 11% of cost
+    with fixes in 5 of 13 runs, so they stay.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Review skips Pass 1 and an unchanged confirmation pass on light
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane.py::test_review_light_lane_skips_pass_1_and_the_unchanged_confirmation
+  executable_predicate: 'all(''`lane: light` → skip Pass 1'' in b for b in two_pass) and ''`lane:
+    light` with round 1 approved and no fix applied'' in confirm'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Intent scope item 3; a non-vacuity guard requires at least one preset to
+    render Pass 1.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: A clean spec_machine check prints one short line
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_machine_check_all.py::test_a_clean_pass_prints_one_short_line
+  executable_predicate: 'rc == 0 and out.count(''\n'') == 1 and json.loads(out) == {''ok'':
+    True, ''overall'': 88, ''strictness'': ''warn''}'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Lever 4 from the token-lever analysis (13k chars per run); the failure
+    payload is unchanged and pinned by the existing tests.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Internal skills and user-typed commands leave the skill listing
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane.py::test_internal_skill_is_typed_only
+  executable_predicate: 'all(''disable-model-invocation: true'' in frontmatter(s) for s in
+    HIDDEN_SKILLS)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Lever 5; the hidden set was classified from template references before
+    the edit, and the visible set (stage commands, health, skills reached by name) is pinned
+    by sibling tests.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []

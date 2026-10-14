@@ -425,13 +425,6 @@ round**, against the merged temp file you already wrote, with the literal review
 > keyed on `reviewer` would then measure the merge output N times instead of N reviewers.
 > Fabricated attribution is worse than no attribution, because nothing downstream can tell.
 >
-> **True per-reviewer payloads need a per-reviewer source**, which exists only at Pass 1 /
-> Pass 2 — before the merge. Persisting them is a **known gap**: capturing each reviewer's
-> raw reply to its own file is a change to the dispatch steps above, not to this one. Until
-> that lands, the corpus holds one honest merged payload per round rather than N dishonest
-> per-reviewer ones. Replay of the consensus stage is possible; replay of the reviewer stage
-> is not yet.
-
 {% if is_codex %}
 ```
 Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger persist-payload --file <the literal temp path> --slug {slug} --run-id <run-id> --round <N> --reviewer merged")
@@ -449,12 +442,6 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 > **silently destroys the previous review's payload**, quietly emptying the corpus this
 > step exists to build.
 >
-> **This buys nothing today and everything afterwards.** The detection check for pipeline
-> changes has failed twice, the second time because no per-reviewer finding payload has ever
-> been persisted anywhere in this repo — REVIEW documents are post-consensus narrative and
-> `review-*.jsonl` holds only counts, so there was no artifact to replay against. Every round
-> that skips this line is a round no future pipeline change can be tested on. It writes to the
-> **base** root, so it survives `task-land`.
 {% endif %}
 {%- if config.second_opinion and config.second_opinion.models %}
 ### Step 3.5 — Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)
@@ -554,13 +541,6 @@ It **reads only** and prints one payload: `{"findings": [...with `tag`...], "gra
 one. Exit 1 means `errors` is non-empty — an untagged or off-vocabulary finding, a missing
 disposition, or a rejection citing an AC id the machine SPEC does not declare — and the letter is
 not trustworthy until those are fixed at the source and the call repeated.
-
-> This was three chained verbs that rewrote the findings file so each could see the last one's
-> column. That chaining was the defect generator: `tag --file <any JSON object>` silently
-> destroyed that file, the envelope was dropped on write-back, the write had no containment
-> check, `record` went green on a blind retry, and the order dependence could only be expressed
-> as prose naming one path three times. A function that reads once and returns a value has none
-> of those. The rules are unchanged — same tag table, same disposition column, same grade.
 
 | Tag | Condition | Auto-fix eligible? |
 |-----|-----------|--------------------|
@@ -804,12 +784,7 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}
 ```{% endif %}
 
-> The union is computed by the CLI, not by you. Round 2 of this change's own review rejected
-> the earlier wording, which told you to take the union yourself: the Grade Gate branches on
-> the CLI's `blocks_approval` field, and this stage separately forbids substituting your own
-> judgement for it — so a prose union asked you to override a field you may not override. With
-> a single `--round`, a round that re-dispatched one lens reported the other four missing and
-> the review could never be approved.
+> The union is computed by the CLI, not by you.
 
 ### Round-state contract
 
