@@ -1602,6 +1602,7 @@ def _run_check_all(args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001 — scoring must not mask the two gates above
         payload["quality"] = {"error": f"{type(e).__name__}: {e}"}
         quality_blocked = False
+        quality_clean = False
     else:
         payload["quality"] = {
             "overall": quality.overall,
@@ -1611,9 +1612,17 @@ def _run_check_all(args: argparse.Namespace) -> int:
             "strictness": quality.strictness,
         }
         quality_blocked = quality.blocked
+        quality_clean = not quality.is_weak
 
     failed = bool(validate_errors) or bool(cross_errors) or quality_blocked
     payload["ok"] = not failed
+    if not failed and quality_clean:
+        # The caller re-reads every byte printed here on each later turn (HM-LIGHT-LANE
+        # lever 4: ~13k chars per run). A clean pass carries nothing to act on.
+        quality_block = payload["quality"]
+        compact = {"ok": True, "overall": quality_block["overall"]}
+        print(json.dumps({**compact, "strictness": quality_block["strictness"]}))
+        return 0
     print(json.dumps(payload, indent=2, ensure_ascii=False))
     return 1 if failed else 0
 

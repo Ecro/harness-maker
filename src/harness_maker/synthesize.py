@@ -407,6 +407,23 @@ _COMMAND_DESCRIPTIONS: dict[str, str] = {
 }
 
 
+#: Typed by the user only, never invoked through the Skill tool (HM-LIGHT-LANE lever 5), so
+#: their descriptions need not ride in every session's skill listing. `health` stays invocable:
+#: verify Check 2 tells the model to run it. Stage commands stay invocable: auto-advance uses
+#: the Skill tool.
+_TYPED_ONLY_COMMANDS: frozenset[str] = frozenset(
+    {
+        "commands/hm/loop.md",
+        "commands/hm/loop-p5-batch.md",
+        "commands/hm/metrics.md",
+        "commands/hm/make.md",
+        "commands/hm/configure.md",
+        "commands/hm/uninstall.md",
+        "commands/hm/help.md",
+    }
+)
+
+
 def _command_frontmatter(out_path: str, world_model_name: str) -> dict[str, Any]:
     """ADR-016 description for a rendered command; empty for every other file kind."""
     stage = out_path.removeprefix("commands/hm/").removesuffix(".md")
@@ -414,7 +431,11 @@ def _command_frontmatter(out_path: str, world_model_name: str) -> dict[str, Any]
         gate = _stage_gate(world_model_name, "/hm:loop")
         return {"description": f"{_STAGE_SUMMARIES[stage]} {gate}"}
     description = _COMMAND_DESCRIPTIONS.get(out_path)
-    return {"description": description} if description else {}
+    if not description:
+        return {}
+    if out_path in _TYPED_ONLY_COMMANDS:
+        return {"description": description, "disable-model-invocation": True}
+    return {"description": description}
 
 
 # Reviewer agents that include the partials in templates/agents/_partials/.
@@ -933,7 +954,19 @@ def _codex_skill_files() -> list[FileSpec]:
 # SPEC-maker-front-door-improvements IRR-001/002: reachable only by typing their name or through
 # the world model's Read. Claude Code/Cursor get `disable-model-invocation` in the template;
 # Codex gets `agents/openai.yaml` (policy.allow_implicit_invocation: false).
-_TYPED_ONLY_SKILLS: tuple[str, ...] = ("intent-layer", "project-knowledge")
+#
+# HM-LIGHT-LANE lever 5 added the next five: no stage prompt invokes them by name and none is
+# meant to self-trigger, yet every session carried their descriptions in the skill listing.
+# `security-scanner` stays visible: security-reviewer defers to it when available.
+_TYPED_ONLY_SKILLS: tuple[str, ...] = (
+    "intent-layer",
+    "project-knowledge",
+    "agent-quality-rubric",
+    "ai-readiness-rubric",
+    "autoloop-driver",
+    "context-linter",
+    "worktree-isolator",
+)
 
 
 _CODEX_OUTPUT_ROOTS = (".codex", ".agents")

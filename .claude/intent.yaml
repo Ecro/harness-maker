@@ -107,6 +107,14 @@ metrics:
     없었는가. 둘 다 예인 건수 / 판정 건수 × 100. 요약 섹션이 존재한다는 것만으로는 통과하지 않는다. 각 측정에 판정한 wrapup 을
     근거로 남긴다. 요약 기능은 아직 없고 baseline 은 미측정이다 — 결과를 주장하지 않는다. 요약의 형식·위치·길이와 표본 단위는 후속
     SPEC 에서 정한다.
+- id: hm_cost_ratio_small
+  description: '작은 단일 세션 과제 벤치에서 /hm: 팔 평균 비용 / 일반 작업 팔 평균 비용 (배수)'
+  target: 5
+  higher_is_better: false
+  how_measured: '벤치 러너로 과제·팔당 3회, 헤드리스. 값 = /hm: 팔 평균 비용 / plain 팔 평균 비용. baseline 22
+    (2026-10-14, timeparse 5과제, claude-sonnet-5-5, Side preset — work-docs/RESEARCH-hm-light-lane.md).
+    반대 신호: /hm: 팔의 숨은 테스트 통과율이 plain 팔보다 낮으면 배수가 목표 안이어도 통과가 아니다. 벤치 러너가 repo 에
+    들어오기 전에는 측정하지 않는다.'
 rules:
 - 품질 하한(결정적 검증·리뷰 게이트)은 크기나 속도를 줄이는 대가로 낮추지 않는다
 - TUNE 값은 재측정 없이 새 모델로 이전하지 않는다

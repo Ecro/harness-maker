@@ -4,6 +4,20 @@
 
 ### Added
 
+- **Light lane for small `/hm:` tasks (HM-LIGHT-LANE, stage 1).** spec Step 0 now writes `lane: light|full`
+  to the SPEC frontmatter: `light` when about five files or fewer change, the work fits one session and no
+  decision is irreversible (the trivial skip path is always `light`; a SPEC without the field is `full`).
+  On `light`, execute skips Phase A.5 only (Phase A, A.4 and B still run), and review keeps every lens, the
+  coverage check and the Grade Gate but drops Pass 1, caps `max_review_rounds` at 2 and skips a Confirmation
+  Pass that would re-review an unchanged artifact. On a 2026-10-14 bench the full path cost ×22 a plain run
+  on single-session tasks with no hidden-test gain (`work-docs/RESEARCH-hm-light-lane.md`).
+- **Less always-loaded context.** A clean `hm spec_machine check --all` prints one line
+  (`{"ok": true, "overall", "strictness"}`); failures still print the full payload. Five internal skills
+  (`agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `context-linter`, `worktree-isolator`)
+  and seven user-typed commands (`make`, `configure`, `uninstall`, `help`, `metrics`, `loop`,
+  `loop-p5-batch`) carry `disable-model-invocation: true`, so their descriptions leave every session's
+  skill listing; you can still type them. Seven rationale paragraphs moved from the review and execute
+  commands to `docs/reference/stage-rationale.md`.
 - **`hm spec_machine retire` — supersede a stand-in AC without voiding the approval.** A machine SPEC AC
   gains a hash-excluded `superseded_by` (spec slug), written only by `retire --yaml --ac (--by <slug>|--clear)`.
   retire refuses a malformed slug, a missing / unapproved / other-checkout-only target, self, an unknown AC,

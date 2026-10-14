@@ -1,0 +1,401 @@
+[
+  {
+    "lens": "functionality",
+    "severity": "P2",
+    "file": "src/harness_maker/templates/stages/review.md.j2",
+    "line": 280,
+    "summary": "Light-lane 'skip Pass 1' does not say which dispatch writes lens results",
+    "suggestion": "lane: light → one reviewer dispatch, not two. The Round 1 dispatch above is the only one: give it the full context, write its result files and run lens_coverage check as usual. Skip Pass 1 and Pass 2; its findings are the merged list Step 3.4 and Step 4 consume.",
+    "evidence": "run Pass 2 item 3 once with an empty Pass 1 list",
+    "reasoning": {
+      "observe": "Round 1 dispatch and result files precede Pass 1; item 3 is a re-run with no file-writing instruction.",
+      "trace": "Model may dispatch twice (no saving) or only item 3 (no result files → blocks_approval).",
+      "infer": "Three readings.",
+      "conclude": "Under-specified; can save nothing or block approval."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "d40401e86b6d203b",
+    "caused_by": "none"
+  },
+  {
+    "lens": "consistency",
+    "severity": "P2",
+    "file": "src/harness_maker/templates/stages/review.md.j2",
+    "line": 739,
+    "summary": "Round cap of 2 lives in a comment inside the gate; other readers uncapped",
+    "suggestion": "Put the cap at the knob definition (`2` on lane: light) and drop the comment.",
+    "evidence": "# lane: light → read max_review_rounds as min(max_review_rounds, 2) in both checks below.",
+    "reasoning": {
+      "observe": "Knob at Configuration untouched; restated twice.",
+      "trace": "Report line prints N / max.",
+      "infer": "Second source of truth.",
+      "conclude": "Apply cap where defined."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "b7ac11699c6d5052",
+    "caused_by": "none"
+  },
+  {
+    "lens": "functionality",
+    "severity": "P2",
+    "file": "src/harness_maker/templates/stages/execute.md.j2",
+    "line": 527,
+    "summary": "A.5 skip ledger row lacks --terminal and reuses the failure sentinel",
+    "suggestion": "Give the full command with --terminal, or drop the row.",
+    "evidence": "Record a `dispatch-skipped` row, reason `lane light`, if the ledger below renders.",
+    "reasoning": {
+      "observe": "dispatch-skipped grouped with dispatch-failed; run without terminal row = incomplete.",
+      "trace": "Deliberate skip has no retry.",
+      "infer": "Every light execute leaves an incomplete A.5 run in the remeasure ledger.",
+      "conclude": "Ambiguous ledger record."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "eb47851834b728be",
+    "caused_by": "none"
+  },
+  {
+    "lens": "design",
+    "severity": "P2",
+    "file": "src/harness_maker/templates/stages/spec.md.j2",
+    "line": 65,
+    "summary": "Lane is a one-time guess at spec time; execute/review never re-check it",
+    "suggestion": "Execute Step 2: PLAN scope > ~5 files → full; review Step 2: diff file count > ~5 → full.",
+    "evidence": "about five files or fewer, one session, and no irreversible decision.",
+    "reasoning": {
+      "observe": "Decided pre-PLAN, read unconditionally downstream.",
+      "trace": "A light SPEC whose PLAN grows to 12 files stays light.",
+      "infer": "Intent counter-example has no guard.",
+      "conclude": "No mechanical backstop."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "c1cfafc2e78553ed",
+    "caused_by": "none"
+  },
+  {
+    "lens": "functionality",
+    "severity": "P2",
+    "file": "src/harness_maker/templates/stages/spec.md.j2",
+    "line": 124,
+    "summary": "Light Round 1 offers Approve beside the questions it must collect",
+    "suggestion": "Attach approve only to a final confirmation question showing the drafted oracle/irreversible list.",
+    "evidence": "From Round 2 onward (Round 1 on `light`), include \"Approve this SPEC and end interview\"",
+    "reasoning": {
+      "observe": "Oracle, irreversible list and approve share one round.",
+      "trace": "Picking approve stands in for answering.",
+      "infer": "Approval can precede the content it binds.",
+      "conclude": "Lock-in can precede content."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "818940cd81cd518a",
+    "caused_by": "none"
+  },
+  {
+    "lens": "consistency",
+    "severity": "P2",
+    "file": "src/harness_maker/spec_machine.py",
+    "line": 1618,
+    "summary": "weak re-derives SpecQualityResult.is_weak with a hardcoded 60",
+    "suggestion": "Set quality_clean = not quality.is_weak in the else branch and use it.",
+    "evidence": "weak = quality_block.get(\"overall\", 0) < 60 or bool(quality_block.get(\"weak_dimensions\"))",
+    "reasoning": {
+      "observe": "is_weak exists in spec_quality.",
+      "trace": "Threshold change would desync.",
+      "infer": "Second source of truth.",
+      "conclude": "Use the property."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "2a6dc3856c971fb7",
+    "caused_by": "none"
+  },
+  {
+    "lens": "consistency",
+    "severity": "P3",
+    "file": "src/harness_maker/spec_machine.py",
+    "line": 1623,
+    "summary": "Failure payload lost indent=2, undeclared",
+    "suggestion": "Keep indent=2 for the failure branch.",
+    "evidence": "print(json.dumps(payload, ensure_ascii=False))",
+    "reasoning": {
+      "observe": "Old line had indent=2.",
+      "trace": "Failures now one long line.",
+      "infer": "Undeclared output change.",
+      "conclude": "Small."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "87ef88c191e0b64a",
+    "caused_by": "none"
+  },
+  {
+    "lens": "design",
+    "severity": "P2",
+    "file": "src/harness_maker/synthesize.py",
+    "line": 961,
+    "summary": "Typed-only skills declared in the tuple AND hand-copied into each template",
+    "suggestion": "Derive the flag from _TYPED_ONLY_SKILLS in FileSpec extras, as commands do.",
+    "evidence": "_TYPED_ONLY_SKILLS: tuple[str, ...] = (",
+    "reasoning": {
+      "observe": "Tuple used for Codex only; templates repeat the flag.",
+      "trace": "Editing one side drifts the other.",
+      "infer": "Two mechanisms.",
+      "conclude": "Drift caught only by a hand list."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "a32cfd970ac662e1",
+    "caused_by": "none"
+  },
+  {
+    "lens": "consistency",
+    "severity": "P2",
+    "file": "src/harness_maker/step_sensitivity.py",
+    "line": 123,
+    "summary": "spec Step 0 still 'INV / mechanical skip heuristic' but holds an LLM lane call",
+    "suggestion": "Reclassify or add a TUNE note for the lane threshold and the review cap of 2.",
+    "evidence": "_u(\"spec\", \"Step 0\", \"INV\", \"spec Step 4\", note=\"mechanical skip heuristic\"),",
+    "reasoning": {
+      "observe": "New judged threshold and cap value filed as INV.",
+      "trace": "Registry test checks classification only.",
+      "infer": "Tunables filed as invariants.",
+      "conclude": "Classification mismatch."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "d7f44473e66f2653",
+    "caused_by": "none"
+  },
+  {
+    "lens": "consistency",
+    "severity": "P2",
+    "file": "docs/reference/stage-rationale.md",
+    "line": 5,
+    "summary": "Moved rationale: non-specific headings, collapsed quotes, no pointer from template",
+    "suggestion": "Head each entry with step and rule; restore blockquote line breaks; add Jinja comments at removal sites.",
+    "evidence": "> **Measured cost of the fan-out it replaces:** ... > **Measured cost of collapsing it:**",
+    "reasoning": {
+      "observe": "Headings name only the file; quotes collapsed.",
+      "trace": "Maintainer cannot find the WHY.",
+      "infer": "Not navigable.",
+      "conclude": "Fix headings and pointers."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "3fc4a318dac4f280",
+    "caused_by": "none"
+  },
+  {
+    "lens": "consistency",
+    "severity": "P2",
+    "file": "tests/render/test_render_light_lane.py",
+    "line": 145,
+    "summary": "AC-008/S6 claim seven typed-only commands; tests cover five",
+    "suggestion": "Cover loop/loop-p5-batch and bind test_user_typed_command_is_typed_only to AC-008.",
+    "evidence": "_HIDDEN_COMMANDS = (\"make\", \"configure\", \"uninstall\", \"help\", \"metrics\")",
+    "reasoning": {
+      "observe": "Seven flagged, five tested.",
+      "trace": "Removing loop from the frozenset passes.",
+      "infer": "AC promises more than bound test.",
+      "conclude": "Bind and cover."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "9eb661d521dcb78f",
+    "caused_by": "none"
+  },
+  {
+    "lens": "consistency",
+    "severity": "P3",
+    "file": "src/harness_maker/templates/skills/context-linter/SKILL.md.j2",
+    "line": 3,
+    "summary": "Typed-only skills' descriptions still advertise automatic use",
+    "suggestion": "Reword descriptions to typed triggers (context-linter, ai-readiness-rubric).",
+    "evidence": "Use before /hm:execute or /hm:wrapup to keep the agent context lean.",
+    "reasoning": {
+      "observe": "Descriptions say the model should invoke.",
+      "trace": "Users see them in the / menu.",
+      "infer": "Promise a trigger that no longer exists.",
+      "conclude": "Doc mismatch."
+    },
+    "pass": 2,
+    "source": "code-reviewer",
+    "id": "64af0251b73c16d0",
+    "caused_by": "none"
+  },
+  {
+    "lens": "security",
+    "severity": "P2",
+    "file": "src/harness_maker/templates/stages/spec.md.j2",
+    "line": 65,
+    "summary": "Light lane is set once, from the ask, and nothing downstream rechecks it against the real diff or security surface",
+    "suggestion": "In execute Step 2 and review Configuration, flip lane: light to full when the PLAN scope or actual diff exceeds ~5 files or touches auth/secrets/permissions/hooks paths, and log the override.",
+    "evidence": "`light` when all three hold, judged from the ask and the files it touches (no keyword rule): about five files or fewer, one session, and no irreversible decision.",
+    "reasoning": {
+      "observe": "spec Step 0 decides the lane before the interview; execute Step 2 and review Configuration only read the frontmatter.",
+      "trace": "Step 0 writes lane: light; execute skips A.5; review skips Pass 1, caps rounds, may skip confirmation. Never revisited when execute touches more files or security code.",
+      "infer": "A small-sounding security change gets light and ships without A.5 and Pass 1; scope creep stays light.",
+      "conclude": "Gate downgrade decided once by an unverified estimate, with no diff-based escape hatch."
+    },
+    "pass": 2,
+    "source": "security-reviewer",
+    "id": "cb1fcf69bb5a8c4c",
+    "caused_by": "none"
+  },
+  {
+    "lens": "concurrency",
+    "severity": "P2",
+    "file": "src/harness_maker/templates/stages/review.md.j2",
+    "line": 739,
+    "summary": "Light cap of 2 makes the no-reap CHANGES_REQUESTED exits common; base ref leaks",
+    "suggestion": "Add hm freeze reap --slug <slug> after the review_run close CHANGES_REQUESTED lines, or have review_run close reap. Pre-existing on the full lane; this diff only raises the frequency.",
+    "evidence": "# lane: light → read max_review_rounds as min(max_review_rounds, 2) in both checks below.",
+    "reasoning": {
+      "observe": "Round 1 writes <slug>-base; the only reap is in the Confirmation Pass; CHANGES_REQUESTED exits never reap; prune_stale never reaps on Side.",
+      "trace": "Lower cap makes the cap exit more reachable; it closes the run with -base still present.",
+      "infer": "Light reviews hitting the cap leak the base ref permanently on Side.",
+      "conclude": "A more frequent terminal path ends without reaping."
+    },
+    "pass": 2,
+    "source": "concurrency-reviewer",
+    "id": "8747a6ba6ce38344",
+    "caused_by": "none"
+  },
+  {
+    "lens": "tests",
+    "severity": "P2",
+    "file": "tests/unit/test_spec_machine_check_all.py",
+    "line": 136,
+    "summary": "Compact-output test never exercises the weak_dimensions branch or the 60 boundary; assertions conditional",
+    "suggestion": "Params (88,[],compact),(60,[],compact),(59,[],full),(88,['completeness'],full); distinct CLI vs stub strictness.",
+    "evidence": "weak = overall < 60 or bool(weak_dimensions)",
+    "reasoning": {
+      "observe": "Params 88/55 only; weak_dimensions always [].",
+      "trace": "Deleting `or bool(weak_dimensions)` passes; `<60`→`<50` passes; reading quality.strictness passes.",
+      "infer": "The warning-hiding conditions are undiscriminated.",
+      "conclude": "Add boundary and weak-dimension rows."
+    },
+    "pass": 2,
+    "source": "test-reviewer",
+    "id": "d3646ef34c6827d6",
+    "caused_by": "none"
+  },
+  {
+    "lens": "tests",
+    "severity": "P2",
+    "file": "tests/render/test_render_light_lane.py",
+    "line": 59,
+    "summary": "Step 0 assertions 'irreversible'/'Refinement Decisions' pre-exist in the skip paragraph; lane thresholds unpinned",
+    "suggestion": "Assert the new paragraph's exact phrases: 'about five files or fewer, one session, and no irreversible decision', 'one-line reason to Refinement Decisions'.",
+    "evidence": "assert \"irreversible\" in step0",
+    "reasoning": {
+      "observe": "Both strings occur in the unchanged trivial-skip paragraph.",
+      "trace": "Deleting the new paragraph's clauses keeps them green.",
+      "infer": "S1 Given clause unbound.",
+      "conclude": "Anchor on the new phrases."
+    },
+    "pass": 2,
+    "source": "test-reviewer",
+    "id": "9d18c71cad307027",
+    "caused_by": "none"
+  },
+  {
+    "lens": "tests",
+    "severity": "P2",
+    "file": "tests/render/test_render_light_lane.py",
+    "line": 145,
+    "summary": "Seven typed-only commands claimed, five tested; plan missing from visible list",
+    "suggestion": "Assert _TYPED_ONLY_COMMANDS equals the seven paths; add plan to _VISIBLE_COMMANDS.",
+    "evidence": "_HIDDEN_COMMANDS = (\"make\", \"configure\", \"uninstall\", \"help\", \"metrics\")",
+    "reasoning": {
+      "observe": "loop/loop-p5-batch not rendered in the fixture; plan absent from visible list.",
+      "trace": "Removing loop from the constant or adding plan passes every test here.",
+      "infer": "A hidden plan would break auto-advance.",
+      "conclude": "Set-equality on the constant plus plan visible."
+    },
+    "pass": 2,
+    "source": "test-reviewer",
+    "id": "e9a15dcd73903935",
+    "caused_by": "none"
+  },
+  {
+    "lens": "tests",
+    "severity": "P2",
+    "file": "tests/render/test_render_light_lane.py",
+    "line": 186,
+    "summary": "Codex test checks only the constant, not the rendered openai.yaml policy",
+    "suggestion": "Render targets=[Target.CODEX] and assert .agents/skills/<name>/agents/openai.yaml == {'policy': {'allow_implicit_invocation': False}} for each hidden skill.",
+    "evidence": "assert set(_HIDDEN_SKILLS) <= set(_TYPED_ONLY_SKILLS)",
+    "reasoning": {
+      "observe": "No Codex tree is rendered.",
+      "trace": "If the renderer stops consuming the constant for these names the test stays green.",
+      "infer": "Restates the constant.",
+      "conclude": "Assert the rendered file."
+    },
+    "pass": 2,
+    "source": "test-reviewer",
+    "id": "b7d52941f31e6ee9",
+    "caused_by": "none"
+  },
+  {
+    "lens": "tests",
+    "severity": "P2",
+    "file": "tests/render/test_render_light_lane.py",
+    "line": 81,
+    "summary": "S2's dispatch-skipped ledger row is not asserted",
+    "suggestion": "assert 'Record a `dispatch-skipped` row' in a5; assert 'reason `lane light`' in a5",
+    "evidence": "Record a `dispatch-skipped` row, reason `lane light`, if the ledger below renders.",
+    "reasoning": {
+      "observe": "Test checks the skip arrow and survivors only.",
+      "trace": "Deleting the ledger sentence stays green.",
+      "infer": "Half of S2 Then unbound.",
+      "conclude": "Add two assertions."
+    },
+    "pass": 2,
+    "source": "test-reviewer",
+    "id": "0233b4aa2fd913c9",
+    "caused_by": "none"
+  },
+  {
+    "lens": "functionality",
+    "severity": "P1",
+    "source": "main-loop",
+    "category": "scope_drift",
+    "file": "work-docs/PLAN-hm-light-lane.md",
+    "line": 61,
+    "summary": "Drift: verify.md.j2 and step_sensitivity.py changed outside stage 1's PLAN scope",
+    "suggestion": "Add verify.md.j2 (light-lane coverage caveat) and step_sensitivity.py (A.5 source note) to the stage 1 scope line.",
+    "evidence": "scope: spec/execute/review templates, spec_machine.py, synthesize.py, five skill templates, tests",
+    "reasoning": {
+      "observe": "git diff names both files; PLAN stage 1 scope does not.",
+      "trace": "Drift gate Step 2.",
+      "infer": "Both edits follow from this stage's changes.",
+      "conclude": "PLAN scope is stale."
+    },
+    "id": "79fe8403db6384f5",
+    "caused_by": "none"
+  },
+  {
+    "lens": "functionality",
+    "severity": "P2",
+    "source": "main-loop",
+    "category": "scope_drift",
+    "file": "work-docs/PLAN-hm-light-lane.md",
+    "line": 96,
+    "summary": "HM-LIGHT-LANE: statement (hm_cost_ratio_small ≤ 5) is not met or measured by this stage",
+    "suggestion": "None in this PR; stage 4 measures it.",
+    "evidence": "hm_cost_ratio_small 이 22 → 5 이하로",
+    "reasoning": {
+      "observe": "Intent statement names the ratio; this PR has no bench.",
+      "trace": "Step 3.3.",
+      "infer": "Stage 1 of 4.",
+      "conclude": "Carried to stage 4."
+    },
+    "id": "51ca5d8bbd06458e",
+    "caused_by": "none"
+  }
+]

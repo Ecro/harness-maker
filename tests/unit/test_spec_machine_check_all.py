@@ -86,14 +86,92 @@ def _run(
 
 def test_one_call_returns_all_three_blocks(tmp_path: Path) -> None:
     """The whole reason this exists: three round-trips' worth of verdicts in one payload."""
-    rc, payload = _run(tmp_path, *_pair(tmp_path))
+    yaml_path, md_path = _pair(tmp_path, ac_id="AC-001", md_heading="AC-999")
+    rc, payload = _run(tmp_path, yaml_path, md_path)
     assert set(payload) >= {"ok", "validate", "cross_validate", "quality"}
     assert payload["validate"]["ok"] is True
-    assert payload["cross_validate"]["ok"] is True
     assert "overall" in payload["quality"]
     assert "scores" in payload["quality"]
+    assert rc == 1
+
+
+@pytest.mark.parametrize(
+    ("overall", "weak_dimensions", "compact"),
+    [(88, [], True), (60, [], True), (59, [], False), (88, ["completeness"], False)],
+)
+def test_a_clean_pass_prints_one_short_line(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    overall: int,
+    weak_dimensions: list[str],
+    compact: bool,
+) -> None:
+    """HM-LIGHT-LANE lever 4: every printed byte is re-read on each later turn of the session.
+
+    A weak score (under 60, or any weak dimension) must still reach the spec stage as a warning,
+    so only a clean pass collapses.
+    """
+    import contextlib
+    import importlib
+    import io
+
+    # By name: an import here would count it as CLI-driven (test_cli_surfaces_are_driven).
+    result_type = importlib.import_module("harness_maker.spec_quality").SpecQualityResult
+    stub = result_type(
+        overall=overall,
+        scores={"completeness": overall},
+        weak_dimensions=weak_dimensions,
+        blocked=False,
+        strictness="block",
+    )
+    monkeypatch.setattr("harness_maker.spec_quality.evaluate_spec", lambda *a, **k: stub)
+    yaml_path, md_path = _pair(tmp_path)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = main(
+            [
+                "check",
+                "--all",
+                "--yaml",
+                str(yaml_path),
+                "--md",
+                str(md_path),
+                "--strictness",
+                "warn",
+            ]
+        )
+    out = buf.getvalue()
     assert rc == 0
-    assert payload["ok"] is True
+    payload = json.loads(out)
+    if compact:
+        assert out.count("\n") == 1
+        # strictness comes from the quality result, as in the full payload.
+        assert payload == {"ok": True, "overall": overall, "strictness": "block"}
+    else:
+        assert set(payload) >= {"validate", "cross_validate", "quality"}
+        assert payload["quality"]["weak_dimensions"] == weak_dimensions
+
+
+def test_a_failed_gate_never_collapses_even_with_a_clean_score(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The compact line says `ok: true`; printing it over a failed gate would hide the failure."""
+    import importlib
+
+    result_type = importlib.import_module("harness_maker.spec_quality").SpecQualityResult
+    stub = result_type(
+        overall=88,
+        scores={"completeness": 88},
+        weak_dimensions=[],
+        blocked=False,
+        strictness="warn",
+    )
+    monkeypatch.setattr("harness_maker.spec_quality.evaluate_spec", lambda *a, **k: stub)
+    yaml_path, md_path = _pair(tmp_path, ac_id="AC-001", md_heading="AC-999")
+    rc, payload = _run(tmp_path, yaml_path, md_path)
+    assert rc == 1
+    assert payload["ok"] is False
+    assert payload["cross_validate"]["ok"] is False
 
 
 def test_a_cross_validate_failure_is_attributed_to_its_rule_and_fails_the_call(

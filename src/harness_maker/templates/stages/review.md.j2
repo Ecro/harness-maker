@@ -65,13 +65,18 @@ rubric.
 Defaults from `harness.yaml.reviewers:`:
 - `auto_fix` (bool, default `true`) — apply consensus-passed fixes between rounds.
 - `grade_threshold` (`A | B | C`, default `A`) — minimum grade to exit.
-- `max_review_rounds` (int, default `3`) — cap on review iterations.
+- `max_review_rounds` (int, default `3`; at most `2` on `lane: light`) — cap on review iterations.
 - `consensus` — `single` | `cross-check (2/3)` | `k-of-n` (default: cross-check).
 - `routing` — `conditional` | `always-all` (default: conditional).
 
 Per-invocation overrides (workflow command flags):
 - `--no-auto-fix` — disable auto-fix this run only.
 - `--with-reviewers=<csv>` — add ad-hoc reviewers (must exist in `reviewers.installed`).
+
+**`lane: light`** (read it from the SPEC frontmatter before Step 1; missing → `full`, as with no SPEC, and so is any value but exactly `light`;
+a diff well over five files reads as `full`) keeps the lens axis, coverage check and
+Grade Gate, and cuts repetition: Step 3 skips Pass 1, `max_review_rounds` caps at 2, and the
+Confirmation Pass is skipped when round 1 approves with no fix applied.
 
 {% if config.reviewers.get("mechanical_checks") %}
 ## Phase 0 — Mechanical Pre-Checks
@@ -220,15 +225,9 @@ each domain lens keeps a call of its own. Send every lens line verbatim.
 proposal to change an exported signature, wire format or file format; the design *behind* it is
 fair game. Without that line a reviewer proposes API changes, which is the question we asked.
 
-**Mint a run id once, at the start of this `/hm:review`.** Any short unique token works — the
+**Mint a run id once, at the start of this `/hm:review`.** Any short unique token works — the{# why: docs/reference/stage-rationale.md #}
 first 8 chars of `git rev-parse HEAD` plus the round-1 timestamp is fine. Every result file
 carries it and every coverage call is given it.
-
-> Why: the results directory is keyed by slug and round, so re-running `/hm:review` on the same
-> slug lands in the **same** directory. Without the run id, a previous invocation's files
-> vouch for every lens in an invocation where only one returned — `blocks_approval: false`,
-> four dead lenses reported as exercised. Measured. The round keying separates a pass from a
-> round; it does not separate one invocation from the next.
 
 **You write the result files; the lens agents do not.** For each dispatch that **returns**, write
 its findings JSON to the per-round results directory, adding the `"run_id"` Step 0's `open` printed
@@ -279,6 +278,10 @@ into the Grade Gate.
 {%- endif %}
 
 {% if (config.reviewers.enabled | default([])) | length > 1 %}
+**`lane: light` → the Round 1 dispatch above is the only one:** give it the full context, write its
+result files and run the coverage check as usual, then skip Pass 1 and Pass 2. Its findings are the
+merged list Step 3.4 and Step 4 consume.
+
 Run reviewers in **two sequential passes** to neutralize metadata anchoring
 (Phase 0 ablation showed +47 percentage-point precision gain on
 anchoring-prone diffs):
@@ -390,7 +393,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm intent show <id> --json")
 {% endif %}
 Add, before Step 3.4 stamps ids, one finding per PLAN drift from the record (work outside `scope` or inside `out_of_scope`, or `statement` unmet; cite the item): **P2**, `source: "main-loop"`, category `scope_drift`, `file` = the PLAN, `message` starting `<id>: …`. No halt, never edit the record: P2 stays out of `unverified_severe`.
 
-### Step 3.4 — Stamp a stable `id` on every merged finding (SINGLE OWNER)
+### Step 3.4 — Stamp a stable `id` on every merged finding (SINGLE OWNER){# why: docs/reference/stage-rationale.md #}
 
 `Write` the merged findings to a temp path (never argv — skill §1), then:
 
@@ -423,14 +426,6 @@ round**, against the merged temp file you already wrote, with the literal review
 > only in the reviewer label — each one claiming to be that reviewer's payload. A replay
 > keyed on `reviewer` would then measure the merge output N times instead of N reviewers.
 > Fabricated attribution is worse than no attribution, because nothing downstream can tell.
->
-> **True per-reviewer payloads need a per-reviewer source**, which exists only at Pass 1 /
-> Pass 2 — before the merge. Persisting them is a **known gap**: capturing each reviewer's
-> raw reply to its own file is a change to the dispatch steps above, not to this one. Until
-> that lands, the corpus holds one honest merged payload per round rather than N dishonest
-> per-reviewer ones. Replay of the consensus stage is possible; replay of the reviewer stage
-> is not yet.
-
 {% if is_codex %}
 ```
 Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger persist-payload --file <the literal temp path> --slug {slug} --run-id <run-id> --round <N> --reviewer merged")
@@ -447,13 +442,6 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 > sanitises to a constant, so every review of this slug writes the same filename and
 > **silently destroys the previous review's payload**, quietly emptying the corpus this
 > step exists to build.
->
-> **This buys nothing today and everything afterwards.** The detection check for pipeline
-> changes has failed twice, the second time because no per-reviewer finding payload has ever
-> been persisted anywhere in this repo — REVIEW documents are post-consensus narrative and
-> `review-*.jsonl` holds only counts, so there was no artifact to replay against. Every round
-> that skips this line is a round no future pipeline change can be tested on. It writes to the
-> **base** root, so it survives `task-land`.
 {% endif %}
 {%- if config.second_opinion and config.second_opinion.models %}
 ### Step 3.5 — Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)
@@ -534,7 +522,7 @@ severity across tiers. Cross-tier same-issue findings that end up `manual-only`
 or `weak-consensus` at P0/P1 are surfaced by the Grade Gate's
 `human_review_needed` flag (ADR-001), not merged here.
 
-#### Step 4d — Tag every finding
+#### Step 4d — Tag every finding{# why: docs/reference/stage-rationale.md #}
 
 **One call decides tag, disposition and grade together — Steps 4d, 4e and the Grade Computation
 below are its three rules, not three commands.** Give each finding a `voices` array — one entry
@@ -553,13 +541,6 @@ It **reads only** and prints one payload: `{"findings": [...with `tag`...], "gra
 one. Exit 1 means `errors` is non-empty — an untagged or off-vocabulary finding, a missing
 disposition, or a rejection citing an AC id the machine SPEC does not declare — and the letter is
 not trustworthy until those are fixed at the source and the call repeated.
-
-> This was three chained verbs that rewrote the findings file so each could see the last one's
-> column. That chaining was the defect generator: `tag --file <any JSON object>` silently
-> destroyed that file, the envelope was dropped on write-back, the write had no containment
-> check, `record` went green on a blind retry, and the order dependence could only be expressed
-> as prose naming one path three times. A function that reads once and returns a value has none
-> of those. The rules are unchanged — same tag table, same disposition column, same grade.
 
 | Tag | Condition | Auto-fix eligible? |
 |-----|-----------|--------------------|
@@ -729,7 +710,7 @@ model ({{ config.second_opinion.models | join(', ') }}) **and** whose dispositio
 exclusion; everything else, including an `accepted` finding consensus later rejected, still sets it.
 {%- endif %}
 
-After each round's report:
+After each round's report (each close below runs `hm freeze reap --slug <slug>` first):
 
 ```
 IF grade ≥ grade_threshold AND blocks_approval == false:
@@ -802,12 +783,7 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}
 ```{% endif %}
 
-> The union is computed by the CLI, not by you. Round 2 of this change's own review rejected
-> the earlier wording, which told you to take the union yourself: the Grade Gate branches on
-> the CLI's `blocks_approval` field, and this stage separately forbids substituting your own
-> judgement for it — so a prose union asked you to override a field you may not override. With
-> a single `--round`, a round that re-dispatched one lens reported the other four missing and
-> the review could never be approved.
+> The union is computed by the CLI, not by you.{# why: docs/reference/stage-rationale.md #}
 
 ### Round-state contract
 
@@ -978,6 +954,11 @@ only touched scopes, so the **last round's fixes always exit unreviewed** — an
 defects at close to 1:1. This pass replaces that exit with *risk closure*: one clean sweep of the
 whole declared failure space over an artifact that cannot move underneath it.
 
+On `lane: light` with round 1 approved and no fix applied, round 1 already reviewed this exact
+artifact: skip, record `confirm_pass_ran: false`, note `lane light, unchanged` in the report, and
+run `hm freeze reap --slug <slug>`, then close the run (`--outcome APPROVED`) — C3 and the reap,
+which do both otherwise, do not run.
+
 Run it **only** on the APPROVED path. A review stopping for `max_review_rounds`, for the
 no-progress invariant, or with `auto_fix` disabled has not approved anything, so there is nothing
 to confirm — dispatching the whole axis there spends the budget to re-confirm a failure. Record it
@@ -1041,7 +1022,7 @@ second invocation here would give them a second vote on the same review.
 {% endif %}
 ### Step C3 — Outcome
 
-**Four of the five arms below are stage-terminal; close the run on each of those**, with
+**Four of the five arms below are stage-terminal; on each, run the reap below first, then close the run**, with
 `hm review_run close --slug <slug> --run-id <run-id> --outcome <APPROVED|CHANGES_REQUESTED>`.
 **The `confirm-1` arm is NOT terminal and must NOT close** — it enters a repair round and
 dispatches confirm-2, so closing there releases the slug *mid-pass* while `<run-id>` is still the
@@ -1094,7 +1075,7 @@ telemetry row.
 **Then release the frozen refs.** They pin a commit whose tree holds every untracked
 non-ignored file present at pass time, reachable from a local ref and so immune to gc; nothing
 else reliably reaps them (`prune_stale`'s sweep needs a live task slug, and the Side preset has
-none). Run this once the review has reached its terminal state:
+none). Run this once the review has reached its terminal state, before the close:
 
 ```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm freeze reap --slug <slug>

@@ -50,7 +50,7 @@ Skip the SPEC interview ONLY when:
 | **Contracts** | No API / IPC / DB schema / file format change |
 | **Risk** | Reversible in <1h with no user-facing impact |
 
-When skipped: write a minimal SPEC (Intent + 1 happy-path scenario in G-W-T form + Verification = "manual smoke") and continue. Do NOT ask permission to skip — proceed and log rationale in the SPEC's `## Refinement Decisions` section. Its machine.yaml is `schema_version: 3` with `irreversible_decisions: []` (the four criteria above rule out every irreversible category), and it is stamped **exempt** — no identity, no prompt; the stamp stays valid only while the list stays empty:
+When skipped: write a minimal SPEC (Intent + 1 happy-path scenario in G-W-T form + Verification = "manual smoke", `lane: light`) and continue. Do NOT ask permission to skip — proceed and log rationale in the SPEC's `## Refinement Decisions` section. Its machine.yaml is `schema_version: 3` with `irreversible_decisions: []` (the four criteria above rule out every irreversible category), and it is stamped **exempt** — no identity, no prompt; the stamp stays valid only while the list stays empty:
 
 {% if is_codex %}
 ```
@@ -61,6 +61,14 @@ Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml 
 !uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --exempt
 ```
 {% endif %}
+
+**Not skipped → pick the lane.** `light` when all three hold, judged from the ask and the files
+it touches (no keyword rule): about five files or fewer, one session, and no irreversible decision.
+Otherwise, or in doubt, `full`. On single-session tasks the full path cost ×22 a plain run with no
+hidden-test gain. Write `lane:` to the frontmatter and its one-line reason to Refinement Decisions.
+On `light`, Step 2 is one round: any WHAT ambiguity, the 2.1.5 oracle and the irreversible-decision
+list, then one closing question that shows the drafted oracle, the list and the lane and offers the approve
+option. Everything else here is unchanged.
 
 ### Step 0.5 — Intent context (intent layer — one line and continue when unused)
 
@@ -114,7 +122,7 @@ Interview UX rules:
   labels, and validation prompt.
 - {% if is_codex %}Use the `request_user_input` tool (if unavailable, ask in your response). **Batch independent questions** per round{% else %}Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds){% endif %}.
 - Always include **"Other — let me describe"**.
-- From Round 2 onward, include **"Approve this SPEC and end interview"** on one foundational question per round. Choosing it is the DRI's acceptance of the SPEC — remember it and stamp it in Step 5, after the files pass Step 4. It is the only approval: no answer, no question tool, or loop mode never counts as one.
+- From Round 2 onward (on `light`, the closing question), include **"Approve this SPEC and end interview"** on one foundational question per round. Choosing it is the DRI's acceptance of the SPEC — remember it and stamp it in Step 5, after the files pass Step 4. It is the only approval: no answer, no question tool, or loop mode never counts as one.
 - Visualization OPTIONAL — prose / bullets preferred, ASCII for topology, Mermaid only in the final document (never in live terminal).
 
 {%- with block = 'brief', stage = 'spec' %}
@@ -177,7 +185,8 @@ non-obvious? is it a real trade-off? — never to exclude an obviously destructi
 scale and compliance are judgment examples inside a category, not categories. Each entry is
 `{id: IRR-NNN, decision, category, rationale, source: spec}` with sequential ids that are never
 renumbered. Show the list to the DRI in the interview (they add or remove entries); an empty
-list is valid and is written as `irreversible_decisions: []`.
+list is valid and is written as `irreversible_decisions: []`. A non-empty list turns `lane: light`
+into `full` before Step 3 writes it; log that in Refinement Decisions.
 
 **Open-ended cap** (follow-ups after the six categories): at most `{{ config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get(config.locale, config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get('default', 1)) }}` open-ended question(s) per turn for locale `{{ config.locale }}`; closed-form (multi-select / yes-no) questions are unrestricted. Ask a follow-up only when its answer would change SPEC content and the user can answer it now; stop when every SPEC slot is settled or the user ends the interview.
 
@@ -228,6 +237,7 @@ created: {YYYY-MM-DD}
 tags: [{project}, spec, {tech-stack}, {2-5 domain tags}]
 test_framework: {pytest | gtest | vitest | bats | …}   # MANDATORY
 interview_rounds: {N}   # rounds this interview took; 0 when Step 0 skipped it
+lane: {light | full}   # Step 0's lane; the skip path is always light
 intent: <id>   # ONLY when Step 0.5 picked one; omit on "none"
 research_doc: "[[RESEARCH-{slug}]]"   # OR omit when no research artifact
 summary: "{≤100 char one-line: what this SPEC is for}"
@@ -352,8 +362,9 @@ uv run --with {{ harness_maker_src_path }} hm spec_machine check --all \
   --strictness {{ strictness_of(config) }}
 ```
 
-Returns `{ok, validate: {ok, errors}, cross_validate: {ok, errors, by_rule}, quality:
-{overall, scores, weak_dimensions, blocked, strictness}}`. Exit 1 when validate or
+A clean pass prints one line, `{ok: true, overall, strictness}`. Otherwise it returns `{ok,
+validate: {ok, errors}, cross_validate: {ok, errors, by_rule}, quality: {overall, scores,
+weak_dimensions, blocked, strictness}}`. Exit 1 when validate or
 cross-validate has errors, or when `quality.blocked`. `by_rule` buckets the
 cross-validate errors under `rule-1`…`rule-6` plus `unattributed`.
 

@@ -120,7 +120,13 @@ REGISTRY: tuple[StepEntry, ...] = (
     _e("research", "Phase 3", "INV", "**", f"{_R}; state that outlives the window"),
     _u("research", "Phase 4", "INV", "research Phase 3", note="write-back validation prompt"),
     # ── spec ───────────────────────────────────────────────────────────────
-    _u("spec", "Step 0", "INV", "spec Step 4", note="mechanical skip heuristic"),
+    _u(
+        "spec",
+        "Step 0",
+        "INV",
+        "spec Step 4",
+        note="skip heuristic + light/full lane call (lane threshold unmeasured until the bench)",
+    ),
     _u("spec", "Step 1", "INV", "research Phase 1", note="prior-work retrieval (state)"),
     _e(
         "spec",
@@ -203,7 +209,9 @@ REGISTRY: tuple[StepEntry, ...] = (
         "Phase A.5",
         "TUNE",
         "**",
-        f"{_R}; FAIL 39/52 (75%, {_LEDGER_SIDE}, n=52) — no ground-truth arm",
+        f"{_R}; FAIL 39/52 (75%, {_LEDGER_SIDE}, n=52). Ground-truth arm "
+        "(RESEARCH-hm-light-lane, Side, n=15): blocked 2 small tasks whose plain arm passed "
+        "every hidden test; skipped on `lane: light`",
         remeasure_on=("model_release",),
         measure_cmd=_LEDGER,
     ),
@@ -309,7 +317,8 @@ REGISTRY: tuple[StepEntry, ...] = (
         ordering="le",
         remeasure_on=("model_release",),
         measure_cmd=_BENCH,
-        note="the disposition mechanism itself is invariant; the TUNE class carries the cap",
+        note="the disposition mechanism itself is invariant; the TUNE class carries the cap. "
+        "`lane: light` hardcodes a cap of 2 in review.md.j2 — remeasure it with this entry",
     ),
     _u("review", "Step 5", "INV", "spec Step 3", note="REVIEW write"),
     _e(
@@ -320,6 +329,7 @@ REGISTRY: tuple[StepEntry, ...] = (
         f"{_R}; confirmation pass n=4 (2/2, {_LEDGER_SIDE})",
         remeasure_on=("model_release",),
         measure_cmd=_LEDGER,
+        note="`lane: light` skips it after an unchanged approved round 1 — remeasure with it",
     ),
     _e(
         "review",
