@@ -194,8 +194,12 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane.py::test_internal_skill_is_typed_only
+  - tests/render/test_render_light_lane.py::test_user_typed_command_is_typed_only
+  - tests/render/test_render_light_lane.py::test_loop_commands_are_typed_only
+  - tests/render/test_render_light_lane.py::test_the_typed_only_command_set_is_exactly_these
+  - tests/render/test_render_light_lane.py::test_codex_renders_the_policy_for_exactly_the_hidden_skills
   executable_predicate: 'all(''disable-model-invocation: true'' in frontmatter(s) for s in
-    HIDDEN_SKILLS)'
+    HIDDEN_SKILLS + HIDDEN_COMMANDS)'
   golden_table: []
   rubric_id: null
   note: ''

@@ -120,7 +120,13 @@ REGISTRY: tuple[StepEntry, ...] = (
     _e("research", "Phase 3", "INV", "**", f"{_R}; state that outlives the window"),
     _u("research", "Phase 4", "INV", "research Phase 3", note="write-back validation prompt"),
     # ── spec ───────────────────────────────────────────────────────────────
-    _u("spec", "Step 0", "INV", "spec Step 4", note="mechanical skip heuristic"),
+    _u(
+        "spec",
+        "Step 0",
+        "INV",
+        "spec Step 4",
+        note="skip heuristic + light/full lane call (lane threshold unmeasured until the bench)",
+    ),
     _u("spec", "Step 1", "INV", "research Phase 1", note="prior-work retrieval (state)"),
     _e(
         "spec",

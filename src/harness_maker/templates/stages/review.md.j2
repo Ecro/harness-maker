@@ -65,7 +65,7 @@ rubric.
 Defaults from `harness.yaml.reviewers:`:
 - `auto_fix` (bool, default `true`) — apply consensus-passed fixes between rounds.
 - `grade_threshold` (`A | B | C`, default `A`) — minimum grade to exit.
-- `max_review_rounds` (int, default `3`) — cap on review iterations.
+- `max_review_rounds` (int, default `3`; at most `2` on `lane: light`) — cap on review iterations.
 - `consensus` — `single` | `cross-check (2/3)` | `k-of-n` (default: cross-check).
 - `routing` — `conditional` | `always-all` (default: conditional).
 
@@ -73,7 +73,8 @@ Per-invocation overrides (workflow command flags):
 - `--no-auto-fix` — disable auto-fix this run only.
 - `--with-reviewers=<csv>` — add ad-hoc reviewers (must exist in `reviewers.installed`).
 
-**`lane: light`** (read it from the SPEC frontmatter before Step 1; missing → `full`, as with no SPEC) keeps the lens axis, coverage check and
+**`lane: light`** (read it from the SPEC frontmatter before Step 1; missing → `full`, as with no SPEC;
+a diff well over five files reads as `full`) keeps the lens axis, coverage check and
 Grade Gate, and cuts repetition: Step 3 skips Pass 1, `max_review_rounds` caps at 2, and the
 Confirmation Pass is skipped when round 1 approves with no fix applied.
 
@@ -224,7 +225,7 @@ each domain lens keeps a call of its own. Send every lens line verbatim.
 proposal to change an exported signature, wire format or file format; the design *behind* it is
 fair game. Without that line a reviewer proposes API changes, which is the question we asked.
 
-**Mint a run id once, at the start of this `/hm:review`.** Any short unique token works — the
+**Mint a run id once, at the start of this `/hm:review`.** Any short unique token works — the{# why: docs/reference/stage-rationale.md #}
 first 8 chars of `git rev-parse HEAD` plus the round-1 timestamp is fine. Every result file
 carries it and every coverage call is given it.
 
@@ -277,8 +278,9 @@ into the Grade Gate.
 {%- endif %}
 
 {% if (config.reviewers.enabled | default([])) | length > 1 %}
-**`lane: light` → skip Pass 1 and Pass 2 item 4 (`two_pass_review merge`):** run Pass 2 item 3
-once with an empty Pass 1 list. Its findings are the merged list Step 3.4 and Step 4 consume.
+**`lane: light` → the Round 1 dispatch above is the only one:** give it the full context, write its
+result files and run the coverage check as usual, then skip Pass 1 and Pass 2. Its findings are the
+merged list Step 3.4 and Step 4 consume.
 
 Run reviewers in **two sequential passes** to neutralize metadata anchoring
 (Phase 0 ablation showed +47 percentage-point precision gain on
@@ -391,7 +393,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm intent show <id> --json")
 {% endif %}
 Add, before Step 3.4 stamps ids, one finding per PLAN drift from the record (work outside `scope` or inside `out_of_scope`, or `statement` unmet; cite the item): **P2**, `source: "main-loop"`, category `scope_drift`, `file` = the PLAN, `message` starting `<id>: …`. No halt, never edit the record: P2 stays out of `unverified_severe`.
 
-### Step 3.4 — Stamp a stable `id` on every merged finding (SINGLE OWNER)
+### Step 3.4 — Stamp a stable `id` on every merged finding (SINGLE OWNER){# why: docs/reference/stage-rationale.md #}
 
 `Write` the merged findings to a temp path (never argv — skill §1), then:
 
@@ -520,7 +522,7 @@ severity across tiers. Cross-tier same-issue findings that end up `manual-only`
 or `weak-consensus` at P0/P1 are surfaced by the Grade Gate's
 `human_review_needed` flag (ADR-001), not merged here.
 
-#### Step 4d — Tag every finding
+#### Step 4d — Tag every finding{# why: docs/reference/stage-rationale.md #}
 
 **One call decides tag, disposition and grade together — Steps 4d, 4e and the Grade Computation
 below are its three rules, not three commands.** Give each finding a `voices` array — one entry
@@ -708,7 +710,7 @@ model ({{ config.second_opinion.models | join(', ') }}) **and** whose dispositio
 exclusion; everything else, including an `accepted` finding consensus later rejected, still sets it.
 {%- endif %}
 
-After each round's report:
+After each round's report (each close below runs `hm freeze reap --slug <slug>` first):
 
 ```
 IF grade ≥ grade_threshold AND blocks_approval == false:
@@ -736,7 +738,6 @@ IF auto_fix disabled (config OR --no-auto-fix):
   → Set human_review_needed=true if grade < threshold OR unverified_severe.
   → Close the run: `hm review_run close --slug <slug> --run-id <run-id> --outcome CHANGES_REQUESTED`.
 
-# lane: light → read max_review_rounds as min(max_review_rounds, 2) in both checks below.
 IF iteration_count ≥ max_review_rounds AND blocks_approval == true:
   → STOP. Status = CHANGES_REQUESTED. Emit the coverage blocker (below), not a finding.
   → Set human_review_needed=true.
@@ -782,7 +783,7 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}
 ```{% endif %}
 
-> The union is computed by the CLI, not by you.
+> The union is computed by the CLI, not by you.{# why: docs/reference/stage-rationale.md #}
 
 ### Round-state contract
 
@@ -955,7 +956,7 @@ whole declared failure space over an artifact that cannot move underneath it.
 
 On `lane: light` with round 1 approved and no fix applied, round 1 already reviewed this exact
 artifact: skip, record `confirm_pass_ran: false`, note `lane light, unchanged` in the report, and
-close the run (`--outcome APPROVED`), then run `hm freeze reap --slug <slug>` — C3 and the reap,
+run `hm freeze reap --slug <slug>`, then close the run (`--outcome APPROVED`) — C3 and the reap,
 which do both otherwise, do not run.
 
 Run it **only** on the APPROVED path. A review stopping for `max_review_rounds`, for the

@@ -59,8 +59,9 @@ Stage templates in `src/harness_maker/templates/stages/`; `spec_machine._run_che
 ## 📝 Implementation Plan
 
 1. **Stage 1 — lane, lever 4, lever 5** (this PR). depends_on: none · parallel_group: 1 ·
-   merge_hazards: goldens · scope: spec/execute/review templates, spec_machine.py, synthesize.py,
-   five skill templates, tests · exit: `uv run pytest tests -n auto` green except the 7
+   merge_hazards: goldens · scope: spec/execute/review/verify templates, spec_machine.py,
+   synthesize.py, step_sensitivity.py (A.5 source, spec Step 0 note), five skill templates,
+   docs/reference/stage-rationale.md, tests · exit: `uv run pytest tests -n auto` green except the 7
    pre-existing environment failures · risk: low · rollback: revert the PR.
 2. **Stage 2 — lever 2, body slimming.** depends_on: 1 · scope: review.md.j2, execute.md.j2 into
    on-demand reference files for full-lane-only and rare paths. User-approved additions
@@ -101,3 +102,5 @@ re-captured goldens (`autopilot_gate_golden.json`, synth snapshots) with their d
 - [ ] AC-001 … AC-008 of SPEC-hm-light-lane pass.
 - [ ] Aggregate shipped surface does not grow.
 - [ ] `hm_cost_ratio_small` measured after stage 4.
+- Carried to stage 2 (review 2026-10-14): derive the skills' `disable-model-invocation` from
+  `_TYPED_ONLY_SKILLS`, as commands already do, instead of a per-template line.

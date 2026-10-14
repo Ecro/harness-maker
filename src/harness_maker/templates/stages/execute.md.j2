@@ -396,7 +396,8 @@ research_field=$(yq '.research_doc' "$PLAN") # e.g., "[[RESEARCH-mqtt-retry]]"
 If `spec:` resolves to an existing file:
 - Read SPEC fully.
 - Extract `test_framework` from frontmatter — Phase A uses this verbatim.
-- Extract `lane` (`light` | `full`; missing → `full`) — Phase A.5 reads it.
+- Extract `lane` (`light` | `full`; missing → `full`) — Phase A.5 reads it. A PLAN whose phases
+  touch well over five files reads as `full`; log that in the PLAN.
 - Extract `## 📋 In-Scope Scenarios` — Phase A authors one test per scenario.
 - Extract `## ✅ Verification Criteria` — Phase B RED-gate uses the named test commands.
 
@@ -488,7 +489,7 @@ All tests MUST be RED initially — they import / depend on functions that do no
 exist or are stubs. The implementation is written in Phase C. When no SPEC and no
 machine SPEC exist, author tests from the PLAN phase's exit-criterion instead.
 
-#### Phase A.4 — false-RED screen (skipped when `tdd_active == false`)
+#### Phase A.4 — false-RED screen (skipped when `tdd_active == false`){# why: docs/reference/stage-rationale.md #}
 
 **Run the tests before you dispatch anyone.** Whether a test passes against the unmodified
 subject is *mechanically decidable*, and the reviewer gate is the most expensive way in this
@@ -521,11 +522,11 @@ Then, for each passing test, take exactly one of two actions:
 **Do not proceed to A.5 with an unexplained pass.** Carry the justified list into the brief so
 the lenses adjudicate the *justification* rather than rediscovering the test.
 
-#### Phase A.5 — test-reviewer gate (skipped when `tdd_active == false`)
+#### Phase A.5 — test-reviewer gate (skipped when `tdd_active == false`){# why: docs/reference/stage-rationale.md #}
 
 **`lane: light` → skip to Phase B** (A, A.4 and B are the deterministic oracles and still run).
-On small tasks A.5 blocked 2 of 15 runs the plain arm passed. Record a `dispatch-skipped` row,
-reason `lane light`, if the ledger below renders.
+On small tasks A.5 blocked 2 of 15 runs the plain arm passed. If the ledger below renders, record
+the skip with its emit command: `--pass 1 --verdict dispatch-skipped --reason 'lane light' --terminal`.
 
 Dispatch **one** `test-reviewer` call carrying **all three lens questions**. The lenses are the
 questions, not the contexts: one reviewer retried *serially* surfaces one category per round,
