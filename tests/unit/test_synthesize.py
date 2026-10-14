@@ -42,7 +42,9 @@ def test_side_file_count_in_range() -> None:
     # were installed, and came back here in Phase 4 — ADR-007 found that `plan.md` stops
     # rendering the moment `AtomicStage.PLAN` goes, so nothing dispatched the old agent and the
     # transitional pair was unnecessary. A ratchet left loose stops ratcheting.
-    assert 40 <= len(SIDE_FILES) <= 61
+    # 61 → 62 (2026-10-14, SPEC-hm-light-lane-s2): `.claude/hm/autopilot-advance.md`, the
+    # auto-advance procedure every stage stub reads (IRR-001).
+    assert 40 <= len(SIDE_FILES) <= 62
 
 
 def test_synthesize_side_returns_blueprint() -> None:

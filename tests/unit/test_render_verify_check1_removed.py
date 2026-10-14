@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, LoopConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.strictness import Strictness
 from harness_maker.synthesize import synthesize
@@ -47,7 +47,13 @@ ARMS = [(p, d) for p in Preset for d in ("warn", "block")]
 
 
 def _verify(tmp: Path, preset: Preset, strictness: Strictness) -> str:
-    answers = InterviewAnswers(preset=preset, strictness=strictness, targets=[Target.CLAUDE_CODE])
+    # Loop on: Check 5 renders only beside the loop driver (SPEC-hm-light-lane-s2).
+    answers = InterviewAnswers(
+        preset=preset,
+        strictness=strictness,
+        targets=[Target.CLAUDE_CODE],
+        loop=LoopConfig(enabled=True),
+    )
     render(
         synthesize(ProjectProfile(), answers, preset=preset), tmp, freeze_time=DEFAULT_FREEZE_TIME
     )

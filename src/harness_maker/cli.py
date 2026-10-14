@@ -544,6 +544,7 @@ def make(
         flag_given=worktree_override is not None,
         asked=(reused is None and not effective_autoloop),
     )
+    _refuse_loop_disable_while_live(a, target, existing_yaml)
     bp = synthesize(p, a)
     # full_bp holds the unfiltered blueprint for orphan-sweep: KEEP'd files
     # are still expected on disk (the user owns them now), so we must NOT
@@ -1351,6 +1352,31 @@ def _apply_worktree_enabled(
             raise typer.Exit(code=1)
 
     return answers.model_copy(update={"worktree": {"enabled": desired}})
+
+
+def _refuse_loop_disable_while_live(
+    answers: InterviewAnswers, target: Path, existing_yaml: Path
+) -> None:
+    """SPEC-hm-light-lane-s2: a loop-off render drops Gate 0, execute Step 5 and verify Check 5,
+    so turning the loop off under a live `/hm:loop` strands its `execute-<uuid>` worktree and
+    finalize stash with no rendered way back — the class `disable_preflight` guards for the
+    worktree flag. The rendered `loop.md` is what says the loop was on; residue is what says
+    it is still running."""
+    from harness_maker.worktree import _load_sibling_dirs, _old_model_residue_blockers
+
+    if answers.loop.enabled or not (target / ".claude" / "commands" / "hm" / "loop.md").is_file():
+        return
+    blockers = _old_model_residue_blockers(target, "")
+    for sib in _load_sibling_dirs(existing_yaml, target):
+        blockers += _old_model_residue_blockers(sib, f" [sibling {sib.name}]")
+    if blockers:
+        typer.echo(
+            "refusing to turn the loop off — in-flight loop work would be stranded: "
+            f"{', '.join(blockers)}\nFinish or stop that /hm:loop first, then re-run. If no "
+            "loop is running, the residue is stale: land or remove it, then re-run.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
 
 def _ask_keep_legacy_isolation(legacy_on: bool) -> bool:

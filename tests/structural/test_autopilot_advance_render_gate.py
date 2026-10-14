@@ -14,6 +14,7 @@ import pytest
 
 TEMPLATES = Path(__file__).parents[2] / "src" / "harness_maker" / "templates"
 STAGES = TEMPLATES / "stages"
+SHARED = TEMPLATES / "hm" / "autopilot-advance.md.j2"
 
 # Only these four stage bodies carry a terminal STOP paragraph that CONTRADICTS the
 # auto-advance block. execute/review have no such paragraph, and wrapup's STOPs are
@@ -44,7 +45,8 @@ def test_terminal_stop_names_the_auto_advance_exception(stage: str) -> None:
 def test_auto_advance_block_claims_precedence() -> None:
     """ADR-006, half two — both sides must name each other. A one-sided override is
     exactly what shipped, and it lost."""
-    partial = _read(TEMPLATES / "agents" / "_partials" / "stage_end_summary.md.j2")
+    # SPEC-hm-light-lane-s2: the procedure moved to the shared reference file the stub reads.
+    partial = _read(SHARED)
     assert "supersedes this" in partial
     assert "Stage terminal" in partial
 
@@ -52,10 +54,11 @@ def test_auto_advance_block_claims_precedence() -> None:
 def test_auto_advance_passes_the_task_slug() -> None:
     """ADR-003 — an argument-less Skill call stalls argument-parsing stages, which reads
     to the user as 'announced but did nothing'."""
+    shared = _read(SHARED)
+    assert "task_slug" in shared
+    assert "task_slug_source" in shared, "an inherited slug must be announced, not silent"
+    assert "bad_slug" in shared, "the halt it can cause must be in the halt list it reads"
     partial = _read(TEMPLATES / "agents" / "_partials" / "stage_end_summary.md.j2")
-    assert "task_slug" in partial
-    assert "task_slug_source" in partial, "an inherited slug must be announced, not silent"
-    assert "bad_slug" in partial, "the halt it can cause must be in the halt list it reads"
 
     # Gate the EXECUTED line, not just the prose around it. The previous version asserted
     # only `"--slug" in partial`, which a mention anywhere satisfies — so it stayed green
@@ -72,7 +75,9 @@ def test_auto_advance_passes_the_task_slug() -> None:
 
     # And the instruction that replaces it must not itself show a bracketed placeholder:
     # a model copying `--slug <it>` reproduces the exact defect this removed.
-    assert not re.search(r"--slug\s*<", partial), "append instruction shows a placeholder token"
+    assert not re.search(r"--slug\s*<", partial + shared), (
+        "append instruction shows a placeholder token"
+    )
 
 
 def test_slug_line_uses_no_positional_parameter() -> None:
@@ -81,7 +86,7 @@ def test_slug_line_uses_no_positional_parameter() -> None:
     text differs. (The repo-wide gate `test_no_positional_params_in_commands` covers the
     whole rendered surface — including, as this change found out, explanatory prose that
     merely QUOTES such a token.)"""
-    partial = _read(TEMPLATES / "agents" / "_partials" / "stage_end_summary.md.j2")
+    partial = _read(TEMPLATES / "agents" / "_partials" / "stage_end_summary.md.j2") + _read(SHARED)
     slug_lines = [ln for ln in partial.splitlines() if "--slug" in ln]
     assert slug_lines
     for line in slug_lines:

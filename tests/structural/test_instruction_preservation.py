@@ -244,6 +244,14 @@ _REVIEW_R2_SPEC_NEED_UNQUOTED = [
 ]
 
 
+_LIGHT_LANE_S2_REVIEW = [
+    "#### Step 2.5 — Silent-intent-miss hook (ADR-008)",
+    "## 📏 Size & Complexity",
+    "!cd <WT> && uv run --with $HOME/harness-maker python -m harness_maker.review_churn "
+    "complexity --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre "
+    "--post refs/hm-churn/v1/{slug}-r{N}-post",
+]
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
     # Vocabulary replacement only; canonical calls retain the same answer gates.
     "intent-vocabulary-and-owners": {
@@ -433,6 +441,13 @@ _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
             "harness_maker.review_consensus finalize --file <the literal temp path> --slug {slug} "
             "--round <N> | tee <FINALIZE-r{N}>",
         ],
+    },
+    # SPEC-hm-light-lane-s2 (AC-007): the DRI's 2026-10-14 cards cut review Step 2.5, step 5c
+    # and the report section 5c fed. Their modules stay callable; only the prompt callers go.
+    # Both arms: none of the three sat behind a strictness gate.
+    "hm-light-lane-s2-dead-review-telemetry": {
+        "review@warn": list(_LIGHT_LANE_S2_REVIEW),
+        "review@block": list(_LIGHT_LANE_S2_REVIEW),
     },
     # top-issues-2026-09: `check` + `verification_plan commands` + a self-attested `mark-pass`
     # became one `verification_cache run` that runs the CI gates and writes the marker itself.

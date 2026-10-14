@@ -1,0 +1,85 @@
+{#- SPEC-hm-light-lane-s2: the auto-advance procedure every Claude Code stage shares, written once.
+    Each stage's stub (agents/_partials/stage_end_summary.md.j2) keeps the no-op conditions, its
+    own gate predicate and the two executed lines; this file holds what is the same everywhere.
+    It names no command of its own, so it cannot drift from the lines the stub runs. -#}
+# Auto-advance procedure (autopilot, Claude Code)
+
+Read by the **Auto-advance check** at the end of every `/hm:` stage, only when that stub says it
+is not a no-op. The stub names this stage's gate and holds the lines to run; run them from the
+stub, never a command reconstructed from this file.
+
+A stage runs under **autopilot** (live auto-advance, ADR-005) only in Claude Code: it needs the
+`.hm-autopilot` marker (armed by the picker) and the `Skill` tool.
+
+**Step 1 — mandatory gate FIRST (absent-case = STOP).** Evaluate THIS stage's gate
+*before* anything else, with the predicate the stage's stub gives.
+
+## Step 1 on a judgment-gated stage (spec, review)
+
+Do NOT stop here and do NOT run `gate-blocked`. Classify the gate and carry the verdict into
+Step 2, which records the stop for you. Exactly one of:
+- **`clear`** — nothing pending.
+- **`pending`** — a genuine judgment is unresolved: a question with a defensible answer.
+  Stops at `gated`/`auto_safe`; `auto_full` answers it.
+- **`blocked`** — the failing half is a **quality threshold**, not a question (a failed grade,
+  a failed check). **No level clears it, `auto_full` included.**
+
+**Unsure at any boundary → pick the more restrictive value.** The ladder is
+`clear` < `pending` < `blocked`. That direction is deliberate: `pending` is the one value
+`auto_full` clears, so resolving uncertainty downward routes a possible failure past the gate.
+
+Omitting the flag entirely is **not** `pending` — it halts at every level, including
+`auto_full`, and reports a stale render. Say nothing only when you mean "I did not classify".
+
+## Step 1 on every other stage
+
+If the gate is pending/unresolved → record it on the ledger, then **STOP** (print the
+banner). Do NOT run the boundary check — a stage that stops at its gate must not record an
+advance:
+run the stub's `gate-blocked` line, then stop.
+
+## Step 2
+
+The stub's Step 2 is the first heading below on every stage except a judgment-gated one, which
+uses the second; read the parenthesis after both as part of either:
+
+**Step 2 — boundary check (ONLY when the gate is clear).** Run the deterministic check
+**Step 2 — boundary check.** Run the deterministic check
+(it enforces the Phase-5 runaway caps + kill switch, and on proceed records the advance it
+authorizes — so it must run only after Step 1 clears):
+
+If this stage has a slug, **append** it to the command below in single quotes — e.g.
+` --slug 'my-task'`. Never a shell expression or a bracketed placeholder. Omit it
+otherwise; the marker keeps the earlier stage's slug.
+"The command below" is the boundary line in the stage's stub.
+
+On a judgment-gated stage:
+**Also append your Step 1 verdict** — exactly one of ` --judgment-gate clear`,
+` --judgment-gate pending`, or ` --judgment-gate blocked`. A literal word, never a
+placeholder. **Omitting it is not a way to say `pending`**: an absent verdict halts at every
+level, `auto_full` included, and reports a stale render.
+
+Read the JSON:
+- `proceed: false` → **STOP** (print the banner) — **except `bad_slug`**. `step_cap`/
+  `time_cap` = a runaway cap fired (`halted_cap` logged, marker cleared); `kill_switch` =
+  autopilot off/expired; `merge_gate` = the next stage is human-gated (e.g. wrapup's
+  merge/land — the marker was cleared, so invoke `/hm:wrapup` manually); `unknown_stage` =
+  `--current` not in the pipeline; `pipeline_complete: true` = the pipeline finished and
+  the marker was cleared.
+  On a judgment-gated stage:
+  `judgment_gate` = the gate was `pending` at a level that does not
+  clear it, or `blocked` (which no level clears). The marker was **preserved** and the stop
+  was recorded; resolve the gate and re-run.
+  **`bad_slug` is yours to undo**: the `--slug` you passed is invalid; nothing was
+  authorized. Do NOT print the banner — re-run with a corrected slug, or no flag.
+- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with
+  the JSON's `task_slug` as its argument (omit when `null`), instead of the STOP banner.
+  **This supersedes this stage's earlier "Stage terminal … STOP"** — that governs the
+  gated path, and `proceed: true` IS the authorization it asks for. `task_slug_source:
+  "persisted"` means the slug came from an earlier stage — name it before invoking, so
+  another task's slug cannot advance silently.
+- `judgment_auto_answered: true` → the level cleared a judgment gate for you. **Do what
+  `judgment_directive` says before advancing.** An auto-answer that is not written down is
+  an unauditable skip of a human decision — the record is the only thing that makes this
+  level reviewable after the fact.
+  This key appears only on a judgment-gated stage.

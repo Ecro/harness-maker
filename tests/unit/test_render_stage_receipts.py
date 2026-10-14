@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 from harness_maker.interview import interview
-from harness_maker.models import ProjectProfile
+from harness_maker.models import LoopConfig, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -33,10 +33,14 @@ def _profile() -> ProjectProfile:
 
 @pytest.fixture(scope="module")
 def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Render the full harness once per module (slow setup, fast asserts)."""
+    """Render the full harness once per module (slow setup, fast asserts).
+
+    Loop on: the receipt renders only beside the loop driver that reads it
+    (SPEC-hm-light-lane-s2); `test_render_light_lane_s2` pins its absence with the loop off.
+    """
     out = tmp_path_factory.mktemp("rendered")
     p = _profile()
-    a = interview(p, autoloop_mode=True)
+    a = interview(p, autoloop_mode=True).model_copy(update={"loop": LoopConfig(enabled=True)})
     bp = synthesize(p, a)
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return out

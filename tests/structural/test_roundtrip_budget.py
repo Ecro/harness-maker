@@ -27,6 +27,13 @@ from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips,
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # −14 total, 145→131 (2026-10-14, SPEC-hm-light-lane-s2). This repo's harness.yaml has
+    # `loop.enabled: false`, and the loop-only branches stopped rendering there: the Gate 0
+    # `iter_receipts write` (−1 on each of execute/research/review/spec/verify/wrapup), execute
+    # Step 0.2 and Step 5 (`loop-mode-active`, `owned-crumb-add`, `finalize stage-only`,
+    # `finalize fail`, `post-commit-pop`), verify Check 5 (`git status`, `git diff --check`),
+    # and review 5c `review_churn complexity` (removed outright, AC-007). No call was added.
+    # execute 25→19, research 8→7, review 35→33, spec 10→9, verify 13→10, wrapup 33→32.
     # +2 on `plan`, +1 on `review`, +2 on `wrapup` (2026-09-16,
     # SPEC-intent-world-model-objective-layer P4): plan Step 0.5 → `hm world status --json` and
     # `hm world objective revisit <objective-id>`; review Step 3.3 → `hm world objective show`;
@@ -111,7 +118,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # recorded, which is the evidence half the removed Step 1.7 gate left behind.
     # 21 → 25 (same task, second fold): `worktree loop-mode-active` in Step 0.2 plus the
     # is_codex-branched call sites ADR-011's counting rule includes.
-    "execute": 25,
+    "execute": 19,
     # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml
     # second_opinion.models` dropped `antigravity`, and `/hm:health` runs ONE per-model
     # positive smoke-test per enabled model, so its `second_opinion_invoke` smoke call for that
@@ -128,7 +135,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # DROPPED with the gate (see tests/unit/test_render_execute_spec_need.py), while
     # `prefilter` / `record` moved to execute Step 0.1 and the validator + cross-model
     # calls to spec Step 4.6 — both accounted for in those rows above.
-    "research": 8,
+    "research": 7,
     # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
     #
     # 8 → 16 (PLAN-ai-review-exit-criteria Phase 4). The largest single-stage round-trip rise
@@ -210,7 +217,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 34 → 35 (top-issues-2026-09, 2026-09-30): Step 3.4 runs `hm review_churn attribute` on the
     # merged temp file before `persist-payload`, so `caused_by` is stamped by code instead of
     # being "determined" in prose that never reached the payload (621/621 findings unstamped).
-    "review": 35,
+    "review": 33,
     # 6 → 7 (ai-native-sdlc-vs-intent-world, 2026-09-19): spec runs `hm spec_machine approve`
     # twice as rendered calls (Step 0 `--exempt`, Step 5 human stamp) and, now judgment-gated,
     # no longer renders the gate-first `autopilot_caps gate-blocked` line: +2 -1. Declared in
@@ -224,7 +231,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 12 → 10 (intent-surface-diet, 2026-10-04): Step 0.5 drops the second `hm intent status`
     # read (the `rejected[]`/`revisits` check) and Step 4.9's `hm intent new --from-proposal`
     # went with the step. Attributed in work-docs/BASELINE-DELTA-intent-surface-diet.md.
-    "spec": 10,
+    "spec": 9,
     "uninstall": 3,
     # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.
     # 15 → 12: SPEC-ci-derived-verification-plan replaces the four EXAMPLE gate commands
@@ -241,7 +248,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `verification_plan commands` + self-attested `mark-pass` became one `verification_cache run`
     # that runs the CI gates and writes the marker itself; `mark-pass` survives only inside the
     # degraded (no-CI) block. -2 +1.
-    "verify": 13,
+    "verify": 10,
     # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
     # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
     # not render. A config flip that adds a gate in two commands and removes an advisory in a
@@ -289,7 +296,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # in `work-docs/BASELINE-DELTA-intent-layer-improvements.md`.
     # 34 → 33 (top-issues-2026-09, 2026-09-30): Step 2's check + plan + mark-pass → one
     # `verification_cache run`, same change as verify. -2 +1.
-    "wrapup": 33,
+    "wrapup": 32,
 }
 
 

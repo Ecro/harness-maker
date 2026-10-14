@@ -3,8 +3,8 @@ spec_slug: hm-light-lane
 parent_spec: null
 verification_tier: 2
 mutation_threshold: null
-mutation_threshold_rationale: Mostly template prose plus one output-shape branch; render and
-  unit tests pin the outcome, mutation testing adds little.
+mutation_threshold_rationale: Mostly template prose plus one output-shape branch;
+  render and unit tests pin the outcome, mutation testing adds little.
 last_mutation_run: null
 paths_to_mutate: []
 mutation_runner: null
@@ -23,8 +23,8 @@ ac:
   note: ''
   pending_test: false
   oracle_source: golden
-  oracle_evidence: The three light-lane conditions and the in-doubt default come from intent
-    HM-LIGHT-LANE scope item 1, fixed before the template edit.
+  oracle_evidence: The three light-lane conditions and the in-doubt default come from
+    intent HM-LIGHT-LANE scope item 1, fixed before the template edit.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -66,15 +66,15 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane.py::test_execute_skips_only_a5_on_light
-  executable_predicate: '''`lane: light` → skip to Phase B'' in a5 and ''lane'' not in a4
-    and ''lane'' not in phase_b'
+  executable_predicate: '''`lane: light` → skip to Phase B'' in a5 and ''lane'' not
+    in a4 and ''lane'' not in phase_b'
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: false
   oracle_source: golden
-  oracle_evidence: Intent scope item 2 names A.5 as the only removed phase; A, A.4 and B are
-    registered INV in step_sensitivity.
+  oracle_evidence: Intent scope item 2 names A.5 as the only removed phase; A, A.4
+    and B are registered INV in step_sensitivity.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -116,15 +116,15 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane.py::test_review_light_lane_keeps_the_lens_axis_and_gate
-  executable_predicate: '''keeps the lens axis, coverage check and'' in config and ''`max_review_rounds`
-    caps at 2'' in config'
+  executable_predicate: '''keeps the lens axis, coverage check and'' in config and
+    ''`max_review_rounds` caps at 2'' in config'
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: false
   oracle_source: golden
-  oracle_evidence: Intent scope item 3; the research thread measured lenses at 11% of cost
-    with fixes in 5 of 13 runs, so they stay.
+  oracle_evidence: Intent scope item 3; the research thread measured lenses at 11%
+    of cost with fixes in 5 of 13 runs, so they stay.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -142,15 +142,16 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane.py::test_review_light_lane_skips_pass_1_and_the_unchanged_confirmation
-  executable_predicate: 'all(''`lane: light` → the Round 1 dispatch above is the only one'' in
-    b for b in two_pass) and ''`lane: light` with round 1 approved and no fix applied'' in confirm'
+  executable_predicate: 'all(''`lane: light` → the Round 1 dispatch above is the only
+    one'' in b for b in two_pass) and ''`lane: light` with round 1 approved and no
+    fix applied'' in confirm'
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: false
   oracle_source: golden
-  oracle_evidence: Intent scope item 3; a non-vacuity guard requires at least one preset to
-    render Pass 1.
+  oracle_evidence: Intent scope item 3; a non-vacuity guard requires at least one
+    preset to render Pass 1.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -168,15 +169,15 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_spec_machine_check_all.py::test_a_clean_pass_prints_one_short_line
-  executable_predicate: 'rc == 0 and out.count(''\n'') == 1 and json.loads(out) == {''ok'':
-    True, ''overall'': overall, ''strictness'': quality.strictness}'
+  executable_predicate: 'rc == 0 and out.count(''\n'') == 1 and json.loads(out) ==
+    {''ok'': True, ''overall'': overall, ''strictness'': quality.strictness}'
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: false
   oracle_source: golden
-  oracle_evidence: Lever 4 from the token-lever analysis (13k chars per run); the failure
-    payload is unchanged and pinned by the existing tests.
+  oracle_evidence: Lever 4 from the token-lever analysis (13k chars per run); the
+    failure payload is unchanged and pinned by the existing tests.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -198,16 +199,16 @@ ac:
   - tests/render/test_render_light_lane.py::test_loop_commands_are_typed_only
   - tests/render/test_render_light_lane.py::test_the_typed_only_command_set_is_exactly_these
   - tests/render/test_render_light_lane.py::test_codex_renders_the_policy_for_exactly_the_hidden_skills
-  executable_predicate: 'all(''disable-model-invocation: true'' in frontmatter(s) for s in
-    HIDDEN_SKILLS + HIDDEN_COMMANDS)'
+  executable_predicate: 'all(''disable-model-invocation: true'' in frontmatter(s)
+    for s in HIDDEN_SKILLS + HIDDEN_COMMANDS)'
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: false
   oracle_source: golden
-  oracle_evidence: Lever 5; the hidden set was classified from template references before
-    the edit, and the visible set (stage commands, health, skills reached by name) is pinned
-    by sibling tests.
+  oracle_evidence: Lever 5; the hidden set was classified from template references
+    before the edit, and the visible set (stage commands, health, skills reached by
+    name) is pinned by sibling tests.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -221,3 +222,23 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 97be8bd7bed8a286a40d6ed8609ff79b62d9b8b282da79b73dadf8d078e52843
+  approved_by: Ecro
+  approved_at: '2026-10-14T13:31:55Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 400ec36168c9dff7418f8e2f64f29349468d148f6267f3e04c31da45a5ed0655
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 81eb91eeb2f5e2817711d0b7afd387acca9a14afe876ec594b0956764ac6d493
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 53837ad7ae4acdd210c412c2c99c18efdb413b0739ee5c3d6e23d7d56bc8822a
+    AC-002: ebfe799bb8c365f59b1ec6921e62a2d78d1672baa9f13dd60cca5fddcd7df563
+    AC-003: 462db1e798b08b95a125e1af0f9d32669de40a9674c3ff102d8599df4d4cc9e5
+    AC-004: 165b529ea5e1cd396c2bd988543d578c7b6f705e8803132e4f7547f150374469
+    AC-005: ec1d11530007e278c79c3ae7868fd1f8d31642ea7e9efb5c5571b9c9334076a6
+    AC-006: dbac2e9941a227ecc1844e974b3a296d491ffc223c297c4afcaea55f5e49214d
+    AC-007: 120e2c4faa745fd3ec1c45620b7351d6629e72a72c36c7a54a95ddc6517417fc
+    AC-008: c65304fd4d2716f75991c4d10f8105cd618fdd9271f2b06f6e4f4acf68fc7989
+    ac_order: b62ad8faf895c4ebdf45f3fce97982d2bcc0a3fa6daa1e45993897fb730655c6
