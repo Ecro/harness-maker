@@ -956,7 +956,8 @@ defects at close to 1:1. This pass replaces that exit with *risk closure*: one c
 whole declared failure space over an artifact that cannot move underneath it.
 
 On `lane: light` with round 1 approved and no fix applied, round 1 already reviewed this exact
-artifact: skip, record `confirm_pass_ran: false`, and note `lane light, unchanged` in the report.
+artifact: skip, record `confirm_pass_ran: false`, note `lane light, unchanged` in the report, and
+close the run (`--outcome APPROVED`) — C3, which closes it otherwise, does not run.
 
 Run it **only** on the APPROVED path. A review stopping for `max_review_rounds`, for the
 no-progress invariant, or with `auto_fix` disabled has not approved anything, so there is nothing
