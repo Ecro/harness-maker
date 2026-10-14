@@ -152,6 +152,28 @@ def test_a_clean_pass_prints_one_short_line(
         assert payload["quality"]["weak_dimensions"] == weak_dimensions
 
 
+def test_a_failed_gate_never_collapses_even_with_a_clean_score(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The compact line says `ok: true`; printing it over a failed gate would hide the failure."""
+    import importlib
+
+    result_type = importlib.import_module("harness_maker.spec_quality").SpecQualityResult
+    stub = result_type(
+        overall=88,
+        scores={"completeness": 88},
+        weak_dimensions=[],
+        blocked=False,
+        strictness="warn",
+    )
+    monkeypatch.setattr("harness_maker.spec_quality.evaluate_spec", lambda *a, **k: stub)
+    yaml_path, md_path = _pair(tmp_path, ac_id="AC-001", md_heading="AC-999")
+    rc, payload = _run(tmp_path, yaml_path, md_path)
+    assert rc == 1
+    assert payload["ok"] is False
+    assert payload["cross_validate"]["ok"] is False
+
+
 def test_a_cross_validate_failure_is_attributed_to_its_rule_and_fails_the_call(
     tmp_path: Path,
 ) -> None:

@@ -317,7 +317,8 @@ REGISTRY: tuple[StepEntry, ...] = (
         ordering="le",
         remeasure_on=("model_release",),
         measure_cmd=_BENCH,
-        note="the disposition mechanism itself is invariant; the TUNE class carries the cap",
+        note="the disposition mechanism itself is invariant; the TUNE class carries the cap. "
+        "`lane: light` hardcodes a cap of 2 in review.md.j2 — remeasure it with this entry",
     ),
     _u("review", "Step 5", "INV", "spec Step 3", note="REVIEW write"),
     _e(
@@ -328,6 +329,7 @@ REGISTRY: tuple[StepEntry, ...] = (
         f"{_R}; confirmation pass n=4 (2/2, {_LEDGER_SIDE})",
         remeasure_on=("model_release",),
         measure_cmd=_LEDGER,
+        note="`lane: light` skips it after an unchanged approved round 1 — remeasure with it",
     ),
     _e(
         "review",

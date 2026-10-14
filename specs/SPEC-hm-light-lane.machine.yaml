@@ -142,8 +142,8 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane.py::test_review_light_lane_skips_pass_1_and_the_unchanged_confirmation
-  executable_predicate: 'all(''`lane: light` → skip Pass 1'' in b for b in two_pass) and ''`lane:
-    light` with round 1 approved and no fix applied'' in confirm'
+  executable_predicate: 'all(''`lane: light` → the Round 1 dispatch above is the only one'' in
+    b for b in two_pass) and ''`lane: light` with round 1 approved and no fix applied'' in confirm'
   golden_table: []
   rubric_id: null
   note: ''
@@ -169,7 +169,7 @@ ac:
   test_ids:
   - tests/unit/test_spec_machine_check_all.py::test_a_clean_pass_prints_one_short_line
   executable_predicate: 'rc == 0 and out.count(''\n'') == 1 and json.loads(out) == {''ok'':
-    True, ''overall'': 88, ''strictness'': ''warn''}'
+    True, ''overall'': overall, ''strictness'': quality.strictness}'
   golden_table: []
   rubric_id: null
   note: ''

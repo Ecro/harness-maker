@@ -1,15 +1,15 @@
 ---
 type: review
 task_slug: hm-light-lane
-status: in-progress
+status: APPROVED
 created: 2026-10-14
 reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
 consensus_method: cross-check
 run_id: e63c8d843621
 review_base: bd3bd67b6efa97624339db85d1643bdf724f022e
 drift_verdict:
-  result: scope_violation
-  scope_violations: [src/harness_maker/templates/stages/verify.md.j2, src/harness_maker/step_sensitivity.py]
+  result: clean
+  scope_violations: []   # round 1 found verify.md.j2 and step_sensitivity.py; round 2 added both to the PLAN scope
   scenario_misses: []
   task_slug: hm-light-lane
   computed_at: 2026-10-14T12:40:00Z
@@ -87,3 +87,66 @@ tier after Pass 2; recorded as one finding plus a duplicate.
 
 - codex: `status: skipped`, reason `CLI not installed: codex`. No findings. No re-invocation in
   later rounds.
+
+### Iteration 2 (Grade: B → A)
+Fixes applied: 19 (the P1 drift fix, plus the accepted P2/P3 findings, applied in the same round
+as an operator sweep so the re-review and the confirmation pass would cover them; P2s are not in
+the auto-fix queue by rule)
+
+| # | Severity | Summary | File | Status |
+|---|---|---|---|---|
+| 1 | P1 | PLAN stage 1 scope lists verify.md.j2, step_sensitivity.py | PLAN | Applied · caused_by=none |
+| 2–19 | P2/P3 | every round-1 finding except the two below | see round-1 table | Applied · caused_by=none |
+
+Carried (accepted, not fixed here): `a32cfd97` derive skills' typed-only flag from
+`_TYPED_ONLY_SKILLS` (PLAN stage 2); `51ca5d8b` the intent's cost ratio (stage 4).
+
+Re-review: one `code-reviewer` (functionality) over the round-2 hunks, churn 0.675 ≥ 0.3. It
+confirmed 19 resolved, 0 new defects; it flagged the missing template pointers to
+`stage-rationale.md`, added as Jinja comments (render nothing).
+Remaining: 2 (carried) | New issues introduced: 0
+Churn: 0.675 (max: docs/reference/stage-rationale.md, measured 17, excluded 0)
+
+## Confirmation Pass (confirm-1)
+
+Frozen `bd3bd67..51eeb88`, all 7 lenses in 4 dispatches, coverage complete. **Zero new P0/P1** →
+APPROVED. Ref reaped, run closed `APPROVED`, ledger row written.
+
+New P2/P3 from the pass (applied after it as a post-review sweep, **not re-reviewed**; tests and
+goldens re-run):
+
+| Sev | Lens | Finding | Done |
+|---|---|---|---|
+| P2 | concurrency | C3 closed the run before reaping, contrary to the new reap-first rule | C3 now reaps, then closes |
+| P2 | consistency | AC-006/AC-007 predicates drifted from the rendered text and the test | predicates updated |
+| P2 | robustness | an unrecognised `lane` value had no reading | any value but exactly `light` is `full` (execute, review) |
+| P2 | design | the approver never sees the lane | the light closing question shows the lane |
+| P2 | consistency | registry silent on the light overrides of TUNE review knobs | notes on Step 4e and Step C1 |
+| P2 | tests | no failed-gate + clean-score case | `test_a_failed_gate_never_collapses_even_with_a_clean_score` |
+| P2 | tests | lane re-check clauses unasserted | asserted in execute and review tests |
+| P3 | tests | AC-007 predicate vs test | covered by the predicate fix |
+| P3 | tests | Codex policy test checks paths, not "exactly" | not done; low risk |
+
+## 🔁 Oscillation
+
+None.
+
+## Review Iteration Summary
+
+| Iteration | Grade | Fixes Applied | Remaining | New |
+|---|---|---|---|---|
+| 1 (init) | B | — | 21 | — |
+| 2 | A | 19 | 2 | 0 |
+
+Final grade: A
+Iterations used: 2 / 3
+Exit reason: converged
+Status: APPROVED
+human_review_needed: false
+Counters (see §5): unreviewed 0 · prior-fix 0 · unattributed 0
+
+Not part of the verdict: the SPEC's DRI approval is still `missing`
+(`hm spec_machine approval-status`), so `/hm:wrapup` would ask for it. Locally,
+`test_real_on_disk_rows_still_validate` globs `review-*.jsonl` and trips on the
+`review-complexity.jsonl` that step 5c writes; this only shows once 5c has run in this repo, and
+stage 2 removes 5c.

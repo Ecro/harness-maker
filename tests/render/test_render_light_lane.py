@@ -71,7 +71,7 @@ def test_light_spec_keeps_the_oracle_irreversible_list_and_approval(bodies: dict
     assert "the 2.1.5 oracle and the irreversible-decision" in step0
     # Approval must follow the content it binds, never sit beside the questions producing it.
     assert (
-        "one closing question that shows the drafted oracle and list and offers the approve"
+        "one closing question that shows the drafted oracle, the list and the lane and offers"
         in step0
     )
     assert "From Round 2 onward (on `light`, the closing question)" in body
@@ -102,6 +102,10 @@ def test_execute_quality_bar_admits_the_light_lane(bodies: dict[str, str]) -> No
 def test_execute_reads_a_missing_lane_as_full(bodies: dict[str, str]) -> None:
     step2 = _section(bodies["execute"], "### Step 2 —", "### Step 3 —")
     assert "missing → `full`" in step2
+    # Only the exact value lowers a gate; a typo must fail closed.
+    assert "any value but exactly `light` is `full`" in step2
+    # The spec-time guess is re-checked once the PLAN exists.
+    assert "touch well over five files reads as `full`" in step2
 
 
 def test_review_light_lane_keeps_the_lens_axis_and_gate(bodies: dict[str, str]) -> None:
@@ -110,6 +114,8 @@ def test_review_light_lane_keeps_the_lens_axis_and_gate(bodies: dict[str, str]) 
     assert "`lane: light`" in config
     assert "keeps the lens axis, coverage check and" in config
     assert "missing → `full`" in config
+    assert "a diff well over five files reads as `full`" in config
+    assert "any value but exactly `light`" in config
     assert "`max_review_rounds` caps at 2" in config
     assert "default `3`; at most `2` on `lane: light`" in config, "the cap sits at the knob"
 

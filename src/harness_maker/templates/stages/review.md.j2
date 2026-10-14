@@ -73,7 +73,7 @@ Per-invocation overrides (workflow command flags):
 - `--no-auto-fix` — disable auto-fix this run only.
 - `--with-reviewers=<csv>` — add ad-hoc reviewers (must exist in `reviewers.installed`).
 
-**`lane: light`** (read it from the SPEC frontmatter before Step 1; missing → `full`, as with no SPEC;
+**`lane: light`** (read it from the SPEC frontmatter before Step 1; missing → `full`, as with no SPEC, and so is any value but exactly `light`;
 a diff well over five files reads as `full`) keeps the lens axis, coverage check and
 Grade Gate, and cuts repetition: Step 3 skips Pass 1, `max_review_rounds` caps at 2, and the
 Confirmation Pass is skipped when round 1 approves with no fix applied.
@@ -1022,7 +1022,7 @@ second invocation here would give them a second vote on the same review.
 {% endif %}
 ### Step C3 — Outcome
 
-**Four of the five arms below are stage-terminal; close the run on each of those**, with
+**Four of the five arms below are stage-terminal; on each, run the reap below first, then close the run**, with
 `hm review_run close --slug <slug> --run-id <run-id> --outcome <APPROVED|CHANGES_REQUESTED>`.
 **The `confirm-1` arm is NOT terminal and must NOT close** — it enters a repair round and
 dispatches confirm-2, so closing there releases the slug *mid-pass* while `<run-id>` is still the
@@ -1075,7 +1075,7 @@ telemetry row.
 **Then release the frozen refs.** They pin a commit whose tree holds every untracked
 non-ignored file present at pass time, reachable from a local ref and so immune to gc; nothing
 else reliably reaps them (`prune_stale`'s sweep needs a live task slug, and the Side preset has
-none). Run this once the review has reached its terminal state:
+none). Run this once the review has reached its terminal state, before the close:
 
 ```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm freeze reap --slug <slug>

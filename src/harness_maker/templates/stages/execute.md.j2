@@ -396,7 +396,7 @@ research_field=$(yq '.research_doc' "$PLAN") # e.g., "[[RESEARCH-mqtt-retry]]"
 If `spec:` resolves to an existing file:
 - Read SPEC fully.
 - Extract `test_framework` from frontmatter — Phase A uses this verbatim.
-- Extract `lane` (`light` | `full`; missing → `full`) — Phase A.5 reads it. A PLAN whose phases
+- Extract `lane` (missing → `full`; any value but exactly `light` is `full`) — Phase A.5 reads it. A PLAN whose phases
   touch well over five files reads as `full`; log that in the PLAN.
 - Extract `## 📋 In-Scope Scenarios` — Phase A authors one test per scenario.
 - Extract `## ✅ Verification Criteria` — Phase B RED-gate uses the named test commands.
