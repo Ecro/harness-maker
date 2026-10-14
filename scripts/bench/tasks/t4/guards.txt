@@ -1,0 +1,2 @@
+# hidden tests that already pass on the pristine fixture (regression guards)
+test_plain_output_unchanged

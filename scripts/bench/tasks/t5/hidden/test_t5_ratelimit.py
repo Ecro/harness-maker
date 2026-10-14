@@ -123,6 +123,6 @@ def test_invalid_n(n: int) -> None:
 
 
 def test_default_clock_is_monotonic() -> None:
-    limiter = RateLimiter("1/1s", 1)
+    limiter = RateLimiter("1/1h", 1)
     assert limiter.allow()
     assert not limiter.allow()

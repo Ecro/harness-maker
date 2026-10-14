@@ -103,6 +103,8 @@ ac:
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_cost_comes_from_cli_and_transcripts
   - tests/unit/test_bench_light_lane.py::test_cli_result_is_parsed_from_the_last_result_line
+  - tests/unit/test_bench_light_lane.py::test_a_lost_cost_with_an_empty_transcript_is_unknown_not_free
+  - tests/unit/test_bench_light_lane.py::test_unknown_cost_run_is_recorded_unpriced_and_left_out_of_the_mean
   executable_predicate: null
   golden_table:
   - input:
@@ -123,6 +125,15 @@ ac:
       cost_source: transcript
     edge: true
     note: timeout or crash leaves no CLI result
+  - input:
+      cli_total_cost_usd: null
+      transcripts: none (zero turns)
+    expected:
+      cost_usd: null
+      cost_source: unknown
+    edge: true
+    note: a lost result with an empty transcript is unknown, not a free run; it is left out
+      of the cost mean and counted in the report
   rubric_id: null
   note: ''
   pending_test: false
@@ -173,6 +184,21 @@ ac:
       passed: false
     edge: true
     note: the agent's conftest must not load
+  - input:
+      work: reference applied plus work/pytest.ini (addopts -k), work/timeparse/pytest.ini,
+        work/pytest.py or work/sitecustomize.py
+    expected:
+      passed: true
+      sitecustomize_ran: false
+    edge: true
+    note: only work/timeparse is copied into the clean grade dir, so nothing beside it is
+      importable or read
+  - input:
+      work: reference applied plus a package import that calls pytest.skip, or one that hangs
+    expected:
+      passed: false
+    edge: true
+    note: a skip is not a pass; a hung import hits the grade timeout
   rubric_id: null
   note: ''
   pending_test: false
@@ -197,6 +223,7 @@ ac:
   type: parametric
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_report_verdict
+  - tests/unit/test_bench_light_lane.py::test_unpriced_runs_stay_out_of_the_cost_mean_and_never_make_a_free_arm
   executable_predicate: null
   golden_table:
   - input:
@@ -254,6 +281,45 @@ ac:
       verdict: met
     edge: true
     note: setup failures excluded
+  - input:
+      plain: t1 $0.1, t2 $0.3 (3 runs each)
+      hm: t1 $0.2, t2 $1.0 (3 runs each)
+    expected:
+      ratio: 3.0
+      verdict: met
+    edge: false
+    note: unequal costs, by hand 0.6 / 0.2
+  - input:
+      plain: t1 $0.1, t2 $0.9
+      hm: t1 $1.0, t2 $1.0
+    expected:
+      ratio: 2.0
+      verdict: met
+    edge: true
+    note: mean of per-task ratios would be 5.56
+  - input:
+      plain: $1.0 each
+      hm: $5.004 each
+    expected:
+      ratio: 5.0
+      verdict: missed
+    edge: true
+    note: the verdict compares the unrounded ratio
+  - input:
+      plain: $0.10 each
+      hm: CLI $0.46, transcript $0.54
+    expected:
+      ratio: 4.6
+      verdict: missed
+    edge: true
+    note: the larger of the CLI and transcript ratios decides when they agree within 20%
+  - input:
+      plain: $0.10 each
+      hm: CLI $0.40, transcript $1.20
+    expected:
+      verdict: suspect
+    edge: true
+    note: CLI and transcript ratios differ by more than 20%
   rubric_id: null
   note: ''
   pending_test: false
@@ -333,8 +399,12 @@ ac:
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_resume_skips_completed_cells
   - tests/unit/test_bench_light_lane.py::test_report_refuses_mixed_results
-  executable_predicate: pending_cells(rows) == all_cells - {c for c, st in done if st != 'setup_error'}
-    and report_exit(mixed_rows) == 2
+  - tests/unit/test_bench_light_lane.py::test_resume_refuses_rows_from_another_setup_before_spending
+  - tests/unit/test_bench_light_lane.py::test_resume_with_the_same_setup_continues
+  - tests/unit/test_bench_light_lane.py::test_runner_hash_covers_every_setting_that_changes_an_arm
+  - tests/unit/test_bench_light_lane.py::test_torn_results_line_is_skipped_and_the_next_row_survives
+  - tests/unit/test_bench_light_lane.py::test_append_row_is_one_write_on_an_append_fd
+  executable_predicate: pending_cells(rows) == all_cells - {c for c, st in done if st not in ('setup_error', 'runner_error')} and report_exit(mixed_rows) == 2 and run_exit(foreign_rows) == 2
   golden_table: []
   rubric_id: null
   note: ''
@@ -387,6 +457,7 @@ ac:
   type: parametric
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_out_dir_with_project_context_is_refused
+  - tests/unit/test_bench_light_lane.py::test_guard_top_is_hidden_and_only_honoured_under_the_test_flag
   executable_predicate: null
   golden_table:
   - input:
@@ -402,6 +473,12 @@ ac:
     edge: false
     note: ''
   - input:
+      out: a dir below a parent holding CLAUDE.local.md or a .claude/ dir
+    expected:
+      exit_code: 2
+    edge: true
+    note: ''
+  - input:
       out: a fresh dir with neither above it
     expected:
       refused: false
@@ -414,6 +491,90 @@ ac:
   oracle_evidence: Claude Code loads CLAUDE.md from every ancestor of the launch cwd (memory
     docs, a citation of host behaviour), so either ancestor contaminates both arms; rationale
     fixed in SPEC S9.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: The agent runs with project-only settings, an allowlisted environment and a spend cap
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_agent_runs_with_project_only_settings_and_a_spend_cap
+  - tests/unit/test_bench_light_lane.py::test_agent_gets_an_allowlisted_environment
+  - tests/unit/test_bench_light_lane.py::test_agent_env_unit
+  - tests/unit/test_bench_light_lane.py::test_total_budget_stops_scheduling_new_cells
+  executable_predicate: all(f in argv for f in required_flags) and not (decoy_secrets & set(agent_env)) and new_cells_after_cap == 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fake agent records the argv and environment it actually received; the
+    flags exist in `claude --help` (checked 2026-10-14) and the decoy secrets are set by the test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-013
+  title: A stop signal or a crashing cell cannot leave agents running or abort the grid
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_stop_signal_kills_live_agents_and_skips_queued_cells
+  - tests/unit/test_bench_light_lane.py::test_one_crashing_cell_is_recorded_and_the_grid_continues
+  - tests/unit/test_bench_light_lane.py::test_a_second_runner_on_the_same_out_is_refused
+  - tests/unit/test_bench_light_lane.py::test_setup_failure_keeps_the_failing_commands_stderr
+  executable_predicate: exit_code == 130 and not any(alive(p) for p in agent_and_child_pids) and queued_started == 0 and crash_status == 'runner_error' and other_cells_ran and second_runner_exit == 2
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fake agent sleeps and records its own and its child's pid; liveness is
+    read from /proc by the test, independent of the runner's bookkeeping.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-014
+  title: Hidden tests are graded from a private snapshot and a leak is flagged
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_snapshot_is_private_and_matches_the_checkout
+  - tests/unit/test_bench_light_lane.py::test_hidden_tests_are_graded_outside_the_results_dir
+  - tests/unit/test_bench_light_lane.py::test_agent_output_naming_the_hidden_path_is_flagged
+  - tests/unit/test_bench_light_lane.py::test_check_task_requires_every_unmarked_test_to_fail_on_pristine
+  executable_predicate: snapshot_hash == checkout_hash and snapshot_mode == 0o700 and not hidden_files_under_out and leak_row['leak_suspect'] is True and all(t in guards or fails_on_pristine(t) for t in hidden_tests)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fake agent prints the hidden dir path for the leak case; the guard
+    cases (marked, unmarked, guard that fails, ghost guard) are fixed by hand in the test.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
