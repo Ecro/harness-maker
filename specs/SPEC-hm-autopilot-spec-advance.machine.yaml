@@ -1,0 +1,106 @@
+schema_version: 3
+spec_slug: hm-autopilot-spec-advance
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: Two sentences of prompt text; render and unit tests pin them,
+  mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: auto_full Step 5 says the stage advances without an approval
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_spec_autopilot_advance.py::test_auto_full_step5_says_the_stage_advances
+  executable_predicate: >-
+    all('autopilot stops at this stage' not in step5[t] and 'does not end this stage
+    by itself' in step5[t] and '`proceed: true` advances WITHOUT an approval' in step5[t]
+    and '`/hm:wrapup` asks again before landing' in step5[t] for t in ('claude', 'codex'))
+    and tail(step5['claude']) == tail(step5['codex'])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The false claim is the d48bdc0 sentence the 2026-10-14 bench runs
+    quoted back ("no approval to advance on, so I stopped here"). What auto_full does
+    is fixed by the boundary, not the template, and is already pinned by
+    tests/unit/test_autopilot_judgment_gate.py::test_auto_full_proceeds_through_a_pending_gate
+    (proceed true on a pending gate), so the expected wording follows from code this
+    task does not change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Step 5 is the same at every level
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_spec_autopilot_advance.py::test_step5_is_the_same_at_every_level
+  executable_predicate: all(step5_at(level) == step5_at('auto_full') for level in ('gated',
+    'ask', 'auto_safe'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The contract predates this task. AC-005 of the autopilot-gate PLAN
+    (tests/structural/test_autopilot_gate_render.py::test_ac_005_the_gated_delta_is_exactly_the_advance_blocks)
+    lets a gated render differ from an armed one only inside the marked advance and
+    picker blocks, and Step 5 sits outside them, so its text must not depend on the
+    level.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the spec directive says the missing approval is no reason to stop
+  type: mechanical
+  test_ids:
+  - tests/unit/test_autopilot_spec_advance_directive.py::test_directive_says_a_missing_approval_is_no_reason_to_stop
+  executable_predicate: res['proceed'] is True and res['next_stage'] == 'execute' and
+    'write NO approval' in d and 'not a reason to stop' in d and 'when `proceed` is
+    true' in d
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: '"write NO approval" is the d48bdc0 directive text, which must stay.
+    The added clause answers the stop reason the bench runs gave (a missing approval)
+    and is checked against the boundary JSON of an auto_full marker on the default
+    pipeline, whose proceed/next_stage come from next_stage() and are unchanged by
+    this task.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []

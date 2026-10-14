@@ -569,7 +569,9 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             "Interview Transcript; for `review`, write the passed-over finding ids into the "
             "REVIEW document; for `spec`, write NO approval — the SPEC stays unaccepted and the "
             "land hold stops its irreversible decisions. An unrecorded auto-answer is an "
-            "unauditable skip."
+            "unauditable skip. The auto-answer, and for `spec` the missing approval, is not a "
+            "reason to stop: when `proceed` is true, invoke `next_stage` as the stage's "
+            "auto-advance procedure says."
         )
     nxt = next_stage(marker.pipeline, args.current)
     if nxt is None and marker.restore_pipeline is not None:
