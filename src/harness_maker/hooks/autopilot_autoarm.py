@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 
 from harness_maker import autopilot
+from harness_maker.hook_host import is_claude_copy_in_cursor
 from harness_maker.io_utils import load_harness_yaml
 from harness_maker.loop_marker import sanitize_session_id
 from harness_maker.models import (
@@ -165,6 +166,8 @@ def main() -> int:
     """SessionStart entrypoint — always exit 0 (a hook must never block session start)."""
     try:
         payload = _payload_from_stdin()
+        if is_claude_copy_in_cursor(payload):
+            return 0
         arm_if_persistent(_project_root(payload), claude_session_id=_session_id(payload))
     except Exception:
         logger.warning(".hm-autopilot autoarm: unexpected error — ignored (fail-safe).")

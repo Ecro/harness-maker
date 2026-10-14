@@ -18,6 +18,8 @@ from __future__ import annotations
 import json
 import sys
 
+from harness_maker.hook_host import is_claude_copy_in_cursor
+
 # Domain-keyed reminder rules. Matched against the written file's path components.
 # Each rule is (path_keyword, reminder_text).
 #
@@ -108,6 +110,8 @@ def _match_rules(file_path: str, rules: list[tuple[str, str]]) -> list[str]:
 def main() -> int:
     """Hook entry. Emits reminders on stdout; never blocks the tool call."""
     payload = _read_tool_input()
+    if is_claude_copy_in_cursor(payload):
+        return 0
     file_path = _extract_written_path(payload)
     if not file_path:
         return 0

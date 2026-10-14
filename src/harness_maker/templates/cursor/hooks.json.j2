@@ -28,30 +28,30 @@
     "preToolUse": [
       {
         "matcher": "Bash",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode pretooluse"
+        "command": "HM_HOOK_HOST=cursor CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode pretooluse"
       },
       {
         "matcher": "Bash",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.permission_gate"
+        "command": "HM_HOOK_HOST=cursor CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.permission_gate"
       },
       {
         "matcher": "Write|Edit|MultiEdit",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.worktree_gate"
+        "command": "HM_HOOK_HOST=cursor CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.worktree_gate"
       }{% if strictness_of(config) == "block" %},
       {
         "matcher": "Write|Edit|MultiEdit",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.spec_gate"
+        "command": "HM_HOOK_HOST=cursor CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.spec_gate"
       }{% endif %}
     ],
     "postToolUse": [
       {
         "matcher": "*",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.telemetry"
+        "command": "HM_HOOK_HOST=cursor CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.telemetry"
       }
     ],
     "stop": [
       {
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.telemetry"
+        "command": "HM_HOOK_HOST=cursor CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.telemetry"
       }
     ],
     {#- `sessionStart` is a REAL Cursor event, not a guess: the extension host's hook-event
@@ -71,12 +71,12 @@
     -#}
     "sessionStart": [
       {
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_autoarm"
+        "command": "HM_HOOK_HOST=cursor CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_autoarm"
       }
     ],
     "preCompact": [
       {
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session",
+        "command": "HM_HOOK_HOST=cursor CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session",
         "timeout": 30
       }
     ]

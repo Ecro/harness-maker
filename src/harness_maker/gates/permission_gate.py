@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from harness_maker import autopilot
+from harness_maker.hook_host import is_claude_copy_in_cursor
 from harness_maker.i18n import resolve_locale, t
 from harness_maker.secscan.hook_injection import _DANGER_PATTERNS
 
@@ -158,6 +159,8 @@ def main() -> int:
     except json.JSONDecodeError:
         return 0
     if not isinstance(payload, dict):
+        return 0
+    if is_claude_copy_in_cursor(payload):
         return 0
     hook_event = str(payload.get("hook_event_name") or "")
     if hook_event and hook_event not in _KNOWN_HOOK_EVENTS:

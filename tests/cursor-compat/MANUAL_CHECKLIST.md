@@ -105,6 +105,20 @@
 
 ---
 
+## A2b — 훅이 한 번만 실행되는지 (third-party import ON)
+
+Cursor 는 "Include Third-Party Plugins, Skills, and Other Configs" (기본 ON) 일 때 `.claude/settings.json`
+훅도 로드하고, 모든 출처의 훅을 dedupe 없이 전부 실행한다. 렌더된 `.cursor/hooks.json` 명령에는
+`HM_HOOK_HOST=cursor` 가 붙고, Claude 사본은 Cursor payload (`cursor_version`) 를 보면 물러난다.
+
+1. 설정에서 토글이 ON 인지 확인. `grep -c HM_HOOK_HOST=cursor .cursor/hooks.json` 이 0 이면 `make --update` 먼저.
+2. `wc -l .claude/observability/metrics-*.jsonl` 로 줄 수 N0 기록 → chat 에서 Read 도구 1회 호출 → 다시 측정.
+   - **PASS**: 정확히 1줄 증가 (postToolUse telemetry 한 번).
+   - **FAIL**: 2줄 증가 → Claude 사본이 물러나지 않음 (payload 에 `cursor_version` 이 없거나 marker 누락).
+3. 토글 OFF 로 같은 측정 → 여전히 1줄 증가해야 PASS (Cursor 사본만으로 동작).
+
+---
+
 ## A3 — Skill auto-discovery (single source `.claude/skills/`)
 
 ### Cursor IDE

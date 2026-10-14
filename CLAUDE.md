@@ -110,7 +110,7 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 
 **Cursor target 추가** (`targets` 에 `cursor` 포함 시):
 - `.cursor/rules/harness.mdc` — 고정 템플릿 `templates/cursor/rules/harness.mdc.j2` 하나 (`alwaysApply: true`, `globs: []` — 경로 스코프 규칙 아님)
-- `.cursor/hooks.json` — Cursor native camelCase hooks (위 "Hook schema diverges by design")
+- `.cursor/hooks.json` — Cursor native camelCase hooks (위 "Hook schema diverges by design"). 모든 명령에 `HM_HOOK_HOST=cursor` 접두. Cursor 는 `.claude/settings.json` 훅도 dedupe 없이 같이 실행하므로 (third-party import, 기본 ON), Claude 사본은 `hook_host.is_claude_copy_in_cursor` 로 물러난다 — settings.json 에 새 훅을 추가하면 그 모듈에도 이 검사를 넣을 것 (`tests/unit/test_hook_host.py` 가 강제)
 - `.cursor/mcp.json` — MCP server (Cursor 별도 위치)
 - `.cursor/commands/` 는 **렌더되지 않는다** — Cursor 2.4+ 가 `.claude/commands/hm/*.md` 를 native 로 읽는다 (kairos 0.5.7 forensic, `tests/cursor-compat/results-2026-05-08.md`). `render.py` 의 `.cursor/commands/` dispatch 는 회귀 대비 예약 코드일 뿐 공급 템플릿이 없다.
 

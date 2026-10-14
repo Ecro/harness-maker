@@ -433,8 +433,10 @@ def test_render_cursor_hooks_json_camelcase_with_path_wrap(tmp_path: Path) -> No
         # Round H GRADE-B 6: Cursor hook commands now also propagate
         # CLAUDE_PROJECT_DIR (falls back to CURSOR_PROJECT_DIR / $PWD)
         # so the gate's stdin-fallback chain works even when env vars
-        # are stripped or renamed in future Cursor releases.
+        # are stripped or renamed in future Cursor releases. HM_HOOK_HOST marks the
+        # Cursor copy so the `.claude/settings.json` copy Cursor also runs stands down.
         assert cmd.startswith(
+            "HM_HOOK_HOST=cursor "
             'CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}" '
             'PATH="$HOME/.local/bin:$PATH"',
         ), cmd
@@ -559,6 +561,7 @@ def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
     spec_gate_hook = next(h for h in pre_tool_use if "spec_gate" in h["command"])
     assert spec_gate_hook["matcher"] == "Write|Edit|MultiEdit"
     assert spec_gate_hook["command"].startswith(
+        "HM_HOOK_HOST=cursor "
         'CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}" '
         'PATH="$HOME/.local/bin:$PATH"',
     )

@@ -22,6 +22,7 @@ from typing import Any
 
 import yaml
 
+from harness_maker.hook_host import is_claude_copy_in_cursor
 from harness_maker.i18n import t
 from harness_maker.io_utils import load_harness_yaml
 from harness_maker.strictness import resolve_strictness
@@ -174,6 +175,8 @@ def main() -> int:
     except json.JSONDecodeError:
         return 0  # malformed input: never block on confusion
     if not isinstance(payload, dict):
+        return 0
+    if is_claude_copy_in_cursor(payload):
         return 0
     tool_name = str(payload.get("tool_name") or "")
     raw_input = payload.get("tool_input")
