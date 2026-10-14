@@ -53,7 +53,84 @@ _OPT_IN_COMMIT = "18714dd1"
 #   `## Project knowledge` pointers were rewritten (routing, decision capture, mid-stage aside)
 #   and help.md's intent-layer / project-knowledge rows became `typed only`. Re-verified the
 #   loop-ON/OFF diff of both files is still only the loop sentence / `/hm:loop` row.
+# - 2026-10-14, `hm-light-lane-s2`: the six stage commands and their `stages/*.md` copies became
+#   loop-sensitive (Gate 0, execute Step 0.2/Step 5, verify Check 5 render only with the loop on)
+#   and moved for the stage's other cuts. Verified before capture that these twelve are the ONLY
+#   paths whose loop-ON body differs from the regenerated loop-OFF snapshot in every fixture; the
+#   loop-ON/OFF diff of each is pinned by tests/render/test_render_light_lane_s2.py (AC-002).
 _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
+    "commands/hm/execute.md": {
+        "side-python-cli": "2614a0c1ab7f8971152bddd0e3668ef2bb337d290a04ce58c4827e7662a4f778",
+        "side-tauri-app": "2614a0c1ab7f8971152bddd0e3668ef2bb337d290a04ce58c4827e7662a4f778",
+        "prod-tauri-app": "6daedcf0dac03ffee5f89b1e249a76a33578f7eab751b89179065e478926d88c",
+        "prod-firmware": "6daedcf0dac03ffee5f89b1e249a76a33578f7eab751b89179065e478926d88c",
+    },
+    "commands/hm/research.md": {
+        "side-python-cli": "8b4cc5fc72f5f297c8ed7bea44fd921293d8d71e8e5d2b0319b000b814bdd0a7",
+        "side-tauri-app": "8b4cc5fc72f5f297c8ed7bea44fd921293d8d71e8e5d2b0319b000b814bdd0a7",
+        "prod-tauri-app": "201bf7dedb9df649c66827fa60bb9bbc290bbfe48f097ec0c9cd13b8724ba3bf",
+        "prod-firmware": "201bf7dedb9df649c66827fa60bb9bbc290bbfe48f097ec0c9cd13b8724ba3bf",
+    },
+    "commands/hm/review.md": {
+        "side-python-cli": "0a9d420f243302b0abb88ab0b186b2df58f3eb64e026757c12939a8973dc5536",
+        "side-tauri-app": "0a9d420f243302b0abb88ab0b186b2df58f3eb64e026757c12939a8973dc5536",
+        "prod-tauri-app": "e54ca9c8773a145335c9aceb26ab3a5dfcc910de4150643207ab7749356afe41",
+        "prod-firmware": "e54ca9c8773a145335c9aceb26ab3a5dfcc910de4150643207ab7749356afe41",
+    },
+    "commands/hm/spec.md": {
+        "side-python-cli": "0e3ee6cec1d555173ddb838b9c40ae4eff5531699db90b1716e160e1097f809e",
+        "side-tauri-app": "0e3ee6cec1d555173ddb838b9c40ae4eff5531699db90b1716e160e1097f809e",
+        "prod-tauri-app": "23b141be5064e1c06b933d75e74872ae6c463235f5864f49470f05ee8c923ff0",
+        "prod-firmware": "23b141be5064e1c06b933d75e74872ae6c463235f5864f49470f05ee8c923ff0",
+    },
+    "commands/hm/verify.md": {
+        "side-python-cli": "11b411598351bd88ce2302f91d38609d025fc49661f0ddf607832694b30e9a7c",
+        "side-tauri-app": "11b411598351bd88ce2302f91d38609d025fc49661f0ddf607832694b30e9a7c",
+        "prod-tauri-app": "808d12688b6640d91753df4391bd7e2f686beba270c88b71e874be9eab956979",
+        "prod-firmware": "808d12688b6640d91753df4391bd7e2f686beba270c88b71e874be9eab956979",
+    },
+    "commands/hm/wrapup.md": {
+        "side-python-cli": "ae0cfa5363cb24defec34fcf7de169fb06e9838564886915c69cf1aa8484acab",
+        "side-tauri-app": "ae0cfa5363cb24defec34fcf7de169fb06e9838564886915c69cf1aa8484acab",
+        "prod-tauri-app": "05adc999ca9eabd692e813ab66c2f8a88c410a0f58788ba4dfec8a561bf4e30b",
+        "prod-firmware": "05adc999ca9eabd692e813ab66c2f8a88c410a0f58788ba4dfec8a561bf4e30b",
+    },
+    "stages/execute.md": {
+        "side-python-cli": "fbb6fb65084c46c6139bfbc6240abdccc834e18e124f60ba1e2134ed165d33cb",
+        "side-tauri-app": "fbb6fb65084c46c6139bfbc6240abdccc834e18e124f60ba1e2134ed165d33cb",
+        "prod-tauri-app": "50159b0b42a00850b7cfdfb83c52cb052449ecde23772ce36d0756f3770b780e",
+        "prod-firmware": "50159b0b42a00850b7cfdfb83c52cb052449ecde23772ce36d0756f3770b780e",
+    },
+    "stages/research.md": {
+        "side-python-cli": "c6c77546d3ea53708f6e4adad2269b319c01cbb0ee1711a3db84dc37243cf5f4",
+        "side-tauri-app": "c6c77546d3ea53708f6e4adad2269b319c01cbb0ee1711a3db84dc37243cf5f4",
+        "prod-tauri-app": "d835c39e3d9521b9dda22a84b7f8dd5182a2afb1d294fa0007945dddabfe8750",
+        "prod-firmware": "d835c39e3d9521b9dda22a84b7f8dd5182a2afb1d294fa0007945dddabfe8750",
+    },
+    "stages/review.md": {
+        "side-python-cli": "b9d93db008040a975e025ffe70a670197ad496002acda63688231eaeb2c1de36",
+        "side-tauri-app": "b9d93db008040a975e025ffe70a670197ad496002acda63688231eaeb2c1de36",
+        "prod-tauri-app": "fc1deee3f6116d4d359348417528f915c87f33bebbfdf660946dea2e5f3397e6",
+        "prod-firmware": "fc1deee3f6116d4d359348417528f915c87f33bebbfdf660946dea2e5f3397e6",
+    },
+    "stages/spec.md": {
+        "side-python-cli": "7952262fdaaf039c6a8119f465cbee5ee99a668df936ed7b133c998b98dc52ff",
+        "side-tauri-app": "7952262fdaaf039c6a8119f465cbee5ee99a668df936ed7b133c998b98dc52ff",
+        "prod-tauri-app": "e538bbadec3e41e7a283598d9a138a361557b05ed496c2a7a92a4b8695db608c",
+        "prod-firmware": "e538bbadec3e41e7a283598d9a138a361557b05ed496c2a7a92a4b8695db608c",
+    },
+    "stages/verify.md": {
+        "side-python-cli": "dadc1efdbc2de915ee7d69bac335622eae02cc140dff8e878bc0eb7547face10",
+        "side-tauri-app": "dadc1efdbc2de915ee7d69bac335622eae02cc140dff8e878bc0eb7547face10",
+        "prod-tauri-app": "ad26b9aa6f50835994320981859474b71c3f33200f1db95314adaa37c59aa164",
+        "prod-firmware": "ad26b9aa6f50835994320981859474b71c3f33200f1db95314adaa37c59aa164",
+    },
+    "stages/wrapup.md": {
+        "side-python-cli": "2718f43d28122b226fc78f15d3f72c3f25cb6c339259e0cd8197149ab928e5ce",
+        "side-tauri-app": "2718f43d28122b226fc78f15d3f72c3f25cb6c339259e0cd8197149ab928e5ce",
+        "prod-tauri-app": "42d54dd4d4f779ca495585bdda67ccee7f8cd7cc3e0ad593fd85dd870efff093",
+        "prod-firmware": "42d54dd4d4f779ca495585bdda67ccee7f8cd7cc3e0ad593fd85dd870efff093",
+    },
     "commands/hm/help.md": {
         "side-python-cli": "1ec7c692208c633334d0443ab360d24ab6c5915a65de26a8233965bfe86c49c9",
         "side-tauri-app": "1ec7c692208c633334d0443ab360d24ab6c5915a65de26a8233965bfe86c49c9",
@@ -81,7 +158,16 @@ LISTING_SURFACES = (
     # AC-009 compared real rendered bodies).
     ".agents/skills/hm-help/SKILL.md",
 )
-ALLOWED_BODY_DIFFS = {".claude/harness.yaml", *LISTING_SURFACES}
+# SPEC-hm-light-lane-s2 AC-012 widens this by exactly the stage bodies that carry loop-only
+# branches: the six stage commands, their `.claude/stages/*.md` copies and the six Codex stage
+# skills. Nothing else may move with the flag.
+_LIGHT_LANE_S2_STAGES = ("execute", "research", "review", "spec", "verify", "wrapup")
+LOOP_GATED_STAGE_BODIES = (
+    *(f".claude/commands/hm/{s}.md" for s in _LIGHT_LANE_S2_STAGES),
+    *(f".claude/stages/{s}.md" for s in _LIGHT_LANE_S2_STAGES),
+    *(f".agents/skills/hm-{s}/SKILL.md" for s in _LIGHT_LANE_S2_STAGES),
+)
+ALLOWED_BODY_DIFFS = {".claude/harness.yaml", *LISTING_SURFACES, *LOOP_GATED_STAGE_BODIES}
 ALL_TARGETS = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
 
 

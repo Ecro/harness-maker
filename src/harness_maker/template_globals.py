@@ -91,6 +91,19 @@ def stage_invocation(text: str, is_codex: bool) -> str:
 #: dispatch list and `hm lens_coverage check` must agree on the mandatory lens set; a literal
 #: would let them disagree, and the symptom of that is not a visible drift but a review that can
 #: never be approved, because the CLI names a lens the command never told anyone to run.
+def loop_enabled(config: object) -> bool:
+    """Whether a config dump turns the /hm:loop family on (SPEC-loop-opt-in).
+
+    Stage bodies drop their loop-only branches on the same answer that drops the loop driver
+    (SPEC-hm-light-lane-s2), so `synthesize._loop_enabled` delegates here: a Gate 0 receipt
+    missing beside a rendered driver would read as every stage missing on every iteration.
+    """
+    if not isinstance(config, dict):
+        return False
+    loop = config.get("loop")
+    return bool(loop.get("enabled", False)) if isinstance(loop, dict) else False
+
+
 TEMPLATE_GLOBALS: dict[str, object] = {
     "lens_dispatch": conditional_router.lens_dispatch,
     # The unit of DISPATCH, which stopped being the unit of lens when the four core lenses
@@ -111,6 +124,7 @@ TEMPLATE_GLOBALS: dict[str, object] = {
     # the same absent-case answer.
     "strictness_of": strictness.resolve_strictness,
     "explicit_strictness": strictness.explicit_strictness,
+    "loop_enabled": loop_enabled,
 }
 
 

@@ -982,11 +982,13 @@ def test_atomic_renders_keep_their_own_copy(flag_on: dict[str, str]) -> None:
     for stage in ("execute", "review", "wrapup", "verify", "spec", "research"):
         text = flag_on[stage]
         assert shared_prose_fingerprints(text, "worktree_preflight") == 1, stage
-        assert shared_prose_fingerprints(text, "gate0_receipt") == 1, stage
+        # SPEC-hm-light-lane-s2: Gate 0 is loop-only and this render has the loop off; the
+        # loop-on copy is pinned by tests/render/test_render_light_lane_s2.py (AC-002).
+        assert shared_prose_fingerprints(text, "gate0_receipt") == 0, stage
         assert shared_prose_fingerprints(text, "stage_end_banner") == 1, stage
         for marker in _PREFLIGHT_TAIL_MARKERS:
             assert text.count(marker) == 1, f"{stage}: {marker}"
-        assert "- **`skipped`** —" in text, stage
+        assert "- **`skipped`** —" not in text, stage  # a Gate 0 line, so loop-only too
 
 
 # ── AC-007 ─────────────────────────────────────────────────────────────────────

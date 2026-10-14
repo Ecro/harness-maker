@@ -352,6 +352,7 @@ def test_codex_execute_manual_post_commit_pop_uses_uuid_strict_mode() -> None:
     """
     cfg = _make_default_config()
     cfg["worktree"] = {"enabled": True}
+    cfg["loop"] = {"enabled": True}  # Step 5 is the loop's finalize (SPEC-hm-light-lane-s2)
     specs = _codex_stage_skills(config_dump=cfg)
     execute_spec = next(s for s in specs if "hm-execute" in s[1])
     body = execute_spec[2]["stage_body"]

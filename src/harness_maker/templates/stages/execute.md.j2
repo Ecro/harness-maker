@@ -257,6 +257,8 @@ retry the call once, and if it is still absent surface the path and the error an
 not ceremony: `/hm:verify` Check 6 reads that key and treats an absent one as `PASS (N-A)`, so a
 write that silently did nothing turns the gate permanently green instead of red.
 
+{% if loop_enabled(config) -%}
+<!-- @hm:loop-only -->
 #### Step 0.2 — Loop mode: the per-iter PLAN
 
 Detection is **session-scoped** — it keys on THIS Claude session, so a loop running in another
@@ -304,6 +306,9 @@ the current code state.
 > the note. The operator re-runs `/hm:spec {slug}` in a separate session to lock the decision
 > where the DRI can see it.
 
+<!-- @hm:/loop-only -->
+
+{% endif -%}
 #### Step 0.3 — Verify the PLAN write
 
 Read the file back and assert:
@@ -660,31 +665,9 @@ set changed during A.5 — treat it as a new false-RED and return to Phase A.
 
 #### Phase C.0 — Declare the repair, before you write it
 
-**Trigger: the same one Phase D.5 uses** — this PLAN phase changes code in order to fix a defect
-(a bug, a review finding, a failing test, a regression). Pure new-feature work skips this; say so
-in one line. One trigger, not two: a second wording drifts from D.5's and produces a state where
-D.5 runs and this does not.
-
-State three things in your turn output. Nothing is written to disk — this is a declaration, not
-an artefact:
-
-1. **The root-cause hypothesis for this repair.** What you believe produces the defect, in one
-   sentence. Not the symptom.
-2. **The scope this repair will touch** — the files and call sites you are about to change.
-3. **The non-goals** — what you will deliberately NOT touch, including any refactor, cleanup or
-   API improvement you noticed while reading. Enlarging the change enlarges the space for a
-   self-induced regression, which is the whole reason this step exists.
-
-**Declare all three unprompted** — what a repair will change and what it will leave alone are
-properties of the repair itself, so they exist at every strictness, with or without a SPEC,
-**with or without TDD** — C.0 is not one of the phases `--no-tdd` skips.
-**Then cite the `Do not change` list loaded at Step 1** where item 3 overlaps it, naming the
-entries your declared scope comes near. If you cannot restate it, re-Read that
-section; if Step 1 emitted a `[boundaries]` line, repeat it. It does not replace the declaration.
-
-What checks it afterwards: the drift check at the **GREEN stage exit** compares the change set
-**you enumerate at Step 4** against the PLAN's phase scope **and** against that same `Do not change` list. The value of item 3 is still that it is the only brake
-existing *before* the edit rather than after it.
+1. **The root-cause hypothesis** — on a repair (code changed to fix a bug, review finding, failing test or regression; D.5's trigger; new-feature work skips this in one line), state three things in your turn output before the edit, with or without TDD. First, the root-cause hypothesis: what produces the defect, not the symptom.
+2. **The scope** — the files and call sites you are about to change.
+3. **The non-goals** — what you will deliberately NOT touch; cite the `Do not change` list loaded at Step 1 where they overlap (re-Read it if you cannot restate it). The drift check at stage exit compares your change set against the phase scope and that list.
 
 #### Phase C — Implementation to GREEN
 
@@ -778,40 +761,9 @@ prints a skip notice and passes (non-gating) — that is intended, not a failure
 
 #### Phase D.5 — Newly-reachable window (ADR-003; runs only after a repair)
 
-**Trigger:** this PLAN phase changed code in order to **fix a defect** — a bug, a review
-finding, a failing test, a regression. Pure new-feature work skips this; say so in one line
-and move on. When in doubt, run it: the cost is a paragraph.
-
-Green gates do not measure your fix. They measure the coverage that existed *before* it.
-`[fail:code] fix-introduced-defect-passes-all-gates` is at **count:4** in this repo —
-ratios 11/22, 7/7, 5, 11/14, each on a four-gate run that was **entirely green**, one of
-them alongside a 7/7 mutation check. Every one of those repairs shipped a second defect
-through the same suite that had just approved the first. The remedy has been written in
-memory for months and was a step in no stage template; this is that step.
-
-Answer all three. Write them into the PLAN phase's notes — this is a **written** artifact,
-not a reflection:
-
-1. **What input window does this repair newly make reachable?** Before the fix, some inputs
-   never reached the repaired code, or reached it and were rejected early. The fix changed
-   that boundary. Name the window concretely — a value range, a state, a call order, an
-   absent field, a length, a concurrency interleaving. "The bug no longer happens" is not a
-   window; it is the absence of one.
-2. **Which test enters that window, and is it in this same commit?** Name the test by node
-   id. It must exercise the newly-reachable window itself, not merely re-assert the original
-   symptom. A test that only proves the reported bug is gone leaves the window it opened
-   untested — that is the shape of all four recurrences.
-3. **If you cannot name one: STOP and say so explicitly.** Do not advance the phase on the
-   strength of a green Phase D. Either add the test now, or file the gap as a blocker with
-   the window from (1) named in it, so the next reader inherits the window rather than
-   rediscovering it. Silence here is the failure mode; an explicit "no fixture, here is why"
-   is an acceptable outcome that a reviewer can act on.
-
-> **Absent-case (the repo's most-recurring class, count:8).** If the repair activates on an
-> optional field or a value that predates the change, the newly-reachable window includes
-> the case where that input is **absent**. State the absent-case behaviour — default,
-> migration, or explicit skip — and cover it. A fixture that only exercises the present case
-> means the fix never fires for the data that motivated it.
+After a repair (C.0's trigger), write in the PLAN phase notes what input window does this repair newly make reachable: a value range, state, call order or absent field ("the bug no longer happens" is not a window), and for an optional input its absent case: default, migration, or explicit skip.
+Name by node id the test in this same commit that enters that window; it must not merely re-assert the original symptom.
+If you cannot name one, STOP: add it now or file a blocker naming the window. Do not advance the phase on a green Phase D alone.
 
 ### Step 4 — Stage exit (NO commit — wrapup owns commits)
 
@@ -835,7 +787,7 @@ When all PLAN phases complete GREEN:
 
 If a PLAN phase blocks (Phase A.5 retry exhausted, Phase D unfixable, or ADR conflict), do these
 five in order. **Everything in the five steps below, the dispatch block included, runs on the
-blocked path ONLY** — a phase that exited GREEN skips to Step 4.5.
+blocked path ONLY** — a phase that exited GREEN skips them.
 
 1. Document the blocker inline in the PLAN under the affected phase.
 2. Dispatch `stuck`, before you surface anything — halting with the failure output alone hands
@@ -861,7 +813,8 @@ blocked path ONLY** — a phase that exited GREEN skips to Step 4.5.
 
 {% set gate0_heading = "### Step 4.5 — Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "execute" %}{% set gate0_pass = "Step 4 exited cleanly (all Phase D checks GREEN, no blocker filed)." %}{% set gate0_fail = "Step 4 raised a blocker (Phase D unfixable, ADR conflict, test-reviewer FAIL retry exhausted)." %}{% set gate0_standalone = false %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 
-{% if wt_on -%}
+{% if wt_on and loop_enabled(config) -%}
+<!-- @hm:loop-only -->
 ### Step 5 — Worktree finalize (ephemeral `/hm:loop` worktrees ONLY)
 
 **Does this step apply?** Two worktree models reach it; finalize belongs to one. Read
@@ -944,6 +897,7 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm w
 !HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with {{ harness_maker_src_path }} hm worktree post-commit-pop "$(pwd)"
 ```
 {% endif %}
+<!-- @hm:/loop-only -->
 
 {%- endif %}
 
@@ -960,7 +914,9 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm w
 - Phase A.5 test-reviewer returned PASS (or `--no-tdd` was set, or `lane: light`).
 - No diff outside the PLAN's stated scope — surprise edits are flagged.
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
-{% if wt_on %}- An `execute-<uuid>` worktree finalized exactly once: success or fail. An `hm/<slug>` task worktree finalized ZERO times — wrapup commits it and `task-land` lands it.
+{% if wt_on and loop_enabled(config) %}<!-- @hm:loop-only -->
+- An `execute-<uuid>` worktree finalized exactly once: success or fail. An `hm/<slug>` task worktree finalized ZERO times — wrapup commits it and `task-land` lands it.
+<!-- @hm:/loop-only -->
 {% endif %}
 
 {% set summary_done = "PLAN phases implemented to GREEN; changes staged, no commit" -%}

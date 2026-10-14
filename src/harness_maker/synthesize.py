@@ -19,7 +19,7 @@ from typing import Any
 
 import typer
 
-from harness_maker import world_model
+from harness_maker import template_globals, world_model
 from harness_maker.models import (
     AgentModelSpec,
     AtomicStage,
@@ -321,7 +321,7 @@ def _atomic_command_files(
 
     env = _make_env()
     if config_dump is None:
-        config_dump = _strict_fallback_dump()
+        config_dump = _no_answers_dump()
     install_ref = _compute_install_ref()
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
@@ -430,6 +430,8 @@ def _command_frontmatter(out_path: str, world_model_name: str) -> dict[str, Any]
     if out_path.startswith("commands/hm/") and stage in _STAGE_SUMMARIES:
         gate = _stage_gate(world_model_name, "/hm:loop")
         return {"description": f"{_STAGE_SUMMARIES[stage]} {gate}"}
+    if out_path in _TYPED_ONLY_SKILL_PATHS:
+        return {"disable-model-invocation": True}
     description = _COMMAND_DESCRIPTIONS.get(out_path)
     if not description:
         return {}
@@ -622,6 +624,20 @@ def _skill_files() -> list[FileSpec]:
     ]
 
 
+def _reference_files(config_dump: dict[str, object] | None) -> list[FileSpec]:
+    """On-demand reference files under ``.claude/hm/`` (SPEC-hm-light-lane-s2 IRR-001).
+
+    The auto-advance procedure renders only where the stage stubs that point at it do: a
+    ``gated`` harness carries neither. No config (the module-level skeletons) is the full
+    inventory.
+    """
+    autonomy = (config_dump or {}).get("autonomy")
+    level = autonomy.get("level") if isinstance(autonomy, dict) else None
+    if config_dump is not None and level == "gated":
+        return []
+    return [("hm/autopilot-advance.md.j2", "hm/autopilot-advance.md", {})]
+
+
 def _world_model_handle(config_dump: dict[str, object] | None) -> str:
     """The router's directory. Callers without a config (module-level skeletons) get the default."""
     wm = (config_dump or {}).get("world_model")
@@ -724,6 +740,16 @@ def _strict_fallback_dump() -> dict[str, Any]:
     return HarnessConfig(spec=holder["spec"]).model_dump(mode="json")
 
 
+def _no_answers_dump() -> dict[str, Any]:
+    """The dump a no-answers render uses: the strict fallback with the loop ON.
+
+    ``_loop_enabled(None)`` renders the loop commands, so the stage bodies on the same path must
+    keep their Gate 0 receipt (SPEC-hm-light-lane-s2 AC-011); the fallback's fresh-install
+    ``False`` alone would drop it beside a rendered driver.
+    """
+    return {**_strict_fallback_dump(), "loop": {"enabled": True}}
+
+
 def _loop_enabled(config_dump: dict[str, Any] | None) -> bool:
     """Whether the /hm:loop family renders (SPEC-loop-opt-in, ADR-003 of its PLAN).
 
@@ -733,7 +759,7 @@ def _loop_enabled(config_dump: dict[str, Any] | None) -> bool:
     """
     if config_dump is None:
         return True
-    return bool(config_dump.get("loop", {}).get("enabled", False))
+    return template_globals.loop_enabled(config_dump)
 
 
 def _loop_command_files() -> list[FileSpec]:
@@ -785,6 +811,7 @@ def _base_files(
         ("commands/hm/uninstall.md.j2", "commands/hm/uninstall.md", {}),
         (_localized("commands/hm/help", locale), "commands/hm/help.md", {}),
         *_skill_files(),
+        *_reference_files(config_dump),
         *_world_model_skill_files(config_dump),
         *_agent_files(preset, agent_models, default_model),
         *_rubric_files(),
@@ -865,7 +892,7 @@ def _codex_target_files(
     loop_on = _loop_enabled(config_dump)
     if config_dump is None:
         # Keep the listing prose consistent with the full inventory this path renders.
-        config_dump = {**_strict_fallback_dump(), "loop": {"enabled": True}}
+        config_dump = _no_answers_dump()
     env = _make_env()
     install_ref = _compute_install_ref()
     loop_specs: list[FileSpec] = []
@@ -952,7 +979,8 @@ def _codex_skill_files() -> list[FileSpec]:
 
 
 # SPEC-maker-front-door-improvements IRR-001/002: reachable only by typing their name or through
-# the world model's Read. Claude Code/Cursor get `disable-model-invocation` in the template;
+# the world model's Read. Claude Code/Cursor get `disable-model-invocation` from
+# `_command_frontmatter` (SPEC-hm-light-lane-s2 AC-009);
 # Codex gets `agents/openai.yaml` (policy.allow_implicit_invocation: false).
 #
 # HM-LIGHT-LANE lever 5 added the next five: no stage prompt invokes them by name and none is
@@ -966,6 +994,14 @@ _TYPED_ONLY_SKILLS: tuple[str, ...] = (
     "autoloop-driver",
     "context-linter",
     "worktree-isolator",
+)
+
+
+#: Claude Code / Cursor read the flag from frontmatter; derived here, as `_TYPED_ONLY_COMMANDS` is
+#: for commands, so the list is the one place a skill becomes typed-only. Codex copies under
+#: `.agents/` never match: Codex gets `agents/openai.yaml` instead.
+_TYPED_ONLY_SKILL_PATHS: frozenset[str] = frozenset(
+    f"skills/{n}/SKILL.md" for n in _TYPED_ONLY_SKILLS
 )
 
 
@@ -998,7 +1034,7 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     if config_dump is None:
-        config_dump = _strict_fallback_dump()
+        config_dump = _no_answers_dump()
     env = _make_env()
     install_ref = _compute_install_ref()
     out: list[FileSpec] = []

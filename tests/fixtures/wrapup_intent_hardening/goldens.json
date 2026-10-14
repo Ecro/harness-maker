@@ -1,6 +1,6 @@
 {
   "Production-claude": {
-    "outside_57_sha256": "05d6ffeb7fbacc09974256f89ad1e544b316db12df4a8408e5ff878260ef562e",
+    "outside_57_sha256": "aac176c28fab0570f6444aea8bb11ae74a87d319af41bf5379e73043d635923c",
     "placeholders": [
       [
         "--locator",
@@ -41,7 +41,7 @@
     ]
   },
   "Production-codex": {
-    "outside_57_sha256": "2d350c1f31f469e4a3383b99b0e75e5ebba72685bdf62cced1c6665a97c80299",
+    "outside_57_sha256": "99f6c6ad66ceb5563046a254945c42c112790480af8a369122fec20ee57d85c7",
     "placeholders": [
       [
         "--locator",
@@ -82,7 +82,7 @@
     ]
   },
   "Side-claude": {
-    "outside_57_sha256": "9adfc75919ecb1a4279358bac753213e1d3ca818b8e10848821a08b097daf4ee",
+    "outside_57_sha256": "473092fd9602227803d3e2801ec53d39fd5203462b774e1f96120590c97d6a8b",
     "placeholders": [
       [
         "--locator",
@@ -123,7 +123,7 @@
     ]
   },
   "Side-codex": {
-    "outside_57_sha256": "0b3d148a364dc13ba1ac80f96b51ed6ac2f17a9d3ccc32102fbd13c9b93fe001",
+    "outside_57_sha256": "ecaa86bc3cc3b9ed14b71c7c7859dfa2c3dce54e8690e6dc2e8ff3fa00099df5",
     "placeholders": [
       [
         "--locator",

@@ -42,7 +42,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.models import Preset, ProjectProfile, Target
+from harness_maker.models import LoopConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.strictness import Strictness
 from harness_maker.synthesize import synthesize
@@ -62,16 +62,38 @@ _LEGACY_VOCABULARY = (
 )
 
 
+_AUTOPILOT_BLOCK = re.compile(
+    r"<!-- @hm:autopilot-advance -->.*?<!-- @hm:/autopilot-advance -->", re.DOTALL
+)
+
+
+# SPEC-hm-light-lane-s2 cut execute D.5 to three lines. Its stop survives in new words; each
+# entry maps the new normalised line to the old one, and is excused only while the old line is
+# still in the reference and the new one in the render.
+_REWORDED_STOPS = {
+    "If you cannot name one, STOP: add it now or file a blocker naming the window. Do not advance"
+    " the phase on a green Phase D alone.": "#. **If you cannot name one: STOP and say so"
+    " explicitly.** Do not advance the phase on the",
+}
+
+
 def _stops(text: str) -> set[str]:
+    # SPEC-hm-light-lane-s2 moved the auto-advance procedure to `.claude/hm/autopilot-advance.md`
+    # and left a reworded stub. That block does not vary with strictness, and its own
+    # instruction-preservation oracle lives in tests/render/test_render_light_lane_s2.py, so it
+    # is cut from both sides here rather than read as stops gained or lost.
+    text = _AUTOPILOT_BLOCK.sub("", text)
     return {re.sub(r"\d+", "#", ln.strip()) for ln in text.splitlines() if STOP.search(ln)}
 
 
 def _render(preset: Preset, strictness: Strictness, tmp: Path) -> dict[str, str]:
     from harness_maker.interview import _build_answers
 
+    # The reference predates SPEC-hm-light-lane-s2, which made verify Check 5 loop-only; the
+    # loop axis is orthogonal to strictness, so it is held at the reference's value (on).
     answers = _build_answers(
         locale="en", targets=[Target.CLAUDE_CODE], preset=preset, strictness=strictness
-    )
+    ).model_copy(update={"loop": LoopConfig(enabled=True)})
     with pytest.MonkeyPatch.context() as mp:
         pin_install_ref(mp)
         render(
@@ -112,7 +134,9 @@ def test_ac_006_warn_renders_the_checks_and_blocks_nothing(preset: Preset, tmp_p
     assert "--spec specs/SPEC-{slug}.machine.yaml" in new["review"]
 
     for stage in STAGES:
-        extra = _stops(new[stage]) - _stops(_ref(preset, "task-driven", stage))
+        ref = _stops(_ref(preset, "task-driven", stage))
+        extra = _stops(new[stage]) - ref
+        extra -= {n for n, o in _REWORDED_STOPS.items() if o in ref}
         assert not extra, (
             f"{stage} at warn stops on what the relaxed harness never did: {sorted(extra)}"
         )
@@ -125,7 +149,9 @@ def test_ac_006_block_renders_the_spec_gate_hook(preset: Preset, tmp_path: Path)
     new = _render(preset, "block", tmp_path)
 
     for stage in STAGES:
-        lost = _stops(_ref(preset, "spec-driven", stage)) - _stops(new[stage])
+        now = _stops(new[stage])
+        lost = _stops(_ref(preset, "spec-driven", stage)) - now
+        lost -= {o for n, o in _REWORDED_STOPS.items() if n in now}
         assert not lost, (
             f"{stage} at block lost stop conditions the strict harness had: {sorted(lost)}"
         )

@@ -27,6 +27,16 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-14, `hm-light-lane-s2`** — `execute`, `research`, `review`, `spec`, `verify`,
+  `wrapup` and `health` moved, in all four arms. The six stages: the auto-advance block became a
+  per-stage stub pointing at the new `.claude/hm/autopilot-advance.md` (its `autopilot_caps`
+  lines and gate predicates unchanged, AC-004), and in the `auto_safe` arms (this repo's
+  `loop.enabled: false`) Gate 0, execute Step 0.2/Step 5 and verify Check 5 stop rendering.
+  Review lost Step 2.5, step 5c and the Size & Complexity section, execute's C.0/D.5 shrank, and
+  `health` lost the `silent_intent_miss_rate` sub-check (SPEC-hm-light-lane-s2). The autopilot
+  gate on `autonomy.level` itself is untouched (AC-006 re-asserts it). Verified before
+  re-capture that these seven are the ONLY moved commands in every arm and none was added or
+  removed.
 - **2026-10-14, `hm-light-lane`** — `spec`, `execute` and `review` moved in all four arms: the
   light lane (spec Step 0 picks `lane: light|full`, execute skips Phase A.5 on light, review cuts
   repetition on light and closes the run and reaps the freeze ref when it skips the confirmation

@@ -268,6 +268,12 @@ _REMOVED_COMMANDS = {
 }
 
 _COLLAPSED_MULTILINE = {
+    # SPEC-hm-light-lane-s2 (2026-10-14): the auto-advance block became a per-stage stub and its
+    # shared procedure moved to `.claude/hm/autopilot-advance.md` (IRR-001). The stub keeps the
+    # dispatch as "`proceed: true` → `Skill(hm:<next_stage from the JSON>)`; else the file's
+    # list."; the full sentence lives in the shared file, pinned by
+    # tests/render/test_render_light_lane_s2.py (AC-005).
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with",
     # SPEC-dev-mode-removal (2026-09-21): `/hm:make`'s pointer sentence listed the axes the
     # slash command asks for. The methodology axis is gone, so the sentence says the same thing
     # with one fewer word. Nothing dispatch-related was lost — the question that WAS removed is

@@ -184,6 +184,7 @@ REGISTRY: tuple[StepEntry, ...] = (
         "INV",
         "plan Step 1.5",
         note="per-iter PLAN under /hm:loop; per-iteration state",
+        renders_when="loop.enabled",
     ),
     _u(
         "execute",
@@ -221,19 +222,35 @@ REGISTRY: tuple[StepEntry, ...] = (
         "Phase C.0",
         "COMP",
         "*",
-        f"{_R}; declared out of scope for this task (mutation-receipt coupling)",
+        f"{_R}; declared out of scope for this task (mutation-receipt coupling); "
+        "three lines since SPEC-hm-light-lane-s2",
     ),
     _u("execute", "Phase C", "INV", "execute Phase B", note="implementation to GREEN"),
     _u("execute", "Phase D", "INV", "execute Phase B", note="deterministic targeted verification"),
-    _e("execute", "Phase D.5", "COMP", "*", f"{_R}; out of scope for this task"),
+    _e(
+        "execute",
+        "Phase D.5",
+        "COMP",
+        "*",
+        f"{_R}; out of scope for this task; three lines since SPEC-hm-light-lane-s2 "
+        "(the failure it targets recurred count:4 to count:19 under the long form)",
+    ),
     _u("execute", "Step 4", "INV", "execute Step 1", note="stage exit + boundary comparison"),
-    _u("execute", "Step 4.5", "INV", "execute Step 4", note="Gate 0 receipt (state)"),
+    _u(
+        "execute",
+        "Step 4.5",
+        "INV",
+        "execute Step 4",
+        note="Gate 0 receipt (state)",
+        renders_when="loop.enabled",
+    ),
     _e(
         "execute",
         "Step 5",
         "HOST",
         "**",
         f"{_R}; Claude Code enforces worktree isolation natively; Codex/Cursor do not",
+        renders_when="loop.enabled",
         knob="worktree.enabled",
         source_kind="yaml",
         ordering="bool_off",
@@ -250,7 +267,6 @@ REGISTRY: tuple[StepEntry, ...] = (
         "reviewers.enabled is NOT a dispatch knob (CLAUDE.md fan-out retraction)",
     ),
     _e("review", "Step 2", "INV", "**", f"{_R}; PLAN/SPEC drift is a state check"),
-    _u("review", "Step 2.5", "INV", "review Step 2", note="silent-intent-miss telemetry"),
     _e(
         "review",
         "Step 3",
@@ -374,7 +390,7 @@ REGISTRY: tuple[StepEntry, ...] = (
     ),
     _e("verify", "Check 3", "INV", "**", _R),
     _e("verify", "Check 4", "INV", "**", _R),
-    _e("verify", "Check 5", "INV", "**", _R),
+    _e("verify", "Check 5", "INV", "**", _R, renders_when="loop.enabled"),
     _e("verify", "Check 6", "INV", "**", f"{_R}; renders at every strictness, blocks at block"),
     _e(
         "verify",

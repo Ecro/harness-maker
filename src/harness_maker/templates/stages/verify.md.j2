@@ -123,6 +123,8 @@ FAIL when: any finding has `severity == "high"` AND `resolution != "accepted-ris
 
 PASS when: zero unresolved high findings.
 
+{% if loop_enabled(config) -%}
+<!-- @hm:loop-only -->
 ### Check 5 — Worktree merge cleanliness
 
 When worktree isolation was engaged (`.worktrees/execute-*` exists or did exist), confirm the merge happened cleanly:
@@ -135,6 +137,8 @@ When worktree isolation was engaged (`.worktrees/execute-*` exists or did exist)
 FAIL when: there are unmerged paths, conflict markers, or unresolved merge state.
 
 PASS when: working tree is clean OR has only the staged changes from `/hm:execute` Step 5 `stage-only`.
+<!-- @hm:/loop-only -->
+{% endif -%}
 ### Check 6 — SPEC requirement
 {% if strictness_of(config) == 'block' %}
 

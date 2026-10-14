@@ -166,36 +166,6 @@ Before reviewers run, scan the diff against PLAN scope:
 
 Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run on the actual diff.
 
-#### Step 2.5 — Silent-intent-miss hook (ADR-008)
-
-If the PLAN has `common_ground_marks:` in its frontmatter (recorded by the
-interview when slots were skipped as common-ground), cross-reference
-each reviewer-flagged mis-specification against that list:
-
-1. Read PLAN frontmatter `common_ground_marks` array.
-2. For each REVIEW finding that flags an under-specified slot, extract the slot identifier from the finding's structured field (NOT free-form prose — prose-only mentions are out of scope for this hook). Look it up by exact, case-sensitive match against the `slot` field of each `common_ground_marks` entry.
-3. If the slot was marked common-ground at `inferred_by: "llm-inference:*"` (i.e., the aggressive ADR-003 path inferred it as known), call:
-
-   ```python
-   from harness_maker.observability.intent_miss import record_intent_miss
-   from pathlib import Path
-
-   record_intent_miss(
-       slot=<slot>,
-       trigger="review-mismatch",
-       original_mark=<mark dict from PLAN frontmatter>,
-       notes=f"REVIEW flagged '{<slot>}' as {<reviewer finding summary>}",
-       audit_path=Path(".claude/observability") / f"silent-intent-miss-{<task_slug>}.jsonl",
-   )
-   ```
-
-4. The event is appended to `.claude/observability/silent-intent-miss-{slug}.jsonl`; `/hm:health` Layer 1 sub-check reads it to compute `silent_intent_miss_rate` for drift alerting.
-
-This is the ADR-008 telemetry hook for the aggressive common-ground-inference
-choice (ADR-003). It does NOT block REVIEW or change the verdict — it only
-records the post-hoc signal so the threshold can be re-calibrated if the
-silent-miss rate exceeds tolerance.
-
 **Emit drift_verdict** in the REVIEW report frontmatter (mandatory — wrapup and verify depend on this):
 
 ```yaml
@@ -725,12 +695,14 @@ IF grade ≥ grade_threshold AND blocks_approval == false:
          `--judgment-gate pending`. `gated`/`auto_safe` stop, exactly as before;
          `auto_full` clears it and records the passed-over finding ids. Do NOT stop
          here on your own: the level decides.
+{% if loop_enabled(config) %}<!-- @hm:loop-only -->
        • Loop mode: proceed — the flag is persisted in the committed
          REVIEW-{slug}.md (a durable record the operator reads when reviewing
          loop output). No per-iter halt and no active loop-close gate — the flag
          has no runtime reader on the loop path (accepted limitation, ADR-003).
          The letter cleared, so Gate 0 is still `pass`.
-     ELSE:
+<!-- @hm:/loop-only -->
+{% endif %}     ELSE:
        STOP. Proceed to wrapup.
 
 IF auto_fix disabled (config OR --no-auto-fix):
@@ -873,22 +845,6 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harn
 !{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>
 ```{% endif %}
 
-{% if config.preset == "Production" %}
-5c. **Measure what the round did to the code**, not only how much it edited. Churn counts edits;
-   this counts what the edits left behind. Its own call on purpose — a telemetry failure must
-   never take 5b's churn measurement down with it, and this feature records rather than gates.
-
-{% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn complexity --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post")
-```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn complexity --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post
-```{% endif %}
-
-   It reuses 5b's endpoints, so it measures the round AFTER reverts — a reverted fix leaves no
-   complexity behind either. `complexity_status` is three-valued: `not-python` is ADR-001's
-   accepted cost made visible, `unparseable` is a transient state, and a `measured` file always
-   scores at least 1 — so a null never has to be guessed at.
-{% endif %}
 
    `tee` keeps this payload for the Telemetry Emit step, which reads the four `churn_*` keys
    out of it. Carry them into the **iteration record** only, never into the row.
@@ -1065,9 +1021,11 @@ ELSE:                                   # confirm-2 was dirty
   → STOP. Status = CHANGES_REQUESTED, human_review_needed = true.
   → Name the surviving findings in the REVIEW report.
   → No third confirmation pass is ever dispatched in one /hm:review.
+{% if loop_enabled(config) %}<!-- @hm:loop-only -->
   → Loop mode: emit the Gate 0 receipt with `verdict: fail` and stop. The loop driver
     owns retry and escalation; this stage reports rather than escalating.
-```
+<!-- @hm:/loop-only -->
+{% endif %}```
 
 Record `confirm_pass_ran: true` and `confirm_pass_new_severe_n: <count>` on the terminal
 telemetry row.
@@ -1132,21 +1090,7 @@ Append to the REVIEW report:
 
 Final grade: {final}
 Iterations used: {N} / {max_review_rounds}
-Exit reason: converged | no-progress | cap-exhausted | auto-fix-disabled{% if config.preset == "Production" %}
-
-## 📏 Size & Complexity
-
-| File | LOC | Cyclomatic | Max nesting | Status |
-|------|-----|------------|-------------|--------|
-| {path} | {pre_loc} → {post_loc} | {pre} → {post} | {pre} → {post} | {complexity_status} |
-
-Read it from 5c's rows — do not re-derive the numbers. **Report only; there is no threshold and
-no gate.** A study measuring ten arms over 47 rounds found the compliance verdict identical
-(19/19) while complexity split −17% against +58%, which is the case for recording it; it supplies
-no threshold, and inventing one here would be a device that costs more than it protects.
-
-Write `null` as `null`, never `0`: a non-Python file and a perfectly simple one are different
-facts, and `complexity_status` says which you are looking at.{% endif %}
+Exit reason: converged | no-progress | cap-exhausted | auto-fix-disabled
 Status: APPROVED | CHANGES_REQUESTED
 human_review_needed: {true|false}
 Counters (see §5): unreviewed {u} · prior-fix {r} · unattributed {a}
