@@ -85,6 +85,11 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "RET", "SIM", "PT"]
 
+[tool.ruff.lint.per-file-ignores]
+# Bench fixture and hidden tests (SPEC-hm-light-lane-bench): the agent under test writes the
+# error messages, so a `match=` would test wording the task never specified.
+"scripts/bench/**" = ["PT011"]
+
 [tool.mypy]
 strict = true
 python_version = "3.12"
