@@ -46,6 +46,7 @@ from harness_maker.models import LoopConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.strictness import Strictness
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 from ..structural.conftest import pin_install_ref
 
@@ -101,7 +102,9 @@ def _render(preset: Preset, strictness: Strictness, tmp: Path) -> dict[str, str]
             tmp,
             freeze_time=DEFAULT_FREEZE_TIME,
         )
-    out = {s: (tmp / "commands" / "hm" / f"{s}.md").read_text(encoding="utf-8") for s in STAGES}
+    # Execute's Phase A.5 body lives in `.claude/hm/execute-a5.md` (SPEC-hm-light-lane-s2b); the
+    # reference predates that move, so each stage is read with its pointers expanded in place.
+    out = {s: stage_text(tmp, s) for s in STAGES}
     out["settings"] = (tmp / "settings.json").read_text(encoding="utf-8")
     return out
 

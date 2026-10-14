@@ -31,6 +31,7 @@ from harness_maker.models import (
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 from .conftest import pin_install_ref
 from .test_command_size_budget import headings
@@ -51,8 +52,10 @@ def _render_arm(preset: Preset, tmp: Path) -> dict[str, str]:
             tmp,
             freeze_time=DEFAULT_FREEZE_TIME,
         )
-    root = tmp / "commands" / "hm"
-    return {s: (root / f"{s}.md").read_text(encoding="utf-8") for s in STAGES}
+    # The registry classifies every step a stage runs, wherever the Claude command keeps its text:
+    # review's confirmation pass lives in `.claude/hm/review-confirmation.md`
+    # (SPEC-hm-light-lane-s2b) and is read in place, so Step C1-C3 stay classified, not orphaned.
+    return {s: stage_text(tmp, s) for s in STAGES}
 
 
 @pytest.fixture(scope="module")

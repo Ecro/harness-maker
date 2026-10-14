@@ -1,0 +1,12 @@
+{#- SPEC-hm-light-lane-s2b: on-demand reference for the Claude Code wrapup command. The text between the ref markers is
+    the stage partial the Codex skill includes inline, rendered with is_codex false, so the two
+    cannot drift; a test slices the markers and compares the bytes to the pre-move render. -#}
+{% set is_codex = false -%}
+# Wrapup Steps 1–5.6 (on-demand reference)
+
+Read by `stage-delegate` (from the brief's `base_root`) and by the main loop on the wrapup
+command's degraded path. The command keeps Step 0.5, Step 5.7 and Steps 6 onward; this file is
+Steps 1 through 5.6 and nothing else.
+
+<!-- @hm:ref:start -->
+{% include "stages/_partials/wrapup_steps.md.j2" %}<!-- @hm:ref:end -->

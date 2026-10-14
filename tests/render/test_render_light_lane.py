@@ -19,6 +19,7 @@ from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 
 @pytest.fixture(scope="module")
@@ -40,7 +41,7 @@ def bodies(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
         other,
         freeze_time=DEFAULT_FREEZE_TIME,
     )
-    rendered["review@other"] = (other / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    rendered["review@other"] = stage_text(other, "review")
     return rendered
 
 
@@ -131,7 +132,7 @@ def test_review_light_lane_skips_pass_1_and_the_unchanged_confirmation(
     for b in two_pass:
         assert "`lane: light` → the Round 1 dispatch above is the only one" in b
         assert "then skip Pass 1 and Pass 2" in b
-    confirm = _section(body, "## Confirmation Pass", "### Step C1")
+    confirm = _section(body, "## Confirmation Pass", "## Final Summary")
     assert "`lane: light` with round 1 approved and no fix applied" in confirm
     # Skipping C3 must not leak the open run or the round-1 freeze ref into the next review.
     assert (

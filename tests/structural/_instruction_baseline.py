@@ -38,6 +38,12 @@ lines guarded here; the loop-off arm is pinned instead by
 `tests/render/test_render_light_lane_s2.py`'s differential (loop-off = loop-on minus a fixed
 inventory), which a second key would only duplicate.
 
+**A stage is its command plus its reference files** (SPEC-hm-light-lane-s2b). Stage 2b moved
+bodies the command reads on demand into `.claude/hm/*.md`; measuring the command alone would
+read every one of those as a deletion and invite an allowlist of the moved lines, which is the
+mask this gate exists to refuse. `STAGE_REFERENCE_FILES` names the files; a renamed or missing
+one raises instead of shrinking the measured set.
+
 **Why not `test_fused_loses_no_instruction`.** That check compares an *atomic* render
 against its *fused* render. An instruction deleted from `verify.md.j2` disappears from
 both sides, so the differential stays exactly the exempt autopilot block and the
@@ -64,6 +70,7 @@ from harness_maker.io_utils import atomic_write
 from harness_maker.models import LoopConfig, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import STAGE_REFERENCE_FILES
 
 from ._surface_baseline import (
     HARNESS_YAML,
@@ -118,7 +125,9 @@ def instruction_set(text: str) -> dict[str, list[str]]:
     }
 
 
-def _render_atomic(strictness: str, *, loop: bool = False) -> dict[str, str]:
+def _render_atomic_with_refs(
+    strictness: str, *, loop: bool = False
+) -> tuple[dict[str, str], dict[str, str]]:
     parsed = answers_from_harness_yaml(HARNESS_YAML)
     assert parsed is not None, f"{HARNESS_YAML} did not parse into answers"
     update: dict[str, Any] = {"strictness": strictness}
@@ -133,21 +142,42 @@ def _render_atomic(strictness: str, *, loop: bool = False) -> dict[str, str]:
                 root / ".claude",
                 freeze_time=DEFAULT_FREEZE_TIME,
             )
-        return {
+        commands = {
             p.stem: p.read_text(encoding="utf-8")
             for p in sorted((root / ".claude" / "commands" / "hm").glob("*.md"))
         }
+        refs = {
+            p.stem: p.read_text(encoding="utf-8")
+            for p in sorted((root / ".claude" / "hm").glob("*.md"))
+        }
+        return commands, refs
+
+
+def _render_atomic(strictness: str, *, loop: bool = False) -> dict[str, str]:
+    return _render_atomic_with_refs(strictness, loop=loop)[0]
+
+
+def stage_text(command: str, commands: dict[str, str], refs: dict[str, str]) -> str:
+    """A stage's instruction surface: its command plus the reference files it reads on demand."""
+    parts = [commands[command]]
+    for name in STAGE_REFERENCE_FILES.get(command, ()):
+        if name not in refs:
+            raise RuntimeError(f"{command} points at .claude/hm/{name}.md, which did not render")
+        parts.append(refs[name])
+    return "\n".join(parts)
 
 
 def measure_instructions() -> dict[str, dict[str, list[str]]]:
     out: dict[str, dict[str, list[str]]] = {}
     for strictness in AXES:
-        rendered = _render_atomic(strictness, loop=True)
+        rendered, refs = _render_atomic_with_refs(strictness, loop=True)
         missing = [c for c in ATOMIC_COMMANDS if c not in rendered]
         if missing:
             raise RuntimeError(f"{strictness} render is missing: {missing}")
         for command in ATOMIC_COMMANDS:
-            out[entry_key(command, strictness)] = instruction_set(rendered[command])
+            out[entry_key(command, strictness)] = instruction_set(
+                stage_text(command, rendered, refs)
+            )
     return out
 
 

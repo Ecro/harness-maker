@@ -249,13 +249,13 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane_s2b.py::test_the_four_commands_shrink
-  executable_predicate: 204430 - sum(len(cmd) for cmd in four) >= 40000
+  executable_predicate: 205430 - sum(len(cmd) for cmd in four) >= 40000
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The before value 204,430 is the frozen surface baseline at d2c0ab0 (wrapup
+  oracle_evidence: The before value 205,430 is the frozen surface baseline at d2c0ab0 (wrapup
     53,107, verify 23,120, review 77,384, execute 51,819), measured under _surface_baseline.pinned_install_ref
     on this repo's harness.yaml; the 40,000 floor is set from the section sizes in the same
     render before the edit. Verify's Output and execute's ledger block stay, about 3,000 chars.

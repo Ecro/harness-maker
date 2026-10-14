@@ -17,6 +17,7 @@ from harness_maker.models import (
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import expand_references
 
 from .conftest import pin_install_ref
 
@@ -50,7 +51,10 @@ def rendered(with_codex: bool, *, ledger: bool = False) -> dict[str, str]:
             )
         out: dict[str, str] = {}
         for p in (root / ".claude" / "commands" / "hm").glob("*.md"):
-            out[f"claude:{p.stem}"] = p.read_text(encoding="utf-8")
+            # Stage bodies that moved to `.claude/hm/` (SPEC-hm-light-lane-s2b) are read in place.
+            out[f"claude:{p.stem}"] = expand_references(
+                p.read_text(encoding="utf-8"), root / ".claude" / "hm"
+            )
         for p in (root / ".agents" / "skills").glob("hm-*/SKILL.md"):
             out[f"codex:{p.parent.name.removeprefix('hm-')}"] = p.read_text(encoding="utf-8")
         for p in (root / ".claude" / "skills").glob("*/SKILL.md"):

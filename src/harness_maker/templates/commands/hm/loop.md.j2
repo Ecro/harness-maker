@@ -785,7 +785,9 @@ For each iter (until convergence or any safety rail fires):
    and the work lands on `hm/<slug>` while loop-close finalizes the empty ephemeral one —
    stranded, and invisible to convergence. This is the same override step 5 already gives
    wrapup{% endif %}, before moving to the next stage. Operate inside {{ WTP }}:
-   substitute the absolute worktree path for every Read/Write/Edit call;
+   substitute the absolute worktree path for every Read/Write/Edit call{% if not is_codex %} — except the
+   `.claude/hm/` reference files a stage command names, which are read from the project root
+   (above `.worktrees/`), never from {{ '`<WT>`' if wt_on else 'a worktree' }}: a worktree copy can be stale{% endif %};
    tests / lints / type checks run via {% if wt_on %}`cd <WT> && <cmd>`{% else %}`<cmd>` in place{% endif %}. Stage "When
    to Run" skip conditions apply only to standalone invocation, not
    under loop dispatch. **Each stage file begins with a step-manifest

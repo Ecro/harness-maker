@@ -1,0 +1,11 @@
+{#- SPEC-hm-light-lane-s2b: on-demand reference for the Claude Code review command. The text between the ref markers is
+    the stage partial the Codex skill includes inline, rendered with is_codex false, so the two
+    cannot drift; a test slices the markers and compares the bytes to the pre-move render. -#}
+{% set is_codex = false -%}
+# Review confirmation pass (on-demand reference)
+
+Read by the review command from the project root, only when the Confirmation Pass runs. The
+command keeps the conditions that start it and the light-lane skip rule.
+
+<!-- @hm:ref:start -->
+{% include "stages/_partials/review_confirmation.md.j2" %}<!-- @hm:ref:end -->

@@ -624,16 +624,30 @@ def _skill_files() -> list[FileSpec]:
     ]
 
 
+# SPEC-hm-light-lane-s2b IRR-001: the stage text that moved out of the Claude commands. The names
+# are read by the commands and by `stage-delegate`, so renaming one needs a retire step.
+_STAGE_REFERENCE_FILES: tuple[str, ...] = (
+    "wrapup-steps",
+    "verify-checks",
+    "review-autofix",
+    "review-confirmation",
+    "execute-a5",
+)
+
+
 def _reference_files(config_dump: dict[str, object] | None) -> list[FileSpec]:
-    """On-demand reference files under ``.claude/hm/`` (SPEC-hm-light-lane-s2 IRR-001).
+    """On-demand reference files under ``.claude/hm/`` (SPEC-hm-light-lane-s2 / -s2b IRR-001).
 
     The auto-advance procedure renders only where the stage stubs that point at it do: a
-    ``gated`` harness carries neither. No config (the module-level skeletons) is the full
-    inventory.
+    ``gated`` harness carries neither. The five stage-body files always render, because the
+    review and execute paths that read them exist in every harness, and a delegated stage that
+    meets a missing file stops (s2b ADR-002); an unused one is harmless. No config (the
+    module-level skeletons) is the full inventory.
     """
-    if not template_globals.autopilot_enabled(config_dump):
-        return []
-    return [("hm/autopilot-advance.md.j2", "hm/autopilot-advance.md", {})]
+    out: list[FileSpec] = [(f"hm/{n}.md.j2", f"hm/{n}.md", {}) for n in _STAGE_REFERENCE_FILES]
+    if template_globals.autopilot_enabled(config_dump):
+        out.insert(0, ("hm/autopilot-advance.md.j2", "hm/autopilot-advance.md", {}))
+    return out
 
 
 def _world_model_handle(config_dump: dict[str, object] | None) -> str:

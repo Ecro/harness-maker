@@ -387,7 +387,13 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # 62820 → 63008 (understanding-handoff, 2026-09-26): +188, Step 0's ADR item requires a
     # `**Decided by:**` provenance line. Attributed in
     # work-docs/BASELINE-DELTA-understanding-handoff.md.
-    "execute": 63008,
+    # 63008 → 43710 (2026-10-14, SPEC-hm-light-lane-s2b, stage 2b of HM-LIGHT-LANE): -19298. Phase
+    # A.5's procedure moved verbatim into `.claude/hm/execute-a5.md` and the command keeps the
+    # heading, the light-lane skip, a pointer and the ledger block. Nothing was deleted (the
+    # moved text is byte-identical, pinned by test_render_light_lane_s2b); the floor moves with
+    # the ceiling because the 0.80 floor would otherwise sit above the render. Folded here, not
+    # declared, per the ADR-010 rule above. work-docs/BASELINE-DELTA-hm-light-lane-s2b.md.
+    "execute": 43710,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -553,7 +559,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # carve-out ADR-011 authorises. This is the SINGLE re-derivation that decision permits:
     # re-deriving again to absorb a later edit is `ratchet-rebaselined-by-its-own-subject`.
     #   review: 70153 -> 80586 (+10433, models-on)
-    "review": 82883,
+    # 82883 → 56211 (2026-10-14, SPEC-hm-light-lane-s2b): -26672. The auto-fix rounds
+    # (`review-autofix.md`) and the confirmation pass (`review-confirmation.md`) moved verbatim;
+    # the command keeps both headings, their start conditions, the light-lane skip rule and a
+    # pointer each. `verify` and `wrapup` do not move here: this fixture delegates neither stage,
+    # and a non-delegated stage keeps its body inline (s2b ADR-006).
+    "review": 56211,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text

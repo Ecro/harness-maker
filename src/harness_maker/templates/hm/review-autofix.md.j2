@@ -1,0 +1,11 @@
+{#- SPEC-hm-light-lane-s2b: on-demand reference for the Claude Code review command. The text between the ref markers is
+    the stage partial the Codex skill includes inline, rendered with is_codex false, so the two
+    cannot drift; a test slices the markers and compares the bytes to the pre-move render. -#}
+{% set is_codex = false -%}
+# Review auto-fix rounds (on-demand reference)
+
+Read by the review command from the project root, only when round 2 or later starts. The
+command keeps the Grade Gate that decides whether it does.
+
+<!-- @hm:ref:start -->
+{% include "stages/_partials/review_autofix.md.j2" %}<!-- @hm:ref:end -->

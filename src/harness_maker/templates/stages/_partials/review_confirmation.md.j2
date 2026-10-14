@@ -1,0 +1,146 @@
+{#- SPEC-hm-light-lane-s2b: review's confirmation pass. Source of the text for both the Codex stage skill (inline)
+    and the rendered .claude/hm/review-confirmation.md; the Claude command carries a pointer instead.
+    Moved verbatim from stages/<stage>.md.j2 — edit it here only. -#}
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') -%}
+{% set lenses = lens_dispatch(config.preset) %}{% set groups = lens_dispatch_groups(config.preset) -%}
+{% import "agents/_partials/dispatch.md.j2" as dsp -%}
+### Step C1 — Freeze the artifact
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm freeze commit --slug <slug> --pass <confirm-1|confirm-2>
+```
+
+It writes `refs/hm-freeze/v1/<slug>-<pass-id>` from a **temporary index**, so the frozen tree is
+the working tree — including the uncommitted fixes the gate is about to approve. A ref naming
+`HEAD` would freeze the artifact without the content this pass exists to look at, because wrapup
+owns commits and nothing is committed yet.
+
+**Read `review_base` from its store; do not re-resolve it.**
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm freeze read-base --slug <slug>
+```
+
+Round 1 wrote `refs/hm-freeze/v1/<slug>-base`. Re-resolving here would recompute against a HEAD
+that has moved during the review, so the span would drift.
+
+### Step C2 — Dispatch all {{ lenses | length }} lenses as {{ groups | length }} dispatches over `review_base..<freeze commit>`
+
+The diff under review is `review_base..<freeze commit>` — **the whole review**, not the repair
+round. Diffing from `HEAD` reinstates the scope-selective re-review this pass replaces: it would
+examine exactly the last round's fixes and nothing else.
+
+Dispatch the mandatory set in ONE message, exactly as round 1 does, and write each **returned**
+dispatch to the pass's own results directory — `confirm-1` / `confirm-2` as the `<round>`
+segment, never a round number. A pass is not a round; reusing a round's directory lets a lens
+that failed during the pass be counted as exercised from that round's stale file.
+
+```
+{% for g in groups %}.claude/observability/.hm-lens-results/<slug>/<run-id>/<pass-id>/{{ g.file }}.json
+{% endfor %}```
+
+The dispatch list is the round-1 list, unchanged — same agents, same lens lines:
+
+{{ dsp.dispatch_intro(is_codex) }}
+
+```
+{% for g in groups %}{{ dsp.dispatch(is_codex, g.agent, ("lens " + g.lenses[0] if g.lenses | length == 1 else "lenses " + g.lenses | join("+")) + ": {slug}", "<brief>\\n\\n" + (("Your lens: " + g.briefs[0]) if g.lenses | length == 1 else ("You are ACCOUNTABLE for all " + (g.lenses | length) | string + " lenses below; tag each finding with the lens it came from.\\n\\n- " + g.briefs | join("\\n- ")))) }}
+{% endfor %}```
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}
+```{% endif %}
+
+**Apply no fixes in this pass.** It is an observation, and a pass that edits what it is measuring
+has measured nothing.
+
+{% if config.second_opinion and config.second_opinion.models %}**Cross-model voters are re-read, never re-invoked.** Re-read the REVIEW report's
+`## 🧊 Cross-model findings (frozen @ round 1)` section. The models voted once, at round 1; a
+second invocation here would give them a second vote on the same review.
+{% endif %}
+### Step C3 — Outcome
+
+**Four of the five arms below are stage-terminal; on each, run the reap below first, then close the run**, with
+`hm review_run close --slug <slug> --run-id <run-id> --outcome <APPROVED|CHANGES_REQUESTED>`.
+**The `confirm-1` arm is NOT terminal and must NOT close** — it enters a repair round and
+dispatches confirm-2, so closing there releases the slug *mid-pass* while `<run-id>` is still the
+join key for the lens-results tree, the ledger rows below and the freeze refs. That is the arm
+where releasing does the most damage, because reaching it means the review is still dirty.
+
+> **The Grade Gate's APPROVE-side exits are NOT terminal and must NOT close.** This pass runs
+> only when the gate would approve, so those exits flow into C1–C3 — closing there releases
+> the slug while the freeze refs and ledger rows still use the id, and lets the next
+> invocation mint a fresh id mid-review. (`close` is idempotent, so a second close is a no-op —
+> not one of the harms.)
+
+A **new finding** is one whose `id` is absent from the union of every prior round's
+`consensus-passed` set in this `/hm:review`. Mechanical, from the REVIEW report's per-round
+records — this pass runs lenses that never ran earlier, so it necessarily returns findings that
+are not regressions, and "new" decided by you is the self-report class the coverage CLI exists to
+close.
+
+```
+IF blocks_approval == true:
+  → STOP. Status = CHANGES_REQUESTED. Emit the coverage blocker, per lens.
+  → No repair round is consumed — there is nothing to repair.
+  → This holds even when the pass returned ZERO new severe findings: a pass whose lenses
+    died returns nothing, and nothing is not evidence of a clean artifact.
+
+ELSE IF zero new consensus-passed findings at P0 or P1:
+  → STOP. Status = APPROVED. Every mandatory lens exercised AND no new severe finding.
+
+ELSE IF auto_fix is disabled (config OR --no-auto-fix):
+  → STOP. Status = CHANGES_REQUESTED, human_review_needed = true.
+  → No repair round, and no second pass: with auto_fix off this pass is READ-ONLY,
+    whatever the grade and whatever order the arms above were evaluated in.
+
+ELSE IF this was confirm-1:
+  → Enter ONE repair round. It is budgeted separately and does NOT increment
+    iteration_count, so it cannot consume a review round or trip max_review_rounds.
+  → Then freeze again as confirm-2 and dispatch one more pass.
+
+ELSE:                                   # confirm-2 was dirty
+  → STOP. Status = CHANGES_REQUESTED, human_review_needed = true.
+  → Name the surviving findings in the REVIEW report.
+  → No third confirmation pass is ever dispatched in one /hm:review.
+{% if loop_enabled(config) %}<!-- @hm:loop-only -->
+  → Loop mode: emit the Gate 0 receipt with `verdict: fail` and stop. The loop driver
+    owns retry and escalation; this stage reports rather than escalating.
+<!-- @hm:/loop-only -->
+{% endif %}```
+
+Record `confirm_pass_ran: true` and `confirm_pass_new_severe_n: <count>` on the terminal
+telemetry row.
+
+**Then release the frozen refs.** They pin a commit whose tree holds every untracked
+non-ignored file present at pass time, reachable from a local ref and so immune to gc; nothing
+else reliably reaps them (`prune_stale`'s sweep needs a live task slug, and the Side preset has
+none). Run this once the review has reached its terminal state, before the close:
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm freeze reap --slug <slug>
+```
+{% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) %}
+**Record each confirmation pass as its own ledger episode.** One row per pass, `--pass 1` for
+`confirm-1` and `--pass 2` for `confirm-2`, `--verdict PASS` when the pass approved and `FAIL`
+otherwise, `--terminal` only on the pass that ends the stage.
+
+{% if is_codex %}
+```
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent confirmation-pass --stage review --slug '{slug}' --pass <1|2> --verdict '<PASS|FAIL>' --duration-ms '<elapsed>'")
+```
+{% else %}
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent confirmation-pass --stage review --slug '{slug}' --pass <1|2> --verdict '<PASS|FAIL>' --duration-ms '<elapsed>'
+```
+{% endif %}
+
+Why a row at all: the two-pass bound here is the **only** cap in this harness with no recorded
+episodes, so nothing can yet say whether the second pass earns its cost. The reviewer and
+validator caps both have rows, and reading them settled questions no argument could — the
+reviewer gate releases 5 of 9 episodes, the validator 0 of 12, and those two numbers call for
+opposite responses. This cap deserves the same treatment rather than a guess.
+{% endif %}
+

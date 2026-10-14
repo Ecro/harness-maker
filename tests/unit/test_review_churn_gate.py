@@ -17,6 +17,7 @@ from harness_maker.readiness import churn_gate_signal
 from harness_maker.review_churn import resolve_churn_threshold
 from harness_maker.review_consensus import exit_record, rereview_plan, rereview_reason
 from harness_maker.spec_machine import GoldenRow, load_golden_table
+from tests.stage_surface import stage_text
 
 _SPEC = Path(__file__).parents[2] / "specs" / "SPEC-review-loop-empirics.machine.yaml"
 _ROWS = load_golden_table(_SPEC, "AC-010")
@@ -154,7 +155,7 @@ def _render_review(*, gate: bool) -> str:
     answers.rereview_churn_gate = gate
     out = Path(tempfile.mkdtemp()) / ".claude"
     render(synthesize(profile, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
-    return (out / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    return stage_text(out, "review")
 
 
 def test_below_threshold_churn_skips_rereview_is_wired_into_the_rendered_stage() -> None:

@@ -26,6 +26,7 @@ from harness_maker.models import (
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 # The `workflow` Production cap from `context_lint.THRESHOLDS`. Nothing ENFORCES it
 # for an atomic stage command — `readiness._CONTEXT_LIMITS` has no command row — so
@@ -51,6 +52,7 @@ def _wrapup(
     preset: str = "Production",
     stages: list[str] | None = None,
     feature_branch: bool = True,
+    expand: bool = True,
 ) -> str:
     # `feature_branch_workflow` must be set EXPLICITLY: constructing `InterviewAnswers`
     # directly bypasses `interview()`'s `_preset_extras`, so the flag-gated Step 7.7
@@ -63,7 +65,11 @@ def _wrapup(
         worktree={"feature_branch_workflow": feature_branch},
     )
     render(synthesize(ProjectProfile(), answers), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    return (tmp_path / "commands" / "hm" / "wrapup.md").read_text(encoding="utf-8")
+    if not expand:
+        return (tmp_path / "commands" / "hm" / "wrapup.md").read_text(encoding="utf-8")
+    # Steps 1-5.6 live in `.claude/hm/wrapup-steps.md` on a delegated harness
+    # (SPEC-hm-light-lane-s2b); the tests below that are about the body read it in place.
+    return stage_text(tmp_path, "wrapup")
 
 
 # ------------------------------------------------------------------ delegate OFF
@@ -315,28 +321,23 @@ def test_the_default_render_costs_existing_users_nothing(
 
 
 @pytest.mark.parametrize("preset", ["Side", "Production"])
-def test_delegation_adds_a_bounded_amount_of_prose(tmp_path: Path, preset: str) -> None:
-    """ADR-006 warns the delegate-on command GROWS rather than shrinks. The DELTA is
-    what this phase owns, so that is what is pinned.
-
-    An absolute cap would be dishonest here twice over: the command already sat at 695
-    Production body lines — past `context_lint`'s `workflow` cap of 600 — before this
-    phase added anything, and nothing ENFORCES that cap on an atomic stage command
-    (`readiness._CONTEXT_LIMITS` has no command row). Measuring the delta instead
-    makes the assertion about this change rather than about inherited size. Measured:
-    **+60 lines — the cap exactly.** Five review rounds of added prose were paid for by
-    compressing existing prose in the same block; there is no headroom left, so the next
-    addition must be paid for the same way rather than by raising the bound.
+def test_delegation_moves_the_body_out_of_the_command(tmp_path: Path, preset: str) -> None:
+    """ADR-006 warned that the delegate-on command GROWS rather than shrinks (+60 lines, "the cap
+    exactly"). Stage 2b of the light lane (SPEC-hm-light-lane-s2b) reverses the direction: with
+    wrapup delegated, Steps 1-5.6 render in `.claude/hm/wrapup-steps.md` and the command carries
+    a pointer, so the bound is now that the delegated command is SHORTER than the inline one by
+    most of that body. The dispatch prose it still adds is measured on the expanded stage instead,
+    where it must stay inside the old +70 allowance (the old +60 plus the Read-path lines).
     """
-    off = _count_body_lines(_wrapup(tmp_path / "off", preset=preset))
-    on = _count_body_lines(_wrapup(tmp_path / "on", preset=preset, stages=["wrapup"]))
+    off = _count_body_lines(_wrapup(tmp_path / "off", preset=preset, expand=False))
+    on = _count_body_lines(_wrapup(tmp_path / "on", preset=preset, stages=["wrapup"], expand=False))
+    assert on < off - 200, f"{preset}: delegated command is {on} body lines, inline {off}"
 
-    assert on - off <= 60, (
-        f"{preset} delegation adds {on - off} body lines ({off} → {on}); the delegated "
-        "body is supposed to move context OUT of the main loop, not add prose to the "
-        f"command. For reference the `workflow` Production cap is "
-        f"{_WORKFLOW_PRODUCTION_CAP}, which this command already exceeded before "
-        "delegation existed."
+    off_full = _count_body_lines(_wrapup(tmp_path / "off2", preset=preset))
+    on_full = _count_body_lines(_wrapup(tmp_path / "on2", preset=preset, stages=["wrapup"]))
+    assert on_full - off_full <= 70, (
+        f"{preset} delegation adds {on_full - off_full} body lines to the stage ({off_full} → "
+        f"{on_full}); the `workflow` Production cap is {_WORKFLOW_PRODUCTION_CAP}"
     )
 
 

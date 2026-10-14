@@ -1,0 +1,11 @@
+{#- SPEC-hm-light-lane-s2b: on-demand reference for the Claude Code execute command. The text between the ref markers is
+    the stage partial the Codex skill includes inline, rendered with is_codex false, so the two
+    cannot drift; a test slices the markers and compares the bytes to the pre-move render. -#}
+{% set is_codex = false -%}
+# Execute Phase A.5 procedure (on-demand reference)
+
+Read by the execute command from the project root, only when Phase A.5 runs (`lane` is not
+`light`). The command keeps the Phase A.5 heading, the light-lane skip and the ledger block.
+
+<!-- @hm:ref:start -->
+{% include "stages/_partials/execute_a5.md.j2" %}<!-- @hm:ref:end -->

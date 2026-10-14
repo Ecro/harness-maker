@@ -1,4 +1,5 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
+{% set verify_moved = not is_codex and config.delegation is defined and 'verify' in config.delegation.stages -%}
 # Stage: verify
 
 > Atomic stage. Pre-completion verification gate — 6-check stop sign before `wrapup`. Failures block by default; `--force` overrides explicitly.
@@ -37,203 +38,9 @@ Block silent regressions and partial completions. Run a rigid 6-check rubric tha
 - Most recent Health snapshot at `.claude/observability/dashboard.md` (2-section schema: `Structural` / `Personalization`; pre-0.13.0 single-`Health:` scalar is intentionally unreadable here). ADR-0007 removed the former `External risks` section in 0.22.3.
 - Most recent security findings at `.claude/observability/security/findings-*.jsonl`.
 
-## The 6 Checks (run in order; STOP on first FAIL unless `--force`)
+{% if not verify_moved %}{% include "stages/_partials/verify_checks.md.j2" %}{% elif loop_enabled(config) %}{% include "stages/_partials/verify_gate0.md.j2" %}
 
-### Check 1 — Drift verdict (REVIEW present)
-
-**Drift verdict existence** (ADR-006): Read `{{ config.work_docs.dir }}REVIEW-{slug}.md` frontmatter.
-- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.
-- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `{{ stage_invocation("BLOCKED: check 1 (drift) — run /hm:review first", is_codex | default(false)) }}`.
-
-This check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here
-as "1b" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is
-enforced where the tests are written: `/hm:execute` Phase A authors one test per SPEC scenario
-and Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a
-TUNE-class gate graded `**` — Side-preset evidence only; see the
-step-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC
-(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or
-manual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.
-**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not
-re-derive scenario coverage.{% if strictness_of(config) == 'block' %}{% if config.preset == 'Production' %} The mechanical backstop is `/hm:wrapup` Step 3.5's
-`spec_machine find-unbound` gate (fail-closed, STOP on this preset): a closed-type AC still `pending_test`
-after the write-back cannot be committed, whichever way execute ran.{% else %} `/hm:wrapup` Step 3.5's
-`spec_machine find-unbound` scan runs on this preset too but is **advisory only** (Side never STOPs),
-so an AC still `pending_test` after `--no-tdd` is surfaced in the wrapup report, not blocked.{% endif %}{% else %} Task-driven mode has no machine
-SPEC to scan, so on that path an uncovered scenario reaches wrapup unflagged — the accepted
-cost of `--no-tdd` without a SPEC contract.{% endif %}
-
-### Check 2 — Regression smoke
-
-**One verb runs the gates and owns the marker.** It takes the gates from the project's CI (a
-narrower guess passes locally, fails on push) and marks only a pass on an unchanged tree.
-
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant --timeout-s 3600 --deadline-s 3600
-```
-{% endif %}
-
-{% if is_codex %}Foreground call: the defaults (540 s/gate, 570 s total) report their own timeout.{% else %}Run it in the **background** (`run_in_background: true`): a full suite outlives the 10-minute
-foreground cap.{% endif %} Branch on the `"exit"` field of the JSON line it prints, never on the
-host's status; no JSON line = not a pass.
-
-- `0` → PASS (`cached: true` = its own marker reused). Skip to Check 3.
-- `1` → a gate failed or timed out, not a pass — stderr names the command and its output tail.
-- `4` → the tree changed during the run, not a pass (stderr lists the paths); re-run.
-- Killed by the host (no exit code) → not a pass, no marker.
-- `3` → degraded: no readable CI (stderr says why). Only then:
-
-<!-- @hm:verify-degraded -->
-fall back to the project's toolchain (`pytest -q` / `ruff check .` / `ruff format --check .` / `mypy --strict`; `cargo test`; `pnpm test`) and say the gates were guessed. If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it. After every command passes — and only then — write the marker:
-
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest
-```
-{% endif %}
-<!-- @hm:/verify-degraded -->
-
-FAIL when: any subprocess returns non-zero.
-
-### Check 3 — Structural delta (formerly "Health delta")
-
-Read the prior `structural` score from `.claude/observability/dashboard.md` — specifically the `score:` line under the **`## Structural`** section of the 2-section dashboard (0.22.3+ schema). Do NOT average with `Personalization`; it is an orthogonal signal (deliberately) owned by no check at all.
-
-Recompute current structural score (or {% if is_codex | default(false) %}run `uv run --with {{ harness_maker_src_path }} hm cli health .`{% else %}invoke `/hm:health` Step 1{% endif %} if a fresh score is needed). Compare ONLY structural values.
-
-**No-baseline PASS rule (ADR-004):** when `dashboard.md` is absent OR exists but does NOT begin with `---\ngenerated_by: harness-maker\n` (pre-0.13.0 single-`Health:` scalar schema) OR is missing the `## Structural` section / `score:` line, emit a **PASS** for this check with a `reason` string `"no-baseline: <cause>"` (e.g. `"no-baseline: dashboard.md missing"`, `"no-baseline: pre-0.13.0 schema"`). Report both `prior` (null) and `current` (value or null) in the text summary.
-
-FAIL when: a parseable prior baseline exists AND `current_structural - prior_structural < -5` (structural score dropped more than 5 points). Mid-work-unit dips are normal; a 5+ point drop signals quality regression.
-
-> **Personalization is NOT a gating field.** The `## Personalization` section (composite / tier / action_items) is informational only — verify must never read it for pass/fail. ADR-002 (amended by ADR-007).
-
-### Check 4 — Security high findings
-
-Read the most recent `.claude/observability/security/findings-*.jsonl`.
-
-FAIL when: any finding has `severity == "high"` AND `resolution != "accepted-risk-with-rationale"`. Resolutions must be deliberate (recorded in PLAN ADR or wrapup commit body).
-
-PASS when: zero unresolved high findings.
-
-{% if loop_enabled(config) -%}
-<!-- @hm:loop-only -->
-### Check 5 — Worktree merge cleanliness
-
-When worktree isolation was engaged (`.worktrees/execute-*` exists or did exist), confirm the merge happened cleanly:
-
-```bash
-!git status
-!git diff --check  # detects whitespace conflicts
-```
-
-FAIL when: there are unmerged paths, conflict markers, or unresolved merge state.
-
-PASS when: working tree is clean OR has only the staged changes from `/hm:execute` Step 5 `stage-only`.
-<!-- @hm:/loop-only -->
 {% endif -%}
-### Check 6 — SPEC requirement
-{% if strictness_of(config) == 'block' %}
-
-Read the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
-
-**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.
-
-**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.
-
-Evaluation sequence when `spec_need_verdict` is one of the above values:
-
-**Step 6a — operation check:**
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …
-```
-{% endif %}
-
-Exit 0 → operation satisfied → **PASS**. Proceed to next check.
-
-**Step 6b — waiver check** (only if Step 6a exits 1):
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …
-```
-{% endif %}
-
-The `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.
-
-**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:
-
-```
-BLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>
-The required SPEC operation was not performed and no valid waiver exists.
-{{ stage_invocation("To resolve: author the SPEC via /hm:spec <slug> (the", is_codex | default(false)) }}
-{{ stage_invocation("resume-marker skips re-detection and routes directly to /hm:spec) or record", is_codex | default(false)) }}
-a fresh, non-empty-rationale waiver with:
-  uv run --with {{ harness_maker_src_path }} hm spec_need waiver-set --root {{ WTR }} --slug <slug> \
-    --verdict <verdict> --target <target> --rationale "<reason>" \
-    --changed-file <f1> …
-Note: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.
-```
-{% else %}
-> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never
-> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.
-
-Read `spec_need_verdict` / `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
-No PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run
-`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …")
-Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …
-!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …
-```
-{% endif %}
-
-Either exiting 0 → `PASS`. Both exiting 1 → report
-`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via
-`/hm:spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.
-
-{% endif %}
-## Advisory probes (non-blocking)
-
-These do **NOT** gate completion. They surface latent footguns and continue
-with `exit 0` regardless of outcome. They sit OUTSIDE the 6-check contract
-of `verify-before-completion` — adding new gating checks means changing
-that SKILL; adding new advisory probes means appending here.
-
-### A1. `work_docs/` (underscore) footgun probe
-
-```bash
-if [ -d "work_docs" ]; then
-  echo "WARN: work_docs/ (underscore) directory found." >&2
-  echo "      The harness-maker directory is work-docs/ (hyphen);" >&2
-  echo "      work_docs is only the YAML key in harness.yaml." >&2
-  echo "      Migration: git mv work_docs/* work-docs/ && rmdir work_docs" >&2
-fi
-exit 0
-```
-
-{% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "verify" %}{% set gate0_pass = "verify produced a green \"=== /hm:verify ===\" report (all gating checks passed)." %}{% set gate0_fail = "any gating check failed; the report's status is non-OK." %}{% set gate0_standalone = false %}{% set gate0_extra_note = "A `/hm:loop` iteration that includes `verify` in `--per-iter-stages` requires this receipt; without it Gate 0 would loop forever." %}{% include "agents/_partials/gate0_receipt.md.j2" %}
-
 ## Output
 
 ### Text (stdout, for humans)
@@ -289,10 +96,20 @@ rest of this step. That is a supported path, not an error.
 
 **2. Dispatch — self-skipping.** If the subagent-dispatch tool is **unavailable** in
 this IDE (Cursor and Codex sessions), say so in one line and run the checks inline
-instead. Otherwise dispatch `stage-delegate` with the `brief` object verbatim plus
+instead. {% if verify_moved -%}
+Otherwise dispatch `stage-delegate` with the `brief` object verbatim plus the instruction:
+*Read the check list at the path on the next line, run its Checks 1..N in order, stopping at the
+first FAIL, and return the receipt JSON; do not run git and do not write a ledger file.*
+
+`<brief.base_root>/.claude/hm/verify-checks.md`
+
+The delegate is allowed that one file as instructions and no other. If it cannot read it, it
+returns no JSON: exit 2 below sends you to the inline checks, which read the same file and stop.
+{% else -%}
+Otherwise dispatch `stage-delegate` with the `brief` object verbatim plus
 the instruction: *run Checks 1..N below in order, stopping at the first FAIL, and
 return the receipt JSON; do not run git and do not write a ledger file.*
-
+{% endif %}
 The receipt must carry `result` and one `checks[]` entry per check with a `PASS | FAIL |
 SKIP` verdict — no `record_path` (this stage writes no JSONL; the CI `verify` command in `cli.py` still does).
 
@@ -333,7 +150,8 @@ Verify is a gate, so an unreconciled receipt is never a PASS.
 ### Checks — inline body (degraded — dispatch unavailable, brief incomplete, or receipt unusable)
 
 Run the checks yourself, below, **only** when Step 0.5 sent you here.
-{% endif %}
+{% if verify_moved %}
+{% with ref_file="verify-checks.md", ref_use="and run the checks and the advisory probes from it", ref_stop=" — the checks did not run, so report FAIL, never PASS" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}{% endif %}{% endif %}
 
 1. Read inputs (PLAN, SPEC, dashboard, security findings).
 2. Run Check 1. If PASS, continue. If FAIL: emit the text summary + STOP (unless `--force`).

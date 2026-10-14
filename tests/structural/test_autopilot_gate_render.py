@@ -27,6 +27,17 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-14, `hm-light-lane-s2b`** — `execute` and `review` moved in all four arms, and
+  `verify` and `wrapup` in the two `auto_safe@*` arms (this repo's `delegation.stages` holds
+  both; the `ask@*` arms delegate neither, and a non-delegated stage keeps its body inline,
+  byte-identical to the previous golden). `loop` moved in the two `ask@*` arms (loop on): its
+  Step 4 now exempts `.claude/hm/` reference files from the `<WT>` substitution. What moved:
+  Phase A.5's procedure, review's auto-fix rounds and confirmation pass, wrapup Steps 1-5.6 and
+  verify's checks and advisory probes left the Claude commands for `.claude/hm/*.md`, each
+  leaving a pointer (and the Step 0.5 dispatch lines naming the file); the Codex skills are
+  unchanged (SPEC-hm-light-lane-s2b). The autopilot gate on `autonomy.level` and the advance
+  stubs are untouched. Verified before re-capture that these are the ONLY moved commands in each
+  arm and that no command was added or removed.
 - **2026-10-14, `hm-light-lane-s2`** — `execute`, `research`, `review`, `spec`, `verify`,
   `wrapup` and `health` moved, in all four arms. The six stages: the auto-advance block became a
   per-stage stub pointing at the new `.claude/hm/autopilot-advance.md` (its `autopilot_caps`

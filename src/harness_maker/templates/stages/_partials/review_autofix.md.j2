@@ -1,0 +1,171 @@
+{#- SPEC-hm-light-lane-s2b: review's auto-fix rounds 2..max_review_rounds. Source of the text for both the Codex stage skill (inline)
+    and the rendered .claude/hm/review-autofix.md; the Claude command carries a pointer instead.
+    Moved verbatim from stages/<stage>.md.j2 — edit it here only. -#}
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') -%}
+### Re-dispatch what is missing; ask for coverage over EVERY round
+
+Re-dispatch what the previous check named in `missing` — read that list from the CLI's output,
+never from your own recollection of which dispatch failed. `missing` names **member lenses** while
+the dispatch unit is a **group**, so a missing member re-dispatches **its whole group** and writes
+**that group's file** — read both off the dispatch list above, never from a worked example: the
+grouping is one constant, and an example naming today's is wrong the moment it changes. Write the
+results into this round's directory.
+
+Then re-run the check **passing `--round` once per round of this review so far**, because
+coverage is cumulative over a review rather than per round: the auto-fix loop re-spawns only
+the reviewers a fix touched, so this round's directory legitimately holds one or two files.
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}
+```{% endif %}
+
+> The union is computed by the CLI, not by you.{# why: docs/reference/stage-rationale.md #}
+
+### Round-state contract
+
+**Load `second-opinion-gate` §5 and follow it** — round order, lifecycle, progress, exit,
+merge-by-`id`, the two-arm trigger. Binding with second opinion off; the only copy.
+
+Per iteration:
+
+1. **Merge and attribute.** Merge the previous round's re-review by `id`, stamp `id`s on new
+   findings, then read each one's `caused_by` from the Step 3.4 `review_churn attribute` stamp.
+
+2. **Group.** On a §5 trigger fire, emit its per-group block and make ONE consolidated edit.
+
+3. **Select fixable findings** — only:
+   - Severity **P0 or P1**. P2 and P3 only when the current grade is D or F.
+   - Tag = `consensus-passed`.
+   - Has a concrete `suggestion` with replacement code (skip vague advice).
+
+   > **P2 was in this queue and bought nothing the gate can read.** P2/P3 cannot move the
+   > grade, so every P2 fixed was churn against a blind gate — and an adjudicated set of this
+   > shape ran 31% real against 69% naming, comments and structure: accurate, mostly not worth
+   > a round trip. The `consistency` lens is what made that volume reachable. They are **not
+   > dropped** — Step 4e dispositions every finding on every path, so a skipped P2 sits in the
+   > report for a human sweep. D/F keeps the old breadth, where it earns the round trip.
+
+3b. **Pin the pre-fix endpoint** — before this round's first `Edit`, never after:
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-pre")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-pre
+```{% endif %}
+
+4. **Apply** in priority order (P0 → P1 → P2):
+
+   > **Run the tests, never edit one to make a finding go away.** You **must not edit a test file
+   > to resolve a finding whose target is not that test** — that weakens the oracle. But **a
+   > finding whose own target is the test may be fixed**: `tests` is a mandatory lens and raises
+   > findings repairable only by writing a test, so an unqualified ban leaves them `pending` → one
+   > non-progressing round → an unapprovable review.
+
+<!-- @hm:oracle-blocked -->
+   > **Read the covering test before this file's first `Edit`, and be willing to refuse.**
+   > `targeted-test-selection` §6 owns the rule and the three outcomes; do not restate it here.
+   > A refusal is recorded twice: retag the finding **`manual-only`**, and set
+   > `disposition: unresolved` / `authority: oracle-blocked`. The retag is what excludes it from
+   > the next round's selection above and from the grade — no second filter exists. "No covering
+   > test found" is a refusal, not permission.
+<!-- @hm:/oracle-blocked -->
+
+   - Read the file at `{file}:{line}`.
+   - Verify current code still matches the finding's `evidence` snippet (prior fixes may have shifted lines).
+   - Apply the suggested fix via `Edit`.
+   - Log: `[Fix #{N}] {severity} {summary} in {file}:{line}`.
+   - Skip when target lines overlap a fix applied this round (same file, line ±5): log `skipped — overlap with Fix #{prev}`.
+
+5. **Verify build** — follow the `targeted-test-selection` skill, whatever the language.
+   Its §0 asks `hm test_runners plan` for THIS project's runner, its capped worker count and
+   which of parallel / changed-selection / rerun-failed that runner actually has; §1–§3 are the
+   Python dep-map and are skipped when there is none. A runner the table does not know is not an
+   error — run the project's own command. Or invoke `/hm:verify` if the harness has it.
+
+   On failure: identify the last fix that touched the failing file → **revert** it (restore original snippet) and log `Fix #{N} reverted — caused build failure`. Continue with remaining fixes (do not abort the round).
+
+   > **Classify the failure first — `targeted-test-selection` §4.5 owns the three-way split**
+   > (production reaches the state / it does not / the target is too narrow for the fix). Two
+   > things are review's own. **Revert either way**: the classification changes the record, not
+   > the action. And the record is per-cause, never one line for all three —
+   > `reverted — build/link error: <missing symbol or unit>` when nothing compiled or linked,
+   > `reverted — test pins unreachable state: <upstream fact>` for the unreachable case, and
+   > `caused build failure` **only** for a fix that built and failed an assertion. Collapsing
+   > them records a scope problem as a bad fix, and the next round re-derives the finding
+   > because nothing said the fix itself was sound.
+
+   > On §4.5's unreachable case, carry one `manual-only` P1 `spec_gap`, as an oscillation is
+   > carried — never grade-lowering, never authority to edit the test. Measured, and since
+   > superseded: four runs broke the same four tests and the finding driving those fixes was
+   > adjudicated a false positive, but re-running the loop with the reviewer able to read the
+   > repository produced those breaks **0 times in 10 rounds**. Ask the question anyway — the
+   > usual cause is a reviewer that could not see the caller, not a test that over-specifies.
+
+5b. **Measure this round's churn** — after Step 5's reverts, so a reverted fix does not count:
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>
+```{% endif %}
+
+
+   `tee` keeps this payload for the Telemetry Emit step, which reads the four `churn_*` keys
+   out of it. Carry them into the **iteration record** only, never into the row.
+   A null `churn_ratio` beside `churn_measured_n: 0` means no file was measurable (all
+   binary/deleted), which is a different fact from a round that changed nothing — and Step 6
+   treats the two differently.{% if not config.reviewers.get("rereview_churn_gate", True) %}
+   **Record only here — `reviewers.rereview_churn_gate` is off, so nothing branches on the
+   ratio.** The rows still accrue, which is what a later recalibration reads.{% endif %}
+
+{% if config.reviewers.get("rereview_churn_gate", True) %}6. **Re-review (gated on Step 5b's ratio).** Three branches, and the third is the one that matters:
+
+   - **`churn_ratio` is null** (nothing measurable — the whole diff was binary or deleted) →
+     re-review as if the gate were off. Unmeasured is not "below the threshold"; treating it as
+     below would silently skip every round the measurement could not see.
+   - **`churn_ratio` < `{{ config.reviewers.get("rereview_churn_ratio", default_churn_ratio()) }}`** → **dispatch nobody.**
+     Record `rereview: skipped — {reason}` in the iteration record, with `{reason}` copied
+     verbatim from the CLI below so the skip is auditable without re-running anything.
+   - **at or above** → run exactly the dispatch the CLI names — **one** structured reviewer over
+     the changed hunks, not the scope-selected set. One is sufficient because a single lens now
+     carries a full vote (ADR-007).
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus plan --churn-ratio <the measured ratio> --threshold {{ config.reviewers.get("rereview_churn_ratio", default_churn_ratio()) }}")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus plan --churn-ratio <the measured ratio> --threshold {{ config.reviewers.get("rereview_churn_ratio", default_churn_ratio()) }}
+```{% endif %}
+
+   It prints `{"dispatches": [...], "reason": "churn <r> <op> <t>"}`. An empty `dispatches` IS
+   the skip — do not second-guess it by re-spawning the old set. To restore the pre-gate
+   behaviour, set `reviewers.rereview_churn_gate: false` and re-render.
+{% else %}6. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one message when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
+{% endif %}
+   **`unreviewed_fix_count` = applied fixes whose file no re-spawned reviewer covers.** A skipped
+   re-review re-spawns nobody, so every fix in that round counts — the skip is a deliberate
+   trade, and hiding its cost from the terminal measure would make the trade unmeasurable.
+
+7. **Recompute grade** using the current voting set (Step 4 again, clusters rebuilt per the round-state contract).
+
+7b. **Evaluate the progress invariant.** No lifecycle transition this round → stop now with
+   `CHANGES_REQUESTED` and exit reason `no-progress`. No-progress is stage-terminal, so close the
+   run: `hm review_run close --slug <slug> --run-id <run-id> --outcome CHANGES_REQUESTED`, **attaching Step 5b's `churn_ratio`** (null when nothing was measurable — record the null, do not omit the field). A stall that churned a lot and a stall that churned nothing are opposite diagnoses; the exit reason alone cannot tell them apart, which is why the gate's threshold is recalibrated from these rows.
+
+8. **Append iteration record** to the REVIEW report:
+
+   ```markdown
+   ### Iteration {N} (Grade: {prev} → {new})
+   Fixes applied: {count}
+   | # | Severity | Summary | File | Status |
+   |---|----------|---------|------|--------|
+   | 1 | P0 | ... | ... | Applied · caused_by=fix-r1 |
+   | 2 | P1 | ... | ... | Skipped — overlap · caused_by=none |
+
+   Remaining: {count} | New issues introduced: {count}
+   Churn: {churn_ratio or "not measurable"} (max: {churn_max_path}, measured {churn_measured_n}, excluded {churn_excluded_n})
+   ```
+
+9. Return to the Grade Gate with the updated grade and incremented `iteration_count`.
+

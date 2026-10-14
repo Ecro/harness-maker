@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: hm-light-lane-s2b
-status: planning
+status: completed
 created: 2026-10-14
 spec: "[[SPEC-hm-light-lane-s2b]]"
 intent: HM-LIGHT-LANE
@@ -58,7 +58,7 @@ yields no JSON, which the existing reconciler maps to `unparseable` and the degr
 
 ## 📝 Implementation Plan
 
-1. **Phase 1 — partials, pointers, reference files.** depends_on: none · scope:
+1. **Phase 1 — partials, pointers, reference files.** ✅ done. depends_on: none · scope:
    `templates/stages/{wrapup,verify,review,execute}.md.j2`, `templates/stages/_partials/*`,
    `templates/hm/{wrapup-steps,verify-checks,review-autofix,review-confirmation,execute-a5}.md.j2`,
    `synthesize.py` (`_reference_files`), `templates/agents/stage-delegate_body.md.j2`, `templates/commands/hm/loop.md.j2` (Step 4 exemption), `tests/unit/test_loop_opt_in.py` and `tests/render/test_render_light_lane_s2.py` (Supersedes row), `step_sensitivity.py` if its registry must name the
@@ -92,5 +92,5 @@ editing a template, then write AC-001..009 against them (RED), then move the tex
 
 ## ✅ Success Criteria
 
-- [ ] AC-001..009 pass.
-- [ ] Surface baseline re-frozen lower with BASELINE-DELTA.
+- [x] AC-001..009 pass.
+- [x] Surface baseline re-frozen lower with BASELINE-DELTA.

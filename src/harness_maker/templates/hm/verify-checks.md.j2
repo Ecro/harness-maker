@@ -1,0 +1,12 @@
+{#- SPEC-hm-light-lane-s2b: on-demand reference for the Claude Code verify command. The text between the ref markers is
+    the stage partial the Codex skill includes inline, rendered with is_codex false, so the two
+    cannot drift; a test slices the markers and compares the bytes to the pre-move render. -#}
+{% set is_codex = false -%}
+# Verify checks (on-demand reference)
+
+Read by `stage-delegate` (from the brief's `base_root`) and by the main loop on the verify
+command's degraded path. The command keeps Step 0.5, the `## Output` report format and the
+Procedure; this file is the six checks and the advisory probes.
+
+<!-- @hm:ref:start -->
+{% include "stages/_partials/verify_checks.md.j2" %}<!-- @hm:ref:end -->

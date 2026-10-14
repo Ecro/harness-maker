@@ -27,6 +27,20 @@ from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips,
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # −31 total, 131→100 (2026-10-14, SPEC-hm-light-lane-s2b). **No call was removed**: five blocks
+    # moved verbatim into `.claude/hm/*.md` and the rendered command keeps a pointer, so the
+    # calls they hold are read on demand instead of counted as the command's. This repo's
+    # `delegation.stages` holds wrapup and verify, which is why those two move here; a harness
+    # that delegates neither keeps both bodies, and their calls, inline.
+    # execute 19→18: the Phase A.5 `Task(` to `test-reviewer`.
+    # review 33→20 (−13): auto-fix rounds (`lens_coverage check`, `review_churn` x2,
+    # `review_consensus`) and the confirmation pass (`freeze commit`, `freeze read-base`,
+    # `lens_coverage check`, `freeze reap`, `stage_agent_ledger emit` and its four lens `Task(`).
+    # verify 10→6 (−4): `verification_cache run` and `mark-pass`, `spec_need op-check` and
+    # `waiver-check`.
+    # wrapup 32→19 (−13): `verification_cache run` and `mark-pass`; `spec_machine mark-tested`,
+    # `find-unbound`, `mark-judged`, `find-unjudged`; `memory_retrieve` x2; `memory_md` x3;
+    # `second_brain promote`; the `judgment-reviewer` `Task(`.
     # −14 total, 145→131 (2026-10-14, SPEC-hm-light-lane-s2). This repo's harness.yaml has
     # `loop.enabled: false`, and the loop-only branches stopped rendering there: the Gate 0
     # `iter_receipts write` (−1 on each of execute/research/review/spec/verify/wrapup), execute
@@ -118,7 +132,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # recorded, which is the evidence half the removed Step 1.7 gate left behind.
     # 21 → 25 (same task, second fold): `worktree loop-mode-active` in Step 0.2 plus the
     # is_codex-branched call sites ADR-011's counting rule includes.
-    "execute": 19,
+    "execute": 18,
     # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml
     # second_opinion.models` dropped `antigravity`, and `/hm:health` runs ONE per-model
     # positive smoke-test per enabled model, so its `second_opinion_invoke` smoke call for that
@@ -217,7 +231,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 34 → 35 (top-issues-2026-09, 2026-09-30): Step 3.4 runs `hm review_churn attribute` on the
     # merged temp file before `persist-payload`, so `caused_by` is stamped by code instead of
     # being "determined" in prose that never reached the payload (621/621 findings unstamped).
-    "review": 33,
+    "review": 20,
     # 6 → 7 (ai-native-sdlc-vs-intent-world, 2026-09-19): spec runs `hm spec_machine approve`
     # twice as rendered calls (Step 0 `--exempt`, Step 5 human stamp) and, now judgment-gated,
     # no longer renders the gate-first `autopilot_caps gate-blocked` line: +2 -1. Declared in
@@ -248,7 +262,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `verification_plan commands` + self-attested `mark-pass` became one `verification_cache run`
     # that runs the CI gates and writes the marker itself; `mark-pass` survives only inside the
     # degraded (no-CI) block. -2 +1.
-    "verify": 10,
+    "verify": 6,
     # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
     # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
     # not render. A config flip that adds a gate in two commands and removes an advisory in a
@@ -296,7 +310,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # in `work-docs/BASELINE-DELTA-intent-layer-improvements.md`.
     # 34 → 33 (top-issues-2026-09, 2026-09-30): Step 2's check + plan + mark-pass → one
     # `verification_cache run`, same change as verify. -2 +1.
-    "wrapup": 32,
+    "wrapup": 19,
 }
 
 
