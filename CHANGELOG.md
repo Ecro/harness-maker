@@ -15,6 +15,14 @@
 
 ### Fixed
 
+- **Cursor no longer runs every harness hook twice.** Cursor also loads `.claude/settings.json` hooks ("Include
+  Third-Party Plugins, Skills, and Other Configs", on by default) and runs every matching hook from every source
+  with no dedupe, so with a cursor target each tool call wrote two telemetry rows, the gates ran twice, and
+  Claude-only hooks (`loop_gate` Stop, `post_write_reminder`, `span-end`) ran in Cursor although
+  `.cursor/hooks.json` leaves them out. Rendered Cursor commands now carry `HM_HOOK_HOST=cursor`, and the
+  Claude-settings copy stands down when the payload has `cursor_version` and `.cursor/hooks.json` carries that
+  marker. Claude Code payloads never have `cursor_version`, so Claude Code is unaffected; an older unmarked
+  `.cursor/hooks.json` keeps firing as before until `make --update` re-renders it.
 - **`make` now says that rendered Codex hooks do nothing until trusted.** Codex runs a non-managed hook only
   after the user trusts its current hash in `/hooks` (and trusts the project `.codex/` layer); an untrusted or
   modified hook is skipped with no startup warning. With a Codex target, `make` prints how many handlers

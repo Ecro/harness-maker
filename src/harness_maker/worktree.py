@@ -5903,7 +5903,7 @@ def _positionals(args: list[str], *, valued_flags: tuple[str, ...]) -> list[str]
     return out
 
 
-def _span_end_session_id() -> str | None:
+def _span_end_session_id(raw: str) -> str | None:
     """The caller's Claude session id, from the channel this command actually has.
 
     `span-end` ships ONLY as a `Stop` / `PreCompact` hook (both settings templates),
@@ -5925,14 +5925,12 @@ def _span_end_session_id() -> str | None:
     from .loop_marker import sanitize_session_id
 
     try:
-        if not sys.stdin.isatty():
-            raw = sys.stdin.read()
-            if raw.strip():
-                payload = json.loads(raw)
-                if isinstance(payload, dict):
-                    sid = payload.get("session_id")
-                    if isinstance(sid, str) and sid.strip():
-                        return sanitize_session_id(sid) or None
+        if raw.strip():
+            payload = json.loads(raw)
+            if isinstance(payload, dict):
+                sid = payload.get("session_id")
+                if isinstance(sid, str) and sid.strip():
+                    return sanitize_session_id(sid) or None
     except Exception:  # noqa: BLE001 - a hook must never fail on a malformed payload
         pass
     env = os.environ.get("HM_SESSION_ID")
@@ -5947,13 +5945,23 @@ def _cli_span_end(args: list[str]) -> int:
     `/hm:` stage. A bare `end` written then would be paired by the reader against
     whatever span preceded it — possibly from a different session entirely.
 
-    Claude-Code-only by construction: hooks live in `.claude/settings.json`, which
-    only Claude Code reads. On Cursor/Codex spans close by next-start or cap
-    (ADR-003), which is why those targets should expect a higher `capped_turns`.
+    Claude-Code-only by construction: hooks live in `.claude/settings.json`. Cursor
+    imports that file too (third-party hooks, on by default), so the Cursor-run copy
+    stands down via `hook_host` once `.cursor/hooks.json` carries the host marker. On
+    Cursor/Codex spans close by next-start or cap (ADR-003), which is why those targets
+    should expect a higher `capped_turns`.
     """
     stage = _flag_value(args, "--stage")
     rest = _positionals(args, valued_flags=("--stage",))
     base = Path(rest[0]).resolve() if rest else Path.cwd()
+    try:
+        raw = sys.stdin.read() if not sys.stdin.isatty() else ""
+    except Exception:  # noqa: BLE001 - a hook must never fail on a missing stdin
+        raw = ""
+    from .hook_host import is_claude_copy_in_cursor
+
+    if is_claude_copy_in_cursor(raw):
+        return 0
     try:
         from .stage_spans import emit_event, ledger_path, read_events
 
@@ -5966,7 +5974,7 @@ def _cli_span_end(args: list[str]) -> int:
         # `_build_spans` was partitioned by session (F-02) nothing closed it at all —
         # the span stayed open until a cap fired, which is precisely the unbounded
         # over-attribution ADR-003 rejected start-only closure to avoid.
-        mine = _span_end_session_id()
+        mine = _span_end_session_id(raw)
         if mine:
             ours = [e for e in events if e.session_id == mine]
         else:

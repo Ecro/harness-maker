@@ -83,7 +83,7 @@ def _close_span(base: Path, session_id: str | None) -> None:
     """Drive the real CLI entry point, not a helper — the defect is in `_cli_span_end`.
 
     The hook payload must be delivered on `sys.stdin`, the Python object, NOT on file
-    descriptor 0: `_span_end_session_id` calls `sys.stdin.isatty()`/`.read()`, and under
+    descriptor 0: `_cli_span_end` calls `sys.stdin.isatty()`/`.read()`, and under
     pytest `sys.stdin` is already a replacement object, so a `dup2` onto fd 0 is invisible to
     it. The first version of this helper did exactly that — the id never arrived, `mine` fell
     to `None`, the session-less bucket held nothing, and `_cli_span_end` returned 0 without

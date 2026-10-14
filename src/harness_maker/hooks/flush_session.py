@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from harness_maker.hook_host import is_claude_copy_in_cursor
 from harness_maker.memory_md import append_session
 
 _PROGRESS_FILE = ".claude-progress.json"
@@ -71,6 +72,8 @@ def run(cwd: Path | None = None) -> int:
         cwd = Path.cwd()
 
     payload = _read_stdin()
+    if is_claude_copy_in_cursor(payload):
+        return 0
     trigger = str(payload.get("trigger", "unknown"))
     ts = _utcnow().strftime("%Y%m%dT%H%M%SZ")
 

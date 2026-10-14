@@ -37,6 +37,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from harness_maker.hook_host import is_claude_copy_in_cursor
 from harness_maker.io_utils import atomic_write
 
 # Version of the `metrics-*.jsonl` ENTRY shape. Distinct from `SCHEMA_VERSION`, which
@@ -168,6 +169,8 @@ def main() -> int:
                 data = parsed
         except (json.JSONDecodeError, ValueError):
             data = {}
+    if is_claude_copy_in_cursor(data):
+        return 0
     raw_workspace = data.get("workspace")
     workspace: dict[str, Any] = raw_workspace if isinstance(raw_workspace, dict) else {}
     # Resolve project root via env-var-first chain (ADR-102, 0.7.1):

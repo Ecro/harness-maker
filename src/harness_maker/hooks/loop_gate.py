@@ -16,6 +16,7 @@ import os
 import sys
 from pathlib import Path
 
+from harness_maker.hook_host import is_claude_copy_in_cursor
 from harness_maker.loop_marker import (
     marker_dir_has_session,
     sanitize_session_id,
@@ -164,6 +165,8 @@ def main() -> None:
     args = parser.parse_args()
 
     stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
+    if is_claude_copy_in_cursor(stdin_text):
+        sys.exit(0)
 
     if args.mode == "stop-hook":
         sys.exit(_stop_hook(stdin_text))

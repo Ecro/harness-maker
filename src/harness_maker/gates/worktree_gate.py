@@ -72,6 +72,7 @@ from typing import Any
 # that fires for every Write/Edit. `harness_maker.autopilot` is NOT: it would drag in
 # pydantic and the 5k-line `worktree` module onto that latency path.
 from harness_maker import loop_marker
+from harness_maker.hook_host import is_claude_copy_in_cursor
 
 # Tool names that can mutate files. Bash is intentionally omitted — blocking
 # `git commit` or test runs would be too aggressive; permission_gate already
@@ -271,6 +272,8 @@ def main() -> int:
     except (OSError, ValueError, json.JSONDecodeError):
         return 0
     if not isinstance(payload, dict):
+        return 0
+    if is_claude_copy_in_cursor(payload):
         return 0
 
     tool_name = str(payload.get("tool_name") or "")
