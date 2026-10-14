@@ -735,6 +735,16 @@ def flag_on(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
 
 
 @pytest.fixture(scope="module")
+def flag_on_loop(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
+    return _render(
+        feature_branch_workflow=True,
+        tmp=tmp_path_factory.mktemp("on-loop"),
+        second_opinion_models=_RATCHET_MODELS,
+        loop=True,
+    )
+
+
+@pytest.fixture(scope="module")
 def flag_off(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     return _render(
         feature_branch_workflow=False,
@@ -982,10 +992,20 @@ def test_atomic_renders_keep_their_own_copy(flag_on: dict[str, str]) -> None:
     for stage in ("execute", "review", "wrapup", "verify", "spec", "research"):
         text = flag_on[stage]
         assert shared_prose_fingerprints(text, "worktree_preflight") == 1, stage
-        assert shared_prose_fingerprints(text, "gate0_receipt") == 1, stage
+        # SPEC-hm-light-lane-s2: Gate 0 is loop-only and this render has the loop off; the
+        # loop-on copy is pinned by tests/render/test_render_light_lane_s2.py (AC-002).
+        assert shared_prose_fingerprints(text, "gate0_receipt") == 0, stage
         assert shared_prose_fingerprints(text, "stage_end_banner") == 1, stage
         for marker in _PREFLIGHT_TAIL_MARKERS:
             assert text.count(marker) == 1, f"{stage}: {marker}"
+        assert "- **`skipped`** —" not in text, stage  # a Gate 0 line, so loop-only too
+
+
+def test_loop_on_atomic_renders_keep_one_gate0_copy(flag_on_loop: dict[str, str]) -> None:
+    """The loop-on half of the check above: Gate 0 renders whole, exactly once per stage."""
+    for stage in ("execute", "review", "wrapup", "verify", "spec", "research"):
+        text = flag_on_loop[stage]
+        assert shared_prose_fingerprints(text, "gate0_receipt") == 1, stage
         assert "- **`skipped`** —" in text, stage
 
 

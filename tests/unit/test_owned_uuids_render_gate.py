@@ -16,7 +16,7 @@ import pytest
 
 from harness_maker import wrapup_land
 from harness_maker.interview import interview
-from harness_maker.models import ProjectProfile
+from harness_maker.models import LoopConfig, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -31,7 +31,10 @@ def rendered(tmp_path_factory: pytest.TempPathFactory) -> Path:
     # deferred a stash. Under `worktree.enabled: false` there is no worktree, no
     # deferred stash, and correctly no crumb (PLAN-worktree-side-defaults ADR-005) —
     # rendering the recommended preset would silently test the wrong configuration.
-    answers = interview(p, autoloop_mode=True).model_copy(update={"worktree": {"enabled": True}})
+    # Loop on too: the finalize that writes the crumb is the loop's (SPEC-hm-light-lane-s2).
+    answers = interview(p, autoloop_mode=True).model_copy(
+        update={"worktree": {"enabled": True}, "loop": LoopConfig(enabled=True)}
+    )
     render(synthesize(p, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
     return out
 

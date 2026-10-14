@@ -11,6 +11,10 @@
                          paragraph (verify uses this for its Gate-0 loop note).
     Inherits is_codex + harness_maker_src_path from the parent stage context.
 
+    SPEC-hm-light-lane-s2: renders only when `loop_enabled(config)`. Only the autoloop driver
+    writes `.current-iter`, and it renders on the same answer, so a loop-off harness carried
+    this block as text that could never fire.
+
     PLAN-token-economy-step-pruning Phase 4: in a FUSED command the variant-free prose
     (the `skipped` rule and the guard base) is hoisted to the workflow preamble and
     rendered once. What stays per stage is what IS per stage: the heading, the pass/fail
@@ -27,6 +31,8 @@
     instead — the guard still no-ops on a standalone run because `.current-iter` is
     written only by the driver. -#}
 {% set g0_root = "<WT>" if (config.worktree is defined and config.worktree.get('enabled')) else "." -%}
+{% if loop_enabled(config) -%}
+<!-- @hm:loop-only -->
 {{ gate0_heading }}
 
 You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can detect missing stages at the next convergence check. Pick `<verdict>`:
@@ -51,4 +57,6 @@ Bash("if [ -f \"{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter\" ]; then 
    fi; \
  fi
 ```
+{% endif %}
+<!-- @hm:/loop-only -->
 {% endif %}

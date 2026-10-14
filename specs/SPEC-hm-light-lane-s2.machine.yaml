@@ -1,0 +1,419 @@
+schema_version: 3
+spec_slug: hm-light-lane-s2
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Template prose plus one synthesize branch; render tests
+  pin the outcome, mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Loop-off renders carry no loop branch
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_loop_off_renders_no_loop_branch
+  executable_predicate: not any(m in body for m in LOOP_ONLY_MARKERS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The marker list is the loop-only inventory the phase-pruning research
+    measured in the e9b6198 render before any edit (Gate 0 x6, execute Step 0.2 and
+    Step 5, verify Check 5), plus every Gate 0 mention; the fixture sets worktree.enabled
+    true and both Claude Code and Codex targets so no marker is absent vacuously.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Loop-on renders add exactly the loop branches
+  type: property
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_loop_on_adds_exactly_the_loop_branches
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: The section inventory is fixed in SPEC S2 from the e9b6198 render
+    before the edit, so over-gating changes the lead set and fails; the stripping
+    relation holds for any renderer that gates only those sections.
+  oracle_independence_waiver: null
+  input_domain: every stage command and Codex stage skill rendered from one answer
+    set with loop.enabled true and false
+  transformation: delete the marked loop-only sections from the loop-on render, after
+    asserting their lead lines equal the SPEC S2 inventory
+  expected_relation: leads(loop_sections(render(loop=True))) == S2_INVENTORY and strip(render(loop=True))
+    == render(loop=False)
+  preconditions: []
+  observable_output: rendered body text
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Each stage stub points at the shared auto-advance procedure
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_stub_points_at_the_shared_procedure
+  executable_predicate: all(p in stub for p in ('.claude/hm/autopilot-advance.md',
+    'project root', 'never from `<WT>`', 'missing or unreadable', 'no `Skill` tool',
+    'loop-mode is on for THIS session', gate_predicate)) and len(prose(stub)) <= 700
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The required phrases and the 700-character prose ceiling (predicate
+    and executed lines excluded, so the install path does not count) were fixed in
+    this SPEC before the template edit; the predicates are the e9b6198 summary_autopilot_gate
+    strings.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: The executed autopilot lines are unchanged
+  type: parametric
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_executed_autopilot_lines_are_unchanged
+  executable_predicate: null
+  golden_table:
+  - input:
+      stage: research
+    expected:
+      lines:
+      - '!uv run --with {src} hm autopilot_caps gate-blocked --root . --stage research
+        --session-id "$HM_SESSION_ID"'
+      - '!uv run --with {src} hm autopilot_caps boundary --root . --current research
+        --session-id "$HM_SESSION_ID" --step-cap 20 --time-cap-min 300'
+    edge: false
+    note: ''
+  - input:
+      stage: spec
+    expected:
+      lines:
+      - '!uv run --with {src} hm autopilot_caps boundary --root . --current spec --session-id
+        "$HM_SESSION_ID" --step-cap 20 --time-cap-min 300'
+    edge: false
+    note: ''
+  - input:
+      stage: execute
+    expected:
+      lines:
+      - '!uv run --with {src} hm autopilot_caps gate-blocked --root . --stage execute
+        --session-id "$HM_SESSION_ID"'
+      - '!uv run --with {src} hm autopilot_caps boundary --root . --current execute
+        --session-id "$HM_SESSION_ID" --step-cap 20 --time-cap-min 300'
+    edge: false
+    note: ''
+  - input:
+      stage: review
+    expected:
+      lines:
+      - '!uv run --with {src} hm autopilot_caps boundary --root . --current review
+        --session-id "$HM_SESSION_ID" --step-cap 20 --time-cap-min 300'
+    edge: false
+    note: ''
+  - input:
+      stage: verify
+    expected:
+      lines:
+      - '!uv run --with {src} hm autopilot_caps gate-blocked --root . --stage verify
+        --session-id "$HM_SESSION_ID"'
+      - '!uv run --with {src} hm autopilot_caps boundary --root . --current verify
+        --session-id "$HM_SESSION_ID" --step-cap 20 --time-cap-min 300'
+    edge: false
+    note: ''
+  - input:
+      stage: wrapup
+    expected:
+      lines:
+      - '!uv run --with {src} hm autopilot_caps gate-blocked --root . --stage wrapup
+        --session-id "$HM_SESSION_ID"'
+      - '!uv run --with {src} hm autopilot_caps boundary --root . --current wrapup
+        --session-id "$HM_SESSION_ID" --step-cap 20 --time-cap-min 300'
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Expected lines are copied from this repo's .claude/commands/hm/*.md
+    rendered at e9b6198, before the edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: The shared procedure keeps every instruction of the old block
+  type: property
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_shared_procedure_keeps_every_instruction
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: Reference is the e9b6198 rendered advance block for spec and verify,
+    saved as fixtures before the edit; ALLOWLIST is fixed in the SPEC Constraints
+    row (six NO-OP lead lines, two predicate lead lines).
+  oracle_independence_waiver: null
+  input_domain: non-blank lines of the e9b6198 advance block
+  transformation: look each line up in the new stub plus .claude/hm/autopilot-advance.md
+  expected_relation: set(old_lines) - ALLOWLIST <= set(new_lines)
+  preconditions: []
+  observable_output: rendered body text
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: A gated harness renders no autopilot text
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_gated_renders_no_autopilot_text
+  executable_predicate: not any(m in body for m in ('.claude/hm/autopilot-advance.md',
+    'autopilot_caps boundary', '@hm:autopilot-advance')) and not shared_file.exists()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Behaviour of the gated level is fixed by PLAN-token-efficiency-autopilot-ux-speed
+    AC-005 (no advance prose under gated).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Dead review telemetry is gone
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_dead_review_telemetry_is_gone
+  executable_predicate: not any(m in body for m in ('record_intent_miss', 'silent_intent_miss_rate',
+    'review_churn complexity', 'Size & Complexity'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Markers name the steps the DRI chose to remove on the 2026-10-14
+    decision card; the research showed no writer for common_ground_marks.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Repair phases C.0 and D.5 are three lines or fewer
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_repair_phases_are_three_lines_or_fewer
+  executable_predicate: len(body_lines(c0)) <= 3 and len(body_lines(d5)) <= 3
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The two-to-three-line bound is the DRI's decision card answer (2026-10-14),
+    not derived from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: The typed-only skill flag comes from the list
+  type: property
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_typed_only_skill_flag_comes_from_the_list
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: Reference is the parsed skill frontmatter rendered at e9b6198 by
+    the per-template line; the derived flag must reproduce it.
+  oracle_independence_waiver: null
+  input_domain: every rendered .claude/skills/*/SKILL.md and .agents/skills/*/SKILL.md
+  transformation: parse frontmatter, drop provenance keys
+  expected_relation: flag_set(new) == set(_TYPED_ONLY_SKILLS) == flag_set(e9b6198)
+    and no template carries the line
+  preconditions: []
+  observable_output: frontmatter key disable-model-invocation
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: The four stage bodies shrink by 20,000 characters
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_the_four_stage_bodies_shrink
+  executable_predicate: 222607 - sum(len(render(s)) for s in ('spec', 'execute', 'review',
+    'verify')) >= 20000
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'Baseline is the e9b6198 render of this repo''s .claude/harness.yaml
+    under pinned_install_ref, measured before the edit: spec 46,985, execute 62,901,
+    review 86,011, verify 26,710 (222,607); the 20,000 floor is the research estimate.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: The no-answers render keeps Gate 0 beside the loop driver
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2.py::test_no_answers_path_keeps_gate0_beside_the_driver
+  executable_predicate: all('Gate 0 receipt' in body for body in atomic_bodies(None))
+    and _loop_enabled(None)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: SPEC-loop-opt-in fixed that config_dump=None renders the loop commands
+    (synthesize._loop_enabled docstring); Gate 0 must follow.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: The loop flag's allowed body diffs stay enumerated
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac009_disable_removes_only_loop_files
+  executable_predicate: changed_bodies <= ALLOWED_BODY_DIFFS_LOOP_OPT_IN | STAGE_FILES_S2
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The added set is enumerated in this SPEC's Supersedes row (six
+    stage commands, six .claude/stages copies, six Codex stage skills) before the
+    edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Add the generated file .claude/hm/autopilot-advance.md and reserve .claude/hm/
+    for harness-maker on-demand reference files
+  category: schema/file format/storage layout
+  rationale: Every rendered harness gains the path; stage 2b adds siblings, and moving
+    the directory later needs a retire step for files already on disk
+  source: spec
+approval:
+  kind: human
+  content_hash: 72b7999d19691995eecf80d313d08a760838a4c46c4781d6e6f674deb4ed5610
+  approved_by: Ecro
+  approved_at: '2026-10-14T13:50:23Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: c42194897ed7fc5aaedb3d34465142d5b6f2d372bc6b737c7b32da37787f4193
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 25a5d4a5f6d601790654d407877a2f172e1cdd14ff891f6cac0806e89c278de5
+    irreversible_decisions: 6d81323b1c44116b4e7ce7f6c9434de4ba5618781951115449bc8e26e89871ec
+    AC-001: 0bf7ecf4c63d4d0461c4cd68ae1184522c90be672232e36460b68373ec092e4f
+    AC-002: 40c4c3817ddef86c11d670d0ac9a5c04e5c2703181d9d33b19172c60541c1713
+    AC-003: bb375aa439730c7157e5287dbce89e64a9dd02976afc74661d39e1e5ef617f56
+    AC-004: a9170f078f8076fdecfe1bef2a043f6f3cb26e4901c69d0a4111e2e62213246f
+    AC-005: 13b917ddb6ddd5d4393fe4a87d152579619942e71710aa7b6b9070957c852dcd
+    AC-006: 8f16dbe2c1cb8167a29d12e2bdf9545c99fa865797b4309853b7bca94b1c8b50
+    AC-007: 35c0a144941de3803d00268b54ffba29c06fb7c89675edea18f67a513ae2dfc2
+    AC-008: 4d4ae53b685c9d94868b09cc73326175e7dd7cf18dd0755ebd8615a2d006fdc2
+    AC-009: 86c561a661bec4ad562266621e3f25fefb4e8eb4fa821d3a991ce6cde5b2f6cc
+    AC-010: 2927f778117830ec4b1b94be3a4bf528052eec9206193e713e104d69fe08b594
+    AC-011: b8c1bfaf57593642366bbaecdaf30245db5cc4fc75b52b97251ec7796f5e6fe5
+    AC-012: 8f6d04c1d9f2b427dfbcc26670475081edc7176714dae349c338e366baacffc4
+    ac_order: 5d5b29b5dde25247a09577085a3501bfcfe37764c50920023e8933350c90e2aa

@@ -156,12 +156,16 @@ def test_spec_driven_no_stray_5_check_count(spec_driven_verify: str) -> None:
         )
 
 
-def test_spec_driven_ordinal_check_5_still_present(spec_driven_verify: str) -> None:
-    """(b) The ordinal '### Check 5 — Worktree merge cleanliness' MUST remain unchanged."""
-    assert "### Check 5 — Worktree merge cleanliness" in spec_driven_verify, (
-        "spec-driven verify must keep '### Check 5 — Worktree merge cleanliness' "
-        "— this is the ORDINAL name of the 5th check, not a count reference"
-    )
+def test_check_5_is_loop_only_and_check_6_keeps_its_number(spec_driven_verify: str) -> None:
+    """(b) Ordinals are names, not counts: Check 6 keeps its number.
+
+    Since SPEC-hm-light-lane-s2, '### Check 5 — Worktree merge cleanliness' renders only with
+    `loop.enabled` (it checks the loop's `execute-*` merge), and this fixture renders loop off.
+    The ordinal survives as Check 6's unchanged name; `test_render_light_lane_s2` pins Check 5
+    on the loop-on arm.
+    """
+    assert "### Check 5 —" not in spec_driven_verify
+    assert "### Check 6 — SPEC requirement" in spec_driven_verify
 
 
 # ── (c) seam: CLI calls present in spec-driven ───────────────────────────────

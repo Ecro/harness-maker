@@ -31,6 +31,13 @@ projection: `preset`, `targets`, and every feature toggle in `harness.yaml`
 Each can gate template blocks. They are out of scope for this PLAN because no phase in
 it edits a block gated on them; a phase that does must extend `AXES` first.
 
+**`loop.enabled` is held ON, not keyed** (SPEC-hm-light-lane-s2). Stage 2a gated Gate 0,
+execute Step 0.2/Step 5 and verify Check 5 on the loop flag, so a loop-off render reads as
+their deletion. The loop-on render is the superset, so measuring it keeps every one of those
+lines guarded here; the loop-off arm is pinned instead by
+`tests/render/test_render_light_lane_s2.py`'s differential (loop-off = loop-on minus a fixed
+inventory), which a second key would only duplicate.
+
 **Why not `test_fused_loses_no_instruction`.** That check compares an *atomic* render
 against its *fused* render. An instruction deleted from `verify.md.j2` disappears from
 both sides, so the differential stays exactly the exempt autopilot block and the
@@ -54,7 +61,7 @@ from typing import Any
 from harness_maker.hm import _DISPATCHABLE
 from harness_maker.interview import answers_from_harness_yaml
 from harness_maker.io_utils import atomic_write
-from harness_maker.models import ProjectProfile
+from harness_maker.models import LoopConfig, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -111,10 +118,13 @@ def instruction_set(text: str) -> dict[str, list[str]]:
     }
 
 
-def _render_atomic(strictness: str) -> dict[str, str]:
+def _render_atomic(strictness: str, *, loop: bool = False) -> dict[str, str]:
     parsed = answers_from_harness_yaml(HARNESS_YAML)
     assert parsed is not None, f"{HARNESS_YAML} did not parse into answers"
-    answers = parsed.model_copy(update={"strictness": strictness})
+    update: dict[str, Any] = {"strictness": strictness}
+    if loop:
+        update["loop"] = LoopConfig(enabled=True)
+    answers = parsed.model_copy(update=update)
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         with pinned_install_ref():
@@ -132,7 +142,7 @@ def _render_atomic(strictness: str) -> dict[str, str]:
 def measure_instructions() -> dict[str, dict[str, list[str]]]:
     out: dict[str, dict[str, list[str]]] = {}
     for strictness in AXES:
-        rendered = _render_atomic(strictness)
+        rendered = _render_atomic(strictness, loop=True)
         missing = [c for c in ATOMIC_COMMANDS if c not in rendered]
         if missing:
             raise RuntimeError(f"{strictness} render is missing: {missing}")

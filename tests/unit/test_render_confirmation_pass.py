@@ -25,14 +25,15 @@ import pytest
 
 from harness_maker.conditional_router import lens_dispatch_groups, mandatory_lenses
 from harness_maker.interview import interview
-from harness_maker.models import ProjectProfile
+from harness_maker.models import LoopConfig, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
 
 def _render(tmp_path: Path, *, auto_fix: bool = True, instrumented: bool = False) -> str:
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True)
+    # Loop on: S7's loop receipt line renders only beside the loop driver (SPEC-hm-light-lane-s2).
+    a = interview(p, autoloop_mode=True).model_copy(update={"loop": LoopConfig(enabled=True)})
     a.auto_fix = auto_fix
     # The ledger emit is behind the `instrumentation` axis, which defaults OFF for a fresh
     # install — same gating as `execute.md.j2`'s A.5 row. Tests that assert the row must turn

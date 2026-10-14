@@ -23,7 +23,11 @@ created_at: '2026-10-14T10:30:49Z'
 schema_version: 1
 rejected: []
 depends_on: []
-approval: null
+approval:
+  content_hash: 57c786cc5a83148ce0afdaf0828915b8289462503ad397272d2a02325f95cfba
+  approved_by: Ecro
+  approved_at: '2026-10-14T13:31:56Z'
+  approved_target: 5
 revisit_when: null
 observed: null
 note: null
