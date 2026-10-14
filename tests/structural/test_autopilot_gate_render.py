@@ -31,7 +31,7 @@ Re-captures (append; never silently overwrite):
   light lane (spec Step 0 picks `lane: light|full`, execute skips Phase A.5 on light, review cuts
   repetition on light and closes the run and reaps the freeze ref when it skips the confirmation
   pass) and seven rationale paragraphs moved to `docs/reference/stage-rationale.md`. `verify`
-  moved for its light-lane coverage caveat; `loop` for the typed-only `autoloop-driver` pointer.
+  moved for its light-lane coverage caveat.
   `configure`, `help`, `make`, `metrics`, `uninstall` (and `loop`, `loop-p5-batch` in the `ask`
   arms, which render them) moved by one frontmatter line, `disable-model-invocation: true`
   (lever 5). Verified before re-capture that these are the ONLY moved commands in every arm and
