@@ -11,6 +11,15 @@
   coverage check and the Grade Gate but drops Pass 1, caps `max_review_rounds` at 2 and skips a Confirmation
   Pass that would re-review an unchanged artifact. On a 2026-10-14 bench the full path cost ×22 a plain run
   on single-session tasks with no hidden-test gain (`work-docs/RESEARCH-hm-light-lane.md`).
+- **Stage commands carry only what can run (HM-LIGHT-LANE, stage 2a).** With `loop.enabled: false` (the
+  default) the stage commands no longer render the Gate 0 receipt, execute Step 0.2 and Step 5, or verify
+  Check 5; with the loop on they render word for word as before. The auto-advance procedure is written once,
+  in the new `.claude/hm/autopilot-advance.md`, behind a short per-stage stub that keeps each stage's own gate
+  and commands and stops at the banner if the file is missing (a `gated` harness renders neither). Review
+  drops Step 2.5, step 5c and the Size & Complexity section, and `/hm:health` drops `silent_intent_miss_rate`.
+  Execute Phases C.0 and D.5 are three lines each. On this repo's config the spec, execute, review and verify
+  commands are about 28K chars smaller. `hm make` now refuses to turn the loop off while a loop marker,
+  owned worktree or finalize stash is live, since the loop-off render has no finalize step to recover them.
 - **Less always-loaded context.** A clean `hm spec_machine check --all` prints one line
   (`{"ok": true, "overall", "strictness"}`); failures still print the full payload. Five internal skills
   (`agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `context-linter`, `worktree-isolator`)
