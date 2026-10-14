@@ -317,6 +317,14 @@ def test_shared_procedure_keeps_every_instruction(loop_off: Path, stage: str) ->
     assert not missing, f"{stage}: instructions lost from the auto-advance block: {missing}"
 
 
+def test_loop_off_task_worktree_keeps_its_finalize_rule(loop_off: Path) -> None:
+    """Round-1 split: the `hm/<slug>` rule renders with the loop off; only `execute-<uuid>` is
+    loop-only."""
+    body = (loop_off / ".claude" / "commands" / "hm" / "execute.md").read_text()
+    assert "An `hm/<slug>` task worktree finalized ZERO times" in body
+    assert "An `execute-<uuid>` worktree finalized exactly once" not in body
+
+
 # AC-006
 def test_gated_renders_no_autopilot_text(tmp_path: Path) -> None:
     root = _render(tmp_path, loop=False, level="gated")

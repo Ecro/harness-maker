@@ -114,12 +114,13 @@ def autopilot_enabled(config: object) -> bool:
     return level != "gated"
 
 
-#: Exported as a callable rather than baked into each template as a literal list. The rendered
-#: dispatch list and `hm lens_coverage check` must agree on the mandatory lens set; a literal
-#: would let them disagree, and the symptom of that is not a visible drift but a review that can
-#: never be approved, because the CLI names a lens the command never told anyone to run.
 TEMPLATE_GLOBALS: dict[str, object] = {
     "autopilot_enabled": autopilot_enabled,
+    # Exported as a callable rather than baked into each template as a literal list. The
+    # rendered dispatch list and `hm lens_coverage check` must agree on the mandatory lens set; a
+    # literal would let them disagree, and the symptom of that is not a visible drift but a
+    # review that can never be approved, because the CLI names a lens the command never told
+    # anyone to run.
     "lens_dispatch": conditional_router.lens_dispatch,
     # The unit of DISPATCH, which stopped being the unit of lens when the four core lenses
     # collapsed into one call. Both dispatch blocks in `review.md.j2` loop over this, so they
