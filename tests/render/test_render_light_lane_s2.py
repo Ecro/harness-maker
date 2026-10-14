@@ -188,6 +188,33 @@ def test_loop_on_adds_exactly_the_loop_branches(loop_off: Path, loop_on: Path) -
     assert "Check 5 — Worktree merge cleanliness" in claude_on["verify"]
 
 
+# The differential above holds by construction if a close marker moves down and swallows
+# non-loop text: both arms lose it together from the loop-off view. So the span CONTENT is
+# bounded too — every heading and every `!` line inside a loop-only span is a loop one.
+SPAN_HEADINGS = {
+    "## Emit Gate 0 receipt (ADR-001, ADR-005)",
+    "### Step 4.5 — Emit Gate 0 receipt (ADR-001, ADR-005)",
+    "#### Step 0.2 — Loop mode: the per-iter PLAN",
+    "### Step 5 — Worktree finalize (ephemeral `/hm:loop` worktrees ONLY)",
+    "### Check 5 — Worktree merge cleanliness",
+}
+SPAN_COMMANDS = re.compile(
+    r"\.hm-iter-receipts|loop-mode-active|owned-crumb-(?:add|read)|post-commit-pop"
+    r"|worktree finalize <WT> (?:stage-only|fail)|^!git status$|^!git diff --check"
+)
+
+
+def test_loop_spans_hold_only_loop_instructions(loop_on: Path) -> None:
+    for name, body in _bodies(loop_on).items():
+        for span in re.findall(re.escape(LOOP_OPEN) + r"(.*?)" + re.escape(LOOP_CLOSE), body, re.S):
+            for ln in span.splitlines():
+                line = ln.strip().replace("`$hm-loop`", "`/hm:loop`")
+                if re.match(r"#{2,} ", line):
+                    assert line in SPAN_HEADINGS, f"{name}: non-loop heading in a loop span: {line}"
+                elif line.startswith("!"):
+                    assert SPAN_COMMANDS.search(line), f"{name}: non-loop command in a span: {line}"
+
+
 # AC-003
 def _gate_predicate(stage: str) -> str:
     src = (TEMPLATES / "stages" / f"{stage}.md.j2").read_text()
@@ -211,8 +238,18 @@ def test_stub_points_at_the_shared_procedure(loop_off: Path, stage: str) -> None
         "missing or unreadable",
         "no `Skill` tool",
         "loop-mode is on for THIS session",
+        "no active marker",
+        "only after Step 1",
+        "--slug '<slug>'",
     ):
         assert phrase in " ".join(stub.split()), f"{stage}: stub lacks {phrase!r}"
+    # What must hold without the shared file stays in the stub, not only in the union AC-005
+    # checks: the pending-gate stop, or each judgment verdict the boundary call needs.
+    if stage in ("spec", "review"):
+        for token in ("--judgment-gate clear", "`pending`", "`blocked`"):
+            assert token in stub, f"{stage}: stub lacks {token!r}"
+    else:
+        assert "STOP without Step 2" in stub, f"{stage}: stub lost the pending-gate stop"
     predicate = _gate_predicate(stage)
     assert predicate in stub, f"{stage}: the stub lost its own gate predicate"
     prose = stub.replace(predicate, "")
@@ -320,7 +357,17 @@ def test_repair_phases_are_three_lines_or_fewer(loop_off: Path) -> None:
     for heading in ("#### Phase C.0", "#### Phase D.5"):
         lines = _phase_body(body, heading)
         assert 1 <= len(lines) <= 3, f"{heading}: {len(lines)} lines"
-        assert "repair" in " ".join(lines).lower(), f"{heading} lost its repair trigger"
+        text = " ".join(lines)
+        assert "repair" in text.lower(), f"{heading} lost its repair trigger"
+        # Three lines is no budget if each can grow without bound; 1,500 chars is the
+        # e9b6198 C.0 cut by more than half.
+        assert len(text) <= 1500, f"{heading}: {len(text)} chars"
+    d5 = " ".join(_phase_body(body, "#### Phase D.5"))
+    assert "STOP" in d5, "D.5 lost its stop condition"
+    assert "Do not advance the phase" in d5, "D.5 lost its exit rule"
+    c0 = " ".join(_phase_body(body, "#### Phase C.0"))
+    for item in ("root-cause hypothesis", "scope", "non-goals"):
+        assert item in c0.lower(), f"C.0 lost {item!r}"
 
 
 # AC-009

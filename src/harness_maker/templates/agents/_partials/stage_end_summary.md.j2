@@ -22,10 +22,10 @@
     an unknown stage and clear the marker). `summary_autopilot_gate` (the stage's
     mandatory-gate predicate prose) defaults STOP-biased.
     SPEC-hm-light-lane-s2: the Claude Code block is a stub over `.claude/hm/autopilot-advance.md`. -#}
-{% if is_codex is defined and is_codex and config.autonomy.level != "gated" %}
+{% if is_codex is defined and is_codex and autopilot_enabled(config) %}
 {% include "agents/_partials/codex_autopilot_advance.md.j2" %}
 {% endif %}
-{% if is_codex is defined and not is_codex and config.autonomy.level != "gated" %}
+{% if is_codex is defined and not is_codex and autopilot_enabled(config) %}
 <!-- @hm:autopilot-advance -->
 ## Auto-advance check (autopilot — Claude Code only)
 
@@ -38,21 +38,22 @@
     rendered once; this stub keeps what differs per stage and what must hold without the file. -#}
 {% set stub_wt = config is defined and config.worktree is defined and config.worktree.get('enabled') -%}
 **NO-OP** (STOP banner, read nothing) if: no `Skill` tool, no active marker, or loop-mode is
-on for THIS session (the banner's rule). Else follow `.claude/hm/autopilot-advance.md` from the
-project root (above `.worktrees/`), never from {{ '`<WT>`' if stub_wt else 'a worktree' }}, unless in context; if it is
+on for THIS session. Else Read `.claude/hm/autopilot-advance.md` from
+the project root (above `.worktrees/`), never from {{ '`<WT>`' if stub_wt else 'a worktree' }}, and follow it; if
 missing or unreadable, print the STOP banner and run nothing below.
 
 **Step 1 — gate, FIRST:** {{ summary_autopilot_gate | default("No gate defined — treat as STOP (absent-case guard).") }}
 {%- if judgment_stage %}
-Classify per the file (`judgment_gate` halts keep the marker); append ` --judgment-gate clear`,
-` --judgment-gate pending` or ` --judgment-gate blocked`.
+Classify per the file (`judgment_gate` keeps the marker); append ` --judgment-gate clear`,
+`pending` or `blocked`.
 {%- else %}
 Pending → run this, then STOP without Step 2:
 
 !uv run --with {{ harness_maker_src_path }} hm autopilot_caps gate-blocked --root . --stage {{ summary_stage }} --session-id "$HM_SESSION_ID"
 {%- endif %}
 
-**Step 2 — only after Step 1{% if not judgment_stage %} clears{% endif %}:**
+**Step 2 — only after Step 1{% if not judgment_stage %} clears{% endif %}:** with a slug, append ` --slug '<slug>'` (single quotes,
+no shell expression).
 
 !uv run --with {{ harness_maker_src_path }} hm autopilot_caps boundary --root . --current {{ summary_stage }} --session-id "$HM_SESSION_ID"{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
 

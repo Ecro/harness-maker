@@ -159,6 +159,23 @@ def test_ac_006_block_renders_the_spec_gate_hook(preset: Preset, tmp_path: Path)
     assert any("spec_gate" in c for c in _hook_commands(new["settings"]))
 
 
+@pytest.mark.parametrize("preset", list(Preset), ids=lambda p: p.value)
+def test_the_autopilot_block_stops_do_not_vary_with_strictness(
+    preset: Preset, tmp_path: Path
+) -> None:
+    """`_stops` cuts the auto-advance block from the reference comparison; this keeps that cut
+    from hiding a strictness-dependent stop inside the block."""
+    warn = _render(preset, "warn", tmp_path / "warn")
+    block = _render(preset, "block", tmp_path / "block")
+    for stage in STAGES:
+        w = "".join(_AUTOPILOT_BLOCK.findall(warn[stage]))
+        b = "".join(_AUTOPILOT_BLOCK.findall(block[stage]))
+        assert w, f"{stage}: no auto-advance block rendered"
+        assert [ln for ln in w.splitlines() if STOP.search(ln)] == [
+            ln for ln in b.splitlines() if STOP.search(ln)
+        ], f"{stage}: the auto-advance block stops differ between warn and block"
+
+
 def _gate_active(tmp_path: Path, body: str) -> bool:
     """True when the hook reaches its SPEC lookup instead of standing aside.
 

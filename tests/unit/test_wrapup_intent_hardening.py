@@ -16,7 +16,8 @@ checks the oracle (a one-heading edit outside 5.7 changes the hash), not the tem
 Re-captures of `outside_57_sha256` by later tasks (append; placeholders are never re-captured):
 - 2026-10-14, `hm-light-lane-s2`: Gate 0 became loop-only and the auto-advance block a stub
   (SPEC-hm-light-lane-s2). Re-captured in all four arms after checking that 5.7's placeholder
-  inventory still equals the golden one.
+  inventory still equals the golden one. Re-captured again after `/hm:review` round 1 edited
+  the stub and wrapup's loop references, with the same placeholder check.
 """
 
 from __future__ import annotations

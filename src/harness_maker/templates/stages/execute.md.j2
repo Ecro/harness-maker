@@ -915,8 +915,9 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm w
 - No diff outside the PLAN's stated scope — surprise edits are flagged.
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
 {% if wt_on and loop_enabled(config) %}<!-- @hm:loop-only -->
-- An `execute-<uuid>` worktree finalized exactly once: success or fail. An `hm/<slug>` task worktree finalized ZERO times — wrapup commits it and `task-land` lands it.
+- An `execute-<uuid>` worktree finalized exactly once: success or fail.
 <!-- @hm:/loop-only -->
+{% endif %}{% if wt_on %}- An `hm/<slug>` task worktree finalized ZERO times — wrapup commits it and `task-land` lands it.
 {% endif %}
 
 {% set summary_done = "PLAN phases implemented to GREEN; changes staged, no commit" -%}

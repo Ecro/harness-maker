@@ -70,6 +70,21 @@ def test_add_skill_creates_file(tmp_path: Path) -> None:
     assert rendered.name == "SKILL.md"
 
 
+@pytest.mark.parametrize("name", ["autoloop-driver", "context-linter"])
+def test_add_typed_only_skill_keeps_the_flag(tmp_path: Path, name: str) -> None:
+    """SPEC-hm-light-lane-s2 moved the flag out of the templates; `add` must still set it."""
+    target_dotclaude = _build_side_fixture(tmp_path)
+    (target_dotclaude / "skills" / name / "SKILL.md").unlink()
+    text = add(f"skill:{name}", target_dotclaude).read_text(encoding="utf-8")
+    assert "disable-model-invocation: true" in text.split("\n---", 1)[0]
+
+
+def test_add_ordinary_skill_stays_invocable(tmp_path: Path) -> None:
+    target_dotclaude = _build_side_fixture(tmp_path)
+    text = add("skill:conditional-router", target_dotclaude).read_text(encoding="utf-8")
+    assert "disable-model-invocation" not in text
+
+
 def test_remove_reviewer_deletes_file(tmp_path: Path) -> None:
     target_dotclaude = _build_side_fixture(tmp_path)
     add("reviewer:security", target_dotclaude)

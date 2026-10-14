@@ -631,9 +631,7 @@ def _reference_files(config_dump: dict[str, object] | None) -> list[FileSpec]:
     ``gated`` harness carries neither. No config (the module-level skeletons) is the full
     inventory.
     """
-    autonomy = (config_dump or {}).get("autonomy")
-    level = autonomy.get("level") if isinstance(autonomy, dict) else None
-    if config_dump is not None and level == "gated":
+    if not template_globals.autopilot_enabled(config_dump):
         return []
     return [("hm/autopilot-advance.md.j2", "hm/autopilot-advance.md", {})]
 
@@ -747,7 +745,9 @@ def _no_answers_dump() -> dict[str, Any]:
     keep their Gate 0 receipt (SPEC-hm-light-lane-s2 AC-011); the fallback's fresh-install
     ``False`` alone would drop it beside a rendered driver.
     """
-    return {**_strict_fallback_dump(), "loop": {"enabled": True}}
+    dump = _strict_fallback_dump()
+    loop = dump.get("loop")
+    return {**dump, "loop": {**(loop if isinstance(loop, dict) else {}), "enabled": True}}
 
 
 def _loop_enabled(config_dump: dict[str, Any] | None) -> bool:

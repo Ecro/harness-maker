@@ -40,11 +40,11 @@ run the stub's `gate-blocked` line, then stop.
 
 ## Step 2
 
-On every other stage the step reads:
+The stub's Step 2 is the first heading below on every stage except a judgment-gated one, which
+uses the second; read the parenthesis after both as part of either:
+
 **Step 2 — boundary check (ONLY when the gate is clear).** Run the deterministic check
-On a judgment-gated stage it reads:
 **Step 2 — boundary check.** Run the deterministic check
-Either way:
 (it enforces the Phase-5 runaway caps + kill switch, and on proceed records the advance it
 authorizes — so it must run only after Step 1 clears):
 
@@ -82,3 +82,4 @@ Read the JSON:
   `judgment_directive` says before advancing.** An auto-answer that is not written down is
   an unauditable skip of a human decision — the record is the only thing that makes this
   level reviewable after the fact.
+  This key appears only on a judgment-gated stage.

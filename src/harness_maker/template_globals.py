@@ -87,10 +87,6 @@ def stage_invocation(text: str, is_codex: bool) -> str:
     return "".join(result)
 
 
-#: Exported as a callable rather than baked into each template as a literal list. The rendered
-#: dispatch list and `hm lens_coverage check` must agree on the mandatory lens set; a literal
-#: would let them disagree, and the symptom of that is not a visible drift but a review that can
-#: never be approved, because the CLI names a lens the command never told anyone to run.
 def loop_enabled(config: object) -> bool:
     """Whether a config dump turns the /hm:loop family on (SPEC-loop-opt-in).
 
@@ -104,7 +100,26 @@ def loop_enabled(config: object) -> bool:
     return bool(loop.get("enabled", False)) if isinstance(loop, dict) else False
 
 
+def autopilot_enabled(config: object) -> bool:
+    """Whether a config dump renders autopilot text (anything but `autonomy.level: gated`).
+
+    One reader for the stage stubs and `synthesize._reference_files` (SPEC-hm-light-lane-s2):
+    a stub rendered without its shared file fails closed and silently stops autopilot; a file
+    rendered without stubs is dead weight. Not a dict (the no-answers skeletons) is True.
+    """
+    if not isinstance(config, dict):
+        return True
+    autonomy = config.get("autonomy")
+    level = autonomy.get("level") if isinstance(autonomy, dict) else None
+    return level != "gated"
+
+
+#: Exported as a callable rather than baked into each template as a literal list. The rendered
+#: dispatch list and `hm lens_coverage check` must agree on the mandatory lens set; a literal
+#: would let them disagree, and the symptom of that is not a visible drift but a review that can
+#: never be approved, because the CLI names a lens the command never told anyone to run.
 TEMPLATE_GLOBALS: dict[str, object] = {
+    "autopilot_enabled": autopilot_enabled,
     "lens_dispatch": conditional_router.lens_dispatch,
     # The unit of DISPATCH, which stopped being the unit of lens when the four core lenses
     # collapsed into one call. Both dispatch blocks in `review.md.j2` loop over this, so they

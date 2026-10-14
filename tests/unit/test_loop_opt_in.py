@@ -58,78 +58,79 @@ _OPT_IN_COMMIT = "18714dd1"
 #   and moved for the stage's other cuts. Verified before capture that these twelve are the ONLY
 #   paths whose loop-ON body differs from the regenerated loop-OFF snapshot in every fixture; the
 #   loop-ON/OFF diff of each is pinned by tests/render/test_render_light_lane_s2.py (AC-002).
+#   Re-captured again in the same task after `/hm:review` round 1 edited those twelve bodies.
 _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
     "commands/hm/execute.md": {
-        "side-python-cli": "2614a0c1ab7f8971152bddd0e3668ef2bb337d290a04ce58c4827e7662a4f778",
-        "side-tauri-app": "2614a0c1ab7f8971152bddd0e3668ef2bb337d290a04ce58c4827e7662a4f778",
-        "prod-tauri-app": "6daedcf0dac03ffee5f89b1e249a76a33578f7eab751b89179065e478926d88c",
-        "prod-firmware": "6daedcf0dac03ffee5f89b1e249a76a33578f7eab751b89179065e478926d88c",
+        "side-python-cli": "391de3893a0cbc1077d749666c67829486f4869708747cacdd47622d528e573a",
+        "side-tauri-app": "391de3893a0cbc1077d749666c67829486f4869708747cacdd47622d528e573a",
+        "prod-tauri-app": "670aef92d192c959d663301d4fabbf28a450eaaf8cc30c712f0f227433d0fbbd",
+        "prod-firmware": "670aef92d192c959d663301d4fabbf28a450eaaf8cc30c712f0f227433d0fbbd",
     },
     "commands/hm/research.md": {
-        "side-python-cli": "8b4cc5fc72f5f297c8ed7bea44fd921293d8d71e8e5d2b0319b000b814bdd0a7",
-        "side-tauri-app": "8b4cc5fc72f5f297c8ed7bea44fd921293d8d71e8e5d2b0319b000b814bdd0a7",
-        "prod-tauri-app": "201bf7dedb9df649c66827fa60bb9bbc290bbfe48f097ec0c9cd13b8724ba3bf",
-        "prod-firmware": "201bf7dedb9df649c66827fa60bb9bbc290bbfe48f097ec0c9cd13b8724ba3bf",
+        "side-python-cli": "b2ff77e2252c1daac97259d98f84acaed2cf941d6e67e4ce156e705847b38a49",
+        "side-tauri-app": "b2ff77e2252c1daac97259d98f84acaed2cf941d6e67e4ce156e705847b38a49",
+        "prod-tauri-app": "cf7644adc98b211c4580693c5c59b5f29317068ff981f76a75a4686de16efa2c",
+        "prod-firmware": "cf7644adc98b211c4580693c5c59b5f29317068ff981f76a75a4686de16efa2c",
     },
     "commands/hm/review.md": {
-        "side-python-cli": "0a9d420f243302b0abb88ab0b186b2df58f3eb64e026757c12939a8973dc5536",
-        "side-tauri-app": "0a9d420f243302b0abb88ab0b186b2df58f3eb64e026757c12939a8973dc5536",
-        "prod-tauri-app": "e54ca9c8773a145335c9aceb26ab3a5dfcc910de4150643207ab7749356afe41",
-        "prod-firmware": "e54ca9c8773a145335c9aceb26ab3a5dfcc910de4150643207ab7749356afe41",
+        "side-python-cli": "baaacacb1b88142a2f7552fdefb7fa239fca347d485cb1b7ea5ad51ada48de7c",
+        "side-tauri-app": "baaacacb1b88142a2f7552fdefb7fa239fca347d485cb1b7ea5ad51ada48de7c",
+        "prod-tauri-app": "0b2254e6f7dad6aaae52a9f433bab5574be4b77b3ad1d5bb99d1a2d7aa234651",
+        "prod-firmware": "0b2254e6f7dad6aaae52a9f433bab5574be4b77b3ad1d5bb99d1a2d7aa234651",
     },
     "commands/hm/spec.md": {
-        "side-python-cli": "0e3ee6cec1d555173ddb838b9c40ae4eff5531699db90b1716e160e1097f809e",
-        "side-tauri-app": "0e3ee6cec1d555173ddb838b9c40ae4eff5531699db90b1716e160e1097f809e",
-        "prod-tauri-app": "23b141be5064e1c06b933d75e74872ae6c463235f5864f49470f05ee8c923ff0",
-        "prod-firmware": "23b141be5064e1c06b933d75e74872ae6c463235f5864f49470f05ee8c923ff0",
+        "side-python-cli": "c57a3d4ba446dbde8bd024bebb0cf6ce767f93c8278bdf0744945beae34aa80a",
+        "side-tauri-app": "c57a3d4ba446dbde8bd024bebb0cf6ce767f93c8278bdf0744945beae34aa80a",
+        "prod-tauri-app": "a866dc14e380e5aafaaf886f8015f59f3a20543144ad8e77d934043ea025bd3f",
+        "prod-firmware": "a866dc14e380e5aafaaf886f8015f59f3a20543144ad8e77d934043ea025bd3f",
     },
     "commands/hm/verify.md": {
-        "side-python-cli": "11b411598351bd88ce2302f91d38609d025fc49661f0ddf607832694b30e9a7c",
-        "side-tauri-app": "11b411598351bd88ce2302f91d38609d025fc49661f0ddf607832694b30e9a7c",
-        "prod-tauri-app": "808d12688b6640d91753df4391bd7e2f686beba270c88b71e874be9eab956979",
-        "prod-firmware": "808d12688b6640d91753df4391bd7e2f686beba270c88b71e874be9eab956979",
+        "side-python-cli": "88000cc5f563afe39613968fd0e1e2129780a24f593ecd6b46d34f20ec5453ad",
+        "side-tauri-app": "88000cc5f563afe39613968fd0e1e2129780a24f593ecd6b46d34f20ec5453ad",
+        "prod-tauri-app": "4347308c2d7a7204b383dd3910f0138f7d1ae64eb91318cdaacf25996a6b12eb",
+        "prod-firmware": "4347308c2d7a7204b383dd3910f0138f7d1ae64eb91318cdaacf25996a6b12eb",
     },
     "commands/hm/wrapup.md": {
-        "side-python-cli": "ae0cfa5363cb24defec34fcf7de169fb06e9838564886915c69cf1aa8484acab",
-        "side-tauri-app": "ae0cfa5363cb24defec34fcf7de169fb06e9838564886915c69cf1aa8484acab",
-        "prod-tauri-app": "05adc999ca9eabd692e813ab66c2f8a88c410a0f58788ba4dfec8a561bf4e30b",
-        "prod-firmware": "05adc999ca9eabd692e813ab66c2f8a88c410a0f58788ba4dfec8a561bf4e30b",
+        "side-python-cli": "64a2ac54b4ec302cb66ad53a942b293014520ecfe8b4eb4f86ace4229d86908b",
+        "side-tauri-app": "64a2ac54b4ec302cb66ad53a942b293014520ecfe8b4eb4f86ace4229d86908b",
+        "prod-tauri-app": "6fb13b67526e62f08629ceb60c5b5b79ed3e8ea9311f0d634b6762240b2fc13b",
+        "prod-firmware": "6fb13b67526e62f08629ceb60c5b5b79ed3e8ea9311f0d634b6762240b2fc13b",
     },
     "stages/execute.md": {
-        "side-python-cli": "fbb6fb65084c46c6139bfbc6240abdccc834e18e124f60ba1e2134ed165d33cb",
-        "side-tauri-app": "fbb6fb65084c46c6139bfbc6240abdccc834e18e124f60ba1e2134ed165d33cb",
-        "prod-tauri-app": "50159b0b42a00850b7cfdfb83c52cb052449ecde23772ce36d0756f3770b780e",
-        "prod-firmware": "50159b0b42a00850b7cfdfb83c52cb052449ecde23772ce36d0756f3770b780e",
+        "side-python-cli": "92c22a8143d3f2f106cb0564a4b60d2d3121ef2c9c8d79ff648ef12e20a5852b",
+        "side-tauri-app": "92c22a8143d3f2f106cb0564a4b60d2d3121ef2c9c8d79ff648ef12e20a5852b",
+        "prod-tauri-app": "f9e2ff25a7472d534edccfac210d75c99a3b5036aa5624bf193ac4bd934672a3",
+        "prod-firmware": "f9e2ff25a7472d534edccfac210d75c99a3b5036aa5624bf193ac4bd934672a3",
     },
     "stages/research.md": {
-        "side-python-cli": "c6c77546d3ea53708f6e4adad2269b319c01cbb0ee1711a3db84dc37243cf5f4",
-        "side-tauri-app": "c6c77546d3ea53708f6e4adad2269b319c01cbb0ee1711a3db84dc37243cf5f4",
-        "prod-tauri-app": "d835c39e3d9521b9dda22a84b7f8dd5182a2afb1d294fa0007945dddabfe8750",
-        "prod-firmware": "d835c39e3d9521b9dda22a84b7f8dd5182a2afb1d294fa0007945dddabfe8750",
+        "side-python-cli": "dd5801166e5918f5572251551018d07e13cb3a241d54772435764ae4bfa5d9ea",
+        "side-tauri-app": "dd5801166e5918f5572251551018d07e13cb3a241d54772435764ae4bfa5d9ea",
+        "prod-tauri-app": "72751dd68a5456f9c1b090f70c0045ca5b7102aba55dc065b863647f40591079",
+        "prod-firmware": "72751dd68a5456f9c1b090f70c0045ca5b7102aba55dc065b863647f40591079",
     },
     "stages/review.md": {
-        "side-python-cli": "b9d93db008040a975e025ffe70a670197ad496002acda63688231eaeb2c1de36",
-        "side-tauri-app": "b9d93db008040a975e025ffe70a670197ad496002acda63688231eaeb2c1de36",
-        "prod-tauri-app": "fc1deee3f6116d4d359348417528f915c87f33bebbfdf660946dea2e5f3397e6",
-        "prod-firmware": "fc1deee3f6116d4d359348417528f915c87f33bebbfdf660946dea2e5f3397e6",
+        "side-python-cli": "240c20acc449f021bc4af5c62bb721e051bae2de14cc09e6ba600aada470cb02",
+        "side-tauri-app": "240c20acc449f021bc4af5c62bb721e051bae2de14cc09e6ba600aada470cb02",
+        "prod-tauri-app": "7d1d57e247df79cc9a8f75eb56f52b039f56804a5ada16209a156bf216ef47db",
+        "prod-firmware": "7d1d57e247df79cc9a8f75eb56f52b039f56804a5ada16209a156bf216ef47db",
     },
     "stages/spec.md": {
-        "side-python-cli": "7952262fdaaf039c6a8119f465cbee5ee99a668df936ed7b133c998b98dc52ff",
-        "side-tauri-app": "7952262fdaaf039c6a8119f465cbee5ee99a668df936ed7b133c998b98dc52ff",
-        "prod-tauri-app": "e538bbadec3e41e7a283598d9a138a361557b05ed496c2a7a92a4b8695db608c",
-        "prod-firmware": "e538bbadec3e41e7a283598d9a138a361557b05ed496c2a7a92a4b8695db608c",
+        "side-python-cli": "19909a0c84013e9408e9b852c2890c769342e1fed471cd90fc44ff838811f3b1",
+        "side-tauri-app": "19909a0c84013e9408e9b852c2890c769342e1fed471cd90fc44ff838811f3b1",
+        "prod-tauri-app": "8869558b08479d93fab1125a82370217fa473b631c75cb7fc7dfefe8ddcb38ab",
+        "prod-firmware": "8869558b08479d93fab1125a82370217fa473b631c75cb7fc7dfefe8ddcb38ab",
     },
     "stages/verify.md": {
-        "side-python-cli": "dadc1efdbc2de915ee7d69bac335622eae02cc140dff8e878bc0eb7547face10",
-        "side-tauri-app": "dadc1efdbc2de915ee7d69bac335622eae02cc140dff8e878bc0eb7547face10",
-        "prod-tauri-app": "ad26b9aa6f50835994320981859474b71c3f33200f1db95314adaa37c59aa164",
-        "prod-firmware": "ad26b9aa6f50835994320981859474b71c3f33200f1db95314adaa37c59aa164",
+        "side-python-cli": "60eb704f3ba7dcc593a2e0fdaffc6a3a16f62055672ca0de95fbd50bd5dd2c8a",
+        "side-tauri-app": "60eb704f3ba7dcc593a2e0fdaffc6a3a16f62055672ca0de95fbd50bd5dd2c8a",
+        "prod-tauri-app": "477543a2887a831d74dad0cfb82a28c47774651a6089bc6bac0ccb47502fe94a",
+        "prod-firmware": "477543a2887a831d74dad0cfb82a28c47774651a6089bc6bac0ccb47502fe94a",
     },
     "stages/wrapup.md": {
-        "side-python-cli": "2718f43d28122b226fc78f15d3f72c3f25cb6c339259e0cd8197149ab928e5ce",
-        "side-tauri-app": "2718f43d28122b226fc78f15d3f72c3f25cb6c339259e0cd8197149ab928e5ce",
-        "prod-tauri-app": "42d54dd4d4f779ca495585bdda67ccee7f8cd7cc3e0ad593fd85dd870efff093",
-        "prod-firmware": "42d54dd4d4f779ca495585bdda67ccee7f8cd7cc3e0ad593fd85dd870efff093",
+        "side-python-cli": "d6ce375a80094c58627fcc59947dc9dade1e0e143f7c0d7112f37a7ce2f0b67c",
+        "side-tauri-app": "d6ce375a80094c58627fcc59947dc9dade1e0e143f7c0d7112f37a7ce2f0b67c",
+        "prod-tauri-app": "de359ec594c405ea1f7c6b4d63db8f703afc04b8c9cb53402141ab54a6313a24",
+        "prod-firmware": "de359ec594c405ea1f7c6b4d63db8f703afc04b8c9cb53402141ab54a6313a24",
     },
     "commands/hm/help.md": {
         "side-python-cli": "1ec7c692208c633334d0443ab360d24ab6c5915a65de26a8233965bfe86c49c9",
@@ -662,3 +663,37 @@ def test_ac011_malformed_loop_value_fails_render(tmp_path: Path, bad: object) ->
     assert res.exit_code != 0
     assert "loop" in res.output
     assert _tree(repo) == before
+
+
+# ---------------------------------------------------------------------------
+# SPEC-hm-light-lane-s2 (concurrency review P1): a loop-off render drops execute Step 5,
+# Gate 0 and verify Check 5, so turning the loop off under live loop residue is refused.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "residue",
+    [".claude/.hm-loop-abc123", ".worktrees/execute-0f1e2d3c"],
+    ids=["loop-marker", "execute-worktree"],
+)
+def test_turning_the_loop_off_is_refused_while_a_loop_is_live(tmp_path: Path, residue: str) -> None:
+    repo = _bootstrap(tmp_path)
+    data = _read_yaml(repo)
+    data["loop"] = {"enabled": True}
+    _write_yaml(repo, data)
+    assert _cli(repo, "--update").exit_code == 0
+    assert (repo / ".claude/commands/hm/loop.md").is_file()
+    path = repo / residue
+    if residue.startswith(".worktrees/"):
+        path.mkdir(parents=True)
+    else:
+        path.write_text("claude_session_id: x\n", encoding="utf-8")
+    data["loop"] = {"enabled": False}
+    _write_yaml(repo, data)
+    res = _cli(repo, "--update")
+    assert res.exit_code == 1, res.output
+    assert "refusing to turn the loop off" in res.output
+    assert (repo / ".claude/commands/hm/loop.md").is_file()
+    path.rmdir() if path.is_dir() else path.unlink()
+    assert _cli(repo, "--update").exit_code == 0
+    assert not (repo / ".claude/commands/hm/loop.md").is_file()

@@ -36,7 +36,9 @@ Re-captures (append; never silently overwrite):
   `health` lost the `silent_intent_miss_rate` sub-check (SPEC-hm-light-lane-s2). The autopilot
   gate on `autonomy.level` itself is untouched (AC-006 re-asserts it). Verified before
   re-capture that these seven are the ONLY moved commands in every arm and none was added or
-  removed.
+  removed. Re-captured again in the same task after `/hm:review` round 1 edited the stub (slug
+  quoting, root-read wording), wrapup's loop references and execute's Quality Bar: only the six
+  stages moved, in all four arms.
 - **2026-10-14, `hm-light-lane`** — `spec`, `execute` and `review` moved in all four arms: the
   light lane (spec Step 0 picks `lane: light|full`, execute skips Phase A.5 on light, review cuts
   repetition on light and closes the run and reaps the freeze ref when it skips the confirmation

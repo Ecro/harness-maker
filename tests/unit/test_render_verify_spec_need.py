@@ -156,7 +156,7 @@ def test_spec_driven_no_stray_5_check_count(spec_driven_verify: str) -> None:
         )
 
 
-def test_spec_driven_ordinal_check_5_still_present(spec_driven_verify: str) -> None:
+def test_check_5_is_loop_only_and_check_6_keeps_its_number(spec_driven_verify: str) -> None:
     """(b) Ordinals are names, not counts: Check 6 keeps its number.
 
     Since SPEC-hm-light-lane-s2, '### Check 5 — Worktree merge cleanliness' renders only with

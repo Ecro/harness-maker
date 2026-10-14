@@ -16,6 +16,10 @@ per-stage counts EXCLUDE the `renders_when` entries (review +3, verify +1, wrapu
 the raw tuple holds 82 (research Phase 0.5 was deleted by this task's Phase 3).
 Headings gated on those three toggles carry ``renders_when`` and sit outside the coverage
 promise until the toggle-on arms are added (ADR-007).
+Since SPEC-hm-light-lane-s2 (2026-10-14) ``loop.enabled`` is a fourth ``renders_when`` source
+(execute Step 0.2 / 4.5 / 5, verify Check 5): ``ARMS`` render with the loop off, so those headings
+sit outside the coverage promise the same way. The census counts above predate both that change
+and review Step 2.5's removal.
 
 Classes — COMP: capability compensation, shrinks as models improve. HOST: the host harness
 (Claude Code / Codex / Cursor) now does it natively. INV: invariant — state that outlives a
