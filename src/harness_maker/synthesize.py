@@ -812,6 +812,9 @@ def _base_files(
         (_localized("memory/failures", locale), "memory/failures.md", {}),
         (_localized("memory/wiki", locale), "memory/wiki.md", {}),
         ("memory/session-readme.md.j2", "memory/session/README.md", {}),
+        # Reference files first: a render cut short must not leave a command whose pointer
+        # names a file that was never written (/hm:review round 1, finding C1).
+        *_reference_files(config_dump),
         *_stage_files(),
         *_atomic_command_files(config_dump=config_dump),
         *(_loop_command_files() if _loop_enabled(config_dump) else []),
@@ -825,7 +828,6 @@ def _base_files(
         ("commands/hm/uninstall.md.j2", "commands/hm/uninstall.md", {}),
         (_localized("commands/hm/help", locale), "commands/hm/help.md", {}),
         *_skill_files(),
-        *_reference_files(config_dump),
         *_world_model_skill_files(config_dump),
         *_agent_files(preset, agent_models, default_model),
         *_rubric_files(),

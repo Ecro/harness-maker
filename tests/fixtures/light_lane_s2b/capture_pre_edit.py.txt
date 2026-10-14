@@ -5,6 +5,8 @@ templates:  PYTHONPATH=src uv run python capture_pre_edit.py.txt <out.json> <ins
 The d2c0ab0 checkout carries the tracked .claude/harness.yaml this renders from.
 Revision 2 (spec-validator pass 1): verify's block ends before "## Output", execute's before the
 stage_agent_ledger block, and the delegation configs are captured as well.
+Revision 3 (/hm:review round 1, T4): the instruction sets are captured for every config, not just the
+two loop-on ones, so the delegation and loop-off arms are held to the old surface too.
 """
 import hashlib, json, sys, tempfile
 from pathlib import Path
@@ -60,8 +62,7 @@ for key, strictness, loop, stages in CONFIGS:
     cfg["command_chars"] = {c: len(cmds[c]) for c in STAGES}
     cfg["command_sha256"] = {c: hashlib.sha256(cmds[c].encode()).hexdigest() for c in STAGES}
     out["configs"][key] = cfg
-    if key in ("warn/loop-on", "block/loop-on"):
-        instr["configs"][key] = {c: instruction_set(cmds[c]) for c in STAGES}
+    instr["configs"][key] = {c: instruction_set(cmds[c]) for c in STAGES}
 Path(sys.argv[1]).write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
 Path(sys.argv[2]).write_text(json.dumps(instr, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
 print(json.dumps({k: {b: v["chars"] for b, v in c["blocks"].items()} for k, c in out["configs"].items()}, indent=1))

@@ -97,7 +97,15 @@ rest of this step. That is a supported path, not an error.
 **2. Dispatch — self-skipping.** If the subagent-dispatch tool is **unavailable** in
 this IDE (Cursor and Codex sessions), say so in one line and run the checks inline
 instead. {% if verify_moved -%}
-Otherwise dispatch `stage-delegate` with the `brief` object verbatim plus the instruction:
+Otherwise **check that the check list exists before anything is dispatched**: a delegate that
+cannot read it returns nothing, and a verify that ran no check must never read as PASS.
+
+```bash
+!test -r .claude/hm/verify-checks.md && echo present || echo MISSING
+```
+
+On `MISSING`, name `verify-checks.md`, say to re-render with `/hm:make`, and STOP — the checks did
+not run, so report FAIL, never PASS. When it is `present`, dispatch `stage-delegate` with the `brief` object verbatim plus the instruction:
 *Read the check list at the path on the next line, run its Checks 1..N in order, stopping at the
 first FAIL, and return the receipt JSON; do not run git and do not write a ledger file.*
 
@@ -149,7 +157,7 @@ Verify is a gate, so an unreconciled receipt is never a PASS.
 
 ### Checks — inline body (degraded — dispatch unavailable, brief incomplete, or receipt unusable)
 
-Run the checks yourself, below, **only** when Step 0.5 sent you here.
+Run the checks yourself, {% if verify_moved %}from the file named next,{% else %}below,{% endif %} **only** when Step 0.5 sent you here.
 {% if verify_moved %}
 {% with ref_file="verify-checks.md", ref_use="and run the checks and the advisory probes from it", ref_stop=" — the checks did not run, so report FAIL, never PASS" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}{% endif %}{% endif %}
 

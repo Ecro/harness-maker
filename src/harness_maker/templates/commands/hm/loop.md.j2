@@ -984,7 +984,9 @@ When the loop halts (convergence, safety rail, or hard error):
      `<WT>` is the `execute-<uuid>` worktree from the create step above (the loop just
      removed `.hm-loop-active`, so wrapup's own preflight has no marker to key off and
      would otherwise mint a *second*, unrelated worktree). Treat that exact `<WT>` as
-     the wrapup stage's `<WT>` for every Read/Write/Edit and `cd`.
+     the wrapup stage's `<WT>` for every Read/Write/Edit and `cd`{% if not is_codex %} — except the
+     `.claude/hm/` reference files the wrapup command names, which are read from the project root
+     (above `.worktrees/`), never from `<WT>`: a worktree copy can be stale{% endif %}.
    - **SKIP wrapup's Step 7.7 (task-branch squash-land)**: the loop's `finalize`
      (step 5 below) is the sole land owner for the `execute-<uuid>` worktree. Running
      wrapup's `task-land` here would either double-land disjoint work or strand an

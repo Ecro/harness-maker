@@ -144,7 +144,10 @@ class Rendered:
         self.delegate = agent.read_text() if agent.exists() else ""
 
     def stage_surface(self, stage: str) -> str:
-        return "\n".join([self.commands[stage], *(self.refs[n] for n in STAGE_REFS[stage])])
+        """The command plus the reference files it POINTS AT (the files always render)."""
+        command = self.commands[stage]
+        pointed = [n for n in STAGE_REFS[stage] if f"Read `.claude/hm/{n}.md`" in command]
+        return "\n".join([command, *(self.refs[n] for n in pointed)])
 
 
 def _render_answers(answers: Any, preset: Preset | None = None) -> Rendered:
@@ -337,9 +340,9 @@ def test_pointers_read_from_root_and_fail_closed(default: Rendered) -> None:
     # The Step 0.5 dispatch lines name the file under the brief's base_root.
     for stage, name in (("wrapup", "wrapup-steps.md"), ("verify", "verify-checks.md")):
         step_0_5 = _section(default.commands[stage], "### Step 0.5", "---")
-        dispatch = [ln for ln in step_0_5.splitlines() if f".claude/hm/{name}" in ln]
-        assert dispatch
-        assert all("base_root" in ln for ln in dispatch)
+        # The `!test -r` line is the S1 existence check and the mismatch bullet (K2) reads the file
+        # from the project root; the dispatch is the one line that names it under base_root.
+        assert f"`<brief.base_root>/.claude/hm/{name}`" in step_0_5.splitlines()
     # The pointers never name a worktree-relative path.
     for stage in STAGES:
         assert "<WT>/.claude/hm" not in default.commands[stage]
@@ -376,8 +379,6 @@ def test_moved_text_is_preserved(key: str) -> None:
         block = _slice_ref(r.refs[block_id])
         assert len(block) == expected["chars"], f"{key}/{block_id}: length changed"
         assert _sha(block) == expected["sha256"], f"{key}/{block_id}: text changed in the move"
-    if key not in PRE_INSTRUCTIONS["configs"]:
-        return
     for stage in STAGES:
         old = PRE_INSTRUCTIONS["configs"][key][stage]
         new = instruction_set(r.stage_surface(stage))
@@ -453,7 +454,7 @@ def test_loop_reads_reference_files_from_root(tmp_path: Path) -> None:
             freeze_time=DEFAULT_FREEZE_TIME,
         )
     loop = (tmp_path / ".claude/commands/hm/loop.md").read_text()
-    step_4 = " ".join(_section(loop, "4. **Invoke per-iter stages**", "4.5. **Gate 0").split())
+    step_4 = " ".join(_section(loop, "**Invoke per-iter stages**", "4.5. **Gate 0").split())
     assert ".claude/hm/" in step_4
     assert "project root" in step_4
     assert "never from `<WT>`" in step_4
@@ -513,3 +514,207 @@ def test_loop_off_reference_files_carry_no_loop_only_text() -> None:
     on = render_config("block/loop-on")
     assert "### Check 5 — Worktree merge cleanliness" in on.refs["verify-checks"]
     assert "@hm:loop-only" in on.refs["review-confirmation"]
+
+
+# ── /hm:review round 1 (2026-10-14): findings S1 S2 C1 C2 C3 K1-K7 T2 T3 T4 ────────────────────
+
+
+def _preface(ref: str) -> str:
+    """What a reference file says OUTSIDE the byte-checked block."""
+    return ref[: ref.index(REF_START)]
+
+
+def _delegated_arm() -> Rendered:
+    return render_config("block/loop-off")
+
+
+@pytest.mark.parametrize(
+    ("stage", "name", "tail"),
+    [
+        ("wrapup", "wrapup-steps.md", "### Steps 1–5.6 — inline body"),
+        ("verify", "verify-checks.md", "### Checks — inline body"),
+    ],
+)
+def test_s1_the_dispatch_is_preceded_by_a_mechanical_existence_check(
+    stage: str, name: str, tail: str
+) -> None:
+    """A missing step list must stop BEFORE the dispatch: a delegate that returns no JSON is
+    otherwise an empty receipt, and an empty wrapup receipt reconciles clean."""
+    step = _section(_delegated_arm().commands[stage], "### Step 0.5", tail)
+    check = f"!test -r .claude/hm/{name}"
+    assert check in step, f"{stage}: no mechanical existence check of {name} before the dispatch"
+    assert step.index(check) < step.index("dispatch `stage-delegate`")
+    after = step[step.index(check) :]
+    assert "/hm:make" in after[: after.index("dispatch `stage-delegate`")]
+    assert "STOP" in after[: after.index("dispatch `stage-delegate`")]
+    # A non-delegated harness has no dispatch, so no check (byte-identity is test_undelegated_*).
+    assert check not in render_config("delegation-none").commands[stage]
+
+
+def test_s2_the_loop_wrapup_step_reads_reference_files_from_root(tmp_path: Path) -> None:
+    answers = _build_answers(
+        locale="en",
+        targets=[Target.CLAUDE_CODE, Target.CODEX],
+        preset=Preset.PRODUCTION,
+        loop=models.LoopConfig(enabled=True),
+        worktree_enabled=True,
+    ).model_copy(update={"delegation": DelegationConfig(stages=["wrapup", "verify"])})
+    with pinned_install_ref():
+        render(
+            synthesize(ProjectProfile(), answers),
+            tmp_path / ".claude",
+            freeze_time=DEFAULT_FREEZE_TIME,
+        )
+    loop = (tmp_path / ".claude/commands/hm/loop.md").read_text()
+    step = " ".join(_section(loop, "**Run wrapup ONCE", "- **SKIP wrapup's Step 7.7").split())
+    assert "for every Read/Write/Edit and `cd`" in step
+    exempt = step[step.index("for every Read/Write/Edit and `cd`") :]
+    assert ".claude/hm/" in exempt
+    assert "project root" in exempt
+    assert "never from `<WT>`" in exempt
+    assert ".claude/hm/" not in (tmp_path / ".agents/skills/hm-loop/SKILL.md").read_text()
+
+
+def test_c1_reference_files_are_written_before_the_commands_that_point_at_them() -> None:
+    p = ProjectProfile()
+    answers = _build_answers(locale="en", targets=[Target.CLAUDE_CODE], preset=Preset.PRODUCTION)
+    paths = [str(f.path) for f in synthesize(p, answers).files]
+    refs = [paths.index(f"hm/{n}.md") for n in REFERENCE_FILES]
+    pointing = [paths.index(f"commands/hm/{s}.md") for s in STAGES]
+    pointing += [paths.index(f"stages/{s}.md") for s in STAGES]
+    assert max(refs) < min(pointing), "a render cut short would leave a pointer with no target"
+
+
+REVIEW_POINTERS = ("review-autofix.md", "review-confirmation.md")
+
+
+@pytest.mark.parametrize("name", REVIEW_POINTERS)
+def test_c2_a_missing_review_file_closes_the_run_and_reaps_the_freeze(name: str) -> None:
+    (pointer,) = _pointer_lines(_delegated_arm().commands["review"], name)
+    stop = pointer[pointer.index("and STOP") :]
+    reap = stop.index("hm freeze reap --slug <slug>")
+    close = stop.index(
+        "hm review_run close --slug <slug> --run-id <run-id> --outcome CHANGES_REQUESTED"
+    )
+    assert reap < close, "reap the freeze, then close the run (the order the grade gate uses)"
+    # Nothing was approved: the outcome is one the real CLI accepts and is not APPROVED.
+    from harness_maker import review_run
+
+    assert "CHANGES_REQUESTED" in Path(review_run.__file__).read_text()
+
+
+def test_c3_the_a5_pointer_names_tdd_active() -> None:
+    (pointer,) = _pointer_lines(_delegated_arm().commands["execute"], "execute-a5.md")
+    assert "`tdd_active`" in pointer, "A.5 is skipped when tdd_active is false, not only on light"
+    assert "not `light`" in pointer
+
+
+def test_k1_the_confirm_1_repair_round_reads_the_autofix_file() -> None:
+    r = _delegated_arm()
+    (autofix_ptr,) = _pointer_lines(r.commands["review"], "review-autofix.md")
+    assert "confirm-1" in autofix_ptr
+    assert "confirm-1" in _preface(r.refs["review-autofix"])
+    (confirm_ptr,) = _pointer_lines(r.commands["review"], "review-confirmation.md")
+    assert "review-autofix.md" in confirm_ptr
+    assert "review-autofix.md" in _preface(r.refs["review-confirmation"])
+
+
+def test_k2_the_receipt_mismatch_bullet_reads_the_steps_file() -> None:
+    r = _delegated_arm()
+    step = _section(r.commands["wrapup"], "- exit 1 (`mismatch`)", "- exit 2 (`unparseable`)")
+    flat = " ".join(step.split())
+    assert ".claude/hm/wrapup-steps.md" in flat
+    assert "project root" in flat
+    assert "never from `<WT>`" in flat
+    assert "the step that owns it" in flat
+    # Codex runs the steps inline, so its bullet keeps the original text.
+    codex = render_config("delegation-wrapup").codex["wrapup"]
+    assert ".claude/hm/" not in _section(codex, "- exit 1 (`mismatch`)", "- exit 2 (`unparseable`)")
+
+
+@pytest.mark.parametrize("worktree", [True, False])
+def test_k3_k4_the_delegate_files_say_what_is_not_theirs(worktree: bool) -> None:
+    answers = _build_answers(
+        locale="en",
+        targets=[Target.CLAUDE_CODE],
+        preset=Preset.PRODUCTION,
+        worktree_enabled=worktree,
+        loop=models.LoopConfig(enabled=True),
+    ).model_copy(update={"delegation": DelegationConfig(stages=["wrapup", "verify"])})
+    r = _render_answers(answers)
+    verify_preface = " ".join(_preface(r.refs["verify-checks"]).split())
+    assert "Gate 0" in verify_preface
+    assert "caller's" in verify_preface
+    assert "skip" in verify_preface
+    for name in ("verify-checks", "wrapup-steps"):
+        preface = " ".join(_preface(r.refs[name]).split())
+        if worktree:
+            assert "`<WT>`" in preface, name
+            assert "`worktree_root`" in preface, name
+        else:
+            assert "<WT>" not in r.refs[name], f"{name}: worktree-off render names <WT>"
+    assert "Gate 0" in " ".join(r.delegate.split())
+
+
+@pytest.mark.parametrize("name", REFERENCE_FILES)
+def test_k5_each_reference_file_resolves_its_relative_references(name: str) -> None:
+    preface = " ".join(_preface(_delegated_arm().refs[name]).split())
+    for needle in ("below", "Step", "refers to the", "command"):
+        assert needle in preface, (name, needle)
+
+
+def test_k5_the_degraded_arm_does_not_say_below_for_text_that_left() -> None:
+    r = _delegated_arm()
+    assert "Run Steps 1 through 5.6 below" not in r.commands["wrapup"]
+    assert "Run the checks yourself, below" not in r.commands["verify"]
+    # Codex keeps both bodies inline, so "below" is still true there.
+    codex = render_config("delegation-wrapup").codex
+    assert "Run Steps 1 through 5.6 below" in codex["wrapup"]
+    assert "Run the checks yourself, below" in render_config("delegation-verify").codex["verify"]
+
+
+@pytest.mark.parametrize("key", list(CONFIGS))
+def test_k6_every_pointer_is_followed_by_a_blank_line(key: str) -> None:
+    r = render_config(key)
+    for stage in STAGES:
+        lines = r.commands[stage].split("\n")
+        for i, ln in enumerate(lines):
+            if ln.startswith("Read `.claude/hm/") and "autopilot-advance" not in ln:
+                assert lines[i + 1] == "", f"{key}/{stage}: pointer abuts {lines[i + 1][:40]!r}"
+                assert lines[i - 1] == "", f"{key}/{stage}: pointer abuts {lines[i - 1][:40]!r}"
+
+
+def test_k7_an_unmatched_pointer_is_not_silently_passed(tmp_path: Path) -> None:
+    from tests.stage_surface import expand_references
+
+    ref_dir = tmp_path / "hm"
+    ref_dir.mkdir()
+    text = "# cmd\n\nRead `.claude/hm/brand-new-body.md` from the project root (above x).\n"
+    with pytest.raises(AssertionError, match="brand-new-body.md"):
+        expand_references(text, ref_dir)
+    # The shared auto-advance pointer is the one deliberate exception.
+    ok = "Read `.claude/hm/autopilot-advance.md` from the project root.\n"
+    assert expand_references(ok, ref_dir) == ok
+
+
+def test_t2_a_reference_file_counts_only_where_the_command_points_at_it() -> None:
+    from tests.structural import _instruction_baseline as ib
+
+    refs = {"wrapup-steps": "### Step 1 — Pre-flight checks\n", "verify-checks": "### Check 1\n"}
+    inline = {"wrapup": "## Procedure\n### Step 1 — Pre-flight checks\n"}
+    assert "Pre-flight" not in ib.stage_text("wrapup", {"wrapup": "## Procedure\n"}, refs), (
+        "an always-rendered reference file masked an inline body that lost its steps"
+    )
+    pointed = {"wrapup": "Read `.claude/hm/wrapup-steps.md` from the project root (above x).\n"}
+    assert "Pre-flight" in ib.stage_text("wrapup", pointed, refs)
+    assert ib.stage_text("wrapup", inline, refs).count("Pre-flight") == 1
+
+
+def test_t3_the_delegate_prompt_names_exactly_two_reference_files(default: Rendered) -> None:
+    prompt = default.delegate
+    named = set(re.findall(r"\.claude/hm/[\w-]+\.md", prompt))
+    assert named == {".claude/hm/wrapup-steps.md", ".claude/hm/verify-checks.md"}
+
+
+def test_t4_instruction_sets_were_captured_for_every_config() -> None:
+    assert set(PRE_INSTRUCTIONS["configs"]) == set(CONFIGS)

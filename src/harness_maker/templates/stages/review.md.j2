@@ -1,6 +1,8 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
 {% set lenses = lens_dispatch(config.preset) %}{% set groups = lens_dispatch_groups(config.preset) %}{% set lens_names = mandatory_lenses(config.preset) -%}
 {% import "agents/_partials/dispatch.md.j2" as dsp -%}
+{#- A missing reference file stops the review mid-run: the run is open and the freeze ref exists, so the stop closes both (nothing was approved, hence CHANGES_REQUESTED, an outcome `review_run close` accepts). -#}
+{% set review_stop = " — first run `hm freeze reap --slug <slug>`, then close the run with `hm review_run close --slug <slug> --run-id <run-id> --outcome CHANGES_REQUESTED` (nothing was approved)" -%}
 # Stage: review
 
 > Atomic stage. Multi-perspective review with **surface-match + reasoning-alignment** consensus, grade gate, and auto-fix loop.
@@ -736,7 +738,7 @@ finding sends the auto-fix loop churning on it and it never reaches the operator
 
 ## Auto-Fix Loop (rounds 2..max_review_rounds)
 
-{% if is_codex %}{% include "stages/_partials/review_autofix.md.j2" %}{% else %}{% with ref_file="review-autofix.md", ref_use="when the grade gate sends the review into round 2 or later, and follow it for every auto-fix round", ref_stop="" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}
+{% if is_codex %}{% include "stages/_partials/review_autofix.md.j2" %}{% else %}{% with ref_file="review-autofix.md", ref_use="when the grade gate sends the review into round 2 or later, or a confirmation pass's `confirm-1` repair round starts, and follow it for every auto-fix round", ref_stop=review_stop %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}
 {% endif -%}
 ## Confirmation Pass (only when the gate would APPROVE)
 
@@ -755,7 +757,7 @@ no-progress invariant, or with `auto_fix` disabled has not approved anything, so
 to confirm — dispatching the whole axis there spends the budget to re-confirm a failure. Record it
 as `confirm_pass_ran: false`, which is a different fact from a pass that ran and found nothing.
 
-{% if is_codex %}{% include "stages/_partials/review_confirmation.md.j2" %}{% else %}{% with ref_file="review-confirmation.md", ref_use="when the pass runs (the APPROVED path, not the light-lane skip above), and follow it for Steps C1, C2 and C3", ref_stop="" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}
+{% if is_codex %}{% include "stages/_partials/review_confirmation.md.j2" %}{% else %}{% with ref_file="review-confirmation.md", ref_use="when the pass runs (the APPROVED path, not the light-lane skip above), and follow it for Steps C1, C2 and C3 (its `confirm-1` repair round runs `review-autofix.md`, read the same way)", ref_stop=review_stop %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}
 {% endif -%}
 ## Final Summary (always)
 

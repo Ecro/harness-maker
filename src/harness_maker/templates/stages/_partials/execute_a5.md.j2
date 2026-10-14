@@ -1,7 +1,9 @@
 {#- SPEC-hm-light-lane-s2b: execute's Phase A.5 test-reviewer gate procedure. Source of the text for both the Codex stage skill (inline)
     and the rendered .claude/hm/execute-a5.md; the Claude command carries a pointer instead.
-    Moved verbatim from stages/<stage>.md.j2 — edit it here only. -#}
-{% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set cdwt = 'cd <WT> && ' if wt_on else '' -%}
+    Moved verbatim from stages/<stage>.md.j2 — edit it here only.
+    The last `{% if stage_agent_ledger %}` line below renders one newline when the ledger block
+    follows in the command, and nothing otherwise: it reproduces, byte for byte, the newline that
+    the old in-command `{% if %}` left behind, which the block-hash fixture pins. -#}
 {% import "agents/_partials/dispatch.md.j2" as dsp -%}
 Dispatch **one** `test-reviewer` call carrying **all three lens questions**. The lenses are the
 questions, not the contexts: one reviewer retried *serially* surfaces one category per round,

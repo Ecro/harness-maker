@@ -158,9 +158,16 @@ def _render_atomic(strictness: str, *, loop: bool = False) -> dict[str, str]:
 
 
 def stage_text(command: str, commands: dict[str, str], refs: dict[str, str]) -> str:
-    """A stage's instruction surface: its command plus the reference files it reads on demand."""
+    """A stage's instruction surface: its command plus the reference files it reads on demand.
+
+    A reference file counts only when the command carries its pointer. The files always render,
+    so unioning them unconditionally would let a delegated stage's body be deleted from an
+    inline command without the baseline noticing: the file would still supply it.
+    """
     parts = [commands[command]]
     for name in STAGE_REFERENCE_FILES.get(command, ()):
+        if f"Read `.claude/hm/{name}.md`" not in commands[command]:
+            continue
         if name not in refs:
             raise RuntimeError(f"{command} points at .claude/hm/{name}.md, which did not render")
         parts.append(refs[name])

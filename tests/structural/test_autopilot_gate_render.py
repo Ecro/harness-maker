@@ -37,7 +37,10 @@ Re-captures (append; never silently overwrite):
   leaving a pointer (and the Step 0.5 dispatch lines naming the file); the Codex skills are
   unchanged (SPEC-hm-light-lane-s2b). The autopilot gate on `autonomy.level` and the advance
   stubs are untouched. Verified before re-capture that these are the ONLY moved commands in each
-  arm and that no command was added or removed.
+  arm and that no command was added or removed. Re-captured again in the same task after
+  `/hm:review` round 1 edited the same commands (the Step 0.5 existence check, the review pointers'
+  stop clause, the mismatch bullet, `loop` Step 3's reference-file exemption); the moved set per arm
+  was checked to be unchanged.
 - **2026-10-14, `hm-light-lane-s2`** — `execute`, `research`, `review`, `spec`, `verify`,
   `wrapup` and `health` moved, in all four arms. The six stages: the auto-advance block became a
   per-stage stub pointing at the new `.claude/hm/autopilot-advance.md` (its `autopilot_caps`

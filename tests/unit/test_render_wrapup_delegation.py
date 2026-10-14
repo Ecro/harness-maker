@@ -1,9 +1,10 @@
 """Phase 5: the delegate-on wrapup artifact carries BOTH paths, and the git tail stays.
 
-ADR-006's fallback only exists if the artifact it falls back INTO is in the same
-file. An earlier draft of this plan put the dispatch and the inline body in
-mutually-exclusive Jinja branches, which would have made "run the body inline"
-unreachable — a degraded path with no destination.
+ADR-006's fallback only exists if the artifact it falls back INTO is reachable. Since stage 2b of
+the light lane (SPEC-hm-light-lane-s2b) the inline body no longer sits in the command: the command
+carries a pointer to `.claude/hm/wrapup-steps.md`, the same file the delegate reads, so the
+degraded path and the dispatched path share one text. The tests that are about the body read the
+command with that file expanded in place (`tests/stage_surface.py`).
 
 These are render-GREP tests: they prove the instruction is PRESENT. They cannot
 prove the interpreting model obeys it. That asymmetry is deliberate and is the same
@@ -320,24 +321,34 @@ def test_the_default_render_costs_existing_users_nothing(
     assert _count_body_lines(_wrapup(tmp_path, preset=preset)) == expected
 
 
+# Expanded-stage cost of delegating wrapup: the dispatch block, the existence check and the
+# pointer, with the moved body read back in place. Pinned as an equality, not a ceiling, so a
+# line added here is a visible edit to this number rather than headroom someone spends silently.
+#   +60 (ADR-006: "the cap exactly") → +66 (2026-10-14, SPEC-hm-light-lane-s2b: the Read-path
+#   lines and the pointer) → +77 (2026-10-14, /hm:review round 1: S1's `!test -r` existence check
+#   before the dispatch, +8, and K2's "fix the gap by the step that owns it" sentence, +3).
+_DELEGATED_EXPANDED_DELTA = 77
+
+
 @pytest.mark.parametrize("preset", ["Side", "Production"])
-def test_delegation_moves_the_body_out_of_the_command(tmp_path: Path, preset: str) -> None:
-    """ADR-006 warned that the delegate-on command GROWS rather than shrinks (+60 lines, "the cap
-    exactly"). Stage 2b of the light lane (SPEC-hm-light-lane-s2b) reverses the direction: with
-    wrapup delegated, Steps 1-5.6 render in `.claude/hm/wrapup-steps.md` and the command carries
-    a pointer, so the bound is now that the delegated command is SHORTER than the inline one by
-    most of that body. The dispatch prose it still adds is measured on the expanded stage instead,
-    where it must stay inside the old +70 allowance (the old +60 plus the Read-path lines).
+def test_delegation_adds_a_bounded_amount_of_prose(tmp_path: Path, preset: str) -> None:
+    """ADR-006 warned that the delegate-on command GROWS rather than shrinks, and bounded the
+    growth at +60 body lines of the command itself. Stage 2b (SPEC-hm-light-lane-s2b) moved Steps
+    1-5.6 out of a delegated command, so that quantity is now negative and the original bound
+    still holds on it; what delegation costs is the dispatch prose, which is measured on the stage
+    as the model meets it (command plus the file it reads) and pinned exactly.
     """
     off = _count_body_lines(_wrapup(tmp_path / "off", preset=preset, expand=False))
     on = _count_body_lines(_wrapup(tmp_path / "on", preset=preset, stages=["wrapup"], expand=False))
+    assert on - off <= 60, f"{preset} delegation adds {on - off} body lines to the command"
     assert on < off - 200, f"{preset}: delegated command is {on} body lines, inline {off}"
 
     off_full = _count_body_lines(_wrapup(tmp_path / "off2", preset=preset))
     on_full = _count_body_lines(_wrapup(tmp_path / "on2", preset=preset, stages=["wrapup"]))
-    assert on_full - off_full <= 70, (
+    assert on_full - off_full == _DELEGATED_EXPANDED_DELTA, (
         f"{preset} delegation adds {on_full - off_full} body lines to the stage ({off_full} → "
-        f"{on_full}); the `workflow` Production cap is {_WORKFLOW_PRODUCTION_CAP}"
+        f"{on_full}); the `workflow` Production cap is {_WORKFLOW_PRODUCTION_CAP}. If the change "
+        "is deliberate, record it in the dated list above"
     )
 
 

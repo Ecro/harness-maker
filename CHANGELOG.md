@@ -27,8 +27,8 @@
   includes them, wrapup Steps 1-5.6 (`wrapup-steps.md`) and verify's checks (`verify-checks.md`). The text
   is byte-identical to before and Codex stage skills still carry it inline. A missing file stops the stage
   with a `/hm:make` instruction (wrapup stops before any commit), and `stage-delegate` follows only its own
-  stage's file under the brief's `base_root`. On this repo's config the four commands are about 52K chars
-  smaller (205,430 → 153,198). Re-render with `/hm:make` to get the five new files.
+  stage's file under the brief's `base_root`. On this repo's config the four commands are about 50K chars
+  smaller (205,430 → 154,844). Re-render with `/hm:make` to get the five new files.
 - **Less always-loaded context.** A clean `hm spec_machine check --all` prints one line
   (`{"ok": true, "overall", "strictness"}`); failures still print the full payload. Five internal skills
   (`agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `context-linter`, `worktree-isolator`)

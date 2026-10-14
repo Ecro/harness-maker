@@ -36,7 +36,17 @@ def expand_references(command: str, ref_dir: Path) -> str:
         i = ref.index(REF_START) + len(REF_START)
         return ref[i : ref.index(REF_END, i)]
 
-    return _POINTER.sub(block, command)
+    expanded, _ = _POINTER.subn(block, command)
+    # A pointer to a reference file this module does not know about would pass through unexpanded
+    # and silently drop that file's text from every test that reads through here. The shared
+    # auto-advance procedure is the one deliberate pointer left alone: tests read it directly.
+    strays = [
+        ln
+        for ln in expanded.splitlines()
+        if ln.startswith("Read `.claude/hm/") and "autopilot-advance.md" not in ln
+    ]
+    assert not strays, f"a reference-file pointer matched nothing in _POINTER: {strays[0][:120]}"
+    return expanded
 
 
 def stage_text(claude_dir: Path, stage: str) -> str:

@@ -27,6 +27,10 @@ from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips,
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # +2 total, 100→102 (2026-10-14, /hm:review round 1 of SPEC-hm-light-lane-s2b, finding S1).
+    # verify 6→7 and wrapup 19→20: one call ADDED to each delegated command, the `!test -r` check
+    # that the step list exists before the dispatch. It is deliberate: a delegate that cannot read
+    # its file returns nothing, and an empty wrapup receipt reconciles clean. No call was removed.
     # −31 total, 131→100 (2026-10-14, SPEC-hm-light-lane-s2b). **No call was removed**: five blocks
     # moved verbatim into `.claude/hm/*.md` and the rendered command keeps a pointer, so the
     # calls they hold are read on demand instead of counted as the command's. This repo's
@@ -262,7 +266,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `verification_plan commands` + self-attested `mark-pass` became one `verification_cache run`
     # that runs the CI gates and writes the marker itself; `mark-pass` survives only inside the
     # degraded (no-CI) block. -2 +1.
-    "verify": 6,
+    "verify": 7,
     # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
     # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
     # not render. A config flip that adds a gate in two commands and removes an advisory in a
@@ -310,7 +314,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # in `work-docs/BASELINE-DELTA-intent-layer-improvements.md`.
     # 34 → 33 (top-issues-2026-09, 2026-09-30): Step 2's check + plan + mark-pass → one
     # `verification_cache run`, same change as verify. -2 +1.
-    "wrapup": 19,
+    "wrapup": 20,
 }
 
 

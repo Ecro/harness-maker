@@ -22,7 +22,9 @@ Re-captures of `outside_57_sha256` by later tasks (append; placeholders are neve
   carry a pointer to `.claude/hm/wrapup-steps.md` where Steps 1-5.6 were, plus the Read-path
   dispatch instruction (SPEC-hm-light-lane-s2b). Re-captured the two Claude arms only; the Codex
   arms still match their goldens byte for byte (AC-007), and 5.7's placeholder inventory still
-  equals the golden one in all four.
+  equals the golden one in all four. Re-captured the same two arms again after `/hm:review`
+  round 1 added the `!test -r` existence check to Step 0.5 and a sentence to the mismatch bullet;
+  the placeholder inventory was re-checked and is unchanged.
 """
 
 from __future__ import annotations

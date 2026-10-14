@@ -533,7 +533,7 @@ the lenses adjudicate the *justification* rather than rediscovering the test.
 On small tasks A.5 blocked 2 of 15 runs the plain arm passed. If the ledger below renders, record
 the skip with its emit command: `--pass 1 --verdict dispatch-skipped --reason 'lane light' --terminal`.
 
-{% if is_codex %}{% include "stages/_partials/execute_a5.md.j2" %}{% else %}{% with ref_file="execute-a5.md", ref_use="when `lane` is not `light`, and follow it for the dispatch, the merge rules and the retry budget", ref_stop="" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}
+{% if is_codex %}{% include "stages/_partials/execute_a5.md.j2" %}{% else %}{% with ref_file="execute-a5.md", ref_use="when `tdd_active` is true and `lane` is not `light`, and follow it for the dispatch, the merge rules and the retry budget", ref_stop="" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}
 {% endif -%}
 {% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) -%}
 **Record every round (ADR-004).** One row per **round**, `--pass` being the round number. The
