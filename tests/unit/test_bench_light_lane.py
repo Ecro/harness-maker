@@ -858,9 +858,12 @@ def test_one_crashing_cell_is_recorded_and_the_grid_continues(
     assert "RuntimeError: unexpected" in errors[0]["error"]
 
     calls.clear()
-    monkeypatch.setattr(
-        bench, "run_cell", lambda t, a, r, o: calls.append((t.id, a, r)) or _canned_row(t, a, r, o)
-    )
+
+    def recording_cell(t: Any, a: str, r: int, o: Path) -> dict[str, Any]:
+        calls.append((t.id, a, r))
+        return _canned_row(t, a, r, o)
+
+    monkeypatch.setattr(bench, "run_cell", recording_cell)
     bench.main(_inprocess_args(out, tmp_path))
     assert calls == [("t1", "plain", 1)]
 
@@ -917,7 +920,12 @@ def test_resume_refuses_rows_from_another_setup_before_spending(
     capsys.readouterr()
 
     calls: list[str] = []
-    monkeypatch.setattr(bench, "run_cell", lambda t, a, r, o: calls.append(t.id) or {})
+
+    def recording_cell(t: Any, a: str, r: int, o: Path) -> dict[str, Any]:
+        calls.append(t.id)
+        return {}
+
+    monkeypatch.setattr(bench, "run_cell", recording_cell)
     code = bench.main([*_inprocess_args(out, tmp_path), *extra])
     assert code == 2
     assert not calls
