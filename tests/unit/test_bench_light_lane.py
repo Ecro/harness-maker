@@ -7,8 +7,10 @@ Expected numbers come from the fake and from the fixture on disk, never from the
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import fcntl
+import functools
 import hashlib
 import importlib.util
 import json
@@ -18,6 +20,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -52,18 +55,21 @@ def bench() -> ModuleType:
     return _load()
 
 
-@pytest.fixture(autouse=True)
-def _no_real_claude(
-    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A `claude` first on PATH that always fails: a regression that forgets --claude-bin must
-    stop here instead of launching (and paying for) the real CLI."""
-    stub_dir = tmp_path_factory.getbasetemp() / "no-claude"
-    stub_dir.mkdir(exist_ok=True)
-    stub = stub_dir / "claude"
+@functools.cache
+def _stub_dir() -> Path:
+    """A `claude` that always fails, for PATH: a regression that forgets --claude-bin must stop
+    here instead of launching (and paying for) the real CLI."""
+    directory = Path(tempfile.mkdtemp(prefix="hm-no-claude-"))
+    atexit.register(shutil.rmtree, directory, ignore_errors=True)
+    stub = directory / "claude"
     stub.write_text(f"#!{sys.executable}\nraise SystemExit(99)\n")
     stub.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{stub_dir}{os.pathsep}{os.environ['PATH']}")
+    return directory
+
+
+@pytest.fixture(autouse=True)
+def _no_real_claude(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PATH", f"{_stub_dir()}{os.pathsep}{os.environ['PATH']}")
 
 
 # The fake reads its settings from a JSON file beside it, not from the environment: the runner
@@ -73,6 +79,9 @@ import hashlib, json, os, re, shutil, subprocess, sys, time, uuid
 from pathlib import Path
 
 cfg = json.loads(Path(__file__).with_suffix(".json").read_text())
+if "--version" in sys.argv[1:]:
+    print(cfg.get("version", "fake 1.0"))
+    sys.exit(0)
 mode = cfg.get("mode", "normal")
 if cfg.get("marker"):
     Path(cfg["marker"]).write_text("called")
@@ -111,7 +120,7 @@ if mode != "lose_cost":
     proj.mkdir(parents=True, exist_ok=True)
     line = {
         "type": "assistant", "timestamp": "2026-10-14T00:00:00Z", "cwd": str(cwd),
-        "sessionId": session,
+        "sessionId": session, "note": cfg.get("transcript_text", ""),
         "message": {"id": "msg_" + session, "model": "claude-sonnet-5-5",
                     "usage": {"input_tokens": 1000 * scale, "output_tokens": 100 * scale}},
     }
@@ -137,6 +146,7 @@ def _write_fake_agent(directory: Path, **cfg: Any) -> Path:
 def _env(home: Path, **extra: str) -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if k not in _SESSION_KEYS}
     env["HOME"] = str(home)
+    env["PATH"] = f"{_stub_dir()}{os.pathsep}{env['PATH']}"
     env.update(extra)
     return env
 
@@ -146,6 +156,7 @@ def _run_bench(
     args: list[str],
     *,
     env: dict[str, str] | None = None,
+    command: str = "run",
     **cfg: Any,
 ) -> dict[str, Any]:
     """One offline `run` through the real CLI with the fake agent; paths live under `base`."""
@@ -155,7 +166,7 @@ def _run_bench(
         base, log_dir=str(logs), transcript_root=str(troot), pid_dir=str(base / "pids"), **cfg
     )
     full_env = _env(home, INTEGRATION="1", HM_BENCH_TEST="1", **(env or {}))
-    argv = [sys.executable, str(_SCRIPT), "run", "--out", str(out), "--claude-bin", str(fake)]
+    argv = [sys.executable, str(_SCRIPT), command, "--out", str(out), "--claude-bin", str(fake)]
     argv += ["--transcript-root", str(troot), "--guard-top", str(base), *args]
     proc = subprocess.run(
         argv, env=full_env, capture_output=True, text=True, timeout=600, check=False
@@ -463,13 +474,19 @@ def _rows(
     return rows
 
 
+def _with(rows: list[dict[str, Any]], **fields: Any) -> list[dict[str, Any]]:
+    for row in rows[:1]:
+        row.update(fields)
+    return rows
+
+
 _VERDICT_CASES = [
     (_rows("plain", 0.10) + _rows("hm", 0.40), 4.0, "met"),
     (_rows("plain", 0.10) + _rows("hm", 2.20), 22.0, "missed"),
     (_rows("plain", 0.10) + _rows("hm", 0.30, fail=1), 3.0, "missed"),
     (_rows("plain", 0.10) + _rows("hm", 0.50), 5.0, "met"),
     (_rows("plain", 0.10), None, "no_data"),
-    (_rows("plain", 0.10) + _rows("hm", 0.40)[:-1], 4.0, "no_data"),
+    (_rows("plain", 0.10) + _rows("hm", 0.40)[:-1], None, "no_data"),
     (
         _rows("plain", 0.10)
         + _rows("hm", 0.40)
@@ -488,14 +505,21 @@ _VERDICT_CASES = [
     (_rows("plain", {"t1": 0.1, "t2": 0.3}) + _rows("hm", {"t1": 0.2, "t2": 1.0}), 3.0, "met"),
     # Mean of per-task ratios would be (10 + 1.11) / 2 = 5.56 and miss; ratio of means is 2.0.
     (_rows("plain", {"t1": 0.1, "t2": 0.9}) + _rows("hm", {"t1": 1.0, "t2": 1.0}), 2.0, "met"),
-    # 5.004 displays as 5.0 but is above the target.
-    (_rows("plain", 1.0) + _rows("hm", 5.004), 5.0, "missed"),
-    # The CLI ratio (4.0) is under target; the larger transcript ratio (4.8) is within 20% and also
-    # under; at 5.4 the transcript ratio decides.
-    (_rows("plain", 0.10) + _rows("hm", 0.40, transcript=0.48), 4.0, "met"),
-    (_rows("plain", 0.10) + _rows("hm", 0.46, transcript=0.54), 4.6, "missed"),
-    # CLI and transcript disagree by more than 20%: the number is not trusted.
-    (_rows("plain", 0.10) + _rows("hm", 0.40, transcript=1.20), 4.0, "suspect"),
+    # 5.004 is above the target and is what gets recorded (3 places), not a rounded 5.0.
+    (_rows("plain", 1.0) + _rows("hm", 5.004), 5.004, "missed"),
+    # The CLI ratio is 4.0 and the larger transcript ratio 4.8 is within 20%: the judged (and
+    # recorded) number is 4.8; at 5.4 it is over the target.
+    (_rows("plain", 0.10) + _rows("hm", 0.40, transcript=0.48), 4.8, "met"),
+    (_rows("plain", 0.10) + _rows("hm", 0.46, transcript=0.54), 5.4, "missed"),
+    # CLI and transcript disagree by more than 20%: the number is not trusted, nothing to record.
+    (_rows("plain", 0.10) + _rows("hm", 0.40, transcript=1.20), None, "suspect"),
+    # A met that rests on a budget-capped or possibly leaking run is not trusted either.
+    (
+        _rows("plain", 0.10) + _with(_rows("hm", 0.40), subtype="error_max_budget_usd"),
+        None,
+        "suspect",
+    ),
+    (_rows("plain", 0.10) + _with(_rows("hm", 0.40), leak_suspect=True), None, "suspect"),
 ]
 
 
@@ -505,7 +529,7 @@ _VERDICT_CASES = [
     ids=[
         "met", "ratio-above", "pass-rate-drop", "inclusive", "no-hm", "unbalanced", "setup",
         "runner-error", "unequal-costs", "mean-of-ratios", "unrounded", "transcript-within",
-        "transcript-decides", "suspect",
+        "transcript-decides", "suspect", "budget-capped", "leak",
     ],
 )  # fmt: skip
 def test_report_verdict(
@@ -544,7 +568,33 @@ def test_record_command_parses(bench: ModuleType) -> None:
     assert ns.value == summary["ratio"] == 4.0
     for part in ("b1", "h1", "claude-sonnet-5-5", "plain 6/6", "hm 6/6", "met"):
         assert part in ns.evidence
-    assert lines[-1] == "hm_cost_ratio_small=4.0"
+    assert lines[-1] == "hm_cost_ratio_small=4.000"
+    assert tokens[tokens.index("--value") + 1] == "4.000"
+
+
+def test_the_recorded_value_is_the_number_the_verdict_used(bench: ModuleType) -> None:
+    rows = _rows("plain", 0.10) + _rows("hm", 0.46, transcript=0.54)
+    summary = bench.summarize(rows)
+    assert summary["verdict"] == "missed"
+    lines = bench.render_report(summary).splitlines()
+    tokens = shlex.split(next(line for line in lines if "intent metric record" in line))
+    assert tokens[tokens.index("--value") + 1] == "5.400"
+    assert lines[-1] == "hm_cost_ratio_small=5.400"
+
+
+@pytest.mark.parametrize(
+    "extra", [{"transcript": 1.20}, {"transcript": None}], ids=["suspect", "no-hm"]
+)
+def test_suspect_and_no_data_record_nothing(bench: ModuleType, extra: dict[str, Any]) -> None:
+    rows = _rows("plain", 0.10)
+    if extra["transcript"]:
+        rows += _rows("hm", 0.40, transcript=extra["transcript"])
+    summary = bench.summarize(rows)
+    assert summary["verdict"] in ("suspect", "no_data")
+    lines = bench.render_report(summary).splitlines()
+    assert not any("intent metric record" in line for line in lines)
+    assert lines[-1] == "hm_cost_ratio_small=n/a"
+    assert bench.record_argv(summary) is None
 
 
 def test_no_ratio_prints_no_record_command(bench: ModuleType) -> None:
@@ -596,7 +646,7 @@ def test_offline_end_to_end_run(bench_run: dict[str, Any]) -> None:
     proc = bench_run["proc"]
     assert proc.returncode == 0, proc.stderr
     lines = proc.stdout.strip().splitlines()
-    assert lines[-1] == "hm_cost_ratio_small=4.0"
+    assert lines[-1] == "hm_cost_ratio_small=4.000"
     assert "verdict: met" in proc.stdout
     rows = bench_run["rows"]
     assert sorted((r["task"], r["arm"], r["rep"]) for r in rows) == [
@@ -841,8 +891,9 @@ def test_total_budget_stops_scheduling_new_cells(
         ({}, ["--max-turns", "7"]),
         ({}, ["--max-budget-usd", "1"]),
         ({}, ["--timeout-s", "9"]),
+        ({}, ["--pass-env", "SOME_NAME"]),
     ],
-    ids=["harness", "model", "bench", "max-turns", "max-budget", "timeout"],
+    ids=["harness", "model", "bench", "max-turns", "max-budget", "timeout", "pass-env"],
 )
 def test_resume_refuses_rows_from_another_setup_before_spending(
     bench: ModuleType,
@@ -891,6 +942,8 @@ def test_runner_hash_covers_every_setting_that_changes_an_arm(bench: ModuleType)
         ("m", 7, 1800, 5.0),
         ("m", 400, 9, 5.0),
         ("m", 400, 1800, 1.0),
+        ("m", 400, 1800, 5.0, ("SOME_NAME",)),
+        ("m", 400, 1800, 5.0, (), "claude 9.9"),
     ]
     assert all(bench.runner_hash(*v) != base for v in variants)
 
@@ -922,7 +975,9 @@ def test_torn_results_line_is_skipped_and_the_next_row_survives(
     rows = bench.read_rows(tmp_path)
     assert [r["task"] for r in rows] == ["t1", "t2"]
     assert "unparsable" in capsys.readouterr().err
-    assert bench.main(["report", "--out", str(tmp_path)]) in (0, 2)
+    capsys.readouterr()
+    assert bench.main(["report", "--out", str(tmp_path)]) == 0
+    assert "verdict: no_data" in capsys.readouterr().out
 
 
 def test_append_row_is_one_write_on_an_append_fd(
@@ -1016,3 +1071,182 @@ def test_check_task_requires_every_unmarked_test_to_fail_on_pristine(
     assert all(any(e in p for p in problems) for e in expect)
     assert any("test_old" in line and "passed" in line for line in lines)
     assert any("test_new" in line for line in lines)
+
+
+# --- confirmation pass ------------------------------------------------------------------------
+
+
+def _wait_dead(pid: int, seconds: float = 10.0) -> bool:
+    deadline = time.monotonic() + seconds
+    while _alive(pid) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    return not _alive(pid)
+
+
+def test_a_stop_flag_set_before_the_agent_is_registered_still_kills_it(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    work = tmp_path / "work"
+    work.mkdir()
+    bench.STOP.set()
+    try:
+        start = time.monotonic()
+        argv = [sys.executable, "-c", "import time; time.sleep(300)"]
+        _out, _err, code = bench._invoke(argv, work, 30)
+    finally:
+        bench.STOP.clear()
+    assert code == -signal.SIGKILL
+    assert time.monotonic() - start < 15
+
+
+def test_a_straggler_holding_the_output_does_not_stall_or_outlive_the_cell(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    work = tmp_path / "work"
+    work.mkdir()
+    pidfile = tmp_path / "straggler.pid"
+    script = (
+        "import subprocess, sys\n"
+        "p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(300)'])\n"
+        f"open({str(pidfile)!r}, 'w').write(str(p.pid))\n"
+        "print('done')\n"
+    )
+    start = time.monotonic()
+    out, _err, code = bench._invoke([sys.executable, "-c", script], work, 20)
+    assert (code, out.strip()) == (0, "done")
+    assert time.monotonic() - start < 15
+    assert _wait_dead(int(pidfile.read_text()))
+
+
+def test_a_hung_agent_times_out_and_its_group_is_killed(tmp_path: Path) -> None:
+    got = _run_bench(
+        tmp_path,
+        ["--tasks", "t1", "--runs", "1", "--arms", "plain", "--timeout-s", "3"],
+        mode="sleep",
+    )
+    (row,) = got["rows"]
+    assert (row["status"], row["exit_code"]) == ("timeout", None)
+    pids = [int(p.name.split("-")[1]) for p in (tmp_path / "pids").glob("*")]
+    assert len(pids) == 2
+    assert all(_wait_dead(pid) for pid in pids)
+
+
+def _cell_options(bench: ModuleType, tmp_path: Path, **cfg: Any) -> tuple[Any, Any]:
+    troot = tmp_path / "transcripts"
+    fake = _write_fake_agent(
+        tmp_path, log_dir=str(tmp_path / "logs"), transcript_root=str(troot), **cfg
+    )
+    template = tmp_path / "tpl"
+    bench.build_template(template, "plain")
+    (tmp_path / "out").mkdir()
+    opts = bench.Options(
+        out=tmp_path / "out", claude_bin=str(fake), model="claude-sonnet-5-5", max_turns=5,
+        timeout_s=120, transcript_root=troot, bench_hash="b", harness_sha="h",
+        templates={"plain": template},
+    )  # fmt: skip
+    return next(t for t in bench.load_tasks() if t.id == "t1"), opts
+
+
+def test_a_crash_after_the_agent_ran_still_records_what_it_cost(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task, opts = _cell_options(bench, tmp_path)
+
+    def boom(*_args: Any, **_kw: Any) -> Any:
+        raise RuntimeError("grader crashed")
+
+    monkeypatch.setattr(bench, "grade", boom)
+    row = bench.run_cell(task, "plain", 1, opts)
+    assert row["status"] == "runner_error"
+    assert "grader crashed" in row["error"]
+    assert row["cli_cost_usd"] == 0.1
+    assert row["transcript_cost_usd"] > 0
+    assert Path(row["run_dir"]).is_dir()
+    assert bench._spent(row) == 0.1
+
+
+def test_spent_falls_back_from_cost_to_cli_to_transcript(bench: ModuleType) -> None:
+    assert bench._spent({"cost_usd": 0.5, "cli_cost_usd": 0.4, "transcript_cost_usd": 0.3}) == 0.5
+    assert bench._spent({"cost_usd": None, "cli_cost_usd": 0.4, "transcript_cost_usd": 0.3}) == 0.4
+    assert bench._spent({"cost_usd": None, "cli_cost_usd": None, "transcript_cost_usd": 0.3}) == 0.3
+    assert bench._spent({"status": "runner_error"}) == 0.0
+
+
+def test_transcript_root_follows_claude_config_dir(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    assert bench.default_transcript_root() == bench.economics_source.default_transcript_root()
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path))
+    assert bench.default_transcript_root() == tmp_path / "projects"
+
+
+def test_canary_passes_when_the_marker_is_absent(tmp_path: Path) -> None:
+    got = _run_bench(tmp_path, ["--marker", "CANARY-7f3a"], command="canary")
+    assert got["proc"].returncode == 0, got["proc"].stderr
+    assert "canary ok" in got["proc"].stdout
+
+
+def test_canary_fails_when_the_marker_reaches_the_transcript(tmp_path: Path) -> None:
+    got = _run_bench(
+        tmp_path,
+        ["--marker", "CANARY-7f3a"],
+        command="canary",
+        transcript_text="memory says CANARY-7f3a",
+    )
+    assert got["proc"].returncode == 1
+    assert "canary FAIL" in got["proc"].stdout
+
+
+def test_canary_without_a_transcript_is_inconclusive_not_ok(tmp_path: Path) -> None:
+    got = _run_bench(tmp_path, ["--marker", "CANARY-7f3a"], command="canary", mode="lose_cost")
+    assert got["proc"].returncode == 2
+    assert "inconclusive" in got["proc"].stderr
+
+
+def test_canary_needs_integration(bench: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("INTEGRATION", raising=False)
+    assert bench.main(["canary", "--marker", "x", "--claude-bin", "/nonexistent"]) == 2
+
+
+def test_runner_hash_follows_the_claude_version(tmp_path: Path) -> None:
+    args = ["--tasks", "t1", "--runs", "1", "--arms", "plain"]
+    hashes = {}
+    for name, version in (("a", "claude 1.0"), ("b", "claude 2.0"), ("c", "claude 1.0")):
+        (tmp_path / name).mkdir()
+        got = _run_bench(tmp_path / name, args, version=version)
+        hashes[name] = got["rows"][0]["runner_hash"]
+    assert hashes["a"] != hashes["b"]
+    assert hashes["a"] == hashes["c"]
+
+
+def test_harness_sha_covers_untracked_files_but_not_ignored_ones(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def git(*args: str) -> None:
+        subprocess.run([*bench._GIT, *args], cwd=tmp_path, capture_output=True, check=True)
+
+    git("init", "-q")
+    (tmp_path / ".gitignore").write_text("ignored.txt\n")
+    (tmp_path / "f.txt").write_text("one\n")
+    git("add", "-A")
+    git("commit", "-q", "-m", "x")
+    monkeypatch.setattr(bench, "REPO_ROOT", tmp_path)
+    clean = bench.harness_sha()
+    (tmp_path / "ignored.txt").write_text("noise\n")
+    assert bench.harness_sha() == clean
+    (tmp_path / "new.py").write_text("a = 1\n")
+    first = bench.harness_sha()
+    (tmp_path / "new.py").write_text("a = 2\n")
+    second = bench.harness_sha()
+    assert first.startswith(f"{clean}-dirty-")
+    assert second.startswith(f"{clean}-dirty-")
+    assert first != second
+
+
+def test_budget_capped_runs_are_counted_and_reported(bench: ModuleType) -> None:
+    rows = _rows("plain", 0.10) + _with(_rows("hm", 0.40), subtype="error_max_budget_usd")
+    summary = bench.summarize(rows)
+    assert summary["budget_capped"] == 1
+    assert "budget-capped runs: 1" in bench.render_report(summary)
+    assert summary["verdict"] == "suspect"

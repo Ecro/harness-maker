@@ -8,10 +8,12 @@ outside it.
 
 Usage:
     INTEGRATION=1 uv run python scripts/bench_light_lane.py run [--runs 3] [--out DIR]
+    INTEGRATION=1 uv run python scripts/bench_light_lane.py canary --marker LINE
     uv run python scripts/bench_light_lane.py report --out DIR [--json]
     uv run python scripts/bench_light_lane.py check
 
-`run` calls a live model and refuses without INTEGRATION=1; `report` and `check` are offline.
+`run` and `canary` call a live model and refuse without INTEGRATION=1; `report` and `check`
+are offline.
 
 Safety: the agent runs with --dangerously-skip-permissions as the invoking user, so it has that
 user's full file access (its environment is an allowlist, not a sandbox). Run live benches in a
@@ -74,6 +76,9 @@ RESULTS = "results.jsonl"
 LOCK_FILE = ".run.lock"
 # Statuses that are the runner's fault: left out of the report and retried on resume.
 UNUSABLE = ("setup_error", "runner_error")
+BUDGET_SUBTYPE = (
+    "error_max_budget_usd"  # the CLI's result subtype when --max-budget-usd stops a run
+)
 MIXED_FIELDS = ("bench_hash", "harness_sha", "model", "runner_hash")
 
 _IGNORED = shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.pyc")
@@ -180,7 +185,8 @@ def bench_hash(root: Path = BENCH_DIR) -> str:
 
 
 def harness_sha() -> str:
-    """HEAD plus a hash of the uncommitted diff, so two different dirty trees never look alike."""
+    """HEAD plus a hash of the uncommitted diff and untracked (non-ignored) files, so two
+    different dirty trees never look alike."""
 
     def git(*args: str) -> str:
         proc = subprocess.run(
@@ -189,9 +195,16 @@ def harness_sha() -> str:
         return proc.stdout.strip() if proc.returncode == 0 else ""
 
     sha = git("rev-parse", "--short=12", "HEAD") or "unknown"
-    if not git("status", "--porcelain", "--untracked-files=no"):
+    untracked = sorted(
+        p for p in git("ls-files", "-z", "-o", "--exclude-standard").split("\0") if p
+    )
+    if not git("status", "--porcelain", "--untracked-files=no") and not untracked:
         return sha
-    return f"{sha}-dirty-{hashlib.sha256(git('diff', 'HEAD').encode()).hexdigest()[:8]}"
+    digest = hashlib.sha256(git("diff", "HEAD").encode())
+    for name in untracked:
+        with contextlib.suppress(OSError):
+            digest.update(name.encode() + b"\0" + (REPO_ROOT / name).read_bytes() + b"\0")
+    return f"{sha}-dirty-{digest.hexdigest()[:8]}"
 
 
 def harness_argv(work: Path) -> list[str]:
@@ -199,15 +212,30 @@ def harness_argv(work: Path) -> list[str]:
     return argv + ["--preset", "Side", "--targets", "claude-code", "--autonomy-level", "auto_full"]
 
 
-def runner_hash(model: str, max_turns: int, timeout_s: int, max_budget_usd: float) -> str:
+def runner_hash(
+    model: str,
+    max_turns: int,
+    timeout_s: int,
+    max_budget_usd: float,
+    pass_env: tuple[str, ...] = (),
+    claude_version: str = "",
+) -> str:
     """Hash of every runner setting that changes what an arm does, so rows never mix them."""
     config = {
         "hm_prefix": HM_PREFIX,
         "agent": agent_argv("<claude>", "<prompt>", model, max_turns, max_budget_usd),
         "harness": harness_argv(Path("<work>"))[1:],
         "timeout_s": timeout_s,
+        "pass_env": sorted(pass_env),
+        "claude_version": claude_version,
     }
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:12]
+
+
+def default_transcript_root() -> Path:
+    """Where the CLI writes transcripts: under CLAUDE_CONFIG_DIR when that is set."""
+    config = os.environ.get("CLAUDE_CONFIG_DIR")
+    return Path(config) / "projects" if config else economics_source.default_transcript_root()
 
 
 def copy_fixture(dest: Path, fixture: Path = FIXTURE_DIR) -> None:
@@ -396,6 +424,18 @@ def agent_argv(
     ]  # fmt: skip
 
 
+def claude_version(claude_bin: str, extra_env: tuple[str, ...] = ()) -> str:
+    """`claude --version`, resolved once per run: a CLI upgrade changes what a cell measures."""
+    try:
+        proc = subprocess.run(
+            [claude_bin, "--version"], env=agent_env(extra_env), stdin=subprocess.DEVNULL,
+            capture_output=True, text=True, timeout=30, check=False,
+        )  # fmt: skip
+    except (OSError, subprocess.SubprocessError):
+        return "unavailable"
+    return proc.stdout.strip() or "unavailable"
+
+
 def agent_env(extra: tuple[str, ...] = ()) -> dict[str, str]:
     """Allowlisted environment: auth, proxy and locale only, never the operator's other secrets."""
     keep = {*_AGENT_ENV, *extra}
@@ -428,39 +468,44 @@ def kill_live() -> None:
         _killpg(pid)
 
 
-def _reap(proc: subprocess.Popen[str]) -> tuple[str, str]:
-    """Collect output after a kill, bounded: a grandchild outside the group may hold the pipes."""
-    try:
-        return proc.communicate(timeout=REAP_TIMEOUT_S)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        return "", ""
+def _read(path: Path) -> str:
+    return path.read_text("utf-8", "replace") if path.exists() else ""
 
 
 def _invoke(
     argv: list[str], work: Path, timeout_s: int, extra_env: tuple[str, ...] = ()
 ) -> tuple[str, str, int | None]:
-    """Run the agent in its own process group so a timeout or interrupt also stops its children."""
-    proc = subprocess.Popen(
-        argv, cwd=work, env=agent_env(extra_env), stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
-    )  # fmt: skip
-    with _LIVE_LOCK:
-        _LIVE.add(proc.pid)
-    try:
-        try:
-            out, err = proc.communicate(timeout=timeout_s)
-        except subprocess.TimeoutExpired:
-            _killpg(proc.pid)
-            out, err = _reap(proc)
-            return out, err, None
-        return out, err, proc.returncode
-    except BaseException:
-        _killpg(proc.pid)
-        raise
-    finally:
+    """Run the agent in its own process group so a timeout or interrupt also stops its children.
+
+    Output goes to agent.stdout/agent.stderr beside `work`, not to pipes: a grandchild that
+    outlives the agent and holds a pipe open would otherwise stall the read until the timeout.
+    The group is killed after every exit, so such a straggler never outlives its cell.
+    """
+    stdout_path, stderr_path = work.parent / "agent.stdout", work.parent / "agent.stderr"
+    with stdout_path.open("w") as out_f, stderr_path.open("w") as err_f:
+        proc = subprocess.Popen(
+            argv, cwd=work, env=agent_env(extra_env), stdin=subprocess.DEVNULL,
+            stdout=out_f, stderr=err_f, text=True, start_new_session=True,
+        )  # fmt: skip
         with _LIVE_LOCK:
-            _LIVE.discard(proc.pid)
+            _LIVE.add(proc.pid)
+        try:
+            if STOP.is_set():
+                _killpg(proc.pid)
+            code: int | None
+            try:
+                code = proc.wait(timeout=timeout_s)
+            except subprocess.TimeoutExpired:
+                _killpg(proc.pid)
+                proc.wait(timeout=REAP_TIMEOUT_S)
+                code = None
+        finally:
+            _killpg(proc.pid)
+            with _LIVE_LOCK:
+                _LIVE.discard(proc.pid)
+            if proc.poll() is None:
+                proc.kill()
+    return _read(stdout_path), _read(stderr_path), code
 
 
 def transcript_cost(work: Path, transcript_root: Path) -> Spend:
@@ -522,8 +567,35 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
     wall = time.monotonic() - start
     if STOP.is_set():
         return {**row, "status": "interrupted"}
-    (run_dir / "agent.stdout").write_text(stdout, encoding="utf-8")
-    (run_dir / "agent.stderr").write_text(stderr, encoding="utf-8")
+    try:
+        return _record(row, task, opts, work, (stdout, stderr, code), wall)
+    except Exception as exc:  # noqa: BLE001 - the agent already ran and spent; keep what we know
+        return {
+            **row, "status": "runner_error", "error": f"{type(exc).__name__}: {failure_text(exc)}",
+            "exit_code": code, **_salvage(work, stdout, opts),
+        }  # fmt: skip
+
+
+def _cli_cost(result: dict[str, Any] | None) -> float | None:
+    raw = result.get("total_cost_usd") if result else None
+    return float(raw) if isinstance(raw, int | float) else None
+
+
+def _salvage(work: Path, stdout: str, opts: Options) -> dict[str, Any]:
+    """Whatever cost evidence survives a failure after the agent ran, so its spend still counts."""
+    found: dict[str, Any] = {}
+    with contextlib.suppress(Exception):
+        found["cli_cost_usd"] = _cli_cost(parse_cli_result(stdout))
+    with contextlib.suppress(Exception):
+        found["transcript_cost_usd"] = round(transcript_cost(work, opts.transcript_root).usd, 6)
+    return found
+
+
+def _record(
+    row: dict[str, Any], task: Task, opts: Options, work: Path,
+    ran: tuple[str, str, int | None], wall: float,
+) -> dict[str, Any]:  # fmt: skip
+    stdout, stderr, code = ran
     result = parse_cli_result(stdout)
     if code is None:
         status = "timeout"
@@ -531,8 +603,7 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
         status = "agent_error"
     else:
         status = "ok"
-    raw_cost = result.get("total_cost_usd") if result else None
-    cli_cost = float(raw_cost) if isinstance(raw_cost, int | float) else None
+    cli_cost = _cli_cost(result)
     spend = transcript_cost(work, opts.transcript_root)
     cost, source = pick_cost(cli_cost, spend)
     scratch = Path(tempfile.mkdtemp(prefix="hm-bench-grade-"))
@@ -629,7 +700,10 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
     The verdict compares unrounded ratios, and takes the larger of the CLI and transcript ratios
     because it is open whether the CLI total includes subagents; when the two disagree by more
-    than SUSPECT_GAP the number is not trusted at all.
+    than SUSPECT_GAP the number is not trusted at all. `ratio` is that judged number (3 places)
+    and exists only for a `met`/`missed` verdict, so what is recorded is what was decided on. A
+    `met` is lowered to `suspect` when a run hit the per-run budget cap or may have seen the
+    hidden tests: both bias the cost or the pass rate in hm's favour.
     """
     ensure_consistent(rows)
     usable = [r for r in rows if r.get("status") not in UNUSABLE]
@@ -661,17 +735,26 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
         verdict, why = "missed", "hm hidden-test pass rate is below plain"
     else:
         verdict, why = "met", f"ratio {judged:.3f} <= target {TARGET:g} and hm pass rate >= plain"
+    capped = sum(1 for r in usable if r.get("subtype") == BUDGET_SUBTYPE)
+    leaks = sum(1 for r in usable if r.get("leak_suspect"))
+    if verdict == "met" and (capped or leaks):
+        verdict = "suspect"
+        why = (
+            f"{capped} run(s) hit the per-run budget cap and {leaks} may have read the hidden tests"
+        )
     first = usable[0] if usable else {}
+    recorded = round(judged, 3) if judged is not None and verdict in ("met", "missed") else None
     return {
         "bench": BENCH_ID, "bench_hash": first.get("bench_hash"),
         "harness_sha": first.get("harness_sha"), "model": first.get("model"),
         "runner_hash": first.get("runner_hash"),
         "tasks": tasks, "runs_per_cell": counts.pop() if balanced else None,
-        "arms": arms, "per_task": per_task, "ratio": _show(ratio), "judged_ratio": judged,
+        "arms": arms, "per_task": per_task, "ratio": recorded, "judged_ratio": judged,
+        "cli_ratio": _show(ratio),
         "transcript_ratio": _show(t_ratio), "verdict": verdict, "why": why,
         "setup_errors": len(rows) - len(usable), "target": TARGET,
         "cost_unknown": sum(a["cost_unknown"] for a in arms.values()),
-        "leak_suspects": sum(1 for r in usable if r.get("leak_suspect")),
+        "leak_suspects": leaks, "budget_capped": capped,
     }  # fmt: skip
 
 
@@ -698,11 +781,12 @@ def record_argv(summary: dict[str, Any]) -> list[str] | None:
         f"bench {BENCH_ID}@{summary['bench_hash']} harness {summary['harness_sha']} "
         f"model {summary['model']}: hm ${a['mean_cost']:.3f}/run vs plain "
         f"${p['mean_cost']:.3f}/run over {len(summary['tasks'])} tasks x "
-        f"{summary['runs_per_cell']} runs (transcript-priced ratio {summary['transcript_ratio']}); "
+        f"{summary['runs_per_cell']} runs (CLI-priced ratio {summary['cli_ratio']}, "
+        f"transcript-priced ratio {summary['transcript_ratio']}); "
         f"hidden-test pass plain {p['passed']}/{p['runs']}, hm {a['passed']}/{a['runs']}; "
         f"verdict {summary['verdict']}"
     )
-    value = str(summary["ratio"])
+    value = f"{summary['ratio']:.3f}"
     return ["hm", "intent", "metric", "record", METRIC_ID, "--value", value, "--evidence", evidence]
 
 
@@ -731,7 +815,7 @@ def render_report(summary: dict[str, Any]) -> str:
         )
     p, h = summary["arms"]["plain"], summary["arms"]["hm"]
     lines.append(
-        f"ratio (CLI cost): {summary['ratio']}    ratio (transcript price): "
+        f"ratio (CLI cost): {summary['cli_ratio']}    ratio (transcript price): "
         f"{summary['transcript_ratio']}"
     )
     lines.append(
@@ -750,11 +834,16 @@ def render_report(summary: dict[str, Any]) -> str:
             f"leak suspects: {summary['leak_suspects']} run(s) whose output names the hidden-test "
             "path; inspect their agent.stdout and transcripts before trusting the pass rate"
         )
+    if summary["budget_capped"]:
+        lines.append(
+            f"budget-capped runs: {summary['budget_capped']} (stopped by --max-budget-usd; "
+            "their cost and pass result are truncated)"
+        )
     lines.append(f"verdict: {summary['verdict']} — {summary['why']}")
     argv = record_argv(summary)
     if argv is not None:
         lines += ["record with:", "  uv run " + shlex.join(argv)]
-    value = "n/a" if summary["ratio"] is None else str(summary["ratio"])
+    value = "n/a" if summary["ratio"] is None else f"{summary['ratio']:.3f}"
     lines.append(f"{METRIC_ID}={value}")
     return "\n".join(lines)
 
@@ -797,7 +886,7 @@ def _on_term(_signum: int, _frame: object) -> None:
 
 
 def _spent(row: dict[str, Any]) -> float:
-    for key in ("cost_usd", "transcript_cost_usd"):
+    for key in ("cost_usd", "cli_cost_usd", "transcript_cost_usd"):
         if isinstance(row.get(key), int | float):
             return float(row[key])
     return 0.0
@@ -850,31 +939,94 @@ def _run_grid(
 
 
 def _make_options(args: argparse.Namespace, out: Path, digest: str, snap_root: Path) -> Options:
-    transcripts = args.transcript_root or economics_source.default_transcript_root()
+    transcripts = args.transcript_root or default_transcript_root()
+    pass_env = tuple(n for n in args.pass_env.split(",") if n)
     return Options(
         out=out, claude_bin=args.claude_bin, model=args.model, max_turns=args.max_turns,
         timeout_s=args.timeout_s, bench_hash=digest, harness_sha=harness_sha(),
         transcript_root=Path(transcripts),
-        runner_hash=runner_hash(args.model, args.max_turns, args.timeout_s, args.max_budget_usd),
-        max_budget_usd=args.max_budget_usd, total_budget_usd=args.total_budget_usd,
+        runner_hash=runner_hash(
+            args.model, args.max_turns, args.timeout_s, args.max_budget_usd, pass_env,
+            claude_version(args.claude_bin, pass_env),
+        ),
+        max_budget_usd=args.max_budget_usd,
+        total_budget_usd=getattr(args, "total_budget_usd", DEFAULT_TOTAL_BUDGET_USD),
         leak_markers=(str(TASKS_DIR), str(snap_root), "scripts/bench/tasks", "/hidden/"),
-        pass_env=tuple(n for n in args.pass_env.split(",") if n),
+        pass_env=pass_env,
     )  # fmt: skip
+
+
+def _guarded_out(args: argparse.Namespace) -> Path | None:
+    """The results dir, or None (after saying why) when it would inherit project context."""
+    out = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix="hm-bench-"))
+    honour = args.guard_top and os.environ.get("HM_BENCH_TEST") == "1"
+    reason = guard_out_dir(out, Path(args.guard_top) if honour else None)
+    if reason is not None:
+        if not args.out:
+            out.rmdir()
+        print(f"refusing --out {out}: {reason}; pick a dir outside any project", file=sys.stderr)
+        return None
+    return out
+
+
+def marker_hits(work: Path, marker: str, opts: Options) -> tuple[list[Path], int]:
+    """Files under the cell's logs and transcripts that contain `marker`, and files scanned."""
+    files = [work.parent / "agent.stdout", work.parent / "agent.stderr"]
+    for directory in economics_source.discover_transcript_dirs(
+        work, transcript_root=opts.transcript_root
+    ):
+        files += sorted(directory.rglob("*.jsonl"))
+    scanned = [f for f in files if f.exists()]
+    return [f for f in scanned if marker in _read(f)], len(scanned)
+
+
+def _cmd_canary(args: argparse.Namespace) -> int:
+    """One plain t1 cell, then a search of its transcript for a marker the operator put in the
+    user-level ~/.claude/CLAUDE.md: if it shows up, user memory is leaking into the arms."""
+    if os.environ.get("INTEGRATION") != "1":
+        print("canary calls a live model; set INTEGRATION=1 to opt in", file=sys.stderr)
+        return 2
+    out = _guarded_out(args)
+    if out is None:
+        return 2
+    out.mkdir(parents=True, exist_ok=True)
+    snap, digest = snapshot_bench()
+    try:
+        task = next(t for t in load_tasks(snap / "tasks") if t.id == "t1")
+        opts = _make_options(args, out, digest, snap.parent)
+        template = out / ".templates" / "plain"
+        shutil.rmtree(template, ignore_errors=True)
+        template.parent.mkdir(exist_ok=True, mode=0o700)
+        (out / "runs").mkdir(exist_ok=True, mode=0o700)
+        build_template(template, "plain", snap / "timeparse")
+        row = run_cell(task, "plain", 1, replace(opts, templates={"plain": template}))
+    except (OSError, shutil.Error, subprocess.SubprocessError) as exc:
+        print(f"canary could not run: {failure_text(exc)}", file=sys.stderr)
+        return 2
+    finally:
+        shutil.rmtree(snap.parent, ignore_errors=True)
+    hits, scanned = marker_hits(Path(row["run_dir"]) / "work", args.marker, opts)
+    if hits:
+        names = ", ".join(str(h) for h in hits)
+        print(f"canary FAIL: marker found in {names}; user-level memory reaches the agent")
+        return 1
+    if row["status"] in UNUSABLE or scanned < 3:
+        print(
+            f"canary inconclusive: status {row['status']}, {scanned} file(s) scanned; "
+            "check --transcript-root / CLAUDE_CONFIG_DIR",
+            file=sys.stderr,
+        )
+        return 2
+    print(f"canary ok: marker not found in {scanned} file(s) of {row['run_dir']}")
+    return 0
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
     if os.environ.get("INTEGRATION") != "1":
         print("run calls a live model; set INTEGRATION=1 to opt in", file=sys.stderr)
         return 2
-    out = Path(args.out) if args.out else Path(tempfile.mkdtemp(prefix="hm-bench-"))
-    top = (
-        Path(args.guard_top) if args.guard_top and os.environ.get("HM_BENCH_TEST") == "1" else None
-    )
-    reason = guard_out_dir(out, top)
-    if reason is not None:
-        if not args.out:
-            out.rmdir()
-        print(f"refusing --out {out}: {reason}; pick a dir outside any project", file=sys.stderr)
+    out = _guarded_out(args)
+    if out is None:
         return 2
     all_tasks = load_tasks()
     wanted = args.tasks.split(",") if args.tasks else [t.id for t in all_tasks]
@@ -969,6 +1121,23 @@ def _cmd_check(_args: argparse.Namespace) -> int:
     return 1 if problems else 0
 
 
+def _add_agent_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--model", default=DEFAULT_MODEL)
+    p.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS, dest="max_turns")
+    p.add_argument("--timeout-s", type=int, default=DEFAULT_TIMEOUT_S, dest="timeout_s")
+    p.add_argument(
+        "--max-budget-usd", type=float, default=DEFAULT_MAX_BUDGET_USD, dest="max_budget_usd",
+        help="per-run spend cap passed to claude",
+    )  # fmt: skip
+    p.add_argument(
+        "--pass-env", default="", dest="pass_env",
+        help="comma-separated extra env var names for the agent (it gets an allowlist only)",
+    )  # fmt: skip
+    p.add_argument("--claude-bin", default="claude", dest="claude_bin")
+    p.add_argument("--transcript-root", default=None, dest="transcript_root")
+    p.add_argument("--guard-top", default=None, dest="guard_top", help=argparse.SUPPRESS)
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bench_light_lane",
@@ -986,24 +1155,17 @@ def _parser() -> argparse.ArgumentParser:
         "--jobs", type=int, default=1,
         help="runs in parallel; runs share the user's Claude state, so smoke-test live first",
     )  # fmt: skip
-    run.add_argument("--model", default=DEFAULT_MODEL)
-    run.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS, dest="max_turns")
-    run.add_argument("--timeout-s", type=int, default=DEFAULT_TIMEOUT_S, dest="timeout_s")
-    run.add_argument(
-        "--max-budget-usd", type=float, default=DEFAULT_MAX_BUDGET_USD, dest="max_budget_usd",
-        help="per-run spend cap passed to claude",
-    )  # fmt: skip
     run.add_argument(
         "--total-budget-usd", type=float, default=DEFAULT_TOTAL_BUDGET_USD,
         dest="total_budget_usd", help="stop scheduling new runs once recorded spend passes this",
     )  # fmt: skip
-    run.add_argument(
-        "--pass-env", default="", dest="pass_env",
-        help="comma-separated extra env var names for the agent (it gets an allowlist only)",
-    )  # fmt: skip
-    run.add_argument("--claude-bin", default="claude", dest="claude_bin")
-    run.add_argument("--transcript-root", default=None, dest="transcript_root")
-    run.add_argument("--guard-top", default=None, dest="guard_top", help=argparse.SUPPRESS)
+    canary = sub.add_parser(
+        "canary", help="one plain t1 cell; fail if a marker from ~/.claude/CLAUDE.md reaches it"
+    )
+    canary.add_argument("--marker", required=True, help="line you put in ~/.claude/CLAUDE.md")
+    canary.add_argument("--out", default=None, help="results dir (default: fresh temp dir)")
+    for parser_ in (run, canary):
+        _add_agent_args(parser_)
     rep = sub.add_parser("report", help="summarize a results dir (offline)")
     rep.add_argument("--out", required=True)
     rep.add_argument("--json", action="store_true")
@@ -1013,7 +1175,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    handlers = {"run": _cmd_run, "report": _cmd_report, "check": _cmd_check}
+    handlers = {"run": _cmd_run, "canary": _cmd_canary, "report": _cmd_report, "check": _cmd_check}
     return handlers[args.cmd](args)
 
 

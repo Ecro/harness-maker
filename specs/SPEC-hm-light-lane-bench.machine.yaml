@@ -224,6 +224,9 @@ ac:
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_report_verdict
   - tests/unit/test_bench_light_lane.py::test_unpriced_runs_stay_out_of_the_cost_mean_and_never_make_a_free_arm
+  - tests/unit/test_bench_light_lane.py::test_the_recorded_value_is_the_number_the_verdict_used
+  - tests/unit/test_bench_light_lane.py::test_suspect_and_no_data_record_nothing
+  - tests/unit/test_bench_light_lane.py::test_budget_capped_runs_are_counted_and_reported
   executable_predicate: null
   golden_table:
   - input:
@@ -301,25 +304,35 @@ ac:
       plain: $1.0 each
       hm: $5.004 each
     expected:
-      ratio: 5.0
+      ratio: 5.004
       verdict: missed
     edge: true
-    note: the verdict compares the unrounded ratio
+    note: the verdict compares the unrounded ratio and the recorded value has 3 places
   - input:
       plain: $0.10 each
       hm: CLI $0.46, transcript $0.54
     expected:
-      ratio: 4.6
+      ratio: 5.4
       verdict: missed
     edge: true
-    note: the larger of the CLI and transcript ratios decides when they agree within 20%
+    note: the larger of the CLI and transcript ratios decides when they agree within 20%, and
+      it is the number recorded
   - input:
       plain: $0.10 each
       hm: CLI $0.40, transcript $1.20
     expected:
+      ratio: null
       verdict: suspect
     edge: true
-    note: CLI and transcript ratios differ by more than 20%
+    note: CLI and transcript ratios differ by more than 20%; the record line is n/a
+  - input:
+      plain: $0.10 each
+      hm: $0.40 each, one run with subtype error_max_budget_usd (or leak_suspect)
+    expected:
+      ratio: null
+      verdict: suspect
+    edge: true
+    note: a met resting on a capped or leaking run is lowered to suspect
   rubric_id: null
   note: ''
   pending_test: false
@@ -575,6 +588,36 @@ ac:
   oracle_source: golden
   oracle_evidence: The fake agent prints the hidden dir path for the leak case; the guard
     cases (marked, unmarked, guard that fails, ghost guard) are fixed by hand in the test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-015
+  title: The canary searches the cell's transcript for a user-memory marker
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_canary_passes_when_the_marker_is_absent
+  - tests/unit/test_bench_light_lane.py::test_canary_fails_when_the_marker_reaches_the_transcript
+  - tests/unit/test_bench_light_lane.py::test_canary_without_a_transcript_is_inconclusive_not_ok
+  - tests/unit/test_bench_light_lane.py::test_canary_needs_integration
+  - tests/unit/test_bench_light_lane.py::test_transcript_root_follows_claude_config_dir
+  executable_predicate: canary_exit == (1 if marker_in_any_scanned_file else 2 if scanned_files
+    < 3 else 0) and (canary_exit == 2 if not integration else True)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fake agent writes the marker into its own transcript only when the test
+    asks it to, so the expected exit code is fixed by the fake, independent of the runner.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null

@@ -7,7 +7,7 @@ tags: [harness-maker, plan, python, bench, cost]
 spec: "[[SPEC-hm-light-lane-bench]]"
 research_doc: "[[RESEARCH-hm-light-lane]]"
 interview_rounds: 0
-adrs: 15
+adrs: 18
 validator_outcome: NOT_RUN
 summary: "Stage 4 runner: one script, a reconstructed timeparse fixture with five hidden-test tasks, offline tests"
 intent: HM-LIGHT-LANE
@@ -122,6 +122,27 @@ does not pass there. t1's parse-back tolerance is half the last kept unit (the o
 machine cannot flake it. Tests whose module cannot import on pristine (t2, t3, t5) show one
 collection error; that still proves the module is missing, not each test.
 
+### ADR-016: Record the judged ratio; suspect and capped runs record nothing
+**Decided by:** agent (confirmation pass). The `--value` and the last output line were the rounded
+CLI ratio while the verdict used `max(CLI, transcript)`, so a recorded number could contradict its
+own verdict. Both now use the judged ratio (`f"{judged:.3f}"`); `suspect` and `no_data` print `n/a`
+and no record command. A `met` with a budget-capped (`error_max_budget_usd`) or `leak_suspect` run
+is lowered to `suspect`.
+
+### ADR-017: Agent output goes to files; the group is killed after every exit
+**Decided by:** agent. Pipes let a grandchild that outlives the agent hold the read until the
+timeout, turning a good run into a `timeout`. Stdout and stderr are files beside `work/`, the wait
+is on the agent only, and the process group is killed in a `finally` (also when the stop flag was
+set between registering and waiting). A crash after the agent ran keeps the CLI and transcript
+cost on a `runner_error` row so the budget still counts it. `runner_hash` also covers `--pass-env`
+names and `claude --version` (resolved once), and the harness stamp hashes untracked files.
+
+### ADR-018: A live canary before the first full grid
+**Decided by:** agent. Whether `--setting-sources project,local` keeps `~/.claude/CLAUDE.md` out
+of the context cannot be proven offline. `canary --marker` runs one plain t1 cell and searches its
+logs and transcripts (root follows `CLAUDE_CONFIG_DIR`); it exits 1 on a hit and 2 when nothing
+could be searched.
+
 ## 📝 Implementation Plan
 
 1. **Phase 1 — fixture and tasks.** scope: `scripts/bench/timeparse/`, `scripts/bench/tasks/t1..t5/`
@@ -146,7 +167,8 @@ The hm arm renders a real harness from this checkout (about two seconds).
 INTEGRATION=1 uv run python scripts/bench_light_lane.py run --runs 3
 ```
 
-Then paste the printed `uv run hm intent metric record hm_cost_ratio_small --value … --evidence …`.
+First run `canary --marker "<line you put in ~/.claude/CLAUDE.md>"` (exit 0 required), then
+paste the printed `uv run hm intent metric record hm_cost_ratio_small --value … --evidence …`.
 
 ## ✅ Success Criteria
 

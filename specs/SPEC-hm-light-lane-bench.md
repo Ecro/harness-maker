@@ -94,8 +94,11 @@ out, and the verdict, computed on the unrounded ratio, is `met` (ratio ≤ 5 and
 plain), `missed` (ratio > 5, or hm pass rate < plain), `no_data` (an arm has no priced runs, or the
 task × arm grid is unbalanced) or `suspect` (the CLI-cost and transcript-price ratios differ by
 more than 20%, which is what a `total_cost_usd` that omits subagent spend would look like). When
-the two agree within 20% the larger one is judged; the rounded CLI ratio is only what is printed
-and recorded
+the two agree within 20% the larger one is judged. That judged ratio, to 3 places, is the
+`--value` of the record command and the last line `hm_cost_ratio_small=<ratio>`; for `suspect` and
+`no_data` the line is `n/a` and no record command is printed. A `met` becomes `suspect` when any
+run hit the per-run budget cap (`subtype: error_max_budget_usd`, counted in the report) or is
+flagged `leak_suspect`
 
 ### S7: The record command is ready to paste
 **Given** a report with a ratio
@@ -122,6 +125,13 @@ results file whose rows mix any of them
 **When** `run` starts
 **Then** it exits 2, because Claude Code would load that context into both arms; `CLAUDE.local.md`
 and a `.claude/` dir in an ancestor count too
+
+### S11: A canary shows whether user-level memory reaches the arms
+**Given** the operator put a unique marker line in `~/.claude/CLAUDE.md`
+**When** they run `INTEGRATION=1 scripts/bench_light_lane.py canary --marker <line>`
+**Then** one plain t1 cell runs and the agent's stdout, stderr and transcripts are searched: exit 1
+if the marker is found, 2 if nothing could be searched, 0 only when transcripts were read and the
+marker is absent. The transcript root follows `CLAUDE_CONFIG_DIR` when it is set
 
 ### S10: A stop signal ends the run, a crash costs one cell, spend is capped
 **Given** a run in progress
@@ -182,6 +192,8 @@ a rerun with the same `--out` resumes
 | S3 (isolation) | unit (fake agent) | `test_agent_runs_with_project_only_settings_and_a_spend_cap`, `test_agent_gets_an_allowlisted_environment`, `test_agent_env_unit` |
 | S5 (snapshot, leak) | unit | `test_snapshot_is_private_and_matches_the_checkout`, `test_hidden_tests_are_graded_outside_the_results_dir`, `test_agent_output_naming_the_hidden_path_is_flagged`, `test_check_task_requires_every_unmarked_test_to_fail_on_pristine` |
 | S8 (resume checks) | unit | `test_resume_refuses_rows_from_another_setup_before_spending`, `test_runner_hash_covers_every_setting_that_changes_an_arm`, `test_torn_results_line_is_skipped_and_the_next_row_survives`, `test_append_row_is_one_write_on_an_append_fd` |
+| S11 | unit (fake agent) | `test_canary_passes_when_the_marker_is_absent`, `test_canary_fails_when_the_marker_reaches_the_transcript`, `test_canary_without_a_transcript_is_inconclusive_not_ok`, `test_canary_needs_integration`, `test_transcript_root_follows_claude_config_dir` |
+| S6 (recorded value) | unit | `test_the_recorded_value_is_the_number_the_verdict_used`, `test_suspect_and_no_data_record_nothing`, `test_budget_capped_runs_are_counted_and_reported` |
 | S10 | unit (subprocess signals, fake agent) | `test_stop_signal_kills_live_agents_and_skips_queued_cells`, `test_one_crashing_cell_is_recorded_and_the_grid_continues`, `test_a_second_runner_on_the_same_out_is_refused`, `test_total_budget_stops_scheduling_new_cells` |
 
 ### AC-001: Live runs refuse without INTEGRATION=1
@@ -198,13 +210,29 @@ a rerun with the same `--out` resumes
 ### AC-012: The agent runs with project-only settings, an allowlisted environment and a spend cap
 ### AC-013: A stop signal or a crashing cell cannot leave agents running or abort the grid
 ### AC-014: Hidden tests are graded from a private snapshot and a leak is flagged
+### AC-015: The canary searches the cell's transcript for a user-memory marker
 
 ## ❓ Open Questions
 
+- Does `--setting-sources project,local` really keep `~/.claude/CLAUDE.md` out of the context?
+  Only a live run answers it. The first live run is a canary (S11): one cell with a marker line in
+  the user `~/.claude/CLAUDE.md`, and the marker must not appear in the transcript. Until that
+  passes, a full grid is not started.
 - Does `total_cost_usd` in `claude -p --output-format json` include subagent spend in the current
   CLI? The runner records the transcript price beside it, prints both ratios, and returns
   `suspect` instead of `met`/`missed` when they differ by more than 20%, so a gap shows up in the
   first live run instead of being assumed away.
+
+## 🔬 Measurement procedure (after merge, stages 2b and 3 landed)
+
+1. Put a unique marker line in `~/.claude/CLAUDE.md` and run
+   `INTEGRATION=1 uv run python scripts/bench_light_lane.py canary --marker "<line>"`; remove the
+   marker afterwards. Continue only on exit 0.
+2. Run `INTEGRATION=1 uv run python scripts/bench_light_lane.py run --runs 3` in a container or
+   throwaway VM.
+3. Read the report: a `suspect` verdict, a leak or budget-capped count above zero, or a
+   `cost_unknown` count means the number is not recorded; otherwise paste the printed record
+   command.
 
 ## 🔍 Refinement Decisions
 
