@@ -15,6 +15,11 @@
 
 ### Fixed
 
+- **`make` now says that rendered Codex hooks do nothing until trusted.** Codex runs a non-managed hook only
+  after the user trusts its current hash in `/hooks` (and trusts the project `.codex/` layer); an untrusted or
+  modified hook is skipped with no startup warning. With a Codex target, `make` prints how many handlers
+  `.codex/hooks.json` holds and that they need trusting, again after any re-render that changes them. The
+  Codex manual checklist gains a Step 6 that checks hooks actually fire, not just that the file exists.
 - **`hm freeze resolve-base` no longer pulls the previously landed task into a zero-commit task branch's review.**
   On a named non-base branch a merge-base equal to HEAD is now accepted (the per-task model commits only at
   wrapup, so HEAD is the right base); on the base branch and a detached HEAD the HEAD~1 fallback is kept.
