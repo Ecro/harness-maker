@@ -12,7 +12,7 @@ spec_quality_score: null
 spec_quality_score_at: null
 ac:
 - id: AC-001
-  title: Tier-2 tasks ship and their hidden tests discriminate
+  title: Every task's hidden tests discriminate, and tier 2 ships 3-5 tasks
   type: property
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_hidden_tests_discriminate
@@ -25,17 +25,18 @@ ac:
   pending_test: true
   oracle_source: differential
   oracle_evidence: Each task's reference overlay under scripts/bench/tasks/<id>/reference/
-    is the independent oracle, written from the prompt's contract before any arm runs;
-    guards.txt names the regression traps that must pass on pristine. The predicate
-    is the one the approved bench SPEC S2 already uses, extended by the seed overlay.
+    is the independent oracle, written from the prompt's contract and signed off
+    by the DRI (S14); guards.txt names the regression traps that must pass on the
+    starting tree. The predicate extends the approved bench SPEC S2 with the seed
+    overlay.
   oracle_independence_waiver: null
   input_domain: every task directory under scripts/bench/tasks/ (tier 1 and tier 2)
-  transformation: grade the pristine fixture plus the task's seed overlay, and the
-    same plus the reference overlay
-  expected_relation: all(t fails on pristine for t in hidden - guards) and all(t passes
-    on pristine for t in guards) and grade(reference).passed and visible(pristine).passed
+  transformation: grade the starting tree (fixture plus the task's seed overlay) and
+    the starting tree plus the reference overlay
+  expected_relation: all(t fails on start for t in hidden - guards) and all(t passes
+    on start for t in guards) and grade(reference).passed and visible(start).passed
     and visible(reference).passed and 3 <= count(tier == 2) <= 5 and count(tier ==
-    1) == 5
+    1) == 5 and all((d / 'damaged').is_dir() for d in tier2_dirs)
   preconditions: []
   observable_output: hidden and visible pytest outcomes per task, tier file per task
   generator_hint: null
@@ -114,31 +115,37 @@ ac:
     edge: false
     note: ''
   - input:
-      work: pristine package, only specs/SPEC-x.md, work-docs/PLAN-x.md and .claude/
+      work: only tests/test_format.py edited, hidden tests fail
+    expected:
+      outcome: wrong
+    edge: true
+    note: a tests-only change counts as changed, so it is judged, not stalled
+  - input:
+      work: starting tree untouched, only specs/SPEC-x.md, work-docs/PLAN-x.md and .claude/
         files added
     expected:
       outcome: stalled
     edge: true
-    note: the 2026-10-14 hm stall shape; process files are not a code change
+    note: the 2026-10-14 hm stall shape; process files are not a change
   - input:
-      work: pristine package, the agent committed twice and rewrote git history
+      work: starting tree untouched, the agent committed twice and rewrote git history
     expected:
       outcome: stalled
     edge: true
     note: the change is measured against the snapshot's starting tree, not git
   - input:
-      work: seed overlay present and untouched (t6)
+      work: t6 seed overlay present and untouched
     expected:
       outcome: stalled
     edge: true
-    note: the seed is the starting tree, not the agent's change
+    note: the seed is part of the starting tree, not the agent's change
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The work dirs are built by hand from the fixture and the reference
-    overlays on disk; the expected label follows from SPEC S3's definition, fixed before
-    the classifier is written.
+  oracle_evidence: The work dirs are built by hand from the fixture, seed and reference
+    overlays on disk; the expected label follows from SPEC S3's definition, fixed
+    before the classifier is written.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -152,10 +159,12 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-004
-  title: Deterministic quality checks count new errors on the source diff only
+  title: Deterministic quality checks count new errors on the source diff of changed
+    runs only
   type: parametric
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_quality_checks_count_new_errors_on_the_source_diff_only
+  - tests/unit/test_bench_light_lane.py::test_tool_versions_enter_the_runner_hash
   executable_predicate: null
   golden_table:
   - input:
@@ -165,7 +174,7 @@ ac:
       mypy_new: 0
       regressions: 0
       tests_touched: false
-      diff_lines: lines(diff(fixture, reference)) counted by difflib in the test
+      diff_lines: lines(diff(start, reference)) counted by difflib in the test
     edge: false
     note: ''
   - input:
@@ -194,27 +203,37 @@ ac:
     edge: false
     note: visible tests come from the private snapshot, not the work dir
   - input:
-      work: reference plus a work-dir pyproject.toml with [tool.ruff] ignore = ["F"]
-        and a mypy.ini with ignore_errors
+      work: reference plus the unused import and untyped def, plus a work-dir pyproject.toml
+        with [tool.ruff] ignore = ["F"] and a mypy.ini with ignore_errors
     expected:
       ruff_new: 1
       mypy_new: 1
     edge: true
-    note: with the unused import and untyped def also present; agent config is never
-      read
+    note: agent config is never read
   - input:
-      work: only .claude/ and specs/ changed
+      work: stalled (only .claude/ and specs/ changed)
     expected:
-      diff_lines: 0
-      tests_touched: false
+      ruff_new: null
+      mypy_new: null
+      regressions: null
+      diff_lines: null
+      tests_touched: null
+      reason: stalled
     edge: true
-    note: harness and process files are outside the scope
+    note: a stall has no code, so it carries no quality signal to win with
   - input:
       work: any of the above
     expected:
       work_dir_unchanged: true
+      quality_tools: '{ruff: <version>, mypy: <version>} as reported by the tools'
     edge: true
     note: tree hash of the work dir before and after scoring is equal
+  - input:
+      runner_hash: computed with ruff version A, then with ruff version B (mypy likewise)
+    expected:
+      equal: false
+    edge: true
+    note: a tool upgrade starts a new series
   rubric_id: null
   note: ''
   pending_test: true
@@ -222,7 +241,7 @@ ac:
   oracle_evidence: Each sabotage is planted by hand in a copy of the reference overlay,
     so the expected count of new errors is fixed by the fixture (the pristine fixture
     is ruff- and mypy --strict-clean, checked 2026-10-14); ruff and mypy themselves
-    are the reference tools.
+    are the reference tools, and their versions come from `--version`.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -236,28 +255,33 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-005
-  title: The judge input is blind to the arm
+  title: The judge input is blind to the arm, harness vocabulary redacted
   type: property
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_judge_input_is_blind_to_the_arm
   executable_predicate: null
   golden_table: []
   rubric_id: null
-  note: ''
+  note: 'judge rubric hm-eval-judge-v1 (SPEC Judge rubric section, not a .claude/rubrics file). Cases: (a) same source change in both arms, the hm work dir also holding
+    a rendered harness, specs/SPEC-x.md and work-docs/PLAN-x.md; (b) the hm diff carries
+    `# AC-003`, `SPEC-hm-x`, `PLAN-hm-x`, `/hm:spec` comments and a `test_ac_003_rounds`
+    test, and the plain run carries the same change with those markers already neutral'
   pending_test: true
   oracle_source: property
   oracle_evidence: The fake claude records the stdin and argv it received; the property
-    compares two recordings, one per arm, so it does not depend on the runner's own
-    prompt builder.
+    compares two recordings, one per arm, and scans the stdin for the SPEC S5 pattern
+    table, so it does not depend on the runner's own prompt builder.
   oracle_independence_waiver: null
-  input_domain: one task run in the plain arm and in the hm arm with the same source
-    change, the hm work dir also holding a rendered harness, specs/SPEC-x.md and work-docs/PLAN-x.md
-  transformation: judge both runs with the fake claude and compare what it received
+  input_domain: the two cases in note, each judged once per arm with the fake claude
+  transformation: compare what the fake claude received for the plain and the hm
+    run
   expected_relation: stdin(plain) == stdin(hm) and argv(plain) == argv(hm) and not
-    any(s in stdin for s in ('/hm:spec', run_dir_plain, run_dir_hm, 'SPEC-x', 'PLAN-x',
-    '.claude/', 'arm'))
+    re.search(r'AC-\d+|SPEC-|PLAN-|/hm:|test_ac_\d+', diff_part(stdin)) and not any(s
+    in stdin for s in (run_dir_plain, run_dir_hm, '.claude/', 'work-docs/', 'specs/'))
+    and row_hm['judge']['redactions'] == 5 and row_plain_case_a['judge']['redactions']
+    == 0
   preconditions: []
-  observable_output: fake claude's recorded stdin and argv
+  observable_output: fake claude's recorded stdin and argv; the rows' judge.redactions
   generator_hint: null
   judgment_verdict: null
   judged_at: null
@@ -272,23 +296,29 @@ ac:
   - tests/unit/test_bench_light_lane.py::test_judge_failure_is_recorded_not_imputed
   - tests/unit/test_bench_light_lane.py::test_judge_cost_stays_out_of_the_arm_cost
   - tests/unit/test_bench_light_lane.py::test_no_judge_and_stalled_runs_make_no_judge_call
-  executable_predicate: argv[0] == opts.claude_bin and all(f in argv for f in ('--tools',
-    '--json-schema', '--model', '--setting-sources', '--strict-mcp-config', '--max-budget-usd'))
-    and not cwd.is_relative_to(out) and bad_row['judge']['status'] == 'error' and
-    bad_row['judge']['scores'] is None and bad_row['status'] == good_row['status']
-    and summary_cost_mean == mean(r['cost_usd'] for r in rows) and spent_toward_total
-    == sum(r['cost_usd'] + r['judge']['cost_usd']) and judge_calls(no_judge) == 0
-    and judge_calls(stalled) == 0 and runner_hash(judge_model='a') != runner_hash(judge_model='b')
+  executable_predicate: 'argv[0] == opts.claude_bin and argv[1] == ''-p'' and all(pair
+    in pairs(argv) for pair in ((''--output-format'', ''json''), (''--tools'', ''''),
+    (''--json-schema'', json.dumps(RUBRIC_SCHEMA, sort_keys=True)), (''--model'',
+    opts.judge_model), (''--setting-sources'', ''project,local''), (''--max-budget-usd'',
+    ''0.5''))) and ''--strict-mcp-config'' in argv and opts.judge_model == opts.model
+    and not cwd.is_relative_to(out) and list(cwd_listing_at_start) == [] and calls_per_run
+    == 1 and bad_row[''judge''][''status''] == ''error'' and bad_row[''judge''][''scores'']
+    is None and bad_row[''status''] == good_row[''status''] and summary_arm_cost_mean
+    == mean(r[''cost_usd''] for r in rows) and spent_toward_total == sum(r[''cost_usd'']
+    + (r[''judge''][''cost_usd''] or 0) for r in rows) and unpriced_judge_calls ==
+    1 and judge_calls(no_judge) == 0 and judge_calls(stalled) == 0 and runner_hash(judge_model=''a'')
+    != runner_hash(judge_model=''b'')'
   golden_table: []
   rubric_id: null
-  note: failure cases are exit 1, a hang past the judge timeout, and JSON that misses
-    a criterion or scores 6
+  note: 'judge rubric hm-eval-judge-v1 (SPEC Judge rubric section). Failure cases: exit 1, a hang past the judge timeout, JSON missing a criterion,
+    a score of 6, and a result without total_cost_usd (cost treated as 0, counted
+    unpriced)'
   pending_test: true
   oracle_source: golden
   oracle_evidence: The fake claude records argv, cwd and call count and returns a
-    canned result chosen by the test (valid, invalid, exit 1, hang) with a fixed total_cost_usd,
-    so expected costs and statuses are set by the fake; the flags exist in `claude
-    --help` (checked 2026-10-14).
+    canned result chosen by the test (valid, invalid, exit 1, hang, no cost) with
+    a fixed total_cost_usd, so expected costs and statuses are set by the fake; the
+    flags exist in `claude --help` (checked 2026-10-14).
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -302,21 +332,23 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-007
-  title: The scorecard leads with quality and keeps the intent-metric line
+  title: The scorecard leads with quality over balanced, changed runs
   type: mechanical
   test_ids:
-  - tests/unit/test_bench_light_lane.py::test_scorecard_leads_with_quality_and_keeps_the_metric_line
+  - tests/unit/test_bench_light_lane.py::test_scorecard_leads_with_quality_over_balanced_changed_runs
   executable_predicate: out == (FIXTURES / 'scorecard.txt').read_text() and out.index('Quality')
     < out.index('Efficiency') < out.index('hm_cost_ratio_small') and out.splitlines()[-1].startswith('hm_cost_ratio_small=')
-    and 'scorecard' in json_out
+    and 'scorecard' in json_out and 't7 excluded (incomplete)' in out
   golden_table: []
   rubric_id: null
-  note: golden rows cover both tiers, a stalled hm run, a judge error and a null mypy
-    check, so the n/a (k) and judged-run counts are exercised
+  note: golden rows cover both tiers, a stalled hm run (quality null, so ruff_new
+    n is 2 of 3), a judge error, a null mypy check, and a tier-2 task t7 with one
+    hm rep missing, which is excluded from every tier-2 figure and listed
   pending_test: true
   oracle_source: golden
   oracle_evidence: The expected scorecard text is written by hand from the golden
-    rows (means computed by hand in the fixture's comment), before the renderer exists.
+    rows (means and n computed by hand in the fixture's comment), before the renderer
+    exists.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -357,28 +389,68 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-009
-  title: Lead labels follow a fixed rule and report plain when plain is ahead
+  title: Lead labels follow the direction table
   type: parametric
   test_ids:
-  - tests/unit/test_bench_light_lane.py::test_lead_labels_follow_the_fixed_rule_and_plain_can_win
+  - tests/unit/test_bench_light_lane.py::test_lead_labels_follow_the_direction_table
   executable_predicate: null
   golden_table:
   - input:
-      metric: hidden all-pass rate
-      plain: 9/12
-      hm: 11/12
+      metric: hidden all-pass count
+      plain: 9 of 12
+      hm: 11 of 12
     expected:
       lead: hm
     edge: false
-    note: ''
+    note: gap 2 runs
   - input:
-      metric: hidden all-pass rate
-      plain: 12/12
-      hm: 9/12
+      metric: hidden all-pass count
+      plain: 12 of 12
+      hm: 9 of 12
     expected:
       lead: plain
     edge: false
     note: plain ahead is printed as-is
+  - input:
+      metric: hidden all-pass count
+      plain: 10 of 12
+      hm: 11 of 12
+    expected:
+      lead: tie
+    edge: true
+    note: gap of 1 run is below the 2-run threshold
+  - input:
+      metric: solved count
+      plain: 6 of 12
+      hm: 9 of 12
+    expected:
+      lead: hm
+    edge: false
+    note: higher is better
+  - input:
+      metric: stalled count
+      plain: 0 of 12
+      hm: 6 of 12
+    expected:
+      lead: plain
+    edge: false
+    note: lower is better
+  - input:
+      metric: wrong count
+      plain: 4 of 12
+      hm: 1 of 12
+    expected:
+      lead: hm
+    edge: false
+    note: lower is better
+  - input:
+      metric: hidden-case pass fraction
+      plain: 0.90
+      hm: 0.93
+    expected:
+      lead: tie
+    edge: true
+    note: gap 0.03 is inside the 0.05 band
   - input:
       metric: judge overall
       plain: 3.60
@@ -402,7 +474,34 @@ ac:
     expected:
       lead: plain
     edge: false
-    note: lower is better
+    note: lower is better, exact compare
+  - input:
+      metric: mean ruff_new and mean regressions
+      plain: 12 changed runs, ruff_new mean 0.33, regressions mean 0.25
+      hm: 6 stalled runs (quality null) and 6 changed runs, ruff_new mean 1.0, regressions
+        mean 0.5
+    expected:
+      ruff_new_lead: plain
+      regressions_lead: plain
+    edge: true
+    note: stalls are excluded from the means, so the stalling arm cannot win by having
+      no code (counted as zeros it would show 0.5 and 0.25)
+  - input:
+      metric: mean diff_lines
+      plain: 40
+      hm: 120
+    expected:
+      lead: —
+    edge: false
+    note: no direction; size is shown, never ranked
+  - input:
+      metric: tests_touched rate
+      plain: 0.2
+      hm: 0.9
+    expected:
+      lead: —
+    edge: false
+    note: no direction; rewarding it would reward the process
   - input:
       metric: mean cost per run
       plain: 0.058
@@ -413,7 +512,7 @@ ac:
     note: the 2026-10-14 tier-1 numbers
   - input:
       metric: judge overall
-      plain: n/a
+      plain: n/a (n=0)
       hm: 4.0
     expected:
       lead: n/a
@@ -423,9 +522,8 @@ ac:
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The rule (direction per metric, exact compare, 0.25 band on judge
-    means) is written in SPEC S7 and docs/evals/README.md before the code; the rows
-    are worked by hand.
+  oracle_evidence: The direction table and bands are written in SPEC S8 and docs/evals/README.md
+    before the code; the rows are worked by hand.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -439,22 +537,24 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-010
-  title: Publish writes RESULTS.md, one history row and the README block
+  title: Publish writes RESULTS.md and the README block
   type: mechanical
   test_ids:
-  - tests/unit/test_bench_light_lane.py::test_publish_writes_results_history_and_readme_block
+  - tests/unit/test_bench_light_lane.py::test_publish_writes_results_and_readme_block
   executable_predicate: proc.returncode == 0 and results_md == golden('RESULTS.md')
-    and history_lines == [golden('history_row.json')] and readme == golden('README.after.md')
-    and readme_outside_markers == readme_before_outside_markers
+    and readme == golden('README.after.md') and readme_outside_markers == readme_before_outside_markers
+    and all(s in results_md for s in (bench_hash, harness_sha, runner_hash, ruff_version,
+    mypy_version, 'hm-eval-judge-v1')) and all(re.search(r'n=\d+', cell) for cell
+    in headline_cells) and sorted(changed_files) == ['README.md', 'docs/evals/RESULTS.md']
   golden_table: []
   rubric_id: null
   note: the golden README.before.md has text, a table and another marker pair around
     the hm:eval block
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The three expected files are written by hand from the golden rows
-    under tests/unit/fixtures/hm_eval/, and the history row is checked key by key
-    against IRR-001's schema in the SPEC, not against the writer.
+  oracle_evidence: The expected files are written by hand from the golden rows under
+    tests/unit/fixtures/hm_eval/; the header fields are checked against SPEC S9's
+    list, not against the writer.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -485,12 +585,10 @@ ac:
   oracle_independence_waiver: null
   input_domain: the golden results set and random permutations of its lines (seeded)
   transformation: publish once, publish again, publish the permuted file into a fresh
-    docs dir
+    docs dir and README copy
   expected_relation: bytes(RESULTS.md) and bytes(README.md) are equal across all runs
-    and len(history.jsonl lines) == 1 after the repeat and results_digest is equal
-    for the permutation
   preconditions: []
-  observable_output: the three written files
+  observable_output: the two written files
   generator_hint: random.Random(0).shuffle on the results lines
   judgment_verdict: null
   judged_at: null
@@ -498,10 +596,10 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-012
-  title: Publish refuses bad markers, mixed or empty results before writing
+  title: Publish refuses bad markers, mixed, empty or unbalanced results before writing
   type: parametric
   test_ids:
-  - tests/unit/test_bench_light_lane.py::test_publish_refuses_bad_markers_mixed_or_empty_results
+  - tests/unit/test_bench_light_lane.py::test_publish_refuses_bad_markers_mixed_empty_or_unbalanced_results
   executable_predicate: null
   golden_table:
   - input:
@@ -539,12 +637,19 @@ ac:
       files_changed: 0
     edge: true
     note: ''
+  - input:
+      results: tier 2 with t7 hm at 2 of 3 usable reps
+    expected:
+      exit_code: 2
+      files_changed: 0
+    edge: true
+    note: an unbalanced tier is reported by `report` but never published
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: files_changed is read by the test from mtimes and hashes of the
-    three target files taken before the call, independent of the publisher.
+  oracle_evidence: files_changed is read by the test from hashes of the two target
+    files taken before the call, independent of the publisher.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -563,11 +668,12 @@ ac:
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_pre_eval_rows_report_and_publish_with_na
   executable_predicate: metric_block(report(old_rows)) == PRE_EVAL_METRIC_BLOCK and
-    'n/a' in quality_section and publish_exit == 0 and all(r_tier == 1 for r in parsed)
+    'n/a (n=0)' in quality_section and publish_exit == 0 and all(tier_of(r) == 1 for
+    r in old_rows)
   golden_table: []
   rubric_id: null
-  note: old rows are three lines copied from the 2026-10-14 results schema (no tier,
-    tokens, outcome, quality, judge) into a test fixture
+  note: old rows are a balanced tier-1 set in the 2026-10-14 results schema (no tier,
+    tokens, outcome, quality, judge, quality_tools) in a test fixture
   pending_test: true
   oracle_source: golden
   oracle_evidence: PRE_EVAL_METRIC_BLOCK is the intent-metric block captured from
@@ -594,12 +700,11 @@ ac:
     prompt) for prompt in tier2_prompts)
   golden_table: []
   rubric_id: null
-  note: a fairness floor, not a fairness proof; the DRI reads the tier-2 prompts
-    before approval. The existing arm-isolation test covers same model, budget and
-    flags.
+  note: a fairness floor, not a fairness proof; the DRI sign-off (AC-017) is the real
+    check. The existing arm-isolation test covers same model, budget and flags.
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The word list is the harness vocabulary from SPEC S12, fixed here
+  oracle_evidence: The word list is the harness vocabulary from SPEC S15, fixed here
     before the tier-2 prompts are written.
   oracle_independence_waiver: null
   input_domain: null
@@ -619,8 +724,9 @@ ac:
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_docs_readme_explains_every_scorecard_metric
   executable_predicate: all(label in docs_readme for label in bench.SCORECARD_LABELS)
-    and all(cmd in docs_readme for cmd in ('run', 'report', 'publish', 'INTEGRATION=1'))
-    and 'hm:eval:start' in repo_readme
+    and all(cmd in docs_readme for cmd in ('run', 'report', 'publish', 'INTEGRATION=1',
+    '--judge-calibration', 'tier2-signoff.json', 'git log -p docs/evals/RESULTS.md'))
+    and repo_readme.count('<!-- hm:eval:start -->') == 1
   golden_table: []
   rubric_id: null
   note: ''
@@ -641,14 +747,74 @@ ac:
   judgment_evidence: null
   judgment_subject_paths: []
   judgment_subject_hash: null
+- id: AC-016
+  title: The judge ranks every tier-2 reference above its damaged copy
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_judge_calibration_ranks_reference_above_damaged
+  executable_predicate: calibrate(fake_scores_all_higher) == 0 and calibrate(fake_scores_t7_equal)
+    == 1 and calibrate(stale_recording) == 1 and (not RECORDING.exists() or (fresh(RECORDING)
+    and all(r['reference']['overall'] > r['damaged']['overall'] for r in recorded_tasks)
+    and {r['task'] for r in recorded_tasks} == tier2_ids))
+  golden_table: []
+  rubric_id: null
+  note: 'offline: a fake judge with scores set by the test exercises the pass, fail
+    and stale paths; the committed recording scripts/bench/judge-calibration.json
+    (from a live `canary --judge-calibration --record`) is checked when present; when
+    absent the live tier-2 gate (AC-017) still refuses'
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: The damaged overlays are the reference with three defects planted
+    by hand (duplicated logic, dead code, a misleading name), each named in a comment
+    in the overlay; the rubric hm-eval-judge-v1 penalises exactly these, so the expected
+    order is fixed by the overlays and the rubric text in SPEC, not by the judge code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-017
+  title: A tier-2 live run needs DRI sign-off, a passing calibration and cited hidden
+    tests
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_tier_two_run_needs_signoff_and_calibration
+  - tests/unit/test_bench_light_lane.py::test_tier_two_hidden_tests_cite_their_prompt
+  executable_predicate: run_exit(tier='2', signoff=None) == 2 and run_exit(tier='all',
+    signoff=stale_hash) == 2 and run_exit(tier='2', signoff=current, calibration=None)
+    == 2 and run_exit(tier='2', signoff=current, calibration=failing) == 2 and agent_calls
+    == 0 and run_exit(tier='1', signoff=None) != 2 and all(len(quote(t)) >= 20 and
+    quote(t) in prompt(task_of(t)) for t in tier2_hidden_tests)
+  golden_table: []
+  rubric_id: null
+  note: the sign-off file holds the tier-2 hash printed by `check`, the signer and
+    a date; tier 1 needs no sign-off
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The fake agent writes a marker file when called, so a run that
+    slipped past the gate is observable independently of the runner; the citation
+    check reads each test's docstring with ast and searches the prompt.md text on
+    disk.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
 irreversible_decisions:
-- id: IRR-001
-  decision: docs/evals/history.jsonl row schema (one JSON object per line, sorted
-    keys, schema 1, additive-only, keyed by results_digest)
-  category: schema/file format/storage layout
-  rationale: the committed trend history is append-only; every later row and reader
-    depends on the shape
-  source: spec
 - id: IRR-002
   decision: README marker contract, exactly one <!-- hm:eval:start --> / <!-- hm:eval:end
     --> pair owned by publish, bytes outside never touched
