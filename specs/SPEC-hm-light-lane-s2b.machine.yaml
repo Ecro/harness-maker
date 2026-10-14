@@ -1,0 +1,277 @@
+schema_version: 3
+spec_slug: hm-light-lane-s2b
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Template moves plus one synthesize list; render and differential
+  tests pin the outcome, mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Wrapup Steps 1-5.6 render only in the reference file
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_wrapup_dispatch_names_the_steps_file
+  executable_predicate: not any(h in command for h in WRAPUP_MOVED) and all(h in ref for h
+    in WRAPUP_MOVED) and 'wrapup-steps.md' in step_0_5
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The moved-heading inventory is fixed from the d2c0ab0 render before any
+    edit (wrapup Step 1 through 5.6 including the Judgment AC binding and 5.1-5.6 sub-headings;
+    verify Check 1-6, Advisory probes, A1 and Output/Text; review Re-dispatch, Round-state
+    contract and Step C1-C3; execute Phase A.5's body), so a heading left behind or a heading
+    moved by mistake changes the set. The fixture renders Claude Code with worktree.enabled
+    true and false.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Verify checks render only in the reference file
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_verify_dispatch_names_the_checks_file
+  executable_predicate: not any(h in command for h in VERIFY_MOVED) and all(h in ref for h
+    in VERIFY_MOVED) and 'verify-checks.md' in step_0_5
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The moved-heading inventory is fixed from the d2c0ab0 render before any
+    edit (wrapup Step 1 through 5.6 including the Judgment AC binding and 5.1-5.6 sub-headings;
+    verify Check 1-6, Advisory probes, A1 and Output/Text; review Re-dispatch, Round-state
+    contract and Step C1-C3; execute Phase A.5's body), so a heading left behind or a heading
+    moved by mistake changes the set.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Review auto-fix rounds and confirmation pass render only in reference files
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_rare_paths_live_in_reference_files
+  executable_predicate: all(k in command for k in REVIEW_KEPT) and not any(h in command for
+    h in REVIEW_MOVED) and all(h in refs for h in REVIEW_MOVED)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The moved-heading inventory is fixed from the d2c0ab0 render before any
+    edit (wrapup Step 1 through 5.6 including the Judgment AC binding and 5.1-5.6 sub-headings;
+    verify Check 1-6, Advisory probes, A1 and Output/Text; review Re-dispatch, Round-state
+    contract and Step C1-C3; execute Phase A.5's body), so a heading left behind or a heading
+    moved by mistake changes the set. The kept lead lines (the two section headings, their
+    start conditions and the light-lane skip rule) are copied from the same render.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Execute Phase A.5 procedure renders only in the reference file
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_rare_paths_live_in_reference_files
+  executable_predicate: all(k in command for k in EXECUTE_KEPT) and not any(h in command for
+    h in EXECUTE_MOVED) and all(h in ref for h in EXECUTE_MOVED)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'The moved-heading inventory is fixed from the d2c0ab0 render before any
+    edit (wrapup Step 1 through 5.6 including the Judgment AC binding and 5.1-5.6 sub-headings;
+    verify Check 1-6, Advisory probes, A1 and Output/Text; review Re-dispatch, Round-state
+    contract and Step C1-C3; execute Phase A.5''s body), so a heading left behind or a heading
+    moved by mistake changes the set. The kept lines (A.5 heading, the lane: light skip line
+    and its emit command) are copied from the d2c0ab0 render.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Every pointer reads from the project root and fails closed
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_pointers_read_from_root_and_fail_closed
+  executable_predicate: all(name in p and 'project root' in p and '<WT>' not in p and 'STOP'
+    in p for name, p in pointers.items()) and 'Step 6' in pointers['wrapup-steps.md']
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'The required phrases come from SPEC-hm-light-lane-s2 S3, the approved
+    rule for the auto-advance file (project root, never <WT>, missing or unreadable means
+    STOP), plus S2 here: the wrapup pointer stops before Step 6. They are written from the
+    SPEC, not from the new templates.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Nothing is lost and nothing is rewritten in the move
+  type: property
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_moved_text_is_preserved
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference is the d2c0ab0 render of the same answers, produced before
+    the edit by the unchanged renderer; the relation holds for any renderer that moves text
+    without editing it, independent of how the partials are arranged.
+  oracle_independence_waiver: null
+  input_domain: the four Claude stage commands rendered from this repo's harness.yaml at d2c0ab0
+    and after the change, with loop on and off
+  transformation: extract instructions with tests/structural/_instruction_baseline's extractor;
+    slice each moved section by heading from both renders
+  expected_relation: instructions(old) subset_of instructions(new_command + its reference
+    files), and old_section(h) == ref_section(h) byte for byte for every moved heading h
+  preconditions: []
+  observable_output: the missing-instruction list and the per-heading section diff, both empty
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Codex stage skills are unchanged
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_codex_stage_skills_unchanged
+  executable_predicate: all(hashlib.sha256(skill[s].encode()).hexdigest() == GOLDEN[s] for
+    s in ('wrapup', 'verify', 'review', 'execute'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: SHA-256 of each Codex stage skill captured from the d2c0ab0 render before
+    the edit and stored as a golden; the Codex arm includes the same partials inline.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Reference files render with generated-file frontmatter in every harness
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_reference_files_render_with_generated_frontmatter
+  executable_predicate: all(set(FRONTMATTER_KEYS) <= set(frontmatter(f)) for f in REFERENCE_FILES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: CLAUDE.md's security section names the four frontmatter keys every generated
+    file carries; the fixture covers gated and auto_safe autonomy and Side and Production
+    presets.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: The four Claude commands shrink by 45,000 characters
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_the_four_commands_shrink
+  executable_predicate: 204430 - sum(len(cmd) for cmd in four) >= 45000
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The before value 204,430 is the frozen surface baseline at d2c0ab0 (wrapup
+    53,107, verify 23,120, review 77,384, execute 51,819), measured under _surface_baseline.pinned_install_ref
+    on this repo's harness.yaml; the 45,000 floor is set from the section sizes in the same
+    render before the edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Add five generated files under .claude/hm/ (wrapup-steps.md, verify-checks.md,
+    review-autofix.md, review-confirmation.md, execute-a5.md) whose names the commands and
+    stage-delegate read
+  category: schema/file format/storage layout
+  rationale: Renaming one later needs a retire step for copies on disk and breaks a harness
+    whose command and file came from different versions
+  source: spec

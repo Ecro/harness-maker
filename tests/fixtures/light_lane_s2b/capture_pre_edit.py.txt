@@ -1,0 +1,51 @@
+"""Capture the d2c0ab0 moved-block hashes and Codex skill hashes for SPEC-hm-light-lane-s2b."""
+import hashlib, json, sys, tempfile
+from pathlib import Path
+sys.path.insert(0, ".")
+from tests.structural._instruction_baseline import AXES, HARNESS_YAML
+from tests.structural._surface_baseline import pinned_install_ref
+from harness_maker.interview import answers_from_harness_yaml
+from harness_maker.models import LoopConfig, ProjectProfile
+from harness_maker.synthesize import synthesize
+from harness_maker.render import DEFAULT_FREEZE_TIME, render
+
+BLOCKS = {
+    "wrapup-steps": ("wrapup", "### Step 1 — Pre-flight checks", "#### 5.7 Intent state"),
+    "verify-checks": ("verify", "## The 6 Checks", "## Procedure"),
+    "review-autofix": ("review", "### Re-dispatch what is missing", "## Confirmation Pass"),
+    "review-confirmation": ("review", "### Step C1 — Freeze the artifact", "## Final Summary (always)"),
+    "execute-a5": ("execute", "Dispatch **one** `test-reviewer` call", "#### Phase B — RED gate"),
+}
+
+def block(text, start, end):
+    i = text.index("\n" + start) + 1 if not text.startswith(start) else 0
+    j = text.index("\n" + end, i) + 1
+    return text[i:j]
+
+out = {"source_sha": "d2c0ab0", "blocks": BLOCKS, "configs": {}}
+for strictness in AXES:
+    for loop in (False, True):
+        parsed = answers_from_harness_yaml(HARNESS_YAML)
+        upd = {"strictness": strictness}
+        if loop:
+            upd["loop"] = LoopConfig(enabled=True)
+        else:
+            upd["loop"] = LoopConfig(enabled=False)
+        answers = parsed.model_copy(update=upd)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            with pinned_install_ref():
+                render(synthesize(ProjectProfile(), answers), root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
+            cmds = {p.stem: p.read_text() for p in (root / ".claude/commands/hm").glob("*.md")}
+            codex = {p.parent.name: p.read_text() for p in (root / ".agents/skills").glob("hm-*/SKILL.md")}
+        key = f"{strictness}/loop-{'on' if loop else 'off'}"
+        cfg = {"blocks": {}, "codex_sha256": {}}
+        for bid, (cmd, s, e) in BLOCKS.items():
+            b = block(cmds[cmd], s, e)
+            cfg["blocks"][bid] = {"sha256": hashlib.sha256(b.encode()).hexdigest(), "chars": len(b)}
+        for st in ("wrapup", "verify", "review", "execute"):
+            cfg["codex_sha256"][st] = hashlib.sha256(codex[f"hm-{st}"].encode()).hexdigest()
+        cfg["command_chars"] = {c: len(cmds[c]) for c in ("wrapup", "verify", "review", "execute")}
+        out["configs"][key] = cfg
+Path("tests/fixtures/light_lane_s2b/pre_edit_d2c0ab0.json").write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
+print(json.dumps({k: {b: v["chars"] for b, v in c["blocks"].items()} for k, c in out["configs"].items()}, indent=1))
