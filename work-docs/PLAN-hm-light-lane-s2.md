@@ -50,9 +50,10 @@ proceed" mentions stay (SPEC Non-Goals).
 ## 📝 Implementation Plan
 
 1. **Phase 1 — tests, then templates.** depends_on: none · scope: stage templates (execute,
-   review, verify, research, spec, wrapup), `stage_end_summary.md.j2`, new
+   review, verify, research, spec, wrapup), `stage_end_summary.md.j2`, `gate0_receipt.md.j2`, new
    `templates/hm/autopilot-advance.md.j2`, `health.md.j2`, seven skill templates, `synthesize.py`,
-   `template_globals.py`, `step_sensitivity.py`, tests and goldens · exit: `uv run pytest tests -n
+   `template_globals.py`, `step_sensitivity.py`, CLAUDE.md's `unsourced:` count (the registry
+   lost a row), tests and goldens, and `work-docs/BASELINE-DELTA-hm-light-lane-s2.md` · exit: `uv run pytest tests -n
    auto` green except the 7 pre-existing environment failures · risk: medium (autopilot wording)
    · rollback: revert the PR.
 
