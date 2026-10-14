@@ -1,0 +1,9 @@
+[project]
+name = "timeparse"
+version = "0.3.0"
+description = "Parse and format human durations"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,429 @@
+schema_version: 3
+spec_slug: hm-light-lane-bench
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Dev-only bench script outside src; the unit tests pin each
+  scenario with fakes and golden rows, mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Live runs refuse without INTEGRATION=1
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_run_refuses_without_integration
+  executable_predicate: proc.returncode == 2 and 'INTEGRATION=1' in proc.stderr and not
+    agent_marker.exists() and not any(out_dir.iterdir())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The opt-in rule is CLAUDE.md's test policy (real external calls only
+    when INTEGRATION=1); the fake agent writes a marker file, so a call that slipped past
+    the guard is observable independently of the runner's own output.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Every task's hidden tests discriminate fix from no fix
+  type: property
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_hidden_tests_discriminate
+  - tests/unit/test_bench_light_lane.py::test_five_tasks_ship
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Reference implementation per task under scripts/bench/tasks/<id>/reference/
+    is the independent oracle; the property is the one the 2026-10-14 bench notes state
+    (hidden tests fail on the original and pass on the reference), checked for every task
+    directory found, not a hand list.
+  oracle_independence_waiver: null
+  input_domain: every task directory under scripts/bench/tasks/
+  transformation: grade a pristine fixture copy and a copy with the task's reference overlay
+  expected_relation: not grade(pristine).passed and grade(reference).passed and visible(pristine).passed
+    and visible(reference).passed
+  preconditions: []
+  observable_output: hidden and visible pytest outcomes
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: The arms differ only by the harness and the prefix
+  type: property
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_arms_differ_only_by_harness_and_prefix
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The fake agent records its argv, its git status and its file listing
+    from inside the work dir; the plain arm's listing is compared with the fixture directory
+    on disk and the hm arm's with that plus the harness paths, so the reference is the fixture
+    tree, independent of the runner's copy code.
+  oracle_independence_waiver: null
+  input_domain: one task run in the plain and the hm arm
+  transformation: compare the recorded argv, git status and file listing of the two arms
+  expected_relation: files(plain) == files(fixture) and files(hm) - files(plain) are all
+    under .claude/ or are CLAUDE.md/.gitignore and argv differs only at the prompt, where
+    prompt(hm) == '/hm:spec ' + prompt(plain), and both git statuses are empty and no hidden
+    or reference file name appears
+  preconditions: []
+  observable_output: fake agent's recorded argv, status and listing
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Cost comes from the CLI result with a transcript cross-check
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_cost_comes_from_cli_and_transcripts
+  - tests/unit/test_bench_light_lane.py::test_cli_result_is_parsed_from_the_last_result_line
+  executable_predicate: null
+  golden_table:
+  - input:
+      cli_total_cost_usd: 0.25
+      transcripts: main + one subagent file in the run's encoded dir, one foreign dir
+    expected:
+      cost_usd: 0.25
+      cost_source: cli
+      transcript_cost_usd: sum(price_turn(t).total_usd) over the run's main and subagent
+        turns only
+    edge: false
+    note: ''
+  - input:
+      cli_total_cost_usd: null
+      transcripts: same
+    expected:
+      cost_usd: transcript_cost_usd
+      cost_source: transcript
+    edge: true
+    note: timeout or crash leaves no CLI result
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: harness_maker.economics.price_turn is the repo's pricing authority (reference
+    price table, PRICE_TABLE_VERSION 3); the test checks the runner sums exactly the run's own
+    turns, main and subagent, and none from a foreign project dir.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Grading is strict and isolated from the work dir
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_grading_is_strict_and_isolated
+  executable_predicate: null
+  golden_table:
+  - input:
+      work: reference applied
+    expected:
+      passed: true
+    edge: false
+    note: ''
+  - input:
+      work: pristine fixture
+    expected:
+      passed: false
+    edge: false
+    note: ''
+  - input:
+      work: reference applied plus a syntax error in the task module
+    expected:
+      passed: false
+    edge: true
+    note: collection error counts as failure
+  - input:
+      work: pristine fixture plus a root conftest.py that marks every test skipped-as-passed
+    expected:
+      passed: false
+    edge: true
+    note: the agent's conftest must not load
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected outcomes follow from the reference overlay and the pristine fixture
+    on disk (scripts/bench/), fixed before the grader was written; the sabotage conftest is
+    the failure mode a work-dir grader would miss.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: The report applies the pre-registered verdict rule
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_report_verdict
+  executable_predicate: null
+  golden_table:
+  - input:
+      plain: 2 tasks x 3 runs, $0.10 each, all pass
+      hm: 2 tasks x 3 runs, $0.40 each, all pass
+    expected:
+      ratio: 4.0
+      verdict: met
+    edge: false
+    note: ''
+  - input:
+      plain: 2 tasks x 3 runs, $0.10 each, all pass
+      hm: 2 tasks x 3 runs, $2.20 each, all pass
+    expected:
+      ratio: 22.0
+      verdict: missed
+    edge: false
+    note: ratio above target
+  - input:
+      plain: 2 tasks x 3 runs, $0.10 each, all pass
+      hm: 2 tasks x 3 runs, $0.30 each, one run fails
+    expected:
+      ratio: 3.0
+      verdict: missed
+    edge: true
+    note: pass-rate counter-signal
+  - input:
+      plain: 2 tasks x 3 runs, $0.10 each, all pass
+      hm: 2 tasks x 3 runs, $0.50 each, all pass
+    expected:
+      ratio: 5.0
+      verdict: met
+    edge: true
+    note: target is inclusive
+  - input:
+      plain: 2 tasks x 3 runs
+      hm: none
+    expected:
+      ratio: null
+      verdict: no_data
+    edge: true
+    note: ''
+  - input:
+      plain: 2 tasks x 3 runs
+      hm: 2 tasks, one with 2 runs
+    expected:
+      verdict: no_data
+    edge: true
+    note: unbalanced grid
+  - input:
+      plain: 2 tasks x 3 runs, $0.10 each
+      hm: 2 tasks x 3 runs, $0.40 each, plus one setup_error row at $9
+    expected:
+      ratio: 4.0
+      verdict: met
+    edge: true
+    note: setup failures excluded
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The rule is copied from intent/HM-LIGHT-LANE.md "판정 규칙 (사전 등록)" and
+    the metric's how_measured in .claude/intent.yaml (mean over mean, target 5, pass-rate
+    counter-signal), registered before the runner existed.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: The printed record command parses
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_record_command_parses
+  - tests/unit/test_bench_light_lane.py::test_no_ratio_prints_no_record_command
+  executable_predicate: ns.cmd == 'metric' and ns.verb == 'record' and ns.id == 'hm_cost_ratio_small'
+    and ns.value == summary.ratio and all(s in ns.evidence for s in (bench_hash, harness_sha,
+    model, 'plain', 'hm')) and lines[-1] == f'hm_cost_ratio_small={summary.ratio}'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference consumer is harness_maker.intent._parser(), the parser the
+    `hm intent` CLI itself uses; the printed line is shlex-split and parsed by it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: The verdict target matches the intent metric
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_target_matches_the_intent_metric
+  executable_predicate: bench.TARGET == metric('hm_cost_ratio_small').target and metric.higher_is_better
+    is False
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The reference is the metric row in .claude/intent.yaml (path), owned by the
+    DRI; the runner's constant must not drift from it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Runs resume and mixed results are refused
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_resume_skips_completed_cells
+  - tests/unit/test_bench_light_lane.py::test_report_refuses_mixed_results
+  executable_predicate: pending_cells(rows) == all_cells - {c for c, st in done if st != 'setup_error'}
+    and report_exit(mixed_rows) == 2
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The cell set is enumerated by hand in the test (tasks x arms x reps) with
+    one ok row, one agent_error row and one setup_error row, a rationale fixed in SPEC S8.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: One offline command runs both arms end to end
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_offline_end_to_end_run
+  - tests/unit/test_bench_light_lane.py::test_report_reprints_without_a_model
+  executable_predicate: "proc.returncode == 0 and stdout_lines[-1] == 'hm_cost_ratio_small=4.0'
+    and 'verdict: met' in stdout and len(rows) == 2"
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fake agent applies the reference overlay and reports $0.10 (plain) and
+    $0.40 (hm), so the expected ratio 4.0 and verdict met are fixed by the fake, independent
+    of the runner; the hm arm renders a real harness from this checkout.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: An output dir with project context is refused
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_out_dir_with_project_context_is_refused
+  executable_predicate: null
+  golden_table:
+  - input:
+      out: a dir inside a git work tree
+    expected:
+      exit_code: 2
+    edge: false
+    note: ''
+  - input:
+      out: a dir below a parent holding CLAUDE.md
+    expected:
+      exit_code: 2
+    edge: false
+    note: ''
+  - input:
+      out: a fresh dir with neither above it
+    expected:
+      refused: false
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Claude Code loads CLAUDE.md from every ancestor of the launch cwd (memory
+    docs, a citation of host behaviour), so either ancestor contaminates both arms; rationale
+    fixed in SPEC S9.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
