@@ -43,6 +43,14 @@ stop clause, so AC-005 tests one sentence shape.
 delegate starts clean and has the brief, so the path needs no cwd reasoning. This also replaces
 the old implicit "find the steps in the command file" read, which loaded the whole command.
 
+### ADR-006: Wrapup and verify move only when delegated
+**Decided by:** agent, from spec-validator pass 1. With `delegation.stages: []` (the shipped
+default) the main loop runs those bodies itself, so a Read saves no carry and adds a STOP path.
+
+### ADR-007: The delegate's one on-disk instruction source (IRR-002)
+**Decided by:** agent. `stage-delegate_body.md.j2` names the two allowlisted files; a missing file
+yields no JSON, which the existing reconciler maps to `unparseable` and the degraded path.
+
 ### ADR-005: Variables the moved text needs come from template globals or the reference context
 **Decided by:** agent. Review's C2 heading uses `lenses` and `groups`; any such stage-local
 `{% set %}` is either computed by a template global both renders call, or passed through
@@ -53,7 +61,7 @@ the old implicit "find the steps in the command file" read, which loaded the who
 1. **Phase 1 — partials, pointers, reference files.** depends_on: none · scope:
    `templates/stages/{wrapup,verify,review,execute}.md.j2`, `templates/stages/_partials/*`,
    `templates/hm/{wrapup-steps,verify-checks,review-autofix,review-confirmation,execute-a5}.md.j2`,
-   `synthesize.py` (`_reference_files`), `step_sensitivity.py` if its registry must name the
+   `synthesize.py` (`_reference_files`), `templates/agents/stage-delegate_body.md.j2`, `templates/commands/hm/loop.md.j2` (Step 4 exemption), `tests/unit/test_loop_opt_in.py` and `tests/render/test_render_light_lane_s2.py` (Supersedes row), `step_sensitivity.py` if its registry must name the
    reference-file headings, `tests/render/test_render_light_lane_s2b.py` (AC-001..009), the
    pre-edit goldens for AC-006/007 under `tests/fixtures/light_lane_s2b/`, re-captured snapshots and
    goldens, `tests/structural/surface_baseline.json` + `work-docs/BASELINE-DELTA-hm-light-lane-s2b.md`,

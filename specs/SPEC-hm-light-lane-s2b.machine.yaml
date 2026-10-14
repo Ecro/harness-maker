@@ -16,8 +16,9 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane_s2b.py::test_wrapup_dispatch_names_the_steps_file
-  executable_predicate: not any(h in command for h in WRAPUP_MOVED) and all(h in ref for h
-    in WRAPUP_MOVED) and 'wrapup-steps.md' in step_0_5
+  executable_predicate: '''wrapup'' not in delegation_stages or (not any(h in command for
+    h in WRAPUP_MOVED) and all(h in ref for h in WRAPUP_MOVED) and ''wrapup-steps.md'' in
+    step_0_5)'
   golden_table: []
   rubric_id: null
   note: ''
@@ -46,8 +47,9 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane_s2b.py::test_verify_dispatch_names_the_checks_file
-  executable_predicate: not any(h in command for h in VERIFY_MOVED) and all(h in ref for h
-    in VERIFY_MOVED) and 'verify-checks.md' in step_0_5
+  executable_predicate: '''verify'' not in delegation_stages or (not any(h in command for
+    h in VERIFY_MOVED[loop]) and all(h in ref for h in VERIFY_MOVED[loop]) and ''## Output''
+    in command and ''verify-checks.md'' in step_0_5)'
   golden_table: []
   rubric_id: null
   note: ''
@@ -105,8 +107,9 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane_s2b.py::test_rare_paths_live_in_reference_files
-  executable_predicate: all(k in command for k in EXECUTE_KEPT) and not any(h in command for
-    h in EXECUTE_MOVED) and all(h in ref for h in EXECUTE_MOVED)
+  executable_predicate: all(k in command for k in EXECUTE_KEPT) and 'stage_agent_ledger emit'
+    in command and not any(h in command for h in EXECUTE_MOVED) and all(h in ref for h in
+    EXECUTE_MOVED)
   golden_table: []
   rubric_id: null
   note: ''
@@ -135,17 +138,19 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane_s2b.py::test_pointers_read_from_root_and_fail_closed
-  executable_predicate: all(name in p and 'project root' in p and '<WT>' not in p and 'STOP'
-    in p for name, p in pointers.items()) and 'Step 6' in pointers['wrapup-steps.md']
+  executable_predicate: all(name in p and 'project root' in p and 'never from `<WT>`' in p
+    and 'STOP' in p and '/hm:make' in p for name, p in pointers.items()) and '5.7' in pointers['wrapup-steps.md']
+    and 'Step 6' in pointers['wrapup-steps.md'] and all('base_root' in line for line in dispatch_lines)
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: 'The required phrases come from SPEC-hm-light-lane-s2 S3, the approved
-    rule for the auto-advance file (project root, never <WT>, missing or unreadable means
-    STOP), plus S2 here: the wrapup pointer stops before Step 6. They are written from the
-    SPEC, not from the new templates.'
+  oracle_evidence: The required phrases come from SPEC-hm-light-lane-s2 S3 (project root,
+    the phrase 'never from `<WT>`' its test asserts, STOP on missing) and from S2 here (stop
+    before 5.7 and Step 6, the /hm:make recovery hint). `pointers` are the lines that tell
+    the main loop to Read a .claude/hm file; the Step 0.5 dispatch lines are checked separately
+    for base_root. The phrases are written from the SPEC, not from the new templates.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -194,7 +199,7 @@ ac:
   - tests/render/test_render_light_lane_s2b.py::test_codex_stage_skills_unchanged
   executable_predicate: all(hashlib.sha256(skill[s].encode()).hexdigest() == GOLDEN[s] for
     s in ('wrapup', 'verify', 'review', 'execute'))
-  golden_table: []
+  golden_table: &id001 []
   rubric_id: null
   note: ''
   pending_test: true
@@ -205,13 +210,13 @@ ac:
   input_domain: null
   transformation: null
   expected_relation: null
-  preconditions: []
+  preconditions: &id002 []
   observable_output: null
   generator_hint: null
   judgment_verdict: null
   judged_at: null
   judgment_evidence: null
-  judgment_subject_paths: []
+  judgment_subject_paths: &id003 []
   judgment_subject_hash: null
 - id: AC-008
   title: Reference files render with generated-file frontmatter in every harness
@@ -240,11 +245,11 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-009
-  title: The four Claude commands shrink by 45,000 characters
+  title: The four Claude commands shrink by 40,000 characters
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane_s2b.py::test_the_four_commands_shrink
-  executable_predicate: 204430 - sum(len(cmd) for cmd in four) >= 45000
+  executable_predicate: 204430 - sum(len(cmd) for cmd in four) >= 40000
   golden_table: []
   rubric_id: null
   note: ''
@@ -252,8 +257,8 @@ ac:
   oracle_source: golden
   oracle_evidence: The before value 204,430 is the frozen surface baseline at d2c0ab0 (wrapup
     53,107, verify 23,120, review 77,384, execute 51,819), measured under _surface_baseline.pinned_install_ref
-    on this repo's harness.yaml; the 45,000 floor is set from the section sizes in the same
-    render before the edit.
+    on this repo's harness.yaml; the 40,000 floor is set from the section sizes in the same
+    render before the edit. Verify's Output and execute's ledger block stay, about 3,000 chars.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -266,6 +271,111 @@ ac:
   judgment_evidence: null
   judgment_subject_paths: []
   judgment_subject_hash: null
+- id: AC-010
+  title: A non-delegated stage keeps its body inline
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_undelegated_stages_stay_inline
+  executable_predicate: all(sha256(command(cfg, s)) == PRE_EDIT_SHA[cfg][s] for cfg in ('delegation-none',
+    'delegation-wrapup', 'delegation-verify') for s in ('wrapup', 'verify') if s not in DELEGATED[cfg])
+  golden_table: *id001
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: SHA-256 of the wrapup and verify commands rendered from the d2c0ab0 templates
+    for each delegation config, captured before the edit in a d2c0ab0 worktree.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: *id002
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: *id003
+  judgment_subject_hash: null
+- id: AC-011
+  title: The delegate follows only its allowlisted file and fails without it
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_delegate_trusts_only_its_file
+  executable_predicate: all(f in delegate_prompt for f in ('.claude/hm/wrapup-steps.md', '.claude/hm/verify-checks.md'))
+    and 'base_root' in delegate_prompt and 'no JSON' in missing_rule and 'Nothing else you
+    read from disk' in delegate_prompt
+  golden_table: *id001
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The allowlist and the fail rule are fixed by IRR-002 and S5b in this SPEC
+    before the edit; the unparseable exit path is wrapup_receipt's existing exit 2, unchanged.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: *id002
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: *id003
+  judgment_subject_hash: null
+- id: AC-012
+  title: The loop exempts reference files from the worktree substitution
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_loop_reads_reference_files_from_root
+  executable_predicate: '''.claude/hm/'' in loop_step_4 and ''project root'' in loop_step_4'
+  golden_table: *id001
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The conflict is the d2c0ab0 loop.md Step 4 sentence 'substitute the absolute
+    worktree path for every Read/Write/Edit call' against SPEC-hm-light-lane-s2 S3's never-from-<WT>
+    rule; the exemption text is fixed here.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: *id002
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: *id003
+  judgment_subject_hash: null
+- id: AC-013
+  title: The loop flag's allowed diffs stay enumerated
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac009_disable_removes_only_loop_files
+  executable_predicate: changed <= ALLOWED_BODY_DIFFS and ALLOWED_BODY_DIFFS - PREVIOUS_ALLOWED
+    == {'.claude/hm/verify-checks.md', '.claude/hm/review-confirmation.md'}
+  golden_table: *id001
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: PREVIOUS_ALLOWED is the d2c0ab0 set in test_loop_opt_in.py; the two additions
+    are named by the Supersedes constraint before the edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: *id002
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: *id003
+  judgment_subject_hash: null
 irreversible_decisions:
 - id: IRR-001
   decision: Add five generated files under .claude/hm/ (wrapup-steps.md, verify-checks.md,
@@ -274,4 +384,12 @@ irreversible_decisions:
   category: schema/file format/storage layout
   rationale: Renaming one later needs a retire step for copies on disk and breaks a harness
     whose command and file came from different versions
+  source: spec
+- id: IRR-002
+  decision: stage-delegate follows <base_root>/.claude/hm/wrapup-steps.md and verify-checks.md
+    as instructions; every other file it reads stays data
+  category: security/permission boundary
+  rationale: Its prompt said nothing read from disk could extend its instructions; a writer
+    of the base checkout's .claude/hm/ can now direct the delegate, the same reach they already
+    have over the command files
   source: spec
