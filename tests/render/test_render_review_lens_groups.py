@@ -44,6 +44,7 @@ from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 PRESETS = ("Side", "Production")
 
@@ -60,7 +61,7 @@ def _render(tmp_path: Path, preset: str) -> str:
     a = interview(p, autoloop_mode=True)
     a.preset = Preset(preset)
     render(synthesize(p, a), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    return (tmp_path / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    return stage_text(tmp_path, "review")
 
 
 @pytest.fixture(scope="module")
@@ -241,7 +242,13 @@ def test_no_lens_text_is_a_literal_in_the_template() -> None:
     An assertion about the template source, not the render: a block holding a literal lens
     name renders correctly today and stops tracking the function the moment it changes.
     """
-    src = Path("src/harness_maker/templates/stages/review.md.j2").read_text(encoding="utf-8")
+    stages = Path("src/harness_maker/templates/stages")
+    # The confirmation pass's C2 lives in a partial the Codex arm and the reference file share.
+    src = (
+        (stages / "review.md.j2").read_text(encoding="utf-8")
+        + "\n### \n"
+        + (stages / "_partials" / "review_confirmation.md.j2").read_text(encoding="utf-8")
+    )
     for section in (_ROUND_1, _STEP_C2):
         i = src.find(section)
         assert i != -1, f"template has no {section!r}"

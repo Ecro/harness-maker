@@ -533,86 +533,9 @@ the lenses adjudicate the *justification* rather than rediscovering the test.
 On small tasks A.5 blocked 2 of 15 runs the plain arm passed. If the ledger below renders, record
 the skip with its emit command: `--pass 1 --verdict dispatch-skipped --reason 'lane light' --terminal`.
 
-Dispatch **one** `test-reviewer` call carrying **all three lens questions**. The lenses are the
-questions, not the contexts: one reviewer retried *serially* surfaces one category per round,
-which is why this was ever a fan-out — but a single call asking all three is not that shape.
-
-| Lens | Asks |
-|---|---|
-| `red-correctness` | Does each test fail, and for the intended reason? |
-| `discrimination` | Would this assertion also pass against a plausibly WRONG implementation? |
-| `coverage` | Does the set cover the criterion — no missing scenario, and no duplicate for the same observable? |
-
-`<brief>` below is the same for all three: `<SPEC body + bindable mechanical AC list (id +
-predicate, when present) + Phase A test file paths + test_framework name + the Phase A.4 counts
-(`N failed, M passed`) and, for each passing test, its node id and the justification you
-recorded>\n\nThe AC list lets you adjudicate the scenario∪AC union for duplication / coverage
-holes. The A.4 line is a MEASUREMENT, not an estimate — quote the counts you actually read, and
-say so if a lens should verify them, because a wrong count sends every lens after a test that
-does not exist. You are ACCOUNTABLE for all three lenses named in the dispatch.\n\nA defect you
-notice outside whichever lens surfaced
-it must still be reported — never dropped — but it has to travel in a field the schema actually
-has, because there is no suggestions field and your Hard Rules forbid inventing a category. Route
-it: a test that would also pass a WRONG implementation is a banned pattern (category 1 tautology,
-6 magic values, or 8 private state) and goes in blocking_issues; a scenario with no test goes in
-scenarios_missing; a scenario covered twice for the same observable is a per_scenario entry for
-that scenario with quality FAIL, naming the duplicated observable and which tests carry it — N
-tests under one scenario ID asserting N different observables is not duplication, so none of them
-may FAIL for that reason, and each is still judged on its own against the banned patterns, which
-this clause never overrides; a
-test aimed at another scenario is the same per_scenario FAIL, which holds regardless of observable
-— which blocks, because PASS requires every per_scenario.quality to be PASS. Only a genuine nice-to-have is
-dropped.\n\nReturn ONLY the JSON output as specified in your instructions.`
-
-{{ dsp.dispatch_intro(is_codex) }}
-
-```
-{{ dsp.dispatch(is_codex, "test-reviewer", "A.5: {slug}", "<brief>\\n\\nYou are ACCOUNTABLE for all three lenses. red-correctness — does each test fail, and for the intended reason? discrimination — would this assertion also pass against a plausibly WRONG implementation? coverage — does the set cover the criterion, with no missing scenario and no duplicate for the same observable?") }}
-```
-
-**The merge rules below still apply**, and are deliberately kept: a retry re-dispatch folds into
-this round's record the same way, and a future reader restoring the fan-out needs them.
-
-| Field | Rule |
-|---|---|
-| `overall_assessment` | PASS iff **every lens dispatched in THIS round** returned PASS **and** the merged `blocking_issues[]`, `scenarios_missing[]` and `per_scenario[]` are all clean. **Recompute — do not take a lens's own header on trust.** That is the agent's own definition of PASS, so a compliant lens agrees; an inconsistent one (PASS while reporting a defect) is parseable, and trusting the header would silently drop the defect it reported. Any FAIL, dead dispatch, or unparseable JSON → round FAIL. Round 1 dispatches the single merged lens (ADR-010); a retry re-dispatches it, and a round-1 PASS is **never** reused to satisfy this. |
-| `blocking_issues[]` | Union, deduped on `test_file:test_function:category`, **carrying the union of the `line`s**. Not keyed on `line`: two lenses seeing one defect anchor on whatever line their OBSERVE step cited (the `assert`, the `def`, a decorator), so a line-keyed dedupe almost never merges them and the rewrite list gets the same defect twice. Not line-blind either: two genuinely different bad assertions in one function share file, function and category, and collapsing them would drop one — that is what the line **list** preserves. Keep the `title`/`reasoning` of the earliest lens in table order. **Authoritative** — the retry rewrites exactly these. |
-| `scenarios_missing[]` | Union by scenario id. |
-| `per_scenario[]` | By `scenario_id`: `quality` = worst, `covered_by` = union, `reason` = from the worst-quality lens (ties → table order). |
-| `passing_tests[]` | Intersection, **advisory — it decides nothing.** Bare function names with no `test_file` cannot identify a test; `blocking_issues` entries can. |
-
-Resolution:
-- Round PASS → proceed to Phase B.
-- Round FAIL → three repair actions, one per carrier. Rewrite the functions named in the merged
-  `blocking_issues[]`. Author one test per `scenarios_missing[]`. And for a `per_scenario[]` entry
-  whose `quality` is FAIL with **no** matching `blocking_issues` entry — duplicate coverage, or a
-  test aimed at another scenario — **retarget or delete the offending test named in its
-  `covered_by`**. If that entry's `covered_by` is **empty** it is a no-coverage report that
-  arrived in the wrong carrier (the schema's own example does exactly this): treat it as a
-  `scenarios_missing[]` item and author a test. If `covered_by` lists several tests, the
-  offending one is whichever the `reason` names; when `reason` does not disambiguate, treat every
-  listed test as in scope rather than guessing. That third arm is not optional: without a repair for it, the same lens
-  re-dispatches against an unchanged file, fails identically, and the two-round budget is spent
-  with nothing having changed.
-  **If you repaired anything, re-dispatch — carrying all three lens questions again, exactly as
-  round 1 did.** No verdict carries between rounds: a rewrite changes a file the previous round
-  judged, and a test authored for `scenarios_missing[]` has never been seen at all. With one
-  dispatch per round the worst case is 2 dispatches, not 6.
-
-  Hand the re-dispatch **two arms**: the
-  before/after of every function you rewrote, keyed by the acted-on `blocking_issues[].test_file`
-  + `.test_function`, **and** the after-only text of every test you authored for a
-  `scenarios_missing[]` entry — after-only because an authored test has no before, and implying
-  one invites a fabricated diff. Ask them what those edits newly made reachable, and whether any
-  of it breaks a property they had already cleared. Use no `git` command here — Phase A's files are usually untracked, so `git diff`
-  shows nothing for exactly the tests in question. Budget: **2 rounds**. No verdict carries
-  between rounds; a retired lens's PASS describes the pre-fix file. After 2 failing rounds this is
-  a **blocked phase**: take Step 4's blocker path (dispatch `stuck`, then surface) rather than
-  halting on the merged verdict alone — that is the defect list a lens-level rewrite already
-  failed twice to fix, without the constraint behind it. Do not enter Phase C: A.5 gates the
-  implementation.
-
-{% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) %}
+{% if is_codex %}{% include "stages/_partials/execute_a5.md.j2" %}{% else %}{% with ref_file="execute-a5.md", ref_use="when `tdd_active` is true and `lane` is not `light`, and follow it for the dispatch, the merge rules and the retry budget", ref_stop="" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}
+{% endif -%}
+{% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) -%}
 **Record every round (ADR-004).** One row per **round**, `--pass` being the round number. The
 rule predates the single-dispatch collapse and survives it: it is keyed on the round, not on the
 dispatch count, so a restored fan-out would not collide on `(agent, stage, run-id, pass)` or

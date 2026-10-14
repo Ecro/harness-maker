@@ -25,6 +25,7 @@ from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import expand_references
 
 #: The review stage's auto-fix loop. Present in every render that inlines the stage.
 _LOOP_HEADING = "## Auto-Fix Loop"
@@ -62,7 +63,8 @@ def _review_bearing_artifacts() -> dict[str, str]:
     return {
         str(path.relative_to(root)): text
         for path in sorted(root.rglob("*.md"))
-        if _LOOP_HEADING in (text := path.read_text(encoding="utf-8"))
+        if _LOOP_HEADING
+        in (text := expand_references(path.read_text(encoding="utf-8"), root / ".claude" / "hm"))
     }
 
 

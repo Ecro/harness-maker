@@ -70,6 +70,7 @@ from harness_maker.interview import interview
 from harness_maker.models import InstrumentationConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import expand_references
 
 #: The one qualifier, reused verbatim from the Phase A authoring rule that predates this change
 #: (ADR-004). A phrase coined for the clause under test would make the expected value
@@ -146,7 +147,12 @@ def _execute_bodies() -> dict[str, str]:
     found = {
         str(p.relative_to(_render_root())): text
         for p in sorted(_render_root().rglob("*.md"))
-        if _A5 in (text := p.read_text(encoding="utf-8"))
+        if _A5
+        in (
+            text := expand_references(
+                p.read_text(encoding="utf-8"), _render_root() / ".claude" / "hm"
+            )
+        )
     }
     assert found, "no rendered document carries the A.5 gate — every assertion here is vacuous"
     return found

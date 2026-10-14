@@ -1,6 +1,6 @@
 {
   "Production-claude": {
-    "outside_57_sha256": "0e945981d5d14d09c8102ddf6950a1e74d172ef6dc4fa8454021018ed474ffa6",
+    "outside_57_sha256": "2045592b4d928bd65957c8ab0de9137d878d7ff3d7350103232ae0925a0bdad1",
     "placeholders": [
       [
         "--locator",
@@ -82,7 +82,7 @@
     ]
   },
   "Side-claude": {
-    "outside_57_sha256": "f89b0aa757de02b78479098c18aaa52d4e411bec21c303d130f3da6f88b654e8",
+    "outside_57_sha256": "6b3e36e5675be763c294fa793f3e3f49e4531ee4ff4c4ef87e7ca5b6c7a2b6db",
     "placeholders": [
       [
         "--locator",

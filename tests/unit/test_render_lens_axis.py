@@ -28,6 +28,7 @@ from harness_maker.lens_coverage import coverage_verdict
 from harness_maker.models import Preset, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 PRESETS = ("Side", "Production")
 
@@ -37,7 +38,7 @@ def _render(tmp_path: Path, preset: str) -> str:
     a = interview(p, autoloop_mode=True)
     a.preset = Preset(preset)
     render(synthesize(p, a), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    return (tmp_path / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    return stage_text(tmp_path, "review")
 
 
 @pytest.fixture(scope="module")

@@ -20,6 +20,15 @@
   Execute Phases C.0 and D.5 are three lines each. On this repo's config the spec, execute, review and verify
   commands are about 28K chars smaller. `hm make` now refuses to turn the loop off while a loop marker,
   owned worktree or finalize stash is live, since the loop-off render has no finalize step to recover them.
+- **Stage commands read rare paths on demand (HM-LIGHT-LANE, stage 2b).** Five stage bodies that run
+  rarely, or only in a delegated or full-lane run, left the Claude commands for `.claude/hm/*.md` files
+  the command reads when it reaches them: review's auto-fix rounds (`review-autofix.md`) and confirmation
+  pass (`review-confirmation.md`), execute Phase A.5 (`execute-a5.md`), and, when `delegation.stages`
+  includes them, wrapup Steps 1-5.6 (`wrapup-steps.md`) and verify's checks (`verify-checks.md`). The text
+  is byte-identical to before and Codex stage skills still carry it inline. A missing file stops the stage
+  with a `/hm:make` instruction (wrapup stops before any commit), and `stage-delegate` follows only its own
+  stage's file under the brief's `base_root`. On this repo's config the four commands are about 50K chars
+  smaller (205,430 → 155,136). Re-render with `/hm:make` to get the five new files.
 - **Less always-loaded context.** A clean `hm spec_machine check --all` prints one line
   (`{"ok": true, "overall", "strictness"}`); failures still print the full payload. Five internal skills
   (`agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `context-linter`, `worktree-isolator`)

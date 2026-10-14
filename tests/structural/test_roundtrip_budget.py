@@ -19,7 +19,14 @@ import re
 
 import pytest
 
-from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips, render_surface
+from ._instruction_baseline import stage_text
+from ._surface_baseline import (
+    CLAUDE_VARIANT,
+    CODEX_VARIANT,
+    REFS_VARIANT,
+    count_round_trips,
+    render_surface,
+)
 
 # Measured 2026-07-29 against this repo's `.claude/harness.yaml` through the SAME
 # generator the surface baseline uses. Phases 2–5 lowered `execute`, `wrapup` and their
@@ -27,6 +34,31 @@ from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips,
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # Counted per command PLUS the `.claude/hm/` files it points at (2026-10-14, stage 2b
+    # confirmation pass), the way `_instruction_baseline.stage_text` reads a stage. The entries
+    # below counted the bare command, so the drops they record for stage 2b were calls that had
+    # MOVED, not left: a call in a reference file is still a call the stage makes. Against the
+    # pre-move d2c0ab0 counts nothing was removed: execute 19 and review 33 are back where they
+    # were, verify is 10→11 and wrapup 32→33 (the `!test -r` existence check before each dispatch,
+    # review round 1 S1).
+    # +2 total, 100→102 (2026-10-14, /hm:review round 1 of SPEC-hm-light-lane-s2b, finding S1).
+    # verify 6→7 and wrapup 19→20: one call ADDED to each delegated command, the `!test -r` check
+    # that the step list exists before the dispatch. It is deliberate: a delegate that cannot read
+    # its file returns nothing, and an empty wrapup receipt reconciles clean. No call was removed.
+    # −31 total, 131→100 (2026-10-14, SPEC-hm-light-lane-s2b). **No call was removed**: five blocks
+    # moved verbatim into `.claude/hm/*.md` and the rendered command keeps a pointer, so the
+    # calls they hold are read on demand instead of counted as the command's. This repo's
+    # `delegation.stages` holds wrapup and verify, which is why those two move here; a harness
+    # that delegates neither keeps both bodies, and their calls, inline.
+    # execute 19→18: the Phase A.5 `Task(` to `test-reviewer`.
+    # review 33→20 (−13): auto-fix rounds (`lens_coverage check`, `review_churn` x2,
+    # `review_consensus`) and the confirmation pass (`freeze commit`, `freeze read-base`,
+    # `lens_coverage check`, `freeze reap`, `stage_agent_ledger emit` and its four lens `Task(`).
+    # verify 10→6 (−4): `verification_cache run` and `mark-pass`, `spec_need op-check` and
+    # `waiver-check`.
+    # wrapup 32→19 (−13): `verification_cache run` and `mark-pass`; `spec_machine mark-tested`,
+    # `find-unbound`, `mark-judged`, `find-unjudged`; `memory_retrieve` x2; `memory_md` x3;
+    # `second_brain promote`; the `judgment-reviewer` `Task(`.
     # −14 total, 145→131 (2026-10-14, SPEC-hm-light-lane-s2). This repo's harness.yaml has
     # `loop.enabled: false`, and the loop-only branches stopped rendering there: the Gate 0
     # `iter_receipts write` (−1 on each of execute/research/review/spec/verify/wrapup), execute
@@ -248,7 +280,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `verification_plan commands` + self-attested `mark-pass` became one `verification_cache run`
     # that runs the CI gates and writes the marker itself; `mark-pass` survives only inside the
     # degraded (no-CI) block. -2 +1.
-    "verify": 10,
+    "verify": 11,
     # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
     # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
     # not render. A config flip that adds a gate in two commands and removes an advisory in a
@@ -296,13 +328,21 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # in `work-docs/BASELINE-DELTA-intent-layer-improvements.md`.
     # 34 → 33 (top-issues-2026-09, 2026-09-30): Step 2's check + plan + mark-pass → one
     # `verification_cache run`, same change as verify. -2 +1.
-    "wrapup": 32,
+    "wrapup": 33,
 }
 
 
 @pytest.fixture(scope="module")
 def surface() -> dict[str, dict[str, str]]:
-    return render_surface()
+    """Each Claude command as the model meets it: the command plus the `.claude/hm/` files it
+    points at (`_instruction_baseline.stage_text`). Calls that moved into a reference file are
+    still calls the stage makes, so they stay under this budget (stage 2b confirmation pass)."""
+    rendered = render_surface(with_refs=True)
+    commands, refs = rendered[CLAUDE_VARIANT], rendered[REFS_VARIANT]
+    return {
+        CLAUDE_VARIANT: {name: stage_text(name, commands, refs) for name in commands},
+        CODEX_VARIANT: rendered[CODEX_VARIANT],
+    }
 
 
 def test_the_table_covers_every_rendered_claude_command(surface: dict[str, dict[str, str]]) -> None:

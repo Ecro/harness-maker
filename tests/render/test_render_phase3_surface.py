@@ -64,6 +64,7 @@ from harness_maker.models import (
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 from .conftest import pin_install_ref
 
@@ -100,7 +101,8 @@ def _surfaces(ledger: bool = False) -> dict[str, str]:
         for stage in ("execute", "review"):
             claude = root / ".claude" / "commands" / "hm" / f"{stage}.md"
             assert claude.is_file(), f"missing {claude}"
-            out[f"claude:{stage}"] = claude.read_text(encoding="utf-8")
+            # Phase A.5 and the confirmation pass are read in place (SPEC-hm-light-lane-s2b).
+            out[f"claude:{stage}"] = stage_text(root / ".claude", stage)
             codex = root / ".agents" / "skills" / f"hm-{stage}" / "SKILL.md"
             assert codex.is_file(), f"missing {codex}"
             out[f"codex:{stage}"] = codex.read_text(encoding="utf-8")

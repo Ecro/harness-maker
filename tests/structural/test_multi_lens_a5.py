@@ -30,6 +30,7 @@ from harness_maker.interview import interview
 from harness_maker.models import InstrumentationConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import expand_references
 
 _A5 = "#### Phase A.5"
 _PHASE_B = "#### Phase B"
@@ -88,7 +89,12 @@ def _bodies() -> dict[str, str]:
     found = {
         str(p.relative_to(_render_root())): text
         for p in sorted(_render_root().rglob("*.md"))
-        if _A5 in (text := p.read_text(encoding="utf-8"))
+        if _A5
+        in (
+            text := expand_references(
+                p.read_text(encoding="utf-8"), _render_root() / ".claude" / "hm"
+            )
+        )
     }
     assert found, "no rendered document contains the A.5 gate — every assertion below is vacuous"
     return found

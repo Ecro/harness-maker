@@ -1,0 +1,68 @@
+"""Capture the d2c0ab0 moved-block hashes, command hashes and Codex skill hashes for SPEC-hm-light-lane-s2b.
+
+Run from a checkout of d2c0ab0 (a temporary `git worktree add <dir> d2c0ab0`), never from edited
+templates:  PYTHONPATH=src uv run python capture_pre_edit.py.txt <out.json> <instructions.json>
+The d2c0ab0 checkout carries the tracked .claude/harness.yaml this renders from.
+Revision 2 (spec-validator pass 1): verify's block ends before "## Output", execute's before the
+stage_agent_ledger block, and the delegation configs are captured as well.
+Revision 3 (/hm:review round 1, T4): the instruction sets are captured for every config, not just the
+two loop-on ones, so the delegation and loop-off arms are held to the old surface too.
+"""
+import hashlib, json, sys, tempfile
+from pathlib import Path
+sys.path.insert(0, ".")
+from tests.structural._instruction_baseline import AXES, HARNESS_YAML, instruction_set
+from tests.structural._surface_baseline import pinned_install_ref
+from harness_maker.interview import answers_from_harness_yaml
+from harness_maker.models import DelegationConfig, LoopConfig, ProjectProfile
+from harness_maker.synthesize import synthesize
+from harness_maker.render import DEFAULT_FREEZE_TIME, render
+
+BLOCKS = {
+    "wrapup-steps": ("wrapup", "### Step 1 — Pre-flight checks", "#### 5.7 Intent state"),
+    "verify-checks": ("verify", "## The 6 Checks", "## Output"),
+    "review-autofix": ("review", "### Re-dispatch what is missing", "## Confirmation Pass"),
+    "review-confirmation": ("review", "### Step C1 — Freeze the artifact", "## Final Summary (always)"),
+    "execute-a5": ("execute", "Dispatch **one** `test-reviewer` call", "**Record every round (ADR-004).**"),
+}
+STAGES = ("wrapup", "verify", "review", "execute")
+
+# (key, strictness, loop on, delegation.stages or None for the repo's own harness.yaml)
+CONFIGS = [(f"{s}/loop-{'on' if lp else 'off'}", s, lp, None) for s in AXES for lp in (False, True)] + [
+    ("delegation-none", "block", False, []),
+    ("delegation-wrapup", "block", False, ["wrapup"]),
+    ("delegation-verify", "block", False, ["verify"]),
+]
+
+def block(text, start, end):
+    i = text.index("\n" + start) + 1 if not text.startswith(start) else 0
+    j = text.index("\n" + end, i) + 1
+    return text[i:j]
+
+out = {"source_sha": "d2c0ab0", "blocks": BLOCKS, "configs": {}}
+instr = {"source_sha": "d2c0ab0", "configs": {}}
+for key, strictness, loop, stages in CONFIGS:
+    parsed = answers_from_harness_yaml(HARNESS_YAML)
+    upd = {"strictness": strictness, "loop": LoopConfig(enabled=loop)}
+    if stages is not None:
+        upd["delegation"] = DelegationConfig(stages=stages)
+    answers = parsed.model_copy(update=upd)
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        with pinned_install_ref():
+            render(synthesize(ProjectProfile(), answers), root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
+        cmds = {p.stem: p.read_text() for p in (root / ".claude/commands/hm").glob("*.md")}
+        codex = {p.parent.name: p.read_text() for p in (root / ".agents/skills").glob("hm-*/SKILL.md")}
+    cfg = {"delegation_stages": list(answers.delegation.stages), "blocks": {}, "codex_sha256": {}}
+    for bid, (cmd, s, e) in BLOCKS.items():
+        b = block(cmds[cmd], s, e)
+        cfg["blocks"][bid] = {"sha256": hashlib.sha256(b.encode()).hexdigest(), "chars": len(b)}
+    for st in STAGES:
+        cfg["codex_sha256"][st] = hashlib.sha256(codex[f"hm-{st}"].encode()).hexdigest()
+    cfg["command_chars"] = {c: len(cmds[c]) for c in STAGES}
+    cfg["command_sha256"] = {c: hashlib.sha256(cmds[c].encode()).hexdigest() for c in STAGES}
+    out["configs"][key] = cfg
+    instr["configs"][key] = {c: instruction_set(cmds[c]) for c in STAGES}
+Path(sys.argv[1]).write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
+Path(sys.argv[2]).write_text(json.dumps(instr, indent=1, ensure_ascii=False, sort_keys=True) + "\n")
+print(json.dumps({k: {b: v["chars"] for b, v in c["blocks"].items()} for k, c in out["configs"].items()}, indent=1))

@@ -28,6 +28,7 @@ from harness_maker.interview import interview
 from harness_maker.models import LoopConfig, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 
 def _render(tmp_path: Path, *, auto_fix: bool = True, instrumented: bool = False) -> str:
@@ -40,7 +41,7 @@ def _render(tmp_path: Path, *, auto_fix: bool = True, instrumented: bool = False
     # the axis on, or they assert the axis rather than the row.
     a.instrumentation.stage_agent_ledger = instrumented
     render(synthesize(p, a), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    return (tmp_path / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    return stage_text(tmp_path, "review")
 
 
 def _section(body: str, start: str, *, stop: str) -> str:

@@ -23,6 +23,7 @@ from harness_maker.interview import _build_answers, answers_from_harness_yaml
 from harness_maker.models import Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import _TYPED_ONLY_SKILLS, synthesize
+from tests.stage_surface import STAGE_REFERENCE_FILES
 
 REPO = Path(__file__).parents[2]
 TEMPLATES = REPO / "src" / "harness_maker" / "templates"
@@ -82,13 +83,35 @@ def _norm(text: str) -> str:
     return re.sub(r"--with \S+ hm ", "--with {src} hm ", text)
 
 
+def _with_refs(command: str, stage: str, root: Path) -> str:
+    """A stage's command plus the `.claude/hm/` files it points at (SPEC-hm-light-lane-s2b).
+
+    Check 5 and the confirmation pass's Gate 0 line live in those files now, so the loop
+    inventory spans both. A file the command does not point at (a non-delegated verify keeps its
+    checks inline) is not appended, or its loop sections would count twice. The reference files'
+    own `content_hash` is dropped, like the command's.
+    """
+    refs = [
+        re.sub(
+            r"^content_hash: .*$", "", (root / ".claude" / "hm" / f"{n}.md").read_text(), flags=re.M
+        )
+        for n in STAGE_REFERENCE_FILES.get(stage, ())
+        if f"Read `.claude/hm/{n}.md`" in command
+    ]
+    return "\n".join([command, *refs])
+
+
 def _bodies(root: Path) -> dict[str, str]:
     out = {
-        f"claude:{s}": (root / ".claude" / "commands" / "hm" / f"{s}.md").read_text()
+        f"claude:{s}": _with_refs(
+            (root / ".claude" / "commands" / "hm" / f"{s}.md").read_text(), s, root
+        )
         for s in STAGES
     }
     for s in STAGES:
-        out[f"stages:{s}"] = (root / ".claude" / "stages" / f"{s}.md").read_text()
+        out[f"stages:{s}"] = _with_refs(
+            (root / ".claude" / "stages" / f"{s}.md").read_text(), s, root
+        )
     for s in STAGES:
         p = root / ".agents" / "skills" / f"hm-{s}" / "SKILL.md"
         if p.exists():
@@ -148,7 +171,10 @@ S2_INVENTORY: dict[str, list[str]] = {
         "### Step 5 — Worktree finalize (ephemeral `/hm:loop` worktrees ONLY)",
         "- An `execute-<uuid>` worktree finalized exactly once: success or fail.",
     ],
-    "review": ["• Loop mode: proceed", "→ Loop mode: emit the Gate 0 receipt"],
+    "review": [
+        "• Loop mode: proceed",
+        "→ Loop mode: emit the Gate 0 receipt",
+    ],  # in review-confirmation.md
     "verify": ["### Check 5 — Worktree merge cleanliness"],
     "wrapup": [],
 }

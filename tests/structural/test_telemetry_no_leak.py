@@ -76,6 +76,13 @@ _OBSERVABILITY_ALLOWLIST: frozenset[str] = frozenset(
         # rows during trend diagnosis (in-band only, no socket). Manual read-only
         # command (0.36.0: no enable flag).
         "src/harness_maker/templates/commands/hm/metrics.md.j2",
+        # SPEC-hm-light-lane-s2b — the text of these four templates moved, verbatim, into the
+        # stage partials the Codex skill and the `.claude/hm/` reference files share. Each
+        # reference already held its allowlist slot in the template it moved from.
+        "src/harness_maker/templates/stages/_partials/review_autofix.md.j2",
+        "src/harness_maker/templates/stages/_partials/review_confirmation.md.j2",
+        "src/harness_maker/templates/stages/_partials/verify_checks.md.j2",
+        "src/harness_maker/templates/stages/_partials/wrapup_steps.md.j2",
     }
 )
 

@@ -1,9 +1,10 @@
 """Phase 5: the delegate-on wrapup artifact carries BOTH paths, and the git tail stays.
 
-ADR-006's fallback only exists if the artifact it falls back INTO is in the same
-file. An earlier draft of this plan put the dispatch and the inline body in
-mutually-exclusive Jinja branches, which would have made "run the body inline"
-unreachable — a degraded path with no destination.
+ADR-006's fallback only exists if the artifact it falls back INTO is reachable. Since stage 2b of
+the light lane (SPEC-hm-light-lane-s2b) the inline body no longer sits in the command: the command
+carries a pointer to `.claude/hm/wrapup-steps.md`, the same file the delegate reads, so the
+degraded path and the dispatched path share one text. The tests that are about the body read the
+command with that file expanded in place (`tests/stage_surface.py`).
 
 These are render-GREP tests: they prove the instruction is PRESENT. They cannot
 prove the interpreting model obeys it. That asymmetry is deliberate and is the same
@@ -26,6 +27,7 @@ from harness_maker.models import (
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 # The `workflow` Production cap from `context_lint.THRESHOLDS`. Nothing ENFORCES it
 # for an atomic stage command — `readiness._CONTEXT_LIMITS` has no command row — so
@@ -51,6 +53,7 @@ def _wrapup(
     preset: str = "Production",
     stages: list[str] | None = None,
     feature_branch: bool = True,
+    expand: bool = True,
 ) -> str:
     # `feature_branch_workflow` must be set EXPLICITLY: constructing `InterviewAnswers`
     # directly bypasses `interview()`'s `_preset_extras`, so the flag-gated Step 7.7
@@ -63,7 +66,11 @@ def _wrapup(
         worktree={"feature_branch_workflow": feature_branch},
     )
     render(synthesize(ProjectProfile(), answers), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    return (tmp_path / "commands" / "hm" / "wrapup.md").read_text(encoding="utf-8")
+    if not expand:
+        return (tmp_path / "commands" / "hm" / "wrapup.md").read_text(encoding="utf-8")
+    # Steps 1-5.6 live in `.claude/hm/wrapup-steps.md` on a delegated harness
+    # (SPEC-hm-light-lane-s2b); the tests below that are about the body read it in place.
+    return stage_text(tmp_path, "wrapup")
 
 
 # ------------------------------------------------------------------ delegate OFF
@@ -314,29 +321,36 @@ def test_the_default_render_costs_existing_users_nothing(
     assert _count_body_lines(_wrapup(tmp_path, preset=preset)) == expected
 
 
+# Expanded-stage cost of delegating wrapup: the dispatch block, the existence check and the
+# pointer, with the moved body read back in place. Pinned as an equality, not a ceiling, so a
+# line added here is a visible edit to this number rather than headroom someone spends silently.
+#   +60 (ADR-006: "the cap exactly") → +66 (2026-10-14, SPEC-hm-light-lane-s2b: the Read-path
+#   lines and the pointer) → +77 (2026-10-14, /hm:review round 1: S1's `!test -r` existence check
+#   before the dispatch, +8, and K2's "fix the gap by the step that owns it" sentence, +3).
+#   → +76 (2026-10-14, stage 2b confirmation pass: the mismatch bullet's sentence became the shared
+#   one-line pointer, -2, and the existence check now names the delegate's `base_root` path, +1).
+_DELEGATED_EXPANDED_DELTA = 76
+
+
 @pytest.mark.parametrize("preset", ["Side", "Production"])
 def test_delegation_adds_a_bounded_amount_of_prose(tmp_path: Path, preset: str) -> None:
-    """ADR-006 warns the delegate-on command GROWS rather than shrinks. The DELTA is
-    what this phase owns, so that is what is pinned.
-
-    An absolute cap would be dishonest here twice over: the command already sat at 695
-    Production body lines — past `context_lint`'s `workflow` cap of 600 — before this
-    phase added anything, and nothing ENFORCES that cap on an atomic stage command
-    (`readiness._CONTEXT_LIMITS` has no command row). Measuring the delta instead
-    makes the assertion about this change rather than about inherited size. Measured:
-    **+60 lines — the cap exactly.** Five review rounds of added prose were paid for by
-    compressing existing prose in the same block; there is no headroom left, so the next
-    addition must be paid for the same way rather than by raising the bound.
+    """ADR-006 warned that the delegate-on command GROWS rather than shrinks, and bounded the
+    growth at +60 body lines of the command itself. Stage 2b (SPEC-hm-light-lane-s2b) moved Steps
+    1-5.6 out of a delegated command, so that quantity is now negative (the `on < off - 200` arm
+    below) and a `<= 60` bound on it could no longer fail. What delegation costs is the dispatch
+    prose, measured on the stage as the model meets it (command plus the file it reads); the
+    `_DELEGATED_EXPANDED_DELTA` equality pin is the guard.
     """
-    off = _count_body_lines(_wrapup(tmp_path / "off", preset=preset))
-    on = _count_body_lines(_wrapup(tmp_path / "on", preset=preset, stages=["wrapup"]))
+    off = _count_body_lines(_wrapup(tmp_path / "off", preset=preset, expand=False))
+    on = _count_body_lines(_wrapup(tmp_path / "on", preset=preset, stages=["wrapup"], expand=False))
+    assert on < off - 200, f"{preset}: delegated command is {on} body lines, inline {off}"
 
-    assert on - off <= 60, (
-        f"{preset} delegation adds {on - off} body lines ({off} → {on}); the delegated "
-        "body is supposed to move context OUT of the main loop, not add prose to the "
-        f"command. For reference the `workflow` Production cap is "
-        f"{_WORKFLOW_PRODUCTION_CAP}, which this command already exceeded before "
-        "delegation existed."
+    off_full = _count_body_lines(_wrapup(tmp_path / "off2", preset=preset))
+    on_full = _count_body_lines(_wrapup(tmp_path / "on2", preset=preset, stages=["wrapup"]))
+    assert on_full - off_full == _DELEGATED_EXPANDED_DELTA, (
+        f"{preset} delegation adds {on_full - off_full} body lines to the stage ({off_full} → "
+        f"{on_full}); the `workflow` Production cap is {_WORKFLOW_PRODUCTION_CAP}. If the change "
+        "is deliberate, record it in the dated list above"
     )
 
 

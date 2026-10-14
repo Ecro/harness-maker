@@ -44,7 +44,10 @@ def test_side_file_count_in_range() -> None:
     # transitional pair was unnecessary. A ratchet left loose stops ratcheting.
     # 61 → 62 (2026-10-14, SPEC-hm-light-lane-s2): `.claude/hm/autopilot-advance.md`, the
     # auto-advance procedure every stage stub reads (IRR-001).
-    assert 40 <= len(SIDE_FILES) <= 62
+    # 62 → 67 (2026-10-14, SPEC-hm-light-lane-s2b): `.claude/hm/{wrapup-steps,verify-checks,
+    # review-autofix,review-confirmation,execute-a5}.md`, the stage bodies the Claude commands
+    # now read on demand.
+    assert 40 <= len(SIDE_FILES) <= 67
 
 
 def test_synthesize_side_returns_blueprint() -> None:

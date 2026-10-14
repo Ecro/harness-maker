@@ -60,6 +60,7 @@ from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 _SKILL = "targeted-test-selection"
 
@@ -87,7 +88,7 @@ def _skill(preset: Preset) -> str:
 
 
 def _review(preset: Preset) -> str:
-    return (_render_root(preset) / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    return stage_text(_render_root(preset), "review")
 
 
 # ── the rule body, in the skill ─────────────────────────────────────────────
@@ -276,7 +277,5 @@ def test_the_predicates_discriminate() -> None:
     Without this, a predicate true of every document — or of the pre-change render — would
     pass every arm above and the module would assert nothing.
     """
-    execute = (_render_root(Preset.PRODUCTION) / "commands" / "hm" / "execute.md").read_text(
-        encoding="utf-8"
-    )
+    execute = stage_text(_render_root(Preset.PRODUCTION), "execute")
     assert "oracle-blocked" not in execute

@@ -97,7 +97,12 @@ def pinned_install_ref() -> Iterator[None]:
         _synthesize_mod._compute_install_ref = original_compute
 
 
-def render_surface(depth_override: str | None = None) -> dict[str, dict[str, str]]:
+REFS_VARIANT = "refs"
+
+
+def render_surface(
+    depth_override: str | None = None, *, with_refs: bool = False
+) -> dict[str, dict[str, str]]:
     """Render this repo's harness in-process and return the two variants' command bodies.
 
     ``depth_override`` sets ``interview.comprehension.depth`` for this render only. It
@@ -106,6 +111,10 @@ def render_surface(depth_override: str | None = None) -> dict[str, dict[str, str
     are what make two renders comparable, and a second implementation of them would drift.
     ``None`` (the default) leaves the config untouched, so ``measure_surface`` and every
     existing caller are unaffected.
+
+    ``with_refs`` adds a third variant, ``REFS_VARIANT``: the rendered ``.claude/hm/*.md``
+    reference files by stem. Off by default, so the frozen surface baseline (which counts
+    the commands as shipped) never sees it.
     """
     if not HARNESS_YAML.exists():
         raise FileNotFoundError(
@@ -133,6 +142,10 @@ def render_surface(depth_override: str | None = None) -> dict[str, dict[str, str
             p.stem: p.read_text(encoding="utf-8")
             for p in sorted((root / ".claude" / "commands" / "hm").glob("*.md"))
         }
+        refs = {
+            p.stem: p.read_text(encoding="utf-8")
+            for p in sorted((root / ".claude" / "hm").glob("*.md"))
+        }
         codex_dir = root / ".agents" / "skills"
         codex = {
             p.parent.name: p.read_text(encoding="utf-8")
@@ -140,7 +153,10 @@ def render_surface(depth_override: str | None = None) -> dict[str, dict[str, str
         }
     if not claude:
         raise RuntimeError("render produced no Claude commands — refusing to freeze zeros")
-    return {CLAUDE_VARIANT: claude, CODEX_VARIANT: codex}
+    out = {CLAUDE_VARIANT: claude, CODEX_VARIANT: codex}
+    if with_refs:
+        out[REFS_VARIANT] = refs
+    return out
 
 
 def count_round_trips(text: str, variant: str) -> int:

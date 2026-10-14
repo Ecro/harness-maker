@@ -111,6 +111,10 @@ def _wrapup_regions(preset: Preset, host: str) -> tuple[str, str]:
     assert "#### 5.7" in text
     delegated = _section(text, "Step 0.5")
     inline = _section(text, "Steps 1–5.6 — inline body")
+    # SPEC-hm-light-lane-s2b: the inline body is a pointer whose fail-closed sentence names Step 5.7
+    # and Step 6 to forbid both ("STOP at once: run no Step 5.7, no Step 6"). That sentence is a
+    # stop, not a routing directive, so the resume check reads the region without it.
+    inline = re.sub(r"If it is missing or unreadable[^\n]*", "", inline)
     return delegated, inline
 
 

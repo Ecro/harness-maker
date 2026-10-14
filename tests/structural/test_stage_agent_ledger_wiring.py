@@ -26,6 +26,7 @@ from harness_maker.models import InstrumentationConfig, Preset, ProjectProfile, 
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.stage_agent_ledger import DISPATCH_FAILED, DISPATCH_SKIPPED
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import expand_references
 
 _EMIT = re.compile(r"hm stage_agent_ledger emit\b")
 _PERSIST = re.compile(r"hm stage_agent_ledger persist-payload\b")
@@ -70,7 +71,12 @@ def artifacts_for(stage: str) -> dict[str, str]:
     return {
         str(p.relative_to(_render_root())): text
         for p in sorted(_render_root().rglob("*.md"))
-        if marker in (text := p.read_text(encoding="utf-8"))
+        if marker
+        in (
+            text := expand_references(
+                p.read_text(encoding="utf-8"), _render_root() / ".claude" / "hm"
+            )
+        )
     }
 
 

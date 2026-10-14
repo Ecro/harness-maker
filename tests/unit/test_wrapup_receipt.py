@@ -916,3 +916,35 @@ def test_a_document_in_neither_root_is_still_a_mismatch(tmp_path: Path) -> None:
     )
     assert [m.kind for m in result.mismatches] == ["document-missing"]
     assert "worktree or base" in result.mismatches[0].detail
+
+
+# ------------------------------------------------- stage 2b: a delegate that cannot read its file
+
+
+def test_a_one_line_reply_naming_a_missing_step_list_is_unparseable(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """SPEC-hm-light-lane-s2b IRR-002: with its step list missing the delegate returns one line and
+    no JSON. The caller must then see `unparseable` (exit 2, so it takes the inline path and stops
+    there), never a receipt: the reply is not a fabricated empty one."""
+    reply = "Cannot read /repo/.claude/hm/wrapup-steps.md: no such file."
+    receipt, error = wr.parse_receipt(reply)
+    assert receipt is None
+    assert error
+
+    path = tmp_path / "r.txt"
+    path.write_text(reply, encoding="utf-8")
+    rc = wr.main(
+        [
+            "--root",
+            str(tmp_path),
+            "--stage",
+            "wrapup",
+            "--worktree",
+            str(tmp_path),
+            "--receipt-file",
+            str(path),
+        ]
+    )
+    assert rc == 2
+    assert json.loads(capsys.readouterr().out)["status"] == "unparseable"

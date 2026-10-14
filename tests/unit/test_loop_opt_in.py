@@ -59,12 +59,27 @@ _OPT_IN_COMMIT = "18714dd1"
 #   paths whose loop-ON body differs from the regenerated loop-OFF snapshot in every fixture; the
 #   loop-ON/OFF diff of each is pinned by tests/render/test_render_light_lane_s2.py (AC-002).
 #   Re-captured again in the same task after `/hm:review` round 1 edited those twelve bodies.
+# - 2026-10-14, `hm-light-lane-s2b`: the execute A.5, review auto-fix / confirmation and (when
+#   delegated) wrapup / verify bodies moved to `.claude/hm/*.md`. Four of the twelve above
+#   (`commands/hm` + `stages` copies of execute and review) were re-captured because their text
+#   shrank to pointers; wrapup / verify keep their bytes at the default `delegation.stages: []`.
+#   Two reference files are new and loop-sensitive (verify Check 5, review Step 0 confirmation
+#   loop branches): `hm/verify-checks.md`, `hm/review-confirmation.md`; `commands/hm/loop.md`
+#   moved too (Step 4 exemption for the reference files). Verified before capture
+#   that no other loop-ON path moved; the loop-ON/OFF diff is pinned by
+#   tests/render/test_render_light_lane_s2.py (AC-002, inventory spans command + refs).
+#   Re-captured again in the same task after `/hm:review` round 1: the review pointers' stop clause
+#   and the `confirm-1` wording changed `commands/hm/review.md`, `stages/review.md` and
+#   `hm/review-confirmation.md`; the A.5 pointer condition and the verify preface changed
+#   `commands/hm/execute.md`, `stages/execute.md` and `hm/verify-checks.md`; `loop` Step 3 gained
+#   the reference-file exemption. wrapup / verify commands are unchanged at the default
+#   `delegation.stages: []`, which is what these fixtures render.
 _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
     "commands/hm/execute.md": {
-        "side-python-cli": "391de3893a0cbc1077d749666c67829486f4869708747cacdd47622d528e573a",
-        "side-tauri-app": "391de3893a0cbc1077d749666c67829486f4869708747cacdd47622d528e573a",
-        "prod-tauri-app": "670aef92d192c959d663301d4fabbf28a450eaaf8cc30c712f0f227433d0fbbd",
-        "prod-firmware": "670aef92d192c959d663301d4fabbf28a450eaaf8cc30c712f0f227433d0fbbd",
+        "side-python-cli": "38b68863ba87ed543fab126435a8bcd10f0a588155687b730a4bf0aec1f526e5",
+        "side-tauri-app": "38b68863ba87ed543fab126435a8bcd10f0a588155687b730a4bf0aec1f526e5",
+        "prod-tauri-app": "0583772a8fed36b1ee629062f9898d6aeb869e645e669b2345fdd8fb00c57f69",
+        "prod-firmware": "0583772a8fed36b1ee629062f9898d6aeb869e645e669b2345fdd8fb00c57f69",
     },
     "commands/hm/research.md": {
         "side-python-cli": "b2ff77e2252c1daac97259d98f84acaed2cf941d6e67e4ce156e705847b38a49",
@@ -73,10 +88,10 @@ _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
         "prod-firmware": "cf7644adc98b211c4580693c5c59b5f29317068ff981f76a75a4686de16efa2c",
     },
     "commands/hm/review.md": {
-        "side-python-cli": "baaacacb1b88142a2f7552fdefb7fa239fca347d485cb1b7ea5ad51ada48de7c",
-        "side-tauri-app": "baaacacb1b88142a2f7552fdefb7fa239fca347d485cb1b7ea5ad51ada48de7c",
-        "prod-tauri-app": "0b2254e6f7dad6aaae52a9f433bab5574be4b77b3ad1d5bb99d1a2d7aa234651",
-        "prod-firmware": "0b2254e6f7dad6aaae52a9f433bab5574be4b77b3ad1d5bb99d1a2d7aa234651",
+        "side-python-cli": "25ea09c9d6fd29fb20ba646495797a7b2a6230530f88f45620ad26263b1a585e",
+        "side-tauri-app": "25ea09c9d6fd29fb20ba646495797a7b2a6230530f88f45620ad26263b1a585e",
+        "prod-tauri-app": "67b5d90b8d22ff6a0e8072f82f9ed5335a86ef09d7f5c7ca36f465b577e7f968",
+        "prod-firmware": "67b5d90b8d22ff6a0e8072f82f9ed5335a86ef09d7f5c7ca36f465b577e7f968",
     },
     "commands/hm/spec.md": {
         "side-python-cli": "c57a3d4ba446dbde8bd024bebb0cf6ce767f93c8278bdf0744945beae34aa80a",
@@ -97,10 +112,10 @@ _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
         "prod-firmware": "6fb13b67526e62f08629ceb60c5b5b79ed3e8ea9311f0d634b6762240b2fc13b",
     },
     "stages/execute.md": {
-        "side-python-cli": "92c22a8143d3f2f106cb0564a4b60d2d3121ef2c9c8d79ff648ef12e20a5852b",
-        "side-tauri-app": "92c22a8143d3f2f106cb0564a4b60d2d3121ef2c9c8d79ff648ef12e20a5852b",
-        "prod-tauri-app": "f9e2ff25a7472d534edccfac210d75c99a3b5036aa5624bf193ac4bd934672a3",
-        "prod-firmware": "f9e2ff25a7472d534edccfac210d75c99a3b5036aa5624bf193ac4bd934672a3",
+        "side-python-cli": "d461969ac7f9446d0c84a6f1278e1d8a6c7d34a78052936ce942f7b96c4e012c",
+        "side-tauri-app": "d461969ac7f9446d0c84a6f1278e1d8a6c7d34a78052936ce942f7b96c4e012c",
+        "prod-tauri-app": "528df3178bd5223a9b918ef5e82617eb1b314c209445bbb12f31305930249873",
+        "prod-firmware": "528df3178bd5223a9b918ef5e82617eb1b314c209445bbb12f31305930249873",
     },
     "stages/research.md": {
         "side-python-cli": "dd5801166e5918f5572251551018d07e13cb3a241d54772435764ae4bfa5d9ea",
@@ -109,10 +124,10 @@ _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
         "prod-firmware": "72751dd68a5456f9c1b090f70c0045ca5b7102aba55dc065b863647f40591079",
     },
     "stages/review.md": {
-        "side-python-cli": "240c20acc449f021bc4af5c62bb721e051bae2de14cc09e6ba600aada470cb02",
-        "side-tauri-app": "240c20acc449f021bc4af5c62bb721e051bae2de14cc09e6ba600aada470cb02",
-        "prod-tauri-app": "7d1d57e247df79cc9a8f75eb56f52b039f56804a5ada16209a156bf216ef47db",
-        "prod-firmware": "7d1d57e247df79cc9a8f75eb56f52b039f56804a5ada16209a156bf216ef47db",
+        "side-python-cli": "b382e06fc6283cb5537a87855ba99baca4921becd409dfe37b9c384a1e1f0c4e",
+        "side-tauri-app": "b382e06fc6283cb5537a87855ba99baca4921becd409dfe37b9c384a1e1f0c4e",
+        "prod-tauri-app": "8a4c224829f18b6bf87c90a04108960e31ccc80b574201b7fef6bd74ee30828a",
+        "prod-firmware": "8a4c224829f18b6bf87c90a04108960e31ccc80b574201b7fef6bd74ee30828a",
     },
     "stages/spec.md": {
         "side-python-cli": "19909a0c84013e9408e9b852c2890c769342e1fed471cd90fc44ff838811f3b1",
@@ -144,6 +159,24 @@ _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
         "prod-tauri-app": "2255501bd4e2586c9ea9594157b8b443231fbbb4d411f1258e3c379064c75fdb",
         "prod-firmware": "2255501bd4e2586c9ea9594157b8b443231fbbb4d411f1258e3c379064c75fdb",
     },
+    "hm/verify-checks.md": {
+        "side-python-cli": "fc5d929270bbd4bbe8388cac4c68b4f4b7b807c98ab78e555c7f9db0df924d7b",
+        "side-tauri-app": "fc5d929270bbd4bbe8388cac4c68b4f4b7b807c98ab78e555c7f9db0df924d7b",
+        "prod-tauri-app": "2311f8f3e0743b17f0e006c1ebdcc81872a392215c31b185e2fabcdafb88a8d6",
+        "prod-firmware": "2311f8f3e0743b17f0e006c1ebdcc81872a392215c31b185e2fabcdafb88a8d6",
+    },
+    "hm/review-confirmation.md": {
+        "side-python-cli": "2b7a85e60afea4f53dec59dc56c87debd5d890740a3aaa8431886ef6a05355bf",
+        "side-tauri-app": "2b7a85e60afea4f53dec59dc56c87debd5d890740a3aaa8431886ef6a05355bf",
+        "prod-tauri-app": "fd4bf0e83eff999ef22877b5a5b980e2676402cfa6bfc4aef39cd8e47223cce7",
+        "prod-firmware": "fd4bf0e83eff999ef22877b5a5b980e2676402cfa6bfc4aef39cd8e47223cce7",
+    },
+    "commands/hm/loop.md": {
+        "side-python-cli": "9b406bb1361a01a39c39018810b087f6eac9b6dc69512deb9c382cd168ed46ab",
+        "side-tauri-app": "9b406bb1361a01a39c39018810b087f6eac9b6dc69512deb9c382cd168ed46ab",
+        "prod-tauri-app": "844f3bb89e1d3f540eed941ee12f12df1b1bfd10e4e7321a58df97a5ec7d2612",
+        "prod-firmware": "844f3bb89e1d3f540eed941ee12f12df1b1bfd10e4e7321a58df97a5ec7d2612",
+    },
 }
 # Loop-sensitive but never hash-compared below (`strip`), so a later key addition may move it.
 _LOOP_SENSITIVE_HASH_EXEMPT = {"harness.yaml"}
@@ -168,7 +201,10 @@ LOOP_GATED_STAGE_BODIES = (
     *(f".claude/stages/{s}.md" for s in _LIGHT_LANE_S2_STAGES),
     *(f".agents/skills/hm-{s}/SKILL.md" for s in _LIGHT_LANE_S2_STAGES),
 )
-ALLOWED_BODY_DIFFS = {".claude/harness.yaml", *LISTING_SURFACES, *LOOP_GATED_STAGE_BODIES}
+PREVIOUS_ALLOWED = {".claude/harness.yaml", *LISTING_SURFACES, *LOOP_GATED_STAGE_BODIES}
+# SPEC-hm-light-lane-s2b widens it by exactly the two reference files that carry loop-only text.
+_S2B_LOOP_REFS = {".claude/hm/verify-checks.md", ".claude/hm/review-confirmation.md"}
+ALLOWED_BODY_DIFFS = PREVIOUS_ALLOWED | _S2B_LOOP_REFS
 ALL_TARGETS = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
 
 
@@ -558,6 +594,9 @@ def test_ac009_disable_removes_only_loop_files(tmp_path: Path) -> None:
     assert not (set(disabled) - set(enabled))
     changed = {p for p in disabled if disabled[p] != enabled[p]}
     assert changed <= ALLOWED_BODY_DIFFS, f"unexpected body changes: {changed - ALLOWED_BODY_DIFFS}"
+    # The s2b widening is exact: both reference files really do move, and nothing else was added.
+    assert ALLOWED_BODY_DIFFS - PREVIOUS_ALLOWED == _S2B_LOOP_REFS
+    assert changed >= _S2B_LOOP_REFS, "an allowance for a file that no longer moves is dead"
     for p in disabled:
         if p in ALLOWED_BODY_DIFFS:
             continue

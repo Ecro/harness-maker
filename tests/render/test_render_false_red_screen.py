@@ -17,6 +17,7 @@ from harness_maker.interview import interview
 from harness_maker.models import ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 
 @pytest.fixture(scope="module")
@@ -26,7 +27,7 @@ def execute_body(tmp_path_factory: pytest.TempPathFactory) -> str:
     render(synthesize(p, interview(p, autoloop_mode=True)), out, freeze_time=DEFAULT_FREEZE_TIME)
     f = out / "commands" / "hm" / "execute.md"
     assert f.is_file(), f"missing rendered command file: {f}"
-    return f.read_text(encoding="utf-8")
+    return stage_text(out, "execute")
 
 
 def _heading(body: str, name: str) -> int:

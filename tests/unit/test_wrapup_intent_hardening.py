@@ -18,6 +18,15 @@ Re-captures of `outside_57_sha256` by later tasks (append; placeholders are neve
   (SPEC-hm-light-lane-s2). Re-captured in all four arms after checking that 5.7's placeholder
   inventory still equals the golden one. Re-captured again after `/hm:review` round 1 edited
   the stub and wrapup's loop references, with the same placeholder check.
+- 2026-10-14, `hm-light-lane-s2b`: with `delegation.stages` containing `wrapup`, the Claude arms
+  carry a pointer to `.claude/hm/wrapup-steps.md` where Steps 1-5.6 were, plus the Read-path
+  dispatch instruction (SPEC-hm-light-lane-s2b). Re-captured the two Claude arms only; the Codex
+  arms still match their goldens byte for byte (AC-007), and 5.7's placeholder inventory still
+  equals the golden one in all four. Re-captured the same two arms again after `/hm:review`
+  round 1 added the `!test -r` existence check to Step 0.5 and a sentence to the mismatch bullet;
+  the placeholder inventory was re-checked and is unchanged. And once more after the confirmation
+  pass (the same two Claude arms: the existence check names the `base_root` path and the mismatch
+  bullet became the shared pointer); placeholder inventory unchanged.
 """
 
 from __future__ import annotations
@@ -406,7 +415,8 @@ def test_ac005_render_outside_57_unchanged(preset: Preset, host: str) -> None:
 def test_ac005_control() -> None:
     text = _wrapup(Preset.PRODUCTION, "claude")
     golden = _golden(Preset.PRODUCTION, "claude")["outside_57_sha256"]
-    edited = text.replace("### Step 4 — PLAN status update", "### Step 4 — PLAN")
+    # Step 8 is outside 5.7 on every arm; Step 4 left the Claude command with Steps 1-5.6 (s2b).
+    edited = text.replace("### Step 8 — Push (manual; never automatic)", "### Step 8 — Push")
     assert edited != text
     assert _sha(strip_57(edited)) != golden
     # A 5.7-only edit, with the frontmatter hash it would move, leaves the oracle unchanged.

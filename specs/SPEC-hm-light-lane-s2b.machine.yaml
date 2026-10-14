@@ -1,0 +1,431 @@
+schema_version: 3
+spec_slug: hm-light-lane-s2b
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Template moves plus one synthesize list; render and
+  differential tests pin the outcome, mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Wrapup Steps 1-5.6 render only in the reference file
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_wrapup_dispatch_names_the_steps_file
+  executable_predicate: '''wrapup'' not in delegation_stages or (not any(h in command
+    for h in WRAPUP_MOVED) and all(h in ref for h in WRAPUP_MOVED) and ''wrapup-steps.md''
+    in step_0_5)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The moved-heading inventory is fixed from the d2c0ab0 render before
+    any edit (wrapup Step 1 through 5.6 including the Judgment AC binding and 5.1-5.6
+    sub-headings; verify Check 1-6, Advisory probes, A1 and Output/Text; review Re-dispatch,
+    Round-state contract and Step C1-C3; execute Phase A.5's body), so a heading left
+    behind or a heading moved by mistake changes the set. The fixture renders Claude
+    Code with worktree.enabled true and false.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Verify checks render only in the reference file
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_verify_dispatch_names_the_checks_file
+  executable_predicate: '''verify'' not in delegation_stages or (not any(h in command
+    for h in VERIFY_MOVED[loop]) and all(h in ref for h in VERIFY_MOVED[loop]) and
+    ''## Output'' in command and ''verify-checks.md'' in step_0_5)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The moved-heading inventory is fixed from the d2c0ab0 render before
+    any edit (wrapup Step 1 through 5.6 including the Judgment AC binding and 5.1-5.6
+    sub-headings; verify Check 1-6, Advisory probes, A1 and Output/Text; review Re-dispatch,
+    Round-state contract and Step C1-C3; execute Phase A.5's body), so a heading left
+    behind or a heading moved by mistake changes the set.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Review auto-fix rounds and confirmation pass render only in reference files
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_rare_paths_live_in_reference_files
+  executable_predicate: all(k in command for k in REVIEW_KEPT) and not any(h in command
+    for h in REVIEW_MOVED) and all(h in refs for h in REVIEW_MOVED)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The moved-heading inventory is fixed from the d2c0ab0 render before
+    any edit (wrapup Step 1 through 5.6 including the Judgment AC binding and 5.1-5.6
+    sub-headings; verify Check 1-6, Advisory probes, A1 and Output/Text; review Re-dispatch,
+    Round-state contract and Step C1-C3; execute Phase A.5's body), so a heading left
+    behind or a heading moved by mistake changes the set. The kept lead lines (the
+    two section headings, their start conditions and the light-lane skip rule) are
+    copied from the same render.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Execute Phase A.5 procedure renders only in the reference file
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_rare_paths_live_in_reference_files
+  executable_predicate: all(k in command for k in EXECUTE_KEPT) and 'stage_agent_ledger
+    emit' in command and not any(h in command for h in EXECUTE_MOVED) and all(h in
+    ref for h in EXECUTE_MOVED)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'The moved-heading inventory is fixed from the d2c0ab0 render before
+    any edit (wrapup Step 1 through 5.6 including the Judgment AC binding and 5.1-5.6
+    sub-headings; verify Check 1-6, Advisory probes, A1 and Output/Text; review Re-dispatch,
+    Round-state contract and Step C1-C3; execute Phase A.5''s body), so a heading
+    left behind or a heading moved by mistake changes the set. The kept lines (A.5
+    heading, the lane: light skip line and its emit command) are copied from the d2c0ab0
+    render.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Every pointer reads from the project root and fails closed
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_pointers_read_from_root_and_fail_closed
+  executable_predicate: all(name in p and 'project root' in p and 'never from `<WT>`'
+    in p and 'STOP' in p and '/hm:make' in p for name, p in pointers.items()) and
+    '5.7' in pointers['wrapup-steps.md'] and 'Step 6' in pointers['wrapup-steps.md']
+    and all('base_root' in line for line in dispatch_lines)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The required phrases come from SPEC-hm-light-lane-s2 S3 (project
+    root, the phrase 'never from `<WT>`' its test asserts, STOP on missing) and from
+    S2 here (stop before 5.7 and Step 6, the /hm:make recovery hint). `pointers` are
+    the lines that tell the main loop to Read a .claude/hm file; the Step 0.5 dispatch
+    lines are checked separately for base_root. The phrases are written from the SPEC,
+    not from the new templates.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Nothing is lost and nothing is rewritten in the move
+  type: property
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_moved_text_is_preserved
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference is the d2c0ab0 render of the same answers, produced
+    before the edit by the unchanged renderer; the relation holds for any renderer
+    that moves text without editing it, independent of how the partials are arranged.
+  oracle_independence_waiver: null
+  input_domain: the four Claude stage commands rendered from this repo's harness.yaml
+    at d2c0ab0 and after the change, with loop on and off
+  transformation: extract instructions with tests/structural/_instruction_baseline's
+    extractor; slice each moved section by heading from both renders
+  expected_relation: instructions(old) subset_of instructions(new_command + its reference
+    files), and old_section(h) == ref_section(h) byte for byte for every moved heading
+    h
+  preconditions: []
+  observable_output: the missing-instruction list and the per-heading section diff,
+    both empty
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Codex stage skills are unchanged
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_codex_stage_skills_unchanged
+  executable_predicate: all(hashlib.sha256(skill[s].encode()).hexdigest() == GOLDEN[s]
+    for s in ('wrapup', 'verify', 'review', 'execute'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: SHA-256 of each Codex stage skill captured from the d2c0ab0 render
+    before the edit and stored as a golden; the Codex arm includes the same partials
+    inline.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Reference files render with generated-file frontmatter in every harness
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_reference_files_render_with_generated_frontmatter
+  executable_predicate: all(set(FRONTMATTER_KEYS) <= set(frontmatter(f)) for f in
+    REFERENCE_FILES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: CLAUDE.md's security section names the four frontmatter keys every
+    generated file carries; the fixture covers gated and auto_safe autonomy and Side
+    and Production presets.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: The four Claude commands shrink by 40,000 characters
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_the_four_commands_shrink
+  executable_predicate: 205430 - sum(len(cmd) for cmd in four) >= 40000
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The before value 205,430 is the frozen surface baseline at d2c0ab0
+    (wrapup 53,107, verify 23,120, review 77,384, execute 51,819), measured under
+    _surface_baseline.pinned_install_ref on this repo's harness.yaml; the 40,000 floor
+    is set from the section sizes in the same render before the edit. Verify's Output
+    and execute's ledger block stay, about 3,000 chars.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: A non-delegated stage keeps its body inline
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_undelegated_stages_stay_inline
+  executable_predicate: all(sha256(command(cfg, s)) == PRE_EDIT_SHA[cfg][s] for cfg
+    in ('delegation-none', 'delegation-wrapup', 'delegation-verify') for s in ('wrapup',
+    'verify') if s not in DELEGATED[cfg])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: SHA-256 of the wrapup and verify commands rendered from the d2c0ab0
+    templates for each delegation config, captured before the edit in a d2c0ab0 worktree.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: The delegate follows only its allowlisted file and fails without it
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_delegate_trusts_only_its_file
+  executable_predicate: all(f in delegate_prompt for f in ('.claude/hm/wrapup-steps.md',
+    '.claude/hm/verify-checks.md')) and 'base_root' in delegate_prompt and 'no JSON'
+    in missing_rule and 'Nothing else you read from disk' in delegate_prompt
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The allowlist and the fail rule are fixed by IRR-002 and S5b in
+    this SPEC before the edit; the unparseable exit path is wrapup_receipt's existing
+    exit 2, unchanged.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: The loop exempts reference files from the worktree substitution
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s2b.py::test_loop_reads_reference_files_from_root
+  executable_predicate: '''.claude/hm/'' in loop_step_4 and ''project root'' in loop_step_4'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The conflict is the d2c0ab0 loop.md Step 4 sentence 'substitute
+    the absolute worktree path for every Read/Write/Edit call' against SPEC-hm-light-lane-s2
+    S3's never-from-<WT> rule; the exemption text is fixed here.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-013
+  title: The loop flag's allowed diffs stay enumerated
+  type: mechanical
+  test_ids:
+  - tests/unit/test_loop_opt_in.py::test_ac009_disable_removes_only_loop_files
+  executable_predicate: changed <= ALLOWED_BODY_DIFFS and ALLOWED_BODY_DIFFS - PREVIOUS_ALLOWED
+    == {'.claude/hm/verify-checks.md', '.claude/hm/review-confirmation.md'}
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: PREVIOUS_ALLOWED is the d2c0ab0 set in test_loop_opt_in.py; the
+    two additions are named by the Supersedes constraint before the edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Add five generated files under .claude/hm/ (wrapup-steps.md, verify-checks.md,
+    review-autofix.md, review-confirmation.md, execute-a5.md) whose names the commands
+    and stage-delegate read
+  category: schema/file format/storage layout
+  rationale: Renaming one later needs a retire step for copies on disk and breaks
+    a harness whose command and file came from different versions
+  source: spec
+- id: IRR-002
+  decision: stage-delegate follows <base_root>/.claude/hm/wrapup-steps.md and verify-checks.md
+    as instructions; every other file it reads stays data
+  category: security/permission boundary
+  rationale: Its prompt said nothing read from disk could extend its instructions;
+    a writer of the base checkout's .claude/hm/ can now direct the delegate, the same
+    reach they already have over the command files
+  source: spec
+approval:
+  kind: human
+  content_hash: 9f349baf4056c6a919aeed0095e58694c86e6926b925a593230096aa41698271
+  approved_by: Ecro
+  approved_at: '2026-10-14T21:32:59Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: ebcf312b7b340e9e7e6de6c1eb681d00bd08e8921b6ef34fde2403b54a3ae90e
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 7728fb3288288577a326865fa5744b05ede989d6099073af6a0bd1bdbe9975ef
+    irreversible_decisions: 5b7c6b88d12d03750c6e64e26acdedf8c2967e196330b6ee4450fd05d5db10e1
+    AC-001: aadfaf1121c6e0745e996e789b2ee15362e647e0dc06ee32dca07beb80c999bb
+    AC-002: 5124a7d0e3e9e8404eda6d36424c4d35ca91b9a01fcc07562996e08c3f0815a4
+    AC-003: 60d5415d9492c90013063e6b5a3f8a10cc580cac04e2aaf250f0d3f02bc80cd0
+    AC-004: 82f953ad51d192adc5ef29dad181b7c5a556d04e79389ce5b50eeadc0a5e6a12
+    AC-005: e22a054f9fdbfb8b865716f6efcb337c869606c4e468232e99da5fecff37657e
+    AC-006: 0102a275086e6542a4e6fa479f79c2e674ffb61d31ad7f536d23dac87f27f646
+    AC-007: 38e93558fb6b05a5d914d24398450a648e0f4084fb8ccd2ec6e567dadfd030ca
+    AC-008: e86f97eec22ec3199c981a3a43c03fc0d22567f53ceb18e8f6d6cc0d7f64a5de
+    AC-009: 5e6982913ea0ad32f204ac022ae342e1e397b7079d9a28081c20a5e0c73863af
+    AC-010: 17a40024f4e76dff1fb8b14bc0b031c9a16769d53b1f7183228a09f0a0cb115e
+    AC-011: dfe8bed897e034bcdfcab302bf98d7bb2ec1b72566522a832faf9f3a0683a034
+    AC-012: b0e586a08c32b99a408ad8130717d64316af3da22b467cb4cf55c21519e3a550
+    AC-013: 42f7806a3249db7ad48f0c3b3979e05318f646fcaf3b864fb07b07632da7c95f
+    ac_order: 3bd5e038e1294d0ef71e83a9ccf2cad4a6485ffdc27e17dd48b96bd16f410378

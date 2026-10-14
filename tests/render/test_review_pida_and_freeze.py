@@ -30,6 +30,7 @@ from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile, SecondOpinionConfig
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 _MODELS = ("codex", "antigravity")
 
@@ -47,7 +48,7 @@ def _render_root(models: tuple[Literal["codex", "antigravity"], ...]) -> Path:
 
 
 def _review(models: tuple[str, ...]) -> str:
-    return (_render_root(models) / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    return stage_text(_render_root(models), "review")
 
 
 def review_on() -> str:

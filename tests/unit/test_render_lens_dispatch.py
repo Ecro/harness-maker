@@ -66,6 +66,7 @@ from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 RESULTS_ROOT = ".claude/observability/.hm-lens-results"
 
@@ -161,7 +162,7 @@ def review_body(tmp_path_factory: pytest.TempPathFactory) -> str:
     out = _render(tmp_path_factory.mktemp("rendered-a"))
     f = out / "commands" / "hm" / "review.md"
     assert f.is_file(), f"missing rendered command file: {f}"
-    return f.read_text(encoding="utf-8")
+    return stage_text(out, "review")
 
 
 @pytest.fixture(scope="module")
@@ -508,7 +509,7 @@ def test_approval_requires_both_conjuncts_at_every_threshold(
     """
     out = _render(tmp_path_factory.mktemp(f"rendered-{threshold}"), grade_threshold=threshold)
     gate = _section(
-        (out / "commands" / "hm" / "review.md").read_text(encoding="utf-8"),
+        stage_text(out, "review"),
         "## Grade Gate",
         stop="\n## ",
     )
@@ -629,7 +630,7 @@ def _render_both_variants(tmp_path_factory: pytest.TempPathFactory) -> dict[str,
     out = tmp_path_factory.mktemp("wt-on")
     render(synthesize(p, a), out, freeze_time=DEFAULT_FREEZE_TIME)
     return {
-        "claude": (out / "commands" / "hm" / "review.md").read_text(encoding="utf-8"),
+        "claude": stage_text(out, "review"),
         "codex": (out / ".." / ".agents" / "skills" / "hm-review" / "SKILL.md")
         .resolve()
         .read_text(encoding="utf-8")
