@@ -91,11 +91,12 @@ Bash("uv run --with {{ harness_maker_src_path }} hm delegation_ledger record --r
 {%- endif %}
 
 {% if wrapup_moved -%}
-Otherwise **check that the step list exists before anything is dispatched**: a delegate that
-cannot read it returns nothing, and a run that did nothing reconciles clean.
+Otherwise **check that the step list exists, at the path the delegate will read, before anything
+is dispatched**: a delegate that cannot read it returns nothing, and a run that did nothing
+reconciles clean. Substitute the brief's `base_root`.
 
 ```bash
-!test -r .claude/hm/wrapup-steps.md && echo present || echo MISSING
+!test -r '<brief.base_root>/.claude/hm/wrapup-steps.md' && echo present || echo MISSING
 ```
 
 On `MISSING`, name `wrapup-steps.md`, say to re-render with `/hm:make`, and STOP at once: commit
@@ -134,10 +135,8 @@ reports `document-missing`. Delete the temp file once you have the verdict.
 - exit 0 → proceed to Step 5.7.
 - exit 1 (`mismatch`) → the agent claimed work that is not on disk. **Print every mismatch
   verbatim and fix the gap yourself before Step 5.7** — the commit is about to make those
-  claims permanent. Do not paraphrase the list.{% if wrapup_moved %} Fix each gap by the step that owns it:
-  Read `.claude/hm/wrapup-steps.md` from the project root (above `.worktrees/`), never from
-  {{ '`<WT>`' if wt_on else 'a worktree' }}, and follow that step's own procedure — its memory writes go through the locked memory
-  CLI, never an Edit or Write on `wiki.md` or `failures.md`.{% endif %}
+  claims permanent. Do not paraphrase the list.{% if wrapup_moved %}{% set fix_pointer %}{% with ref_file="wrapup-steps.md", ref_use="and fix each gap by the step that owns it (its memory writes go through the locked memory CLI, never an Edit or Write on `wiki.md` or `failures.md`)", ref_stop=" at once: run no Step 5.7 and make no commit" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}{% endset %}
+{{ fix_pointer | trim | indent(2, first=True) }}{% endif %}
 - exit 2 (`unparseable`) → no usable receipt. Run the inline body; the delegated attempt
   produced nothing you can verify, so treat it as not having run.
 

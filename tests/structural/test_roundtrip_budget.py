@@ -19,7 +19,14 @@ import re
 
 import pytest
 
-from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips, render_surface
+from ._instruction_baseline import stage_text
+from ._surface_baseline import (
+    CLAUDE_VARIANT,
+    CODEX_VARIANT,
+    REFS_VARIANT,
+    count_round_trips,
+    render_surface,
+)
 
 # Measured 2026-07-29 against this repo's `.claude/harness.yaml` through the SAME
 # generator the surface baseline uses. Phases 2–5 lowered `execute`, `wrapup` and their
@@ -27,6 +34,13 @@ from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips,
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # Counted per command PLUS the `.claude/hm/` files it points at (2026-10-14, stage 2b
+    # confirmation pass), the way `_instruction_baseline.stage_text` reads a stage. The entries
+    # below counted the bare command, so the drops they record for stage 2b were calls that had
+    # MOVED, not left: a call in a reference file is still a call the stage makes. Against the
+    # pre-move d2c0ab0 counts nothing was removed: execute 19 and review 33 are back where they
+    # were, verify is 10→11 and wrapup 32→33 (the `!test -r` existence check before each dispatch,
+    # review round 1 S1).
     # +2 total, 100→102 (2026-10-14, /hm:review round 1 of SPEC-hm-light-lane-s2b, finding S1).
     # verify 6→7 and wrapup 19→20: one call ADDED to each delegated command, the `!test -r` check
     # that the step list exists before the dispatch. It is deliberate: a delegate that cannot read
@@ -136,7 +150,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # recorded, which is the evidence half the removed Step 1.7 gate left behind.
     # 21 → 25 (same task, second fold): `worktree loop-mode-active` in Step 0.2 plus the
     # is_codex-branched call sites ADR-011's counting rule includes.
-    "execute": 18,
+    "execute": 19,
     # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml
     # second_opinion.models` dropped `antigravity`, and `/hm:health` runs ONE per-model
     # positive smoke-test per enabled model, so its `second_opinion_invoke` smoke call for that
@@ -235,7 +249,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 34 → 35 (top-issues-2026-09, 2026-09-30): Step 3.4 runs `hm review_churn attribute` on the
     # merged temp file before `persist-payload`, so `caused_by` is stamped by code instead of
     # being "determined" in prose that never reached the payload (621/621 findings unstamped).
-    "review": 20,
+    "review": 33,
     # 6 → 7 (ai-native-sdlc-vs-intent-world, 2026-09-19): spec runs `hm spec_machine approve`
     # twice as rendered calls (Step 0 `--exempt`, Step 5 human stamp) and, now judgment-gated,
     # no longer renders the gate-first `autopilot_caps gate-blocked` line: +2 -1. Declared in
@@ -266,7 +280,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # `verification_plan commands` + self-attested `mark-pass` became one `verification_cache run`
     # that runs the CI gates and writes the marker itself; `mark-pass` survives only inside the
     # degraded (no-CI) block. -2 +1.
-    "verify": 7,
+    "verify": 11,
     # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
     # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
     # not render. A config flip that adds a gate in two commands and removes an advisory in a
@@ -314,13 +328,21 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # in `work-docs/BASELINE-DELTA-intent-layer-improvements.md`.
     # 34 → 33 (top-issues-2026-09, 2026-09-30): Step 2's check + plan + mark-pass → one
     # `verification_cache run`, same change as verify. -2 +1.
-    "wrapup": 20,
+    "wrapup": 33,
 }
 
 
 @pytest.fixture(scope="module")
 def surface() -> dict[str, dict[str, str]]:
-    return render_surface()
+    """Each Claude command as the model meets it: the command plus the `.claude/hm/` files it
+    points at (`_instruction_baseline.stage_text`). Calls that moved into a reference file are
+    still calls the stage makes, so they stay under this budget (stage 2b confirmation pass)."""
+    rendered = render_surface(with_refs=True)
+    commands, refs = rendered[CLAUDE_VARIANT], rendered[REFS_VARIANT]
+    return {
+        CLAUDE_VARIANT: {name: stage_text(name, commands, refs) for name in commands},
+        CODEX_VARIANT: rendered[CODEX_VARIANT],
+    }
 
 
 def test_the_table_covers_every_rendered_claude_command(surface: dict[str, dict[str, str]]) -> None:

@@ -26,6 +26,14 @@ _POINTER = re.compile(
     r"|review-confirmation|execute-a5)\.md)` from the project root.*\n",
     re.M,
 )
+#: An INDENTED pointer is a reference, not the body's position (the wrapup receipt-mismatch bullet
+#: sends the reader to the same file mid-list). It is checked against `ref_dir` but never expanded:
+#: expanding it would put the block in Step 0.5, ahead of where the stage reads it.
+_INLINE_POINTER = re.compile(
+    r"^[ \t]+Read `\.claude/hm/(?P<name>(?:wrapup-steps|verify-checks|review-autofix"
+    r"|review-confirmation|execute-a5)\.md)` from the project root.*$",
+    re.M,
+)
 
 
 def expand_references(command: str, ref_dir: Path) -> str:
@@ -37,13 +45,17 @@ def expand_references(command: str, ref_dir: Path) -> str:
         return ref[i : ref.index(REF_END, i)]
 
     expanded, _ = _POINTER.subn(block, command)
+    for m in _INLINE_POINTER.finditer(expanded):
+        assert (ref_dir / m.group("name")).is_file(), f"{m.group('name')} did not render"
     # A pointer to a reference file this module does not know about would pass through unexpanded
     # and silently drop that file's text from every test that reads through here. The shared
     # auto-advance procedure is the one deliberate pointer left alone: tests read it directly.
     strays = [
         ln
         for ln in expanded.splitlines()
-        if ln.startswith("Read `.claude/hm/") and "autopilot-advance.md" not in ln
+        if ln.lstrip().startswith("Read `.claude/hm/")
+        and "autopilot-advance.md" not in ln
+        and not _INLINE_POINTER.match(ln)
     ]
     assert not strays, f"a reference-file pointer matched nothing in _POINTER: {strays[0][:120]}"
     return expanded

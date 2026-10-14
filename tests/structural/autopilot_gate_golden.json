@@ -43,8 +43,8 @@
       "review": "1b71d2fd53cf497d432be85dcf41aa2927d8f7048c627f143c3d62beec0d3408",
       "spec": "8ae5e3b5dcc8846794c92de6e0fece5eec000644f0c7806455d268a382f456ef",
       "uninstall": "7a836f5633d991f207d45574fd9e599c3cb92af42ccf4c169761c45fea0754f5",
-      "verify": "17ebe452bf9de60dd78656b618e08115987d8134c826d65991613ff5acdf6a32",
-      "wrapup": "ad77155b726fcc8e959367719d525882ba7f89f9c45afb8c4edb80911481ec22"
+      "verify": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+      "wrapup": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8"
     },
     "auto_safe@warn": {
       "configure": "3a8ac6d3c54bed38e16c479bc02cd5976820c1a68eeb56264b71e2ebc7c00822",
@@ -57,8 +57,8 @@
       "review": "1b71d2fd53cf497d432be85dcf41aa2927d8f7048c627f143c3d62beec0d3408",
       "spec": "496a4e86d945fb8cc17f84481b2901f836320345d94f2f20906d6aa71e8ea196",
       "uninstall": "7a836f5633d991f207d45574fd9e599c3cb92af42ccf4c169761c45fea0754f5",
-      "verify": "17ebe452bf9de60dd78656b618e08115987d8134c826d65991613ff5acdf6a32",
-      "wrapup": "ad77155b726fcc8e959367719d525882ba7f89f9c45afb8c4edb80911481ec22"
+      "verify": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+      "wrapup": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8"
     }
   },
   "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",

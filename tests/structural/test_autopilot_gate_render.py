@@ -40,7 +40,9 @@ Re-captures (append; never silently overwrite):
   arm and that no command was added or removed. Re-captured again in the same task after
   `/hm:review` round 1 edited the same commands (the Step 0.5 existence check, the review pointers'
   stop clause, the mismatch bullet, `loop` Step 3's reference-file exemption); the moved set per arm
-  was checked to be unchanged.
+  was checked to be unchanged. And once more after the confirmation pass: only `verify` and
+  `wrapup` in the two `auto_safe@*` arms moved (the existence checks name the delegate's
+  `base_root` path; the mismatch bullet became the shared pointer).
 - **2026-10-14, `hm-light-lane-s2`** — `execute`, `research`, `review`, `spec`, `verify`,
   `wrapup` and `health` moved, in all four arms. The six stages: the auto-advance block became a
   per-stage stub pointing at the new `.claude/hm/autopilot-advance.md` (its `autopilot_caps`

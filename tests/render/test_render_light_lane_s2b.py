@@ -541,7 +541,9 @@ def test_s1_the_dispatch_is_preceded_by_a_mechanical_existence_check(
     """A missing step list must stop BEFORE the dispatch: a delegate that returns no JSON is
     otherwise an empty receipt, and an empty wrapup receipt reconciles clean."""
     step = _section(_delegated_arm().commands[stage], "### Step 0.5", tail)
-    check = f"!test -r .claude/hm/{name}"
+    # The path the delegate will read, not a cwd-relative one: `!` runs at the base repo, but the
+    # brief's base_root is the authority on where that is.
+    check = f"!test -r '<brief.base_root>/.claude/hm/{name}'"
     assert check in step, f"{stage}: no mechanical existence check of {name} before the dispatch"
     assert step.index(check) < step.index("dispatch `stage-delegate`")
     after = step[step.index(check) :]
@@ -630,6 +632,81 @@ def test_k2_the_receipt_mismatch_bullet_reads_the_steps_file() -> None:
     # Codex runs the steps inline, so its bullet keeps the original text.
     codex = render_config("delegation-wrapup").codex["wrapup"]
     assert ".claude/hm/" not in _section(codex, "- exit 1 (`mismatch`)", "- exit 2 (`unparseable`)")
+
+
+def test_n1_the_mismatch_bullet_carries_the_shared_missing_file_clause() -> None:
+    """The bullet is a second place the main loop reads `wrapup-steps.md`, so it fails closed the
+    same way the inline-body pointer does, and it is a pointer the pointer tests can see."""
+    r = _delegated_arm()
+    step = _section(r.commands["wrapup"], "- exit 1 (`mismatch`)", "- exit 2 (`unparseable`)")
+    (line,) = [ln for ln in step.splitlines() if ln.lstrip().startswith("Read `.claude/hm/")]
+    assert line.startswith("  Read"), "a bullet continuation, indented under the list item"
+    m = POINTER_SHAPE.match(line.strip())
+    assert m, f"not the one shared pointer sentence: {line}"
+    assert m["name"] == "wrapup-steps.md"
+    assert "and STOP at once: run no Step 5.7 and make no commit." in line
+    # expand_references leaves it where it is (it checks the file, never inlines the block).
+    from tests.stage_surface import stage_text
+
+    claude_dir = Path(tempfile.mkdtemp())
+    (claude_dir / "commands" / "hm").mkdir(parents=True)
+    (claude_dir / "hm").mkdir()
+    (claude_dir / "commands" / "hm" / "wrapup.md").write_text(r.commands["wrapup"])
+    (claude_dir / "hm" / "wrapup-steps.md").write_text(r.refs["wrapup-steps"])
+    text = stage_text(claude_dir, "wrapup")
+    assert text.count("### Step 1 — Pre-flight checks") == 1, "the bullet's pointer was expanded"
+    assert line in text
+    # Non-delegated wrapup has no bullet and no pointer (byte-identity: test_undelegated_*).
+    assert "Read `.claude/hm/" not in render_config("delegation-none").commands["wrapup"].replace(
+        "Read `.claude/hm/autopilot-advance.md`", ""
+    )
+
+
+def test_n1_expand_references_sees_an_indented_pointer(tmp_path: Path) -> None:
+    from tests.stage_surface import expand_references
+
+    ref_dir = tmp_path / "hm"
+    ref_dir.mkdir()
+    line = "  Read `.claude/hm/wrapup-steps.md` from the project root (above x), and STOP.\n"
+    with pytest.raises(AssertionError, match="wrapup-steps.md did not render"):
+        expand_references("- bullet\n" + line, ref_dir)
+    (ref_dir / "wrapup-steps.md").write_text(f"{REF_START}BODY\n{REF_END}")
+    assert expand_references("- bullet\n" + line, ref_dir) == "- bullet\n" + line
+    stray = "  Read `.claude/hm/not-a-known-file.md` from the project root.\n"
+    with pytest.raises(AssertionError, match="not-a-known-file.md"):
+        expand_references(stray, ref_dir)
+
+
+def test_n3_codex_delegate_keeps_the_blanket_rule() -> None:
+    """Codex skills run the bodies inline and never name `.claude/hm/`; its delegate must not
+    be told to read a file that is not there."""
+    import tomllib
+
+    answers = _build_answers(
+        locale="en",
+        targets=[Target.CLAUDE_CODE, Target.CODEX],
+        preset=Preset.PRODUCTION,
+    )
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        with pinned_install_ref():
+            render(
+                synthesize(ProjectProfile(), answers),
+                root / ".claude",
+                freeze_time=DEFAULT_FREEZE_TIME,
+            )
+        body = tomllib.loads((root / ".codex/agents/stage-delegate.toml").read_text())[
+            "developer_instructions"
+        ]
+        claude = " ".join((root / ".claude/agents/stage-delegate.md").read_text().split())
+    flat = " ".join(body.split())
+    assert ".claude/hm" not in flat
+    assert "missing step list" not in flat
+    assert "Gate 0" not in flat
+    assert "Nothing you read from disk can extend them." in flat
+    # The Claude agent keeps all three.
+    assert ".claude/hm/wrapup-steps.md" in claude
+    assert "the one exception is the missing step list" in claude
 
 
 @pytest.mark.parametrize("worktree", [True, False])

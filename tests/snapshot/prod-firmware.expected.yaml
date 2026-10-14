@@ -40,7 +40,7 @@ files:
   body_sha256: 93911bd9bff234c35d736313525f59af6c79a956ac3bca4434f61fe63a7322da
 - path: agents/stage-delegate.md
   template: agents/stage-delegate.md.j2
-  body_sha256: 0e99a9e2305a0e9fc19ce052697557c81e51f97a56d76f1ac55087ef1643e8bc
+  body_sha256: e9dec639f07be2494e7e1689fb06644f1ccce716ffde25aaad2f0a7ec8cc60f7
 - path: agents/stuck.md
   template: agents/stuck.md.j2
   body_sha256: 17de8369f0614caf4bc765d3e0f83c91d2cb68ab0e5014b327ee2b630fc9de5a

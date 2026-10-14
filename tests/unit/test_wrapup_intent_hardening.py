@@ -24,7 +24,9 @@ Re-captures of `outside_57_sha256` by later tasks (append; placeholders are neve
   arms still match their goldens byte for byte (AC-007), and 5.7's placeholder inventory still
   equals the golden one in all four. Re-captured the same two arms again after `/hm:review`
   round 1 added the `!test -r` existence check to Step 0.5 and a sentence to the mismatch bullet;
-  the placeholder inventory was re-checked and is unchanged.
+  the placeholder inventory was re-checked and is unchanged. And once more after the confirmation
+  pass (the same two Claude arms: the existence check names the `base_root` path and the mismatch
+  bullet became the shared pointer); placeholder inventory unchanged.
 """
 
 from __future__ import annotations

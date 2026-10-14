@@ -327,20 +327,22 @@ def test_the_default_render_costs_existing_users_nothing(
 #   +60 (ADR-006: "the cap exactly") → +66 (2026-10-14, SPEC-hm-light-lane-s2b: the Read-path
 #   lines and the pointer) → +77 (2026-10-14, /hm:review round 1: S1's `!test -r` existence check
 #   before the dispatch, +8, and K2's "fix the gap by the step that owns it" sentence, +3).
-_DELEGATED_EXPANDED_DELTA = 77
+#   → +76 (2026-10-14, stage 2b confirmation pass: the mismatch bullet's sentence became the shared
+#   one-line pointer, -2, and the existence check now names the delegate's `base_root` path, +1).
+_DELEGATED_EXPANDED_DELTA = 76
 
 
 @pytest.mark.parametrize("preset", ["Side", "Production"])
 def test_delegation_adds_a_bounded_amount_of_prose(tmp_path: Path, preset: str) -> None:
     """ADR-006 warned that the delegate-on command GROWS rather than shrinks, and bounded the
     growth at +60 body lines of the command itself. Stage 2b (SPEC-hm-light-lane-s2b) moved Steps
-    1-5.6 out of a delegated command, so that quantity is now negative and the original bound
-    still holds on it; what delegation costs is the dispatch prose, which is measured on the stage
-    as the model meets it (command plus the file it reads) and pinned exactly.
+    1-5.6 out of a delegated command, so that quantity is now negative (the `on < off - 200` arm
+    below) and a `<= 60` bound on it could no longer fail. What delegation costs is the dispatch
+    prose, measured on the stage as the model meets it (command plus the file it reads); the
+    `_DELEGATED_EXPANDED_DELTA` equality pin is the guard.
     """
     off = _count_body_lines(_wrapup(tmp_path / "off", preset=preset, expand=False))
     on = _count_body_lines(_wrapup(tmp_path / "on", preset=preset, stages=["wrapup"], expand=False))
-    assert on - off <= 60, f"{preset} delegation adds {on - off} body lines to the command"
     assert on < off - 200, f"{preset}: delegated command is {on} body lines, inline {off}"
 
     off_full = _count_body_lines(_wrapup(tmp_path / "off2", preset=preset))
