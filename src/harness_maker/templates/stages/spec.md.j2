@@ -50,7 +50,7 @@ Skip the SPEC interview ONLY when:
 | **Contracts** | No API / IPC / DB schema / file format change |
 | **Risk** | Reversible in <1h with no user-facing impact |
 
-When skipped: write a minimal SPEC (Intent + 1 happy-path scenario in G-W-T form + Verification = "manual smoke") and continue. Do NOT ask permission to skip — proceed and log rationale in the SPEC's `## Refinement Decisions` section. Its machine.yaml is `schema_version: 3` with `irreversible_decisions: []` (the four criteria above rule out every irreversible category), and it is stamped **exempt** — no identity, no prompt; the stamp stays valid only while the list stays empty:
+When skipped: write a minimal SPEC (Intent + 1 happy-path scenario in G-W-T form + Verification = "manual smoke", `lane: light`) and continue. Do NOT ask permission to skip — proceed and log rationale in the SPEC's `## Refinement Decisions` section. Its machine.yaml is `schema_version: 3` with `irreversible_decisions: []` (the four criteria above rule out every irreversible category), and it is stamped **exempt** — no identity, no prompt; the stamp stays valid only while the list stays empty:
 
 {% if is_codex %}
 ```
@@ -61,6 +61,23 @@ Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml 
 !uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --exempt
 ```
 {% endif %}
+
+**Not skipped → pick the lane: `light` or `full`.** On a bench of single-session tasks the full
+pipeline added no hidden-test accuracy over a plain run (plain 44/45, /hm: 13/15) at ×22 cost,
+and both of its failures were Phase A.5 self-blocks. `light` is for that size of work; `full`
+keeps everything for work whose value the bench never measured. Choose `light` only when **all
+three** hold, judged by reading the ask and the files it touches — no keyword rule:
+
+- about five files or fewer change;
+- the work fits one session — nothing has to survive a context window;
+- no decision falls in an irreversible category (Step 3.5). Re-check there: a non-empty
+  `irreversible_decisions` turns the lane back to `full`.
+
+In doubt, `full`. Write the lane to the frontmatter (Step 3) and its one-line reason to
+`## 🔍 Refinement Decisions`, so a wrong call can be spot-checked. On `light`, Step 2 runs at most
+one round and asks only about a WHAT ambiguity that would change the outcome; every other step
+here runs unchanged, `spec-validator` included. `/hm:execute` and `/hm:review` read the field; a
+SPEC without it is `full`.
 
 ### Step 0.5 — Intent context (intent layer — one line and continue when unused)
 
@@ -228,6 +245,7 @@ created: {YYYY-MM-DD}
 tags: [{project}, spec, {tech-stack}, {2-5 domain tags}]
 test_framework: {pytest | gtest | vitest | bats | …}   # MANDATORY
 interview_rounds: {N}   # rounds this interview took; 0 when Step 0 skipped it
+lane: {light | full}   # Step 0's lane; the skip path is always light
 intent: <id>   # ONLY when Step 0.5 picked one; omit on "none"
 research_doc: "[[RESEARCH-{slug}]]"   # OR omit when no research artifact
 summary: "{≤100 char one-line: what this SPEC is for}"

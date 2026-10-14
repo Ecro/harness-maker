@@ -396,6 +396,7 @@ research_field=$(yq '.research_doc' "$PLAN") # e.g., "[[RESEARCH-mqtt-retry]]"
 If `spec:` resolves to an existing file:
 - Read SPEC fully.
 - Extract `test_framework` from frontmatter — Phase A uses this verbatim.
+- Extract `lane` from frontmatter (`light` | `full`; missing → `full`) — Phase A.5 reads it.
 - Extract `## 📋 In-Scope Scenarios` — Phase A authors one test per scenario.
 - Extract `## ✅ Verification Criteria` — Phase B RED-gate uses the named test commands.
 
@@ -416,7 +417,7 @@ If RESEARCH file is older than `mtime_warn_days`: warn the user, proceed with im
 
 ### Step 3 — Per-PLAN-phase TDD machine
 
-For each phase in PLAN's `## 📝 Implementation Plan`, run Phases A → A.4 → A.5 → B → C → D in order:
+For each phase in PLAN's `## 📝 Implementation Plan`, run Phases A → A.4 → A.5 → B → C → D in order (A.5 is skipped on `lane: light`):
 
 #### Phase A — Author tests (skipped when `tdd_active == false`)
 
@@ -524,6 +525,11 @@ Then, for each passing test, take exactly one of two actions:
 the lenses adjudicate the *justification* rather than rediscovering the test.
 
 #### Phase A.5 — test-reviewer gate (skipped when `tdd_active == false`)
+
+**`lane: light` in the SPEC frontmatter → skip to Phase B.** Phase A, A.4 and B still run: they
+are the deterministic oracles. A.5 is the LLM gate that, on the small-task bench, blocked 2 of 15
+runs whose plain counterpart passed every hidden test. A missing `lane` is `full`. Record the skip
+as one `dispatch-skipped` ledger row with reason `lane light` when the ledger below renders.
 
 Dispatch **one** `test-reviewer` call carrying **all three lens questions**. The lenses are the
 questions, not the contexts: one reviewer retried *serially* surfaces one category per round,

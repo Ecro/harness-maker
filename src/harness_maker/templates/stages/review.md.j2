@@ -73,6 +73,12 @@ Per-invocation overrides (workflow command flags):
 - `--no-auto-fix` — disable auto-fix this run only.
 - `--with-reviewers=<csv>` — add ad-hoc reviewers (must exist in `reviewers.installed`).
 
+**Lane (SPEC frontmatter `lane:`; missing → `full`).** On `lane: light` the lens axis, the
+coverage check and the Grade Gate are unchanged — what shrinks is repetition: one review pass
+(Step 3 skips Pass 1), at most one auto-fix round (`max_review_rounds` capped at 2), and no
+Confirmation Pass when round 1 approves with no fix applied. That is the bench's small-task size,
+where the full path cost ×22 a plain run for no hidden-test gain.
+
 {% if config.reviewers.get("mechanical_checks") %}
 ## Phase 0 — Mechanical Pre-Checks
 
@@ -279,6 +285,9 @@ into the Grade Gate.
 {%- endif %}
 
 {% if (config.reviewers.enabled | default([])) | length > 1 %}
+**`lane: light` → skip Pass 1 and the step-4 merge:** run step 3 below once, with the full context
+and an empty Pass 1 list; its findings are the input to Step 4.
+
 Run reviewers in **two sequential passes** to neutralize metadata anchoring
 (Phase 0 ablation showed +47 percentage-point precision gain on
 anchoring-prone diffs):
@@ -757,6 +766,7 @@ IF auto_fix disabled (config OR --no-auto-fix):
   → Set human_review_needed=true if grade < threshold OR unverified_severe.
   → Close the run: `hm review_run close --slug <slug> --run-id <run-id> --outcome CHANGES_REQUESTED`.
 
+# lane: light → read max_review_rounds as min(max_review_rounds, 2) in both checks below.
 IF iteration_count ≥ max_review_rounds AND blocks_approval == true:
   → STOP. Status = CHANGES_REQUESTED. Emit the coverage blocker (below), not a finding.
   → Set human_review_needed=true.
@@ -977,6 +987,10 @@ The grade gate's exit is *issue exhaustion* over a moving target: the auto-fix l
 only touched scopes, so the **last round's fixes always exit unreviewed** — and fixes introduce
 defects at close to 1:1. This pass replaces that exit with *risk closure*: one clean sweep of the
 whole declared failure space over an artifact that cannot move underneath it.
+
+On `lane: light`, when round 1 approved and no fix was applied, the frozen artifact is the one
+round 1 just reviewed: skip this pass, record `confirm_pass_ran: false`, and say why in the REVIEW report (`lane light,
+unchanged since round 1`). Once a fix has landed, run it as below.
 
 Run it **only** on the APPROVED path. A review stopping for `max_review_rounds`, for the
 no-progress invariant, or with `auto_fix` disabled has not approved anything, so there is nothing

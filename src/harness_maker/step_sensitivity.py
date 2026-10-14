@@ -203,7 +203,9 @@ REGISTRY: tuple[StepEntry, ...] = (
         "Phase A.5",
         "TUNE",
         "**",
-        f"{_R}; FAIL 39/52 (75%, {_LEDGER_SIDE}, n=52) — no ground-truth arm",
+        f"{_R}; FAIL 39/52 (75%, {_LEDGER_SIDE}, n=52). Ground-truth arm "
+        "(RESEARCH-hm-light-lane, Side, n=15): blocked 2 small tasks whose plain arm passed "
+        "every hidden test; skipped on `lane: light`",
         remeasure_on=("model_release",),
         measure_cmd=_LEDGER,
     ),
