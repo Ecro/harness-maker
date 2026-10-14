@@ -161,6 +161,28 @@ python3 -c "import tomllib; tomllib.load(open('.codex/config.toml', 'rb'))"
 
 ---
 
+## Step 6 — hooks 가 실제로 **실행**되는지 (trust) [BLOCK]
+
+Step 5 는 파일 존재와 key 만 본다. Codex 는 managed 가 아닌 hook 을 사용자가 그 hook 의 현재 해시를
+trust 하기 전엔 실행하지 않는다 (`codex-rs/hooks/src/engine/discovery.rs`: `Trusted`/`Managed` 이거나
+bypass 일 때만 handler 등록). 파일이 맞아도 hook 은 죽어 있을 수 있다 — `.claude/hooks/hooks.json` 과 같은 실패.
+
+```bash
+cat .claude/observability/metrics-*.jsonl 2>/dev/null | wc -l   # N0
+codex exec "run: true"                                           # trust 전
+cat .claude/observability/metrics-*.jsonl 2>/dev/null | wc -l   # 기대: N0 그대로 (untrusted → skip)
+# codex 실행 → /hooks → 모든 hook trust
+codex exec "run: true"
+cat .claude/observability/metrics-*.jsonl 2>/dev/null | wc -l   # 기대: N0 보다 큼 (PostToolUse telemetry)
+```
+
+재렌더 후 `/hooks` 에서 바뀐 hook 이 `modified` 로 표시되고 다시 trust 해야 실행되는지도 확인한다.
+
+**PASS 조건**: trust 전 증가 없음, trust 후 증가. `make` 출력에 `codex hooks: N handler(s) … will not run until trusted` 줄 존재.
+**FAIL = P0**. trust 후에도 증가가 없으면 hook 이 Codex 에서 죽어 있다.
+
+---
+
 ## Results 기록
 
 위 5 step 의 결과를 `tests/codex-compat/results-YYYY-MM-DD.md` 에 기록. Format:

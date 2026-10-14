@@ -684,6 +684,7 @@ def make(
     # them in project-local config). Idempotent — silent no-op once
     # they're already present.
     if Target.CODEX in a.targets:
+        _emit_codex_hook_trust_notice(target)
         try:
             result = bootstrap_user_codex_profiles()
         except OSError as e:
@@ -1186,6 +1187,33 @@ def _emit_refdocs_index_build(target: Path, ref_folders: list[RefFolder]) -> Non
     )
     for w in result.warnings:
         typer.echo(f"  warn: {w}")
+
+
+def _emit_codex_hook_trust_notice(target: Path) -> None:
+    """Codex runs a project hook only after the user trusts that hook's current hash.
+
+    Codex skips an untrusted or modified non-managed hook without a startup warning; the
+    only notice is inside the `/hooks` browser. Every handler rendered into
+    `.codex/hooks.json` is therefore inert until trusted, and a re-render that changes a
+    command string (e.g. the embedded install path) un-trusts it again. Without this line
+    the Codex half of the harness can be dead with nothing reporting it — the
+    `.claude/hooks/hooks.json` failure mode. Diagnostic only: never fails ``make``.
+    """
+    try:
+        data = json.loads((target / ".codex" / "hooks.json").read_text(encoding="utf-8"))
+        count = sum(
+            len(group.get("hooks", []))
+            for groups in data.get("hooks", {}).values()
+            for group in groups
+        )
+    except Exception:  # noqa: BLE001 — diagnostic, never fail the make
+        return
+    if count:
+        typer.echo(
+            f"codex hooks: {count} handler(s) in .codex/hooks.json will not run until trusted — "
+            "open `/hooks` in Codex and trust them (the project `.codex/` must be trusted too). "
+            "Re-trust after any re-render that changes them."
+        )
 
 
 def _emit_post_make_readiness(target: Path, preset: Preset, *, is_fresh: bool = False) -> None:
