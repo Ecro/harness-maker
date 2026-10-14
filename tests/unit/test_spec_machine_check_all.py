@@ -86,14 +86,50 @@ def _run(
 
 def test_one_call_returns_all_three_blocks(tmp_path: Path) -> None:
     """The whole reason this exists: three round-trips' worth of verdicts in one payload."""
-    rc, payload = _run(tmp_path, *_pair(tmp_path))
+    yaml_path, md_path = _pair(tmp_path, ac_id="AC-001", md_heading="AC-999")
+    rc, payload = _run(tmp_path, yaml_path, md_path)
     assert set(payload) >= {"ok", "validate", "cross_validate", "quality"}
     assert payload["validate"]["ok"] is True
-    assert payload["cross_validate"]["ok"] is True
     assert "overall" in payload["quality"]
     assert "scores" in payload["quality"]
+    assert rc == 1
+
+
+def test_a_clean_pass_prints_one_short_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """HM-LIGHT-LANE lever 4: every printed byte is re-read on each later turn of the session."""
+    import contextlib
+    import io
+    from types import SimpleNamespace
+
+    clean = SimpleNamespace(
+        overall=88,
+        scores={"completeness": 88},
+        weak_dimensions=[],
+        blocked=False,
+        strictness="warn",
+    )
+    monkeypatch.setattr("harness_maker.spec_quality.evaluate_spec", lambda *a, **k: clean)
+    yaml_path, md_path = _pair(tmp_path)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = main(
+            [
+                "check",
+                "--all",
+                "--yaml",
+                str(yaml_path),
+                "--md",
+                str(md_path),
+                "--strictness",
+                "warn",
+            ]
+        )
+    out = buf.getvalue()
     assert rc == 0
-    assert payload["ok"] is True
+    assert out.count("\n") == 1
+    assert json.loads(out) == {"ok": True, "overall": 88, "strictness": "warn"}
 
 
 def test_a_cross_validate_failure_is_attributed_to_its_rule_and_fails_the_call(

@@ -396,7 +396,7 @@ research_field=$(yq '.research_doc' "$PLAN") # e.g., "[[RESEARCH-mqtt-retry]]"
 If `spec:` resolves to an existing file:
 - Read SPEC fully.
 - Extract `test_framework` from frontmatter — Phase A uses this verbatim.
-- Extract `lane` from frontmatter (`light` | `full`; missing → `full`) — Phase A.5 reads it.
+- Extract `lane` (`light` | `full`; missing → `full`) — Phase A.5 reads it.
 - Extract `## 📋 In-Scope Scenarios` — Phase A authors one test per scenario.
 - Extract `## ✅ Verification Criteria` — Phase B RED-gate uses the named test commands.
 
@@ -492,10 +492,7 @@ machine SPEC exist, author tests from the PLAN phase's exit-criterion instead.
 
 **Run the tests before you dispatch anyone.** Whether a test passes against the unmodified
 subject is *mechanically decidable*, and the reviewer gate is the most expensive way in this
-stage to decide it. Measured across two tasks: eleven Phase A.5 findings were the single
-sentence "this test passes before the implementation exists" — five tautologies satisfied by a
-model's `extra="forbid"` guard, six anchors satisfied by prose the template already shipped.
-Each cost a reviewer round that could have been one pytest run.
+stage to decide it.
 
 {% if is_codex %}
 ```
@@ -526,10 +523,9 @@ the lenses adjudicate the *justification* rather than rediscovering the test.
 
 #### Phase A.5 — test-reviewer gate (skipped when `tdd_active == false`)
 
-**`lane: light` in the SPEC frontmatter → skip to Phase B.** Phase A, A.4 and B still run: they
-are the deterministic oracles. A.5 is the LLM gate that, on the small-task bench, blocked 2 of 15
-runs whose plain counterpart passed every hidden test. A missing `lane` is `full`. Record the skip
-as one `dispatch-skipped` ledger row with reason `lane light` when the ledger below renders.
+**`lane: light` → skip to Phase B** (A, A.4 and B are the deterministic oracles and still run).
+On small tasks A.5 blocked 2 of 15 runs the plain arm passed. Record a `dispatch-skipped` row,
+reason `lane light`, if the ledger below renders.
 
 Dispatch **one** `test-reviewer` call carrying **all three lens questions**. The lenses are the
 questions, not the contexts: one reviewer retried *serially* surfaces one category per round,
@@ -540,11 +536,6 @@ which is why this was ever a fan-out — but a single call asking all three is n
 | `red-correctness` | Does each test fail, and for the intended reason? |
 | `discrimination` | Would this assertion also pass against a plausibly WRONG implementation? |
 | `coverage` | Does the set cover the criterion — no missing scenario, and no duplicate for the same observable? |
-
-> **Measured cost of the fan-out it replaces:** ≈330k subagent tokens and ≈2 minutes per round.
-> **Measured cost of collapsing it:** on the round that produced this change, all six blocking
-> issues were solo finds — no defect was reported by more than one lens, so the independent
-> contexts, not the lens text, produced that spread. The trade is recorded rather than hidden.
 
 `<brief>` below is the same for all three: `<SPEC body + bindable mechanical AC list (id +
 predicate, when present) + Phase A test file paths + test_framework name + the Phase A.4 counts

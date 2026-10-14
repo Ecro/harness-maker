@@ -1614,7 +1614,12 @@ def _run_check_all(args: argparse.Namespace) -> int:
 
     failed = bool(validate_errors) or bool(cross_errors) or quality_blocked
     payload["ok"] = not failed
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    quality_block = payload["quality"]
+    if not failed and "error" not in quality_block and not quality_block["weak_dimensions"]:
+        # The caller re-reads every byte printed here on each later turn (HM-LIGHT-LANE
+        # lever 4: ~13k chars per run). A clean pass carries nothing to act on.
+        payload = {"ok": True, "overall": quality_block["overall"], "strictness": args.strictness}
+    print(json.dumps(payload, ensure_ascii=False))
     return 1 if failed else 0
 
 

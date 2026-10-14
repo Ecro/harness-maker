@@ -27,6 +27,13 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-14, `hm-light-lane`** — `spec`, `execute` and `review` moved in all four arms: the
+  light lane (spec Step 0 picks `lane: light|full`, execute skips Phase A.5 on light, review cuts
+  repetition on light) and three rationale paragraphs moved to `docs/reference/stage-rationale.md`.
+  `configure`, `help`, `make`, `metrics`, `uninstall` (and `loop`, `loop-p5-batch` in the `ask`
+  arms, which render them) moved by one frontmatter line, `disable-model-invocation: true`
+  (lever 5). Verified before re-capture that these are the ONLY moved commands in every arm and
+  that no command was added or removed; the autopilot advance block is untouched.
 - **2026-10-04, `wrapup-intent-hardening`** — only `wrapup` moved, in all four arms: Step 5.7
   step 5 gained the whole-value argument check and source-row marking in their own table, and the
   close block gained the intent-id check (SPEC-wrapup-intent-hardening). Verified before

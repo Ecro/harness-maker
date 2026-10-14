@@ -62,22 +62,12 @@ Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml 
 ```
 {% endif %}
 
-**Not skipped → pick the lane: `light` or `full`.** On a bench of single-session tasks the full
-pipeline added no hidden-test accuracy over a plain run (plain 44/45, /hm: 13/15) at ×22 cost,
-and both of its failures were Phase A.5 self-blocks. `light` is for that size of work; `full`
-keeps everything for work whose value the bench never measured. Choose `light` only when **all
-three** hold, judged by reading the ask and the files it touches — no keyword rule:
-
-- about five files or fewer change;
-- the work fits one session — nothing has to survive a context window;
-- no decision falls in an irreversible category (Step 3.5). Re-check there: a non-empty
-  `irreversible_decisions` turns the lane back to `full`.
-
-In doubt, `full`. Write the lane to the frontmatter (Step 3) and its one-line reason to
-`## 🔍 Refinement Decisions`, so a wrong call can be spot-checked. On `light`, Step 2 runs at most
-one round and asks only about a WHAT ambiguity that would change the outcome; every other step
-here runs unchanged, `spec-validator` included. `/hm:execute` and `/hm:review` read the field; a
-SPEC without it is `full`.
+**Not skipped → pick the lane.** `light` when all three hold, judged from the ask and the files
+it touches (no keyword rule): about five files or fewer, one session, and no irreversible decision
+(Step 3.5 — a non-empty list there turns it back to `full`). Otherwise, or in doubt, `full`. On
+single-session tasks the full path cost ×22 a plain run with no hidden-test gain. Write `lane:` to
+the frontmatter and its one-line reason to Refinement Decisions. On `light`, Step 2 runs at most one
+round, only for a WHAT ambiguity; everything else here is unchanged.
 
 ### Step 0.5 — Intent context (intent layer — one line and continue when unused)
 
@@ -370,8 +360,9 @@ uv run --with {{ harness_maker_src_path }} hm spec_machine check --all \
   --strictness {{ strictness_of(config) }}
 ```
 
-Returns `{ok, validate: {ok, errors}, cross_validate: {ok, errors, by_rule}, quality:
-{overall, scores, weak_dimensions, blocked, strictness}}`. Exit 1 when validate or
+A clean pass prints one line, `{ok: true, overall, strictness}`. Otherwise it returns `{ok,
+validate: {ok, errors}, cross_validate: {ok, errors, by_rule}, quality: {overall, scores,
+weak_dimensions, blocked, strictness}}`. Exit 1 when validate or
 cross-validate has errors, or when `quality.blocked`. `by_rule` buckets the
 cross-validate errors under `rule-1`…`rule-6` plus `unattributed`.
 
