@@ -956,7 +956,7 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm w
 
 - All Phase D checks GREEN at stage exit, OR the blocker is documented in PLAN.
 - Every SPEC In-Scope Scenario maps to a test (when `tdd_active`).
-- Phase A.5 test-reviewer returned PASS (or `--no-tdd` was set).
+- Phase A.5 test-reviewer returned PASS (or `--no-tdd` was set, or `lane: light`).
 - No diff outside the PLAN's stated scope — surprise edits are flagged.
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
 {% if wt_on %}- An `execute-<uuid>` worktree finalized exactly once: success or fail. An `hm/<slug>` task worktree finalized ZERO times — wrapup commits it and `task-land` lands it.

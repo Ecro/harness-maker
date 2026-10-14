@@ -62,6 +62,17 @@ def test_spec_step_0_decides_the_lane_and_writes_it(bodies: dict[str, str]) -> N
     assert "`lane: light`" in step0, "the trivial skip path must be light, not unset (= full)"
 
 
+def test_light_spec_keeps_the_oracle_irreversible_list_and_approval(bodies: dict[str, str]) -> None:
+    """One round must still elicit the oracle and list irreversible decisions, and must offer the
+    only approval, or every light SPEC ends unstamped and autopilot stops at spec."""
+    body = bodies["spec"]
+    step0 = _section(body, "**Not skipped → pick the lane.**", "### Step 0.5")
+    assert "the 2.1.5 oracle and" in step0
+    assert "with the approve option" in step0
+    assert "From Round 2 onward (Round 1 on `light`)" in body
+    assert "A non-empty list turns `lane: light`\ninto `full` before Step 3 writes it" in body
+
+
 def test_spec_frontmatter_carries_the_lane(bodies: dict[str, str]) -> None:
     step3 = _section(bodies["spec"], "### Step 3 —", "### Step 3.5")
     assert "lane: {light | full}" in step3
@@ -75,6 +86,10 @@ def test_execute_skips_only_a5_on_light(bodies: dict[str, str]) -> None:
     # A.4 and Phase B are untouched: no lane clause inside them.
     assert "lane" not in _section(body, "#### Phase A.4", "#### Phase A.5")
     assert "lane" not in _section(body, "#### Phase B", "#### Phase C.0")
+
+
+def test_execute_quality_bar_admits_the_light_lane(bodies: dict[str, str]) -> None:
+    assert "PASS (or `--no-tdd` was set, or `lane: light`)" in bodies["execute"]
 
 
 def test_execute_reads_a_missing_lane_as_full(bodies: dict[str, str]) -> None:
@@ -103,6 +118,9 @@ def test_review_light_lane_skips_pass_1_and_the_unchanged_confirmation(
         assert "`lane: light` → skip Pass 1" in b
     confirm = _section(body, "## Confirmation Pass", "### Step C1")
     assert "`lane: light` with round 1 approved and no fix applied" in confirm
+    # Skipping C3 must not leak the open run or the round-1 freeze ref into the next review.
+    assert "close the run (`--outcome APPROVED`), then run `hm freeze reap" in confirm
+    assert "read it from the SPEC frontmatter before Step 1" in body
     gate = _section(body, "## Grade Gate", "## Auto-Fix Loop")
     assert "lane: light → read max_review_rounds as min(max_review_rounds, 2)" in gate
 

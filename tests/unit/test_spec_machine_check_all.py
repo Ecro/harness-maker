@@ -95,16 +95,20 @@ def test_one_call_returns_all_three_blocks(tmp_path: Path) -> None:
     assert rc == 1
 
 
+@pytest.mark.parametrize("overall", [88, 55])
 def test_a_clean_pass_prints_one_short_line(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, overall: int
 ) -> None:
-    """HM-LIGHT-LANE lever 4: every printed byte is re-read on each later turn of the session."""
+    """HM-LIGHT-LANE lever 4: every printed byte is re-read on each later turn of the session.
+
+    Below 60 overall the spec stage must still warn, so warn mode keeps the full payload.
+    """
     import contextlib
     import io
     from types import SimpleNamespace
 
     clean = SimpleNamespace(
-        overall=88,
+        overall=overall,
         scores={"completeness": 88},
         weak_dimensions=[],
         blocked=False,
@@ -129,7 +133,10 @@ def test_a_clean_pass_prints_one_short_line(
     out = buf.getvalue()
     assert rc == 0
     assert out.count("\n") == 1
-    assert json.loads(out) == {"ok": True, "overall": 88, "strictness": "warn"}
+    if overall >= 60:
+        assert json.loads(out) == {"ok": True, "overall": 88, "strictness": "warn"}
+    else:
+        assert json.loads(out)["quality"]["overall"] == 55
 
 
 def test_a_cross_validate_failure_is_attributed_to_its_rule_and_fails_the_call(

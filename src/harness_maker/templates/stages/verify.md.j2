@@ -49,11 +49,11 @@ This check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that u
 as "1b" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is
 enforced where the tests are written: `/hm:execute` Phase A authors one test per SPEC scenario
 and Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a
-TUNE-class gate graded `**` — Side-preset evidence only, no ground-truth arm; see the
+TUNE-class gate graded `**` — Side-preset evidence only; see the
 step-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC
 (`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or
 manual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.
-**`--no-tdd` path:** `/hm:execute --no-tdd` skips Phase A/A.5, and this stage does not
+**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not
 re-derive scenario coverage.{% if strictness_of(config) == 'block' %}{% if config.preset == 'Production' %} The mechanical backstop is `/hm:wrapup` Step 3.5's
 `spec_machine find-unbound` gate (fail-closed, STOP on this preset): a closed-type AC still `pending_test`
 after the write-back cannot be committed, whichever way execute ran.{% else %} `/hm:wrapup` Step 3.5's

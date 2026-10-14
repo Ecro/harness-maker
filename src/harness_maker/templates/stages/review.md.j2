@@ -73,7 +73,7 @@ Per-invocation overrides (workflow command flags):
 - `--no-auto-fix` — disable auto-fix this run only.
 - `--with-reviewers=<csv>` — add ad-hoc reviewers (must exist in `reviewers.installed`).
 
-**`lane: light`** (SPEC frontmatter; missing → `full`) keeps the lens axis, coverage check and
+**`lane: light`** (read it from the SPEC frontmatter before Step 1; missing → `full`, as with no SPEC) keeps the lens axis, coverage check and
 Grade Gate, and cuts repetition: Step 3 skips Pass 1, `max_review_rounds` caps at 2, and the
 Confirmation Pass is skipped when round 1 approves with no fix applied.
 
@@ -277,8 +277,8 @@ into the Grade Gate.
 {%- endif %}
 
 {% if (config.reviewers.enabled | default([])) | length > 1 %}
-**`lane: light` → skip Pass 1 and the step-4 merge:** run step 3 once with an empty Pass 1 list;
-its findings go to Step 4.
+**`lane: light` → skip Pass 1 and Pass 2 item 4 (`two_pass_review merge`):** run Pass 2 item 3
+once with an empty Pass 1 list. Its findings are the merged list Step 3.4 and Step 4 consume.
 
 Run reviewers in **two sequential passes** to neutralize metadata anchoring
 (Phase 0 ablation showed +47 percentage-point precision gain on
@@ -424,7 +424,6 @@ round**, against the merged temp file you already wrote, with the literal review
 > only in the reviewer label — each one claiming to be that reviewer's payload. A replay
 > keyed on `reviewer` would then measure the merge output N times instead of N reviewers.
 > Fabricated attribution is worse than no attribution, because nothing downstream can tell.
->
 {% if is_codex %}
 ```
 Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger persist-payload --file <the literal temp path> --slug {slug} --run-id <run-id> --round <N> --reviewer merged")
@@ -441,7 +440,6 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 > sanitises to a constant, so every review of this slug writes the same filename and
 > **silently destroys the previous review's payload**, quietly emptying the corpus this
 > step exists to build.
->
 {% endif %}
 {%- if config.second_opinion and config.second_opinion.models %}
 ### Step 3.5 — Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)
@@ -957,7 +955,8 @@ whole declared failure space over an artifact that cannot move underneath it.
 
 On `lane: light` with round 1 approved and no fix applied, round 1 already reviewed this exact
 artifact: skip, record `confirm_pass_ran: false`, note `lane light, unchanged` in the report, and
-close the run (`--outcome APPROVED`) — C3, which closes it otherwise, does not run.
+close the run (`--outcome APPROVED`), then run `hm freeze reap --slug <slug>` — C3 and the reap,
+which do both otherwise, do not run.
 
 Run it **only** on the APPROVED path. A review stopping for `max_review_rounds`, for the
 no-progress invariant, or with `auto_fix` disabled has not approved anything, so there is nothing

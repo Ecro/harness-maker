@@ -63,7 +63,12 @@ Stage templates in `src/harness_maker/templates/stages/`; `spec_machine._run_che
    five skill templates, tests · exit: `uv run pytest tests -n auto` green except the 7
    pre-existing environment failures · risk: low · rollback: revert the PR.
 2. **Stage 2 — lever 2, body slimming.** depends_on: 1 · scope: review.md.j2, execute.md.j2 into
-   on-demand reference files for full-lane-only and rare paths · exit: size ratchet re-frozen
+   on-demand reference files for full-lane-only and rare paths. User-approved additions
+   (decision cards, 2026-10-14, from `harness-research/ab/2026-10-14-phase-pruning.md`): render
+   loop-only branches (Gate 0 receipt, execute Step 0.2 and Step 5, verify Check 5) only when
+   `loop.enabled`; state the Auto-advance procedure once and keep each stage's own gate check;
+   delete review Step 2.5 and step 5c with its Size table; shrink execute Phase C.0 and D.5 to
+   2–3 lines. spec-validator stays on the light lane (user, same date) · exit: size ratchet re-frozen
    lower with BASELINE-DELTA · risk: medium (instruction preservation) · rollback: revert.
 3. **Stage 3 — levers 1 and 3.** depends_on: 1 · scope: light execute and verify through
    `stage-delegate`; lens results carried as verdict + path · exit: render tests · risk: medium ·
