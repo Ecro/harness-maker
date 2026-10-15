@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: hm-light-lane-s3d
-status: draft
+status: approved
 created: 2026-10-15
 tags: [harness-maker, spec, light-lane, verification-cache, regression, ci, cost]
 test_framework: pytest
