@@ -2636,7 +2636,7 @@ def _trap_rows() -> list[dict[str, Any]]:
     return rows
 
 
-def test_traps_caught_leads_the_value_section_by_the_count_gap(bench: ModuleType) -> None:
+def test_traps_caught_leads_the_value_section_by_the_rate_gap(bench: ModuleType) -> None:
     rows = _trap_rows()
     card = bench.scorecard(rows)
     tier = next(t for t in card["tiers"] if t["tier"] == 2)

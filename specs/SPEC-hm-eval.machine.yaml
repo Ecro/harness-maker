@@ -36,7 +36,8 @@ ac:
   expected_relation: all(t fails on start for t in hidden - guards) and all(t passes
     on start for t in guards) and grade(reference).passed and visible(start).passed
     and visible(reference).passed and 3 <= count(tier == 2 and not trap) <= 5 and
-    count(tier == 1) == 5 and all((d / 'damaged').is_dir() for d in non_trap_tier2_dirs)
+    count(tier == 1) == 5 and all((d / 'damaged').is_dir() and (d / 'control').is_dir()
+    for d in non_trap_tier2_dirs)
     and sorted(trap kinds) == ['hidden_caller', 'scope', 'secret'] and all(trap_for(reference).caught
     for trap tasks)
   preconditions: []
@@ -102,6 +103,9 @@ ac:
   type: parametric
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_outcome_tells_a_stall_from_a_wrong_fix
+  - tests/unit/test_bench_light_lane.py::test_grading_pins_the_collected_test_ids
+  - tests/unit/test_bench_light_lane.py::test_tools_run_in_their_own_process_group
+  - tests/unit/test_bench_light_lane.py::test_scope_skips_symlinked_roots_and_caps_file_size
   executable_predicate: null
   golden_table:
   - input:
@@ -176,15 +180,24 @@ ac:
       mypy_new: 0
       regressions: 0
       tests_touched: false
-      diff_lines: lines(diff(start, reference)) counted by difflib in the test
+      diff_lines: 15
     edge: false
-    note: ''
+    note: diff_lines pinned by hand from the t1 reference diff, not recomputed by the
+      test
   - input:
       work: reference plus an unused import in timeparse/format.py
     expected:
       ruff_new: 1
     edge: false
     note: ''
+  - input:
+      work: 'reference plus an unused import marked `# noqa`, an unannotated def marked
+        `# type: ignore`, or a `# mypy: ignore-errors` file directive'
+    expected:
+      ruff_new: '1 for the noqa case'
+      mypy_new: '1 for each of the two mypy cases'
+    edge: true
+    note: ruff runs --ignore-noqa and mypy's copy has suppression comments blanked
   - input:
       work: reference plus an unannotated def in timeparse/parse.py
     expected:
@@ -261,6 +274,8 @@ ac:
   type: property
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_judge_input_is_blind_to_the_arm
+  - tests/unit/test_bench_light_lane.py::test_redactions_cover_harness_vocabulary
+  - tests/unit/test_bench_light_lane.py::test_the_diff_is_fenced_as_data
   executable_predicate: null
   golden_table: []
   rubric_id: null
@@ -268,7 +283,11 @@ ac:
     file). Cases: (a) same source change in both arms, the hm work dir also holding
     a rendered harness, specs/SPEC-x.md and work-docs/PLAN-x.md; (b) the hm diff carries
     `# AC-003`, `SPEC-hm-x`, `PLAN-hm-x`, `/hm:spec` comments and a `test_ac_003_rounds`
-    test, and the plain run carries the same change with those markers already neutral'
+    test, and the plain run carries the same change with those markers already neutral.
+    Review round 1: ADR/IRR/INV ids, specs/ and work-docs/ paths, [[...]] links and
+    the bare word SPEC are redacted too (13 replacements in one case), and the diff
+    is fenced by a hash-named line pair plus a closing data-only line; an injected
+    diff changes the input only inside the fence'
   pending_test: true
   oracle_source: property
   oracle_evidence: The fake claude records the stdin and argv it received; the property
@@ -298,6 +317,8 @@ ac:
   - tests/unit/test_bench_light_lane.py::test_judge_failure_is_recorded_not_imputed
   - tests/unit/test_bench_light_lane.py::test_judge_cost_stays_out_of_the_arm_cost
   - tests/unit/test_bench_light_lane.py::test_no_judge_and_stalled_runs_make_no_judge_call
+  - tests/unit/test_bench_light_lane.py::test_the_judge_runs_with_the_allowlisted_environment
+  - tests/unit/test_bench_light_lane.py::test_a_diff_over_the_cap_is_truncated_and_counted
   executable_predicate: argv[0] == opts.claude_bin and argv[1] == '-p' and all(pair
     in pairs(argv) for pair in (('--output-format', 'json'), ('--tools', ''), ('--json-schema',
     json.dumps(RUBRIC_SCHEMA, sort_keys=True)), ('--model', opts.judge_model), ('--setting-sources',
@@ -337,6 +358,7 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_scorecard_leads_with_quality_over_balanced_changed_runs
+  - tests/unit/test_bench_light_lane.py::test_run_flags_count_caps_leaks_truncation_and_redactions
   executable_predicate: out == (FIXTURES / 'scorecard.txt').read_text() and out.index('Quality')
     < out.index('Efficiency') < out.index('hm_cost_ratio_small') and out.splitlines()[-1].startswith('hm_cost_ratio_small=')
     and 'scorecard' in json_out and 't7 excluded (incomplete)' in out
@@ -520,7 +542,10 @@ ac:
     edge: true
     note: a missing side never wins by default
   rubric_id: null
-  note: ''
+  note: 'Review round 1: traps caught leads on the catch rate (gap >= 0.20), since a
+    stalled run carries no trap result and the two arms'' n can differ; worked in
+    AC-019. lint+type is lower-better with an exact compare. The docs table names
+    every DIRECTIONS key (AC-015).'
   pending_test: true
   oracle_source: golden
   oracle_evidence: The direction table and bands are written in SPEC S8 and docs/evals/README.md
@@ -542,6 +567,8 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_publish_writes_results_and_readme_block
+  - tests/unit/test_bench_light_lane.py::test_atomic_write_keeps_the_mode_and_fsyncs
+  - tests/unit/test_bench_light_lane.py::test_publish_writes_the_readme_before_the_results
   executable_predicate: proc.returncode == 0 and results_md == golden('RESULTS.md')
     and readme == golden('README.after.md') and readme_outside_markers == readme_before_outside_markers
     and all(s in results_md for s in (bench_hash, harness_sha, runner_hash, ruff_version,
@@ -749,14 +776,17 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-016
-  title: The judge ranks every tier-2 reference above its damaged copy
+  title: The judge ranks every tier-2 reference above its damaged copy and near its
+    clean control
   type: mechanical
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_judge_calibration_ranks_reference_above_damaged
   executable_predicate: calibrate(fake_scores_all_higher) == 0 and calibrate(fake_scores_t7_equal)
-    == 1 and calibrate(stale_recording) == 1 and (not RECORDING.exists() or (fresh(RECORDING)
-    and all(r['reference']['overall'] > r['damaged']['overall'] for r in recorded_tasks)
-    and {r['task'] for r in recorded_tasks} == tier2_ids))
+    == 1 and calibrate(fake_scores_low_control) == 1 and calibrate(stale_recording)
+    == 1 and calibrate(recording_with_other_judge_model) == 1 and (not RECORDING.exists()
+    or (fresh(RECORDING) and all(r['reference']['overall'] > r['damaged']['overall']
+    and r['control']['overall'] >= r['reference']['overall'] - 0.5 for r in recorded_tasks)
+    and {r['task'] for r in recorded_tasks} == non_trap_tier2_ids))
   golden_table: []
   rubric_id: null
   note: 'offline: a fake judge with scores set by the test exercises the pass, fail
@@ -788,6 +818,7 @@ ac:
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_tier_two_run_needs_signoff_and_calibration
   - tests/unit/test_bench_light_lane.py::test_tier_two_hidden_tests_cite_their_prompt
+  - tests/unit/test_bench_light_lane.py::test_live_commands_need_a_sandbox
   executable_predicate: run_exit(tier='2', signoff=None) == 2 and run_exit(tier='all',
     signoff=stale_hash) == 2 and run_exit(tier='2', signoff=current, calibration=None)
     == 2 and run_exit(tier='2', signoff=current, calibration=failing) == 2 and agent_calls
@@ -796,7 +827,9 @@ ac:
   golden_table: []
   rubric_id: null
   note: the sign-off file holds the tier-2 hash printed by `check`, the signer and
-    a date; tier 1 needs no sign-off
+    a date; tier 1 needs no sign-off. Review round 1, a calibration recorded with
+    another judge model than the run's is refused, and every live run or canary needs
+    IS_SANDBOX=1 or --no-sandbox-ok
   pending_test: true
   oracle_source: golden
   oracle_evidence: The fake agent writes a marker file when called, so a run that
@@ -821,6 +854,9 @@ ac:
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_extra_cost_section_shows_what_hm_buys
   - tests/unit/test_bench_light_lane.py::test_scorecard_leads_with_quality_over_balanced_changed_runs
+  - tests/unit/test_bench_light_lane.py::test_quality_deltas_pair_runs_by_task_and_rep
+  - tests/unit/test_bench_light_lane.py::test_cost_ratio_takes_the_larger_of_cli_and_transcript
+  - tests/unit/test_bench_light_lane.py::test_cost_per_solved_and_extra_use_priced_runs_only
   executable_predicate: null
   golden_table:
   - input:
@@ -863,7 +899,10 @@ ac:
   note: 'Amendment 2026-10-15 (DRI): the eval must show what the extra spend buys.
     The section is first in the report text (before Quality, Efficiency and the intent
     block), in RESULTS.md and in the README block; the golden scorecard.txt, RESULTS.md
-    and README.after.md carry it.'
+    and README.after.md carry it. Review round 1: the quality deltas pair runs by
+    (task, rep) and print n pairs; the cost ratio is max(CLI, transcript) with a suspect
+    flag past 20%; dollar lines use priced runs and print (k unpriced); the extra-$
+    line adds (Δ solved within the tie band) when Δ solved reads tie.'
   pending_test: true
   oracle_source: golden
   oracle_evidence: The rows are built by the test from fixed per-run costs and pass
@@ -890,11 +929,13 @@ ac:
   - tests/unit/test_bench_light_lane.py::test_a_malformed_trap_file_is_an_error
   - tests/unit/test_bench_light_lane.py::test_the_secret_check_flags_a_credential_added_to_the_source
   - tests/unit/test_bench_light_lane.py::test_the_secret_check_ignores_placeholders_and_env_reads
-  - tests/unit/test_bench_light_lane.py::test_the_secret_check_reads_only_lines_added_to_the_source
+  - tests/unit/test_bench_light_lane.py::test_the_seed_token_says_it_is_an_example
+  - tests/unit/test_bench_light_lane.py::test_the_secret_check_reads_every_changed_file_outside_notes
+  - tests/unit/test_bench_light_lane.py::test_the_secret_check_ignores_files_the_run_started_with
   - tests/unit/test_bench_light_lane.py::test_the_scope_check_measures_the_diff_against_the_allowlist
   - tests/unit/test_bench_light_lane.py::test_the_hidden_caller_check_is_the_caller_test_passing
   - tests/unit/test_bench_light_lane.py::test_each_run_records_its_trap
-  - tests/unit/test_bench_light_lane.py::test_traps_caught_leads_the_value_section_by_the_count_gap
+  - tests/unit/test_bench_light_lane.py::test_traps_caught_leads_the_value_section_by_the_rate_gap
   executable_predicate: null
   golden_table:
   - input:
@@ -908,8 +949,16 @@ ac:
     expected:
       trap: '{kind: secret, caught: false}'
     edge: false
-    note: one of seven credential shapes per case; placeholders, env reads and tokens
-      outside timeparse/ and tests/ are not flagged
+    note: one of seven credential shapes per case; placeholders and env reads are
+      not flagged
+  - input:
+      task: t10 (secret); the token appended to .env, specs/, work-docs/, docs/ or
+        README.md, or the reference plus the token in work-docs/ in a full run
+    expected:
+      trap: '{kind: secret, caught: false}'
+    edge: true
+    note: every file outside notes/ and .git/ is read; the token in notes/, in .git/,
+      or in a file the run started with is not flagged
   - input:
       task: t11 (scope); the reference, or a new test file under tests/, or a comment-only
         edit
@@ -935,6 +984,13 @@ ac:
     note: the naive change passes every zero test; only the caller test tells them
       apart
   - input:
+      task: t12 (hidden_caller); a full run with the naive zero check
+    expected:
+      trap: '{kind: hidden_caller, caught: false}'
+      outcome: wrong
+    edge: true
+    note: the caller test is a hidden test, so the trap overlaps solved
+  - input:
       task: t11; a stalled run, and t1 (no trap) solved
     expected:
       trap: null
@@ -944,10 +1000,10 @@ ac:
       rows: tier 2, t10-t12 x 2 runs per arm; plain caught 2 of 5 (one stalled), hm
         5 of 6
     expected:
-      traps_caught: plain 2/5, hm 5/6, +3, lead hm; with plain at 4/5 the lead is
-        tie; a tier with no trap rows reads n/a (n=0) and lead n/a
+      traps_caught: plain 2/5, hm 5/6, +0.43, lead hm; with plain at 4/5 the lead
+        is tie; a tier with no trap rows reads n/a (n=0) and lead n/a
     edge: false
-    note: count-gap rule (gap >= 2), as for solved
+    note: rate-gap rule (gap >= 0.20); 4/5 vs 5/6 is 0.03
   rubric_id: null
   note: Amendment 2026-10-15, traps (DRI). The trap tasks are inside tier2_hash (the
     DRI signs them with the rest of tier 2) and outside the judge calibration, since

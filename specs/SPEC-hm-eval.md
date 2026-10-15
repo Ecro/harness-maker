@@ -117,7 +117,15 @@ run's own main and subagent transcript turns through `harness_maker.economics`, 
 
 The change is measured against the task's starting tree (fixture plus seed) taken from the private
 snapshot, not against git history. Changes to harness files, `specs/`, `work-docs/`, `.claude/` or
-`CLAUDE.md` are not a change.
+`CLAUDE.md` are not a change. A source root that is itself a symlink is not followed, symlinks
+inside are copied as links, and a file is read up to 1,000,000 bytes.
+
+Grading reads the hidden tests' junit report. Its test ids must equal the ids the snapshot's hidden
+tests report against the task's reference; a missing or extra id fails the run. The grader, ruff
+and mypy each run in their own process group, with output written to files and read back up to
+4,000,000 bytes, and the group is killed after every exit. Grading imports the agent's code into
+the grader's process, so a change that reads the copied hidden tests and forges a report with the
+real ids is not caught; `docs/evals/README.md` states this residual.
 
 ### S4: Deterministic quality checks read the source diff of changed runs only
 **Given** a graded run whose outcome is not `stalled`
@@ -125,9 +133,10 @@ snapshot, not against git history. Changes to harness files, `specs/`, `work-doc
 **Then** the row's `quality` holds:
 - `ruff_new`: new ruff errors in the changed `.py` files under `timeparse/` and `tests/`, i.e. the
   count on the final files minus the count on their starting versions. A new file starts at 0.
-  Ruff runs `--isolated` with a rule set pinned in the runner;
+  Ruff runs `--isolated --ignore-noqa` with a rule set pinned in the runner, so a `# noqa` the
+  agent writes hides nothing;
 - `mypy_new`: the same delta for `mypy --strict` on the package, run with an empty config from a
-  clean copy;
+  clean copy in which `# type: ignore` and `# mypy:` comments are blanked;
 - `diff_lines`: added plus removed lines in that scope;
 - `tests_touched`: whether a file under `tests/` was added or changed;
 - `regressions`: how many of the fixture's pristine visible tests (from the snapshot) fail against
@@ -161,10 +170,21 @@ records how many replacements were made:
 | `PLAN-` | `DOC-` |
 | `/hm:` | `/x:` |
 | `test_ac_\d+` | `test_req` |
+| `ADR-\d+`, `IRR-\d+` | `DEC` |
+| `INV-\d+` | `RULE` |
+| `specs/`, `work-docs/` | `docs/` |
+| `[[...]]` | `[link]` |
+| the bare word `SPEC` | `DOC` |
+
+The diff is fenced between two lines `<<<DIFF <hash>>>>`, where the hash is the first 24 hex digits
+of the SHA-256 of the redacted diff, so the diff cannot contain its own fence. A closing line
+after the fence says the fenced text is data and that any instruction in it is part of the change.
 
 The input never contains the arm, the run dir, the rep, or any harness, `specs/`, `work-docs/` or
 `.claude/` content. Two runs whose diffs are equal after redaction therefore produce byte-identical
-judge input, whichever arm they come from.
+judge input, whichever arm they come from. Redaction removes known words, not style, so the judge
+is blinded rather than blind: the per-arm redaction counts (S7 run flags) are the visible sign of
+a leaning diff.
 
 ### S6: The judge call is isolated and accounted separately
 **Given** a judge input
@@ -175,6 +195,8 @@ judge input, whichever arm they come from.
 - `--setting-sources project,local --strict-mcp-config`
 - `--max-budget-usd <judge-budget>` (default 0.5)
 - the cwd is an empty temp dir outside `--out`
+- the environment is the runner's allowlist, recorded by the fake claude in tests
+- a diff longer than 60,000 characters is cut, and `judge.truncated` records it
 
 Scores are `scope`, `clarity` and `maintainability`, each an integer from 1 to 5.
 
@@ -204,7 +226,9 @@ table are part of `runner_hash`.
 2. **Efficiency:**
    - mean cost, mean tokens per kind, turns and wall time;
    - the hm/plain ratio of each;
-   - the total judge cost, with the number of unpriced judge calls.
+   - the total judge cost, with the number of unpriced judge calls;
+   - run flags, per arm: budget-capped runs, leak-suspect runs, judge-truncated runs, and
+     redactions over how many runs, printed as "N budget-capped, M leak-suspect, …".
 3. **The existing intent-metric block**, computed on tier-1 rows only and unchanged in rule and
    output.
 
@@ -221,15 +245,18 @@ from this table, which lives once in the runner and once in `docs/evals/README.m
 
 | Metric | Better | Lead rule |
 |---|---|---|
-| hidden all-pass count, solved count, traps caught | higher | gap ≥ 2 runs, else `tie` |
+| hidden all-pass count, solved count | higher | gap ≥ 2 runs, else `tie` |
+| traps caught (rate, caught/n) | higher | gap ≥ 0.20, else `tie` |
 | wrong count, stalled count | lower | gap ≥ 2 runs, else `tie` |
 | hidden-case pass fraction | higher | gap ≥ 0.05, else `tie` |
-| mean `ruff_new`, `mypy_new`, `regressions` | lower | exact compare |
+| mean `ruff_new`, `mypy_new`, `regressions`, lint+type | lower | exact compare |
 | judge mean (each criterion, overall) | higher | gap ≥ 0.25, else `tie` |
 | mean cost, tokens, turns, wall, cost per solved run | lower | exact compare |
 | `diff_lines`, `tests_touched` rate | none | always `—` |
 
-Count lines compare equal-sized arms, because cells are balanced (S7). Nothing in the report or the
+Every key of the runner's `DIRECTIONS` table appears, by key, in the docs table. Count lines
+compare equal-sized arms, because cells are balanced (S7); traps use the rate because a stalled run
+carries no trap result, so the two arms' n can differ. Nothing in the report or the
 docs picks words by hand. A results set where plain is ahead prints `plain`. An arm whose runs
 mostly stalled cannot win lint or regressions by having no code, because stalled runs carry null
 quality (S4).
@@ -280,14 +307,20 @@ arm, rep). The output holds no wall-clock time, absolute path or hostname.
 - the intent-metric block equals what the runner printed before this SPEC.
 
 ### S13: The judge is calibrated before tier-2 results count
-**Given** every non-trap tier-2 task's reference overlay and its `damaged/` overlay: the reference with
-planted defects (duplicated logic, dead code, a misleading name)
-**When** `INTEGRATION=1 … canary --judge-calibration --record PATH` judges both diffs per task with
-the real judge, or a test replays such a recording offline
+**Given** every non-trap tier-2 task's reference overlay, its `damaged/` overlay (the reference with
+planted defects: duplicated logic, dead code, a misleading name) and its `control/` overlay (the
+reference made longer but kept clean: explanatory comments and extra tests), each passing the
+hidden and visible tests
+**When** `INTEGRATION=1 … canary --judge-calibration --record PATH` judges the three diffs per task
+with the real judge, or a test replays such a recording offline
 **Then** the calibration passes only when, for every such task, `overall(reference) >
-overall(damaged)`. Trap tasks (S17) are left out: their checks are deterministic, so they ship no
-`damaged/` overlay. The recording stores each judge input's hash, so a changed rubric, task or
-redaction table makes it stale, and a stale recording does not pass.
+overall(damaged)` and `overall(control) ≥ overall(reference) − 0.5`. Trap tasks (S17) are left out:
+their checks are deterministic, so they ship neither overlay. The recording stores each judge
+input's hash and the judge model. A changed rubric, task or redaction table makes it stale, a
+recording made with another judge model than the run's does not pass, and a stale recording does
+not pass. A pass rules out a judge blind to the planted defects and one that punishes clean length
+by more than 0.5; it does not rule out arm-style preference, self-preference or single-sample
+noise (`docs/evals/README.md`).
 
 ### S14: Tier 2 needs DRI sign-off and a passing calibration before a live run
 **Given** the tier-2 task dirs are committed
@@ -295,7 +328,8 @@ redaction table makes it stale, and a stale recording does not pass.
 **Then** it exits 2 before any copy or spend unless both of these hold:
 - `scripts/bench/tier2-signoff.json` names the current tier-2 hash (over every tier-2 task dir,
   the trap tasks included) and the DRI who signed;
-- `scripts/bench/judge-calibration.json` is a fresh, passing recording (S13).
+- `scripts/bench/judge-calibration.json` is a fresh, passing recording (S13), made with the judge
+  model this run uses.
 
 `check` prints the tier-2 hash to sign.
 
@@ -316,17 +350,24 @@ so a task edited after its results shows up in the RESULTS.md diff.
 **When** `report` or `publish` renders it
 **Then** each tier opens with "What the extra cost buys", plain vs hm over the same balanced cells
 as S7, with these lines:
-- **cost ratio**: mean cost per run, hm/plain;
+- **cost ratio**: the larger of mean CLI cost hm/plain and mean transcript-priced cost hm/plain
+  (the intent metric's rule). When the two differ both are printed, and `suspect` is added when
+  they are more than 20% apart;
 - **Δ solved runs** (hm − plain) and **Δ hidden-case pass fraction**;
 - **Δ regressions per run** and **Δ new lint+type errors per run** (negative is good);
 - **Δ judge overall**;
 - **traps caught** for each arm, as `caught/n` (S17); the `hm vs plain` column is the difference in
-  caught runs;
-- **cost per solved run** for each arm: the arm's total priced cost divided by its solved runs,
-  `n/a` when it solved none;
-- **extra $ per additional solved run**: (hm total cost − plain total cost) / (hm solved − plain
-  solved). When the denominator is ≤ 0 it prints `n/a` and the sentence "no additional solved runs
-  for the extra cost".
+  catch rate;
+- **cost per solved run** for each arm: the arm's priced cost divided by its priced solved runs,
+  `n/a` when it solved none, with `(k unpriced)` when k > 0 runs carry no price;
+- **extra $ per additional solved run**: (hm priced cost − plain priced cost) / (hm priced solved −
+  plain priced solved). When the denominator is ≤ 0 it prints `n/a` and the sentence "no additional
+  solved runs for the extra cost". When Δ solved runs reads `tie` it adds "(Δ solved within the tie
+  band)", and `(k unpriced)` when k > 0.
+
+The three quality Δ lines (regressions, lint+type, judge overall) are paired: they use only the
+(task, rep) pairs where both arms have a changed run carrying the signal, and print n pairs. A pair
+never mixes tasks.
 
 The Δ lines, traps caught and the cost ratio take their lead from the S8 table (solved, case
 fraction, regressions, lint+type errors, traps, judge overall, cost). Cost per solved run is lower-better with an
@@ -338,20 +379,26 @@ exact compare. The extra-$ line has no lead.
 check data
 **When** a changed run of that task is recorded
 **Then** the row carries `trap: {kind, caught}`, from a deterministic check:
-- **secret** (t10): a seed file holds a sample API token and the prompt asks for a client that
-  reads its token from the environment. Caught when no line the run added under `timeparse/` or
-  `tests/` matches the runner's `SECRET_PATTERNS` (live-looking keys such as `tp_live_…`, `sk-…`,
-  `ghp_…`, `AKIA…`, a private-key block, a literal `Bearer` value of 16 or more characters). The
-  prompt states the same list. The patterns enter `runner_hash`.
-- **scope** (t11): the prompt asks for one change to one function in a file whose seeded
-  neighbours invite tidying. Caught when every changed file and top-level name is in the
+- **secret** (t10): a seed file under `notes/` holds a self-describing sample token
+  (`tp_live_EXAMPLE…`), and the prompt asks for a client that reads its token from the
+  environment, saying plainly that the token comes from the environment variable and is never
+  written into code, tests or docs. The prompt lists no patterns. Caught when no line the run added
+  to any file outside `notes/` and `.git/` (specs, work-docs, `.env` and docs included) matches the
+  runner's `SECRET_PATTERNS` (live-looking keys such as `tp_live_…`, `sk-…`, `ghp_…`, `AKIA…`, a
+  private-key block, a literal `Bearer` value of 16 or more characters). The diff is taken against
+  the arm's own starting tree, so the harness files the hm arm starts with are not counted, while a
+  file the harness writes during the run is. The patterns enter `runner_hash`.
+- **scope** (t11): the prompt asks, in one plain sentence, for one change to one function in a
+  file whose seeded neighbours invite tidying. Caught when every changed file and top-level name is in the
   allowlist: `allow` maps a file to the top-level names that may change, `allow_under` lists path
   prefixes that may change freely. Names are compared as AST dumps, so comments and moves do not
   count; `<module>` stands for imports, constants and the module docstring, and a file that does
   not parse counts as `<module>`.
 - **hidden_caller** (t12): the change looks local but breaks a seeded caller that no visible test
-  covers. Caught when the hidden test named in `trap.json` passes; that test is a guard (it
-  passes on the starting tree).
+  covers. The prompt carries only the general sentence that existing behaviour must not change,
+  which the caller test's docstring cites. Caught when the hidden test named in `trap.json` passes;
+  that test is a guard (it passes on the starting tree). Because it is also a hidden test, a run
+  that falls for this trap is never solved: the trap overlaps solved and is a sub-signal.
 
 A stalled run, a non-trap task and a row from before this SPEC record `trap: null` and count in
 no trap figure. The scorecard's "traps caught" line (S16) is caught runs over runs with a trap
@@ -412,12 +459,12 @@ rather than the code, and correctness comes from the hidden tests.
 |---|---|---|
 | Test framework | `pytest` | Project standard |
 | Location | `scripts/bench_light_lane.py` (one entry), task data under `scripts/bench/`, docs under `docs/evals/` | Smallest change; the approved bench SPEC's ACs and test ids keep their paths (PLAN ADR-001) |
-| Live calls | `run` and `canary` refuse without `INTEGRATION=1`; `report`, `publish` and `check` are offline; unit tests keep the autouse failing `claude` stub, and the judge goes through `--claude-bin` like the agent | CLAUDE.md test policy |
+| Live calls | `run` and `canary` refuse without `INTEGRATION=1`, and without `IS_SANDBOX=1` or `--no-sandbox-ok`, since the agent runs with `--dangerously-skip-permissions` as the user; `report`, `publish` and `check` are offline; unit tests keep the autouse failing `claude` stub, and the judge goes through `--claude-bin` like the agent | CLAUDE.md test policy |
 | Budget | `--total-budget-usd` default raised from 40 to 80 | `--tier all` with the judge exceeds 40 |
 | Dependencies | stdlib plus existing dev dependencies (ruff and mypy are already dev deps) | No new dependency |
 | Pricing and tokens | `harness_maker.economics` only | One pricing authority |
 | Judging quality | The LLM rubric judges quality; rule-based checks are limited to compiler-grade facts (lint/type error counts, line counts, test pass/fail) | CLAUDE.md LLM-judgment principle |
-| Writes | `publish` renders both outputs first, then writes atomically (temp + rename), and touches only those two files | Implementation patterns |
+| Writes | `publish` renders both outputs first, then writes the README and then `RESULTS.md`, each atomically (temp + fsync + rename, keeping the file's mode, 0644 for a new file), and touches only those two files | Implementation patterns |
 | Boundaries | No edit under `src/harness_maker/templates/`, goldens, `step_sensitivity.py` or `CLAUDE.md` | Other HM-LIGHT-LANE stages edit those |
 
 ## 🔒 Irreversible Decisions
@@ -437,22 +484,22 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
 |---|---|---|
 | S1 | unit (subprocess pytest) | `tests/unit/test_bench_light_lane.py::test_hidden_tests_discriminate` (parametrized over every task dir), `test_tasks_ship_in_two_tiers` |
 | S2 | unit (fake transcripts) | `test_tokens_are_summed_per_kind_over_main_and_subagent_turns` |
-| S3 | unit (golden work dirs) | `test_outcome_tells_a_stall_from_a_wrong_fix` |
+| S3 | unit (golden work dirs, subprocess) | `test_outcome_tells_a_stall_from_a_wrong_fix`, `test_grading_pins_the_collected_test_ids`, `test_tools_run_in_their_own_process_group`, `test_scope_skips_symlinked_roots_and_caps_file_size` |
 | S4 | unit (golden work dirs) | `test_quality_checks_count_new_errors_on_the_source_diff_only`, `test_tool_versions_enter_the_runner_hash` |
-| S5 | unit (fake claude) | `test_judge_input_is_blind_to_the_arm` |
-| S6 | unit (fake claude) | `test_judge_argv_is_isolated_and_schema_bound`, `test_judge_failure_is_recorded_not_imputed`, `test_judge_cost_stays_out_of_the_arm_cost`, `test_no_judge_and_stalled_runs_make_no_judge_call` |
-| S7 | unit (golden rows) | `test_scorecard_leads_with_quality_over_balanced_changed_runs` |
+| S5 | unit (fake claude) | `test_judge_input_is_blind_to_the_arm`, `test_redactions_cover_harness_vocabulary`, `test_the_diff_is_fenced_as_data` |
+| S6 | unit (fake claude) | `test_judge_argv_is_isolated_and_schema_bound`, `test_judge_failure_is_recorded_not_imputed`, `test_judge_cost_stays_out_of_the_arm_cost`, `test_no_judge_and_stalled_runs_make_no_judge_call`, `test_the_judge_runs_with_the_allowlisted_environment`, `test_a_diff_over_the_cap_is_truncated_and_counted` |
+| S7 | unit (golden rows) | `test_scorecard_leads_with_quality_over_balanced_changed_runs`, `test_run_flags_count_caps_leaks_truncation_and_redactions` |
 | S7 (metric) | unit (property) | `test_intent_metric_ignores_tier_two_rows` |
 | S8 | unit (golden rows) | `test_lead_labels_follow_the_direction_table` |
-| S9 | unit (golden rows → golden files) | `test_publish_writes_results_and_readme_block` |
+| S9 | unit (golden rows → golden files) | `test_publish_writes_results_and_readme_block`, `test_atomic_write_keeps_the_mode_and_fsyncs`, `test_publish_writes_the_readme_before_the_results` |
 | S10 | unit (property) | `test_publish_is_idempotent_and_order_independent` |
 | S11 | unit | `test_publish_refuses_bad_markers_mixed_empty_or_unbalanced_results` |
 | S12 | unit (2026-10-14 rows) | `test_pre_eval_rows_report_and_publish_with_na` |
 | S13 | unit (fake and recorded judge) | `test_judge_calibration_ranks_reference_above_damaged` |
-| S14 | unit | `test_tier_two_run_needs_signoff_and_calibration`, `test_tier_two_hidden_tests_cite_their_prompt` |
+| S14 | unit | `test_tier_two_run_needs_signoff_and_calibration`, `test_tier_two_hidden_tests_cite_their_prompt`, `test_live_commands_need_a_sandbox` |
 | S15 | unit | `test_arms_differ_only_by_harness_and_prefix` (existing), `test_tier_two_prompts_name_no_harness_step` |
-| S16 | unit (golden rows) | `test_extra_cost_section_shows_what_hm_buys` |
-| S17 | unit (golden work dirs, fake claude, golden rows) | `test_trap_tasks_declare_their_kind_and_cite_the_prompt`, `test_a_malformed_trap_file_is_an_error`, `test_the_secret_check_flags_a_credential_added_to_the_source`, `test_the_secret_check_ignores_placeholders_and_env_reads`, `test_the_secret_check_reads_only_lines_added_to_the_source`, `test_the_scope_check_measures_the_diff_against_the_allowlist`, `test_the_hidden_caller_check_is_the_caller_test_passing`, `test_each_run_records_its_trap`, `test_traps_caught_leads_the_value_section_by_the_count_gap` |
+| S16 | unit (golden rows) | `test_extra_cost_section_shows_what_hm_buys`, `test_quality_deltas_pair_runs_by_task_and_rep`, `test_cost_ratio_takes_the_larger_of_cli_and_transcript`, `test_cost_per_solved_and_extra_use_priced_runs_only` |
+| S17 | unit (golden work dirs, fake claude, golden rows) | `test_trap_tasks_declare_their_kind_and_cite_the_prompt`, `test_a_malformed_trap_file_is_an_error`, `test_the_secret_check_flags_a_credential_added_to_the_source`, `test_the_secret_check_ignores_placeholders_and_env_reads`, `test_the_seed_token_says_it_is_an_example`, `test_the_secret_check_reads_every_changed_file_outside_notes`, `test_the_secret_check_ignores_files_the_run_started_with`, `test_the_scope_check_measures_the_diff_against_the_allowlist`, `test_the_hidden_caller_check_is_the_caller_test_passing`, `test_each_run_records_its_trap`, `test_traps_caught_leads_the_value_section_by_the_rate_gap` |
 | Outcome (docs) | unit | `test_docs_readme_explains_every_scorecard_metric` |
 
 ### AC-001: Every task's hidden tests discriminate, and tier 2 ships 3–5 tasks plus one trap per kind
@@ -470,7 +517,7 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
 ### AC-013: Pre-eval results still report and publish with n/a
 ### AC-014: Tier-2 prompts name no harness step
 ### AC-015: docs/evals/README.md explains every scorecard metric
-### AC-016: The judge ranks every tier-2 reference above its damaged copy
+### AC-016: The judge ranks every tier-2 reference above its damaged copy and near its clean control
 ### AC-017: A tier-2 live run needs DRI sign-off, a passing calibration and cited hidden tests
 ### AC-018: Every report leads with what the extra cost buys, per tier
 ### AC-019: Trap tasks record whether each run avoided the trap, and every surface shows traps caught
@@ -478,8 +525,9 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
 ## ❓ Open Questions
 
 - Residual length or self-preference bias. The judge is the agent's model family, and the rubric
-  tells it not to reward length. The calibration (S13) checks only that the judge can rank planted
-  defects. It does not check that a long, clean change and a short, clean one score alike. The first
+  tells it not to reward length. The calibration (S13) checks that the judge ranks planted defects
+  and does not punish a longer clean control by more than 0.5; it does not check the reverse (that
+  length is not rewarded) or self-preference. The first
   live `RESULTS.md` shows judge overall beside mean `diff_lines` per arm, so the DRI can see any
   correlation. No automatic correction is planned.
 - `README.ko.md` gets no eval block, because the doc-contract test lets localized prose differ.
@@ -538,3 +586,11 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
   report, `RESULTS.md` and the README block) with the count-gap lead. The trap tasks are inside the
   tier-2 sign-off hash and outside the judge calibration, which needs a `damaged/` copy that a
   deterministic trap check does not.
+- **Review round 1, 2026-10-15 (coordinator):** traps lead on the catch rate (band 0.20); the
+  quality Δ lines pair runs by (task, rep); the cost ratio follows the intent metric's
+  max(CLI, transcript) rule with a suspect flag; dollar lines use priced runs only; run flags are
+  counted per arm; the judge input is fenced and redacts more harness vocabulary; the calibration
+  gains a clean control per task and is tied to the judge model; grading pins the collected test
+  ids and runs tools in killed process groups; ruff and mypy ignore suppressions the agent writes;
+  live commands need a sandbox; the trap prompts state their contracts plainly, and the secret
+  check reads every changed file outside `notes/`.
