@@ -1,0 +1,695 @@
+"""SPEC-hm-eval-tier3 — tier 3 of the hm eval and its multi-session runner, offline.
+
+No test here calls a model. A fake `claude` (written per test) follows a per-call script: it
+records what it saw, copies the overlay the test chose into its work dir, writes a transcript
+and prints a CLI-shaped result. Expected values come from the fake, from the task files on disk
+and from hash values recorded before tier 3 existed, never from the runner.
+"""
+
+from __future__ import annotations
+
+import ast
+import dataclasses
+import hashlib
+import importlib.util
+import json
+import os
+import shutil
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+import pytest
+
+_ROOT = Path(__file__).resolve().parents[2]
+_SCRIPT = _ROOT / "scripts" / "bench_light_lane.py"
+_BENCH = _ROOT / "scripts" / "bench"
+_TIER3 = _BENCH / "tier3"
+_TASK_IDS = ["t13", "t14", "t15", "t16", "t17", "t18", "t19", "t20", "t21"]
+_COPY_IGNORE = shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.pyc")
+CAREFUL = (
+    "Before changing code, read the documentation and every caller that the change could affect."
+)
+
+
+def _load() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("bench_light_lane", _SCRIPT)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["bench_light_lane"] = module  # dataclasses resolve their module by name
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="module")
+def bench() -> ModuleType:
+    return _load()
+
+
+@pytest.fixture(autouse=True)
+def _no_real_claude(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """A `claude` on PATH that always fails: a test that forgets --claude-bin stops here."""
+    stub_dir = tmp_path_factory.getbasetemp() / "no-claude"
+    stub = stub_dir / "claude"
+    if not stub.exists():
+        stub_dir.mkdir(exist_ok=True)
+        stub.write_text(f"#!{sys.executable}\nraise SystemExit(99)\n")
+        stub.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{stub_dir}{os.pathsep}{os.environ['PATH']}")
+
+
+def _task(bench: ModuleType, task_id: str) -> Any:
+    return next(t for t in bench.load_tier3_tasks() if t.id == task_id)
+
+
+def _norm(text: str) -> str:
+    return " ".join(text.split())
+
+
+# --- the fake agent ---------------------------------------------------------------------------
+
+# One step per call, in call order: {"overlay": dir, "write": {rel: text}, "stage": [rel],
+# "exit": n, "error": bool, "cost": usd}. The fake also logs, per call, its argv, cwd, prompt,
+# the HEAD commit's files and message and `git status --porcelain`.
+_FAKE = r"""
+import json, os, re, shutil, subprocess, sys, uuid
+from pathlib import Path
+
+cfg = json.loads(Path(__file__).with_suffix(".json").read_text())
+if "--version" in sys.argv[1:]:
+    print("fake 1.0")
+    sys.exit(0)
+argv = sys.argv[1:]
+log = Path(cfg["log"])
+calls = log.read_text().splitlines() if log.exists() else []
+step = cfg["steps"][len(calls)] if len(calls) < len(cfg["steps"]) else {}
+cwd = Path.cwd()
+
+def git(*args):
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True).stdout
+
+seen = {
+    "argv": argv, "cwd": str(cwd), "prompt": argv[argv.index("-p") + 1],
+    "head_files": git("show", "--name-only", "--format=", "HEAD").split(),
+    "head_message": git("log", "-1", "--format=%s").strip(),
+    "status": git("status", "--porcelain"),
+    "locale": (cwd / "timeparse" / "locale.py").read_text()
+    if (cwd / "timeparse" / "locale.py").exists() else None,
+}
+with log.open("a") as handle:
+    handle.write(json.dumps(seen) + "\n")
+if step.get("overlay"):
+    shutil.copytree(step["overlay"], cwd, dirs_exist_ok=True)
+for rel, text in step.get("write", {}).items():
+    (cwd / rel).parent.mkdir(parents=True, exist_ok=True)
+    (cwd / rel).write_text(text)
+if step.get("stage"):
+    subprocess.run(["git", "add", "--", *step["stage"]], cwd=cwd, check=True)
+session = str(uuid.uuid4())
+proj = Path(cfg["transcript_root"]) / re.sub(r"[/._]", "-", str(cwd))
+proj.mkdir(parents=True, exist_ok=True)
+line = {
+    "type": "assistant", "timestamp": "2026-10-15T00:00:00Z", "cwd": str(cwd),
+    "sessionId": session,
+    "message": {"id": "msg_" + session, "model": "claude-sonnet-5-5",
+                "usage": {"input_tokens": 1000, "output_tokens": 100}},
+}
+(proj / f"{session}.jsonl").write_text(json.dumps(line) + "\n")
+result = {"type": "result", "subtype": "success", "is_error": bool(step.get("error")),
+          "num_turns": 2, "session_id": session, "total_cost_usd": step.get("cost", 0.1)}
+print(json.dumps(result))
+sys.exit(step.get("exit", 0))
+"""
+
+
+def _fake(directory: Path, steps: list[dict[str, Any]]) -> tuple[Path, Path]:
+    path = directory / "fake-claude"
+    path.write_text(f"#!{sys.executable}\n{_FAKE}")
+    path.chmod(0o755)
+    log = directory / "calls.jsonl"
+    cfg = {"log": str(log), "steps": steps, "transcript_root": str(directory / "transcripts")}
+    path.with_suffix(".json").write_text(json.dumps(cfg))
+    return path, log
+
+
+def _calls(log: Path) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+
+def _options(bench: ModuleType, tmp_path: Path, task: Any, steps: list[dict[str, Any]]) -> Any:
+    """Options for one in-process run_cell of `task` in the plain template, every arm mapped to
+    it, so a test of the session loop never renders the harness."""
+    fake, _log = _fake(tmp_path, steps)
+    template = tmp_path / "tpl"
+    bench.build_template(template, "plain", seed=task.seed_dir, base=task.base_dir)
+    (tmp_path / "out").mkdir()
+    keys = {bench.template_key(task, arm) for arm in bench.ALL_ARMS}
+    return bench.Options(
+        out=tmp_path / "out", claude_bin=str(fake), model="m", max_turns=5, timeout_s=120,
+        transcript_root=tmp_path / "transcripts", bench_hash="b", harness_sha="h",
+        templates=dict.fromkeys(keys, template), judge=False,
+        tier3_hash=bench.tier3_hash(),
+    )  # fmt: skip
+
+
+def _run(bench: ModuleType, tmp_path: Path, task_id: str, steps: list[dict[str, Any]],
+         arm: str = "plain") -> tuple[dict[str, Any], list[dict[str, Any]]]:  # fmt: skip
+    task = _task(bench, task_id)
+    opts = _options(bench, tmp_path, task, steps)
+    row = bench.run_cell(task, arm, 1, opts)
+    assert row["status"] not in ("setup_error", "runner_error", "interrupted"), row
+    return row, _calls(tmp_path / "calls.jsonl")
+
+
+def _reference(task_id: str) -> str:
+    return str(_TIER3 / "tasks" / task_id / "reference")
+
+
+# --- AC-001: every tier-3 task discriminates --------------------------------------------------
+
+
+def test_tier3_ships_nine_tasks_in_four_families(bench: ModuleType) -> None:
+    tasks = bench.load_tier3_tasks()
+    assert [t.id for t in tasks] == _TASK_IDS
+    assert {t.tier for t in tasks} == {3}
+    assert all(t.base_dir == _TIER3 / "base" for t in tasks)
+    assert all(t.careless_dir is not None and t.careless_dir.is_dir() for t in tasks)
+    assert [t.id for t in tasks if len(t.sessions) == 2] == ["t19", "t20", "t21"]
+    assert [t.id for t in tasks if any(s.overlay for s in t.sessions)] == ["t20"]
+    assert [t.id for t in tasks if t.guard] == ["t21"]
+    assert all(t.trap is None for t in tasks)
+    assert sorted(t.id for t in bench.load_tasks()) == sorted(f"t{n}" for n in range(1, 13))
+
+
+@pytest.mark.parametrize("task_id", _TASK_IDS)
+def test_tier3_tasks_discriminate(bench: ModuleType, task_id: str, tmp_path: Path) -> None:
+    assert bench.check_task(_task(bench, task_id), tmp_path) == []
+
+
+def _task_copy(tmp_path: Path, task_id: str) -> Path:
+    """A private tier-3 tree holding the base and one task, for tests that break a task."""
+    root = tmp_path / "tier3"
+    shutil.copytree(_TIER3 / "base", root / "base", ignore=_COPY_IGNORE)
+    shutil.copytree(_TIER3 / "tasks" / task_id, root / "tasks" / task_id, ignore=_COPY_IGNORE)
+    return root / "tasks"
+
+
+def test_a_careless_overlay_that_passes_is_a_problem(bench: ModuleType, tmp_path: Path) -> None:
+    tasks = _task_copy(tmp_path, "t16")
+    careless = tasks / "t16" / "careless"
+    shutil.rmtree(careless)
+    shutil.copytree(tasks / "t16" / "reference", careless)
+    task = bench.load_tasks(tasks)[0]
+    problems = bench.check_task(task, tmp_path / "scratch")
+    assert any("careless" in p and "passes the hidden tests" in p for p in problems), problems
+
+    (careless / "timeparse" / "parse.py").write_text("raise ImportError('broken')\n")
+    problems = bench.check_task(task, tmp_path / "scratch2")
+    assert any("careless" in p and "visible" in p for p in problems), problems
+
+
+# --- AC-002: every hidden test cites a findable sentence --------------------------------------
+
+
+def _hidden_docstrings(task_dir: Path) -> dict[str, str]:
+    found = {}
+    for path in sorted((task_dir / "hidden").glob("test_*.py")):
+        for node in ast.parse(path.read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
+                found[node.name] = ast.get_docstring(node) or ""
+    return found
+
+
+@pytest.mark.parametrize("task_id", _TASK_IDS)
+def test_every_tier3_hidden_test_cites_a_findable_sentence(
+    bench: ModuleType, task_id: str, tmp_path: Path
+) -> None:
+    task = _task(bench, task_id)
+    tree = tmp_path / "tree"
+    bench.start_tree(tree, task)
+    docstrings = _hidden_docstrings(_TIER3 / "tasks" / task_id)
+    assert docstrings
+    for name, doc in docstrings.items():
+        quote, sep, home = doc.rpartition("Source:")
+        assert sep, f"{name} names no source"
+        home = home.strip()
+        if home == "prompt":
+            text = (_TIER3 / "tasks" / task_id / "prompt.md").read_text(encoding="utf-8")
+        elif home.startswith("session "):
+            path = _TIER3 / "tasks" / task_id / "sessions" / home.split()[1] / "prompt.md"
+            text = path.read_text(encoding="utf-8")
+        else:
+            assert not home.startswith(("/", "..")), home
+            text = (tree / home).read_text(encoding="utf-8")
+        assert _norm(quote), f"{name}: empty quote"
+        assert _norm(quote) in _norm(text), f"{name}: quote not in {home}"
+    assert bench.citation_problems(task, tree) == []
+
+
+def test_a_quote_missing_from_its_home_is_a_problem(bench: ModuleType, tmp_path: Path) -> None:
+    tasks = _task_copy(tmp_path, "t14")
+    hidden = tasks / "t14" / "hidden" / "test_t14_decimals.py"
+    text = hidden.read_text(encoding="utf-8")
+    assert "never rounded or truncated." in text
+    hidden.write_text(text.replace("never rounded or truncated.", "always rounded."))
+    task = bench.load_tasks(tasks)[0]
+    tree = tmp_path / "tree"
+    bench.start_tree(tree, task)
+    problems = bench.citation_problems(task, tree)
+    assert problems
+    assert all("docs/DECISIONS.md" in p for p in problems), problems
+
+    hidden.write_text(text.replace("    Source: prompt\n", ""))
+    problems = bench.citation_problems(bench.load_tasks(tasks)[0], tree)
+    assert any("test_decimal_amounts_are_accepted" in p and "Source" in p for p in problems)
+
+    hidden.write_text(text.replace("Source: prompt", "Source: docs/NOWHERE.md"))
+    problems = bench.citation_problems(bench.load_tasks(tasks)[0], tree)
+    assert any("docs/NOWHERE.md" in p for p in problems), problems
+
+
+# --- AC-003: the prompt lint ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("task_id", _TASK_IDS)
+def test_tier3_prompts_carry_no_harness_word(bench: ModuleType, task_id: str) -> None:
+    task = _task(bench, task_id)
+    assert task.session_prompts
+    for prompt in task.session_prompts:
+        assert bench.prompt_lint(prompt) == [], prompt
+
+
+@pytest.mark.parametrize(
+    ("prompt", "count"),
+    [
+        ("Fix issue #21 in the format module.", 0),
+        ("Write a spec first, then fix it.", 1),
+        ("Make a Plan and remember the cap.", 2),
+        ("See docs/DECISIONS.md.", 1),
+        ("Cover AC-1 and note this.", 2),
+        ("The planner keeps its specification.", 0),
+        ("Keep it in memory; acceptance first; no non-goal.", 3),
+    ],
+)
+def test_the_prompt_lint_rejects_each_listed_word(
+    bench: ModuleType, prompt: str, count: int
+) -> None:
+    assert len(bench.prompt_lint(prompt)) == count, bench.prompt_lint(prompt)
+
+
+# --- AC-004: the differential oracles equal the unchanged start tree --------------------------
+
+_ORACLE_CHECK = textwrap.dedent(
+    """
+    import importlib.util, sys
+    from pathlib import Path
+
+    def hidden(path):
+        spec = importlib.util.spec_from_file_location("hidden_" + Path(path).stem, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    from timeparse import format_duration, parse_duration
+    from timeparse.pack import pack
+
+    t16, t18, t13 = (hidden(p) for p in sys.argv[1:4])
+    bad = [v for v, packed in t16._PACKED.items() if pack(v) != packed]
+    corpus = t18._corpus()
+    bad += [t for t in corpus if t18._outcome(parse_duration, t) != t18._outcome(t18._original, t)]
+    bad += [s for s in t13._SWEEP if format_duration(s) != t13._compact(s)]
+    print(len(t16._PACKED), len(corpus), len(t13._SWEEP), len(bad))
+    """
+)
+
+
+def test_goldens_match_the_unchanged_start_tree(bench: ModuleType, tmp_path: Path) -> None:
+    tree = tmp_path / "start"
+    bench.start_tree(tree, _task(bench, "t16"))
+    hidden = [
+        _TIER3 / "tasks" / "t16" / "hidden" / "test_t16_weeks.py",
+        _TIER3 / "tasks" / "t18" / "hidden" / "test_t18_one_regex.py",
+        _TIER3 / "tasks" / "t13" / "hidden" / "test_t13_issue_21.py",
+    ]
+    proc = subprocess.run(
+        [sys.executable, "-c", _ORACLE_CHECK, *map(str, hidden)], cwd=tmp_path,
+        env={**os.environ, "PYTHONPATH": str(tree)}, capture_output=True, text=True,
+        timeout=300, check=False,
+    )  # fmt: skip
+    assert proc.returncode == 0, proc.stderr
+    packed, corpus, sweep, bad = map(int, proc.stdout.split())
+    assert packed >= 25
+    assert corpus >= 5000
+    assert sweep >= 1000
+    assert bad == 0
+
+
+# --- AC-005: the multi-session runner ---------------------------------------------------------
+
+
+def test_sessions_run_in_order_as_fresh_processes_in_one_work_dir(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    steps = [{"write": {"NOTES.md": "cap: 30 days\n"}, "cost": 0.1},
+             {"overlay": _reference("t19"), "cost": 0.2}]  # fmt: skip
+    row, calls = _run(bench, tmp_path, "t19", steps)
+    task = _task(bench, "t19")
+    assert [c["prompt"] for c in calls] == list(task.session_prompts)
+    assert calls[0]["cwd"] == calls[1]["cwd"] == str(Path(row["run_dir"]) / "work")
+    for call in calls:
+        assert "--continue" not in call["argv"]
+        assert "--resume" not in call["argv"]
+    first, second = (list(c["argv"]) for c in calls)
+    index = first.index("-p") + 1
+    first[index] = second[index] = "<prompt>"
+    assert first == second
+    assert row["status"] == "ok"
+    assert row["outcome"] == "solved"
+    assert row["passed"] is True
+    assert row["tier3_hash"] == bench.tier3_hash()
+    assert [s["cost_usd"] for s in row["sessions"]] == [0.1, 0.2]
+    assert [s["status"] for s in row["sessions"]] == ["ok", "ok"]
+    assert row["cost_usd"] == pytest.approx(0.3)
+    assert row["num_turns"] == 4
+    assert row["stopped_at"] is None
+    assert row["overlay_clobbered"] == []
+    assert row["wall_s"] == pytest.approx(sum(s["wall_s"] for s in row["sessions"]), abs=0.2)
+    hm = [bench.prompt_for(task, "hm", i) for i in range(2)]
+    assert hm == ["/hm:spec " + p for p in task.session_prompts]
+
+
+def test_the_teammate_commit_holds_only_the_overlay_paths(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    edited = "# the arm's own uncommitted work\n"
+    steps: list[dict[str, Any]] = [
+        {"write": {"timeparse/format.py": edited, "scratch.txt": "wip\n"},
+         "stage": ["timeparse/format.py"]},
+        {"overlay": _reference("t20")},
+    ]  # fmt: skip
+    row, calls = _run(bench, tmp_path, "t20", steps)
+    second = calls[1]
+    assert second["head_message"] == "teammate"
+    assert second["head_files"] == ["timeparse/locale.py"]
+    overlay = _TIER3 / "tasks" / "t20" / "sessions" / "2" / "overlay" / "timeparse" / "locale.py"
+    assert second["locale"] == overlay.read_text(encoding="utf-8")
+    status = second["status"].splitlines()
+    assert "M  timeparse/format.py" in status, status  # still staged, never committed
+    assert "?? scratch.txt" in status, status
+    assert row["overlay_clobbered"] == []
+    assert row["outcome"] == "solved"
+
+
+def test_an_overlay_the_arm_already_wrote_is_recorded_as_clobbered(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    steps: list[dict[str, Any]] = [
+        {"write": {"timeparse/locale.py": "NAMES = {}\n"}},
+        {"overlay": _reference("t20")},
+    ]
+    row, calls = _run(bench, tmp_path, "t20", steps)
+    assert row["overlay_clobbered"] == ["timeparse/locale.py"]
+    assert calls[1]["locale"] != "NAMES = {}\n"
+    assert calls[1]["head_files"] == ["timeparse/locale.py"]
+
+
+def test_a_failed_session_stops_the_run_and_grades_once(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    graded: list[Path] = []
+    original = bench.grade
+
+    def counting(work: Path, tests_dir: Path, *args: Any, **kwargs: Any) -> Any:
+        if tests_dir.name == "hidden":
+            graded.append(work)
+        return original(work, tests_dir, *args, **kwargs)
+
+    monkeypatch.setattr(bench, "grade", counting)
+    row, calls = _run(bench, tmp_path, "t20", [{"error": True, "exit": 1}, {}])
+    assert len(calls) == 1
+    assert row["status"] == "agent_error"
+    assert row["stopped_at"] == 1
+    assert [s["status"] for s in row["sessions"]] == ["agent_error"]
+    assert row["outcome"] == "stalled", "the overlay was never applied, so it is no change"
+    assert graded.count(Path(row["run_dir"]) / "work") == 1
+
+
+# --- AC-006: tier-3 hash, gate and rows -------------------------------------------------------
+
+
+def test_tier3_hash_covers_tier3_files_only(bench: ModuleType, tmp_path: Path) -> None:
+    copy = tmp_path / "bench"
+    shutil.copytree(_BENCH, copy, ignore=_COPY_IGNORE)
+    digest, bench_digest = bench.tier3_hash(copy), bench.bench_hash(copy)
+    assert digest == bench.tier3_hash()
+    assert len(digest) == 12
+    (copy / "tasks" / "t6" / "prompt.md").write_text("changed\n")
+    assert bench.tier3_hash(copy) == digest
+    (copy / "tier3" / "tasks" / "t13" / "prompt.md").write_text("changed\n")
+    assert bench.tier3_hash(copy) != digest
+    edited = bench.tier3_hash(copy)
+    (copy / "tier3" / "base" / "docs" / "DECISIONS.md").write_text("changed\n")
+    assert bench.tier3_hash(copy) != edited
+    shutil.rmtree(copy / "tasks" / "t6")
+    shutil.copytree(_BENCH / "tasks" / "t6", copy / "tasks" / "t6", ignore=_COPY_IGNORE)
+    assert bench.bench_hash(copy) == bench_digest, "a tier-3 edit leaves bench_hash alone"
+
+
+@pytest.fixture
+def inprocess(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("INTEGRATION", "1")
+    monkeypatch.setenv("IS_SANDBOX", "1")
+    monkeypatch.setenv("HM_BENCH_TEST", "1")
+
+
+def _canned(task: Any, arm: str, rep: int, opts: Any) -> dict[str, Any]:
+    return {
+        "bench_hash": opts.bench_hash, "harness_sha": opts.harness_sha, "model": opts.model,
+        "runner_hash": opts.runner_hash, "tier": task.tier, "task": task.id, "arm": arm,
+        "rep": rep, "status": "ok", "passed": True, "outcome": "solved", "cost_usd": 0.1,
+        "transcript_cost_usd": 0.1, "tier3_hash": opts.tier3_hash,
+    }  # fmt: skip
+
+
+def test_a_tier3_run_with_the_hm_arm_needs_the_signoff(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inprocess: None
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def cell(task: Any, arm: str, rep: int, opts: Any) -> dict[str, Any]:
+        calls.append((task.id, arm))
+        return _canned(task, arm, rep, opts)
+
+    monkeypatch.setattr(bench, "run_cell", cell)
+    monkeypatch.setattr(bench, "build_template", lambda *a, **k: None)
+    monkeypatch.setattr(bench, "check_cli_fresh", lambda *a, **k: None)
+    signoff = tmp_path / "tier3-signoff.json"
+    monkeypatch.setattr(bench, "TIER3_SIGNOFF_FILE", signoff)
+    current = {"tier3_hash": bench.tier3_hash(), "signed_by": "dri", "signed_at": "2026-10-16"}
+
+    def run(name: str, arms: str) -> int:
+        out = tmp_path / name
+        argv = ["run", "--out", str(out), "--guard-top", str(tmp_path), "--claude-bin", "unused"]
+        code = int(bench.main([*argv, "--tier", "3", "--runs", "1", "--arms", arms]))
+        if code == 2:
+            assert not out.exists(), "a refused run copies nothing"
+        return code
+
+    assert run("no-signoff", "plain,hm") == 2
+    signoff.write_text(json.dumps({**current, "tier3_hash": "000000000000"}))
+    assert run("stale", "plain,hm") == 2
+    signoff.write_text(json.dumps({**current, "signed_by": " "}))
+    assert run("unsigned", "plain,hm") == 2
+    assert calls == []
+    signoff.unlink()
+    assert run("pilot", "plain") == 0
+    assert sorted(calls) == [(t, "plain") for t in _TASK_IDS]
+    calls.clear()
+    signoff.write_text(json.dumps(current))
+    assert run("signed", "plain,hm") == 0
+    assert len(calls) == 18
+    argv = ["run", "--out", str(tmp_path / "all"), "--guard-top", str(tmp_path)]
+    argv += ["--claude-bin", "unused", "--tier", "all", "--tasks", "t13", "--arms", "plain"]
+    assert int(bench.main(argv)) == 2, "--tier all keeps meaning tiers 1 and 2"
+
+
+def test_tier3_rows_record_their_hash_and_never_mix(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str], inprocess: None,
+) -> None:  # fmt: skip
+    (tmp_path / "cell").mkdir()
+    row, _calls_seen = _run(bench, tmp_path / "cell", "t13", [{"overlay": _reference("t13")}])
+    assert row["tier3_hash"] == bench.tier3_hash()
+    assert row["tier"] == 3
+    other = {**row, "tier3_hash": "000000000000", "rep": 2}
+    with pytest.raises(bench.MixedResultsError):
+        bench.ensure_consistent([row, other])
+    bench.ensure_consistent([row, {**row, "rep": 2}])
+    tier1 = {**row, "tier": 1, "task": "t1"}
+    tier1.pop("tier3_hash")
+    bench.ensure_consistent([row, tier1])
+
+    out = tmp_path / "out"
+    monkeypatch.setattr(bench, "run_cell", lambda t, a, r, o: _canned(t, a, r, o))
+    monkeypatch.setattr(bench, "build_template", lambda *a, **k: None)
+    argv = ["run", "--out", str(out), "--guard-top", str(tmp_path), "--claude-bin", "unused"]
+    argv += ["--tier", "3", "--runs", "1", "--arms", "plain", "--tasks", "t13"]
+    assert bench.main(argv) == 0
+    rows = bench.read_rows(out)
+    assert [r["tier3_hash"] for r in rows] == [bench.tier3_hash()]
+    (out / "results.jsonl").write_text(json.dumps({**rows[0], "tier3_hash": "000000000000"}))
+    capsys.readouterr()
+    assert bench.main([*argv[:-2], "--tasks", "t13,t14"]) == 2
+    assert "tier3_hash" in capsys.readouterr().err
+
+
+# --- AC-007: tiers 1-2 are unchanged ----------------------------------------------------------
+
+
+def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType) -> None:
+    """Values recorded by the runner at origin/main db19f023, before tier 3 existed."""
+    assert bench.bench_hash() == "569e17ef29ab"
+    assert bench.tier2_hash() == "1cf707c57e12"
+    tools = {"ruff": "r", "mypy": "m"}
+    assert bench.runner_hash("model-x", 400, 1800, 5.0, (), "fake 1.0", quality_tools=tools) == (
+        "17f703bf0fcc"
+    )
+    assert (
+        bench.runner_hash(
+            "model-x", 400, 1800, 5.0, ("IS_SANDBOX",), "fake 1.0", quality_tools=tools, judge=False
+        )
+        == "10856c4eb248"
+    )
+    rows = bench.read_rows(_ROOT / "docs" / "evals")
+    report = hashlib.sha256(bench.report_text(rows).encode()).hexdigest()[:16]
+    assert report == "387310765063ba47"
+    card = json.dumps(bench.scorecard(rows), sort_keys=True)
+    assert hashlib.sha256(card.encode()).hexdigest()[:16] == "5aab714072eb7600"
+
+
+_TIER_TWO_ROW_KEYS = {
+    "bench", "bench_hash", "harness_sha", "runner_hash", "model", "tier", "task", "arm", "rep",
+    "max_budget_usd", "total_budget_usd", "started_at", "run_dir", "status", "exit_code",
+    "cost_usd", "cost_source", "cli_cost_usd", "transcript_cost_usd", "transcript_turns",
+    "subagent_turns", "num_turns", "subtype", "wall_s", "hidden", "passed", "leak_suspect",
+    "tokens", "outcome", "quality", "trap", "quality_tools", "judge", "judge_model",
+}  # fmt: skip
+
+
+def test_a_tier_two_row_has_no_tier3_fields(bench: ModuleType, tmp_path: Path) -> None:
+    task = next(t for t in bench.load_tasks() if t.id == "t12")
+    opts = _options(bench, tmp_path, task, [{"overlay": str(task.reference_dir)}])
+    row = bench.run_cell(task, "plain", 1, opts)
+    assert row["status"] == "ok"
+    assert row["outcome"] == "solved"
+    assert set(row) == _TIER_TWO_ROW_KEYS
+    assert bench.template_key(task, "plain") == "plain-t12"
+    assert bench.template_key(next(t for t in bench.load_tasks() if t.id == "t1"), "plain") == (
+        "plain"
+    )
+    assert bench.prompt_for(task, "plain") == task.prompt
+    assert bench.prompt_for(task, "hm") == "/hm:spec " + task.prompt
+
+
+# --- AC-008: the plain controls ---------------------------------------------------------------
+
+
+def test_the_careful_variant_appends_one_sentence(bench: ModuleType, tmp_path: Path) -> None:
+    assert bench.CAREFUL_SENTENCE == CAREFUL
+    task = _task(bench, "t19")
+    _row, calls = _run(bench, tmp_path, "t19", [{}, {}], arm="plain-careful")
+    assert [c["prompt"] for c in calls] == [f"{p}\n\n{CAREFUL}" for p in task.session_prompts]
+    assert all("--continue" not in c["argv"] for c in calls)
+    assert bench.template_key(task, "plain-careful") == bench.template_key(task, "plain")
+
+
+def test_the_continue_variant_continues_after_the_first_session(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    task = _task(bench, "t19")
+    row, calls = _run(bench, tmp_path, "t19", [{}, {}], arm="plain-continue")
+    assert [c["argv"].count("--continue") for c in calls] == [0, 1]
+    assert [c["prompt"] for c in calls] == list(task.session_prompts)
+    assert row["arm"] == "plain-continue"
+
+
+def _row(task: str, arm: str, rep: int, *, solved: bool, cost: float = 0.1,
+         judge: float | None = None, tier: int = 3) -> dict[str, Any]:  # fmt: skip
+    scores = (
+        None
+        if judge is None
+        else {"scope": judge, "clarity": judge, "maintainability": judge, "overall": judge}
+    )
+    return {
+        "bench_hash": "b", "harness_sha": "h", "model": "m", "runner_hash": "r", "tier": tier,
+        "task": task, "arm": arm, "rep": rep, "status": "ok", "passed": solved,
+        "outcome": "solved" if solved else "wrong", "cost_usd": cost, "cli_cost_usd": cost,
+        "transcript_cost_usd": cost, "transcript_turns": 2, "num_turns": 2, "wall_s": 30.0,
+        "hidden": {"tests": 4, "failures": 0 if solved else 2, "errors": 0, "skipped": 0},
+        "judge": {"status": "ok", "scores": scores} if scores else {"status": "off"},
+        "tier3_hash": "t3" if tier == 3 else None,
+    }  # fmt: skip
+
+
+def _main_rows() -> list[dict[str, Any]]:
+    return [_row(t, a, r, solved=(a == "hm"), judge=4.0) for t in ("t13", "t16")
+            for a in ("plain", "hm") for r in (1, 2, 3)]  # fmt: skip
+
+
+def test_control_rows_stay_out_of_the_main_scorecard(bench: ModuleType) -> None:
+    rows = _main_rows()
+    controls = [_row(t, a, r, solved=True) for t in ("t13", "t16")
+                for a in ("plain-careful", "plain-continue") for r in (1, 2, 3, 4)]  # fmt: skip
+    assert bench.scorecard(rows + controls) == bench.scorecard(rows)
+    assert bench.summarize(rows + controls)["arms"] == bench.summarize(rows)["arms"]
+    cells = bench.pending_cells([], ["t19"], ["plain-careful", "plain"], 1)
+    assert cells == [("t19", "plain-careful", 1), ("t19", "plain", 1)]
+    assert set(bench.ALL_ARMS) == {"plain", "hm", "plain-careful", "plain-continue"}
+
+
+# --- AC-009: the tier-3 report ----------------------------------------------------------------
+
+
+def test_the_tier3_report_lists_each_task_and_the_pilot_drop(bench: ModuleType) -> None:
+    solved = {"t13": 0, "t14": 2, "t15": 3, "t21": 1}
+    rows = [_row(t, "plain", r, solved=r <= n, cost=0.05 * r) for t, n in solved.items()
+            for r in (1, 2, 3)]  # fmt: skip
+    rows += [_row("t16", "plain", r, solved=r == 1) for r in (1, 2)]
+    lines = bench.tier3_block(rows)
+    text = "\n".join(lines)
+    assert lines[0].startswith("Per task (tier 3)")
+    by_task = {line.split()[0]: line for line in lines[2:]}
+    assert set(by_task) == {"t13", "t14", "t15", "t16", "t21"}
+    assert by_task["t13"].split()[1:3] == ["plain", "0/3"]
+    assert by_task["t13"].rstrip().endswith("keep")
+    assert by_task["t14"].rstrip().endswith("drop")
+    assert by_task["t15"].rstrip().endswith("drop")
+    assert by_task["t21"].rstrip().endswith("guard")
+    assert by_task["t16"].rstrip().endswith("n/a (n=2)")
+    assert "$0.100" in by_task["t13"]  # mean of 0.05, 0.10, 0.15
+    assert "Per task (tier 3)" in bench.report_text(rows)
+    assert text in bench.report_text(rows)
+    tier12 = bench.read_rows(_ROOT / "docs" / "evals")
+    assert bench.tier3_block(tier12) == []
+    assert "Per task (tier 3)" not in bench.report_text(tier12)
+
+
+def test_tier3_judge_lines_are_labelled_uncalibrated(bench: ModuleType) -> None:
+    rows = _main_rows()
+    tier2 = [{**r, "tier": 2, "tier3_hash": None} for r in rows]
+    card = bench.scorecard(rows + tier2)
+    by_tier = {t["tier"]: t for t in card["tiers"]}
+    judge3 = [line["label"] for line in by_tier[3]["lines"] if line["metric"].startswith("judge_")]
+    judge2 = [line["label"] for line in by_tier[2]["lines"] if line["metric"].startswith("judge_")]
+    assert judge3
+    assert all(label.endswith(" (uncalibrated)") for label in judge3)
+    assert not any("uncalibrated" in label for label in judge2)
+    value3 = next(x for x in by_tier[3]["value"]["lines"] if x["metric"] == "judge_overall")
+    assert value3["label"].endswith(" (uncalibrated)")
+    assert dataclasses.is_dataclass(bench.Session)

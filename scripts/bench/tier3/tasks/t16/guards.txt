@@ -1,0 +1,4 @@
+# below one week every other function keeps its start-tree behaviour (prompt; timeparse/pack.py)
+test_pack_is_unchanged_below_a_week
+test_stored_packed_strings_still_decode
+test_other_functions_are_unchanged_below_a_week

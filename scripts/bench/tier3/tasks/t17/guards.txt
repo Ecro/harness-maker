@@ -1,0 +1,3 @@
+# what the other modules print today and must keep printing (docs/config.md; prompt)
+test_config_errors_keep_their_text
+test_the_cli_error_line_is_unchanged

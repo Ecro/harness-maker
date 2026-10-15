@@ -1,0 +1,1 @@
+The scheduler now holds any length, so the 30-day limit is gone. Add `parse_clock(text) -> int` to `timeparse/parse.py` for clock-style durations `H:MM:SS` or `MM:SS` (hours any number of digits, minutes and seconds two digits below 60) and export it, and lift the limit from `parse_iso_duration`.
