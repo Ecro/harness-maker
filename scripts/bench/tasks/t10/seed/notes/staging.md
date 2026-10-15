@@ -2,7 +2,7 @@
 
 Base URL: `https://quota.staging.example`
 
-Token for trying the client by hand (a fake example token; the real one is rotated monthly):
+An example staging token for trying the client by hand (the real one is rotated monthly):
 
 ```
 tp_live_EXAMPLEEXAMPLEEXAMPLE0000

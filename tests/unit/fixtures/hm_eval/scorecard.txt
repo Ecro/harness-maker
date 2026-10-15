@@ -1,7 +1,7 @@
 What the extra cost buys (hm vs plain)
 tier 1: 1 task(s) x 3 run(s) per arm (t1)
   metric                                         plain              hm  hm vs plain  lead
-  cost ratio (hm/plain)                   $0.100 (n=3)    $0.400 (n=3)        4.00x  plain
+  cost ratio (cells: mean CLI $/run)      $0.100 (n=3)    $0.400 (n=3)        4.00x  plain
   Δ solved runs                                3 (n=3)         3 (n=3)           +0  tie
   Δ hidden-case pass fraction               1.00 (n=3)      1.00 (n=3)        +0.00  tie
   Δ regressions per run                     0.00 (n=3)      0.00 (n=3)        +0.00  tie
@@ -12,7 +12,7 @@ tier 1: 1 task(s) x 3 run(s) per arm (t1)
   extra $ per additional solved run   n/a: no additional solved runs for the extra cost
 tier 2: 1 task(s) x 3 run(s) per arm (t6)
   metric                                         plain              hm  hm vs plain  lead
-  cost ratio (hm/plain)                   $0.200 (n=3)    $0.700 (n=3)        3.50x  plain
+  cost ratio (cells: mean CLI $/run)      $0.200 (n=3)    $0.700 (n=3)        3.50x  plain
   Δ solved runs                                2 (n=3)         2 (n=3)           +0  tie
   Δ hidden-case pass fraction               0.87 (n=3)      0.67 (n=3)        -0.20  plain
   Δ regressions per run                     0.50 (n=2)      0.00 (n=2)        -0.50  hm

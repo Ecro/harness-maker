@@ -24,7 +24,7 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (hm/plain) | $0.100 (n=3) | $0.400 (n=3) | 4.00x | plain |
+| cost ratio (cells: mean CLI $/run) | $0.100 (n=3) | $0.400 (n=3) | 4.00x | plain |
 | Δ solved runs | 3 (n=3) | 3 (n=3) | +0 | tie |
 | Δ hidden-case pass fraction | 1.00 (n=3) | 1.00 (n=3) | +0.00 | tie |
 | Δ regressions per run | 0.00 (n=3) | 0.00 (n=3) | +0.00 | tie |
@@ -38,7 +38,7 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (hm/plain) | $0.175 (n=6) | $0.650 (n=6) | 3.71x | plain |
+| cost ratio (cells: mean CLI $/run) | $0.175 (n=6) | $0.650 (n=6) | 3.71x | plain |
 | Δ solved runs | 5 (n=6) | 4 (n=6) | -1 | tie |
 | Δ hidden-case pass fraction | 0.93 (n=6) | 0.78 (n=6) | -0.15 | plain |
 | Δ regressions per run | 0.20 (n=5) | 0.00 (n=5) | -0.20 | hm |

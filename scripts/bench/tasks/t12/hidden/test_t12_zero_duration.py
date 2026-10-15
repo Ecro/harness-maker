@@ -20,7 +20,8 @@ def test_a_zero_unit_inside_a_nonzero_duration_is_accepted() -> None:
 
 
 def test_other_functions_keep_their_documented_behaviour() -> None:
-    """Apart from rejecting a zero duration, existing behaviour of the package must not change."""
+    """Apart from `parse_duration` rejecting a zero duration, every other function in the
+    package must behave as before."""
     from timeparse.schedule import normalize, total
 
     assert normalize("90m") == "1h30m"
