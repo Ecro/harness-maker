@@ -1,0 +1,96 @@
+What the extra cost buys (hm vs plain)
+tier 1: 1 task(s) x 3 run(s) per arm (t1)
+  metric                                         plain              hm  hm vs plain  lead
+  cost ratio (cells: mean CLI $/run)      $0.100 (n=3)    $0.400 (n=3)        4.00x  plain
+  Δ solved runs                                3 (n=3)         3 (n=3)           +0  tie
+  Δ hidden-case pass fraction               1.00 (n=3)      1.00 (n=3)        +0.00  tie
+  Δ regressions per run                     0.00 (n=3)      0.00 (n=3)        +0.00  tie
+  Δ new lint+type errors per run            0.00 (n=3)      0.00 (n=3)        +0.00  tie
+  traps caught                               n/a (n=0)       n/a (n=0)          n/a  n/a
+  Δ judge overall                           4.00 (n=3)      4.33 (n=3)        +0.33  tie  (single-sample scores, judge noise ±0.67; tie band 0.38 over 3 pairs)
+  cost per solved run                     $0.100 (n=3)    $0.400 (n=3)               plain
+  extra $ per additional solved run   n/a: no additional solved runs for the extra cost
+tier 2: 1 task(s) x 3 run(s) per arm (t6)
+  metric                                         plain              hm  hm vs plain  lead
+  cost ratio (cells: mean CLI $/run)      $0.200 (n=3)    $0.700 (n=3)        3.50x  plain
+  Δ solved runs                                2 (n=3)         2 (n=3)           +0  tie
+  Δ hidden-case pass fraction               0.87 (n=3)      0.67 (n=3)        -0.20  plain
+  Δ regressions per run                     0.50 (n=2)      0.00 (n=2)        -0.50  hm
+  Δ new lint+type errors per run            0.50 (n=2)      1.50 (n=2)        +1.00  plain
+  traps caught                               n/a (n=0)       n/a (n=0)          n/a  n/a
+  Δ judge overall                           4.00 (n=1)      5.00 (n=1)        +1.00  hm  (single-sample scores, judge noise ±0.67; tie band 0.67 over 1 pairs)
+  cost per solved run                     $0.300 (n=2)    $1.050 (n=2)               plain
+  extra $ per additional solved run   n/a: no additional solved runs for the extra cost
+
+Quality: plain vs hm
+tier 1: 1 task(s) x 3 run(s) per arm (t1)
+  metric                               plain              hm  lead
+  runs                                     3               3  —
+  hidden all-pass                    3 (n=3)         3 (n=3)  tie
+  hidden-case pass fraction       1.00 (n=3)      1.00 (n=3)  tie
+  solved                             3 (n=3)         3 (n=3)  tie
+  wrong                              0 (n=3)         0 (n=3)  tie
+  stalled                            0 (n=3)         0 (n=3)  tie
+  ruff_new mean                   0.00 (n=3)      0.00 (n=3)  tie
+  mypy_new mean                   0.00 (n=3)      0.00 (n=3)  tie
+  regressions mean                0.00 (n=3)      0.00 (n=3)  tie
+  diff_lines mean                10.00 (n=3)     20.00 (n=3)  —
+  tests_touched rate              0.00 (n=3)      1.00 (n=3)  —
+  judge scope                     4.00 (n=3)      4.00 (n=3)  tie
+  judge clarity                   4.00 (n=3)      5.00 (n=3)  hm
+  judge maintainability           4.00 (n=3)      4.00 (n=3)  tie
+  judge overall                   4.00 (n=3)      4.33 (n=3)  tie
+tier 2: 1 task(s) x 3 run(s) per arm (t6)
+  t7 excluded (incomplete)
+  metric                               plain              hm  lead
+  runs                                     3               3  —
+  hidden all-pass                    2 (n=3)         2 (n=3)  tie
+  hidden-case pass fraction       0.87 (n=3)      0.67 (n=3)  plain
+  solved                             2 (n=3)         2 (n=3)  tie
+  wrong                              1 (n=3)         0 (n=3)  tie
+  stalled                            0 (n=3)         1 (n=3)  tie
+  ruff_new mean                   0.33 (n=3)      1.00 (n=2)  plain
+  mypy_new mean                   0.00 (n=2)      0.50 (n=2)  plain
+  regressions mean                0.33 (n=3)      0.00 (n=2)  hm
+  diff_lines mean                40.00 (n=3)     70.00 (n=2)  —
+  tests_touched rate              0.33 (n=3)      1.00 (n=2)  —
+  judge scope                     3.50 (n=2)      4.50 (n=2)  hm
+  judge clarity                   3.50 (n=2)      4.50 (n=2)  hm
+  judge maintainability           3.50 (n=2)      5.00 (n=2)  hm
+  judge overall                   3.50 (n=2)      4.67 (n=2)  hm
+
+Efficiency: the cost of that quality
+tier 1: 1 task(s) x 3 run(s) per arm (t1)
+  metric                               plain              hm  hm/plain  lead
+  cost $/run                    $0.100 (n=3)    $0.400 (n=3)     4.00x  plain
+  input tokens                    1000 (n=3)      4000 (n=3)     4.00x  plain
+  output tokens                    100 (n=3)       400 (n=3)     4.00x  plain
+  cache_read tokens               5000 (n=3)     20000 (n=3)     4.00x  plain
+  cache_write tokens               500 (n=3)      2000 (n=3)     4.00x  plain
+  turns                            4.0 (n=3)      12.0 (n=3)     3.00x  plain
+  wall s                            20 (n=3)        80 (n=3)     4.00x  plain
+  judge cost                $0.150 total over 6 call(s), 0 unpriced
+  run flags                 plain: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s); hm: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s)
+tier 2: 1 task(s) x 3 run(s) per arm (t6)
+  metric                               plain              hm  hm/plain  lead
+  cost $/run                    $0.200 (n=3)    $0.700 (n=3)     3.50x  plain
+  input tokens                    2000 (n=3)      6000 (n=3)     3.00x  plain
+  output tokens                    200 (n=3)       600 (n=3)     3.00x  plain
+  cache_read tokens              10000 (n=3)     29333 (n=3)     2.93x  plain
+  cache_write tokens              1000 (n=3)      2933 (n=3)     2.93x  plain
+  turns                            6.0 (n=3)      17.3 (n=3)     2.89x  plain
+  wall s                            40 (n=3)       140 (n=3)     3.50x  plain
+  judge cost                $0.100 total over 5 call(s), 1 unpriced
+  run flags                 plain: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s); hm: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s)
+
+Intent metric (tier 1 only)
+bench hm-light-lane@bh0001  harness hs0001  model model-a
+task   plain pass  hm pass  plain $/run  hm $/run  plain s   hm s
+t1         3/3      3/3           0.100     0.400       20     80
+all        3/3      3/3           0.100     0.400       20     80
+ratio (CLI cost): 4.0    ratio (transcript price): 4.0
+pass rate: plain 3/3 (100%), hm 3/3 (100%)
+verdict: met — ratio 4.000 <= target 5 and hm pass rate >= plain
+record with:
+  uv run hm intent metric record hm_cost_ratio_small --value 4.000 --evidence 'bench hm-light-lane@bh0001 harness hs0001 model model-a: hm $0.400/run vs plain $0.100/run over 1 tasks x 3 runs (CLI-priced ratio 4.0, transcript-priced ratio 4.0); hidden-test pass plain 3/3, hm 3/3; verdict met'
+hm_cost_ratio_small=4.000

@@ -1,0 +1,5 @@
+{
+  "kind": "hidden_caller",
+  "cites": "Apart from `parse_duration` rejecting a zero duration, every other function in the package must behave as before.",
+  "test": "test_other_functions_keep_their_documented_behaviour"
+}
