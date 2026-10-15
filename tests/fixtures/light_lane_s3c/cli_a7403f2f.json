@@ -1,0 +1,41 @@
+{
+ "outputs": {
+  "autopilot status": {
+   "exit": 0,
+   "stdout": "{\"active\": true, \"reason\": \"armed\", \"level\": \"auto_safe\", \"pipeline\": [\"research\", \"spec\", \"execute\", \"review\", \"verify\", \"wrapup\"], \"task_slug\": null, \"session_scoped\": true, \"idle_minutes\": null}\n"
+  },
+  "autopilot_caps boundary merge-gate": {
+   "exit": 0,
+   "stdout": "{\"proceed\": false, \"halt_kind\": \"merge_gate\", \"reason\": \"next stage <AtomicStage.WRAPUP: 'wrapup'> is human-gated (merge/push, ADR-002) \\u2014 autopilot stopped; invoke it manually\", \"steps\": 1, \"next_stage\": \"wrapup\", \"pipeline_complete\": false, \"narrow_end\": false, \"task_slug\": \"demo\", \"task_slug_source\": \"flag\", \"judgment_auto_answered\": false, \"judgment_directive\": null}\n"
+  },
+  "autopilot_caps boundary proceed": {
+   "exit": 0,
+   "stdout": "{\"proceed\": true, \"halt_kind\": null, \"reason\": \"advancing to AtomicStage.SPEC\", \"steps\": 2, \"next_stage\": \"spec\", \"pipeline_complete\": false, \"narrow_end\": false, \"task_slug\": \"demo\", \"task_slug_source\": \"flag\", \"judgment_auto_answered\": false, \"judgment_directive\": null}\n"
+  },
+  "observability.verification_cache run": {
+   "exit": 0,
+   "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"pytest -q\"], \"exit\": 0, \"key\": \"<KEY>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 0, \"seconds\": 0}, {\"cmd\": \"pytest -q\", \"rc\": 0, \"seconds\": 0}]}\n"
+  },
+  "spec_machine approval-status": {
+   "exit": 0,
+   "stdout": "{\"slug\": \"demo\", \"state\": \"approved\", \"land\": \"ok\", \"gate\": \"clear\", \"irreversible\": [], \"notice\": null, \"detail\": null, \"trusted_lane\": \"light\"}\n"
+  },
+  "spec_need frontmatter-upsert": {
+   "exit": 0,
+   "stdout": "{\"spec_need_verdict\": \"none\", \"spec_need_target\": \"none\", \"preserved_verdict\": false, \"preserved_target\": false, \"repaired\": false, \"wrote\": true}\n"
+  },
+  "spec_need op-check": {
+   "exit": 0,
+   "stdout": "{\"satisfied\": true}\n"
+  },
+  "spec_need record": {
+   "exit": 0,
+   "stdout": "{\"recorded\": true}\n"
+  },
+  "spec_need waiver-check": {
+   "exit": 0,
+   "stdout": "{\"valid\": true}\n"
+  }
+ },
+ "source_sha": "a7403f2f"
+}

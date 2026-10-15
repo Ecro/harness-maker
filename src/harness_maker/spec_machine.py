@@ -1570,34 +1570,84 @@ def _attribute_cross_errors(errors: list[str]) -> dict[str, list[str]]:
     return buckets
 
 
+#: SPEC-hm-light-lane-s3c IRR-001: every dimension under this score is named, with its score, on
+#: a weak or low check. It is the `overall` floor, so the map is never empty when `overall` is
+#: under it: the integer mean of scores that are all at or above it cannot fall below it.
+_LOW_DIMENSION = 60
+#: What cross-validate says when the yaml did not load: validate already printed why.
+_CROSS_LOAD_FAILED = "yaml load failed (see validate.errors)"
+
+
+def _load_error_lines(exc: Exception, yaml_path: Path) -> list[str]:
+    """One line per load failure, without the help URLs and input echoes pydantic prints.
+
+    The spec stage re-reads every byte of this payload on each later turn (HM-LIGHT-LANE
+    stage 3c: one bench run's failures printed each pydantic error three times, each copy with
+    its help URL and its input). The location and the message are what a fix needs.
+    """
+    if isinstance(exc, ValidationError):
+        lines = [
+            f"{'.'.join(str(part) for part in err['loc']) or '<root>'}: {err['msg']}"
+            for err in exc.errors()
+        ]
+        return list(dict.fromkeys(lines))
+    if isinstance(exc, yaml.YAMLError):
+        problem = getattr(exc, "problem", None) or str(exc)
+        line = f"yaml load failed: YAMLError: {problem.splitlines()[0] if problem else ''}"
+        mark = getattr(exc, "problem_mark", None)
+        if mark is not None:
+            line += f" (line {mark.line + 1}, column {mark.column + 1})"
+        return [line]
+    if isinstance(exc, FileNotFoundError):
+        return [f"yaml load failed: FileNotFoundError: {yaml_path}"]
+    if isinstance(exc, OSError):
+        # Keep the reason: a directory or a permission problem needs a different fix.
+        reason = exc.strerror or str(exc)
+        return [f"yaml load failed: {type(exc).__name__}: {yaml_path} ({reason})"]
+    first = str(exc).splitlines()[0] if str(exc) else ""
+    return [f"yaml load failed: {type(exc).__name__}: {first}"]
+
+
 def _run_check_all(args: argparse.Namespace) -> int:
     """Steps 4 and 4.5 of the spec stage in one call — three round-trips become one.
 
     Orchestration only ([ADR-003](work-docs/PLAN-workflow-step-audit.md)): every verdict
     comes from `validate` / `cross_validate` / `evaluate_spec` unchanged, so this cannot
-    drift from the subcommands it replaces.
+    drift from the subcommands it replaces. Only the printing is this function's own
+    (SPEC-hm-light-lane-s3c IRR-001): one line whenever no gate failed, and on a failure each
+    error once.
     """
     from harness_maker.spec_quality import evaluate_spec
 
-    payload: dict[str, Any] = {
-        "yaml_path": str(args.yaml_path),
-        "md_path": str(args.md_path),
-        "strictness": args.strictness,
-    }
+    loaded = True
+    validate_errors: list[str]
+    try:
+        model = load(args.yaml_path)
+    except Exception as e:  # noqa: BLE001 — an unloadable yaml is a reportable verdict
+        loaded = False
+        validate_errors = _load_error_lines(e, args.yaml_path)
+    else:
+        # Separate from the load: a validator exception is not a load failure, and must not
+        # replace cross-validate's own errors with the load placeholder below.
+        try:
+            validate_errors = validate(model, spec_dir=args.yaml_path.parent)
+        except Exception as e:  # noqa: BLE001 — reported as a failed gate, not a traceback
+            first = str(e).splitlines()[0] if str(e) else ""
+            validate_errors = [f"validate failed: {type(e).__name__}: {first}"]
 
     try:
-        validate_errors = validate(load(args.yaml_path), spec_dir=args.yaml_path.parent)
-    except Exception as e:  # noqa: BLE001 — an unloadable yaml is a reportable verdict
-        validate_errors = [f"yaml load failed: {type(e).__name__}: {e}"]
-    payload["validate"] = {"ok": not validate_errors, "errors": validate_errors}
-
-    cross_errors = cross_validate(args.md_path, args.yaml_path)
-    payload["cross_validate"] = {
-        "ok": not cross_errors,
-        "errors": cross_errors,
-        "by_rule": _attribute_cross_errors(cross_errors),
+        cross_errors = cross_validate(args.md_path, args.yaml_path)
+    except OSError as e:  # the .md is missing or unreadable: a failed gate, not a traceback
+        cross_errors = [f"{type(e).__name__}: {e}"]
+    if not loaded:
+        # cross_validate returns early with the same load failure validate already reported.
+        cross_errors = [_CROSS_LOAD_FAILED]
+    cross_errors = list(dict.fromkeys(cross_errors))
+    by_rule = {
+        rule: len(errs) for rule, errs in _attribute_cross_errors(cross_errors).items() if errs
     }
 
+    quality_block: dict[str, Any]
     try:
         quality = evaluate_spec(
             args.md_path.read_text(encoding="utf-8"),
@@ -1607,30 +1657,48 @@ def _run_check_all(args: argparse.Namespace) -> int:
             else None,
         )
     except Exception as e:  # noqa: BLE001 — scoring must not mask the two gates above
-        payload["quality"] = {"error": f"{type(e).__name__}: {e}"}
-        quality_blocked = False
-        quality_clean = False
+        error = f"{type(e).__name__}: {e}"
+        if error in cross_errors:
+            error = f"{type(e).__name__}: see cross_validate.errors"
+        quality_block = {
+            "error": error,
+            "strictness": "block" if args.strictness == "block" else "warn",
+        }
+        quality_blocked = quality_weak = False
+        quality_failed = True
     else:
-        payload["quality"] = {
+        low = {d: s for d, s in quality.scores.items() if s < _LOW_DIMENSION}
+        quality_block = {
             "overall": quality.overall,
-            "scores": quality.scores,
             "weak_dimensions": quality.weak_dimensions,
+            "low_dimensions": low,
             "blocked": quality.blocked,
             "strictness": quality.strictness,
         }
         quality_blocked = quality.blocked
-        quality_clean = not quality.is_weak
+        quality_weak = quality.is_weak
+        quality_failed = False
 
     failed = bool(validate_errors) or bool(cross_errors) or quality_blocked
-    payload["ok"] = not failed
-    if not failed and quality_clean:
+    if not failed and not quality_failed:
         # The caller re-reads every byte printed here on each later turn (HM-LIGHT-LANE
-        # lever 4: ~13k chars per run). A clean pass carries nothing to act on.
-        quality_block = payload["quality"]
-        compact = {"ok": True, "overall": quality_block["overall"]}
-        print(json.dumps({**compact, "strictness": quality_block["strictness"]}))
+        # lever 4). No failed gate prints one line; a weak or low score adds the dimensions
+        # Step 4.5's warn row names.
+        line: dict[str, Any] = {"ok": True, "overall": quality_block["overall"]}
+        line["strictness"] = quality_block["strictness"]
+        if quality_weak:
+            line["weak_dimensions"] = quality_block["weak_dimensions"]
+            line["low_dimensions"] = quality_block["low_dimensions"]
+        print(json.dumps(line, ensure_ascii=False))
         return 0
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    payload: dict[str, Any] = {
+        "ok": not failed,
+        "strictness": args.strictness,
+        "validate": {"ok": not validate_errors, "errors": validate_errors},
+        "cross_validate": {"ok": not cross_errors, "errors": cross_errors, "by_rule": by_rule},
+        "quality": quality_block,
+    }
+    print(json.dumps(payload, ensure_ascii=False))
     return 1 if failed else 0
 
 

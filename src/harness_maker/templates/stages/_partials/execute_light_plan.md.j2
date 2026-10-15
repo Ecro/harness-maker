@@ -1,0 +1,42 @@
+{#- SPEC-hm-light-lane-s3c ADR-006/011: execute Step 0's light block, the one marked span a trusted light task outside
+    loop mode writes its PLAN from. Included by both the Claude command and the Codex skill, right after the full-lane
+    text. The template keeps every key and section a gate reads (IRR-002); its headings sit inside the fence, so the
+    step-sensitivity registry sees no new heading. -#}
+<!-- @hm:light-plan -->
+**Light PLAN** (a line per phase, boundary, ADR; drop unused `intent`, `research_doc`):
+
+```markdown
+---
+type: plan
+task_slug: {slug}
+status: planning
+created: {YYYY-MM-DD}
+spec: "[[SPEC-{slug}]]"
+research_doc: "[[RESEARCH-{slug}]]"
+intent: <id>
+adrs: {M}
+summary: "{summary}"
+---
+
+## 📝 Implementation Plan
+- [ ] {N}. **Phase {N} — {name}** — scope: {files} · exit: `{command}` · risk: {risk} · rollback: {rollback}
+
+## 🚧 Contract Boundaries
+### Do not change
+- `{path}` — {why}
+
+## 📐 Architecture Decision Records
+- ADR-{NNN}: {decision}. **Decided by:** {provenance}
+```
+
+Paths are repo-relative (no absolute, `..` or globs); else `Advisory: {intent}` or the sole
+`none — this task has no contract boundaries`. `{provenance}`: `user (source: …)` only when the
+user explicitly made that call, else `agent`. **Light read-back** (after Step 0.1): (a) the
+frontmatter carries every key of the template kept; (b) every phase line carries `scope:`,
+`exit:`, `risk:` and `rollback:`; (c) `### Do not change` is present and non-empty, every bullet
+is one of the three admitted forms, `none` only as the sole bullet (never invented for an empty
+list; beside others, delete the `none`); (d) `spec_need_verdict` is set. Failures are
+self-repaired inline; if a re-read still fails, surface the path and error and stop before
+Step 1. Step 1.5 does not apply: phases run in order; well over five files is not light: follow
+the full PLAN text instead and log that it reads as `full`.
+<!-- @hm:/light-plan -->

@@ -27,6 +27,12 @@ Re-captures of `outside_57_sha256` by later tasks (append; placeholders are neve
   the placeholder inventory was re-checked and is unchanged. And once more after the confirmation
   pass (the same two Claude arms: the existence check names the `base_root` path and the mismatch
   bullet became the shared pointer); placeholder inventory unchanged.
+- 2026-10-15, `hm-light-lane-s3c`: the Claude arms carry a pointer to
+  `.claude/hm/stage-preamble.md` where the loop check, start banner and picker were
+  (SPEC-hm-light-lane-s3c ADR-001). Before re-capture, the pointer span was replaced by that file's
+  text and the result matched the previous golden in both Claude arms; the Codex arms still match
+  theirs, and 5.7's placeholder inventory equals the golden one in all four. Re-captured the two
+  Claude arms only.
 """
 
 from __future__ import annotations

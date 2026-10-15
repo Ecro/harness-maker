@@ -34,6 +34,10 @@ from ._surface_baseline import (
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # +1 total, 140→141 (2026-10-15, SPEC-hm-light-lane-s3c): execute 25→26, the
+    # `spec_machine approval-status` call Step 0 now makes before it picks the light or the full
+    # PLAN. The three new `.claude/hm/` files (preamble, full PLAN text, full schema) hold no
+    # mandated call, so moving their text changed no count. No call was removed.
     # +7 total, 133→140 (2026-10-15, SPEC-hm-light-lane-s3a): execute 19→25 and spec 9→10; see
     # those entries. No call was removed.
     # Counted per command PLUS the `.claude/hm/` files it points at (2026-10-14, stage 2b
@@ -159,7 +163,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # the review of 3a, item F, dropped it.) Those calls are the gates that replace the review
     # and verify turns on a trusted light lane. No call was removed. Attributed in
     # work-docs/BASELINE-DELTA-hm-light-lane-s3a.md.
-    "execute": 25,
+    "execute": 26,
     # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml
     # second_opinion.models` dropped `antigravity`, and `/hm:health` runs ONE per-model
     # positive smoke-test per enabled model, so its `second_opinion_invoke` smoke call for that

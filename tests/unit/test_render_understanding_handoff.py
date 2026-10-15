@@ -22,6 +22,7 @@ from harness_maker.models import (
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 MAIN_LOOP_HEADING = "### Steps 6 "
 ARMS = [
@@ -115,7 +116,8 @@ def test_ac_005_closing_output_repeats_the_block(
 def test_ac_006_execute_adr_section_requires_decided_by(
     tmp_path: Path, preset: Preset, wt_on: bool
 ) -> None:
-    body = (_render(tmp_path, preset, wt_on) / "commands/hm/execute.md").read_text(encoding="utf-8")
+    # The full PLAN text lives in `.claude/hm/execute-plan.md` (SPEC-hm-light-lane-s3c).
+    body = stage_text(_render(tmp_path, preset, wt_on), "execute")
     start = body.index("**📐 Architecture Decision Records**")
     end = body.index("**🏗️ Technical Design**", start)
     item = _flat(body[start:end])

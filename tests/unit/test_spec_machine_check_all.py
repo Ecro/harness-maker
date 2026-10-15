@@ -91,7 +91,10 @@ def test_one_call_returns_all_three_blocks(tmp_path: Path) -> None:
     assert set(payload) >= {"ok", "validate", "cross_validate", "quality"}
     assert payload["validate"]["ok"] is True
     assert "overall" in payload["quality"]
-    assert "scores" in payload["quality"]
+    # SPEC-hm-light-lane-s3c IRR-001: the dims that pull the score down, with their scores,
+    # replace the full `scores` map.
+    assert "low_dimensions" in payload["quality"]
+    assert "scores" not in payload["quality"]
     assert rc == 1
 
 
@@ -108,8 +111,9 @@ def test_a_clean_pass_prints_one_short_line(
 ) -> None:
     """HM-LIGHT-LANE lever 4: every printed byte is re-read on each later turn of the session.
 
-    A weak score (under 60, or any weak dimension) must still reach the spec stage as a warning,
-    so only a clean pass collapses.
+    A weak score (under 60, or any weak dimension) must still reach the spec stage as a warning.
+    Since SPEC-hm-light-lane-s3c it does so on the same one line, which then names the weak and
+    low dimensions; only a failed gate prints the full payload.
     """
     import contextlib
     import importlib
@@ -143,13 +147,16 @@ def test_a_clean_pass_prints_one_short_line(
     out = buf.getvalue()
     assert rc == 0
     payload = json.loads(out)
+    assert out.count("\n") == 1
     if compact:
-        assert out.count("\n") == 1
         # strictness comes from the quality result, as in the full payload.
         assert payload == {"ok": True, "overall": overall, "strictness": "block"}
     else:
-        assert set(payload) >= {"validate", "cross_validate", "quality"}
-        assert payload["quality"]["weak_dimensions"] == weak_dimensions
+        assert payload["weak_dimensions"] == weak_dimensions
+        assert payload["low_dimensions"] == {
+            d: s for d, s in {"completeness": overall}.items() if s < 60
+        }
+        assert "validate" not in payload
 
 
 def test_a_failed_gate_never_collapses_even_with_a_clean_score(
@@ -207,7 +214,8 @@ def test_task_driven_does_not_block_on_a_weak_score(tmp_path: Path) -> None:
     yaml_path, md_path = _pair(tmp_path)
     md_path.write_text("---\ntier: 1\n---\n\n### AC-001: render emits content_hash\n", "utf-8")
     rc, payload = _run(tmp_path, yaml_path, md_path, mode="warn")
-    assert payload["quality"]["blocked"] is False
+    # No failed gate prints the one line, which never carries `blocked` (SPEC-hm-light-lane-s3c).
+    assert payload.get("quality", {}).get("blocked", False) is False
     assert rc == 0 or payload["cross_validate"]["ok"] is False
 
 

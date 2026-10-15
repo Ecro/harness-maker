@@ -633,6 +633,11 @@ _STAGE_REFERENCE_FILES: tuple[str, ...] = (
     "review-confirmation",
     "execute-a5",
     "execute-light-check",
+    # SPEC-hm-light-lane-s3c IRR-004: read by every Claude stage command and by `/hm:health`,
+    # by execute off the trusted light lane, and by spec on `lane: full`.
+    "stage-preamble",
+    "execute-plan",
+    "spec-machine-full",
 )
 
 

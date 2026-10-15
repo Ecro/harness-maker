@@ -16,6 +16,13 @@ _GATED_STAGES = ("review", "wrapup", "verify")  # have a real mandatory gate
 _TEMPLATES = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
 
 
+def _with_preamble(root: Path, stage: str) -> str:
+    """A stage command plus the preamble it reads first (SPEC-hm-light-lane-s3c moved the
+    picker into `.claude/hm/stage-preamble.md`, so a Claude stage receives both)."""
+    command = (root / "commands" / "hm" / f"{stage}.md").read_text(encoding="utf-8")
+    return command + (root / "hm" / "stage-preamble.md").read_text(encoding="utf-8")
+
+
 @pytest.fixture(scope="module")
 def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     out = tmp_path_factory.mktemp("rendered")
@@ -54,7 +61,7 @@ def test_picker_present_under_the_promoted_default_level(rendered_root: Path) ->
     # session-start picker. The render-time gate itself is unchanged — it is still keyed on
     # the level, and a project pinned back to `gated` still renders no picker
     # (test_picker_absent_when_level_is_pinned_gated below).
-    body = (rendered_root / "commands" / "hm" / "research.md").read_text(encoding="utf-8")
+    body = _with_preamble(rendered_root, "research")
     assert "<!-- @hm:autopilot-picker -->" in body
 
 
@@ -73,7 +80,7 @@ def test_picker_absent_when_level_is_pinned_gated(tmp_path: Path) -> None:
         update={"autonomy": AutonomyConfig(level="gated", autopilot_persistent=False)}
     )
     render(synthesize(p, a), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    body = (tmp_path / "commands" / "hm" / "research.md").read_text(encoding="utf-8")
+    body = _with_preamble(tmp_path, "research")
     assert "<!-- @hm:autopilot-picker -->" not in body
 
 
