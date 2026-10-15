@@ -1,6 +1,6 @@
 preset: Side
 strictness: warn
-file_count: 65
+file_count: 66
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.en.md.j2
@@ -55,7 +55,7 @@ files:
   body_sha256: 21018297793864154d0b065fdd700302d101d6576fc503c3c65138255e901fc8
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 739e234e790f9be155430e77e94e42766089f53e225295e4a8f71509c756b88d
+  body_sha256: e9e23dfaafe7d43817b82e4e52ad32133b97249a896106580ea53dca5237629d
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 2308682ee2ac02e403e24b93a3b6cd9cf05f123932cb2b224aa4caa2bb726b3b
@@ -76,7 +76,7 @@ files:
   body_sha256: a5c9cdb4b352a8cc409bf10add29cf4325933ed412027b00b201130550909293
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 3b0a033605d7ac469050edb0faebbaa1772114b550648cdad5835768285c3f0c
+  body_sha256: d2dfed155451a09f1b2a15851aae804eed5bcfc135349d0fc1d634b92658616b
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: 86a9b22c2d05bb4c25d11d38a50fb331dda627fe91c0348f95acee03f3be15a1
@@ -95,6 +95,9 @@ files:
 - path: hm/execute-a5.md
   template: hm/execute-a5.md.j2
   body_sha256: 1d0dc3830db2da4ea121f002dceaa018fc691193fdfbaeff531d043249ae8f94
+- path: hm/execute-light-check.md
+  template: hm/execute-light-check.md.j2
+  body_sha256: bb699ce19e9c5f9f6987a44b636189e26015e93f56d1bbba0c06ea15f1e58a6f
 - path: hm/review-autofix.md
   template: hm/review-autofix.md.j2
   body_sha256: ecf0698ee1db23a86a182b56bc97b84f5d35f6a17ee3840525580275682662cd
@@ -181,7 +184,7 @@ files:
   body_sha256: b3ce34ea25321280d309fe3188fd757e1665aad75a95aa76ecd942bdcc128b47
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: 7c5526842c06a5f514075786509e70a9cb1512778f6d802fea4ae1c4403bf3fc
+  body_sha256: 0a7926ab28864ccd757a1f740ee16a7f0ffc32c7ff14d0e8708de0d9e3095e68
 - path: stages/research.md
   template: stages/research.md.j2
   body_sha256: 49ad625d0982559793c5ca78f05b8f9c304dafb1834411e8e9ed591e16d2e66f
@@ -190,7 +193,7 @@ files:
   body_sha256: 1624c5bfc59d00eddb0ef3096b8260784b57a853bfe9d05967d0ffa7773e41b2
 - path: stages/spec.md
   template: stages/spec.md.j2
-  body_sha256: 3cb0c3bec9578e99fecbeaf17831eb0a7856c042f53130764b12294131a6f452
+  body_sha256: 276cf81174cf45c2fb301278e6755dee5594eb5ffdb562d259b5b5520092bc0f
 - path: stages/verify.md
   template: stages/verify.md.j2
   body_sha256: 8ee002da7c51834278a2adc48227688800f47c0719ed4805ffb0be09027cbeef

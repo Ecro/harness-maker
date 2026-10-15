@@ -1,0 +1,9 @@
+{#- SPEC-hm-light-lane-s3a ADR-004: verify Check 4 (security high findings), shared by verify's checks and execute's light check, so the
+    text has one source. Moved verbatim from verify_checks.md.j2 — edit it here only. -#}
+### Check 4 — Security high findings
+
+Read the most recent `.claude/observability/security/findings-*.jsonl`.
+
+FAIL when: any finding has `severity == "high"` AND `resolution != "accepted-risk-with-rationale"`. Resolutions must be deliberate (recorded in PLAN ADR or wrapup commit body).
+
+PASS when: zero unresolved high findings.

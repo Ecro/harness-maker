@@ -47,7 +47,9 @@ def test_side_file_count_in_range() -> None:
     # 62 → 67 (2026-10-14, SPEC-hm-light-lane-s2b): `.claude/hm/{wrapup-steps,verify-checks,
     # review-autofix,review-confirmation,execute-a5}.md`, the stage bodies the Claude commands
     # now read on demand.
-    assert 40 <= len(SIDE_FILES) <= 67
+    # 67 → 68 (2026-10-15, SPEC-hm-light-lane-s3a): `.claude/hm/execute-light-check.md`, execute
+    # Step 4.2's light check (IRR-003).
+    assert 40 <= len(SIDE_FILES) <= 68
 
 
 def test_synthesize_side_returns_blueprint() -> None:

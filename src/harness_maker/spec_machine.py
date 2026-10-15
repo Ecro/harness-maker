@@ -2111,6 +2111,15 @@ def approve(yaml_path: Path, *, exempt: bool = False) -> SpecApproval:
 
     with _spec_write_lock(yaml_path):
         model = load(yaml_path)
+        # An exempt stamp means "nothing here needs a human" (Step 0, and a light SPEC with an
+        # empty list — SPEC-hm-light-lane-s3a ADR-009); `approval_state_of` reads one beside
+        # irreversible ids as `invalid`, so it is refused before it is written.
+        if exempt and model.irreversible_decisions:
+            ids = ", ".join(i.id for i in model.irreversible_decisions)
+            raise ApprovalError(
+                f"an exempt stamp cannot cover irreversible decisions ({ids}); "
+                "the DRI approves this SPEC instead"
+            )
         name: str | None = None
         if not exempt:
             name = _git_user_name(resolve_base_root(yaml_path.parent))

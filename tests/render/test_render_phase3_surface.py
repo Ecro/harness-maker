@@ -204,6 +204,15 @@ def test_the_pre_repair_block_avoids_the_two_collided_words(variant: str) -> Non
 # ── ADR-008 (revised): neither stage touches the verification cache ──────────
 
 
+def _without_light_check_check2(body: str) -> tuple[str, str]:
+    """`body` minus the light check's verify Check 2 section, and that section."""
+    start = body.find("### Check 2 — Regression smoke")
+    if start == -1:
+        return body, ""
+    end = body.index("**3. Security**", start)
+    return body[:start] + body[end:], body[start:end]
+
+
 @pytest.mark.parametrize("variant", VARIANTS)
 @pytest.mark.parametrize("stage", ["execute", "review"])
 def test_the_stage_does_not_touch_the_verification_cache(variant: str, stage: str) -> None:
@@ -217,8 +226,19 @@ def test_the_stage_does_not_touch_the_verification_cache(variant: str, stage: st
 
     `verify`, `wrapup` and the `verify-before-completion` skill keep the cache — they hold BOTH
     halves, so theirs can actually hit. This asserts only that these two stages stay out of it;
-    re-adding a read here without a producer is the regression."""
-    body = _body(f"{variant}:{stage}")
+    re-adding a read here without a producer is the regression.
+
+    One scoped exception (2026-10-15, SPEC-hm-light-lane-s3a ADR-004): execute's Step 4.2 light
+    check renders verify's OWN Check 2 partial, on a trusted light lane only, in place of the
+    verify stage turn. That is verify's full-gate `run` (it marks only a full pass on an unchanged
+    tree), not a mark after a targeted run, so the hazard above does not apply; the boundary's
+    skip needs exactly that marker. The carve-out is that one section, and it must not mention a
+    targeted mode."""
+    body, light_check2 = _without_light_check_check2(_body(f"{variant}:{stage}"))
+    if light_check2:
+        assert stage == "execute"
+        assert "### Step 4.2 — Light check" in body
+        assert "targeted" not in light_check2
     assert "verification_cache" not in body, (
         f"{stage} touches the verification cache. A read here cannot hit (the fingerprint always "
         "moved) and a write here would poison `verify`/`wrapup` — see this test's docstring"

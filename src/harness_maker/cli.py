@@ -2212,6 +2212,11 @@ def security_scan_cmd(
         default_factory=Path.cwd,
         help="Project root to scan.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Rescan even when a fresh cached scan exists (the light check's uncached scan).",
+    ),
 ) -> None:
     """Run the bundled security scanner and print a compact summary."""
     from collections import Counter
@@ -2220,7 +2225,7 @@ def security_scan_cmd(
 
     target = target.resolve()
     harness_config = _read_harness_config(target / ".claude" / "harness.yaml")
-    findings = scan_all(target, harness_config=harness_config)
+    findings = scan_all(target, harness_config=harness_config, force=force)
     by_severity = Counter(f.severity for f in findings)
 
     typer.echo(f"Security scan: {len(findings)} finding(s)")

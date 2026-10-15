@@ -29,6 +29,20 @@
   with a `/hm:make` instruction (wrapup stops before any commit), and `stage-delegate` follows only its own
   stage's file under the brief's `base_root`. On this repo's config the four commands are about 50K chars
   smaller (205,430 → 155,136). Re-render with `/hm:make` to get the five new files.
+- **The light lane skips review and verify after a passing light check (HM-LIGHT-LANE, stage 3a).** On a
+  trusted light lane (`lane: light`, an approved or exempt SPEC, no irreversible decisions) `/hm:execute`
+  ends with Step 4.2, one deterministic light check that dispatches nothing: the configured mechanical
+  checks, verify Checks 2, 4 and 6 (Check 4 after an uncached `hm cli security-scan <checkout> --force`)
+  and review Step 2's drift rule, all from the same partials verify and review render. A clean pass writes
+  `REVIEW-<slug>-<date>.md` with `review_kind: light-check`, `status: PASSED` and review's `drift_verdict`,
+  which wrapup and verify already read; any non-pass writes nothing and review runs next. Under autopilot,
+  execute's boundary then passes over review and verify (one `stage_skipped` ledger row) and stops at the
+  wrapup merge gate, but only when that record is the newest REVIEW for the slug, postdates the session and
+  the verification cache is fresh for the current tree; every other boundary is byte-identical. Maker's
+  digest routes the same task to wrapup. Typed `/hm:review` and `/hm:verify`, wrapup and `/hm:loop` are
+  unchanged. `/hm:spec` now stamps a light SPEC with an empty irreversible list `exempt` when the DRI did
+  not approve it, and `approve --exempt` refuses a non-empty list. Re-render with `/hm:make` to get
+  `.claude/hm/execute-light-check.md`; an older render's execute writes no record, so it never skips.
 - **Less always-loaded context.** A clean `hm spec_machine check --all` prints one line
   (`{"ok": true, "overall", "strictness"}`); failures still print the full payload. Five internal skills
   (`agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `context-linter`, `worktree-isolator`)

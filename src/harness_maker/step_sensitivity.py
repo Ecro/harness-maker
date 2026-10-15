@@ -19,7 +19,7 @@ promise until the toggle-on arms are added (ADR-007).
 Since SPEC-hm-light-lane-s2 (2026-10-14) ``loop.enabled`` is a fourth ``renders_when`` source
 (execute Step 0.2 / 4.5 / 5, verify Check 5): ``ARMS`` render with the loop off, so those headings
 sit outside the coverage promise the same way. The census counts above predate both that change
-and review Step 2.5's removal.
+and review Step 2.5's removal, and SPEC-hm-light-lane-s3a's execute Step 4.2 + Check 2/4/6.
 
 Classes — COMP: capability compensation, shrinks as models improve. HOST: the host harness
 (Claude Code / Codex / Cursor) now does it natively. INV: invariant — state that outlives a
@@ -240,6 +240,20 @@ REGISTRY: tuple[StepEntry, ...] = (
         "(the failure it targets recurred count:4 to count:19 under the long form)",
     ),
     _u("execute", "Step 4", "INV", "execute Step 1", note="stage exit + boundary comparison"),
+    # SPEC-hm-light-lane-s3a ADR-008: the light check runs verify's deterministic gates in place of
+    # the review and verify stage turns. The Check headings are verify's own partials, read through
+    # `.claude/hm/execute-light-check.md` (Claude) or inlined (Codex), so they carry verify's rows.
+    _e(
+        "execute",
+        "Step 4.2",
+        "INV",
+        "*",
+        "SPEC-hm-light-lane-s3a ADR-001 (user decision 2026-10-15); deterministic gates, no "
+        "dispatch — judgement until the stage 4 bench re-runs on light tasks",
+    ),
+    _e("execute", "Check 2", "INV", "**", f"{_R}, verify Check 2's row: the same partial"),
+    _e("execute", "Check 4", "INV", "**", f"{_R}, verify Check 4's row: the same partial"),
+    _e("execute", "Check 6", "INV", "**", f"{_R}, verify Check 6's row: the same partial"),
     _u(
         "execute",
         "Step 4.5",

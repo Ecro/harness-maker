@@ -513,7 +513,22 @@ Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml 
 ```
 {% endif %}
 
-Otherwise leave the SPEC unstamped. A missing approval does not end this stage by itself: at any
+Otherwise, on `lane: light` with `irreversible_decisions: []` (a non-empty list already turned the
+lane `full`), stamp it **exempt** with Step 0's command — nothing in it needs a human, the
+light-lane boundary trusts only an accepted SPEC, and the stamp stays valid only while the list
+stays empty:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --exempt")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_machine approve --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --exempt
+```
+{% endif %}
+
+On `full`, leave the SPEC unstamped. A missing approval does not end this stage by itself: at any
 level other than `auto_full` the stage stops at this gate; at `auto_full` the boundary answers it,
 and its `proceed: true` advances WITHOUT an approval. `/hm:wrapup` asks again before landing.
 `status:` above is the document lifecycle; acceptance lives only in `approval`.

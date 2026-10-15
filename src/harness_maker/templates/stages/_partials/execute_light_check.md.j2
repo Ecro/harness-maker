@@ -1,0 +1,100 @@
+{#- SPEC-hm-light-lane-s3a: execute Step 4.2, the light lane's one combined check. Source of the text for both the
+    Codex execute skill (inline) and the rendered .claude/hm/execute-light-check.md; the Claude command carries a
+    pointer instead. Checks 2, 4 and 6 and the drift rule are verify's and review's own partials, so each has one
+    source. Edit it here only. -#}
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
+Runs on the GREEN path only, after Step 4's items 1–3, and dispatches nothing: every gate below is
+a command or a read. It replaces the separate review and verify stage turns on a trusted light
+lane; anything short of a clean pass leaves them in place.
+
+**Skip it** — it writes no record, and review runs next as on the full lane — when any of these holds:
+- the SPEC's acceptance below is not `approved` or `exempt`, or it lists irreversible ids (the
+  boundary trusts the light lane only then);
+- loop mode is active for this session (`/hm:loop` runs every stage it lists and checks a
+  receipt from each);
+- the diff is well over five files, which review's own rule reads as `full`.
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approval-status --root . --slug <slug>")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_machine approval-status --root . --slug <slug>
+```
+{% endif %}
+
+Then run the gates in order and stop at the first that does not pass.
+{%- if wt_on %} Run Check 2's command from `<WT>` (prefix it with `cd <WT> && `): the boundary
+reads its marker for the tree in `<WT>`.{% endif %}
+
+**1. Mechanical checks** — review Phase 0's list, stop on the first non-zero exit:
+{% if config.reviewers.get("mechanical_checks") %}
+```bash
+{% for cmd in config.reviewers.mechanical_checks %}{{ cmd }}
+{% endfor %}```
+{% else %}
+none configured (`reviewers.mechanical_checks`); record `mechanical: n-a`.
+{% endif %}
+
+**2. Regression** — verify's Check 2, word for word. Its "Skip to Check 3" means: go on to gate 3 here.
+
+{% include "stages/_partials/verify_check_2.md.j2" %}
+**3. Security** — scan the change's checkout uncached, then apply verify's Check 4 to the findings
+the scan wrote under `{{ WTR }}/.claude/observability/security/`:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm cli security-scan {{ WTR }} --force")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm cli security-scan {{ WTR }} --force
+```
+{% endif %}
+
+{% include "stages/_partials/verify_check_4.md.j2" %}
+**4. SPEC requirement** — verify's Check 6. `PASS`, `WARN` and `N-A` all pass here.
+
+{% include "stages/_partials/verify_check_6.md.j2" %}
+**5. Drift** — review Step 2's rule, against the PLAN, unchanged:
+
+{% include "stages/_partials/review_drift_scan.md.j2" %}
+{% include "stages/_partials/review_drift_verdict.md.j2" %}
+**The outcome.** If any check fails (a mechanical exit, Check 2 not `0`, a high finding, a Check 6
+failure) or the drift result is not `clean`, it writes no record: name the gate that did not pass
+and say review runs next. Nothing is retried and nothing is deleted here. If
+`{{ WTR }}/{{ config.work_docs.dir }}REVIEW-{slug}-{date}.md` already holds a real review (no
+`review_kind: light-check`), it writes no record either — never overwrite a real review — and
+review runs next.
+
+Otherwise every gate passed and the drift is `result: clean`:
+Write `{{ WTR }}/{{ config.work_docs.dir }}REVIEW-{slug}-{date}.md` (review's own file name) with
+this frontmatter — the drift block is the one from gate 5 — and a one-line body naming the gates:
+
+```yaml
+---
+type: review
+review_kind: light-check
+task_slug: {slug}
+status: PASSED
+created: {YYYY-MM-DD}
+drift_verdict:
+  result: clean
+  scope_violations: []
+  scenario_misses: []
+  task_slug: {slug}
+  computed_at: <ISO timestamp>
+checks:
+  mechanical: pass | n-a
+  regression: pass
+  security: pass
+  spec_requirement: pass | warn | n-a
+  structural: not-run
+---
+```
+
+`status: PASSED` is not `APPROVED`: nothing graded the change. Under autopilot, execute's boundary
+then passes over review and verify only when this record is the newest REVIEW for the slug, was
+computed after the session armed, and the tree is unchanged since Check 2; otherwise review runs
+next. A typed `/hm:review` or `/hm:verify` still runs in full.

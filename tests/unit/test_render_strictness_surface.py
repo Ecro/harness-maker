@@ -138,6 +138,12 @@ def test_ac_006_warn_renders_the_checks_and_blocks_nothing(preset: Preset, tmp_p
 
     for stage in STAGES:
         ref = _stops(_ref(preset, "task-driven", stage))
+        # 2026-10-15, SPEC-hm-light-lane-s3a ADR-004: execute's Step 4.2 light check renders
+        # verify's own Check 2/4/6 partials, so their stop lines arrive in execute verbatim from
+        # the relaxed harness's verify. They end the light check (no record; review runs next),
+        # never the stage, and they are excused only while the relaxed verify carried them.
+        if stage == "execute":
+            ref |= _stops(_ref(preset, "task-driven", "verify"))
         extra = _stops(new[stage]) - ref
         extra -= {n for n, o in _REWORDED_STOPS.items() if o in ref}
         assert not extra, (

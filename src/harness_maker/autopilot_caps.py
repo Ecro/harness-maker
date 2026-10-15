@@ -356,6 +356,44 @@ def _objective_check(root: Path, *, cwd: Path, slug: str | None, stage: str) -> 
     )
 
 
+#: What a passing light check lets execute's boundary pass over (SPEC-hm-light-lane-s3a).
+_LIGHT_SKIPPABLE: frozenset[str] = frozenset({"review", "verify"})
+
+
+def _stage_name(stage: str) -> str:
+    # The pipeline holds AtomicStage members (a str mixin whose str() is the repr), so read the
+    # value rather than constructing the enum from a name.
+    value = getattr(stage, "value", stage)
+    return value if isinstance(value, str) else str(stage)
+
+
+def _light_skip(
+    marker: autopilot.AutopilotMarker, root: Path, slug: str | None
+) -> tuple[str | None, list[str]]:
+    """The stage after execute once review and verify are passed over, plus what was passed over.
+
+    Returns execute's ordinary next stage and nothing skipped unless the light check passed for
+    this slug since this session armed (`light_lane.light_check_passed`): no slug, an untrusted
+    lane, a stale or contradicted record, or a pipeline with nothing skippable after execute all
+    fall through to today's answer.
+    """
+    stages = list(marker.pipeline)
+    nxt = next_stage(stages, "execute")
+    if not slug or nxt is None or _stage_name(nxt) not in _LIGHT_SKIPPABLE:
+        return nxt, []
+    from harness_maker import light_lane
+
+    if not light_lane.light_check_passed(root, slug, since=marker.created_at):
+        return nxt, []
+    skipped: list[str] = []
+    after = [_stage_name(s) for s in stages].index("execute") + 1
+    for stage in stages[after:]:
+        if _stage_name(stage) not in _LIGHT_SKIPPABLE:
+            return stage, skipped
+        skipped.append(_stage_name(stage))
+    return None, skipped
+
+
 def _cmd_boundary(args: argparse.Namespace) -> int:
     """The deterministic boundary check the P6 auto-branch runs before advancing.
 
@@ -574,6 +612,18 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             "auto-advance procedure says."
         )
     nxt = next_stage(marker.pipeline, args.current)
+    # SPEC-hm-light-lane-s3a ADR-002: placed where `nxt` is computed, after every halt above, so
+    # each keeps its precedence; an empty `skip_note` leaves every reason below byte-identical.
+    skip_note = ""
+    if args.current == "execute":
+        nxt, skipped = _light_skip(marker, root, slug)
+        if skipped:
+            autopilot_ledger.append_event(
+                root,
+                event="stage_skipped",
+                fields={"from": "execute", "skipped": skipped, "to": nxt, "reason": "lane light"},
+            )
+            skip_note = f" (lane light: skipped {', '.join(skipped)})"
     if nxt is None and marker.restore_pipeline is not None:
         # PLAN-maker-front-door-improvements ADR-002: a NARROWED end is not pipeline
         # completion. Restore the armed pipeline instead of clearing, so the session stays
@@ -588,14 +638,14 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             "narrowed end stage reached — pipeline restored"
             if cause is None
             else f"narrowed end stage reached — restore skipped: {cause}"
-        )
+        ) + skip_note
         print(json.dumps(out))
         return 0
     if nxt is None:
         # `current` IS the last stage → end the session (ADR-006).
         autopilot.clear(root, session_id=args.session_id)
         out["pipeline_complete"] = True
-        out["reason"] = "pipeline complete — autopilot session finished"
+        out["reason"] = "pipeline complete — autopilot session finished" + skip_note
         print(json.dumps(out))
         return 0
     if nxt in _HUMAN_GATED_STAGES:
@@ -611,7 +661,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         out["reason"] = (
             f"next stage {nxt!r} is human-gated (merge/push, ADR-002) — "
             "autopilot stopped; invoke it manually"
-        )
+        ) + skip_note
         print(json.dumps(out))
         return 0
     # SPEC-intent-world-model-objective-layer S7 — the objective gate runs LAST, so it can
@@ -620,7 +670,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
     objective_halt = _objective_check(root, cwd=Path.cwd(), slug=slug, stage=args.current)
     if objective_halt is not None:
         out["halt_kind"] = "objective_gate"
-        out["reason"] = objective_halt
+        out["reason"] = objective_halt + skip_note
         print(json.dumps(out))
         return 0
     # AUTHORIZED, not entered — the next stage's own boundary/gate-blocked call confirms
@@ -630,7 +680,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
     out["proceed"] = True
     out["next_stage"] = nxt
     out["steps"] = steps + 1
-    out["reason"] = f"advancing to {nxt}"
+    out["reason"] = f"advancing to {nxt}" + skip_note
     print(json.dumps(out))
     return 0
 
