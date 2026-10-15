@@ -23,16 +23,23 @@ from tests.unit import light_lane_s3d_fixture as fx
 
 GOLDEN: dict[str, Any] = json.loads((fx.GOLDENS / "run_4bd3d3d8.json").read_text(encoding="utf-8"))
 SLUG = fx.SLUG
+#: A slug that cannot occur in a tmp path, so "not echoed" cannot pass or fail by accident.
+UNIQUE_SLUG = "qz7-slug-s3d"
 IRR = [{"id": "IRR-001", "decision": "d", "category": "c", "rationale": "r", "source": "spec"}]
 
+#: Unit-separated, so a path with a space stays one field.
+_SEP = "\x1f"
+#: The stub logs its full argv first, before any other import, so a slow start under load
+#: cannot hide that the gate was started (the timeout row).
 _STUB = """#!{exe}
-import json, os, pathlib, sys, time
+import os, sys
 args = sys.argv[1:]
 tool = args[1] if args[:1] == ["-m"] and len(args) > 1 else ""
 log = os.environ.get("S3D_LOG")
 if log:
     with open(log, "a", encoding="utf-8") as f:
-        f.write(json.dumps([tool, *args[2:]]) + "\\n")
+        f.write("\\x1f".join(sys.argv) + "\\n")
+import pathlib, time
 if os.environ.get("S3D_SLEEP_" + tool):
     time.sleep(float(os.environ["S3D_SLEEP_" + tool]))
 if os.environ.get("S3D_MUTATE_" + tool):
@@ -66,10 +73,15 @@ def _markers(tmp_path: Path) -> list[Path]:
 
 
 def _gates(tmp_path: Path) -> list[list[str]]:
+    """The full argv of every gate the stub interpreter ran, in order."""
     log = tmp_path / "gates.log"
     if not log.is_file():
         return []
-    return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    return [line.split(_SEP) for line in log.read_text(encoding="utf-8").splitlines()]
+
+
+def _tools(tmp_path: Path) -> list[str]:
+    return [argv[2] for argv in _gates(tmp_path)]
 
 
 def _stub_python(root: Path) -> Path:
@@ -77,6 +89,7 @@ def _stub_python(root: Path) -> Path:
     py.parent.mkdir(parents=True, exist_ok=True)
     py.write_text(_STUB.format(exe=sys.executable), encoding="utf-8")
     py.chmod(0o755)
+    (root / ".venv" / "pyvenv.cfg").write_text("home = /usr/bin\n", encoding="utf-8")
     return py
 
 
@@ -84,14 +97,21 @@ def _py(root: Path) -> str:
     return shlex.quote(str(root.resolve() / ".venv" / "bin" / "python"))
 
 
-def _light_repo(root: Path, *, pyproject: str | None = None, venv: bool = True) -> None:
+def _light_repo(
+    root: Path,
+    *,
+    pyproject: str | None = None,
+    venv: bool = True,
+    ci: str = "absent_dir",
+    slug: str = SLUG,
+) -> None:
     """No CI file, a trusted exempt light pytest SPEC, and (by default) a stub `.venv`."""
-    fx.init_repo(root)
+    fx.init_repo(root, ci)
     if pyproject is not None:
         (root / "pyproject.toml").write_text(pyproject, encoding="utf-8")
     if venv:
         _stub_python(root)
-    fx.write_spec(root)
+    fx.write_spec(root, slug=slug)
 
 
 def _run(root: Path, *extra: str, slug: str = SLUG) -> tuple[int, dict[str, Any], str]:
@@ -127,10 +147,13 @@ def test_outside_the_opt_in_case_matches_4bd3d3d8(
     root = tmp_path / "repo"
     fx.build_cell(root, ci, spec)
     extra = ["--spec-slug", SLUG] if flag == "on" else []
+    keys: list[str] = []
     got = fx.observe_cell(
-        vc, root, tmp_path / "home" / "cache", fx.SUITES[suite], extra, monkeypatch.setattr
+        vc, root, tmp_path / "home" / "cache", fx.SUITES[suite], extra, monkeypatch.setattr, keys
     )
     assert got == GOLDEN["cells"][fx.golden_key(ci, spec, suite)]
+    # The masked key is this cell's own relevant key, not merely some key in the same place.
+    assert all(key == vc.compute_relevant_skip_key(root) for key in keys)
 
 
 # ── AC-002 ──────────────────────────────────────────────────────────────────
@@ -162,6 +185,18 @@ PLAN_TABLE: dict[str, tuple[str | None, list[str]]] = {
         ["<py> -m pytest"],
     ),
     "pyproject.toml absent": (None, ["<py> -m pytest"]),
+    "[tool.mypy] with packages": (
+        _PROJECT + '\n[tool.mypy]\npackages = ["app"]\n',
+        ["<py> -m mypy", "<py> -m pytest"],
+    ),
+    "[tool.mypy] with modules": (
+        _PROJECT + '\n[tool.mypy]\nmodules = ["app"]\n',
+        ["<py> -m mypy", "<py> -m pytest"],
+    ),
+    "[tool.ruff] and [tool.mypy] without files": (
+        _PROJECT + "\n[tool.ruff]\nline-length = 100\n\n[tool.mypy]\nstrict = true\n",
+        ["<py> -m ruff check .", "<py> -m mypy .", "<py> -m pytest"],
+    ),
 }
 
 
@@ -177,12 +212,13 @@ def test_plan_follows_project_configuration(tmp_path: Path, case: str) -> None:
     code, out, err = _run(root)
     py = _py(root)
     assert code == 0, err
-    assert out["commands"] == [c.replace("<py>", py) for c in expected]
+    golden = [c.replace("<py>", py) for c in expected]
+    assert out["commands"] == golden
     assert out["gate_source"] == "spec"
     for cmd in out["commands"]:
         assert cmd.startswith(py + " ")
         assert shlex.split(cmd)[0] == str(root.resolve() / ".venv" / "bin" / "python")
-    assert [g[0] for g in _gates(tmp_path)] == [c.split()[2] for c in expected]
+    assert _gates(tmp_path) == [shlex.split(c) for c in golden]
 
 
 # ── AC-003 ──────────────────────────────────────────────────────────────────
@@ -215,6 +251,60 @@ def _broken_pyproject(root: Path) -> None:
     _light_repo(root, pyproject="[tool.ruff\nline-length = 1\n")
 
 
+def _no_pyvenv_cfg(root: Path) -> None:
+    _light_repo(root)
+    (root / ".venv" / "pyvenv.cfg").unlink()
+
+
+def _cfg_without_python(root: Path) -> None:
+    _light_repo(root)
+    (root / ".venv" / "bin" / "python").unlink()
+
+
+def _dangling_python(root: Path) -> None:
+    _cfg_without_python(root)
+    (root / ".venv" / "bin" / "python").symlink_to(root / "nowhere" / "python3")
+
+
+def _without_yml(root: Path) -> None:
+    _light_repo(root, ci="dir_without_yml")
+
+
+def _one_yaml(root: Path) -> None:
+    """A workflows dir whose only file is `.yaml`: CI is present, so the flag is inert."""
+    _light_repo(root)
+    wf = root / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "ci.yaml").write_text(
+        "name: ci\non: [push]\njobs:\n  b:\n    runs-on: x\n    steps:\n      - run: echo hi\n"
+    )
+    fx._git(root, "add", "-A")
+    fx._git(root, "commit", "-q", "-m", "ci")
+
+
+def _ci_deleted_in_tree(root: Path) -> None:
+    _light_repo(root, ci="readable")
+    (root / ".github" / "workflows" / "ci.yml").unlink()
+
+
+def _head_tool_dropped(tool: str) -> Any:
+    def build(root: Path) -> None:
+        _light_repo(root, pyproject=_PROJECT + f"\n[tool.{tool}]\nstrict = true\n")
+        fx._git(root, "add", "pyproject.toml")
+        fx._git(root, "commit", "-q", "-m", "config")
+        (root / "pyproject.toml").write_text(_PROJECT, encoding="utf-8")
+
+    return build
+
+
+def _other_config(name: str) -> Any:
+    def build(root: Path) -> None:
+        _light_repo(root)
+        (root / name).write_text("[mypy]\n" if "mypy" in name else "line-length = 100\n")
+
+    return build
+
+
 #: (builder, slug, expected exit, the stderr fragment naming why — None on a pass).
 TRUST_TABLE: dict[str, tuple[Any, str, int, str | None]] = {
     "exempt light pytest, .venv, passing suite": (_light_repo, SLUG, 0, None),
@@ -236,7 +326,21 @@ TRUST_TABLE: dict[str, tuple[Any, str, int, str | None]] = {
     "test_framework missing": (_framework(fx._ABSENT), SLUG, 3, _FRAMEWORK),
     "test_framework a list": (_framework(["pytest"]), SLUG, 3, _FRAMEWORK),
     "test_framework a number": (_framework(1), SLUG, 3, _FRAMEWORK),
+    "test_framework null": (_framework(None), SLUG, 3, _FRAMEWORK),
+    "test_framework true": (_framework(True), SLUG, 3, _FRAMEWORK),
     "no .venv/bin/python": (_no_venv, SLUG, 3, ".venv/bin/python"),
+    ".venv without pyvenv.cfg": (_no_pyvenv_cfg, SLUG, 3, "pyvenv.cfg"),
+    "pyvenv.cfg but no .venv/bin/python": (_cfg_without_python, SLUG, 3, ".venv/bin/python"),
+    ".venv/bin/python a dangling symlink": (_dangling_python, SLUG, 3, ".venv/bin/python"),
+    "workflows dir without a yml file": (_without_yml, SLUG, 0, None),
+    "workflows dir with one .yaml file": (_one_yaml, SLUG, 3, "no verification command"),
+    "HEAD tracks a workflow the tree lacks": (_ci_deleted_in_tree, SLUG, 3, "HEAD tracks"),
+    "HEAD's [tool.ruff] dropped in the tree": (_head_tool_dropped("ruff"), SLUG, 3, "HEAD"),
+    "HEAD's [tool.mypy] dropped in the tree": (_head_tool_dropped("mypy"), SLUG, 3, "HEAD"),
+    "ruff.toml present": (_other_config("ruff.toml"), SLUG, 3, "ruff.toml"),
+    ".ruff.toml present": (_other_config(".ruff.toml"), SLUG, 3, ".ruff.toml"),
+    "mypy.ini present": (_other_config("mypy.ini"), SLUG, 3, "mypy.ini"),
+    ".mypy.ini present": (_other_config(".mypy.ini"), SLUG, 3, ".mypy.ini"),
     "pyproject.toml does not parse": (_broken_pyproject, SLUG, 3, "pyproject.toml"),
     "slug ..": (_light_repo, "..", 3, _NOT_LIGHT),
     "slug containing /": (_light_repo, "specs/demo", 3, _NOT_LIGHT),
@@ -320,7 +424,7 @@ FAIL_TABLE: dict[str, tuple[str | None, dict[str, str], list[str], str, int, lis
     "a gate exceeds --timeout-s": (
         None,
         {"S3D_SLEEP_pytest": "20"},
-        ["--timeout-s", "1"],
+        ["--timeout-s", "3"],
         "stub",
         1,
         ["pytest"],
@@ -349,13 +453,14 @@ FAIL_TABLE: dict[str, tuple[str | None, dict[str, str], list[str], str, int, lis
 def test_spec_plan_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str) -> None:
     pyproject, env, extra, mode, expected, ran = FAIL_TABLE[case]
     root = tmp_path / "repo"
-    _light_repo(root, pyproject=pyproject)
+    _light_repo(root, pyproject=pyproject, slug=UNIQUE_SLUG)
     if mode == "not_executable":
         os.chmod(root / ".venv" / "bin" / "python", 0o644)
     for name, value in env.items():
         monkeypatch.setenv(name, value.replace("<root>", str(root)))
-    code, out, err = _run(root, *extra)
+    code, out, err = _run(root, *extra, slug=UNIQUE_SLUG)
     assert code == expected == out["exit"], err
     assert out["gate_source"] == "spec"
+    assert UNIQUE_SLUG not in json.dumps(out)  # IRR-002: the slug is not echoed
     assert _markers(tmp_path) == []
-    assert [g[0] for g in _gates(tmp_path)] == ran
+    assert _tools(tmp_path) == ran

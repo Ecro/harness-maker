@@ -175,6 +175,7 @@ def write_venv_python(root: Path) -> Path:
     py.parent.mkdir(parents=True, exist_ok=True)
     py.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     py.chmod(0o755)
+    (root / ".venv" / "pyvenv.cfg").write_text("home = /usr/bin\n", encoding="utf-8")
     return py
 
 
@@ -207,13 +208,15 @@ def observe_cell(
     rc: int,
     extra: list[str],
     patch: Callable[[object, str, object], None] = setattr,
+    keys_out: list[str] | None = None,
 ) -> dict[str, Any]:
     """Two `run` calls with a fake gate runner: stdout, exit, the gates asked for, marker bytes.
 
     Normalised only where the value is the fixture's own place or time: the root path, the key
     (a hash over that path and the fixture's commit), `passed_at` and each gate's `seconds`.
     `patch` is `setattr` in the capture script and `monkeypatch.setattr` in a test.
-    `_tool_versions` is stubbed for speed only: the key it feeds is masked.
+    `_tool_versions` is stubbed for speed only: the key it feeds is masked. `keys_out`, when
+    given, receives every key before masking, so a test can check it is the cell's own key.
     """
     argv = ["run", "--root", str(root), "--mode", "relevant", *extra]
     calls: list[str] = []
@@ -226,6 +229,8 @@ def observe_cell(
         markers = sorted((cache / "verify").glob("*.json")) if (cache / "verify").is_dir() else []
         marker_texts = [m.read_text(encoding="utf-8") for m in markers]
         keys = list(dict.fromkeys([m.stem for m in markers] + _KEY_FIELD.findall(out)))
+        if keys_out is not None:
+            keys_out.extend(keys)
         rounds.append(
             {
                 "exit": code,

@@ -512,11 +512,19 @@ GATE_SOURCE_SPEC = "spec"
 _SPEC_FRAMEWORKS: dict[str, str] = {"pytest": "pytest"}
 
 
+#: Lint or type config outside `pyproject.toml`: unsupported, so a SPEC plan would drop it.
+_OTHER_TOOL_CONFIGS = ("ruff.toml", ".ruff.toml", "mypy.ini", ".mypy.ini")
+#: `[tool.mypy]` keys that name mypy's own targets, so the command adds none.
+_MYPY_TARGET_KEYS = ("files", "modules", "packages")
+
+
 def _spec_test_framework(root: Path, slug: str) -> object:
     """The `.md` frontmatter's `test_framework`, read where `light_lane.lane_of` reads the lane."""
     from harness_maker.frontmatter import split_frontmatter
-    from harness_maker.spec_machine import _named_spec_dir, _resolve_checkout
+    from harness_maker.spec_machine import _is_plain_slug, _named_spec_dir, _resolve_checkout
 
+    if not _is_plain_slug(slug):
+        return None
     spec_dir = _named_spec_dir(root, slug, _resolve_checkout(root, slug, None))
     try:
         mapping = split_frontmatter((spec_dir / f"SPEC-{slug}.md").read_bytes()).mapping
@@ -525,39 +533,76 @@ def _spec_test_framework(root: Path, slug: str) -> object:
     return mapping.get("test_framework") if isinstance(mapping, dict) else None
 
 
-def spec_plan(root: Path, py: str, module: str = "pytest") -> list[str] | str:
-    """ruff, then mypy, each only when `pyproject.toml` configures it, then the test module.
+def _git_out(root: Path, *args: str) -> str | None:
+    """stdout of a bounded git call, or None when it did not succeed (no shell)."""
+    try:
+        proc = subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, text=True, timeout=30, check=False
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
 
-    Returns the commands, or the reason there are none. A pyproject that does not parse is a
-    reason: guessing that it configures nothing would drop a gate the project asked for.
-    """
-    tool: object = {}
+
+def _tool_table(text: str) -> dict[str, Any]:
+    tool = tomllib.loads(text).get("tool", {})
+    return tool if isinstance(tool, dict) else {}
+
+
+def _head_drift(root: Path, tool: dict[str, Any]) -> str | None:
+    """Why the tree may have shed a gate HEAD declares: a deleted workflow or tool table would
+    otherwise turn a gated repo into a pytest-only one."""
+    listed = _git_out(root, "ls-tree", "-z", "--name-only", "HEAD", "--", ".github/workflows/")
+    head_pyproject = _git_out(root, "ls-tree", "-z", "--name-only", "HEAD", "--", "pyproject.toml")
+    if listed is None or head_pyproject is None:
+        return "cannot read HEAD to compare the working tree with it"
+    if any(n.endswith((".yml", ".yaml")) for n in listed.split("\0") if n):
+        return "HEAD tracks a workflow file under .github/workflows that the working tree lacks"
+    if not head_pyproject.strip("\0"):
+        return None
+    text = _git_out(root, "show", "HEAD:pyproject.toml")
+    try:
+        head_tool = _tool_table(text) if text is not None else None
+    except tomllib.TOMLDecodeError:
+        head_tool = None
+    if head_tool is None:
+        return "HEAD's pyproject.toml does not parse"
+    dropped = [k for k in ("ruff", "mypy") if k in head_tool and k not in tool]
+    if dropped:
+        return (
+            f"HEAD's pyproject.toml configures {', '.join(dropped)} and the working copy does not"
+        )
+    return None
+
+
+def spec_plan(root: Path, py: str, module: str = "pytest") -> list[str] | str:
+    """The gates, or why there are none: a config this plan cannot read must not drop a gate."""
+    present = [name for name in _OTHER_TOOL_CONFIGS if (root / name).exists()]
+    if present:
+        return f"{', '.join(present)} is not supported (only pyproject.toml configures ruff/mypy)"
+    tool: dict[str, Any] = {}
     pyproject = root / "pyproject.toml"
     if pyproject.is_file():
         try:
-            doc = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+            tool = _tool_table(pyproject.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
             return f"pyproject.toml does not parse: {exc}"
-        tool = doc.get("tool", {})
-    if not isinstance(tool, dict):
-        tool = {}
+    drift = _head_drift(root, tool)
+    if drift is not None:
+        return drift
     commands: list[str] = []
     if "ruff" in tool:
         commands.append(f"{py} -m ruff check .")
     if "mypy" in tool:
         mypy = tool["mypy"]
-        has_files = isinstance(mypy, dict) and "files" in mypy
-        commands.append(f"{py} -m mypy" if has_files else f"{py} -m mypy .")
+        targeted = isinstance(mypy, dict) and any(k in mypy for k in _MYPY_TARGET_KEYS)
+        commands.append(f"{py} -m mypy" if targeted else f"{py} -m mypy .")
     commands.append(f"{py} -m {module}")
     return commands
 
 
 def _spec_commands(root: Path, slug: str) -> list[str] | str:
-    """Trust, then the interpreter, then the plan; the first that fails is the reason.
-
-    Checked on every call, before any marker is reused, so a SPEC that lost its trust never
-    reports `cached: true` — the SPEC can live outside the relevant key (`spec.dir`).
-    """
+    """Trust is checked on every call, before any marker is reused, so lost trust never caches."""
     from harness_maker.light_lane import lane_of
 
     if lane_of(root, slug) != "light":
@@ -566,9 +611,12 @@ def _spec_commands(root: Path, slug: str) -> list[str] | str:
     module = _SPEC_FRAMEWORKS.get(framework) if isinstance(framework, str) else None
     if module is None:
         return "the SPEC's test_framework is not exactly 'pytest'"
-    py = root / ".venv" / "bin" / "python"
-    if not py.exists():
+    venv = root / ".venv"
+    py = venv / "bin" / "python"
+    if not py.is_file():
         return "no .venv/bin/python in the project (no other interpreter is used)"
+    if not (venv / "pyvenv.cfg").is_file():
+        return "no .venv/pyvenv.cfg: .venv is not a virtual environment (no other is used)"
     return spec_plan(root, shlex.quote(str(py)), module)
 
 
@@ -585,10 +633,6 @@ def run_gates(
 
     Stops at the first failure. A pass on a tree that changed while the gates ran is not a
     pass of the tree now on disk, so it writes nothing and says which paths moved.
-
-    `spec_slug` counts only when there is no CI file at all: then the gates come from that
-    SPEC (`_spec_commands`), and the summary says `gate_source: spec`. Any other CI state
-    ignores it.
     """
     from harness_maker.verification_plan import read_plan
 
@@ -598,6 +642,8 @@ def run_gates(
         return compute_skip_key(root)
 
     plan = read_plan(root.resolve())
+    # `spec_slug` counts only with no CI file at all (SPEC-hm-light-lane-s3d): the gates then
+    # come from that SPEC and the summary says `gate_source: spec`; any other CI state ignores it.
     if plan.degraded and spec_slug is not None and plan.ci_absent:
         spec = _spec_commands(root.resolve(), spec_slug)
         if isinstance(spec, str):
