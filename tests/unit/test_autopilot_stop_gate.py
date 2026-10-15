@@ -222,9 +222,13 @@ class World:
             claude_session_id=None if kind == "idless" else PEER,
             created=_at(19 * 60) if kind == "old" else _at(60),
             level="gated" if kind == "gated" else "auto_full",
-            last_seen={"live": _at(5), "idle": _at(45), "gated": _at(5), "idless": _at(5)}.get(
-                str(kind)
-            ),
+            last_seen={
+                "live": _at(5),
+                "idle": _at(45),
+                "gated": _at(5),
+                "idless": _at(5),
+                "future-seen": _at(-60),
+            }.get(str(kind)),
         )
 
     def _write_loop(self) -> None:
@@ -378,6 +382,7 @@ GOLDEN: list[tuple[str, Setup, tuple[str, str | None]]] = [
     ("r15d-gated-peer", _set(peer="gated"), _BLOCK_EXECUTE),
     ("r15e-idless-peer", _set(peer="idless"), _BLOCK_EXECUTE),
     ("r15f-19h-old-peer", _set(peer="old"), _BLOCK_EXECUTE),
+    ("r15g-peer-last-seen-in-the-future-falls-back-to-ttl", _set(peer="future-seen"), _ALLOW),
     ("r16-marker-after-authorization", _set(marker_created_m=2), _ALLOW),
     ("r17-stage-outside-pipeline", _set(pipeline=["research", "spec"]), _ALLOW),
     ("r18-loop-precedence", _set(loop="own"), _LOOP),
@@ -415,6 +420,9 @@ GOLDEN: list[tuple[str, Setup, tuple[str, str | None]]] = [
     ("s4-hyphen-form", _append_after(skill_at(_z(4.5), "hm-execute")), _ALLOW),
     ("s5-longer-name", _append_after(skill_at(_z(4.5), "hm:executor")), _BLOCK_EXECUTE),
     ("s6-stage-only-as-arg", _append_after(skill_at(_z(4.5), "hm:review execute")), _BLOCK_EXECUTE),
+    ("s7-bare-stage-name", _append_after(skill_at(_z(4.5), "execute")), _BLOCK_EXECUTE),
+    ("s8-other-plugin-stage", _append_after(skill_at(_z(4.5), "other:execute")), _BLOCK_EXECUTE),
+    ("s9-longer-hyphen-name", _append_after(skill_at(_z(4.5), "hm:execute-plan")), _BLOCK_EXECUTE),
     (
         "d1-same-second-skill-500us-before",
         _set(

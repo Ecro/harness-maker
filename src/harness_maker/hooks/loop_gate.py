@@ -250,7 +250,7 @@ def _unstarted_stage(
     refusable = _scan_transcript(data, pending)
     if not refusable:
         return None
-    latest = max(refusable, key=lambda name: pending[name])
+    latest = max(refusable, key=lambda name: (pending[name], name))
     return latest, marker.task_slug
 
 
@@ -275,9 +275,9 @@ def _peer_armed(base: Path, session_id: str, moment: datetime) -> bool:
             continue
         if not peer.claude_session_id or peer.level == GATED_LEVEL:
             continue
-        if peer.last_seen:
-            idle = autopilot.idle_minutes(peer, now=moment)
-            if idle is not None and idle <= _PEER_IDLE_MINUTES:
+        idle = autopilot.idle_minutes(peer, now=moment) if peer.last_seen else None
+        if idle is not None:
+            if idle <= _PEER_IDLE_MINUTES:
                 return True
         elif autopilot._freshness(peer.created_at, moment) == "fresh":
             return True
@@ -374,10 +374,10 @@ def _moves_on(record: dict[str, Any], *, after: datetime, stage: str) -> bool:
 
 
 def _invokes(content: object, stage: str) -> bool:
-    """A `Skill` tool_use whose skill names ``stage``: `hm:x`, `/hm:x args`, `ns:x`, `hm-x`."""
+    """A `Skill` tool_use naming ``stage``: `hm:x`, `/hm:x args`, `harness-maker:x`, `hm-x`."""
     if not isinstance(content, list):
         return False
-    pattern = re.compile(rf"(?:[\w.-]+:)*(?:hm[:-])?{re.escape(stage)}")
+    pattern = re.compile(rf"(?:[\w.-]+:)*(?:hm[:-]|harness-maker:){re.escape(stage)}")
     for block in content:
         if not isinstance(block, dict) or block.get("type") != "tool_use":
             continue
