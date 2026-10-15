@@ -29,7 +29,9 @@ ac:
     cursor_model context and _alias_by_cursor_id; presets.CURSOR_MODEL_IDS; readiness Cursor
     advisory; Target.CURSOR; templates/cursor/; the cursor branches of help/make templates
     and the plugin commands/make.md; .cursor-plugin/plugin.json. Kept: hook_host,
-    reconcile .cursor sweep root and backup, foreign_config detection of an existing .cursor/rules.'
+    reconcile .cursor sweep root and backup, foreign_config detection of an existing .cursor/rules.
+    Lifecycle: the HEAD side is pinned to the PR-C merge commit, recorded by PR-S in tests/fixtures/overhaul_p1/prc_merge_sha
+    and rendered via git worktree add; before PR-C merges it is the working tree. Not superseded.'
   pending_test: true
   oracle_source: differential
   oracle_evidence: The reference is the db19f023 renderer run in a temp checkout from `git
@@ -217,7 +219,7 @@ ac:
       case: D-6, D-7
     expected: metrics.md <= 3000 chars; research.md <= 8000 chars
     edge: false
-    note: defaults, see Open Questions 1
+    note: D-6 and D-7 are defaults pending the DRI's card, see Open Questions 1
   - input:
       case: stage budgets, Side and Production, worktree off, depth standard
     expected: spec.md <= 6500, execute.md <= 7000, wrapup.md <= 3500; codex SKILL.md <= 1.03x
@@ -244,17 +246,38 @@ ac:
     edge: false
     note: ''
   - input:
-      case: settings.json hooks
-    expected: exactly permission_gate, worktree_gate, (Production) spec_gate, flush_session,
-      worktree span-end, loop_gate --mode stop-hook, sessionid_envfile
+      case: settings.json hooks, strictness_of(config) block and not block
+    expected: exactly permission_gate, worktree_gate, flush_session, worktree span-end, loop_gate
+      --mode stop-hook, sessionid_envfile, plus spec_gate (Write|Edit|MultiEdit) exactly when strictness
+      is block
     edge: false
-    note: ''
+    note: keyed on strictness as at db19f023, not on preset
   - input:
       case: .codex/hooks.json hooks
     expected: exactly permission_gate (PermissionRequest, PreToolUse), sessionstart_drift, sessionid_envfile,
-      loop_gate --mode stop-hook, flush_session
+      loop_gate --mode stop-hook, flush_session, plus spec_gate (apply_patch) exactly when strictness
+      is block
     edge: false
     note: ''
+  - input:
+      case: D-8 no lanes, spec.md
+    expected: contains interview.main_loop.max_rounds and 'Approve this SPEC and end interview';
+      no 'lane:' field, no pick-the-lane step, no one-round mode; Step 5 exempt rule names irreversible_decisions
+      [] and no lane clause
+    edge: false
+    note: default pending the DRI's card
+  - input:
+      case: execute.md content
+    expected: contains checkpoint:compaction and .claude-progress.json; reviewers.max_review_rounds;
+      --no-tdd only inside its retirement notice; second_brain search only when second_brain.enabled
+    edge: false
+    note: Session Context Loading is INV and kept
+  - input:
+      case: D-7 research.md
+    expected: <= 8000 chars; no other stage file requires research output; no auto-advance into
+      or out of research
+    edge: false
+    note: default pending the DRI's card
   - input:
       case: every rendered stage file
     expected: names no `.claude/hm/` or `.claude/stages/` path and no Read of another harness
@@ -294,9 +317,9 @@ ac:
   - input:
       case: approved SPEC, all gates pass, every non-judgment AC bound and passing, no security
         or cve finding in touched paths
-    expected: exit 0, one JSON line, every section ok
+    expected: exit 0, one JSON line, every section ok, tree_changed []
     edge: false
-    note: ''
+    note: tree_changed is always present
   - input:
       case: as row 1, a failing gate
     expected: exit 1, sections.gates.ok false
@@ -313,10 +336,50 @@ ac:
     edge: true
     note: judgment is the only test-free type
   - input:
-      case: as row 1, ac is []
+      case: as row 1, ac is [] and the stamp is not exempt
     expected: exit 1
     edge: true
-    note: eval-3 t6-hm-2 shape
+    note: ''
+  - input:
+      case: skip-path SPEC (exempt stamp, ac []), change set touches only README.md and a .toml
+    expected: exit 0, sections.ac ok with reason skip-path
+    edge: true
+    note: the exempt stamp exempts the human, not the test
+  - input:
+      case: skip-path SPEC (exempt stamp, ac []), change set touches a .py file
+    expected: exit 1, sections.ac reason 'skip-path SPEC with a code change'
+    edge: true
+    note: eval-3 t6-hm-2 shape (a bugfix with ac [])
+  - input:
+      case: skip-path SPEC (exempt stamp, ac []), change set touches only tests/test_x.txt
+    expected: exit 1
+    edge: true
+    note: a path under tests/ counts as a test file
+  - input:
+      case: as row 1, the only mapped test of an AC is skipped
+    expected: exit 1, sections.ac names the AC with outcome skipped
+    edge: true
+    note: an env-gated skip gets no exemption
+  - input:
+      case: as row 1, the only mapped test of an AC is xfailed
+    expected: exit 1, outcome xfailed
+    edge: true
+    note: ''
+  - input:
+      case: as row 1, the only mapped test of an AC is deselected (collected, not run)
+    expected: exit 1, outcome deselected
+    edge: true
+    note: ''
+  - input:
+      case: as row 1, a mapped test xpasses (non-strict xfail marker)
+    expected: exit 1, outcome xpassed counted as failing
+    edge: true
+    note: ''
+  - input:
+      case: hm check --no-tdd
+    expected: exit 2
+    edge: true
+    note: --no-tdd is retired; /hm:execute prints a notice and runs TDD (AC-004 row)
   - input:
       case: as row 1, a secret-shaped string added in a touched file
     expected: exit 1, sections.security
@@ -354,9 +417,9 @@ ac:
     note: degraded
   - input:
       case: a gate writes a tracked file during the run
-    expected: exit 4
+    expected: exit 4, tree_changed lists that path
     edge: true
-    note: ''
+    note: hm check itself writes nothing; the prompt reruns once and stops on a second exit 4
   - input:
       case: as row 1, SPEC unstamped, autonomy.level ask
     expected: exit 5
@@ -403,10 +466,43 @@ ac:
     edge: true
     note: not a real RED
   - input:
-      case: --red, tests fail on ImportError of the not-yet-written symbol
-    expected: exit 0
+      case: --red, an AC's only test is skipped, xfailed, deselected or xpassed (one row each in
+        the test)
+    expected: exit 1, the AC not RED, outcome named
     edge: true
-    note: real RED
+    note: none of these counts as RED
+  - input:
+      case: --red, a test fails on ModuleNotFoundError for pkg.newmod, first-party and absent at
+        HEAD
+    expected: exit 0, red_by_import lists {ac, test_id, module pkg.newmod}
+    edge: true
+    note: new in this SPEC; db19f023 Phase B counted import errors as a wrong reason
+  - input:
+      case: --red, a test fails on ImportError of symbol new_fn from an existing first-party module,
+        new_fn absent at HEAD
+    expected: exit 0, red_by_import lists {module, symbol new_fn}
+    edge: true
+    note: ''
+  - input:
+      case: --red, a test fails on ImportError of a third-party package
+    expected: exit 1, not RED
+    edge: true
+    note: needs an AssertionError stub instead
+  - input:
+      case: --red, a test fails on ImportError of a first-party name already present at HEAD
+    expected: exit 1, not RED
+    edge: true
+    note: ''
+  - input:
+      case: plain hm check (GREEN), red_by_import name new_fn defined nowhere in the change set
+    expected: exit 1, sections.ac reason 'red_by_import not implemented'
+    edge: true
+    note: derived statically with ast; no state file
+  - input:
+      case: plain hm check (GREEN), new_fn defined as a top-level def in a changed file
+    expected: sections.ac ok for that AC
+    edge: false
+    note: ''
   - input:
       case: --mutation with mutmut absent
     expected: skip notice, section passes
@@ -416,10 +512,12 @@ ac:
   note: PR-S
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The exit meanings are fixed in this SPEC before implementation. Rows 7 and 16
-    reproduce shapes observed in the eval-3 trees on 2026-10-15; the RED rules restate
-    db19f023 execute Phase A.4/B and DRI rule 2; the approval rows follow the db19f023
-    spec_machine approval states.
+  oracle_evidence: The exit meanings, the pytest-outcome rule, the skip-path rule and the red_by_import
+    rule are fixed in this SPEC before implementation and are new here, not restated from db19f023
+    (db19f023 Phase B counted import errors as a wrong reason and Phase A.4 counted only passes).
+    The out-of-scope security, skip-path code-change and invalid-stamp rows reproduce shapes
+    observed in the eval-3 trees on 2026-10-15; the approval rows follow the db19f023 spec_machine
+    approval states; the RED requirement is DRI rule 23:12Z.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -441,7 +539,9 @@ ac:
   executable_predicate: null
   golden_table:
   - input:
-      case: each of the 36 trees as-is (copied, .venv kept, __pycache__ dropped), --offline
+      case: each of the 36 trees rebuilt from committed fixtures (db19f023 bench fixture + db19f023
+        harness render via git worktree add + the run's committed patch; .venv via venv --system-site-packages),
+        --offline
     expected: security ok with 0 gating findings, although unscoped scan_all reports 10-15
       high/P0 per tree; gates ok (pytest only, from pyproject); tree unchanged
     edge: false
@@ -453,9 +553,15 @@ ac:
     note: ''
   - input:
       case: same, ac section
-    expected: fails on all 36 (every AC pending_test true; t6-hm-2 has ac [])
+    expected: fails on all 36 (every AC pending_test true; t6-hm-2 has ac [] with an exempt stamp
+      and a code change, reason 'skip-path SPEC with a code change')
     edge: false
     note: the SDD gap rule 3 targets; overall exit 1
+  - input:
+      case: same, any tree
+    expected: tree_changed [] in the JSON line
+    edge: false
+    note: PYTHONDONTWRITEBYTECODE=1 probe 2026-10-15
   - input:
       case: negative control, a secret-shaped line appended to the tree's changed source file
     expected: security section fails
@@ -472,8 +578,11 @@ ac:
     edge: false
     note: ''
   rubric_id: null
-  note: PR-S. Skipped unless /var/tmp/hm-eval-3/runs exists or INTEGRATION=1 with a fixture
-    copy; the expected verdicts are committed as tests/fixtures/hm_check_eval3/expected.json.
+  note: PR-S. Ungated, so it never skips (a skip fails the ac section). Fixtures committed under
+    tests/fixtures/hm_check_eval3/<run>/patch.diff (git diff --cached HEAD plus untracked unignored
+    files, .venv and __pycache__ excluded) with expected.json; the harness commit is regenerated from db19f023, which
+    needs full git history (CI fetch-depth 0). Precondition, pinned by the test, is that the
+    rebuilt tree's harness files equal the original's harness commit modulo provenance.
   pending_test: true
   oracle_source: golden
   oracle_evidence: The verdicts were recorded on 2026-10-15 from the eval-3 artifacts (results.jsonl,
@@ -510,15 +619,19 @@ ac:
     fixed before implementation; the edit-preservation relation holds for any reconcile that
     honours the content_hash/manifest contract of pre-change-checklist items 1 and 5.
   oracle_independence_waiver: null
-  input_domain: a 0.62 tree from the fixtures, optionally with one mutation from {one byte appended
+  input_domain: 'a 0.62 tree from the fixtures, optionally with one mutation from {one byte appended
     to a retired file, text inside an @hm:user:* block of a kept stage, a user hook added to
-    a harness matcher group, a user hook group of its own, harness.yaml autopilot_persistent
-    true}
+    a harness matcher group, a user hook group of its own}, or one harness.yaml key from the
+    AC-007 table: loop.enabled true; delegation.stages [review, execute]; delegation.stages [verify];
+    reviewers.max_review_rounds 2; reviewers.enabled naming a lens reviewer; skills.enabled naming
+    conditional-router; agent_models.test-reviewer set; autonomy.autopilot_persistent true'
   transformation: hm make <tree> --update at HEAD
   expected_relation: 'pristine tree: files after == AC-004 set and every removed file was in the
     db19f023 listing; mutated retired file kept byte-identical with one KEPT warning; user block
     text present in the new stage; user hook commands present; retired invocations absent;
-    specs/, work-docs/, .claude/memory/, .claude/observability/ byte-identical'
+    specs/, work-docs/, .claude/memory/, .claude/observability/ byte-identical; each inert harness.yaml
+    key gives exactly one warning naming it and keeps its value, reviewers.max_review_rounds gives
+    none and is still read by execute.md; the file still parses under extra=forbid'
   preconditions:
   - HOME pinned; freeze_time
   observable_output: per tree, the violating paths, empty
@@ -537,6 +650,8 @@ ac:
   golden_table: []
   rubric_id: null
   note: PR-C and PR-S. Covers the leftover .cursor/hooks.json and the three stubbed entry points.
+    Out of reach, recorded in IRR-001, is a kept .cursor/hooks.json whose --with path names a pruned
+    plugin cache, because that command fails before any module loads.
   pending_test: true
   oracle_source: differential
   oracle_evidence: The command corpus and the reference exits come from db19f023 renders and
@@ -567,15 +682,26 @@ ac:
   - tests/unit/test_overhaul_p1_kept.py::test_ac009_digest_and_spec_machine_equal_reference
   - tests/unit/test_overhaul_p1_kept.py::test_ac009_stage_cli_invocations_preserved
   - tests/unit/test_overhaul_p1_kept.py::test_ac009_bench_contract
+  - tests/unit/test_overhaul_p1_kept.py::test_ac009_spec_gate_keyed_on_strictness
+  - tests/unit/test_overhaul_p1_kept.py::test_ac009_compaction_checkpoint_resume
   executable_predicate: null
   golden_table: []
   rubric_id: null
-  note: 'PR-S. Invocation golden (db19f023, Side, worktree on): spec {spec_machine check, approve,
-    approval-status, worktree task-preflight, task-refresh}; execute {spec_machine validate,
-    approve, approval-status, task-preflight, task-refresh}; wrapup {memory_md upsert-wiki,
-    upsert-failure, spec_machine approval-status, approve, find-unbound, find-unjudged, mark-judged,
-    mark-tested, waiver-check, wrapup_land, worktree task-land, commit-base-memory, task-preflight,
-    task-refresh}. Declared move: mark-tested wrapup -> execute. Declared additions: hm check.'
+  note: 'PR-S. The reference union is extracted at test time from db19f023 renders (Side, [claude-code],
+    worktree on, .claude/hm/ helpers inlined) by the regex hm (\S+)( [a-z][\w-]*)?; the SPEC
+    AC-009 table records it as of 2026-10-15: research {autopilot on/status, autopilot_caps boundary/gate-blocked,
+    second_brain search, worktree task-preflight/task-refresh, memory_retrieve}; spec {autopilot
+    on/status, autopilot_caps boundary, intent status, spec_machine approval-status/approve/check,
+    worktree task-preflight/task-refresh, memory_retrieve}; execute {autopilot on/status, autopilot_caps
+    boundary/gate-blocked, cli security-scan, observability.verification_cache key/run, second_brain
+    search, spec_machine approval-status/approve/validate, spec_mutation gate, spec_need frontmatter-upsert/op-check/prefilter/record/waiver-check,
+    test_runners plan, worktree task-preflight/task-refresh, memory_retrieve, test_dep_map}; wrapup
+    {autopilot on/status, autopilot_caps boundary/gate-blocked, autopilot_ledger rollup, intent
+    close/metric/question/status, memory_md upsert-failure/upsert-wiki, observability.verification_cache
+    mark-pass/run, proposals list/summary, second_brain promote, spec_machine approval-status/approve/find-unbound/find-unjudged/mark-judged/mark-tested/waiver-check,
+    worktree commit-base-memory/task-land/task-preflight/task-refresh, memory_retrieve, wrapup_land}.
+    Each drop or move is a row of the SPEC AC-009 table tied to a ledger row; additions are hm
+    check. second_brain rows are checked with second_brain.enabled true.'
   pending_test: true
   oracle_source: differential
   oracle_evidence: Reference modules are loaded from `git show db19f023:` into a temp package
@@ -583,13 +709,16 @@ ac:
     that leaves these behaviours alone.
   oracle_independence_waiver: null
   input_domain: payload corpora for permission_gate (incl. curl|sh), flush_session, sessionstart_drift,
-    sessionid_envfile, worktree_gate, loop_gate --mode stop-hook; digest and spec_machine fixtures;
-    stage renders over worktree {off,on} x targets
+    sessionid_envfile, worktree_gate, loop_gate --mode stop-hook, spec_gate; digest and spec_machine
+    fixtures; stage renders over worktree {off,on} x targets x strictness {block, warn} x second_brain.enabled
+    {false, true}
   transformation: run each under the db19f023 module or render and under HEAD on the same fixture
   expected_relation: stdout, exit code and written files equal; the union of kept CLI invocations
-    over the three stages equals the reference union minus the declared moves, plus the declared
-    additions; make --autoloop --preset Side --targets claude-code --autonomy-level auto_full
-    exits 0 and spec.md matches `uv run --with (\S+) hm `
+    over the four stages equals the reference union minus the AC-009 table drops and moves, plus
+    hm check; spec_gate is present in settings.json and in .codex/hooks.json exactly when strictness_of(config)
+    == block, at HEAD as at db19f023; execute.md at HEAD contains the db19f023 hot-tier sentences
+    naming checkpoint:compaction and .claude-progress.json; make --autoloop --preset Side --targets
+    claude-code --autonomy-level auto_full exits 0 and spec.md matches `uv run --with (\S+) hm `
   preconditions:
   - freeze_time and HOME pinned
   observable_output: differing cells, empty
@@ -607,13 +736,76 @@ ac:
   executable_predicate: t1_cost_ratio <= 8 and hm_hidden_pass_rate >= plain_hidden_pass_rate
   golden_table: []
   rubric_id: null
-  note: PR-S. Measured by scripts/bench_light_lane.py on tiers 1-2, 3 runs per cell; rows with
-    the new runner_hash only. A ratio <= 5 meets the intent metric; over 8x, trace with `economics
-    stages` before cutting further.
+  note: PR-S. Measured by scripts/bench_light_lane.py on tiers 1-2, 3 runs per cell. The test
+    reads the committed docs/evals/results.jsonl and uses the rows whose harness_sha is reachable
+    from HEAD and not from db19f023 (git merge-base --is-ancestor); with no such rows it fails,
+    never skips, so the published scorecard is the ship gate for PR-S wrapup. A ratio <= 5 meets
+    the intent metric; over 8x, trace with `economics stages` before cutting further. D-8 (no
+    lanes) is invisible to this headless eval; interactive cost is watched in use.
   pending_test: true
   oracle_source: golden
   oracle_evidence: The thresholds are the DRI's 2026-10-15 ship bar and the pass-rate counter-signal
     from the draft section 4, fixed before the re-run.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: Every metrics-*.jsonl reader says it has no telemetry source
+  type: parametric
+  test_ids:
+  - tests/unit/test_overhaul_p1_telemetry_readers.py::test_ac011_reader_table
+  - tests/unit/test_overhaul_p1_telemetry_readers.py::test_ac011_reader_list_matches_grep
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: security_scanner.scan_all on a project with no metrics-*.jsonl
+    expected: Gate 7 reports prod_name_guard 'no telemetry source' as a status, not zero findings
+      and not passed
+    edge: false
+    note: a security reader never reports clean on absent data
+  - input:
+      case: security_scanner.scan_all with a db19f023-shaped metrics file present
+    expected: Gate 7 findings equal db19f023 on the same file
+    edge: true
+    note: behaviour with data is unchanged
+  - input:
+      case: readiness._dim_observability_setup with no metrics file
+    expected: the telemetry-presence and sample-count signals are n/a, labelled 'telemetry hook retired',
+      and excluded from the dimension score
+    edge: false
+    note: ''
+  - input:
+      case: feedback.telemetry_grep with no metrics file
+    expected: returns 'no telemetry source'
+    edge: false
+    note: ''
+  - input:
+      case: cache_diagnostics.diagnose_cache_for_project
+    expected: imports no _metrics_io and reads no metrics-*.jsonl
+    edge: true
+    note: already transcript-based (economics_source.load_turns)
+  - input:
+      case: grep of src/ at HEAD for _metrics_io importers and metrics- readers
+    expected: exactly security_scanner, readiness, feedback/telemetry_grep and telemetry (the stubbed
+      writer)
+    edge: true
+    note: a new reader must join this table
+  rubric_id: null
+  note: PR-S. Found by grep of db19f023 for _metrics_io and metrics- on 2026-10-15.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The reader list is a grep of db19f023 made before implementation; the rule that
+    a security reader must not read absent data as clean is the spec-validator's P1-6 finding
+    and the 'never read it as a pass' rule of AC-005, neither derived from the new code.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -632,11 +824,14 @@ irreversible_decisions:
     .cursor-plugin/plugin.json deleted, version sync 4 files, Cursor-only Python deleted)
   category: public API/CLI contract
   rationale: Users and the Cursor Marketplace lose a supported target; restoring it means restoring
-    code and the listing.
+    code and the listing. Pruned-cache risk, a kept user-edited .cursor/hooks.json runs uv run --with
+    a plugin cache path, and once that cache is pruned every command fails before any module loads;
+    AC-008 cannot cover it and Cursor's handling is unverified; the KEPT warning says so on every
+    update while the file exists.
   source: spec
 - id: IRR-002
   decision: /hm:review, /hm:verify, /hm:configure and /hm:loop (and Codex $hm-review, $hm-verify,
-    $hm-loop) are no longer rendered
+    $hm-loop) are no longer rendered; /hm:execute --no-tdd becomes a notice and TDD runs anyway
   category: public API/CLI contract
   rationale: Scripts and habits that call them break; kept user-edited copies call CLI a later
     phase may delete.
@@ -660,4 +855,14 @@ irreversible_decisions:
   category: public API/CLI contract
   rationale: The retired set is append-only by test and re-rendering strips these hooks from
     every user's settings.
+  source: spec
+- id: IRR-006
+  decision: harness.yaml keeps every key; keys whose consumer is retired (loop.enabled, delegation.stages
+    naming review or verify, retired lens reviewers and skills, agent_models of retired agents,
+    autonomy.autopilot_persistent) stay parseable, keep their value and become inert with one warning
+    each per make run; the only rewrite is dropping cursor from targets; no lane field remains
+  category: schema/file format/storage layout
+  rationale: A user's config silently changes meaning; ignoring keeps every 0.62 file loadable
+    under extra=forbid where a rewrite would discard values the user chose; restoring behaviour
+    means restoring the consumers, not the file.
   source: spec
