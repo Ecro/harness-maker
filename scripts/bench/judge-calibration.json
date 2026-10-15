@@ -1,0 +1,162 @@
+{
+  "judge_model": "claude-sonnet-5-5",
+  "rubric_id": "hm-eval-judge-v1",
+  "tasks": [
+    {
+      "control": {
+        "cost_usd": 0.0201174,
+        "input_sha": "ea0f28f3f8efb3ae",
+        "overall": 5.0,
+        "scores": {
+          "clarity": 5,
+          "maintainability": 5,
+          "overall": 5.0,
+          "scope": 5
+        },
+        "status": "ok"
+      },
+      "damaged": {
+        "cost_usd": 0.019795399999999998,
+        "input_sha": "4c850ec6f43e1676",
+        "overall": 2.3333333333333335,
+        "scores": {
+          "clarity": 2,
+          "maintainability": 2,
+          "overall": 2.3333333333333335,
+          "scope": 3
+        },
+        "status": "ok"
+      },
+      "reference": {
+        "cost_usd": 0.0269403,
+        "input_sha": "cddca025e4bd18c6",
+        "overall": 4.666666666666667,
+        "scores": {
+          "clarity": 5,
+          "maintainability": 4,
+          "overall": 4.666666666666667,
+          "scope": 5
+        },
+        "status": "ok"
+      },
+      "task": "t6"
+    },
+    {
+      "control": {
+        "cost_usd": 0.0212934,
+        "input_sha": "917967c9d6e3e625",
+        "overall": 5.0,
+        "scores": {
+          "clarity": 5,
+          "maintainability": 5,
+          "overall": 5.0,
+          "scope": 5
+        },
+        "status": "ok"
+      },
+      "damaged": {
+        "cost_usd": 0.020725399999999998,
+        "input_sha": "d0ca5ea0297bdc0a",
+        "overall": 2.6666666666666665,
+        "scores": {
+          "clarity": 2,
+          "maintainability": 2,
+          "overall": 2.6666666666666665,
+          "scope": 4
+        },
+        "status": "ok"
+      },
+      "reference": {
+        "cost_usd": 0.0191894,
+        "input_sha": "1a4ae3bad2588ec4",
+        "overall": 5.0,
+        "scores": {
+          "clarity": 5,
+          "maintainability": 5,
+          "overall": 5.0,
+          "scope": 5
+        },
+        "status": "ok"
+      },
+      "task": "t7"
+    },
+    {
+      "control": {
+        "cost_usd": 0.0233574,
+        "input_sha": "e10ddc96819a6cc6",
+        "overall": 4.666666666666667,
+        "scores": {
+          "clarity": 5,
+          "maintainability": 4,
+          "overall": 4.666666666666667,
+          "scope": 5
+        },
+        "status": "ok"
+      },
+      "damaged": {
+        "cost_usd": 0.022821400000000002,
+        "input_sha": "17928621e6d43696",
+        "overall": 2.3333333333333335,
+        "scores": {
+          "clarity": 2,
+          "maintainability": 2,
+          "overall": 2.3333333333333335,
+          "scope": 3
+        },
+        "status": "ok"
+      },
+      "reference": {
+        "cost_usd": 0.021319400000000002,
+        "input_sha": "6ff80285aec78918",
+        "overall": 5.0,
+        "scores": {
+          "clarity": 5,
+          "maintainability": 5,
+          "overall": 5.0,
+          "scope": 5
+        },
+        "status": "ok"
+      },
+      "task": "t8"
+    },
+    {
+      "control": {
+        "cost_usd": 0.0248134,
+        "input_sha": "5128d3236eaa5f8f",
+        "overall": 4.666666666666667,
+        "scores": {
+          "clarity": 4,
+          "maintainability": 5,
+          "overall": 4.666666666666667,
+          "scope": 5
+        },
+        "status": "ok"
+      },
+      "damaged": {
+        "cost_usd": 0.022571400000000002,
+        "input_sha": "3473660401733876",
+        "overall": 2.6666666666666665,
+        "scores": {
+          "clarity": 3,
+          "maintainability": 2,
+          "overall": 2.6666666666666665,
+          "scope": 3
+        },
+        "status": "ok"
+      },
+      "reference": {
+        "cost_usd": 0.0229214,
+        "input_sha": "bb972ffc62cf012c",
+        "overall": 4.666666666666667,
+        "scores": {
+          "clarity": 5,
+          "maintainability": 4,
+          "overall": 4.666666666666667,
+          "scope": 5
+        },
+        "status": "ok"
+      },
+      "task": "t9"
+    }
+  ]
+}
