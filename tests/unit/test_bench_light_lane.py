@@ -56,6 +56,13 @@ def _load() -> ModuleType:
     return module
 
 
+def _cell(bench: ModuleType, task: Any, opts: Any) -> Any:
+    """`run_cell`, failing loudly with the row when the runner itself broke, not the agent."""
+    row = bench.run_cell(task, "plain", 1, opts)
+    assert row.get("status") not in ("setup_error", "runner_error", "interrupted"), row
+    return row
+
+
 @pytest.fixture(scope="module")
 def bench() -> ModuleType:
     return _load()
@@ -1709,7 +1716,7 @@ def test_a_failed_judge_never_changes_the_run_status(bench: ModuleType, tmp_path
     for name, judge in (("good", {}), ("bad", {"mode": "exit1"})):
         (tmp_path / name).mkdir()
         task, opts = _cell_options(bench, tmp_path / name, judge=judge)
-        rows[name] = bench.run_cell(task, "plain", 1, opts)
+        rows[name] = _cell(bench, task, opts)
     good, bad = rows["good"], rows["bad"]
     assert bad["judge"]["status"] == "error"
     assert good["judge"]["status"] == "ok"
@@ -1748,7 +1755,7 @@ def test_no_judge_and_stalled_runs_make_no_judge_call(
     task, opts = _cell_options(bench, tmp_path, **cfg)
     if case == "no_judge":
         opts = dataclasses.replace(opts, judge=False)
-    row = bench.run_cell(task, "plain", 1, opts)
+    row = _cell(bench, task, opts)
     assert not list((tmp_path / "logs").glob("judge-*.json"))
     if case == "stalled":
         assert row["outcome"] == "stalled"
@@ -2559,7 +2566,7 @@ def _trap_cell(bench: ModuleType, tmp_path: Path, task_id: str, **cfg: Any) -> A
         template = tmp_path / "tpl-seed"
         bench.build_template(template, "plain", seed=task.seed_dir)
         opts = dataclasses.replace(opts, templates={bench.template_key(task, "plain"): template})
-    return bench.run_cell(task, "plain", 1, dataclasses.replace(opts, judge=False))
+    return _cell(bench, task, dataclasses.replace(opts, judge=False))
 
 
 def _missed_overlay(tmp_path: Path, task_id: str) -> Path:
