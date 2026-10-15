@@ -116,6 +116,17 @@
 
 ### Fixed
 
+- **Autopilot no longer ends the turn between an authorization and the stage it authorized
+  (SPEC-autopilot-stop-gate).** In the 2026-10-15 eval re-run, 5 of 36 hm runs stopped after `/hm:spec`
+  with `advance_authorized(to=execute)` as the last ledger row and no `Skill(hm:execute)` call after it.
+  The Claude Code Stop hook (`loop_gate --mode stop-hook`) now refuses that stop once, naming `/hm:<stage>`
+  and the `Skill` call. It refuses only when this session's armed, non-`gated` marker has an unconfirmed
+  authorization in its window, no other session is armed, and the transcript shows neither that stage's
+  `Skill` call nor a user entry after the authorization. A stage that started and then halted or asked a
+  question is never refused, and a second stop is honoured. Every other state, every read failure, Codex
+  and Cursor behave as before, and a loop marker still takes precedence. Replayed against the 35 eval-2
+  runs, it blocks exactly the five stalls and none of the 89 points right after a stage started. No
+  re-render is needed.
 - **`auto_full` autopilot no longer stops after an unapproved SPEC.** On a 2026-10-14 bench, 6 of 15
   headless `/hm:spec` runs at `auto_full` stopped with `proceed: true` in hand, citing Step 5's "autopilot
   stops at this stage" or the directive's "write NO approval". Step 5 now says a missing approval does not
