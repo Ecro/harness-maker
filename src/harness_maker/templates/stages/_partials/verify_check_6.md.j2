@@ -1,0 +1,94 @@
+{#- SPEC-hm-light-lane-s3a ADR-004: verify Check 6 (SPEC requirement), shared by verify's checks and execute's light check, so the
+    text has one source. Moved verbatim from verify_checks.md.j2 — edit it here only. `light_check` (default false, so verify
+    renders unchanged) is execute's light check: the same two commands, without the stop box or the 6a/6b prose. -#}
+### Check 6 — SPEC requirement
+{% if light_check | default(false) %}
+Read `spec_need_verdict` / `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
+No PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `N-A`. Otherwise run
+`op-check`, then — only if it exits 1 — `waiver-check`:
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …
+```
+{% endif %}
+
+Either exiting 0 → `PASS`. Both exiting 1 → {% if strictness_of(config) == 'block' %}the check fails (a `not-evaluated` verdict included){% else %}`WARN` (this harness runs at `warn` strictness){% endif %}.
+{% elif strictness_of(config) == 'block' %}
+
+Read the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
+
+**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.
+
+**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.
+
+Evaluation sequence when `spec_need_verdict` is one of the above values:
+
+**Step 6a — operation check:**
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …
+```
+{% endif %}
+
+Exit 0 → operation satisfied → **PASS**. Proceed to next check.
+
+**Step 6b — waiver check** (only if Step 6a exits 1):
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …
+```
+{% endif %}
+
+The `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.
+
+**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:
+
+```
+BLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>
+The required SPEC operation was not performed and no valid waiver exists.
+{{ stage_invocation("To resolve: author the SPEC via /hm:spec <slug> (the", is_codex | default(false)) }}
+{{ stage_invocation("resume-marker skips re-detection and routes directly to /hm:spec) or record", is_codex | default(false)) }}
+a fresh, non-empty-rationale waiver with:
+  uv run --with {{ harness_maker_src_path }} hm spec_need waiver-set --root {{ WTR }} --slug <slug> \
+    --verdict <verdict> --target <target> --rationale "<reason>" \
+    --changed-file <f1> …
+Note: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.
+```
+{% else %}
+> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never
+> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.
+
+Read `spec_need_verdict` / `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
+No PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run
+`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …
+```
+{% endif %}
+
+Either exiting 0 → `PASS`. Both exiting 1 → report
+`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via
+`/hm:spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.
+
+{% endif %}

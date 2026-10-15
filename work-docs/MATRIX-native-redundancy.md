@@ -216,6 +216,10 @@ inherited with no RESEARCH row, or researched and none found (30 of 85). TUNE ev
 | execute | Phase D | INV | unsourced |
 | execute | Phase D.5 | COMP | * |
 | execute | Step 4 | INV | unsourced |
+| execute | Step 4.2 | INV | * |
+| execute | Check 2 | INV | ** |
+| execute | Check 4 | INV | ** |
+| execute | Check 6 | INV | ** |
 | execute | Step 4.5 | INV | unsourced |
 | execute | Step 5 | HOST | ** |
 | review | Step 0 | INV | unsourced |

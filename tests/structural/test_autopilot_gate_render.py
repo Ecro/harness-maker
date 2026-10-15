@@ -27,6 +27,15 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-15, `hm-light-lane-s3a`** — `execute` and `spec` moved in all four arms. `execute`
+  gained Step 4.2, the light lane's combined check (a pointer to `.claude/hm/execute-light-check.md`
+  in the Claude command); `spec` Step 5 now stamps a light SPEC with an empty irreversible list
+  `exempt` with Step 0's command, the same sentence at every level, so the gated delta stays the
+  marked blocks. Verified before re-capture that these two are the ONLY moved commands in each arm
+  and none was added or removed; review, verify and wrapup render byte-identical
+  (SPEC-hm-light-lane-s3a AC-011). Re-captured again the same day after the review of 3a (items
+  E, G, P): the exempt branch's three conditions, the stub's loop-mode condition and missing-file
+  skip, and the banner naming wrapup. Again only `execute` and `spec` moved, in all four arms.
 - **2026-10-14, `hm-autopilot-spec-advance`** — `spec` moved in all four arms: Step 5's
   "autopilot stops at this stage" became a sentence that holds at every level (a missing
   approval does not end the stage; at `auto_full` the boundary's `proceed: true` advances

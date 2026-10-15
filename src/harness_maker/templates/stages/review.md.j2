@@ -162,25 +162,10 @@ says how many dispatches the round sends.
 
 ### Step 2 — Drift gate (PLAN/SPEC vs actual diff) — SINGLE OWNER
 
-Before reviewers run, scan the diff against PLAN scope:
-- Files changed that are NOT in any PLAN phase's "scope" → flag as **scope drift**.
-- Files in PLAN phase's scope that have NOT changed → flag as **incomplete phase**.
-
+{% include "stages/_partials/review_drift_scan.md.j2" %}
 Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run on the actual diff.
 
-**Emit drift_verdict** in the REVIEW report frontmatter (mandatory — wrapup and verify depend on this):
-
-```yaml
-drift_verdict:
-  result: clean | scope_violation | scenario_miss
-  scope_violations: [<list of files outside PLAN scope>]
-  scenario_misses: [<list of SPEC scenarios without coverage>]
-  task_slug: <current task slug from PLAN frontmatter>
-  computed_at: <ISO timestamp>
-```
-
-When no drift is detected, emit `result: clean` with empty lists. This record is the single source of truth for drift status — wrapup and verify read it without re-running the analysis.
-
+{% include "stages/_partials/review_drift_verdict.md.j2" %}
 ### Step 3 — Parallel reviewer invocation (2-pass redaction)
 
 **Round 1 — dispatch the {{ lenses | length }} lenses as {{ groups | length }} dispatches, in ONE

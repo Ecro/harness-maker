@@ -1,0 +1,11 @@
+{
+ "source_sha": "e7dd6648",
+ "cases": {
+  "approved light, PLAN, PASSED record, fresh cache": "review",
+  "lane full, same artifacts": "review",
+  "approved light, PLAN, PASSED record, cache not fresh": "review",
+  "unapproved light, PLAN, PASSED record, fresh cache": "spec",
+  "approved light, PLAN, no REVIEW record": "execute",
+  "approved light, newest a real CHANGES_REQUESTED review": "review"
+ }
+}

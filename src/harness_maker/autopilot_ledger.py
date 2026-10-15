@@ -64,6 +64,11 @@ LedgerEvent = Literal[
     # ADR-003/004). No writer remains since SPEC-intent-layer-diet (the row had no reader);
     # the name stays registered so existing ledgers keep parsing.
     "objective_proposed",
+    # SPEC-hm-light-lane-s3a IRR-001: execute's boundary passed over review and verify after a
+    # passing light check. Fields `from`, `skipped`, `to` (None at a pipeline's end), `reason`.
+    # Not an entry: `count_entries` counts only stages actually entered, so a skipped stage
+    # never spends the step cap.
+    "stage_skipped",
 ]
 # DERIVED from LedgerEvent (not a hand-maintained copy) so the typed signature and the
 # runtime guard cannot drift apart (REVIEW P2). The two module-level asserts make
