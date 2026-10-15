@@ -3,8 +3,8 @@ spec_slug: hm-light-lane-s3a
 parent_spec: null
 verification_tier: 2
 mutation_threshold: null
-mutation_threshold_rationale: One small Python reader plus a boundary branch and template text;
-  CLI goldens and the differential property pin the outcome, mutation testing adds little.
+mutation_threshold_rationale: One small Python reader, a boundary branch, a CLI flag and template
+  text; CLI goldens and the differential property pin the outcome, mutation testing adds little.
 last_mutation_run: null
 paths_to_mutate: []
 mutation_runner: null
@@ -12,7 +12,7 @@ spec_quality_score: null
 spec_quality_score_at: null
 ac:
 - id: AC-001
-  title: The lane reader reads exactly light, everything else as full
+  title: The lane reader trusts light only on an accepted SPEC with no irreversible decisions
   type: mechanical
   test_ids:
   - tests/unit/test_light_lane.py::test_lane_of
@@ -20,34 +20,53 @@ ac:
     expected in LANE_TABLE)
   golden_table:
   - input:
-      case: SPEC-<slug>.md frontmatter lane light
+      case: lane light, approval_state approved, irreversible_decisions []
     expected: light
   - input:
-      case: SPEC-<slug>.md frontmatter lane full
+      case: lane light, approval_state exempt, irreversible_decisions []
+    expected: light
+  - input:
+      case: lane light, approval_state missing (no approval written, e.g. auto_full)
     expected: full
   - input:
-      case: SPEC-<slug>.md without a lane key
+      case: lane light, approval_state invalid (edited after approval)
     expected: full
   - input:
-      case: lane Light, lane 'light ' or lane true
+      case: lane light, approval_state approved, irreversible_decisions [IRR-001]
     expected: full
   - input:
-      case: unparseable frontmatter
+      case: lane light, schema_version 2 without irreversible_decisions (state legacy)
+    expected: full
+  - input:
+      case: lane light, SPEC-<slug>.md without a machine yaml (state malformed)
+    expected: full
+  - input:
+      case: lane full, approved, no irreversible decisions
+    expected: full
+  - input:
+      case: no lane key, approved, no irreversible decisions
+    expected: full
+  - input:
+      case: lane Light, lane 'light ' or lane true, approved
+    expected: full
+  - input:
+      case: unparseable SPEC-<slug>.md frontmatter
     expected: full
   - input:
       case: no SPEC-<slug>.md, or slug None, '..' or containing '/'
     expected: full
   - input:
-      case: lane light only in the per-task worktree checkout, not the base
+      case: approved light SPEC only in the per-task worktree checkout, not the base
     expected: light
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The expected values come from SPEC-hm-light-lane S3 and the execute and
-    review templates at e7dd6648 ('missing -> full; any value but exactly light is full'),
-    written before the reader exists. The checkout rule is spec_machine.approval_state's
-    'per-task worktree, else the base'.
+  oracle_evidence: The lane values come from SPEC-hm-light-lane S3 and the execute and review
+    templates at e7dd6648 ('missing -> full; any value but exactly light is full'); the trust
+    rows come from this SPEC's Outcomes (approved or exempt, empty irreversible list), and the
+    states are spec_machine.approval_state_of's existing table at e7dd6648. All are written
+    before the reader exists.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -61,22 +80,26 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-002
-  title: A passing light-check record is recognised only for its own slug
+  title: A passing light-check record is recognised only for its own slug and checkout, and
+    never beside a real review
   type: mechanical
   test_ids:
   - tests/unit/test_light_lane.py::test_light_check_passed
-  executable_predicate: all(light_lane.light_check_passed(base, slug) == expected for
-    base, slug, expected in RECORD_TABLE)
+  executable_predicate: all(light_lane.light_check_passed(base, slug) == expected for base,
+    slug, expected in RECORD_TABLE)
   golden_table:
   - input:
-      case: lane light, newest REVIEW-<slug>-<date>.md has review_kind light-check, status
+      case: trusted light lane, newest REVIEW-<slug>-<date>.md is review_kind light-check, status
         PASSED, task_slug <slug>
     expected: true
   - input:
-      case: same record, SPEC lane full or absent
+      case: same record, lane full or untrusted (approval missing)
     expected: false
   - input:
-      case: newest record is a real review (no review_kind), an older one is a PASSED light-check
+      case: newest record is a real review (no review_kind)
+    expected: false
+  - input:
+      case: newest record is a PASSED light-check, an older-dated real review exists for the slug
     expected: false
   - input:
       case: light-check record with status FAILED or no status
@@ -88,15 +111,23 @@ ac:
       case: REVIEW-<slug>-extra-<date>.md for a hyphen-prefix sibling slug only
     expected: false
   - input:
-      case: no REVIEW record, or unparseable frontmatter
+      case: no REVIEW record, or unparseable record frontmatter
+    expected: false
+  - input:
+      case: PASSED record and approved light SPEC exist only in the per-task worktree <WT>/work-docs/
+    expected: true
+  - input:
+      case: PASSED record only in the base checkout while a per-task worktree for the slug exists
     expected: false
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The rows are fixed by this SPEC's Outcomes (record frontmatter) and S3
-    before any code; the exact-name rule is world_model_digest._reviews at e7dd6648
-    (REVIEW a003ff68), which the reader reuses rather than re-deriving.
+  oracle_evidence: The rows are fixed by this SPEC's Outcomes (record frontmatter, real reviews
+    win, the record follows the checkout) before any code. Every fixture has a fresh verification
+    cache and passes no `since`; freshness and `since` are AC-006's rows. The exact-name rule
+    is world_model_digest._reviews at e7dd6648 (REVIEW a003ff68), and checkout resolution is
+    spec_machine._resolve_checkout at e7dd6648, both reused rather than re-derived.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -129,8 +160,9 @@ ac:
     The expected halt is the e7dd6648 behaviour of verify''s boundary on the default pipeline
     (merge_gate, gate_blocked for wrapup, marker cleared), copied from that run before the
     edit; the stage_skipped fields are fixed by IRR-001. Fixture: auto_full marker, default
-    pipeline, an advance_authorized row to execute, a lane: light SPEC and a PASSED light-check
-    record.'
+    pipeline, an advance_authorized row to execute, an approved lane: light SPEC with no irreversible
+    decisions, a PASSED light-check record whose computed_at is after the marker''s created_at,
+    and a fresh verification cache for the tree.'
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -144,7 +176,7 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-004
-  title: Full-lane boundaries are byte-identical to e7dd6648
+  title: Every other boundary is byte-identical to e7dd6648
   type: property
   test_ids:
   - tests/unit/test_autopilot_caps_light_lane.py::test_full_lane_boundary_matches_e7dd6648
@@ -156,16 +188,19 @@ ac:
   oracle_source: differential
   oracle_evidence: The reference outputs are produced by the e7dd6648 autopilot_caps module
     on the same fixtures and stored as a golden before the edit; the relation holds for any
-    implementation that leaves the non-light path alone, independent of where the skip
-    branch sits.
+    implementation that leaves the non-skip paths alone, independent of where the skip branch
+    sits.
   oracle_independence_waiver: null
-  input_domain: 'every (lane, current, level, judgment_gate, pipeline) with lane in {full,
-    absent, Light, unparseable SPEC, no SPEC, light with no record, light with a FAILED record,
-    light whose newest record is a real review}, current in the default pipeline, level
-    in {auto_safe, auto_full}, judgment_gate in {None, clear, pending, blocked}, pipeline
-    in {default, narrowed to review, [execute, verify, wrapup]}'
+  input_domain: 'every (lane, record, current, level, judgment_gate, pipeline) with (lane,
+    record) in {full + no record, full + PASSED record, absent lane, Light, unparseable SPEC,
+    no SPEC, untrusted light (approval missing) + PASSED record, light + no record, light +
+    FAILED record, light + real review newest, light + PASSED record with current in {review,
+    verify}}, current in the default pipeline unless fixed by the pair, level in {auto_safe,
+    auto_full}, judgment_gate in {None, clear, pending, blocked}, pipeline in {default, narrowed
+    to review, [execute, verify, wrapup]} where current is in it'
   transformation: run `hm autopilot_caps boundary` on a fresh fixture for each input with
-    the e7dd6648 module and with the new module, at a fixed clock and session id
+    the e7dd6648 module and with the new module, at a fixed clock and session id, with the
+    verification cache fresh
   expected_relation: stdout JSON(new) == stdout JSON(e7dd6648) and ledger rows(new) == ledger
     rows(e7dd6648) with ts removed, and marker file contents equal after the call
   preconditions:
@@ -182,28 +217,29 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_autopilot_caps_light_lane.py::test_skip_respects_pipeline_shape
-  executable_predicate: all(boundary(pipeline, narrowed)[key] == expected for pipeline,
-    narrowed, key, expected in SHAPE_TABLE)
+  executable_predicate: all(boundary(pipeline, narrowed)[key] == expected for pipeline, narrowed,
+    key, expected in SHAPE_TABLE)
   golden_table:
   - input:
-      case: '[execute, verify, wrapup], light, PASSED record, current execute'
+      case: '[execute, verify, wrapup], passing light check, current execute'
     expected: next_stage wrapup, halt_kind merge_gate, stage_skipped skipped [verify]
   - input:
-      case: '[research, spec, execute, review, verify], light, PASSED record, current execute'
+      case: '[research, spec, execute, review, verify], passing light check, current execute'
     expected: pipeline_complete true, marker cleared, stage_skipped to null
   - input:
-      case: default pipeline narrowed to review, light, PASSED record, current execute
+      case: default pipeline narrowed to review, passing light check, current execute
     expected: narrow_end true, pipeline restored, stage_skipped skipped [review]
   - input:
-      case: '[spec, execute, review, verify, wrapup], light, PASSED record, current spec'
+      case: '[spec, execute, review, verify, wrapup], passing light check, current spec'
     expected: next_stage execute, proceed true, no stage_skipped row
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The rows follow from S4 and from the e7dd6648 handling of a pipeline's
-    last stage (pipeline_complete clears the marker; a narrowed end restores it), which is
-    copied from those code paths' existing tests, not from the new branch.
+  oracle_evidence: The rows follow from S4 and from the e7dd6648 handling of a pipeline's last
+    stage (pipeline_complete clears the marker; a narrowed end restores it), which is copied
+    from those code paths' existing tests, not from the new branch. 'Passing light check' is
+    AC-003's fixture.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -217,20 +253,45 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-006
-  title: Without a passing record the boundary does not skip
+  title: A missing, stale or contradicted record does not skip
   type: mechanical
   test_ids:
   - tests/unit/test_autopilot_caps_light_lane.py::test_no_passing_record_no_skip
-  executable_predicate: all(out['next_stage'] == 'review' and out['proceed'] is True and
-    'stage_skipped' not in events for out, events in NO_RECORD_CASES)
-  golden_table: []
+  executable_predicate: all(out['next_stage'] == 'review' and out['proceed'] is True and 'stage_skipped'
+    not in events for out, events in NO_SKIP_CASES)
+  golden_table:
+  - input:
+      case: no REVIEW record
+    expected: next_stage review, no stage_skipped
+  - input:
+      case: a real review exists for the slug beside a PASSED light-check record
+    expected: next_stage review, no stage_skipped
+  - input:
+      case: light-check record with status FAILED
+    expected: next_stage review, no stage_skipped
+  - input:
+      case: PASSED light-check record for another slug
+    expected: next_stage review, no stage_skipped
+  - input:
+      case: PASSED record, but the tree changed after it (verification cache not fresh for compute_relevant_skip_key)
+    expected: next_stage review, no stage_skipped
+  - input:
+      case: PASSED record whose drift_verdict.computed_at is before the marker's created_at
+    expected: next_stage review, no stage_skipped
+  - input:
+      case: PASSED record with drift_verdict.computed_at missing or unparseable
+    expected: next_stage review, no stage_skipped
+  - input:
+      case: PASSED record, fresh cache, but the light SPEC is unapproved
+    expected: next_stage review, no stage_skipped
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The cases are S3's (no record, a real review newest, a FAILED record,
-    another slug's record) on a lane light SPEC at auto_safe; the expected next stage is
-    e7dd6648's execute -> review on the default pipeline.
+  oracle_evidence: The cases are S3's, fixed before the edit, on an auto_safe marker with the
+    default pipeline; the expected next stage is e7dd6648's execute -> review. Freshness is
+    toggled by editing a tracked source file after the record, which changes compute_relevant_skip_key
+    at e7dd6648; computed_at is set relative to the marker's created_at.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -249,21 +310,20 @@ ac:
   test_ids:
   - tests/render/test_render_light_lane_s3a.py::test_execute_points_at_the_light_check
   executable_predicate: '''### Step 4.2 — Light check'' in claude_execute and ''execute-light-check.md''
-    in pointer and ''project root'' in pointer and ''never from `<WT>`'' in pointer and
-    ''STOP'' in pointer and LIGHT_CHECK_MARKERS.isdisjoint(claude_execute_without_pointer)
-    and set(FRONTMATTER_KEYS) <= set(frontmatter(ref)) and LIGHT_CHECK_MARKERS <= set_of(codex_execute)
-    and ''execute-light-check'' in synthesize._STAGE_REFERENCE_FILES and len(claude_execute)
-    - E7DD_EXECUTE_LEN <= 1000'
+    in pointer and ''project root'' in pointer and ''never from `<WT>`'' in pointer and ''STOP''
+    in pointer and LIGHT_CHECK_MARKERS.isdisjoint(claude_execute_without_pointer) and set(FRONTMATTER_KEYS)
+    <= set(frontmatter(ref)) and LIGHT_CHECK_MARKERS <= set_of(codex_execute) and ''execute-light-check''
+    in synthesize._STAGE_REFERENCE_FILES and len(claude_execute) - E7DD_EXECUTE_LEN <= 1000'
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The pointer phrases come from SPEC-hm-light-lane-s2b AC-005 (project
-    root, never from `<WT>`, STOP); LIGHT_CHECK_MARKERS (security-scan, verify-checks.md,
-    review_kind light-check, drift_verdict) are written from this SPEC's Outcomes; E7DD_EXECUTE_LEN
-    is the length of this repo's Claude execute command rendered at e7dd6648, measured before
-    the edit; the four frontmatter keys are CLAUDE.md's.
+  oracle_evidence: The pointer phrases come from SPEC-hm-light-lane-s2b AC-005 (project root,
+    never from `<WT>`, STOP); LIGHT_CHECK_MARKERS (security-scan, review_kind light-check, drift_verdict,
+    the Check 2 heading) are written from this SPEC's Outcomes; E7DD_EXECUTE_LEN is the length
+    of this repo's Claude execute command rendered at e7dd6648, measured before the edit; the
+    four frontmatter keys are CLAUDE.md's.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -281,21 +341,27 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane_s3a.py::test_light_check_runs_the_kept_gates
-  executable_predicate: all(all(k in text for k in ('security-scan', 'Check 2', 'Check 4',
-    'Check 6', 'drift_verdict', verify_source[runtime])) and DRIFT_RULE in text and not
-    DISPATCH_RE.search(text) and (all(c in text for c in MECH) if MECH else '## MECHANICAL_BLOCK'
-    not in text) for runtime, text, MECH in LIGHT_CHECK_RENDERS)
+  - tests/unit/test_cli_security_scan_force.py::test_force_bypasses_the_fresh_scan_cache
+  executable_predicate: all(SCAN_CMD[wt] in text and 'hm spec_machine approval-status' in
+    text and all(section in text for section in E7DD_CHECKS) and DRIFT_RULE in text and REVIEWERS_STILL_RUN
+    not in text and not DISPATCH_RE.search(text) and (all(c in text for c in MECH) if MECH
+    else '## MECHANICAL_BLOCK' not in text) for wt, text, MECH in LIGHT_CHECK_RENDERS) and
+    scan_all_mock.call_args.kwargs['force'] is True
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: 'The kept gates are this SPEC''s Q3 list, fixed before the edit. verify_source
-    is .claude/hm/verify-checks.md (Claude Code) or .agents/skills/hm-verify/SKILL.md (Codex).
-    DRIFT_RULE is review Step 2''s body sliced from the e7dd6648 review render, so the partial
-    must reproduce it. DISPATCH_RE matches the dispatch macro''s rendered forms (Agent(,
-    subagent_type, spawn_agent), taken from agents/_partials/dispatch.md.j2 at e7dd6648.
-    Fixtures: mechanical_checks unset and set to two commands.'
+  oracle_evidence: 'SCAN_CMD is pinned here before the edit: worktree on -> ''hm cli security-scan
+    <WT> --force'', worktree off -> ''hm cli security-scan . --force''. E7DD_CHECKS are verify''s
+    Check 2, Check 4 and Check 6 sections sliced by heading from the e7dd6648 verify render (Claude
+    and Codex arms), so the shared partials must reproduce them byte for byte. DRIFT_RULE is
+    review Step 2''s body from the e7dd6648 review render minus REVIEWERS_STILL_RUN, the sentence
+    ''Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run
+    on the actual diff.'' DISPATCH_RE matches the dispatch macro''s rendered forms (Agent(,
+    subagent_type, spawn_agent) from agents/_partials/dispatch.md.j2 at e7dd6648. Fixtures:
+    worktree on and off, mechanical_checks unset and set to two commands. The CLI test mocks
+    scan_all and asserts --force reaches it and that no flag keeps force=False.'
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -309,35 +375,41 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-009
-  title: The light check fails closed and writes a record only on a clean pass
+  title: Any non-pass writes no record
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane_s3a.py::test_light_check_fails_closed
-  executable_predicate: "all(phrase in light_check for phrase in FAIL_CLOSED_PHRASES) and
-    light_check.index('status: PASSED') > light_check.index('result: clean')"
+  executable_predicate: "all(phrase in light_check for phrase in NO_RECORD_PHRASES) and light_check.index('status:\
+    \ PASSED') > light_check.index('result: clean') and 'repair' not in light_check"
   golden_table:
   - input:
-      case: not run (loop mode active for this session)
-    expected: no record, earlier light-check record removed, review runs next
+      case: skipped (approval-status not approved/exempt, or irreversible ids present)
+    expected: no record, review runs next
   - input:
-      case: not run (more than 10 changed paths)
-    expected: no record, earlier light-check record removed, review runs next
+      case: skipped (loop mode active for this session)
+    expected: no record, review runs next
+  - input:
+      case: skipped (diff well over five files, review's rule)
+    expected: no record, review runs next
+  - input:
+      case: any check fails (mechanical, Check 2, scan + Check 4, Check 6 FAIL)
+    expected: no record, review runs next
   - input:
       case: drift result not clean
-    expected: no record, earlier light-check record removed, review runs next
+    expected: no record, review runs next
   - input:
-      case: a check fails twice
-    expected: one repair round, then Step 4's blocked path, no record
+      case: today's REVIEW-<slug>-<date>.md already holds a real review
+    expected: no record (never overwrite a real review), review runs next
   - input:
-      case: every check passes and drift is clean
-    expected: write REVIEW-<slug>-<date>.md with status PASSED
+      case: every check passes, Check 6 PASS, WARN or N-A, drift clean
+    expected: write REVIEW-<slug>-<date>.md under <checkout>/work-docs/ with status PASSED
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: FAIL_CLOSED_PHRASES are the five rows above plus 'never a real REVIEW',
-    written from S6 before the template exists; the test checks each phrase in the rendered
-    reference file and the Codex skill.
+  oracle_evidence: NO_RECORD_PHRASES are the condition phrases of the rows above, written from
+    S6 before the template exists; the test checks each phrase in the rendered reference file
+    and the Codex skill, and that no repair round is described.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -356,19 +428,22 @@ ac:
   test_ids:
   - tests/unit/test_light_lane.py::test_record_satisfies_wrapup_and_verify
   executable_predicate: fm['drift_verdict']['task_slug'] == slug and fm['drift_verdict']['result']
-    == 'clean' and fm['review_kind'] == 'light-check' and fm['status'] == 'PASSED' and
-    light_lane.light_check_passed(base, slug) and fnmatch(record.name, 'REVIEW-' + slug
-    + '-*.md') and world_model_digest._reviews(docs, slug) == [record]
+    == 'clean' and 'computed_at' in fm['drift_verdict'] and fm['review_kind'] == 'light-check'
+    and fm['status'] == 'PASSED' and fm['checks']['spec_requirement'] in {'pass', 'warn', 'n-a'}
+    and fm['checks']['structural'] == 'not-run' and RECORD_DIR[wt] in record_path_line and
+    light_lane.light_check_passed(base, slug) and fnmatch(record.name, 'REVIEW-' + slug + '-*.md')
+    and world_model_digest._reviews(docs, slug) == [record]
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
   oracle_evidence: fm is the YAML example block in the rendered light-check reference file
-    with the slug filled in. The required keys are what wrapup Step 3 and verify Check 1
-    read at e7dd6648 (drift_verdict present, task_slug matching the PLAN), and the glob is
-    wrapup_land's optional REVIEW path in the e7dd6648 wrapup render; both are copied from
-    those renders, not from the new template.
+    with the slug filled in, one fixture per spec_requirement value. The required keys are what
+    wrapup Step 3 and verify Check 1 read at e7dd6648 (drift_verdict present, task_slug matching
+    the PLAN), and the glob is wrapup_land's optional REVIEW path in the e7dd6648 wrapup render;
+    both are copied from those renders, not from the new template. RECORD_DIR is '<WT>/work-docs/'
+    with worktree on and './work-docs/' off, as review Step 5 writes at e7dd6648.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -394,10 +469,10 @@ ac:
   pending_test: true
   oracle_source: differential
   oracle_evidence: E7DD_SHA is captured from the e7dd6648 render in a separate worktree before
-    the edit. UNCHANGED_PATHS are the Claude commands review, verify, wrapup and loop, the
-    reference files verify-checks.md, wrapup-steps.md, review-autofix.md and review-confirmation.md,
-    and the Codex skills hm-review, hm-verify and hm-wrapup. CONFIGS covers loop on and off,
-    worktree on and off, and Side and Production.
+    the edit. UNCHANGED_PATHS are the Claude commands review, verify, wrapup and loop, the reference
+    files verify-checks.md, wrapup-steps.md, review-autofix.md and review-confirmation.md, and
+    the Codex skills hm-review, hm-verify and hm-wrapup. CONFIGS covers loop on and off, worktree
+    on and off, warn and block strictness, mechanical_checks unset and set, and Side and Production.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -415,27 +490,34 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_light_lane.py::test_digest_routes_checked_light_task_to_wrapup
-  executable_predicate: all(world_model_digest.next_stage(base, slug, wt) == expected for
-    lane, record, expected in DIGEST_TABLE)
+  executable_predicate: all(world_model_digest.next_stage(base, slug, wt) == expected for case,
+    expected in DIGEST_TABLE)
   golden_table:
   - input:
-      case: lane light, approved SPEC, PLAN, PASSED light-check record
+      case: approved light SPEC, PLAN, PASSED light-check record, fresh cache
     expected: wrapup
   - input:
       case: lane full, same artifacts
     expected: review
   - input:
-      case: lane light, PLAN, no REVIEW record
+      case: approved light SPEC, PLAN, PASSED record, cache not fresh
+    expected: review
+  - input:
+      case: unapproved light SPEC, PLAN, PASSED record, fresh cache
+    expected: spec
+  - input:
+      case: approved light SPEC, PLAN, no REVIEW record
     expected: execute
   - input:
-      case: lane light, newest record a real review with status CHANGES_REQUESTED
+      case: approved light SPEC, newest record a real review with status CHANGES_REQUESTED
     expected: review
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The full and no-record rows are world_model_digest.next_stage's e7dd6648
-    output on the same fixture, captured before the edit; the light row is S9.
+  oracle_evidence: Every row except the first is world_model_digest.next_stage's e7dd6648 output
+    on the same fixture, captured before the edit (a PASSED status is not APPROVED, so e7dd6648
+    routes it to review; an unapproved SPEC routes to spec); the first row is S9.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -461,36 +543,9 @@ ac:
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: E7DD_EVENTS is autopilot_ledger.EVENTS at e7dd6648; the counting rules
-    are ADR-004 of the autopilot ledger (steps count stages entered) and smoke_check's 'any
-    event in EVENTS' denominator, both in the e7dd6648 source.
-  oracle_independence_waiver: null
-  input_domain: null
-  transformation: null
-  expected_relation: null
-  preconditions: []
-  observable_output: null
-  generator_hint: null
-  judgment_verdict: null
-  judged_at: null
-  judgment_evidence: null
-  judgment_subject_paths: []
-  judgment_subject_hash: null
-- id: AC-014
-  title: Execute's auto-advance gate names a failed light check
-  type: mechanical
-  test_ids:
-  - tests/render/test_render_light_lane_s3a.py::test_execute_gate_names_a_failed_light_check
-  executable_predicate: '''light check'' in gate_line and ''lane: light'' in gate_line and
-    ''gate-blocked --root . --stage execute'' in auto_advance_block'
-  golden_table: []
-  rubric_id: null
-  note: ''
-  pending_test: true
-  oracle_source: golden
-  oracle_evidence: gate_line is execute's Step 1 gate sentence in the auto-advance stub of
-    an auto_safe Claude render; the gate-blocked line is the stub's existing non-judgment
-    form at e7dd6648, so a light-check failure must reach it rather than the boundary.
+  oracle_evidence: E7DD_EVENTS is autopilot_ledger.EVENTS at e7dd6648; the counting rules are
+    ADR-004 of the autopilot ledger (steps count stages entered) and smoke_check's 'any event
+    in EVENTS' denominator, both in the e7dd6648 source.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -512,16 +567,21 @@ irreversible_decisions:
     do; the /hm:health smoke denominator counts every event
   source: spec
 - id: IRR-002
-  decision: The light-check record is REVIEW-{slug}-{date}.md with review_kind light-check
-    and status PASSED, carrying review's drift_verdict
+  decision: The light-check record is REVIEW-{slug}-{date}.md under the change's checkout, with
+    review_kind light-check and status PASSED, carrying review's drift_verdict
   category: schema/file format/storage layout
   rationale: Wrapup commits it, so it persists in history; the boundary, the digest, wrapup
     Step 3 and verify Check 1 read it, and a reader may not later drop review_kind
   source: spec
 - id: IRR-003
-  decision: Add the generated file .claude/hm/execute-light-check.md, the name the execute
-    command reads
+  decision: Add the generated file .claude/hm/execute-light-check.md, the name the execute command
+    reads
   category: schema/file format/storage layout
-  rationale: Renaming it needs a retire step for copies on disk, as SPEC-hm-light-lane-s2b
-    IRR-001
+  rationale: Renaming it needs a retire step for copies on disk, as SPEC-hm-light-lane-s2b IRR-001
+  source: spec
+- id: IRR-004
+  decision: Add --force to hm cli security-scan, mapping to scan_all(force=True)
+  category: public API/CLI contract
+  rationale: Rendered stage text calls it, so removing or renaming the flag breaks every harness
+    rendered with it
   source: spec
