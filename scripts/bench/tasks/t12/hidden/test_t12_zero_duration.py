@@ -20,7 +20,7 @@ def test_a_zero_unit_inside_a_nonzero_duration_is_accepted() -> None:
 
 
 def test_other_functions_keep_their_documented_behaviour() -> None:
-    """Every other function in the package must keep the behaviour its docstring documents."""
+    """Apart from rejecting a zero duration, existing behaviour of the package must not change."""
     from timeparse.schedule import normalize, total
 
     assert normalize("90m") == "1h30m"

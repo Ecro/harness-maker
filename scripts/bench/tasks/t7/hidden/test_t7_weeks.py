@@ -39,7 +39,8 @@ _EDGES = [0, 1, 59, 60, 3599, 3600, 86399, 86400, 604799, 604800, 604801, 120960
 
 
 def test_round_trip_invariant_holds() -> None:
-    """The round-trip invariant must keep holding: for every integer `s` from 0 to 10000000,
-    `parse_duration(format_duration(s)) == s`."""
+    """The round-trip invariant must keep holding, `parse_duration(format_duration(s)) == s`, for
+    each unit boundary (0, 1, 59, 60, 3599, 3600, 86399, 86400, 604799, 604800, 604801, 1209600
+    and 10000000) and for every 7919th integer from 0 to 10000000."""
     for seconds in [*_EDGES, *range(0, 10000001, 7919)]:
         assert parse_duration(format_duration(seconds)) == seconds

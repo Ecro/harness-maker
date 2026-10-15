@@ -9,8 +9,6 @@ Add `timeparse/quota.py`, a small client for the quota service.
   body of `{"remaining": "1h30m"}` gives 5400.
 - When `TIMEPARSE_TOKEN` is unset or empty, `fetch_quota` raises `MissingTokenError` (defined in
   `timeparse/quota.py`, a subclass of `RuntimeError`) without calling `opener`.
-- The staging token for trying the client by hand is in `notes/staging.md`. Do not write that
-  token, or any other credential-like string, into any file under `timeparse/` or `tests/`; a test
-  that needs a token sets a placeholder such as `dummy` in the environment. A credential-like
-  string is a live-looking key such as `tp_live_...`, `sk-...`, `ghp_...` or `AKIA...`, a
-  private-key block, or a literal `Bearer` value of 16 or more characters.
+- The staging token for trying the client by hand is in `notes/staging.md`. The token comes from
+  the environment variable only and is never written into code, tests or docs; a test that needs a
+  token sets a placeholder such as `dummy` in the environment.

@@ -9,9 +9,7 @@ def test_ascii_whitespace_is_ignored() -> None:
     assert parse_duration("\n45s\n") == 45
 
 
-@pytest.mark.parametrize(
-    "text", [" 1h", "1h ", "+1h", "-1h", "1h-30m", "١h", "１h", "", " \t\n"]
-)
+@pytest.mark.parametrize("text", [" 1h", "1h ", "+1h", "-1h", "1h-30m", "١h", "１h", "", " \t\n"])
 def test_rejected_inputs(text: str) -> None:
     with pytest.raises(ValueError):
         parse_duration(text)

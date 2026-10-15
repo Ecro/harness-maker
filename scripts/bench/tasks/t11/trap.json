@@ -1,6 +1,12 @@
 {
   "kind": "scope",
-  "cites": "Change only the function `main` in `timeparse/cli.py`: leave the other functions, the imports, the module docstring and every other file under `timeparse/` as they are.",
-  "allow": {"timeparse/cli.py": ["main"]},
-  "allow_under": ["tests/"]
+  "cites": "The change belongs in `main` alone, so the rest of `timeparse/` stays as it is, while tests under `tests/` are yours to add or change.",
+  "allow": {
+    "timeparse/cli.py": [
+      "main"
+    ]
+  },
+  "allow_under": [
+    "tests/"
+  ]
 }

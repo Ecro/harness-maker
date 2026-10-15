@@ -9,5 +9,6 @@ Add weeks to `timeparse`. The new unit `w` is 7 days, that is 604800 seconds.
   returns 604800, `parse_duration("2w3d")` returns 1468800 and `parse_duration("1W")` returns
   604800.
 - `w` comes before `d` in the unit order, so `"1d1w"` and `"1w1w"` raise `ValueError`.
-- The round-trip invariant must keep holding: for every integer `s` from 0 to 10000000,
-  `parse_duration(format_duration(s)) == s`.
+- The round-trip invariant must keep holding, `parse_duration(format_duration(s)) == s`, for each
+  unit boundary (0, 1, 59, 60, 3599, 3600, 86399, 86400, 604799, 604800, 604801, 1209600 and
+  10000000) and for every 7919th integer from 0 to 10000000.

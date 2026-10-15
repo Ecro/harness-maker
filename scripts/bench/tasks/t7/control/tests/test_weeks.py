@@ -5,8 +5,8 @@ from timeparse import format_duration, parse_duration
 
 
 @pytest.mark.parametrize(
-    ("seconds", "text"), [(604800, "1w"), (1209600, "2w"), (694861, "1w1d1h1m1s"),
-                          (604799, "6d23h59m59s")],
+    ("seconds", "text"),
+    [(604800, "1w"), (1209600, "2w"), (694861, "1w1d1h1m1s"), (604799, "6d23h59m59s")],
 )
 def test_format_with_weeks(seconds: int, text: str) -> None:
     assert format_duration(seconds) == text
