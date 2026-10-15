@@ -16,7 +16,9 @@ ac:
   title: The stop-hook decision is the golden function of marker, ledger, transcript
     and payload state
   type: parametric
-  test_ids: []
+  test_ids:
+  - tests/unit/test_autopilot_stop_gate.py::test_ac001_golden_state_table
+  - tests/unit/test_autopilot_stop_gate.py::test_ac001_r22_read_oserror_fails_open_with_one_warn_line
   executable_predicate: null
   golden_table:
   - input:
@@ -133,7 +135,7 @@ ac:
     note: fail open
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The rows come from the eval-2 run end states, the marker contract
     (active, gated, foreign, expired, narrowed, peer as autopilot.status reports them),
@@ -155,12 +157,13 @@ ac:
 - id: AC-002
   title: Without a refusing state the stop hook equals the df070f6c loop gate
   type: property
-  test_ids: []
+  test_ids:
+  - tests/unit/test_autopilot_stop_gate.py::test_ac002_equals_the_reference_loop_gate_without_a_refusing_state
   executable_predicate: null
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: differential
   oracle_evidence: The reference is the df070f6c hooks/loop_gate.py, loaded from `git
     show` into a temp module before any edit; any implementation that confines its
@@ -186,7 +189,9 @@ ac:
   title: Replaying the eval-2 hm runs blocks exactly the five stalled runs, and no
     other run at its end or at any stage start
   type: parametric
-  test_ids: []
+  test_ids:
+  - tests/unit/test_autopilot_stop_gate.py::test_ac003_replay_at_run_end
+  - tests/unit/test_autopilot_stop_gate.py::test_ac003_no_skill_call_cut_blocks
   executable_predicate: null
   golden_table:
   - input:
@@ -213,7 +218,7 @@ ac:
     note: a stage that started is never refused; this is the mid-body state
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The five run ids and their stage were read by hand from the eval-2
     ledger tails and transcripts on 2026-10-15, before any implementation; t4-hm-1's
@@ -235,7 +240,8 @@ ac:
 - id: AC-004
   title: The block reason names the stage and how to proceed or stop
   type: parametric
-  test_ids: []
+  test_ids:
+  - tests/unit/test_autopilot_stop_gate.py::test_ac004_reason_names_stage_skill_and_the_second_stop
   executable_predicate: null
   golden_table:
   - input:
@@ -246,7 +252,7 @@ ac:
     note: the second stop is honoured by stop_hook_active
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The names are the rendered Claude Code entry point (the `hm:<stage>`
     skill invoked through the `Skill` tool) and the Stop-hook protocol's one-refusal
