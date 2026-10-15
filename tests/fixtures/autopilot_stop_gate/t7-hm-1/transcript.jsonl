@@ -28,7 +28,9 @@
 {"type":"user","timestamp":"2026-10-15T07:28:38.270Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:28:40.108Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:28:42.241Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:28:41.997Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:28:43.577Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:28:43.325Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:28:45.046Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:28:54.672Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T07:29:00.818Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}

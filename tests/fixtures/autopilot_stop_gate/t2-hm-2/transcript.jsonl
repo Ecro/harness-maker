@@ -40,10 +40,12 @@
 {"type":"user","timestamp":"2026-10-15T06:56:13.177Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:56:23.329Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T06:56:27.891Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T06:56:25.971Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T06:56:33.794Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:56:36.554Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:56:39.819Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T06:56:49.878Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T06:56:40.442Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T06:57:00.475Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:57:11.149Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:57:15.074Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
@@ -66,8 +68,11 @@
 {"type":"user","timestamp":"2026-10-15T06:58:27.451Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:58:34.794Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T06:58:39.663Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T06:58:37.015Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T06:58:44.177Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T06:58:43.735Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T06:59:01.285Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T06:58:46.436Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T06:59:08.653Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:59:14.030Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:59:24.654Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
@@ -81,6 +86,8 @@
 {"type":"user","timestamp":"2026-10-15T07:00:04.591Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:00:15.274Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T07:00:20.214Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:00:16.114Z","attachment":{"type":"queued_command"}}
+{"type":"attachment","timestamp":"2026-10-15T07:00:17.999Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:00:25.356Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:00:28.673Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:00:30.977Z","origin":{"kind":"task-notification"},"message":{"content":""}}

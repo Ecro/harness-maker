@@ -12,6 +12,7 @@
 {"type":"user","timestamp":"2026-10-15T07:13:38.917Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:13:41.772Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:13:44.856Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:13:44.848Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:13:47.518Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:13:53.015Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:13:56.287Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
@@ -33,6 +34,7 @@
 {"type":"user","timestamp":"2026-10-15T07:14:51.992Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T07:14:56.076Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:15:03.932Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:15:02.331Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:15:14.764Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:15:24.353Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:15:28.073Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}

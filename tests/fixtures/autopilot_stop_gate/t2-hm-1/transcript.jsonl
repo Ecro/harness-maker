@@ -53,6 +53,7 @@
 {"type":"user","timestamp":"2026-10-15T06:52:54.976Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:52:57.588Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T06:53:00.216Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T06:52:59.639Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T06:53:02.960Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T06:53:08.733Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T06:53:22.943Z","origin":{"kind":"task-notification"},"message":{"content":""}}

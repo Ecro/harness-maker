@@ -32,10 +32,13 @@
 {"type":"user","timestamp":"2026-10-15T07:29:53.732Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:29:55.703Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T07:29:58.634Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:29:56.053Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:30:00.963Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:30:02.827Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:30:01.686Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:30:05.473Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:30:07.772Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:30:06.152Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:30:15.979Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:30:21.975Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:30:26.199Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
@@ -47,9 +50,12 @@
 {"type":"user","timestamp":"2026-10-15T07:30:55.102Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:30:57.226Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:30:59.385Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:30:58.933Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:31:01.885Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:31:04.367Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:31:02.131Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:31:06.960Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:31:04.859Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:31:09.112Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:31:10.966Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:31:13.088Z","origin":{"kind":"task-notification"},"message":{"content":""}}

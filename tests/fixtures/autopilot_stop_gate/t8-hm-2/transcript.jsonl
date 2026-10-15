@@ -30,6 +30,7 @@
 {"type":"user","timestamp":"2026-10-15T07:34:09.093Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:34:28.649Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T07:34:32.550Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:34:32.115Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:34:37.178Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:34:45.770Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:34:48.756Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}

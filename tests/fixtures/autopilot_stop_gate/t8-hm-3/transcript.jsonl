@@ -26,6 +26,7 @@
 {"type":"user","timestamp":"2026-10-15T07:35:30.949Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T07:35:45.240Z","origin":{"kind":"task-notification"},"message":{"content":""}}
 {"type":"user","timestamp":"2026-10-15T07:35:54.416Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
+{"type":"attachment","timestamp":"2026-10-15T07:35:51.543Z","attachment":{"type":"queued_command"}}
 {"type":"user","timestamp":"2026-10-15T07:36:06.155Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:36:11.899Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
 {"type":"user","timestamp":"2026-10-15T07:36:23.295Z","toolUseResult":true,"message":{"content":[{"type":"tool_result"}]}}
