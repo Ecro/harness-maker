@@ -30,7 +30,7 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 | Δ regressions per run | 0.00 (n=3) | 0.00 (n=3) | +0.00 | tie |
 | Δ new lint+type errors per run | 0.00 (n=3) | 0.00 (n=3) | +0.00 | tie |
 | traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
-| Δ judge overall | 4.00 (n=3) | 4.33 (n=3) | +0.33 | hm |
+| Δ judge overall | 4.00 (n=3) | 4.33 (n=3) | +0.33 (single-sample scores, judge noise ±0.67; tie band 0.38 over 3 pairs) | tie |
 | cost per solved run | $0.100 (n=3) | $0.400 (n=3) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
@@ -44,7 +44,7 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 | Δ regressions per run | 0.20 (n=5) | 0.00 (n=5) | -0.20 | hm |
 | Δ new lint+type errors per run | 0.20 (n=5) | 0.80 (n=5) | +0.60 | plain |
 | traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
-| Δ judge overall | 3.75 (n=4) | 4.17 (n=4) | +0.42 | hm |
+| Δ judge overall | 3.75 (n=4) | 4.17 (n=4) | +0.42 (single-sample scores, judge noise ±0.67; tie band 0.33 over 4 pairs) | hm |
 | cost per solved run | $0.210 (n=5) | $0.975 (n=4) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
@@ -68,7 +68,7 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 | judge scope | 4.00 (n=3) | 4.00 (n=3) | tie |
 | judge clarity | 4.00 (n=3) | 5.00 (n=3) | hm |
 | judge maintainability | 4.00 (n=3) | 4.00 (n=3) | tie |
-| judge overall | 4.00 (n=3) | 4.33 (n=3) | hm |
+| judge overall | 4.00 (n=3) | 4.33 (n=3) | tie |
 
 ### tier 2: 2 task(s) x 3 run(s) per arm (t6, t7)
 

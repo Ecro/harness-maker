@@ -7,7 +7,7 @@ tier 1: 1 task(s) x 3 run(s) per arm (t1)
   Δ regressions per run                     0.00 (n=3)      0.00 (n=3)        +0.00  tie
   Δ new lint+type errors per run            0.00 (n=3)      0.00 (n=3)        +0.00  tie
   traps caught                               n/a (n=0)       n/a (n=0)          n/a  n/a
-  Δ judge overall                           4.00 (n=3)      4.33 (n=3)        +0.33  hm
+  Δ judge overall                           4.00 (n=3)      4.33 (n=3)        +0.33  tie  (single-sample scores, judge noise ±0.67; tie band 0.38 over 3 pairs)
   cost per solved run                     $0.100 (n=3)    $0.400 (n=3)               plain
   extra $ per additional solved run   n/a: no additional solved runs for the extra cost
 tier 2: 1 task(s) x 3 run(s) per arm (t6)
@@ -18,7 +18,7 @@ tier 2: 1 task(s) x 3 run(s) per arm (t6)
   Δ regressions per run                     0.50 (n=2)      0.00 (n=2)        -0.50  hm
   Δ new lint+type errors per run            0.50 (n=2)      1.50 (n=2)        +1.00  plain
   traps caught                               n/a (n=0)       n/a (n=0)          n/a  n/a
-  Δ judge overall                           4.00 (n=1)      5.00 (n=1)        +1.00  hm
+  Δ judge overall                           4.00 (n=1)      5.00 (n=1)        +1.00  hm  (single-sample scores, judge noise ±0.67; tie band 0.67 over 1 pairs)
   cost per solved run                     $0.300 (n=2)    $1.050 (n=2)               plain
   extra $ per additional solved run   n/a: no additional solved runs for the extra cost
 
@@ -39,7 +39,7 @@ tier 1: 1 task(s) x 3 run(s) per arm (t1)
   judge scope                     4.00 (n=3)      4.00 (n=3)  tie
   judge clarity                   4.00 (n=3)      5.00 (n=3)  hm
   judge maintainability           4.00 (n=3)      4.00 (n=3)  tie
-  judge overall                   4.00 (n=3)      4.33 (n=3)  hm
+  judge overall                   4.00 (n=3)      4.33 (n=3)  tie
 tier 2: 1 task(s) x 3 run(s) per arm (t6)
   t7 excluded (incomplete)
   metric                               plain              hm  lead

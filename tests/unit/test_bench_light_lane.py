@@ -112,6 +112,11 @@ if "--json-schema" in argv:  # a judge call: record what it saw, answer as the t
     sha = hashlib.sha256(stdin.encode()).hexdigest()
     default = {"scope": 4, "clarity": 4, "maintainability": 4, "note": "fine"}
     scores = judge.get("scores_by_sha", {}).get(sha, judge.get("scores", default))
+    if isinstance(scores, list):  # a sequence of samples for the same input, in call order
+        counter = log / f"count-{sha[:16]}"
+        seen_before = int(counter.read_text()) if counter.exists() else 0
+        counter.write_text(str(seen_before + 1))
+        scores = scores[seen_before % len(scores)]
     result = {"type": "result", "subtype": "success", "is_error": False,
               "structured_output": scores, "result": json.dumps(scores)}
     if jmode != "no_cost":
@@ -1974,17 +1979,26 @@ def _scores(value: int) -> dict[str, Any]:
 
 
 def _calibration_scores(
-    bench: ModuleType, equal: str | None = None, low_control: str | None = None
+    bench: ModuleType,
+    equal: str | None = None,
+    low_control: str | None = None,
+    noisy_control: str | None = None,
 ) -> dict[str, Any]:
     """Judge answers keyed by the exact judge input: references 5, damaged copies 2 (or 5 for
     the task named by `equal`), controls 5, 5 and 4, an overall of 4.67, within the 0.5
-    margin (or 4 for the task named by `low_control`, 1.0 below)."""
+    margin (or 4 for the task named by `low_control`, 1.0 below). The task named by
+    `noisy_control` answers its control with three samples, 5.00, 4.33 and 5.00: the middle one
+    alone is 0.67 below the reference, but their mean, 4.78, is within the margin."""
     inputs = bench.calibration_inputs(_tier2(bench), bench.FIXTURE_DIR)
-    by_sha = {}
+    by_sha: dict[str, Any] = {}
     for task_id, texts in inputs.items():
         by_sha[_sha(texts["reference"])] = _scores(5)
         by_sha[_sha(texts["damaged"])] = _scores(5 if task_id == equal else 2)
-        control = _scores(4) if task_id == low_control else {**_scores(5), "maintainability": 4}
+        control: Any = (
+            _scores(4) if task_id == low_control else {**_scores(5), "maintainability": 4}
+        )
+        if task_id == noisy_control:
+            control = [_scores(5), {**_scores(4), "scope": 5}, _scores(5)]
         by_sha[_sha(texts["control"])] = control
     return by_sha
 
@@ -1997,22 +2011,47 @@ def test_judge_calibration_ranks_reference_above_damaged(
     assert tier2_ids == {t.id for t in _tier2(bench) if t.damaged_dir is not None}
     recordings = {}
     assert all(t.control_dir is not None for t in _tier2(bench) if t.trap is None)
-    for name, equal, low in (("pass", None, None), ("t7_equal", "t7", None),
-                             ("t8_low_control", None, "t8")):  # fmt: skip
+    k = bench.CALIBRATION_SAMPLES
+    assert k == 3
+    for name, equal, low, noisy in (("pass", None, None, None), ("t7_equal", "t7", None, None),
+                                    ("t8_low_control", None, "t8", None),
+                                    ("t8_noisy_control", None, None, "t8")):  # fmt: skip
         base = tmp_path / name
         base.mkdir()
         record = base / "calibration.json"
         got = _run_bench(
             base, ["--judge-calibration", "--record", str(record)], command="canary",
-            judge={"scores_by_sha": _calibration_scores(bench, equal, low)},
+            judge={"scores_by_sha": _calibration_scores(bench, equal, low, noisy)},
         )  # fmt: skip
-        assert got["proc"].returncode == (0 if name == "pass" else 1), got["proc"].stderr
+        passes = name in ("pass", "t8_noisy_control")
+        assert got["proc"].returncode == (0 if passes else 1), got["proc"].stderr
         recordings[name] = json.loads(record.read_text())
         calls = _judge_calls(got["logs"])
-        assert len(calls) == 3 * len(tier2_ids)  # reference, damaged and control per task
+        assert len(calls) == 3 * k * len(tier2_ids)  # K samples of each of the three copies
     good = recordings["pass"]
     assert {r["task"] for r in good["tasks"]} == tier2_ids
+    assert good["samples_per_item"] == k
+    for row in good["tasks"]:
+        for kind in ("reference", "damaged", "control"):
+            item = row[kind]
+            assert len(item["samples"]) == k
+            assert item["mean"] == pytest.approx(sum(item["samples"]) / k)
+            assert item["spread"] == pytest.approx(max(item["samples"]) - min(item["samples"]))
     assert bench.calibration_problems(good, _tier2(bench), bench.FIXTURE_DIR) == []
+    # one noisy sample (4.33, 0.67 below the reference) no longer fails the band: the mean does
+    noisy = next(r for r in recordings["t8_noisy_control"]["tasks"] if r["task"] == "t8")
+    assert noisy["control"]["samples"] == pytest.approx([5.0, 13 / 3, 5.0])
+    assert noisy["control"]["spread"] == pytest.approx(2 / 3)
+    assert (
+        bench.calibration_problems(recordings["t8_noisy_control"], _tier2(bench), bench.FIXTURE_DIR)
+        == []
+    )
+    # a recording from before K samples per item is stale, whatever it scored
+    single = _recording(bench, damaged=2, samples=1)
+    assert bench.calibration_problems(single, _tier2(bench), bench.FIXTURE_DIR) == [
+        f"calibration has 1 sample(s) per item, not {k}: re-record with "
+        "canary --judge-calibration --record"
+    ]
     failing = bench.calibration_problems(recordings["t7_equal"], _tier2(bench), bench.FIXTURE_DIR)
     assert failing
     assert all("t7" in p for p in failing)
@@ -2041,29 +2080,47 @@ def test_judge_calibration_ranks_reference_above_damaged(
 
     if bench.CALIBRATION_FILE.exists():  # the DRI's live recording, once it is committed
         committed = json.loads(bench.CALIBRATION_FILE.read_text())
-        assert bench.calibration_problems(committed, _tier2(bench), bench.FIXTURE_DIR) == []
-        assert {r["task"] for r in committed["tasks"]} == tier2_ids
-        for row in committed["tasks"]:
-            assert row["reference"]["overall"] > row["damaged"]["overall"]
+        problems = bench.calibration_problems(committed, _tier2(bench), bench.FIXTURE_DIR)
+        if committed.get("samples_per_item") != k:  # a single-sample recording awaits K=3
+            assert len(problems) == 1
+            assert "sample(s) per item" in problems[0]
+        else:
+            assert problems == []
+            assert {r["task"] for r in committed["tasks"]} == tier2_ids
+            for row in committed["tasks"]:
+                assert row["reference"]["mean"] > row["damaged"]["mean"]
 
 
 def _recording(
-    bench: ModuleType, *, damaged: int, judge_model: str = "claude-sonnet-5-5"
+    bench: ModuleType, *, damaged: int, judge_model: str = "claude-sonnet-5-5", samples: int = 3
 ) -> dict[str, Any]:
+    """A recording in the K-sample format; `samples=1` gives the single-sample format of the
+    first live recording (one `overall` per item, no `samples_per_item`)."""
+
+    def item(text: str, value: float) -> dict[str, Any]:
+        sha = bench.judge_input_sha(text)
+        if samples == 1:
+            return {"input_sha": sha, "status": "ok", "overall": value}
+        return {"input_sha": sha, "status": "ok", "samples": [value] * samples, "mean": value,
+                "spread": 0.0}  # fmt: skip
+
     tasks = []
     for task_id, texts in sorted(
         bench.calibration_inputs(_tier2(bench), bench.FIXTURE_DIR).items()
     ):
         tasks.append({
-            "task": task_id,
-            "reference": {"input_sha": bench.judge_input_sha(texts["reference"]),
-                          "status": "ok", "overall": 5.0},
-            "damaged": {"input_sha": bench.judge_input_sha(texts["damaged"]),
-                        "status": "ok", "overall": float(damaged)},
-            "control": {"input_sha": bench.judge_input_sha(texts["control"]),
-                        "status": "ok", "overall": 4.5},
+            "task": task_id, "reference": item(texts["reference"], 5.0),
+            "damaged": item(texts["damaged"], float(damaged)),
+            "control": item(texts["control"], 4.5),
         })  # fmt: skip
-    return {"rubric_id": bench.RUBRIC_ID, "judge_model": judge_model, "tasks": tasks}
+    recording: dict[str, Any] = {
+        "rubric_id": bench.RUBRIC_ID,
+        "judge_model": judge_model,
+        "tasks": tasks,
+    }
+    if samples != 1:
+        recording["samples_per_item"] = samples
+    return recording
 
 
 def test_tier_two_run_needs_signoff_and_calibration(
@@ -3239,3 +3296,30 @@ def test_a_reap_that_times_out_never_raises(
     work2 = tmp_path / "agent"
     work2.mkdir()
     assert bench._invoke([sys.executable, "-c", "pass"], work2, 60)[2] == 0
+
+
+# --- review round 3: judge noise ----------------------------------------------------------------
+
+
+def test_judge_tie_band_widens_with_the_measured_noise(bench: ModuleType) -> None:
+    """Two live recordings of byte-identical calibration inputs differed by up to 0.67 per item
+    (t6 damaged 2.33 vs 1.67), so a judge mean over few pairs is not compared at the fixed 0.25:
+    the band is max(0.25, 0.67 / sqrt(n pairs))."""
+    assert pytest.approx(2 / 3) == bench.JUDGE_NOISE
+    assert bench.judge_band(4) == pytest.approx(1 / 3)
+    assert bench.judge_band(9) == 0.25  # 0.67 / 3 = 0.22 < 0.25: the fixed band holds
+    assert bench.lead("judge_overall", 4.0, 4.3, n=4) == "tie"  # 0.30 < 0.33
+    assert bench.lead("judge_overall", 4.0, 4.3, n=9) == "hm"
+    assert bench.lead("judge_overall", 4.0, 4.3) == "hm"  # no n: the fixed band
+    assert bench.lead("regressions", 0.5, 0.0, n=1) == "hm"  # only judge lines widen
+    plain = [_quality_row(r, reg=0, judge=4.0) for r in _rows("plain", 0.1)]
+    hm = [_quality_row(r, reg=0, judge=4.25) for r in _rows("hm", 0.4)]
+    line = _value_line(bench, plain + hm, "judge_overall")
+    # 6 pairs: band max(0.25, 0.667 / 2.449) = 0.27, so a +0.25 gap is a tie (0.25 alone would
+    # call it for hm)
+    assert line["delta"] == pytest.approx(0.25)
+    assert line["lead"] == "tie"
+    assert line["note"] == "single-sample scores, judge noise ±0.67; tie band 0.27 over 6 pairs"
+    tier = bench.scorecard(plain + hm)["tiers"][0]
+    quality = next(x for x in tier["lines"] if x["metric"] == "judge_overall")
+    assert quality["lead"] == "tie"  # the Quality section uses the same band

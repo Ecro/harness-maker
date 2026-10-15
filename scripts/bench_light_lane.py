@@ -165,6 +165,10 @@ REDACTIONS = (
     (r"\b(?:specs|work-docs)/", "docs/"), (r"\[\[[A-Za-z][^\],\n]*\]\]", "[link]"),
     (r"\bSPEC\b", "DOC"),
 )  # fmt: skip
+# Single-sample judge noise: two live calibration recordings of byte-identical inputs (2026-10-15)
+# differed by up to 2/3 of a point per item (t6 damaged 2.33 vs 1.67; mean |Δ| 0.11 over 12).
+JUDGE_NOISE = 2 / 3
+CALIBRATION_SAMPLES = 3  # judge calls per calibration item; the bands compare their means
 TRAP_N_GAP = 2  # the traps line leads only when the arms' trap n differ by less than this
 CONTROL_MARGIN = 0.5  # a clean, longer control may score at most this much below its reference
 JUDGE_DATA_NOTE = (
@@ -1140,32 +1144,42 @@ def calibration_inputs(tasks: list[Task], fixture: Path) -> dict[str, dict[str, 
 
 
 def record_calibration(opts: Options, tasks: list[Task], fixture: Path) -> dict[str, Any]:
-    """Judge every tier-2 reference, damaged copy and control once with the real judge."""
+    """Judge every tier-2 reference, damaged copy and control CALIBRATION_SAMPLES times with the
+    real judge. One sample moves by up to JUDGE_NOISE between runs, more than the control band,
+    so the bands compare means; each item keeps its samples, mean and spread."""
     entries = []
     for task_id, texts in sorted(calibration_inputs(tasks, fixture).items()):
         entry: dict[str, Any] = {"task": task_id}
         for kind in sorted(texts, key=CALIBRATION_KINDS.index):
-            judged = run_judge(texts[kind], opts)
-            scores = judged["scores"] or {}
+            calls = [run_judge(texts[kind], opts) for _ in range(CALIBRATION_SAMPLES)]
+            ok = all(c["status"] == "ok" for c in calls)
+            samples = [float(c["scores"]["overall"]) for c in calls if c["scores"]]
+            costs = [c["cost_usd"] for c in calls if c["cost_usd"] is not None]
             entry[kind] = {
-                "input_sha": judged["input_sha"], "status": judged["status"],
-                "scores": judged["scores"], "overall": scores.get("overall"),
-                "cost_usd": judged["cost_usd"],
+                "input_sha": calls[0]["input_sha"], "status": "ok" if ok else "error",
+                "scores": [c["scores"] for c in calls], "samples": samples,
+                "mean": _mean(samples) if ok else None,
+                "spread": max(samples) - min(samples) if ok else None,
+                "cost_usd": math.fsum(costs),
             }  # fmt: skip
         entries.append(entry)
     return {"rubric_id": RUBRIC_ID, "judge_model": opts.judge_model or opts.model,
-            "tasks": entries}  # fmt: skip
+            "samples_per_item": CALIBRATION_SAMPLES, "tasks": entries}  # fmt: skip
 
 
 def calibration_problems(
     recording: Any, tasks: list[Task], fixture: Path, *, judge_model: str | None = None
 ) -> list[str]:
     """Why a calibration recording does not let tier-2 results count (empty = it passes). It
-    must be fresh (same judge inputs, so the same rubric, tasks and redaction table), made with
-    the judge model this run uses, rank every reference strictly above its damaged copy, and
-    score the clean, longer control no more than CONTROL_MARGIN below the reference."""
+    must be fresh (same judge inputs, so the same rubric, tasks and redaction table), hold
+    CALIBRATION_SAMPLES samples per item, be made with the judge model this run uses, rank every
+    reference mean strictly above its damaged copy's, and keep the clean, longer control's mean
+    no more than CONTROL_MARGIN below the reference's."""
     if not isinstance(recording, dict) or not isinstance(recording.get("tasks"), list):
         return ["no judge calibration recording: run canary --judge-calibration --record PATH"]
+    if (k := recording.get("samples_per_item", 1)) != CALIBRATION_SAMPLES:
+        return [f"calibration has {k} sample(s) per item, not {CALIBRATION_SAMPLES}: re-record "
+                "with canary --judge-calibration --record"]  # fmt: skip
     if judge_model is not None and recording.get("judge_model") != judge_model:
         return [f"calibration was recorded with judge model {recording.get('judge_model')}; "
                 f"this run judges with {judge_model}"]  # fmt: skip
@@ -1186,12 +1200,15 @@ def calibration_problems(
         if any(got[kind].get("status") != "ok" for kind in texts):
             problems.append(f"{task_id}: a calibration judge call failed")
             continue
-        ref, dam = float(got["reference"]["overall"]), float(got["damaged"]["overall"])
+        if any(len(got[kind].get("samples") or ()) != CALIBRATION_SAMPLES for kind in texts):
+            problems.append(f"{task_id}: an item does not hold {CALIBRATION_SAMPLES} samples")
+            continue
+        ref, dam = float(got["reference"]["mean"]), float(got["damaged"]["mean"])
         if not ref > dam:
             problems.append(f"{task_id}: the judge scored the damaged copy {dam:.2f}, "
                             f"not below the reference {ref:.2f}")  # fmt: skip
         if "control" in texts:
-            control = float(got["control"]["overall"])
+            control = float(got["control"]["mean"])
             if control + LEAD_EPS < ref - CONTROL_MARGIN:
                 problems.append(f"{task_id}: the judge scored the clean, longer control "
                                 f"{control:.2f}, more than {CONTROL_MARGIN:g} below the reference "
@@ -1843,9 +1860,19 @@ def outcome_of(row: dict[str, Any]) -> str | None:
     return "solved" if row.get("passed") else None
 
 
-def lead(metric: str, plain: float | None, hm: float | None) -> str:
-    """hm, plain, tie, — (no direction) or n/a (a side has no value), from DIRECTIONS only."""
+def judge_band(n: int) -> float:
+    """A judge line's tie band over n runs or pairs: the fixed band, widened to JUDGE_NOISE /
+    sqrt(n) when n is too small for single-sample scores to average the noise out."""
+    fixed = DIRECTIONS["judge_overall"][1]
+    return max(fixed, JUDGE_NOISE / math.sqrt(n)) if n > 0 else fixed
+
+
+def lead(metric: str, plain: float | None, hm: float | None, n: int | None = None) -> str:
+    """hm, plain, tie, — (no direction) or n/a (a side has no value), from DIRECTIONS only;
+    a judge line given its n uses judge_band(n)."""
     better, band = DIRECTIONS[metric]
+    if metric.startswith("judge_") and n is not None:
+        band = judge_band(n)
     if better is None:
         return "—"
     if plain is None or hm is None:
@@ -1993,7 +2020,10 @@ def _value(kept: list[dict[str, Any]], totals: dict[str, int]) -> dict[str, Any]
             how = lead(metric, p[0] if p[1] else None, h[0] if h[1] else None)
         elif metric in PAIRED:
             p, h, delta = _paired(metric, by_arm)
-            how = lead(metric, p[0] if p[1] else None, h[0] if h[1] else None)
+            how = lead(metric, p[0] if p[1] else None, h[0] if h[1] else None, n=p[1])
+            if metric.startswith("judge_") and p[1]:
+                line["note"] = (f"single-sample scores, judge noise ±{JUDGE_NOISE:.2f}; "
+                                f"tie band {judge_band(p[1]):.2f} over {p[1]} pairs")  # fmt: skip
         elif metric == "traps":
             p, h = (_measure(metric, by_arm[a], totals) for a in ARMS)
             rp, rh = (x[0] / x[1] if x[0] is not None and x[1] else None for x in (p, h))
@@ -2072,7 +2102,8 @@ def scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
                 "metric": metric, "label": label, "section": section,
                 "plain": {"value": p[0], "n": p[1]}, "hm": {"value": h[0], "n": h[1]},
                 "ratio": _ratio(h[0], p[0]) if section == "efficiency" else None,
-                "lead": lead(metric, p[0] if p[1] else None, h[0] if h[1] else None),
+                "lead": lead(metric, p[0] if p[1] else None, h[0] if h[1] else None,
+                             n=min(p[1], h[1])),
             })  # fmt: skip
         judged = [r["judge"] for r in kept if isinstance(r.get("judge"), dict)]
         called = [j for j in judged if j.get("status") in ("ok", "error")]
@@ -2568,8 +2599,8 @@ def _cmd_calibrate(args: argparse.Namespace) -> int:
     path = Path(args.record) if args.record else CALIBRATION_FILE
     atomic_write(path, json.dumps(recording, indent=2, sort_keys=True) + "\n")
     for row in recording["tasks"]:
-        print(f"  {row['task']}: reference {row['reference']['overall']} "
-              f"damaged {row['damaged']['overall']}")  # fmt: skip
+        means = {kind: row[kind]["mean"] for kind in CALIBRATION_KINDS if kind in row}
+        print(f"  {row['task']}: " + ", ".join(f"{kind} {value}" for kind, value in means.items()))
     for problem in problems:
         print(problem, file=sys.stderr)
     print(f"calibration {'ok' if not problems else 'FAIL'}: recorded in {path}")

@@ -113,7 +113,7 @@ scorecard. The `hm vs plain` column is hm minus plain, except on the cost line, 
 | Δ regressions per run | hm minus plain mean regressions, over paired runs; negative is good for hm. |
 | Δ new lint+type errors per run | hm minus plain mean of ruff_new + mypy_new, over paired runs; negative is good for hm. |
 | traps caught | Per arm, trap runs that avoided the trap over trap runs that carry a result (`caught/n`). The `hm vs plain` column and the lead use the caught rate (band 0.20). The lead reads `n/a` when the two arms' n differ by 2 or more (one arm stalled more, so the rates cover different runs). A tier with no trap task reads `n/a (n=0)`. |
-| Δ judge overall | hm minus plain mean judge overall, over paired runs. |
+| Δ judge overall | hm minus plain mean judge overall, over paired runs. Each run's score is a single judge sample, and one sample moves by up to 0.67 on identical input (measured below), so only means over pairs are compared, with a tie band of max(0.25, 0.67 / √n pairs); the note prints the band in use. |
 | cost per solved run | Each arm's priced run cost divided by its priced solved runs; `n/a (n=0)` when the arm solved nothing. Runs with no price are left out and counted, as `(k unpriced)`. Lower is better. |
 | extra $ per additional solved run | (hm priced cost - plain priced cost) / (hm priced solved - plain priced solved). When hm solves no more runs than plain it reads `n/a: no additional solved runs for the extra cost`. When Δ solved runs reads `tie`, it adds `(Δ solved within the tie band)`: the extra solved runs are inside the noise the lead rule allows. Unpriced runs add `(k unpriced)`. |
 
@@ -216,7 +216,7 @@ table and nothing else. No word in the report or these docs is picked by hand.
 | hidden-case pass fraction (`case_fraction`) | higher | gap of at least 0.05, else `tie` |
 | traps caught (`traps`) | higher | caught-rate gap of at least 0.2, else `tie` |
 | ruff_new mean (`ruff_new`), mypy_new mean (`mypy_new`), regressions mean (`regressions`), new lint+type errors (`lint_type`) | lower | exact compare |
-| judge scope (`judge_scope`), clarity (`judge_clarity`), maintainability (`judge_maintainability`), overall (`judge_overall`) | higher | gap of at least 0.25, else `tie` |
+| judge scope (`judge_scope`), clarity (`judge_clarity`), maintainability (`judge_maintainability`), overall (`judge_overall`) | higher | gap of at least max(0.25, 0.67 / √n), else `tie`; n is the pairs (Δ line) or the smaller arm's n (Quality section) |
 | cost $/run (`cost`), cost per solved run (`cost_per_solved`), tokens (`tokens_input`, `tokens_output`, `tokens_cache_read`, `tokens_cache_write`), turns (`turns`), wall s (`wall`) | lower | exact compare |
 | runs (`runs`), diff_lines mean (`diff_lines`), tests_touched rate (`tests_touched`) | none | always `—` |
 
@@ -278,24 +278,33 @@ family; residual self-preference is not corrected.
        --record scripts/bench/judge-calibration.json
    ```
 
-   It judges three copies of each tier-2 task, using the live judge model:
+   It judges three copies of each tier-2 task, three times each (`CALIBRATION_SAMPLES`), using the
+   live judge model, and compares the means:
    - the `reference`;
    - its `damaged/` copy: the reference with duplicated logic, dead code and a misleading name
-     planted (see each task's `damaged/DEFECTS.md`); it must score strictly below the reference;
+     planted (see each task's `damaged/DEFECTS.md`); its mean must be strictly below the reference's;
    - its `control/` copy: the reference made longer but kept clean, with explanatory comments and
-     extra tests (see `control/CONTROL.md`); it must score no more than 0.5 below the reference.
+     extra tests (see `control/CONTROL.md`); its mean must be no more than 0.5 below the reference's.
 
    `check` requires both copies to pass the hidden and visible tests, so the calibration ranks
    quality, not correctness. The trap tasks t10-t12 have neither copy and are left out: their
    checks are deterministic and do not rest on the judge. The recording stores each judge input's
    hash and the judge model, so a changed rubric, task or redaction table, or a run that judges
-   with another model, makes it stale.
+   with another model, makes it stale. Each item records its three samples, their mean and their
+   spread (max − min); a recording without three samples per item (the first, single-sample
+   format) is stale.
+
+   **Measured judge noise.** Two single-sample live recordings of byte-identical inputs
+   (2026-10-15) differed by up to 0.67 on one item (t6 damaged, 2.33 then 1.67) and by 0.11 on
+   average over the 12 items. That is wider than the 0.5 control band, so one sample cannot
+   decide the calibration, and the second recording failed on noise alone. The same figure,
+   `JUDGE_NOISE` in the runner, sets the scorecard's judge tie band.
 
    **What a pass rules out:** a judge that cannot tell planted duplication, dead code and a
    misleading name from the clean reference, and a judge that punishes a clean change for being
    longer (more comments, more tests) by more than half a point. **What it does not rule out:**
    preference for one arm's style, self-preference for the agent's model family, unreliable
-   ranking between two different clean solutions, or noise: each copy is judged once. A pass is
+   ranking between two different clean solutions, or noise beyond what three samples average out. A pass is
    necessary for the judge lines to mean anything; it is not proof that they are right.
 
 ## Improvement loop
