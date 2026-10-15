@@ -253,9 +253,9 @@ def test_the_stage_does_not_touch_the_verification_cache(variant: str, stage: st
     if light_check2:
         assert stage == "execute"
         assert "### Step 4.2 — Light check" in body
-        # 2026-10-15, SPEC-hm-light-lane-s3d: the section's `run` also passes `--spec-slug`, and
-        # its `0`/`3` bullets name the SPEC plan. No cache call was added; undoing exactly those
-        # bytes must give the frozen text.
+        # 2026-10-15, SPEC-hm-light-lane-s3d: the section's `run` also passes `--spec-slug`, its
+        # intro says the gates may come from the SPEC, and its `3` bullet names the SPEC plan. No
+        # cache call was added; undoing exactly those bytes must give the frozen text.
         assert s3d.without_s3d(light_check2) == _LIGHT_CHECK2[variant]
     assert "verification_cache" not in body, (
         f"{stage} touches the verification cache. A read here cannot hit (the fingerprint always "

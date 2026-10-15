@@ -5,7 +5,8 @@
 ### Check 2 — Regression smoke
 
 **One verb runs the gates and owns the marker.** It takes the gates from the project's CI (a
-narrower guess passes locally, fails on push) and marks only a pass on an unchanged tree.
+narrower guess passes locally, fails on push) and marks only a pass on an unchanged tree.{% if light_check | default(false) %}
+With no CI file, `--spec-slug` takes the gates from this trusted SPEC instead.{% endif %}
 
 {% if is_codex %}
 ```

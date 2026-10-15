@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -53,9 +56,27 @@ def golden() -> dict[str, Any]:
     return data
 
 
+@contextmanager
+def _empty_home(home: Path) -> Iterator[None]:
+    home.mkdir()
+    old = os.environ.get("HOME")
+    os.environ["HOME"] = str(home)
+    try:
+        yield
+    finally:
+        if old is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = old
+
+
 @cache
 def render_paths(key: str) -> dict[str, str | None]:
-    """Stage 3a's answer builder, rendered once per config (shared with the capture script)."""
+    """Stage 3a's answer builder, rendered once per config (shared with the capture script).
+
+    HOME is pinned to an empty dir for the render, as the capture pinned it. The clock needs no
+    `HARNESS_MAKER_FREEZE`: the capture did not set it, and `render` gets `DEFAULT_FREEZE_TIME`.
+    """
     loop, wt, strictness, mech, preset = dict(CONFIGS)[key]
     base = answers_from_harness_yaml(HARNESS_YAML)
     assert base is not None
@@ -68,8 +89,8 @@ def render_paths(key: str) -> dict[str, str | None]:
             "preset": Preset(preset),
         }
     )
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td)
+    with tempfile.TemporaryDirectory() as td, _empty_home(Path(td) / "home"):
+        root = Path(td) / "out"
         with pinned_install_ref():
             render(
                 synthesize(ProjectProfile(), answers),
@@ -115,6 +136,7 @@ def test_only_the_light_check_passes_the_slug(key: str) -> None:
     for arm, text in light.items():
         assert "--spec-slug <slug>" in text, arm
         assert "from SPEC (no CI file)" in text, arm
+        assert "With no CI file, `--spec-slug` takes the gates from this trusted SPEC" in text, arm
         (run,) = [ln for ln in text.splitlines() if "verification_cache run" in ln]
         assert "--spec-slug <slug>" in run, arm
         bullet = next(ln for ln in text.splitlines() if ln.startswith("- `3`"))

@@ -134,6 +134,14 @@ that any pass comes from the fixture's own `.venv`.
 - **The RESULTS note.** `docs/evals/RESULTS.md` is written by `bench_light_lane.py publish`
   ("do not edit"), so the fixture-change note went to `docs/evals/README.md`; the next
   `publish` run is where the RESULTS page changes.
+- **Review round 1 (2026-10-15).** Applied: the SPEC plan also needs `.venv/pyvenv.cfg`, and
+  exits 3 when HEAD tracks a `*.yml`/`*.yaml` under `.github/workflows` that the tree lacks, when
+  HEAD's pyproject has `tool.ruff`/`tool.mypy` the working copy lacks, or when
+  `ruff.toml`/`.ruff.toml`/`mypy.ini`/`.mypy.ini` exists; mypy takes no `.` when `[tool.mypy]`
+  sets `files`, `modules` or `packages`; Check 2's light intro names the SPEC plan, the record
+  example reads `regression: gates from SPEC (no CI file)`, and the fixture pins
+  `pytest>=8`. The HEAD-workflow check counts only workflow files (what `read_plan` reads), so a
+  tracked `.github/workflows/README.md` with no workflow still takes the SPEC plan.
 - **Snapshots** were regenerated with `tests/snapshot/regenerate.py`: only
   `hm/execute-light-check.md`'s body hash moved, in all four profiles.
 

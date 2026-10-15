@@ -280,6 +280,7 @@ def dumps(doc: object) -> str:
 #: `light_check`), as (3d text, the text before it). Older suites that froze that section
 #: compare `without_s3d(section)` with their frozen text, so anything else added still fails.
 S3D_CHECK2_DELTA: tuple[tuple[str, str], ...] = (
+    ("\nWith no CI file, `--spec-slug` takes the gates from this trusted SPEC instead.", ""),
     (" --spec-slug <slug>", ""),
     (
         "- `3` → degraded: neither readable CI nor a usable SPEC plan (stderr says why), not a "
@@ -294,7 +295,7 @@ S3D_CHECK2_DELTA: tuple[tuple[str, str], ...] = (
 #: The light-check record's body line (execute_light_check.md.j2), the other 3d addition.
 S3D_RECORD_DELTA: tuple[str, str] = (
     'a one-line body naming the gates\n(after Check 2\'s `"gate_source": "spec"`, '
-    "`regression: pytest from SPEC (no CI file)`):",
+    "`regression: gates from SPEC (no CI file)`):",
     "a one-line body naming the gates:",
 )
 
