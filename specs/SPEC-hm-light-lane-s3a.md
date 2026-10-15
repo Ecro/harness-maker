@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: hm-light-lane-s3a
-status: draft
+status: approved
 created: 2026-10-15
 tags: [harness-maker, spec, autopilot, cost, light-lane, execute, review, verify]
 test_framework: pytest
