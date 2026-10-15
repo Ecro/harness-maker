@@ -3167,6 +3167,16 @@ def test_a_symlink_in_the_scope_nulls_the_quality_signals(
     assert all(quality[name] is None for name in bench.QUALITY_SIGNALS)
 
 
+def test_link_redaction_spares_python_nested_lists(bench: ModuleType) -> None:
+    """P3-1: only a wiki link, `[[` then a letter and no comma inside, is redacted."""
+    assert bench.redact("+grid = [[1, 2], [3, 4]]")[1] == 0
+    assert bench.redact("+pairs = [[a, b] for a, b in xs]")[1] == 0
+    assert bench.redact("+row = [[1, 2]]")[1] == 0
+    assert bench.redact('+names = [["a", "b"]]')[1] == 0
+    assert bench.redact("+pair = [[left, right]]")[1] == 0
+    assert bench.redact("+# see [[RESEARCH-hm-light-lane]]") == ("+# see [link]", 1)
+
+
 # --- CI robustness: git maintenance, template copy, STOP and reap -----------------------------
 
 

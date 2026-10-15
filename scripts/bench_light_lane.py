@@ -162,7 +162,8 @@ RUBRIC_SCHEMA: dict[str, Any] = {
 REDACTIONS = (
     (r"AC-\d+", "REQ"), (r"SPEC-", "DOC-"), (r"PLAN-", "DOC-"), (r"/hm:", "/x:"),
     (r"test_ac_\d+", "test_req"), (r"\b(?:ADR|IRR)-\d+", "DEC"), (r"\bINV-\d+", "RULE"),
-    (r"\b(?:specs|work-docs)/", "docs/"), (r"\[\[[^\]\n]*\]\]", "[link]"), (r"\bSPEC\b", "DOC"),
+    (r"\b(?:specs|work-docs)/", "docs/"), (r"\[\[[A-Za-z][^\],\n]*\]\]", "[link]"),
+    (r"\bSPEC\b", "DOC"),
 )  # fmt: skip
 TRAP_N_GAP = 2  # the traps line leads only when the arms' trap n differ by less than this
 CONTROL_MARGIN = 0.5  # a clean, longer control may score at most this much below its reference
