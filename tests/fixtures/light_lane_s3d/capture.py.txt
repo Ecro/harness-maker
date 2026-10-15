@@ -1,0 +1,67 @@
+"""Capture the reference oracles for SPEC-hm-light-lane-s3d, before any module or template changed.
+
+Two references, each from the tree the AC names, unpacked with `git archive` (no worktree, no
+checkout of this repo is touched):
+
+    git archive 4bd3d3d8 src | tar -x -C <old>      # AC-001: verification_cache run
+    git archive df070f6c src | tar -x -C <tip>      # AC-006: the renders 3d builds on
+
+    PYTHONPATH=<old>/src:<repo> <repo>/.venv/bin/python <this file> ac001 <old> <repo>/tests/fixtures/light_lane_s3d
+    PYTHONPATH=<tip>/src:<repo> <repo>/.venv/bin/python <this file> ac006 <tip> <repo>/tests/fixtures/light_lane_s3d
+
+AC-006 is taken at df070f6c, not 4bd3d3d8: stage 3c (merged after the SPEC was written) changed
+those renders, and the AC's intent is that 3d adds no render bytes outside the light check.
+`verification_cache.py` and `verification_plan.py` are byte-identical between the two SHAs, so
+AC-001 is unaffected by the choice.
+
+It writes:
+- run_4bd3d3d8.json — AC-001: for every (CI state, SPEC kind, suite) cell, two `run` calls under
+  a fake gate runner: exit, stdout, the gate commands asked for, and the marker bytes (root path,
+  key and passed_at masked). The cell builder is `tests/unit/light_lane_s3d_fixture.py`.
+- renders_df070f6c.json — AC-006: the SHA-256 of each unchanged path over stage 3a's render
+  configs, and the Step/Phase/Check headings of the two light-check surfaces.
+"""
+import hashlib, json, os, re, sys, tempfile
+from pathlib import Path
+
+mode, source, out_dir = sys.argv[1], Path(sys.argv[2]).resolve(), Path(sys.argv[3])
+
+import harness_maker
+
+# Provenance: the imported package is the unpacked tree, not this repo's src.
+assert Path(harness_maker.__file__).resolve().is_relative_to(source), harness_maker.__file__
+
+if mode == "ac001":
+    from harness_maker.observability import verification_cache
+
+    module_src = Path(verification_cache.__file__).read_text(encoding="utf-8")
+    assert "spec-slug" not in module_src and "gate_source" not in module_src
+    from tests.unit import light_lane_s3d_fixture as fx
+
+    with tempfile.TemporaryDirectory() as td:
+        cells = fx.capture_ac001(verification_cache, Path(td))
+    doc = {
+        "source_sha": "4bd3d3d8",
+        "module_sha256": hashlib.sha256(module_src.encode()).hexdigest(),
+        "cells": cells,
+    }
+    (out_dir / "run_4bd3d3d8.json").write_text(fx.dumps(doc), encoding="utf-8")
+    print("ac001 cells:", len(cells))
+elif mode == "ac006":
+    os.environ["HOME"] = tempfile.mkdtemp()
+    from tests.render import test_render_light_lane_s3d as t
+
+    configs: dict[str, object] = {}
+    for key in t.KEYS:
+        texts = t.render_paths(key)
+        configs[key] = {
+            "sha256": {rel: t.sha256(texts[rel]) for rel in t.UNCHANGED_PATHS},
+            "headings": {rel: t.headings(texts[rel]) for rel in t.LIGHT_CHECK_PATHS},
+        }
+    doc = {"source_sha": "df070f6c", "unchanged_paths": list(t.UNCHANGED_PATHS), "configs": configs}
+    (out_dir / "renders_df070f6c.json").write_text(
+        json.dumps(doc, indent=1, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    print("ac006 configs:", len(configs))
+else:
+    raise SystemExit(f"unknown mode {mode!r}")

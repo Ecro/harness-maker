@@ -1,0 +1,633 @@
+{
+ "cells": {
+  "absent_dir/none/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "absent_dir/none/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "absent_dir/trusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "absent_dir/trusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "absent_dir/untrusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "absent_dir/untrusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflows directory at <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "all_advisory/none/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    }
+   ]
+  },
+  "all_advisory/none/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    }
+   ]
+  },
+  "all_advisory/trusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    }
+   ]
+  },
+  "all_advisory/trusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    }
+   ]
+  },
+  "all_advisory/untrusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    }
+   ]
+  },
+  "all_advisory/untrusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no blocking gate\"}\n"
+    }
+   ]
+  },
+  "dir_without_yml/none/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "dir_without_yml/none/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "dir_without_yml/trusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "dir_without_yml/trusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "dir_without_yml/untrusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "dir_without_yml/untrusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no workflow files in <root>/.github/workflows\"}\n"
+    }
+   ]
+  },
+  "no_recognised_command/none/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    }
+   ]
+  },
+  "no_recognised_command/none/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    }
+   ]
+  },
+  "no_recognised_command/trusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    }
+   ]
+  },
+  "no_recognised_command/trusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    }
+   ]
+  },
+  "no_recognised_command/untrusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    }
+   ]
+  },
+  "no_recognised_command/untrusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"no verification command recognised in the commit-gating workflow(s): ci.yml\"}\n"
+    }
+   ]
+  },
+  "readable/none/failing": {
+   "rounds": [
+    {
+     "exit": 1,
+     "gates": [
+      "ruff check ."
+     ],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 1, \"key\": \"<key0>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 1, \"seconds\": \"<s>\"}]}\n"
+    },
+    {
+     "exit": 1,
+     "gates": [
+      "ruff check .",
+      "ruff check ."
+     ],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 1, \"key\": \"<key0>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 1, \"seconds\": \"<s>\"}]}\n"
+    }
+   ]
+  },
+  "readable/none/passing": {
+   "rounds": [
+    {
+     "exit": 0,
+     "gates": [
+      "ruff check .",
+      "mypy --strict src",
+      "pytest -q"
+     ],
+     "markers": [
+      "{\"passed\": true, \"passed_at\": \"<passed_at>\", \"checks\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"project_root\": \"<root>\", \"key\": \"<key0>\", \"writer\": \"run\", \"commands_sha256\": \"b3e585bcaeb946eae5887ccfdc062d035c2eef2132635b081e4f063c3dcd2815\"}"
+     ],
+     "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 0, \"key\": \"<key0>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 0, \"seconds\": \"<s>\"}, {\"cmd\": \"mypy --strict src\", \"rc\": 0, \"seconds\": \"<s>\"}, {\"cmd\": \"pytest -q\", \"rc\": 0, \"seconds\": \"<s>\"}]}\n"
+    },
+    {
+     "exit": 0,
+     "gates": [
+      "ruff check .",
+      "mypy --strict src",
+      "pytest -q"
+     ],
+     "markers": [
+      "{\"passed\": true, \"passed_at\": \"<passed_at>\", \"checks\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"project_root\": \"<root>\", \"key\": \"<key0>\", \"writer\": \"run\", \"commands_sha256\": \"b3e585bcaeb946eae5887ccfdc062d035c2eef2132635b081e4f063c3dcd2815\"}"
+     ],
+     "stdout": "{\"cached\": true, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 0, \"key\": \"<key0>\"}\n"
+    }
+   ]
+  },
+  "readable/trusted/failing": {
+   "rounds": [
+    {
+     "exit": 1,
+     "gates": [
+      "ruff check ."
+     ],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 1, \"key\": \"<key0>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 1, \"seconds\": \"<s>\"}]}\n"
+    },
+    {
+     "exit": 1,
+     "gates": [
+      "ruff check .",
+      "ruff check ."
+     ],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 1, \"key\": \"<key0>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 1, \"seconds\": \"<s>\"}]}\n"
+    }
+   ]
+  },
+  "readable/trusted/passing": {
+   "rounds": [
+    {
+     "exit": 0,
+     "gates": [
+      "ruff check .",
+      "mypy --strict src",
+      "pytest -q"
+     ],
+     "markers": [
+      "{\"passed\": true, \"passed_at\": \"<passed_at>\", \"checks\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"project_root\": \"<root>\", \"key\": \"<key0>\", \"writer\": \"run\", \"commands_sha256\": \"b3e585bcaeb946eae5887ccfdc062d035c2eef2132635b081e4f063c3dcd2815\"}"
+     ],
+     "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 0, \"key\": \"<key0>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 0, \"seconds\": \"<s>\"}, {\"cmd\": \"mypy --strict src\", \"rc\": 0, \"seconds\": \"<s>\"}, {\"cmd\": \"pytest -q\", \"rc\": 0, \"seconds\": \"<s>\"}]}\n"
+    },
+    {
+     "exit": 0,
+     "gates": [
+      "ruff check .",
+      "mypy --strict src",
+      "pytest -q"
+     ],
+     "markers": [
+      "{\"passed\": true, \"passed_at\": \"<passed_at>\", \"checks\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"project_root\": \"<root>\", \"key\": \"<key0>\", \"writer\": \"run\", \"commands_sha256\": \"b3e585bcaeb946eae5887ccfdc062d035c2eef2132635b081e4f063c3dcd2815\"}"
+     ],
+     "stdout": "{\"cached\": true, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 0, \"key\": \"<key0>\"}\n"
+    }
+   ]
+  },
+  "readable/untrusted/failing": {
+   "rounds": [
+    {
+     "exit": 1,
+     "gates": [
+      "ruff check ."
+     ],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 1, \"key\": \"<key0>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 1, \"seconds\": \"<s>\"}]}\n"
+    },
+    {
+     "exit": 1,
+     "gates": [
+      "ruff check .",
+      "ruff check ."
+     ],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 1, \"key\": \"<key0>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 1, \"seconds\": \"<s>\"}]}\n"
+    }
+   ]
+  },
+  "readable/untrusted/passing": {
+   "rounds": [
+    {
+     "exit": 0,
+     "gates": [
+      "ruff check .",
+      "mypy --strict src",
+      "pytest -q"
+     ],
+     "markers": [
+      "{\"passed\": true, \"passed_at\": \"<passed_at>\", \"checks\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"project_root\": \"<root>\", \"key\": \"<key0>\", \"writer\": \"run\", \"commands_sha256\": \"b3e585bcaeb946eae5887ccfdc062d035c2eef2132635b081e4f063c3dcd2815\"}"
+     ],
+     "stdout": "{\"cached\": false, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 0, \"key\": \"<key0>\", \"results\": [{\"cmd\": \"ruff check .\", \"rc\": 0, \"seconds\": \"<s>\"}, {\"cmd\": \"mypy --strict src\", \"rc\": 0, \"seconds\": \"<s>\"}, {\"cmd\": \"pytest -q\", \"rc\": 0, \"seconds\": \"<s>\"}]}\n"
+    },
+    {
+     "exit": 0,
+     "gates": [
+      "ruff check .",
+      "mypy --strict src",
+      "pytest -q"
+     ],
+     "markers": [
+      "{\"passed\": true, \"passed_at\": \"<passed_at>\", \"checks\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"project_root\": \"<root>\", \"key\": \"<key0>\", \"writer\": \"run\", \"commands_sha256\": \"b3e585bcaeb946eae5887ccfdc062d035c2eef2132635b081e4f063c3dcd2815\"}"
+     ],
+     "stdout": "{\"cached\": true, \"commands\": [\"ruff check .\", \"mypy --strict src\", \"pytest -q\"], \"exit\": 0, \"key\": \"<key0>\"}\n"
+    }
+   ]
+  },
+  "unreadable/none/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    }
+   ]
+  },
+  "unreadable/none/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    }
+   ]
+  },
+  "unreadable/trusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    }
+   ]
+  },
+  "unreadable/trusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    }
+   ]
+  },
+  "unreadable/untrusted/failing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    }
+   ]
+  },
+  "unreadable/untrusted/passing": {
+   "rounds": [
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    },
+    {
+     "exit": 3,
+     "gates": [],
+     "markers": [],
+     "stdout": "{\"cached\": false, \"commands\": [], \"exit\": 3, \"reason\": \"unreadable workflow(s): ci.yml: ParserError\"}\n"
+    }
+   ]
+  }
+ },
+ "module_sha256": "e2af9ccc31d7fa8bac00f598c93db3ee4bf5efbad58e75f40c2dac027d04745e",
+ "source_sha": "4bd3d3d8"
+}

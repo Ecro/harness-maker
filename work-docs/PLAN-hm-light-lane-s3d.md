@@ -78,11 +78,20 @@ that any pass comes from the fixture's own `.venv`.
 ## 📝 Implementation Plan
 
 0. **Phase 0: goldens, before any edit.** depends_on: none · parallel_group: 0 ·
-   merge_hazards: none · scope: a detached `4bd3d3d8` worktree under the scratchpad, and
-   `tests/fixtures/light_lane_s3d/` (new). The fixtures hold `run`'s stdout, exit code and
-   marker bytes over AC-001's domain, and the render SHAs for AC-006, with the capture script
-   beside them, as in `light_lane_s3a/` · exit: fixtures committed · risk: low · rollback:
-   delete the fixtures.
+   merge_hazards: none · scope: `git archive` unpacks of `4bd3d3d8` and `df070f6c` under the
+   scratchpad, and `tests/fixtures/light_lane_s3d/` (new). The fixtures hold `run`'s stdout,
+   exit code and marker bytes over AC-001's domain, and the render SHAs for AC-006, with the
+   capture script beside them, as in `light_lane_s3a/` · exit: fixtures committed · risk: low ·
+   rollback: delete the fixtures.
+
+   **Reference SHAs (2026-10-15, execution).** AC-001 and AC-003 compare against `4bd3d3d8`
+   as written: `verification_cache.py` and `verification_plan.py` are byte-identical between
+   `4bd3d3d8` and `df070f6c`. AC-006's render reference is **`df070f6c`**, the main tip this
+   stage builds on, not `4bd3d3d8`: stage 3c (merged after the SPEC was written) changed those
+   renders, so a `4bd3d3d8` reference would fail on 3c's bytes, not on 3d's. The AC's intent —
+   3d adds no render bytes outside the light check — is what the `df070f6c` reference tests.
+   The SPEC files are not edited (that would void the stamp); the test name
+   `test_typed_stages_match_4bd3d3d8` is kept as the SPEC lists it, and its docstring says so.
 1. **Phase 1: Python.** depends_on: 0 · parallel_group: 1 · merge_hazards: none · scope:
    `src/harness_maker/verification_plan.py` (`ci_absent`) and
    `src/harness_maker/observability/verification_cache.py` (`--spec-slug`, the trust check, the
