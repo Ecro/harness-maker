@@ -3,8 +3,8 @@ spec_slug: hm-autopilot-spec-advance
 parent_spec: null
 verification_tier: 1
 mutation_threshold: null
-mutation_threshold_rationale: Two sentences of prompt text; render and unit tests pin them,
-  mutation testing adds little.
+mutation_threshold_rationale: Two sentences of prompt text; render and unit tests
+  pin them, mutation testing adds little.
 last_mutation_run: null
 paths_to_mutate: []
 mutation_runner: null
@@ -16,11 +16,10 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_spec_autopilot_advance.py::test_auto_full_step5_says_the_stage_advances
-  executable_predicate: >-
-    all('autopilot stops at this stage' not in step5[t] and 'does not end this stage
-    by itself' in step5[t] and '`proceed: true` advances WITHOUT an approval' in step5[t]
-    and '`/hm:wrapup` asks again before landing' in step5[t] for t in ('claude', 'codex'))
-    and tail(step5['claude']) == tail(step5['codex'])
+  executable_predicate: 'all(''autopilot stops at this stage'' not in step5[t] and
+    ''does not end this stage by itself'' in step5[t] and ''`proceed: true` advances
+    WITHOUT an approval'' in step5[t] and ''`/hm:wrapup` asks again before landing''
+    in step5[t] for t in (''claude'', ''codex'')) and tail(step5[''claude'']) == tail(step5[''codex''])'
   golden_table: []
   rubric_id: null
   note: ''
@@ -28,8 +27,7 @@ ac:
   oracle_source: golden
   oracle_evidence: The false claim is the d48bdc0 sentence the 2026-10-14 bench runs
     quoted back ("no approval to advance on, so I stopped here"). What auto_full does
-    is fixed by the boundary, not the template, and is already pinned by
-    tests/unit/test_autopilot_judgment_gate.py::test_auto_full_proceeds_through_a_pending_gate
+    is fixed by the boundary, not the template, and is already pinned by tests/unit/test_autopilot_judgment_gate.py::test_auto_full_proceeds_through_a_pending_gate
     (proceed true on a pending gate), so the expected wording follows from code this
     task does not change.
   oracle_independence_waiver: null
@@ -49,8 +47,8 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_spec_autopilot_advance.py::test_step5_is_the_same_at_every_level
-  executable_predicate: all(step5_at(level) == step5_at('auto_full') for level in ('gated',
-    'ask', 'auto_safe'))
+  executable_predicate: all(step5_at(level) == step5_at('auto_full') for level in
+    ('gated', 'ask', 'auto_safe'))
   golden_table: []
   rubric_id: null
   note: ''
@@ -78,19 +76,19 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_autopilot_spec_advance_directive.py::test_directive_says_a_missing_approval_is_no_reason_to_stop
-  executable_predicate: res['proceed'] is True and res['next_stage'] == 'execute' and
-    'write NO approval' in d and 'not a reason to stop' in d and 'when `proceed` is
-    true' in d
+  executable_predicate: res['proceed'] is True and res['next_stage'] == 'execute'
+    and 'write NO approval' in d and 'not a reason to stop' in d and 'when `proceed`
+    is true' in d
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: '"write NO approval" is the d48bdc0 directive text, which must stay.
-    The added clause answers the stop reason the bench runs gave (a missing approval)
-    and is checked against the boundary JSON of an auto_full marker on the default
-    pipeline, whose proceed/next_stage come from next_stage() and are unchanged by
-    this task.'
+  oracle_evidence: '"write NO approval" is the d48bdc0 directive text, which must
+    stay. The added clause answers the stop reason the bench runs gave (a missing
+    approval) and is checked against the boundary JSON of an auto_full marker on the
+    default pipeline, whose proceed/next_stage come from next_stage() and are unchanged
+    by this task.'
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -104,3 +102,18 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 001b7ee0b62f71ea59c2fe73c2f9bc8fad35276c26d10431eae6df62fb5e4cbc
+  approved_by: Ecro
+  approved_at: '2026-10-15T00:12:15Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 8c7c934e12ff77414973ca9b0a52691b75fa5c1d7d27000348bd7a6ee03fef10
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    mutation_threshold_rationale: 04352788dbc37adba9f4eb9871cebd96acec08b27f6f956cd4318d1eaef462ce
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: f667cf3bffae3668b4a369c5cca43941f64b11ad3a66fc380e087cfd08ead9cd
+    AC-002: c89ef828aeab3d85d9151e687154aeb59a5c09c32a8fd6645d6ba0f0b86046b4
+    AC-003: dc64bf84c6a9d675db5872c98e314a65116e8129ef5adbcd97ca4c5a27a7ca97
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d
