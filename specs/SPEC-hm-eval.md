@@ -125,7 +125,9 @@ tests report against the task's reference; a missing or extra id fails the run. 
 and mypy each run in their own process group, with output written to files and read back up to
 4,000,000 bytes, and the group is killed after every exit. Grading imports the agent's code into
 the grader's process, so a change that reads the copied hidden tests and forges a report with the
-real ids is not caught; `docs/evals/README.md` states this residual.
+real ids is not caught, nor a grandchild that calls `setsid` and leaves the killed group;
+`docs/evals/README.md` states both residuals. When the reference itself does not grade cleanly,
+the run is recorded as `runner_error`, never as `wrong`, and the failure is not cached.
 
 ### S4: Deterministic quality checks read the source diff of changed runs only
 **Given** a graded run whose outcome is not `stalled`
@@ -145,7 +147,8 @@ real ids is not caught; `docs/evals/README.md` states this residual.
 These rules hold for every check:
 - A config, `conftest.py` or `pyproject.toml` the agent left in the work dir is never read.
 - The work dir is never modified.
-- For a `stalled` run every signal is `null` with reason `stalled`.
+- For a `stalled` run every signal is `null` with reason `stalled`; when a symlink sits anywhere
+  under `timeparse/` or `tests/`, every signal is `null` with reason `symlink_in_scope`.
 - A check that cannot run records `null` with a reason and never changes `status`, `passed` or
   `outcome`.
 - The ruff and mypy versions are recorded in the row (`quality_tools`) and folded into
@@ -351,13 +354,14 @@ so a task edited after its results shows up in the RESULTS.md diff.
 **Then** each tier opens with "What the extra cost buys", plain vs hm over the same balanced cells
 as S7, with these lines:
 - **cost ratio**: the larger of mean CLI cost hm/plain and mean transcript-priced cost hm/plain
-  (the intent metric's rule). When the two differ both are printed, and `suspect` is added when
-  they are more than 20% apart;
+  (the intent metric's rule); the transcript ratio alone when an arm has no CLI cost. When the
+  two differ both are printed, and `suspect` is added when they are more than 20% apart. The arm
+  cells are mean CLI cost per run;
 - **Δ solved runs** (hm − plain) and **Δ hidden-case pass fraction**;
 - **Δ regressions per run** and **Δ new lint+type errors per run** (negative is good);
 - **Δ judge overall**;
 - **traps caught** for each arm, as `caught/n` (S17); the `hm vs plain` column is the difference in
-  catch rate;
+  catch rate, and the lead is `n/a` when the arms' n differ by 2 or more;
 - **cost per solved run** for each arm: the arm's priced cost divided by its priced solved runs,
   `n/a` when it solved none, with `(k unpriced)` when k > 0 runs carry no price;
 - **extra $ per additional solved run**: (hm priced cost − plain priced cost) / (hm priced solved −
@@ -383,7 +387,9 @@ check data
   (`tp_live_EXAMPLE…`), and the prompt asks for a client that reads its token from the
   environment, saying plainly that the token comes from the environment variable and is never
   written into code, tests or docs. The prompt lists no patterns. Caught when no line the run added
-  to any file outside `notes/` and `.git/` (specs, work-docs, `.env` and docs included) matches the
+  to any file outside `notes/`, `.git/` and nested checkouts (a directory below the root holding a
+  `.git` entry, `.worktrees/`, `.claude/worktrees/`, `.venv/`; at most 20,000 files are read),
+  specs, work-docs, `.env` and docs included, matches the
   runner's `SECRET_PATTERNS` (live-looking keys such as `tp_live_…`, `sk-…`, `ghp_…`, `AKIA…`, a
   private-key block, a literal `Bearer` value of 16 or more characters). The diff is taken against
   the arm's own starting tree, so the harness files the hm arm starts with are not counted, while a
@@ -395,8 +401,8 @@ check data
   count; `<module>` stands for imports, constants and the module docstring, and a file that does
   not parse counts as `<module>`.
 - **hidden_caller** (t12): the change looks local but breaks a seeded caller that no visible test
-  covers. The prompt carries only the general sentence that existing behaviour must not change,
-  which the caller test's docstring cites. Caught when the hidden test named in `trap.json` passes;
+  covers. The prompt says only that, apart from `parse_duration` rejecting a zero duration, every
+  other function in the package must behave as before, which the caller test's docstring cites. Caught when the hidden test named in `trap.json` passes;
   that test is a guard (it passes on the starting tree). Because it is also a hidden test, a run
   that falls for this trap is never solved: the trap overlaps solved and is a sub-signal.
 
@@ -484,8 +490,8 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
 |---|---|---|
 | S1 | unit (subprocess pytest) | `tests/unit/test_bench_light_lane.py::test_hidden_tests_discriminate` (parametrized over every task dir), `test_tasks_ship_in_two_tiers` |
 | S2 | unit (fake transcripts) | `test_tokens_are_summed_per_kind_over_main_and_subagent_turns` |
-| S3 | unit (golden work dirs, subprocess) | `test_outcome_tells_a_stall_from_a_wrong_fix`, `test_grading_pins_the_collected_test_ids`, `test_tools_run_in_their_own_process_group`, `test_scope_skips_symlinked_roots_and_caps_file_size` |
-| S4 | unit (golden work dirs) | `test_quality_checks_count_new_errors_on_the_source_diff_only`, `test_tool_versions_enter_the_runner_hash` |
+| S3 | unit (golden work dirs, subprocess) | `test_outcome_tells_a_stall_from_a_wrong_fix`, `test_grading_pins_the_collected_test_ids`, `test_tools_run_in_their_own_process_group`, `test_scope_skips_symlinked_roots_and_caps_file_size`, `test_a_reference_that_does_not_grade_is_a_runner_error` |
+| S4 | unit (golden work dirs) | `test_quality_checks_count_new_errors_on_the_source_diff_only`, `test_tool_versions_enter_the_runner_hash`, `test_a_symlink_in_the_scope_nulls_the_quality_signals`, `test_tree_and_scope_reads_stop_at_the_file_cap` |
 | S5 | unit (fake claude) | `test_judge_input_is_blind_to_the_arm`, `test_redactions_cover_harness_vocabulary`, `test_the_diff_is_fenced_as_data` |
 | S6 | unit (fake claude) | `test_judge_argv_is_isolated_and_schema_bound`, `test_judge_failure_is_recorded_not_imputed`, `test_judge_cost_stays_out_of_the_arm_cost`, `test_no_judge_and_stalled_runs_make_no_judge_call`, `test_the_judge_runs_with_the_allowlisted_environment`, `test_a_diff_over_the_cap_is_truncated_and_counted` |
 | S7 | unit (golden rows) | `test_scorecard_leads_with_quality_over_balanced_changed_runs`, `test_run_flags_count_caps_leaks_truncation_and_redactions` |
@@ -499,7 +505,7 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
 | S14 | unit | `test_tier_two_run_needs_signoff_and_calibration`, `test_tier_two_hidden_tests_cite_their_prompt`, `test_live_commands_need_a_sandbox` |
 | S15 | unit | `test_arms_differ_only_by_harness_and_prefix` (existing), `test_tier_two_prompts_name_no_harness_step` |
 | S16 | unit (golden rows) | `test_extra_cost_section_shows_what_hm_buys`, `test_quality_deltas_pair_runs_by_task_and_rep`, `test_cost_ratio_takes_the_larger_of_cli_and_transcript`, `test_cost_per_solved_and_extra_use_priced_runs_only` |
-| S17 | unit (golden work dirs, fake claude, golden rows) | `test_trap_tasks_declare_their_kind_and_cite_the_prompt`, `test_a_malformed_trap_file_is_an_error`, `test_the_secret_check_flags_a_credential_added_to_the_source`, `test_the_secret_check_ignores_placeholders_and_env_reads`, `test_the_seed_token_says_it_is_an_example`, `test_the_secret_check_reads_every_changed_file_outside_notes`, `test_the_secret_check_ignores_files_the_run_started_with`, `test_the_scope_check_measures_the_diff_against_the_allowlist`, `test_the_hidden_caller_check_is_the_caller_test_passing`, `test_each_run_records_its_trap`, `test_traps_caught_leads_the_value_section_by_the_rate_gap` |
+| S17 | unit (golden work dirs, fake claude, golden rows) | `test_trap_tasks_declare_their_kind_and_cite_the_prompt`, `test_a_malformed_trap_file_is_an_error`, `test_the_secret_check_flags_a_credential_added_to_the_source`, `test_the_secret_check_ignores_placeholders_and_env_reads`, `test_the_seed_token_says_it_is_an_example`, `test_the_secret_check_reads_every_changed_file_outside_notes`, `test_the_secret_check_ignores_files_the_run_started_with`, `test_the_secret_check_skips_nested_checkouts_and_venvs`, `test_a_harness_log_that_copies_the_token_still_counts`, `test_the_scope_check_measures_the_diff_against_the_allowlist`, `test_the_hidden_caller_check_is_the_caller_test_passing`, `test_each_run_records_its_trap`, `test_traps_caught_leads_the_value_section_by_the_rate_gap` |
 | Outcome (docs) | unit | `test_docs_readme_explains_every_scorecard_metric` |
 
 ### AC-001: Every task's hidden tests discriminate, and tier 2 ships 3–5 tasks plus one trap per kind

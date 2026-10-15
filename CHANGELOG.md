@@ -29,7 +29,8 @@
   task and is tied to the judge model. Grading pins the collected test ids, and the grader, ruff and mypy
   run in killed process groups with capped output; ruff and mypy ignore suppression comments the agent
   writes. Live `run` and `canary` need `IS_SANDBOX=1` or `--no-sandbox-ok`. The t10 secret check now reads
-  every changed file outside `notes/`.
+  every changed file outside `notes/` and nested checkouts. The runner's git calls never fork background
+  maintenance, which had made a template copy fail mid-copy in CI.
 - **Light lane for small `/hm:` tasks (HM-LIGHT-LANE, stage 1).** spec Step 0 now writes `lane: light|full`
   to the SPEC frontmatter: `light` when about five files or fewer change, the work fits one session and no
   decision is irreversible (the trivial skip path is always `light`; a SPEC without the field is `full`).

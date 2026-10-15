@@ -105,6 +105,7 @@ ac:
   - tests/unit/test_bench_light_lane.py::test_grading_pins_the_collected_test_ids
   - tests/unit/test_bench_light_lane.py::test_tools_run_in_their_own_process_group
   - tests/unit/test_bench_light_lane.py::test_scope_skips_symlinked_roots_and_caps_file_size
+  - tests/unit/test_bench_light_lane.py::test_a_reference_that_does_not_grade_is_a_runner_error
   executable_predicate: null
   golden_table:
   - input:
@@ -170,6 +171,8 @@ ac:
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_quality_checks_count_new_errors_on_the_source_diff_only
   - tests/unit/test_bench_light_lane.py::test_tool_versions_enter_the_runner_hash
+  - tests/unit/test_bench_light_lane.py::test_a_symlink_in_the_scope_nulls_the_quality_signals
+  - tests/unit/test_bench_light_lane.py::test_tree_and_scope_reads_stop_at_the_file_cap
   executable_predicate: null
   golden_table:
   - input:
@@ -931,6 +934,8 @@ ac:
   - tests/unit/test_bench_light_lane.py::test_the_seed_token_says_it_is_an_example
   - tests/unit/test_bench_light_lane.py::test_the_secret_check_reads_every_changed_file_outside_notes
   - tests/unit/test_bench_light_lane.py::test_the_secret_check_ignores_files_the_run_started_with
+  - tests/unit/test_bench_light_lane.py::test_the_secret_check_skips_nested_checkouts_and_venvs
+  - tests/unit/test_bench_light_lane.py::test_a_harness_log_that_copies_the_token_still_counts
   - tests/unit/test_bench_light_lane.py::test_the_scope_check_measures_the_diff_against_the_allowlist
   - tests/unit/test_bench_light_lane.py::test_the_hidden_caller_check_is_the_caller_test_passing
   - tests/unit/test_bench_light_lane.py::test_each_run_records_its_trap
@@ -1002,7 +1007,8 @@ ac:
       traps_caught: plain 2/5, hm 5/6, +0.43, lead hm; with plain at 4/5 the lead
         is tie; a tier with no trap rows reads n/a (n=0) and lead n/a
     edge: false
-    note: rate-gap rule (gap >= 0.20); 4/5 vs 5/6 is 0.03
+    note: rate-gap rule (gap >= 0.20); 4/5 vs 5/6 is 0.03; with plain at 3 trap results
+      against hm's 6 (n differ by >= 2) the lead is n/a
   rubric_id: null
   note: Amendment 2026-10-15, traps (DRI). The trap tasks are inside tier2_hash (the
     DRI signs them with the rest of tier 2) and outside the judge calibration, since
