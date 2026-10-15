@@ -4,6 +4,24 @@
 
 ### Added
 
+- **Plain-vs-hm eval with published results (SPEC-hm-eval).** `scripts/bench_light_lane.py` now records,
+  per run, tokens by kind, an outcome (solved / wrong / stalled against the starting tree), deterministic
+  quality deltas on the changed source (new ruff and `mypy --strict` errors, regressions of the visible
+  tests, diff size, tests touched; null for a stalled run) and one blind, schema-bound judge score (rubric
+  `hm-eval-judge-v1`; `--no-judge`, `--judge-model`, `--judge-budget-usd`; judge spend stays out of arm
+  costs). Each tier of the scorecard opens with **What the extra cost buys**: the hm/plain cost ratio, Δ
+  solved runs, Δ case fraction, Δ regressions, Δ new lint+type errors, Δ judge overall, cost per solved run
+  per arm, traps caught, and extra $ per additional solved run (`n/a` when hm solves no more). Quality and Efficiency
+  detail follows; every lead comes from one fixed direction table, and every figure prints its n. Tier-2
+  tasks t6–t9 (bug fix with a regression trap, invariant-keeping change, stated multi-case contract, one
+  source of truth) run only after a DRI sign-off of their hash and a passing judge calibration
+  (`canary --judge-calibration --record`). Three tier-2 trap tasks, t10 (secret), t11 (scope) and t12
+  (hidden caller), each declare a deterministic check in `trap.json`, and each run of one records
+  `trap: {kind, caught}`; they are in the sign-off hash and outside the calibration. The new `publish` subcommand writes `docs/evals/RESULTS.md` and
+  a README block between `<!-- hm:eval:start -->` markers, deterministically; both are seeded from the
+  2026-10-14 tier-1 rows (quality `n/a`). `docs/evals/README.md` explains every line and how cost cuts
+  such as the light lane are read on the same scorecard. `hm_cost_ratio_small` is unchanged and reads
+  tier-1 rows only. `--total-budget-usd` now defaults to 80.
 - **Light lane for small `/hm:` tasks (HM-LIGHT-LANE, stage 1).** spec Step 0 now writes `lane: light|full`
   to the SPEC frontmatter: `light` when about five files or fewer change, the work fits one session and no
   decision is irreversible (the trivial skip path is always `light`; a SPEC without the field is `full`).

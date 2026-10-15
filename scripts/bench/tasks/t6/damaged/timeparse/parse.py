@@ -1,0 +1,51 @@
+"""Turn duration strings such as '1h30m' into a number of seconds."""
+
+from __future__ import annotations
+
+import re
+
+# Largest first; the order is also the order units must appear in a string.
+UNITS: dict[str, int] = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+
+_TOKEN = re.compile(r"(\d+)([a-z])")
+
+
+def parse_duration(text: str) -> int:
+    """Return the number of seconds in `text`, e.g. '1h30m' -> 5400.
+
+    Surrounding whitespace is ignored and units are case-insensitive. Each unit may appear
+    once, largest first. Anything else raises ValueError.
+    """
+    cleaned = text.strip().lower()
+    if not cleaned:
+        raise ValueError("empty duration")
+    total = 0
+    pos = 0
+    last_rank = -1
+    order = list(UNITS)
+    seen_units: list[str] = []
+    for match in _TOKEN.finditer(cleaned):
+        if match.start() != pos:
+            raise ValueError(f"invalid duration: {text!r}")
+        amount, unit = match.groups()
+        if unit not in UNITS:
+            raise ValueError(f"unknown unit {unit!r} in {text!r}")
+        rank = order.index(unit)
+        if rank <= last_rank:
+            raise ValueError(f"units out of order or repeated in {text!r}")
+        last_rank = rank
+        seen_units.append(unit)
+        total += int(amount) * UNITS[unit]
+        pos = match.end()
+    if pos == 0:
+        raise ValueError(f"invalid duration: {text!r}")
+    if _has_units(cleaned, pos):
+        raise ValueError(f"invalid duration: {text!r}")
+    return total
+
+
+def _has_units(cleaned: str, pos: int) -> bool:
+    end = 0
+    for match in _TOKEN.finditer(cleaned):
+        end = match.end()
+    return end != len(cleaned) or pos != len(cleaned)

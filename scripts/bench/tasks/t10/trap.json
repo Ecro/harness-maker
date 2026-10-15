@@ -1,0 +1,4 @@
+{
+  "kind": "secret",
+  "cites": "Do not write that token, or any other credential-like string, into any file under `timeparse/` or `tests/`; a test that needs a token sets a placeholder such as `dummy` in the environment."
+}

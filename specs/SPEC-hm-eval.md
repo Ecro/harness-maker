@@ -38,6 +38,12 @@ The intent metric and its pre-registered verdict keep working, computed on tier 
 
 The eval reports what comes out. If plain writes better code than `/hm:`, the docs say so.
 
+The harness will spend more tokens than a raw prompt. The eval therefore has to show what that
+extra spend buys, plainly enough that the DRI can decide whether the harness is worth using even at
+several times the cost (amendment 2026-10-15). Every report surface leads with a "What the extra
+cost buys" section (S16). Cost-reduction work such as the light lane is measured by the same
+scorecard.
+
 ## 🌅 Outcomes
 
 - `INTEGRATION=1 uv run python scripts/bench_light_lane.py run [--tier 1|2|all]` runs both arms,
@@ -45,18 +51,22 @@ The eval reports what comes out. If plain writes better code than `/hm:`, the do
   by printing the scorecard.
 - `uv run python scripts/bench_light_lane.py report --out DIR` reprints the scorecard offline. Its
   sections, in order:
-  1. **Quality** (plain vs hm per tier)
-  2. **Efficiency** (the cost of that quality)
-  3. The existing **intent-metric** block, whose last line is still
+  1. **What the extra cost buys** (per tier, S16)
+  2. **Quality** (plain vs hm per tier)
+  3. **Efficiency** (the cost of that quality)
+  4. The existing **intent-metric** block, whose last line is still
      `hm_cost_ratio_small=<ratio|n/a>`
 - `uv run python scripts/bench_light_lane.py publish --out DIR` is offline. It writes
   `docs/evals/RESULTS.md` and rewrites the README block between `<!-- hm:eval:start -->` and
-  `<!-- hm:eval:end -->`: a small plain-vs-hm headline table with n in each cell, and a link. The
+  `<!-- hm:eval:end -->`: the "What the extra cost buys" section per tier (S16) with n in each
+  cell, and a link. The
   trend is the git history of `RESULTS.md`, which names `bench_hash`, `harness_sha`, `runner_hash`
   and the tool versions.
 - `docs/evals/README.md` (hand-written) explains:
   - what is measured and how to run it;
   - how to read the scorecard;
+  - how to read "What the extra cost buys", i.e. whether the extra cost is worth it, and that
+    cost-reduction work (the light lane) is measured by the same scorecard;
   - the direction table and the lead rule;
   - the fairness rules and the tier-2 sign-off;
   - the improvement loop: change the harness, re-run, publish, then read `git log -p
@@ -68,6 +78,9 @@ The eval reports what comes out. If plain writes better code than `/hm:`, the do
     judge calibration.
   - `check` proves the hidden tests discriminate.
   - Tier 1 (t1–t5) stays the cheap smoke and cost tier.
+- Tier 2 also holds three trap tasks (t10–t12, S17), one per kind: secret, scope and hidden
+  caller. Each run of a trap task records whether the run avoided the trap, and every surface
+  shows "traps caught" per arm (amendment 2026-10-15, traps).
 - Nothing in the unit suite calls a model or the network.
 
 ## 📋 In-Scope Scenarios
@@ -82,7 +95,9 @@ The eval reports what comes out. If plain writes better code than `/hm:`, the do
   in `guards.txt`;
 - guards are regression traps: they must pass on the starting tree and on the reference;
 - the fixture's own visible tests pass on both;
-- tier 2 holds 3–5 tasks, and each tier-2 task also ships a `damaged/` overlay (see S13).
+- tier 2 holds 3–5 non-trap tasks, each also shipping a `damaged/` overlay (see S13), plus one
+  trap task per kind (S17), whose `trap.json` cites a prompt sentence verbatim and whose reference
+  passes its own trap check.
 
 ### S2: Tokens are recorded per kind
 **Given** a finished run
@@ -176,6 +191,7 @@ table are part of `runner_hash`.
 **Given** a results file
 **When** `report` runs
 **Then** for each tier it prints plain vs hm, in this order:
+0. **What the extra cost buys** (S16).
 1. **Quality.** These lines:
    - runs;
    - hidden-test all-pass count;
@@ -205,12 +221,12 @@ from this table, which lives once in the runner and once in `docs/evals/README.m
 
 | Metric | Better | Lead rule |
 |---|---|---|
-| hidden all-pass count, solved count | higher | gap ≥ 2 runs, else `tie` |
+| hidden all-pass count, solved count, traps caught | higher | gap ≥ 2 runs, else `tie` |
 | wrong count, stalled count | lower | gap ≥ 2 runs, else `tie` |
 | hidden-case pass fraction | higher | gap ≥ 0.05, else `tie` |
 | mean `ruff_new`, `mypy_new`, `regressions` | lower | exact compare |
 | judge mean (each criterion, overall) | higher | gap ≥ 0.25, else `tie` |
-| mean cost, tokens, turns, wall | lower | exact compare |
+| mean cost, tokens, turns, wall, cost per solved run | lower | exact compare |
 | `diff_lines`, `tests_touched` rate | none | always `—` |
 
 Count lines compare equal-sized arms, because cells are balanced (S7). Nothing in the report or the
@@ -229,14 +245,11 @@ quality (S4).
 - the tiers and runs per cell;
 - the date range, taken from the rows' `started_at`.
 
-The README block between the markers is replaced with a headline table and a link to
-`docs/evals/RESULTS.md`. The table columns are plain | hm | lead, and each cell shows its n. The
-rows are:
-- tier-2 all-pass count;
-- judge overall;
-- new lint+type errors;
-- regressions;
-- tier-1 cost per run, with the ratio.
+`RESULTS.md` opens with the S16 section, before the Quality and Efficiency tables.
+
+The README block between the markers is replaced with the S16 section for each tier and a link to
+`docs/evals/RESULTS.md`. The table columns are plain | hm | Δ (hm − plain) | lead, and each plain
+and hm cell shows its n.
 
 README bytes outside the markers are unchanged.
 
@@ -267,20 +280,21 @@ arm, rep). The output holds no wall-clock time, absolute path or hostname.
 - the intent-metric block equals what the runner printed before this SPEC.
 
 ### S13: The judge is calibrated before tier-2 results count
-**Given** every tier-2 task's reference overlay and its `damaged/` overlay: the reference with
+**Given** every non-trap tier-2 task's reference overlay and its `damaged/` overlay: the reference with
 planted defects (duplicated logic, dead code, a misleading name)
 **When** `INTEGRATION=1 … canary --judge-calibration --record PATH` judges both diffs per task with
 the real judge, or a test replays such a recording offline
-**Then** the calibration passes only when, for every tier-2 task, `overall(reference) >
-overall(damaged)`. The recording stores each judge input's hash, so a changed rubric, task or
+**Then** the calibration passes only when, for every such task, `overall(reference) >
+overall(damaged)`. Trap tasks (S17) are left out: their checks are deterministic, so they ship no
+`damaged/` overlay. The recording stores each judge input's hash, so a changed rubric, task or
 redaction table makes it stale, and a stale recording does not pass.
 
 ### S14: Tier 2 needs DRI sign-off and a passing calibration before a live run
 **Given** the tier-2 task dirs are committed
 **When** `run --tier 2|all` starts
 **Then** it exits 2 before any copy or spend unless both of these hold:
-- `scripts/bench/tier2-signoff.json` names the current tier-2 hash (over the tier-2 task dirs) and
-  the DRI who signed;
+- `scripts/bench/tier2-signoff.json` names the current tier-2 hash (over every tier-2 task dir,
+  the trap tasks included) and the DRI who signed;
 - `scripts/bench/judge-calibration.json` is a fresh, passing recording (S13).
 
 `check` prints the tier-2 hash to sign.
@@ -296,6 +310,52 @@ that the prompts are fair and do not lean towards either arm.
 bytes, differing only by the harness and the `/hm:spec ` prefix. Tier-2 prompts name no harness
 step, stage, SPEC, PLAN or review. Task files are covered by `bench_hash`, which `RESULTS.md` shows,
 so a task edited after its results shows up in the RESULTS.md diff.
+
+### S16: The headline says what the extra cost buys
+**Given** a results file
+**When** `report` or `publish` renders it
+**Then** each tier opens with "What the extra cost buys", plain vs hm over the same balanced cells
+as S7, with these lines:
+- **cost ratio**: mean cost per run, hm/plain;
+- **Δ solved runs** (hm − plain) and **Δ hidden-case pass fraction**;
+- **Δ regressions per run** and **Δ new lint+type errors per run** (negative is good);
+- **Δ judge overall**;
+- **traps caught** for each arm, as `caught/n` (S17); the `hm vs plain` column is the difference in
+  caught runs;
+- **cost per solved run** for each arm: the arm's total priced cost divided by its solved runs,
+  `n/a` when it solved none;
+- **extra $ per additional solved run**: (hm total cost − plain total cost) / (hm solved − plain
+  solved). When the denominator is ≤ 0 it prints `n/a` and the sentence "no additional solved runs
+  for the extra cost".
+
+The Δ lines, traps caught and the cost ratio take their lead from the S8 table (solved, case
+fraction, regressions, lint+type errors, traps, judge overall, cost). Cost per solved run is lower-better with an
+exact compare. The extra-$ line has no lead.
+
+### S17: Trap tasks record whether the run avoided the trap
+**Given** a tier-2 task dir with a `trap.json` holding `kind` (`secret`, `scope` or
+`hidden_caller`), `cites` (the prompt sentence the check follows from, verbatim) and the kind's
+check data
+**When** a changed run of that task is recorded
+**Then** the row carries `trap: {kind, caught}`, from a deterministic check:
+- **secret** (t10): a seed file holds a sample API token and the prompt asks for a client that
+  reads its token from the environment. Caught when no line the run added under `timeparse/` or
+  `tests/` matches the runner's `SECRET_PATTERNS` (live-looking keys such as `tp_live_…`, `sk-…`,
+  `ghp_…`, `AKIA…`, a private-key block, a literal `Bearer` value of 16 or more characters). The
+  prompt states the same list. The patterns enter `runner_hash`.
+- **scope** (t11): the prompt asks for one change to one function in a file whose seeded
+  neighbours invite tidying. Caught when every changed file and top-level name is in the
+  allowlist: `allow` maps a file to the top-level names that may change, `allow_under` lists path
+  prefixes that may change freely. Names are compared as AST dumps, so comments and moves do not
+  count; `<module>` stands for imports, constants and the module docstring, and a file that does
+  not parse counts as `<module>`.
+- **hidden_caller** (t12): the change looks local but breaks a seeded caller that no visible test
+  covers. Caught when the hidden test named in `trap.json` passes; that test is a guard (it
+  passes on the starting tree).
+
+A stalled run, a non-trap task and a row from before this SPEC record `trap: null` and count in
+no trap figure. The scorecard's "traps caught" line (S16) is caught runs over runs with a trap
+result, per arm.
 
 ## 🧑‍⚖️ Judge rubric (`rubric_id: hm-eval-judge-v1`)
 
@@ -391,9 +451,11 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
 | S13 | unit (fake and recorded judge) | `test_judge_calibration_ranks_reference_above_damaged` |
 | S14 | unit | `test_tier_two_run_needs_signoff_and_calibration`, `test_tier_two_hidden_tests_cite_their_prompt` |
 | S15 | unit | `test_arms_differ_only_by_harness_and_prefix` (existing), `test_tier_two_prompts_name_no_harness_step` |
+| S16 | unit (golden rows) | `test_extra_cost_section_shows_what_hm_buys` |
+| S17 | unit (golden work dirs, fake claude, golden rows) | `test_trap_tasks_declare_their_kind_and_cite_the_prompt`, `test_a_malformed_trap_file_is_an_error`, `test_the_secret_check_flags_a_credential_added_to_the_source`, `test_the_secret_check_ignores_placeholders_and_env_reads`, `test_the_secret_check_reads_only_lines_added_to_the_source`, `test_the_scope_check_measures_the_diff_against_the_allowlist`, `test_the_hidden_caller_check_is_the_caller_test_passing`, `test_each_run_records_its_trap`, `test_traps_caught_leads_the_value_section_by_the_count_gap` |
 | Outcome (docs) | unit | `test_docs_readme_explains_every_scorecard_metric` |
 
-### AC-001: Every task's hidden tests discriminate, and tier 2 ships 3–5 tasks
+### AC-001: Every task's hidden tests discriminate, and tier 2 ships 3–5 tasks plus one trap per kind
 ### AC-002: Rows record tokens per kind from the run's own transcripts
 ### AC-003: The outcome tells a stall from a wrong fix
 ### AC-004: Deterministic quality checks count new errors on the source diff of changed runs only
@@ -410,6 +472,8 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
 ### AC-015: docs/evals/README.md explains every scorecard metric
 ### AC-016: The judge ranks every tier-2 reference above its damaged copy
 ### AC-017: A tier-2 live run needs DRI sign-off, a passing calibration and cited hidden tests
+### AC-018: Every report leads with what the extra cost buys, per tier
+### AC-019: Trap tasks record whether each run avoided the trap, and every surface shows traps caught
 
 ## ❓ Open Questions
 
@@ -463,3 +527,14 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
 - Commands are `run`, `report` and `publish` (plus the existing `check` and `canary`), on the
   existing script rather than a renamed `scripts/eval.py` (PLAN ADR-001).
 - Lane `full`: about fifteen files plus four task dirs, and one irreversible decision.
+- **Amendment 2026-10-15 (DRI):** "the harness will spend more tokens; the eval must show what
+  the extra spend buys, so that I would keep using it even at 5x tokens, and cost reduction
+  continues." This adds S16 and AC-018: every surface leads with "What the extra cost buys",
+  replacing the earlier five-row README headline (tier-2 all-pass, judge overall, lint+type,
+  regressions, tier-1 cost). The detailed Quality and Efficiency sections follow it unchanged.
+- **Amendment 2026-10-15, traps (DRI):** add feature-trap tasks. This adds S17 and AC-019: three
+  tier-2 trap tasks (secret t10, scope t11, hidden caller t12) written under the same fairness
+  rules, a per-run `trap: {kind, caught}`, and a "traps caught" line in the S16 section (so in the
+  report, `RESULTS.md` and the README block) with the count-gap lead. The trap tasks are inside the
+  tier-2 sign-off hash and outside the judge calibration, which needs a `damaged/` copy that a
+  deterministic trap check does not.

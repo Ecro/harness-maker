@@ -636,6 +636,26 @@ Other harnesses give everyone the same starting point. harness-maker reads YOUR 
 
 harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static template gives you a starting point. harness-maker gives you a starting point that knows who it was created for, and can be updated without losing your changes.
 
+<!-- hm:eval:start -->
+**Measured: plain prompt vs `/hm:`** at harness `d48bdc0b6b49`, same model and budget; n is the number of runs behind each figure. Leads follow the fixed bands in [docs/evals/README.md](docs/evals/README.md); the full scorecard is [docs/evals/RESULTS.md](docs/evals/RESULTS.md).
+
+**What the extra cost buys, tier 1: 5 task(s) x 3 run(s) per arm (t1, t2, t3, t4, t5)**
+
+| Metric | plain | hm | hm vs plain | Lead |
+|---|---|---|---|---|
+| cost ratio (hm/plain) | $0.058 (n=15) | $0.707 (n=15) | 12.29x | plain |
+| Δ solved runs | 15 (n=15) | 9 (n=15) | -6 | plain |
+| Δ hidden-case pass fraction | 1.00 (n=15) | 0.64 (n=15) | -0.36 | plain |
+| Δ regressions per run | n/a (n=0) | n/a (n=0) | n/a | n/a |
+| Δ new lint+type errors per run | n/a (n=0) | n/a (n=0) | n/a | n/a |
+| traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
+| Δ judge overall | n/a (n=0) | n/a (n=0) | n/a | n/a |
+| cost per solved run | $0.058 (n=15) | $1.179 (n=9) |  | plain |
+| extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
+
+_Pre-eval seed: these rows predate the quality signals (no tier, tokens, outcome, quality or judge fields), so every quality line reads n/a (n=0)._
+<!-- hm:eval:end -->
+
 ---
 
 ## Configuration

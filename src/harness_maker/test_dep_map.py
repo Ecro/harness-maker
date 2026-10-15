@@ -638,6 +638,9 @@ TESTS_NOT_CONFIG_AFFECTING: tuple[str, ...] = (
     # reproduce the verbosity composition that made the find-unbound gate inert. The trap
     # is built, never inherited, so THIS repo's addopts cannot change the outcome.
     "tests/unit/test_nonmechanical_binding.py",
+    # Writes a synthetic pyproject.toml into a bench work dir to prove the eval's quality
+    # checks ignore the agent's config; THIS repo's pyproject.toml is never read.
+    "tests/unit/test_bench_light_lane.py",
 )
 
 #: Markdown is inert only in these locations. A blanket "`.md` is inert" would make

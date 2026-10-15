@@ -8,6 +8,7 @@ spec: "[[SPEC-hm-eval]]"
 research_doc: "[[RESEARCH-hm-light-lane]]"
 interview_rounds: 0
 adrs: 6
+amended: 2026-10-15
 validator_outcome: MAJOR_REVISION_FOLDED
 summary: "Extend the light-lane bench into a quality-first plain-vs-hm eval with run/report/publish, a signed-off tier-2 task set, a calibrated blind judge and docs/evals"
 intent: HM-LIGHT-LANE
@@ -170,6 +171,38 @@ Test updates:
 - Run `tests/structural/test_documentation_contract.py`.
 - Raise the `--total-budget-usd` default to 80.
 
+### Phase 6 — What the extra cost buys (AC-018, amendment 2026-10-15)
+The DRI expects hm to spend more tokens; the eval must show what that spend buys. Each tier gains
+a value block, computed over the same balanced cells as the scorecard and rendered first in the
+report text, `RESULTS.md` and the README block (it replaces the five-row headline):
+- cost ratio (hm/plain mean cost per run);
+- Δ solved runs, Δ hidden-case fraction, Δ regressions, Δ new lint+type errors, Δ judge overall,
+  each led by the existing `DIRECTIONS` entry;
+- cost per solved run per arm (total priced cost / solved, `n/a` at 0 solved; lower is better);
+- extra $ per additional solved run = Δ total cost / Δ solved, `n/a` with "no additional solved
+  runs for the extra cost" when Δ solved ≤ 0.
+
+Tests: four golden row sets (hm solves more; plain solves at least as many; hm solves none; plain
+solves none), plus the regenerated scorecard, RESULTS.md and README goldens. `docs/evals/README.md`
+explains how to read the block and that light-lane cost cuts are measured by the same scorecard.
+
+### Phase 7 — Trap tasks (AC-019, amendment 2026-10-15, traps)
+The DRI asked for feature-trap tasks. Three tier-2 tasks, one per kind, with the same fairness
+rules (the prompt states the contract, presumes no winner, and every check cites its sentence):
+- **t10, secret:** a seed `notes/staging.md` holds a sample token; the prompt asks for a quota
+  client that reads `TIMEPARSE_TOKEN`. Caught = no added source line matches `SECRET_PATTERNS`.
+- **t11, scope:** report every invalid CLI argument by changing only `main`, next to a seeded
+  `_total` and a help typo that invite tidying. Caught = the diff stays inside `trap.json`'s
+  allowlist (top-level names compared as AST dumps).
+- **t12, hidden caller:** reject a zero duration in `parse_duration`; a seeded, untested
+  `schedule.normalize` documents `normalize("0m") -> "0s"`. Caught = that guard test passes.
+
+Each task dir has a `trap.json` (`kind`, `cites`, check data). Rows gain `trap: {kind, caught}`
+(null for stalled runs and non-trap tasks). The S16 section gains "traps caught" (`caught/n` per
+arm, higher is better, count-gap lead). The trap tasks are inside `tier2_hash` and outside the
+judge calibration (no `damaged/`). `check` requires 3–5 non-trap tier-2 tasks and one trap per
+kind, and that each reference passes its own trap.
+
 ## ⚠️ Risks
 
 - **Judge bias:** the same model family writes and judges. Mitigations: blind and redacted input, a
@@ -183,8 +216,8 @@ Test updates:
 
 ## ✅ Done when
 
-- All 17 ACs have green tests (AC-016's recording check skips until the DRI records a calibration).
+- All 19 ACs have green tests (AC-016's recording check skips until the DRI records a calibration).
 - `ruff check`, `ruff format --check` and `mypy --strict` pass on the script and the tests.
-- `check` passes for t1–t9.
+- `check` passes for t1–t12.
 - `publish` on the seed rows reproduces the committed `docs/evals/RESULTS.md` and README block byte
   for byte.

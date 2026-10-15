@@ -12,7 +12,7 @@ spec_quality_score: null
 spec_quality_score_at: null
 ac:
 - id: AC-001
-  title: Every task's hidden tests discriminate, and tier 2 ships 3-5 tasks
+  title: Every task's hidden tests discriminate, and tier 2 ships 3-5 tasks plus one trap per kind
   type: property
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_hidden_tests_discriminate
@@ -35,8 +35,10 @@ ac:
     the starting tree plus the reference overlay
   expected_relation: all(t fails on start for t in hidden - guards) and all(t passes
     on start for t in guards) and grade(reference).passed and visible(start).passed
-    and visible(reference).passed and 3 <= count(tier == 2) <= 5 and count(tier ==
-    1) == 5 and all((d / 'damaged').is_dir() for d in tier2_dirs)
+    and visible(reference).passed and 3 <= count(tier == 2 and not trap) <= 5 and count(tier ==
+    1) == 5 and all((d / 'damaged').is_dir() for d in non_trap_tier2_dirs) and
+    sorted(trap kinds) == ['hidden_caller', 'scope', 'secret'] and all(trap_for(reference).caught
+    for trap tasks)
   preconditions: []
   observable_output: hidden and visible pytest outcomes per task, tier file per task
   generator_hint: null
@@ -802,6 +804,149 @@ ac:
     slipped past the gate is observable independently of the runner; the citation
     check reads each test's docstring with ast and searches the prompt.md text on
     disk.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-018
+  title: Every report leads with what the extra cost buys, per tier
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_extra_cost_section_shows_what_hm_buys
+  - tests/unit/test_bench_light_lane.py::test_scorecard_leads_with_quality_over_balanced_changed_runs
+  executable_predicate: null
+  golden_table:
+  - input:
+      rows: tier 1, 2 tasks x 3 runs per arm; plain $0.10/run with 3 of 6 solved, hm $0.40/run
+        with 6 of 6 solved
+    expected:
+      cost_ratio: 4.00x
+      delta_solved: '+3'
+      solved_lead: hm
+      cost_per_solved: plain $0.200 (n=3), hm $0.400 (n=6)
+      extra_per_solved: $0.600 per additional solved run
+    edge: false
+    note: hm solves more, so the figure is finite ((2.40 - 0.60) / (6 - 3))
+  - input:
+      rows: plain $0.10/run with 6 of 6 solved, hm $0.40/run with 5 of 6 solved
+    expected:
+      delta_solved: '-1'
+      solved_lead: tie
+      cost_per_solved: plain $0.100 (n=6), hm $0.480 (n=5)
+      extra_per_solved: 'n/a: no additional solved runs for the extra cost'
+    edge: true
+    note: plain solves at least as many, so the denominator is <= 0
+  - input:
+      rows: plain $0.10/run with 6 of 6 solved, hm $0.30/run with 0 of 6 solved
+    expected:
+      delta_solved: '-6'
+      solved_lead: plain
+      cost_per_solved: plain $0.100 (n=6), hm n/a (n=0)
+      extra_per_solved: 'n/a: no additional solved runs for the extra cost'
+    edge: true
+    note: 0 solved in the hm arm
+  - input:
+      rows: plain $0.10/run with 0 of 6 solved, hm $0.40/run with 6 of 6 solved
+    expected:
+      cost_per_solved: plain n/a (n=0), hm $0.400 (n=6)
+      extra_per_solved: $0.300 per additional solved run
+    edge: true
+    note: 0 solved in the plain arm; (2.40 - 0.60) / 6
+  rubric_id: null
+  note: 'Amendment 2026-10-15 (DRI): the eval must show what the extra spend buys. The section
+    is first in the report text (before Quality, Efficiency and the intent block), in RESULTS.md
+    and in the README block; the golden scorecard.txt, RESULTS.md and README.after.md carry it.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The rows are built by the test from fixed per-run costs and pass counts, and
+    every expected figure is worked by hand in the golden table above (totals, quotients and the
+    n/a sentence), independent of the renderer.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+- id: AC-019
+  title: Trap tasks record whether each run avoided the trap, and every surface shows traps caught
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_trap_tasks_declare_their_kind_and_cite_the_prompt
+  - tests/unit/test_bench_light_lane.py::test_a_malformed_trap_file_is_an_error
+  - tests/unit/test_bench_light_lane.py::test_the_secret_check_flags_a_credential_added_to_the_source
+  - tests/unit/test_bench_light_lane.py::test_the_secret_check_ignores_placeholders_and_env_reads
+  - tests/unit/test_bench_light_lane.py::test_the_secret_check_reads_only_lines_added_to_the_source
+  - tests/unit/test_bench_light_lane.py::test_the_scope_check_measures_the_diff_against_the_allowlist
+  - tests/unit/test_bench_light_lane.py::test_the_hidden_caller_check_is_the_caller_test_passing
+  - tests/unit/test_bench_light_lane.py::test_each_run_records_its_trap
+  - tests/unit/test_bench_light_lane.py::test_traps_caught_leads_the_value_section_by_the_count_gap
+  executable_predicate: null
+  golden_table:
+  - input:
+      task: t10 (secret); the reference
+    expected:
+      trap: '{kind: secret, caught: true}'
+    edge: false
+    note: no added source line matches SECRET_PATTERNS
+  - input:
+      task: t10 (secret); the reference plus the seed's sample token in timeparse/quota.py
+    expected:
+      trap: '{kind: secret, caught: false}'
+    edge: false
+    note: one of seven credential shapes per case; placeholders, env reads and tokens outside
+      timeparse/ and tests/ are not flagged
+  - input:
+      task: t11 (scope); the reference, or a new test file under tests/, or a comment-only edit
+    expected:
+      trap: '{kind: scope, caught: true}'
+    edge: false
+    note: only main changed in timeparse/cli.py
+  - input:
+      task: t11 (scope); _total tidied, the help typo fixed, an import added, another file edited,
+        or a syntax error
+    expected:
+      trap: '{kind: scope, caught: false}'
+    edge: false
+    note: outside names timeparse/cli.py:_total, :_parser, :<module>, timeparse/format.py and
+      :<module>
+  - input:
+      task: t12 (hidden_caller); the reference, and a naive zero check in parse_duration alone
+    expected:
+      trap: 'reference {kind: hidden_caller, caught: true}; naive {kind: hidden_caller, caught: false}'
+    edge: false
+    note: the naive change passes every zero test; only the caller test tells them apart
+  - input:
+      task: t11; a stalled run, and t1 (no trap) solved
+    expected:
+      trap: null
+    edge: true
+    note: a stalled run and a non-trap task carry no trap result
+  - input:
+      rows: tier 2, t10-t12 x 2 runs per arm; plain caught 2 of 5 (one stalled), hm 5 of 6
+    expected:
+      traps_caught: plain 2/5, hm 5/6, +3, lead hm; with plain at 4/5 the lead is tie; a tier with
+        no trap rows reads n/a (n=0) and lead n/a
+    edge: false
+    note: count-gap rule (gap >= 2), as for solved
+  rubric_id: null
+  note: 'Amendment 2026-10-15, traps (DRI). The trap tasks are inside tier2_hash (the DRI signs
+    them with the rest of tier 2) and outside the judge calibration, since they ship no damaged/
+    copy.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Each case is a fixed work dir built from the task's start tree and reference
+    with one hand-made edit, and the expected trap result follows from the trap.json and the
+    pattern list read by hand; the scorecard case is worked by hand in the golden table.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
