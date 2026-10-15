@@ -47,6 +47,12 @@
 
 ### Fixed
 
+- **`auto_full` autopilot no longer stops after an unapproved SPEC.** On a 2026-10-14 bench, 6 of 15
+  headless `/hm:spec` runs at `auto_full` stopped with `proceed: true` in hand, citing Step 5's "autopilot
+  stops at this stage" or the directive's "write NO approval". Step 5 now says a missing approval does not
+  end the stage: other levels stop at the gate, at `auto_full` the boundary's `proceed: true` advances
+  without an approval, and `/hm:wrapup` asks again before landing. The auto_full `judgment_directive` adds that the auto-answer, and for `spec`
+  the missing approval, is not a reason to stop. Re-render with `/harness-maker:make`.
 - **Cursor no longer runs every harness hook twice.** Cursor also loads `.claude/settings.json` hooks ("Include
   Third-Party Plugins, Skills, and Other Configs", on by default) and runs every matching hook from every source
   with no dedupe, so with a cursor target each tool call wrote two telemetry rows, the gates ran twice, and

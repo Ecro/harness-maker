@@ -27,6 +27,13 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-14, `hm-autopilot-spec-advance`** — `spec` moved in all four arms: Step 5's
+  "autopilot stops at this stage" became a sentence that holds at every level (a missing
+  approval does not end the stage; at `auto_full` the boundary's `proceed: true` advances
+  without one). Re-captured again after the light review tied that clause to `proceed`. The text is
+  the same at every level, so the gated delta above stays exactly the marked blocks. Verified
+  before re-capture that `spec` is the ONLY moved command in each arm and none was added or
+  removed (SPEC-hm-autopilot-spec-advance).
 - **2026-10-14, `hm-light-lane-s2b`** — `execute` and `review` moved in all four arms, and
   `verify` and `wrapup` in the two `auto_safe@*` arms (this repo's `delegation.stages` holds
   both; the `ask@*` arms delegate neither, and a non-delegated stage keeps its body inline,
