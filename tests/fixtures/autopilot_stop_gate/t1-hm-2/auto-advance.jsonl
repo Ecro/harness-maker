@@ -1,0 +1,9 @@
+{"to": "execute", "ts": "2026-10-15T06:33:53.825496+00:00", "event": "advance_authorized"}
+{"to": "execute", "elapsed_s": 57.693, "ts": "2026-10-15T06:34:51.518133+00:00", "event": "advance_entered"}
+{"stage": "execute", "ts": "2026-10-15T06:34:51.518745+00:00", "event": "gate_blocked"}
+{"to": "review", "ts": "2026-10-15T06:34:51.911861+00:00", "event": "advance_authorized"}
+{"to": "review", "elapsed_s": 68.303, "ts": "2026-10-15T06:36:00.214907+00:00", "event": "advance_entered"}
+{"to": "verify", "ts": "2026-10-15T06:36:00.238388+00:00", "event": "advance_authorized"}
+{"to": "verify", "elapsed_s": 31.424, "ts": "2026-10-15T06:36:31.662209+00:00", "event": "advance_entered"}
+{"stage": "verify", "ts": "2026-10-15T06:36:31.662780+00:00", "event": "gate_blocked"}
+{"stage": "wrapup", "ts": "2026-10-15T06:36:32.049443+00:00", "event": "gate_blocked"}

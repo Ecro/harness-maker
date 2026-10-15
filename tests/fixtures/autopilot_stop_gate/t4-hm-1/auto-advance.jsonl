@@ -1,0 +1,5 @@
+{"to": "execute", "ts": "2026-10-15T07:11:21.823022+00:00", "event": "advance_authorized"}
+{"to": "execute", "elapsed_s": 173.843, "ts": "2026-10-15T07:14:15.665780+00:00", "event": "advance_entered"}
+{"to": "review", "ts": "2026-10-15T07:14:15.755708+00:00", "event": "advance_authorized"}
+{"to": "review", "elapsed_s": 71.934, "ts": "2026-10-15T07:15:27.689378+00:00", "event": "advance_entered"}
+{"to": "verify", "ts": "2026-10-15T07:15:27.716246+00:00", "event": "advance_authorized"}
