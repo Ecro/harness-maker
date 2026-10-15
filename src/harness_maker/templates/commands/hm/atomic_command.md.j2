@@ -1,6 +1,8 @@
-{% include "agents/_partials/step_manifest.md.j2" %}
-
-{% include "agents/_partials/output_language.md.j2" %}
+{#- SPEC-hm-light-lane-s3c ADR-001: the preamble lives in `.claude/hm/stage-preamble.md`, read once per session and
+    applied every stage. The two markers stay so `/hm:health` can tell the pointer did not drop out of the wrapper. -#}
+{% with ref_file="stage-preamble.md", ref_use="unless this session's context already holds it from an earlier `/hm:` stage; either way, apply it to this stage, in order: the loop-mode check, this stage's start banner, then the autopilot picker only if it has not been answered this session", ref_missing="run this stage with no banner and no picker (an auto-armed session stays armed)", ref_stop="" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}
+<!-- @hm:banner:start -->
+<!-- @hm:output_language -->
 
 {{ stage_body | default('# /hm:' + stage) }}
 {%- if feedback_enabled %}

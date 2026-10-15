@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -1441,6 +1442,33 @@ def _dim_verification(project_dir: Path) -> DimensionScore:
     return DimensionScore(name="verification", score=_score_signals(signals), signals=signals)
 
 
+#: SPEC-hm-light-lane-s3c IRR-004: the reference file the stage commands' preamble pointer names.
+_STAGE_PREAMBLE = ".claude/hm/stage-preamble.md"
+
+
+def _stage_preamble_gap(project_dir: Path, bodies: Iterable[str]) -> Callable[[str], str | None]:
+    """Why the preamble file fails a marker check, or None; only when a command names the file.
+
+    The commands keep both markers next to the pointer, which proves the pointer is there, not
+    that the text it points at is. A render whose commands still inline the preamble names no
+    file and is scored exactly as before, so a plugin upgrade never turns an un-re-rendered
+    project red (SPEC-hm-light-lane-s3c ADR-002).
+    """
+    if not any("stage-preamble.md" in t for t in bodies):
+        return lambda _marker: None
+    path = project_dir / _STAGE_PREAMBLE
+    text = _read_text(path) if path.is_file() else None
+
+    def gap(marker: str) -> str | None:
+        if text is None:
+            return f"{_STAGE_PREAMBLE} is missing"
+        if marker not in text:
+            return f"{_STAGE_PREAMBLE} lacks {marker}"
+        return None
+
+    return gap
+
+
 def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
     """Rendered /hm: command surface: presence, completeness, locale + banner wiring."""
     signals: list[Signal] = []
@@ -1505,37 +1533,52 @@ def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
     meta_cmds = {"make", "help", "health", "configure", "uninstall", "loop", "loop-p5-batch"}
     stage_fused = [c for c in commands if c.stem in atomic_stages and c.stem not in meta_cmds]
     _bodies = {c: _read_text(c) for c in stage_fused}
-    loc_hits = sum(1 for t in _bodies.values() if "<!-- @hm:output_language -->" in t)
-    loc_ok = (not stage_fused) or loc_hits == len(stage_fused)
+    lang_marker, banner_marker = "<!-- @hm:output_language -->", "<!-- @hm:banner:start -->"
+    preamble_gap = _stage_preamble_gap(project_dir, _bodies.values())
+    loc_hits = sum(1 for t in _bodies.values() if lang_marker in t)
+    loc_file = preamble_gap(lang_marker)
+    loc_ok = ((not stage_fused) or loc_hits == len(stage_fused)) and loc_file is None
     signals.append(
         _signal(
             "output_language_present",
             loc_ok,
             15,
-            f"{loc_hits}/{len(stage_fused)} stage/fused commands carry the locale directive"
-            if stage_fused
-            else "No stage/fused commands to check",
+            (
+                f"{loc_hits}/{len(stage_fused)} stage/fused commands carry the locale directive"
+                if stage_fused
+                else "No stage/fused commands to check"
+            )
+            + (f"; {loc_file}" if loc_file else ""),
             None
             if loc_ok
             else "Re-render via /hm:make — commands missing the locale directive "
-            "(the output_language partial silently dropped from a wrapper)",
+            "(the output_language partial silently dropped from a wrapper"
+            + (f", or {_STAGE_PREAMBLE} missing it" if loc_file else "")
+            + ")",
         )
     )
-    ban_markers = ("<!-- @hm:banner:start -->", "<!-- @hm:banner:end -->")
+    ban_markers = (banner_marker, "<!-- @hm:banner:end -->")
     ban_hits = sum(1 for t in _bodies.values() if all(m in t for m in ban_markers))
-    ban_ok = (not stage_fused) or ban_hits == len(stage_fused)
+    ban_file = preamble_gap(banner_marker)
+    ban_ok = ((not stage_fused) or ban_hits == len(stage_fused)) and ban_file is None
     signals.append(
         _signal(
             "start_end_summary_present",
             ban_ok,
             15,
-            f"{ban_hits}/{len(stage_fused)} stage/fused commands carry start + end summary banners"
-            if stage_fused
-            else "No stage/fused commands to check",
+            (
+                f"{ban_hits}/{len(stage_fused)} stage/fused commands carry start + end "
+                "summary banners"
+                if stage_fused
+                else "No stage/fused commands to check"
+            )
+            + (f"; {ban_file}" if ban_file else ""),
             None
             if ban_ok
             else "Re-render via /hm:make — commands missing a start or end summary banner "
-            "(step_manifest or stage_end_summary partial silently dropped)",
+            "(step_manifest or stage_end_summary partial silently dropped"
+            + (f", or {_STAGE_PREAMBLE} missing it" if ban_file else "")
+            + ")",
         )
     )
 

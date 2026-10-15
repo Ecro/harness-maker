@@ -1,0 +1,57 @@
+{#- SPEC-hm-light-lane-s3c ADR-005/010: execute Step 0's full PLAN text after the inline head (part 1). Source of the text for
+    both the Codex execute skill (inline) and the rendered .claude/hm/execute-plan.md; the Claude command carries a
+    pointer instead. Edit it here only. -#}
+**Required frontmatter** (this block is the document's contract — every later stage reads from
+it):
+
+```yaml
+---
+type: plan
+task_slug: {slug}
+status: planning
+created: {YYYY-MM-DD}
+tags: [{project}, plan, {tech-stack}, {2-5 domain tags}]
+spec: "[[SPEC-{slug}]]"          # OR omit when no SPEC exists
+research_doc: "[[RESEARCH-{slug}]]"  # OR omit when /hm:research did not run
+interview_rounds: 0              # this stage holds no interview; the SPEC's count is the task's
+adrs: {M}
+validator_outcome: NOT_RUN       # no plan-validator exists; `spec-validator` critiques the SPEC
+summary: "{≤100 char one-line TL;DR}"
+intent: <id>                  # ONLY when the SPEC names one; omit otherwise
+objective: <id>               # preserve legacy only; omit with intent
+---
+```
+
+`spec_need_verdict` / `spec_need_target` are deliberately **not** in that list. Step 0.1 judges
+them from evidence and writes them, and the writer preserves whatever is already there — so a
+value guessed here, before the evidence is gathered, would be the one that survives.
+
+`validator_outcome: NOT_RUN` is deliberate and is not one of the four values the removed stage
+documented. Nothing parses this field, so an honest value costs no reader — and borrowing
+`APPROVED` would make an uncritiqued PLAN indistinguishable from a critiqued one.
+
+**Required sections (in this order):**
+
+1. **🎯 Executive Summary** — TL;DR, what/why, the key decisions and where they came from.
+2. **📚 Prior Work** — similar PLANs, lessons from `failures.md` / `wiki.md`, RESEARCH findings.
+3. **📐 Architecture Decision Records** — the design records this stage locks. The SPEC owns
+   the irreversible ones; these are the reversible calls you make while building. Every ADR
+   carries a provenance line: `**Decided by:** user (source: <SPEC section or conversation>)`
+   only when the user explicitly made that call, otherwise `**Decided by:** agent`.
+4. **🏗️ Technical Design** — current state, affected components, dependencies, data flow.
+5. **📝 Implementation Plan** — numbered phases. **Each phase MUST have** `depends_on`,
+   `parallel_group`, `merge_hazards`, scope (files in / out), an exit criterion that is a
+   runnable command or check, `risk` (`low` / `medium` / `high`), and a rollback point.
+6. **🚧 Contract Boundaries** — one list, `### Do not change`: surfaces the implementation must
+   leave alone. The only behaviour that moves across a long review is the one the contract never
+   fixed, so an unwritten hole is the defect this section closes.
+   - **Exactly three admitted forms**, one per `- ` bullet: (a) a **repo-relative** path in
+     backticks — `` - `src/pkg/mod.py` `` or a directory prefix `` - `src/pkg/` `` — optionally
+     ` — {why}`; (b) `- Advisory: {intent no path expresses}`; (c)
+     `- none — this task has no contract boundaries`, valid **only as the sole bullet**. No
+     absolute paths, `..` or globs.
+   - An empty list is **written, never omitted** — form (c). "Nobody was asked" and "the author
+     said there are none" are different facts.
+7. **🧪 Testing Strategy** — unit / integration / manual steps.
+8. **⚠️ Risks & Mitigation** — a risk register table.
+9. **✅ Success Criteria** — a checklist mirroring the SPEC's verification criteria.
