@@ -30,6 +30,14 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 - **A trusted lane.** `light_lane.lane_of` returns `light` only when the SPEC frontmatter's `lane`
   is exactly `light`, `spec_machine.approval_state` is `approved` or `exempt`, and
   `irreversible_decisions` is empty. Anything else, including an unreadable SPEC, is `full`.
+- **Light SPECs with no irreversible decisions are stamped exempt.** When the DRI did not choose
+  "Approve this SPEC and end interview", `/hm:spec` Step 5 stamps a `lane: light` SPEC whose
+  `irreversible_decisions` is `[]` with the Step 0 skip path's command,
+  `hm spec_machine approve --yaml … --exempt`, so the trust rule also holds on unattended
+  `auto_full` runs. A DRI approval is still stamped `human`. A non-empty list still turns `light`
+  into `full` before Step 3 writes it, and `approve --exempt` refuses a SPEC whose list is not
+  empty, so an exempt stamp never covers an irreversible decision. Decided 2026-10-15 by the DRI
+  ("Approve + exempt light", Refinement Decisions).
 - **The light check.** On a trusted light lane, `/hm:execute` ends with a light check (new
   `### Step 4.2`) after all PLAN phases are GREEN. It is deterministic and dispatches no reviewer
   or other subagent. Its first line runs `hm spec_machine approval-status` and skips the check
@@ -128,6 +136,12 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 **When** `hm world_model digest` computes `next_stage`
 **Then** it is `wrapup`; the same artifacts on a full SPEC, or with a stale cache, route as today
 
+### S10: An unattended light SPEC is stamped exempt
+**Given** a rendered spec command (Claude Code) and spec stage skill (Codex), and a SPEC whose `irreversible_decisions` is not empty
+**When** Step 5 is read, and `hm spec_machine approve --exempt` runs on that SPEC
+**Then** Step 5 stamps a `lane: light` SPEC with an empty list `exempt` with Step 0's command when the DRI did not approve
+**And** the command refuses the non-empty list, writes no approval and exits non-zero
+
 ## 🚫 Non-Goals
 
 - Stage 3b: running light execute or verify through `stage-delegate`, and lens results as verdict + path.
@@ -180,6 +194,7 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 | S7 | unit | `tests/unit/test_light_lane.py::test_record_satisfies_wrapup_and_verify` |
 | S8 | unit (render, differential) | `tests/render/test_render_light_lane_s3a.py::test_typed_stages_and_loop_unchanged` |
 | S9 | unit | `tests/unit/test_light_lane.py::test_digest_routes_checked_light_task_to_wrapup` |
+| S10 | unit (render, CLI) | `tests/render/test_render_light_lane_s3a.py::test_spec_stamps_light_exempt`, `tests/unit/test_spec_approve_exempt.py::test_exempt_refuses_irreversible_decisions` |
 | Outcome (reader) | unit | `tests/unit/test_light_lane.py::test_lane_of`, `tests/unit/test_light_lane.py::test_light_check_passed` |
 | Outcome (pointer) | unit (render) | `tests/render/test_render_light_lane_s3a.py::test_execute_points_at_the_light_check` |
 | Outcome (ledger) | unit | `tests/unit/test_autopilot_caps_light_lane.py::test_stage_skipped_is_a_ledger_event` |
@@ -197,15 +212,10 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 ### AC-011: Typed review, verify, wrapup and the loop are byte-identical
 ### AC-012: The digest routes a checked light task to wrapup
 ### AC-013: stage_skipped is a ledger event that does not count as an entered stage
+### AC-014: A light SPEC with no irreversible decisions is stamped exempt, and an exempt stamp refuses irreversible decisions
 
 ## ❓ Open Questions
 
-- **At `auto_full` an interviewed light SPEC is unapproved, so it reads as `full` and nothing is
-  skipped.** The spec gate is answered without writing an approval, and only the trivial skip path
-  stamps `exempt`. The bench arm runs `auto_full`, so there it would see the saving only on
-  skip-path tasks, and it pays the light check plus review and verify on the rest. Options: accept
-  this (the trust rule wins), or have spec Step 0 stamp `exempt` on a light SPEC with an empty
-  irreversible list. The second option is a change to the approval model and needs a decision.
 - `hm cli security-scan --force` walks the whole checkout, queries OSV.dev and may try an LLM pass
   for prompt injection (it falls back to regex). Uncached, its wall time on a large repo is
   unmeasured. `_persist` appends to today's findings file, so Check 4 also sees earlier findings
@@ -255,5 +265,16 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
   execute. Its keys are unchanged, an old render's execute writes no record (so no skip), and a
   revert restores it. Dropping review lenses on light is not a permission-boundary change; it is a
   policy the revert undoes.
+- Decided 2026-10-15 by the DRI ("Approve + exempt light" on the decision card): at `auto_full` an interviewed
+  light SPEC was unapproved (the spec gate is answered without an approval, and only the skip path
+  stamped `exempt`), so it read as `full` and the bench arm would see the saving only on skip-path
+  tasks. The options were to accept that (the trust rule wins) or to stamp `exempt` on a light
+  SPEC with an empty irreversible list. The DRI chose the second, the card's recommended option
+  (Outcomes, AC-014): the four lane criteria and the empty list already say nothing needs a
+  human, and `exempt` is the stamp Step 0 uses for exactly that. `approve --exempt` now refuses a
+  non-empty list, which `approval_state` would have read as `invalid` anyway. Undoing it later is
+  a revert of the amendment commit and the Step 5 sentence; nothing else depends on it.
+- Evaluated, not irreversible: the exempt stamp on light. It is the existing `exempt` kind, no new
+  format or key; a revert stops new stamps, and a stamp already written means what Step 0's does.
 - Work stays on the session's designated branch instead of an `hm/<slug>` task worktree, as in
   stages 1, 2a and 2b.

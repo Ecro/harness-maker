@@ -558,6 +558,41 @@ ac:
   judgment_evidence: null
   judgment_subject_paths: []
   judgment_subject_hash: null
+- id: AC-014
+  title: A light SPEC with no irreversible decisions is stamped exempt, and an exempt
+    stamp refuses irreversible decisions
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s3a.py::test_spec_stamps_light_exempt
+  - tests/unit/test_spec_approve_exempt.py::test_exempt_refuses_irreversible_decisions
+  executable_predicate: 'all(EXEMPT_CMD in step5 and ''lane: light'' in step5 and
+    ''irreversible_decisions: []'' in step5 for step5 in SPEC_STEP5_RENDERS) and rc
+    != 0 and load(yaml).approval is None'
+  golden_table: []
+  rubric_id: null
+  note: Decided 2026-10-15 by the DRI ('Approve + exempt light').
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'EXEMPT_CMD is Step 0''s own exempt command in the e7dd6648 spec
+    render (''hm spec_machine approve --yaml <spec.dir>SPEC-{slug}.machine.yaml --exempt''),
+    copied from that render, not from the new sentence. SPEC_STEP5_RENDERS are the
+    Claude spec command and the Codex hm-spec skill, Step 5 sliced by heading. The
+    refusal row follows from approval_state_of''s e7dd6648 rule that an exempt stamp
+    with irreversible ids is invalid, so refusing at write time cannot change any
+    state a valid stamp produces. Fixture: a v3 machine SPEC with irreversible_decisions
+    [IRR-001] and no approval.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
 irreversible_decisions:
 - id: IRR-001
   decision: Add stage_skipped to the autopilot ledger's closed event vocabulary, with fields

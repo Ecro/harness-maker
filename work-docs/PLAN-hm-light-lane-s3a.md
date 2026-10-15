@@ -8,7 +8,7 @@ research_doc: "[[RESEARCH-hm-light-lane]]"
 intent: HM-LIGHT-LANE
 lane: full
 tdd: true
-adrs: 8
+adrs: 9
 summary: "Light lane runs spec → execute (+ light check) → wrapup; boundary skips review and verify on a passing light-check record"
 ---
 
@@ -94,16 +94,24 @@ by itself. Execute's `summary_autopilot_gate` stays "No mandatory gate". The new
 registered in `step_sensitivity.py` as INV, inherited from verify Check 2 (`_u`): Step 4.2 in the
 Claude command, and Step 4.2 plus the included Check 2/4/6 headings in the Codex execute skill.
 
+### ADR-009: A light SPEC with no irreversible decisions is stamped exempt
+**Decided by:** DRI, 2026-10-15 ("Approve + exempt light" on the decision card; SPEC AC-014). Spec Step 5 stamps a `lane: light` SPEC with
+`irreversible_decisions: []` using Step 0's `approve --exempt` command when the DRI did not
+approve it, so `lane_of` trusts it on unattended `auto_full` runs. `spec_machine.approve` refuses
+`--exempt` on a non-empty list (a stamp `approval_state` would read as `invalid` anyway). It lives
+in its own amendment commit plus the Step 5 sentence and its two tests, so it can still revert alone.
+
 ## 📝 Implementation Plan
 
 1. **Phase 1 — reader, ledger event, boundary skip.** depends_on: none · parallel_group: 1 ·
    merge_hazards: none · scope: `src/harness_maker/light_lane.py` (new), `autopilot_ledger.py`
    (`stage_skipped` in `LedgerEvent`), `autopilot_caps.py` (`_light_skip`, reason suffix),
    `world_model_digest.py` (use `light_lane.review_records`; `light_check_passed` → `wrapup`),
-   `cli.py` (`security-scan --force`), `tests/unit/test_light_lane.py`,
+   `cli.py` (`security-scan --force`), `spec_machine.approve` (refuse `--exempt` on a non-empty
+   list, ADR-009), `tests/unit/test_spec_approve_exempt.py`, `tests/unit/test_light_lane.py`,
    `tests/unit/test_autopilot_caps_light_lane.py`, `tests/unit/test_cli_security_scan_force.py`,
    the e7dd6648 boundary and digest goldens under `tests/fixtures/light_lane_s3a/`, captured
-   before any edit (AC-004, AC-012) · exit: AC-001..006, 010, 012, 013 and AC-008's CLI test
+   before any edit (AC-004, AC-012) · exit: AC-001..006, 010, 012, 013, AC-014's CLI test and AC-008's CLI test
    green; ruff, mypy --strict clean · risk: medium (boundary is load-bearing; AC-004 is the
    guard) · rollback: revert the phase.
 2. **Phase 2 — templates.** depends_on: 1 · parallel_group: 2 · merge_hazards: goldens, size
@@ -111,11 +119,12 @@ Claude command, and Step 4.2 plus the included Check 2/4/6 headings in the Codex
    `templates/stages/_partials/{execute_light_check,review_drift_scan,review_drift_verdict,verify_check_2,verify_check_4,verify_check_6}.md.j2`
    (new), `templates/stages/review.md.j2` and `templates/stages/_partials/verify_checks.md.j2`
    (include the partials in place, byte-identical render),
-   `templates/hm/execute-light-check.md.j2` (new), `synthesize.py`, `step_sensitivity.py`,
+   `templates/hm/execute-light-check.md.j2` (new), `templates/stages/spec.md.j2` (Step 5's exempt
+   stamp on light, ADR-009), `synthesize.py`, `step_sensitivity.py`,
    `tests/render/test_render_light_lane_s3a.py`, e7dd6648 render SHAs for AC-011 captured before
    the edit, re-captured execute snapshots and goldens with a dated note,
    `tests/structural/surface_baseline.json` + `work-docs/BASELINE-DELTA-hm-light-lane-s3a.md` if
-   the aggregate ratchet requires, `CHANGELOG.md` · exit: AC-007..009 and 011 green;
+   the aggregate ratchet requires, `CHANGELOG.md` · exit: AC-007..009, 011 and 014 green;
    `uv run pytest tests -n auto` green except the known environment failures · risk: medium
    (golden churn) · rollback: revert the PR.
 
@@ -126,7 +135,7 @@ Claude command, and Step 4.2 plus the included Check 2/4/6 headings in the Codex
 - Verify's rendered output: `verify.md.j2` and `_partials/verify_checks.md.j2` may change only to include the Check 2/4/6 partials, and verify must render byte-identical (AC-011).
 - Review's rendered output: `review.md.j2` may change only to include the drift partials, and review must render byte-identical (AC-011).
 - `src/harness_maker/templates/commands/hm/loop.md.j2` — the loop is unchanged (AC-011).
-- `src/harness_maker/wrapup_land.py`, `src/harness_maker/spec_machine.py` approval and land-hold logic.
+- `src/harness_maker/wrapup_land.py`, `src/harness_maker/spec_machine.py` approval-state and land-hold logic. The one exception is ADR-009: `approve(exempt=True)` refuses a non-empty irreversible list.
 - `_HUMAN_GATED_STAGES` and `_JUDGMENT_GATED_STAGES` in `autopilot_caps.py`.
 - The boundary JSON key set (AC-003 asserts it).
 
@@ -145,7 +154,7 @@ implement (GREEN). No live model: the security scan's LLM pass is not exercised 
 | The full-lane boundary drifts | AC-004 differential against e7dd6648 |
 | A stale PASSED record outlives a later change | Python requires a fresh verification cache and `computed_at` ≥ marker (ADR-003); AC-006 |
 | Partials change review's or verify's bytes | AC-011 SHA of both renders |
-| At `auto_full` an interviewed light SPEC is unapproved, so no skip | SPEC open question; the bench saving appears only on approved or exempt light SPECs until it is decided |
+| At `auto_full` an interviewed light SPEC is unapproved, so no skip | ADR-009 stamps it exempt when its irreversible list is empty (decided by the DRI 2026-10-15) |
 | Forced `security-scan` is slow on a large repo | unmeasured; SPEC open question names the fallback (Check 4 alone) |
 | Old render + new CLI | old execute writes no record, so no skip (fails closed) |
 
