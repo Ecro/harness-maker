@@ -51,6 +51,19 @@
   list. Every approval stamp now records the SPEC's `.md` lane (`approval.lane`); a stamp written before
   this release reads as the full lane until re-approved. Re-render with `/hm:make` to get
   `.claude/hm/execute-light-check.md`; an older render's execute writes no record, so it never skips.
+- **Stage commands load the preamble once, `check --all` is quiet, and light tasks write a short PLAN
+  (HM-LIGHT-LANE, stage 3c).** The loop-mode check, the stage start banner and the autopilot picker
+  left the six Claude stage commands for `.claude/hm/stage-preamble.md`, which a command reads once per
+  session behind a short pointer (byte-identical text; a missing file runs the stage with no banner and
+  no picker, and `/hm:health` names the file). Codex skills, `CLAUDE.md` and `AGENTS.md` keep it inline.
+  `hm spec_machine check --all` prints one line whenever no gate failed, naming `weak_dimensions` and
+  `low_dimensions` (`{dim: score}`, dims under 60) on a weak score; a failed gate prints each error once,
+  pydantic errors as `<loc>: <msg>` and the full `scores` map replaced by `low_dimensions`, and a missing
+  `.md` is reported instead of a traceback. On `lane: light`, `/hm:execute` writes a short PLAN (one line
+  per phase, boundary and ADR) with an inline read-back that every PLAN reader already accepts, and
+  `/hm:spec` authors only the minimal `machine.yaml`; the full PLAN text and the full schema moved to
+  `.claude/hm/execute-plan.md` and `.claude/hm/spec-machine-full.md` (Codex keeps both inline). Re-render
+  with `/hm:make` to get the three new files.
 - **Less always-loaded context.** A clean `hm spec_machine check --all` prints one line
   (`{"ok": true, "overall", "strictness"}`); failures still print the full payload. Five internal skills
   (`agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `context-linter`, `worktree-isolator`)

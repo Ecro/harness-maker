@@ -31,6 +31,7 @@ from harness_maker.models import (
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 ROOT = Path(__file__).parents[2]
 GOLDENS = ROOT / "tests" / "fixtures" / "intent_surface_diet" / "goldens.json"
@@ -458,7 +459,12 @@ def test_ac004_understanding_byte_identical(preset: Preset, host: str) -> None:
     golden = _golden(preset, host)["understanding"]
     assert len(golden) == 3
     assert all(golden)
-    got = understanding_extracts([_stage(preset, host, "wrapup"), _stage(preset, host, "execute")])
+    execute = _stage(preset, host, "execute")
+    if host == "claude":
+        # The ADR provenance line moved into `.claude/hm/execute-plan.md` with the rest of the
+        # full PLAN text (SPEC-hm-light-lane-s3c); read the command with that file in place.
+        execute = _normalized(stage_text(_root(preset) / ".claude", "execute"))
+    got = understanding_extracts([_stage(preset, host, "wrapup"), execute])
     assert got == golden
 
 

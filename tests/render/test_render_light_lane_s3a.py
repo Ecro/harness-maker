@@ -26,6 +26,7 @@ from harness_maker.models import LoopConfig, Preset, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 from tests.structural._surface_baseline import HARNESS_YAML, pinned_install_ref
+from tests.unit import light_lane_s3c_fixture as s3c
 
 GOLDEN: dict[str, Any] = json.loads(
     (Path(__file__).parents[1] / "fixtures/light_lane_s3a/renders_e7dd6648.json").read_text(
@@ -116,6 +117,7 @@ def _render(key: str) -> dict[str, str | None]:
         "hm/execute-light-check.md",
         "skills/hm-execute",
         "skills/hm-spec",
+        "hm/stage-preamble.md",
     )
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -257,6 +259,13 @@ def test_typed_stages_and_loop_unchanged(key: str) -> None:
     golden = GOLDEN["configs"][key]["sha256"]
     for rel in GOLDEN["unchanged_paths"]:
         text = _render(key)[rel]
+        if text is not None and rel in s3c.CLAUDE_COMMANDS:
+            # 2026-10-15, SPEC-hm-light-lane-s3c: the Claude stage commands point at
+            # `.claude/hm/stage-preamble.md` for the preamble they used to carry. Putting that
+            # text back (and recomputing the body hash) must give the e7dd6648 bytes exactly.
+            text = s3c.with_content_hash(
+                s3c.restore_preamble(text, _text(key, "hm/stage-preamble.md"))
+            )
         got = None if text is None else hashlib.sha256(text.encode()).hexdigest()
         assert got == golden[rel], (key, rel)
 

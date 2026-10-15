@@ -38,6 +38,7 @@ from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from tests.stage_surface import stage_text
 
 _REPO_ROOT = Path(__file__).parents[2]
 _PLAN_DOC = _REPO_ROOT / "work-docs" / "PLAN-ai-work-boundaries.md"
@@ -188,7 +189,8 @@ def _plan_variants() -> dict[str, str]:
     for path in sorted(root.rglob("*.md")):
         rel = path.relative_to(root).as_posix()
         if rel.endswith("commands/hm/execute.md"):
-            out["claude"] = path.read_text(encoding="utf-8")
+            # With `.claude/hm/execute-plan.md` read in place (SPEC-hm-light-lane-s3c).
+            out["claude"] = stage_text(path.parents[2], "execute")
         elif "skills/hm-execute/" in rel:
             out["codex"] = path.read_text(encoding="utf-8")
     return out

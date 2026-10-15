@@ -21,10 +21,18 @@ PARTIAL = TPL / PARTIAL_REL
 
 # The two fused wrappers (`workflow_command.md.j2`, `codex/workflow_skill.md.j2`) were
 # deleted with the fused axis (PLAN-harness-diet ADR-001), leaving one wrapper per target.
+# SPEC-hm-light-lane-s3c moved the Claude include into `hm/stage-preamble.md.j2`, which renders
+# `.claude/hm/stage-preamble.md`; the Claude wrapper points at that file and must say so.
 WRAPPERS = (
-    "commands/hm/atomic_command.md.j2",
+    "hm/stage-preamble.md.j2",
     "codex/stage_skill.md.j2",
 )
+
+
+def test_claude_wrapper_points_at_the_preamble_file() -> None:
+    src = (TPL / "commands/hm/atomic_command.md.j2").read_text(encoding="utf-8")
+    assert 'ref_file="stage-preamble.md"' in src
+    assert 'include "stages/_partials/ref_pointer.md.j2"' in src
 
 
 def test_partial_exists_with_suppression_and_intended_framing() -> None:

@@ -34,6 +34,7 @@ from tests.stage_surface import STAGE_REFERENCE_FILES
 from tests.structural._instruction_baseline import instruction_set
 from tests.structural._surface_baseline import HARNESS_YAML, pinned_install_ref
 from tests.structural.test_command_size_budget import headings
+from tests.unit import light_lane_s3c_fixture as s3c
 
 REPO = Path(__file__).parents[2]
 FIXTURES = REPO / "tests" / "fixtures" / "light_lane_s2b"
@@ -43,7 +44,15 @@ PRE_INSTRUCTIONS = json.loads((FIXTURES / "pre_edit_instructions_d2c0ab0.json").
 STAGES = ("wrapup", "verify", "review", "execute")
 REF_START, REF_END = "<!-- @hm:ref:start -->\n", "<!-- @hm:ref:end -->"
 STAGE_REFS = STAGE_REFERENCE_FILES
-REFERENCE_FILES = tuple(n for names in STAGE_REFS.values() for n in names)
+# This SPEC's five files. Stage 3c added three more to STAGE_REFS (SPEC-hm-light-lane-s3c); its
+# own tests cover them, so they are not this suite's subject.
+REFERENCE_FILES = (
+    "wrapup-steps",
+    "verify-checks",
+    "review-autofix",
+    "review-confirmation",
+    "execute-a5",
+)
 FRONTMATTER_KEYS = ("generated_by", "content_hash", "source_template", "harness_maker_version")
 
 # (strictness, loop on, delegation.stages or None for this repo's own harness.yaml)
@@ -413,16 +422,33 @@ def _without_light_check(stage: str, text: str) -> str:
     return head + cut[fm_end:]
 
 
+def _without_light_plan(stage: str, r: Rendered) -> str:
+    """The Codex execute skill minus stage 3c's PLAN edits (2026-10-15, SPEC-hm-light-lane-s3c).
+
+    3c added the approval-status read, the routing sentence, the light PLAN block and the Step 0.3
+    sentence; `s3c.undo_execute` removes exactly those, and `_without_light_check` then cuts 3a's
+    section and recomputes the body hash over what is left.
+    """
+    text = r.codex[stage]
+    if stage != "execute" or s3c.LIGHT_OPEN not in text:
+        return text
+    parts = s3c.ref_slice(r.refs["execute-plan"]).split(s3c.SEPARATOR)
+    return s3c.undo_execute(text, parts, claude=False)
+
+
 # AC-007
 @pytest.mark.parametrize("key", list(CONFIGS))
 def test_codex_stage_skills_unchanged(key: str) -> None:
     r = render_config(key)
     for stage in STAGES:
-        codex = _without_light_check(stage, r.codex[stage])
+        codex = _without_light_check(stage, _without_light_plan(stage, r))
         assert _sha(codex) == PRE["configs"][key]["codex_sha256"][stage], (
             f"{key}: the Codex {stage} skill changed; it runs the bodies inline"
         )
-        assert ".claude/hm/" not in r.codex[stage].replace(".claude/hm/autopilot-advance.md", "")
+        # The SPEC's exact Step 0.3 sentence names `.claude/hm/execute-plan.md` on every target
+        # (SPEC-hm-light-lane-s3c Outcomes C); the Codex skill still carries part 2 inline below it.
+        rest = r.codex[stage].replace(s3c.STEP03_SENTENCE, "")
+        assert ".claude/hm/" not in rest.replace(".claude/hm/autopilot-advance.md", "")
 
 
 # AC-010
@@ -437,10 +463,14 @@ def test_undelegated_stages_stay_inline(key: str) -> None:
                 f"{key}: delegated {stage} lost its pointer"
             )
             continue
-        assert _sha(r.commands[stage]) == PRE["configs"][key]["command_sha256"][stage], (
+        # 3c's preamble pointer put back (2026-10-15, SPEC-hm-light-lane-s3c), body hash recomputed.
+        command = s3c.with_content_hash(
+            s3c.restore_preamble(r.commands[stage], r.refs["stage-preamble"])
+        )
+        assert _sha(command) == PRE["configs"][key]["command_sha256"][stage], (
             f"{key}: the non-delegated {stage} command differs from its d2c0ab0 render"
         )
-        assert "Read `.claude/hm/" not in r.commands[stage].replace(
+        assert "Read `.claude/hm/" not in command.replace(
             "Read `.claude/hm/autopilot-advance.md`", ""
         )
         assert "Read `.claude/hm/" not in r.stages[stage].replace(
@@ -680,13 +710,14 @@ def test_n1_the_mismatch_bullet_carries_the_shared_missing_file_clause() -> None
     (claude_dir / "hm").mkdir()
     (claude_dir / "commands" / "hm" / "wrapup.md").write_text(r.commands["wrapup"])
     (claude_dir / "hm" / "wrapup-steps.md").write_text(r.refs["wrapup-steps"])
+    (claude_dir / "hm" / "stage-preamble.md").write_text(r.refs["stage-preamble"])
     text = stage_text(claude_dir, "wrapup")
     assert text.count("### Step 1 — Pre-flight checks") == 1, "the bullet's pointer was expanded"
     assert line in text
     # Non-delegated wrapup has no bullet and no pointer (byte-identity: test_undelegated_*).
     assert "Read `.claude/hm/" not in render_config("delegation-none").commands["wrapup"].replace(
         "Read `.claude/hm/autopilot-advance.md`", ""
-    )
+    ).replace("Read `.claude/hm/stage-preamble.md`", "")
 
 
 def test_n1_expand_references_sees_an_indented_pointer(tmp_path: Path) -> None:
@@ -783,6 +814,10 @@ def test_k6_every_pointer_is_followed_by_a_blank_line(key: str) -> None:
     for stage in STAGES:
         lines = r.commands[stage].split("\n")
         for i, ln in enumerate(lines):
+            # The 3c preamble pointer fills the span between the frontmatter and `# Stage:`, where
+            # the preamble stood (SPEC-hm-light-lane-s3c); it is checked by that suite.
+            if ln.startswith("Read `.claude/hm/stage-preamble.md`"):
+                continue
             if ln.startswith("Read `.claude/hm/") and "autopilot-advance" not in ln:
                 assert lines[i + 1] == "", f"{key}/{stage}: pointer abuts {lines[i + 1][:40]!r}"
                 assert lines[i - 1] == "", f"{key}/{stage}: pointer abuts {lines[i - 1][:40]!r}"
