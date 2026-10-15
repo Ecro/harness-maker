@@ -43,10 +43,11 @@ Measured on this repo's committed `.claude/harness.yaml` with
     start banner, then the autopilot picker, only if the picker has not been answered this
     session.
 - The pointer keeps the `<!-- @hm:banner:start -->` and `<!-- @hm:output_language -->` markers.
-- `/hm:health` changes slightly. `readiness._dim_workflow_clarity`'s two signals
-  (`output_language_present`, `start_end_summary_present`) also require
-  `.claude/hm/stage-preamble.md` to exist and carry both markers. Without it, they fail and name
-  the file.
+- `/hm:health` changes slightly. When a stage command names `stage-preamble.md`,
+  `readiness._dim_workflow_clarity`'s two signals (`output_language_present`,
+  `start_end_summary_present`) also require `.claude/hm/stage-preamble.md` to exist and carry
+  both markers. Without it, they fail and name the file. An older render whose commands carry
+  the inline preamble and name no such file is scored as today, so it stays valid.
 - A missing file is not a STOP. The stage names the file, says to re-render with `/hm:make`, and
   runs with no banner and no picker. An auto-armed session (`autopilot_persistent`) stays armed.
   The output language still holds, because CLAUDE.md carries the same directive.
@@ -69,19 +70,27 @@ Measured on this repo's committed `.claude/harness.yaml` with
   - `low_dimensions` is never empty when `overall` < 60, because the integer mean of scores that
     are all ≥ 60 is ≥ 60.
 - **A gate failed:**
-  `{"ok": false, "validate": {"ok", "errors"}, "cross_validate": {"ok", "errors", "by_rule"},
-  "quality": {"overall", "weak_dimensions", "low_dimensions", "blocked", "strictness"}}`.
+  `{"ok": false, "strictness": S, "validate": {"ok", "errors"}, "cross_validate": {"ok",
+  "errors", "by_rule"}, "quality": {"overall", "weak_dimensions", "low_dimensions", "blocked",
+  "strictness"}}`. The top-level `strictness` stays.
   - Each distinct error appears once.
   - A pydantic load error is one line per location (`<loc>: <msg>`), with no help URL and no
     `input_value` echo.
+  - A non-pydantic load error is one line, `yaml load failed: <Type>: <message>`:
+    - a yaml syntax error: `yaml load failed: YAMLError: <problem> (line L, column C)`, the
+      problem being the parser's first line;
+    - a missing or unreadable file: `yaml load failed: FileNotFoundError: <path>` (or
+      `OSError`);
+    - a missing `.md`: cross-validate's existing message, once.
   - When the yaml failed to load, `cross_validate.errors` holds
     `yaml load failed (see validate.errors)` instead of a second copy.
   - `by_rule` maps each non-empty bucket to its count.
   - `scores`, `yaml_path` and `md_path` are gone; `low_dimensions` carries the scores that
     matter. The exit code is unchanged.
 - **Scoring exception.** When `evaluate_spec` raises, `check` prints the failure-shaped payload
-  with `quality: {"error": "<Type>: <msg>"}` and exits as today: 1 when validate or
-  cross-validate failed, else 0, with `ok` true in that case.
+  with the top-level `strictness` and `quality: {"error": "<Type>: <msg>", "strictness": S}`,
+  and exits as today: 1 when validate or cross-validate also failed (`ok: false`), else 0
+  (`ok: true`).
 - **Saving.** Estimated on the same 26 runs with a text-level replay: ~9.9k → ~2.9k chars per
   run.
 - **Other light-path CLIs, unchanged.** These already print one JSON line on success: `autopilot
@@ -96,33 +105,67 @@ Measured on this repo's committed `.claude/harness.yaml` with
 
 ### C — Less paperwork on light
 
-**Short light PLAN.** On a **trusted light lane** (`approval-status` prints
-`"trusted_lane": "light"`) with loop mode off for the session:
-- Execute Step 0 writes `work-docs/PLAN-{slug}.md` from an inline, one-screen template. It holds:
-  - frontmatter: `type: plan`, `task_slug`, `status: planning`, `created`, `spec`, `intent` when
-    the SPEC names one (`research_doc` only when RESEARCH ran), `adrs`, `summary`;
-  - `## 📝 Implementation Plan`: numbered `- [ ]` phases, each with `scope:` (files), `exit:`
-    (a runnable command), `risk:` and `rollback:`;
-  - `## 🚧 Contract Boundaries` / `### Do not change`, in the three admitted forms;
-  - `## 📐 Architecture Decision Records`: one bullet per decision with its id and a
-    `**Decided by:** user (source: …)` or `**Decided by:** agent` provenance line.
-- Step 0.1 upserts `spec_need_verdict` / `spec_need_target` into it, as today.
-- A short inline read-back replaces Step 0.3 for this PLAN.
-- Step 1.5 (parallel split) does not apply, because the phases run in order.
-- A filled light PLAN for a typical task (two phases, three files, one boundary, two decisions,
-  spec_need fields) is ≤ 1,200 chars. A draft fill for the bench t1 task (format-max-units)
-  measures 947 chars. The light PLANs the bench wrote from the full template were 1.5–2.9k
-  chars.
-- **Oversize rule.** If the light phases touch well over five files, Step 0 writes the full PLAN
-  instead and logs that the task reads as `full`, so Step 2's rule and the 3a light check's
-  five-file skip agree.
+**Execute Step 0, in order** (Claude command; the Codex skill has the same order with its full
+text inline):
 
-**Every other execute** (full lane, an untrusted light lane, loop mode, or oversize) Reads the
-full PLAN-authoring text from a new reference file `.claude/hm/execute-plan.md`, and writes the
-PLAN as today:
-- the file holds Step 0's body (4.2k) and Step 0.3's body (1.3k), byte-identical to `a7403f2f`;
-- the headings stay in the command;
-- the Codex skill inlines the same text through the same partial.
+1. **Step 0's `a7403f2f` head, inline, above the lane split**, so both arms get it: the two intro
+   paragraphs and then the two shared rules (`execute.md.j2:126-132`), unchanged, ending at the
+   do-not-rewrite paragraph. The head is a pure prefix of the `a7403f2f` body, so S13 rebuilds
+   that body by concatenation (980 chars on the default render). The shared rules are:
+   - the rooted write path: `` Write to `<WT>/work-docs/PLAN-{slug}.md` ``, or
+     `` `./work-docs/PLAN-{slug}.md` `` with worktree off;
+   - "**If that file already exists, do not rewrite it** — skip to the SPEC-need write below".
+2. **The `approval-status` call**, then the routing sentence, exactly:
+   `` If that prints `"trusted_lane": "light"` and loop mode is not active for this session, write the light PLAN from the light block below. Otherwise (full lane, untrusted light, or loop mode) follow the full PLAN text instead. ``
+3. **The full-lane pointer** (`ref_pointer` partial, STOP on a missing file):
+   `.claude/hm/execute-plan.md`, its Step 0 part now and its Step 0.3 part at the Step 0.3
+   heading.
+4. **The light block.** One span per file, between `<!-- @hm:light-plan -->` and
+   `<!-- @hm:/light-plan -->`, anchored right after the full-lane pointer, at most 2,400 chars.
+   It holds:
+   - **The fenced one-screen template.** Its placeholders are `{slug}`, `{YYYY-MM-DD}`,
+     `{summary}`, `{M}`, `<id>`, and per row `{name}`, `{files}`, `{command}`, `{risk}`,
+     `{rollback}`, `{path}`, `{why}`, `{NNN}`, `{decision}`, `{provenance}`. Its content:
+     - frontmatter: `type: plan`, `task_slug`, `status: planning`, `created`, `spec`, `intent`
+       when the SPEC names one (`research_doc` only when RESEARCH ran), `adrs`, `summary`;
+     - `## 📝 Implementation Plan`: one line per phase, with the fixed literal
+       `` - [ ] {N}. **Phase {N} — {name}** — scope: {files} · exit: `{command}` · risk: {risk} · rollback: {rollback} ``.
+       Wrapup Step 4 and the Quality Bar match `- [ ]`; the `verify-before-completion` skill's
+       1b matches the numbered item;
+     - `## 🚧 Contract Boundaries` / `### Do not change`, in the three admitted forms;
+     - `## 📐 Architecture Decision Records`: one bullet per decision, `- ADR-{NNN}: {decision}.
+       **Decided by:** {provenance}`, where provenance is `user (source: …)` or `agent`.
+   - **The light read-back**, run at the Step 0.3 heading after Step 0.1. It asserts:
+     - (a) the frontmatter carries every key of the template;
+     - (b) every phase line carries `scope:`, `exit:`, `risk:` and `rollback:`;
+     - (c) `### Do not change` is present and non-empty, every bullet is one of the three
+       admitted forms, and a `none` bullet appears only as the sole bullet;
+     - (d) the frontmatter carries `spec_need_verdict` after Step 0.1.
+
+     A failure is self-repaired inline, as in Step 0.3.
+   - **The Step 1.5 note:** Step 1.5 (parallel split) does not apply to a light PLAN, because
+     its phases run in order.
+   - **The oversize rule:** if the light phases touch well over five files, the task is not
+     light. Follow the full PLAN text instead and log that it reads as `full`, so Step 2's rule
+     and the 3a light check's five-file skip agree.
+5. **Step 0.1** (the spec_need upsert) and **Step 0.2** (loop mode only) stay as they are.
+   **Step 0.3**'s heading carries, exactly:
+   `` Light PLAN: run the light read-back from Step 0's light block. Any other PLAN: apply the Step 0.3 part of `.claude/hm/execute-plan.md`. ``
+
+**Size.** A light PLAN filled from the template for the bench t1 task (the value table under S9)
+is ≤ 1,200 chars after Step 0.1. A draft of the template filled from that table measures 925
+chars, and the draft light block 1,417 chars. The light PLANs the bench wrote
+from the full template were 1.5–2.9k chars.
+
+**`execute-plan.md`** holds two ref slices, compared separately:
+- **Part 1:** the rest of Step 0's `a7403f2f` body after the inline head, from
+  `**Required frontmatter**` to the end.
+- **The separator**, one fixed line:
+  `<!-- @hm:ref:step-0.3 --> Apply the rest of this file at the command's Step 0.3 heading, after Step 0.1 has run.`
+- **Part 2:** Step 0.3's `a7403f2f` body.
+
+The headings stay in the command. The Codex skill inlines both parts at their `a7403f2f`
+positions through the same partials.
 
 **No reader changes.** Every light task still has a PLAN, so no stage gets a no-PLAN branch.
 The light PLAN carries every key and section a gate reads:
@@ -201,11 +244,12 @@ at each phase commit.
 |---|---|---|
 | A | ≈ −6.3k: 2 × 4,362 saved, minus 3 pointers, minus one Read's overhead | ≈ −13.9k |
 | B | ≈ −7.0k | ≈ −7.0k |
-| C | ≈ −8.4k (breakdown below) | ≈ +4.6k (breakdown below) |
-| **Total** | **≈ −21.7k** | **≈ −16.3k** |
+| C | ≈ −7.4k (breakdown below) | ≈ +4.6k (breakdown below) |
+| **Total** | **≈ −20.7k** | **≈ −16.3k** |
 
-- **C on a light run:** execute instructions −3.3k, spec instructions −1.5k, the PLAN written
-  −0.9k (≈ 2.0k → ≤ 1.2k) and read back twice (Step 0.3 and Step 1) −1.8k, yaml −0.9k
+- **C on a light run:** execute instructions −2.3k (the Step 0 and 0.3 bodies, 5,526 chars,
+  minus the 980-char inline head, the routing, pointer and Step 0.3 sentences, and the ~1.4k
+  light block), spec instructions −1.5k, the PLAN written −0.9k (≈ 2.0k → ≤ 1.2k) and read back twice (Step 0.3 and Step 1) −1.8k, yaml −0.9k
   (19 light SPECs: 3,530 → 2,591 average).
 - **C on a full run:** the two Reads with line-number overhead, and the light-branch text every
   lane carries.
@@ -216,14 +260,14 @@ at each phase commit.
 **Given** a rendered Claude stage command for each of the six stages, on every config arm (autonomy gated, auto_safe, auto_full and ask; worktree on and off; locales en and ko)
 **When** its text before `# Stage:` is read
 **Then** it is the pointer, at most 650 chars, naming `.claude/hm/stage-preamble.md`, the project root, the read-unless-in-context condition, "either way" applying it to this stage (loop check, banner, picker only if not yet answered), and the missing-file rule
-**And** a later stage whose context already holds the file prints its own banner without reading the file again
 **And** none of the preamble's sentences appears in the command
+**And** (runtime, bench-measured; the render test pins only the wording) a later stage whose context already holds the file prints its own banner without reading the file again
 
 ### S2: The moved preamble is byte-identical, and health checks it
 **Given** the same config arms
-**When** `.claude/hm/stage-preamble.md` is rendered and `/hm:health`'s workflow-clarity dimension scores the render, then scores it again with the file deleted and again with a marker removed from it
+**When** `.claude/hm/stage-preamble.md` is rendered and `/hm:health`'s workflow-clarity dimension scores the render, then scores it again with the file deleted, again with a marker removed from it, and once on the `a7403f2f` render (inline preamble, no file)
 **Then** the text between its `@hm:ref:start` / `@hm:ref:end` markers equals each command's `a7403f2f` preamble span
-**And** both signals pass on the full render and fail, naming the file, in the other two cases
+**And** both signals pass on the full render and on the `a7403f2f` render, and fail, naming the file, when the file is deleted or a marker is removed
 
 ### S3: Codex, CLAUDE.md and AGENTS.md keep their inline preamble
 **Given** a render with the `codex` target
@@ -234,10 +278,10 @@ at each phase commit.
 **Given** a SPEC pair that passes validate and cross-validate, with quality clean, weak (a dimension < 40), low (overall < 60) under `warn`, or `evaluate_spec` raising
 **When** `hm spec_machine check --all` runs
 **Then** the first three print one JSON line, carrying `weak_dimensions` and `low_dimensions` exactly when the score is weak or low, and exit 0
-**And** the raising case prints the failure-shaped payload with `quality.error` and exits 0
+**And** the raising case prints the failure-shaped payload with the top-level `strictness` and `quality: {error, strictness}`, `ok: true`, and exits 0
 
 ### S5: A failing check prints each error once and names the low dimensions
-**Given** the failure fixtures: string golden-row input, a golden row without `expected`, a missing AC heading, a title mismatch, a v2 AC without `oracle_evidence`, an unparseable yaml, and `block` strictness with overall 55 and no dimension < 40
+**Given** the failure fixtures: string golden-row input, a golden row without `expected`, a missing AC heading, a title mismatch, a v2 AC without `oracle_evidence`, an unparseable yaml, a missing yaml file, `block` strictness with overall 55 and no dimension < 40, and `evaluate_spec` raising while validate fails
 **When** `check --all` runs on `a7403f2f` and after the change
 **Then** `ok`, the exit code, `validate.ok`, `cross_validate.ok`, `quality.blocked` and the set of error locations are equal
 **And** no error string appears twice, no help URL or `input_value` appears, the overall-55 payload names at least one dimension with its score in `low_dimensions`, and the total output is at most half of `a7403f2f`'s
@@ -249,29 +293,48 @@ at each phase commit.
 
 ### S7: A trusted light execute writes the short light PLAN
 **Given** a rendered execute command (Claude) and execute skill (Codex)
-**When** Step 0 is read
-**Then** its first action is `approval-status`; on `trusted_lane: light` with loop mode off it writes the PLAN from the inline light template, reads it back with the short check, and skips Step 1.5
-**And** a light phase block that touches well over five files writes the full PLAN instead
+**When** Step 0 and the Step 0.3 heading are read, with worktree on and off
+**Then** Step 0 opens with its `a7403f2f` head, the intro and then the two shared rules (the rooted write path, `<WT>/` or `./`, and "if that file already exists, do not rewrite it"), then the `approval-status` call and the exact routing sentence, then the full-lane pointer, then exactly one light block between the `@hm:light-plan` markers
+**And** the light block holds the template with the phase-line literal, the four read-back assertions (a)–(d), the Step 1.5 note and the oversize rule, and the Step 0.3 heading carries its exact sentence
+**And** the two shared rules sit above the lane split, so they apply to the light arm and the full arm alike
 
 ### S8: Every other execute writes the full PLAN from the reference file
 **Given** a full lane, an untrusted light lane, loop mode, or an oversize light block
 **When** execute Step 0 runs
-**Then** the Claude command Reads `.claude/hm/execute-plan.md`, whose text between its ref markers equals the `a7403f2f` Step 0 and Step 0.3 bodies, and the Codex skill inlines the same bytes
+**Then** the Claude command Reads `.claude/hm/execute-plan.md`; its part 1 equals the `a7403f2f` Step 0 body after the inline head, then the fixed separator line, then part 2 equals the `a7403f2f` Step 0.3 body
+**And** the Codex skill inlines both parts at their `a7403f2f` positions
 
 ### S9: The light PLAN feeds every gate that reads a PLAN
-**Given** the light template filled for a light fixture task whose SPEC names an intent, after Step 0.1's real `spec_need frontmatter-upsert`
-**When** each reader in the Outcomes table reads it, and `autopilot_caps._plan_link`, `wrapup_land` (PLAN `--required`) and `world_model_digest.next_stage` run on it
-**Then** every key and section that reader needs is present and parseable: `_plan_link` returns the intent link, `wrapup_land` stages the PLAN, the Do-not-change list parses in an admitted form, and the ADR ids carry `**Decided by:**`
+**Given** the fenced light template extracted from `render(cfg)['execute']`, filled mechanically from this value table (bench t1, plus a fixture intent), then given Step 0.1's real `spec_need frontmatter-upsert`:
+
+| Placeholder | Value |
+|---|---|
+| `{slug}` | `format-max-units` |
+| `{YYYY-MM-DD}` | `2026-10-14` |
+| `<id>` (intent) | `TIMEPARSE-UNITS` |
+| `{M}` | `2` |
+| `{summary}` | `format_duration gains max_units to cap the number of emitted units` |
+| phase 1 | `max_units parameter`; `` `timeparse/format.py`, `tests/test_format.py` ``; `pytest tests/test_format.py -q`; `low`; `revert` |
+| phase 2 | `CLI flag`; `` `timeparse/cli.py`, `tests/test_cli.py` ``; `pytest tests/test_cli.py -q`; `low`; `revert` |
+| boundary | `timeparse/parse.py`; `parsing grammar is out of scope` |
+| ADR-001 | `truncate, never round, the dropped units`; `user (source: SPEC S2)` |
+| ADR-002 | `max_units=None keeps today's output`; `agent` |
+| spec_need | `--verdict add --target SPEC-format-max-units` |
+
+The phase, boundary and ADR lines repeat once per row; `research_doc` is dropped (no RESEARCH).
+**When** each reader in the Outcomes table reads it, and `autopilot_caps._plan_link` and `wrapup_land` (PLAN `--required`) run on it
+**Then** every key and section that reader needs is present and parseable: `_plan_link` returns the intent link, `wrapup_land` stages the PLAN, the Do-not-change list parses in an admitted form, the phase lines match `- [ ]` and the numbered-item form, and the ADR ids carry `**Decided by:**`
 
 ### S10: The light PLAN is short
-**Given** the same filled fixture (two phases, three files, one boundary, two decisions, spec_need fields)
+**Given** the template-derived fixture of S9, after the upsert
 **When** its size is measured
 **Then** it is at most 1,200 chars
 
-### S11: A minimal light machine.yaml validates and approves
+### S11: A minimal light machine.yaml validates, approves and survives write-back
 **Given** minimal light machine.yamls at tiers 1, 2 and 3 with mechanical, parametric, judgment and property ACs and `irreversible_decisions: []`
-**When** `check --all --strictness block`, `approve --exempt` and `approval-status` run
-**Then** check is `ok` and not blocked, the stamp is written, and `approval-status` prints `trusted_lane: light`
+**When** `check --all --strictness block`, `approve --exempt` and `approval-status` run, then `spec_machine mark-tested` writes test ids back, then `approval-status` runs again
+**Then** check is `ok` and not blocked, the stamp is written, and both `approval-status` calls print state `exempt` and `trusted_lane: light`
+**And** a human-approved copy reads `approved` and `trusted_lane: light` after the same write-back
 
 ### S12: Spec Step 3.5 shows the minimal schema and reads the rest on full
 **Given** a rendered spec command (Claude) and spec skill (Codex)
@@ -280,7 +343,13 @@ at each phase commit.
 
 ### S13: The full lane and the typed stages change only by the named deltas
 **Given** full-lane configs (Side and Production, worktree on and off, warn and block, loop on and off)
-**When** each `a7403f2f` stage command, reference file, Codex skill and the `verify-before-completion` skill is compared to the new render with the A pointer restored to the preamble, the C reference pointers restored to their text, the light-branch text removed from execute and spec, and the Step 4 output description restored in spec
+**When** each `a7403f2f` stage command, reference file, Codex skill and the `verify-before-completion` skill is compared to the new render after a fixed normalisation:
+- the A pointer is restored to the preamble;
+- in execute, exactly one `@hm:light-plan` span (≤ 2,400 chars, right after the full-lane pointer) is deleted;
+- the exact routing sentence, the `approval-status` call and the exact Step 0.3 heading sentence are deleted;
+- the full-lane pointer and the separator are replaced by `execute-plan.md`'s two parts;
+- in spec, the Step 3.5 and Step 4 + 4.5 sections are left out (AC-015 and AC-009 compare them)
+
 **Then** they are equal, and the boundary JSON for the same inputs equals `a7403f2f`
 
 ### S14: The surface shrinks by the measured bounds
@@ -331,7 +400,7 @@ at each phase commit.
 | Scenario | Verification mode | Test name / manual step |
 |---|---|---|
 | S1 | unit (render) | `tests/render/test_render_light_lane_s3c.py::test_stage_commands_point_at_the_preamble` |
-| S2 | unit (render, differential) | `tests/render/test_render_light_lane_s3c.py::test_preamble_moved_byte_for_byte`, `tests/unit/test_readiness_stage_preamble.py::test_health_checks_the_preamble_file` |
+| S2 | unit (render, differential) | `tests/render/test_render_light_lane_s3c.py::test_preamble_moved_byte_for_byte`, `tests/unit/test_readiness_stage_preamble.py::test_health_checks_the_preamble_file`, `tests/unit/test_readiness_stage_preamble.py::test_health_scores_an_old_render_as_today` |
 | S3 | unit (render, differential) | `tests/render/test_render_light_lane_s3c.py::test_codex_and_claude_md_keep_the_preamble` |
 | S4 | unit (CLI) | `tests/unit/test_spec_machine_check_quiet.py::test_no_failed_gate_prints_one_line` |
 | S5 | unit (CLI, differential) | `tests/unit/test_spec_machine_check_quiet.py::test_failure_prints_each_error_once`, `tests/unit/test_spec_machine_check_quiet.py::test_failure_output_is_at_most_half` |
@@ -340,7 +409,7 @@ at each phase commit.
 | S8 | unit (render, differential) | `tests/render/test_render_light_lane_s3c.py::test_full_execute_reads_the_moved_plan_text` |
 | S9 | unit | `tests/unit/test_light_plan.py::test_light_plan_feeds_every_reader` |
 | S10 | unit | `tests/unit/test_light_plan.py::test_light_plan_is_short` |
-| S11 | unit (CLI) | `tests/unit/test_light_plan.py::test_minimal_machine_yaml_validates_and_approves` |
+| S11 | unit (CLI) | `tests/unit/test_light_plan.py::test_minimal_machine_yaml_validates_and_approves`, `tests/unit/test_light_plan.py::test_mark_tested_write_back_keeps_the_stamp` |
 | S12 | unit (render, differential) | `tests/render/test_render_light_lane_s3c.py::test_spec_step_3_5_minimal_inline` |
 | S13 | unit (render, differential) | `tests/render/test_render_light_lane_s3c.py::test_full_lane_changes_only_by_named_deltas` |
 | S14 | unit (structural) | `tests/render/test_render_light_lane_s3c.py::test_surface_meets_bounds` |
@@ -349,7 +418,7 @@ at each phase commit.
 ### AC-001: Every Claude stage command carries the read-once, apply-every-stage preamble pointer
 ### AC-002: stage-preamble.md holds the a7403f2f preamble byte-for-byte in every config arm
 ### AC-003: Codex stage skills, CLAUDE.md and AGENTS.md keep the inline preamble
-### AC-004: The health audit requires the preamble file and its markers
+### AC-004: The health audit requires the preamble file and its markers when a stage command names it
 ### AC-005: A check run with no failed gate prints one line, and a scoring exception keeps the verdict
 ### AC-006: A failing check prints each error once and names its low dimensions with scores
 ### AC-007: Check output on the failure fixtures is at most half of a7403f2f's
@@ -358,8 +427,8 @@ at each phase commit.
 ### AC-010: A trusted light execute outside loop mode writes the short light PLAN
 ### AC-011: Every other execute writes the full PLAN from execute-plan.md, whose text is a7403f2f's
 ### AC-012: The light PLAN carries every key and section a gate reads
-### AC-013: The light PLAN is at most 1,200 chars on the fixture
-### AC-014: A minimal light machine.yaml passes check, approve and approval-status
+### AC-013: The template-derived light PLAN fixture is at most 1,200 chars
+### AC-014: A minimal light machine.yaml passes check, approve and approval-status, and survives write-back
 ### AC-015: Spec Step 3.5 shows the minimal schema inline and the full-lane fields on demand
 ### AC-016: The full lane and the typed stages differ from a7403f2f only by the named deltas
 ### AC-017: The rendered surface meets the per-stage bounds
@@ -368,12 +437,9 @@ at each phase commit.
 
 - **C's split costs the full lane about +4.6k carried chars and two Reads per run.** Execute's
   full PLAN text and spec's full-lane yaml fields move to reference files, so the light lane stops
-  carrying them. Keeping them inline would cut the light lane's C saving from ≈ −8.4k to
+  carrying them. Keeping them inline would cut the light lane's C saving from ≈ −7.4k to
   ≈ −3.6k (only the shorter PLAN and yaml) and cost the full lane nothing. Agent default: split
   (PLAN ADR-005).
-- **The DRI card "short light PLAN" vs "No PLAN" is pending.** This SPEC follows the
-  coordinator's recommendation (short light PLAN). "No PLAN" would bring back the no-PLAN reader
-  branches that spec-validator pass 1 found fail-open (Refinement Decisions).
 - **Most bench `check` failures are golden-row shape errors** (`input` not a mapping, `expected`
   missing). The minimal inline schema shows the row shape, so both lanes see it. Whether that
   lowers the retry count is unmeasured until the stage 4 bench.
@@ -395,7 +461,7 @@ at each phase commit.
   - the oversize downgrade after Step 0;
   - the drift scope.
 
-  On the coordinator's recommendation (DRI card pending), C became a short light PLAN that
+  On the coordinator's recommendation, which the DRI later confirmed, C became a short light PLAN that
   carries every key and section a gate reads. Every no-PLAN branch, the `_plan_link` SPEC
   fallback and the SPEC-frontmatter spec_need fields were removed.
 - Pass 1 also changed B and A:
@@ -412,6 +478,26 @@ at each phase commit.
 - Confirmed unchanged: Maker's decision-capture rule ("write it into that task's most downstream
   artifact (PLAN, else SPEC, else RESEARCH)") and AGENTS.md (`$hm-execute` "Writes the PLAN
   (phases, ADRs)") stay true with a light PLAN.
+- **DRI decision 2026-10-15, "Short PLAN" on the card.** spec-validator pass 2 found no missing
+  IRR and confirmed that every key a reader parses is in the light template. Its findings were
+  folded in:
+  - Step 0's two shared rules (the rooted write path; do not rewrite an existing PLAN) stay
+    inline above the lane split. The two intro paragraphs before them stay too, so the inline
+    head is a pure prefix of the `a7403f2f` body and S13 compares by concatenation. That costs
+    the light lane ~0.56k; the alternative, a reorder rule in the normalisation, is the kind of
+    hand-written whitelist entry AC-016 exists to avoid;
+  - the light read-back's four assertions are listed;
+  - `execute-plan.md` is two ref slices with a fixed separator, and the Step 0.3 heading
+    sentence is exact;
+  - the AC-012 fixture is derived from the rendered template and the S9 value table, and
+    `next_stage` was dropped from S9 (the digest reads only a PLAN's existence);
+  - the light span has fixed markers and a size bound, and the routing sentence is exact;
+  - `/hm:health` checks the file only when a command names it;
+  - the phase-line literal is pinned;
+  - B keeps the top-level `strictness`, states the non-pydantic load-error format, and adds the
+    raise-plus-failed-gate row;
+  - AC-014 adds the `mark-tested` round-trip;
+  - S1's runtime clause is labelled bench-measured.
 - Evaluated, not irreversible: execute Step 0's `approval-status` call, and Step 1.5 not applying
   to a light PLAN.
 - Work stays on the session's designated branch, as in stages 1–3a.
