@@ -98,6 +98,18 @@
   `/hm:spec` authors only the minimal `machine.yaml`; the full PLAN text and the full schema moved to
   `.claude/hm/execute-plan.md` and `.claude/hm/spec-machine-full.md` (Codex keeps both inline). Re-render
   with `/hm:make` to get the three new files.
+- **The light check passes Check 2 from its SPEC when the repo has no CI file (HM-LIGHT-LANE, stage 3d).**
+  `hm observability.verification_cache run` takes `--spec-slug <slug>`. With no `.github/workflows`
+  directory (or no `*.yml`/`*.yaml` in it), a trusted light SPEC (`trusted_lane: light`) whose `.md`
+  `test_framework` is exactly `pytest` supplies the gates, run by `<root>/.venv/bin/python`:
+  `-m ruff check .` and `-m mypy` only when `pyproject.toml` configures them, then `-m pytest`. No
+  `.venv/bin/python`, an untrusted SPEC, another framework or an unparseable `pyproject.toml` is exit 3
+  with no gates; trust is checked before a marker is reused. The JSON line says `"gate_source": "spec"`
+  on that path only; any other CI state ignores the flag, and `run` without it is unchanged. Only
+  execute's light check passes the flag, and its record names the source
+  (`regression: pytest from SPEC (no CI file)`); verify, review, wrapup and the loop render unchanged.
+  The bench fixture `scripts/bench/timeparse` gains `[dependency-groups] dev = ["pytest"]`, so both eval
+  arms now start from a project whose `.venv` has pytest. Re-render with `/hm:make` to get the new flag.
 - **Less always-loaded context.** A clean `hm spec_machine check --all` prints one line
   (`{"ok": true, "overall", "strictness"}`); failures still print the full payload. Five internal skills
   (`agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `context-linter`, `worktree-isolator`)
