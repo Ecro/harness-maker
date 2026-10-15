@@ -1,0 +1,663 @@
+schema_version: 3
+spec_slug: hm-overhaul-p1
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Render, reconcile and CLI-contract changes are pinned by db19f023
+  differentials, golden tables and the eval-3 replay; mutation testing is opt-in by DRI
+  decision (card c) and adds little over byte-level differentials here.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Cursor leaves the render and the code without changing any other output
+  type: property
+  test_ids:
+  - tests/unit/test_overhaul_p1_cursor_removal.py::test_ac001_render_equals_reference_without_cursor
+  - tests/unit/test_overhaul_p1_cursor_removal.py::test_ac001_cursor_only_paths_absent
+  - tests/unit/test_version_sync.py::test_four_manifests_share_one_version
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: 'PR-C. Removed: render._is_cursor_mdc, _is_cursor_command, _is_cursor_mcp_json and
+    their dispatch branches; the flat-schema branches of _entry_identity, _strip_shipped_commands,
+    _refresh_ref and the _merge_hooks_json schema select; .cursor/ in resolve_output_path and
+    _SIBLING_TREE_PREFIXES; synthesize._cursor_target_files and its Target.CURSOR branch; the
+    cursor_model context and _alias_by_cursor_id; presets.CURSOR_MODEL_IDS; readiness Cursor
+    advisory; Target.CURSOR; templates/cursor/; the cursor branches of help/make templates
+    and the plugin commands/make.md; .cursor-plugin/plugin.json. Kept: hook_host,
+    reconcile .cursor sweep root and backup, foreign_config detection of an existing .cursor/rules.'
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference is the db19f023 renderer run in a temp checkout from `git
+    show`/`git worktree add` before any edit, rendering T minus cursor; the relation holds
+    for any implementation that only removes Cursor, and the removed-symbol list was taken
+    by grep of db19f023 on 2026-10-15.
+  oracle_independence_waiver: null
+  input_domain: targets {[claude-code,cursor], [claude-code,cursor,codex], [cursor], [claude-code],
+    [claude-code,codex]} x preset {Side, Production} x worktree.enabled {false, true}
+  transformation: render at HEAD with targets T; render at db19f023 with T minus cursor (empty
+    -> [claude-code]); normalise generated_at, harness_maker_version, content_hash and manifest
+    timestamps
+  expected_relation: file sets equal, and every differing hunk's old side contains /cursor/i
+  preconditions:
+  - same HOME pin and freeze_time for both renders
+  observable_output: the list of files and hunks violating the relation, empty
+  generator_hint: itertools.product over the domain
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: An existing Cursor install upgrades with one warning and no lost edits
+  type: parametric
+  test_ids:
+  - tests/unit/test_overhaul_p1_cursor_removal.py::test_ac002_cursor_brownfield_table
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: 0.62 tree targets [claude-code,cursor,codex], .cursor/* pristine; make --update
+    expected: one 'cursor target removed' warning; .cursor/rules/harness.mdc, mcp.json, hooks.json
+      deleted; empty .cursor/ removed; harness.yaml targets [claude-code, codex]
+    edge: false
+    note: pristine = on-disk sha256 equals the manifest hash and, for hooks.json, every entry
+      is harness-managed
+  - input:
+      case: as row 1, one byte of harness.mdc edited
+    expected: harness.mdc kept byte-identical with one KEPT warning; the other two deleted
+    edge: false
+    note: ''
+  - input:
+      case: as row 1, hooks.json carries a user entry folded in by an earlier merge (hash in
+        manifest)
+    expected: hooks.json kept byte-identical, one KEPT warning
+    edge: true
+    note: the merged hash is ours by manifest but holds user content (the .claude/hooks/hooks.json
+      lesson)
+  - input:
+      case: as row 1, mcp.json edited
+    expected: mcp.json kept
+    edge: false
+    note: ''
+  - input:
+      case: targets [cursor] only
+    expected: one warning; targets become [claude-code]
+    edge: true
+    note: same fallback as a missing targets key
+  - input:
+      case: agent_models.code-reviewer.cursor set to a model alias
+    expected: one warning; key ignored; render succeeds
+    edge: true
+    note: ''
+  - input:
+      case: hm make --targets claude-code,cursor on a fresh dir
+    expected: same as row 1 for a fresh render (warning, no .cursor/)
+    edge: false
+    note: ''
+  - input:
+      case: fresh tree, no cursor anywhere
+    expected: no warning
+    edge: false
+    note: ''
+  rubric_id: null
+  note: PR-C
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The rows encode the DRI's 22:54Z rule (one warning then ignore; sweep only
+    byte-identical; keep edited) and pre-change-checklist items 1 and 5, with 0.62 trees rendered
+    from db19f023; none is derived from the new reconcile code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Every 0.62 stage heading is disposed of according to its class
+  type: parametric
+  test_ids:
+  - tests/unit/test_overhaul_p1_cut_ledger.py::test_ac003_ledger_covers_db19f023_registry
+  - tests/unit/test_overhaul_p1_cut_ledger.py::test_ac003_no_inv_heading_is_cut
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: a registry key at db19f023 not in the SPEC cut ledger
+    expected: it is KEPT, so a heading with its ordinal renders in the same stage at HEAD
+    edge: false
+    note: ''
+  - input:
+      case: a ledger row with disposition CUT-COMP or CUT-HOST
+    expected: the db19f023 class of that key is COMP or HOST respectively
+    edge: false
+    note: ''
+  - input:
+      case: a ledger row on an INV key
+    expected: disposition is KEPT, MOVED, VACUOUS (with a named cause) or DRI
+    edge: false
+    note: no INV heading is cut
+  - input:
+      case: a ledger row on a TUNE key
+    expected: disposition is TUNE-M naming a measurement, or DRI
+    edge: false
+    note: ''
+  - input:
+      case: a MOVED row
+    expected: the new owner (hm check section, execute review step, execute) contains the
+      named function (golden substring or CLI section)
+    edge: true
+    note: ''
+  rubric_id: null
+  note: PR-S. The ledger is the SPEC.md 'Cut ledger' table; the test parses it.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The classes come from `git show db19f023:src/harness_maker/step_sensitivity.py`
+    (the repo's own pre-change classification, graded against RESEARCH-workflow-steps-vs-model-capability);
+    the cut rule is the DRI's 23:15Z instruction. Neither depends on the new templates.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: The rendered surface per target holds the kept set within its char budgets
+  type: parametric
+  test_ids:
+  - tests/unit/test_overhaul_p1_surface.py::test_ac004_file_set_per_target
+  - tests/unit/test_overhaul_p1_surface.py::test_ac004_char_budgets
+  - tests/unit/test_overhaul_p1_surface.py::test_ac004_hook_commands_per_file
+  - tests/unit/test_overhaul_p1_surface.py::test_ac004_stage_content_substrings
+  - tests/unit/test_overhaul_p1_surface.py::test_ac004_no_removed_command_named
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: D-1 one reviewer default; claude-code
+    expected: .claude/agents/code-reviewer.md present, <= 3000 chars; execute.md dispatches code-reviewer
+    edge: false
+    note: flip Q1 -> this row gains a review on/off axis
+  - input:
+      case: D-2 codex in targets
+    expected: .agents/skills/hm-{research,spec,execute,wrapup,help}/SKILL.md, .codex/agents/<agent>.toml
+      per rendered agent, config.toml [agents.*] only for those, .codex/hooks.json, AGENTS.md;
+      no .agents/skills/hm-{review,verify,loop}
+    edge: false
+    note: ''
+  - input:
+      case: D-3 spec-validator
+    expected: .claude/agents/spec-validator.md present; spec.md dispatches it once
+    edge: false
+    note: ''
+  - input:
+      case: D-4 second_brain.enabled false / true
+    expected: wrapup.md has no / has `second_brain promote`
+    edge: false
+    note: ''
+  - input:
+      case: D-5 default config
+    expected: execute.md has no spec_mutation call
+    edge: false
+    note: ''
+  - input:
+      case: D-6, D-7
+    expected: metrics.md <= 3000 chars; research.md <= 8000 chars
+    edge: false
+    note: defaults, see Open Questions 1
+  - input:
+      case: stage budgets, Side and Production, worktree off, depth standard
+    expected: spec.md <= 6500, execute.md <= 7000, wrapup.md <= 3500; codex SKILL.md <= 1.03x
+      the same
+    edge: false
+    note: wc -c of the rendered file, frontmatter included
+  - input:
+      case: worktree.enabled true
+    expected: spec <= 8000, execute <= 8500, wrapup <= 6300; each stage contains `hm worktree
+      task-preflight`; wrapup contains `task-land` and `commit-base-memory`
+    edge: false
+    note: ''
+  - input:
+      case: interview.comprehension.depth deep
+    expected: spec.md <= base + 800 and contains the per-question envelope and closing readback
+    edge: true
+    note: ''
+  - input:
+      case: any render
+    expected: absent .claude/stages/, .claude/hm/, commands review/verify/configure/loop/loop-p5-batch,
+      agents test-reviewer/stuck/security-auditor/executor/autoloop-coder and the 5 lens reviewers,
+      skills security-scanner/verify-before-completion/targeted-test-selection/conditional-router/
+      autoloop-driver/refdocs-search, .cursor/
+    edge: false
+    note: ''
+  - input:
+      case: settings.json hooks
+    expected: exactly permission_gate, worktree_gate, (Production) spec_gate, flush_session,
+      worktree span-end, loop_gate --mode stop-hook, sessionid_envfile
+    edge: false
+    note: ''
+  - input:
+      case: .codex/hooks.json hooks
+    expected: exactly permission_gate (PermissionRequest, PreToolUse), sessionstart_drift, sessionid_envfile,
+      loop_gate --mode stop-hook, flush_session
+    edge: false
+    note: ''
+  - input:
+      case: every rendered stage file
+    expected: names no `.claude/hm/` or `.claude/stages/` path and no Read of another harness
+      prose file; keeps @hm:user:extensions
+    edge: false
+    note: self-contained
+  rubric_id: null
+  note: PR-S
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The file lists come from the DRI-approved draft sections 1 and 6 as amended by
+    the 2026-10-15 corrections; the budgets are the DRI's 6k/7k/3k targets adjusted by the
+    scratchpad-draft estimates stated in Open Questions 5, fixed here before any template
+    is written.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: hm check exits per its contract and never writes the tree
+  type: parametric
+  test_ids:
+  - tests/unit/test_overhaul_p1_hm_check.py::test_ac005_exit_table
+  - tests/unit/test_overhaul_p1_hm_check.py::test_ac005_red_mode_table
+  - tests/unit/test_overhaul_p1_hm_check.py::test_ac005_tree_bytes_unchanged
+  - tests/unit/test_overhaul_p1_hm_check.py::test_ac005_gate_env_has_no_bytecode
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: approved SPEC, all gates pass, every non-judgment AC bound and passing, no security
+        or cve finding in touched paths
+    expected: exit 0, one JSON line, every section ok
+    edge: false
+    note: ''
+  - input:
+      case: as row 1, a failing gate
+    expected: exit 1, sections.gates.ok false
+    edge: false
+    note: ''
+  - input:
+      case: as row 1, one AC with pending_test true or empty test_ids
+    expected: exit 1, sections.ac names the AC
+    edge: false
+    note: DRI rule 3
+  - input:
+      case: as row 1, a judgment AC with no current pass verdict
+    expected: exit 1, sections.ac names it
+    edge: true
+    note: judgment is the only test-free type
+  - input:
+      case: as row 1, ac is []
+    expected: exit 1
+    edge: true
+    note: eval-3 t6-hm-2 shape
+  - input:
+      case: as row 1, a secret-shaped string added in a touched file
+    expected: exit 1, sections.security
+    edge: false
+    note: ''
+  - input:
+      case: as row 1, a secret-shaped string in an untouched harness file
+    expected: exit 0, sections.security.out_of_scope >= 1
+    edge: true
+    note: eval-3 high=3 shape
+  - input:
+      case: as row 1, a curl|sh hook added to .claude/settings.json
+    expected: exit 1, sections.security
+    edge: false
+    note: ''
+  - input:
+      case: as row 1, uv.lock adds a dependency with a mocked OSV hit
+    expected: exit 1, sections.cve
+    edge: false
+    note: ''
+  - input:
+      case: as row 1, mocked OSV hit on an untouched dependency
+    expected: exit 0, sections.cve.existing non-empty
+    edge: true
+    note: ''
+  - input:
+      case: as row 1, OSV lookup raises
+    expected: exit 0, sections.cve unavailable with a warning
+    edge: true
+    note: never read as clean
+  - input:
+      case: no CI file, no .venv/bin/python
+    expected: exit 3
+    edge: false
+    note: degraded
+  - input:
+      case: a gate writes a tracked file during the run
+    expected: exit 4
+    edge: true
+    note: ''
+  - input:
+      case: as row 1, SPEC unstamped, autonomy.level ask
+    expected: exit 5
+    edge: false
+    note: ''
+  - input:
+      case: as row 1, SPEC unstamped, autonomy.level auto_full
+    expected: exit 0, sections.approval pending reported
+    edge: true
+    note: ''
+  - input:
+      case: as row 1, stamp invalid (edited after approval), auto_full
+    expected: exit 5
+    edge: true
+    note: eval-3 t12-hm-2 shape
+  - input:
+      case: failing gate and missing approval together
+    expected: exit 1
+    edge: true
+    note: precedence 2 > 1 > 4 > 3 > 5 > 0
+  - input:
+      case: unknown flag
+    expected: exit 2
+    edge: false
+    note: ''
+  - input:
+      case: --red, every testable AC has a failing test, code absent
+    expected: exit 0
+    edge: false
+    note: ''
+  - input:
+      case: --red, an AC whose tests all pass
+    expected: exit 1, listed in green_before
+    edge: false
+    note: ''
+  - input:
+      case: --red, same with --green-ok AC-NNN
+    expected: exit 0, waiver echoed
+    edge: true
+    note: ''
+  - input:
+      case: --red, a test file with a SyntaxError, or a test id that does not exist
+    expected: exit 1
+    edge: true
+    note: not a real RED
+  - input:
+      case: --red, tests fail on ImportError of the not-yet-written symbol
+    expected: exit 0
+    edge: true
+    note: real RED
+  - input:
+      case: --mutation with mutmut absent
+    expected: skip notice, section passes
+    edge: true
+    note: unchanged from db19f023 spec_mutation gate
+  rubric_id: null
+  note: PR-S
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The exit meanings are fixed in this SPEC before implementation. Rows 7 and 16
+    reproduce shapes observed in the eval-3 trees on 2026-10-15; the RED rules restate
+    db19f023 execute Phase A.4/B and DRI rule 2; the approval rows follow the db19f023
+    spec_machine approval states.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: hm check on the 36 eval-3 hm trees reproduces the recorded section verdicts
+  type: parametric
+  test_ids:
+  - tests/integration/test_overhaul_p1_eval3_replay.py::test_ac006_section_verdicts_match_golden
+  - tests/integration/test_overhaul_p1_eval3_replay.py::test_ac006_negative_controls
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: each of the 36 trees as-is (copied, .venv kept, __pycache__ dropped), --offline
+    expected: security ok with 0 gating findings, although unscoped scan_all reports 10-15
+      high/P0 per tree; gates ok (pytest only, from pyproject); tree unchanged
+    edge: false
+    note: probe 2026-10-15
+  - input:
+      case: same, approval section, autonomy auto_full
+    expected: 31 exempt ok, 4 missing ok (t2-hm-1..3, t5-hm-3), t12-hm-2 invalid -> 5
+    edge: false
+    note: ''
+  - input:
+      case: same, ac section
+    expected: fails on all 36 (every AC pending_test true; t6-hm-2 has ac [])
+    edge: false
+    note: the SDD gap rule 3 targets; overall exit 1
+  - input:
+      case: negative control, a secret-shaped line appended to the tree's changed source file
+    expected: security section fails
+    edge: false
+    note: ''
+  - input:
+      case: negative control, the same line in .claude/agents/code-reviewer.md
+    expected: security ok, out_of_scope >= 1
+    edge: true
+    note: ''
+  - input:
+      case: negative control, the tree's src change reverted with its tests kept
+    expected: gates section fails
+    edge: false
+    note: ''
+  rubric_id: null
+  note: PR-S. Skipped unless /var/tmp/hm-eval-3/runs exists or INTEGRATION=1 with a fixture
+    copy; the expected verdicts are committed as tests/fixtures/hm_check_eval3/expected.json.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The verdicts were recorded on 2026-10-15 from the eval-3 artifacts (results.jsonl,
+    approval-status on each tree, a scoped-scan and pyproject-gate probe with PYTHONDONTWRITEBYTECODE=1)
+    before any hm check code exists; hidden-test results are not an input.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Upgrading a 0.62 tree sweeps only pristine retired files and keeps every user edit
+  type: property
+  test_ids:
+  - tests/integration/test_overhaul_p1_brownfield.py::test_ac007_pristine_trees_sweep_to_the_ac004_set
+  - tests/integration/test_overhaul_p1_brownfield.py::test_ac007_one_byte_edit_is_kept
+  - tests/integration/test_overhaul_p1_brownfield.py::test_ac007_user_blocks_and_hooks_survive
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: 'PR-S. Fixtures: db19f023 renders for [claude-code] and [claude-code,codex] x {Side,
+    Production} x worktree {off,on}, and copies of the 36 eval-3 hm trees (pristine 0.62 claude-code,
+    verified by git status on 2026-10-15).'
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: Expected sets are AC-004's golden list and the db19f023 render listing, both
+    fixed before implementation; the edit-preservation relation holds for any reconcile that
+    honours the content_hash/manifest contract of pre-change-checklist items 1 and 5.
+  oracle_independence_waiver: null
+  input_domain: a 0.62 tree from the fixtures, optionally with one mutation from {one byte appended
+    to a retired file, text inside an @hm:user:* block of a kept stage, a user hook added to
+    a harness matcher group, a user hook group of its own, harness.yaml autopilot_persistent
+    true}
+  transformation: hm make <tree> --update at HEAD
+  expected_relation: 'pristine tree: files after == AC-004 set and every removed file was in the
+    db19f023 listing; mutated retired file kept byte-identical with one KEPT warning; user block
+    text present in the new stage; user hook commands present; retired invocations absent;
+    specs/, work-docs/, .claude/memory/, .claude/observability/ byte-identical'
+  preconditions:
+  - HOME pinned; freeze_time
+  observable_output: per tree, the violating paths, empty
+  generator_hint: one mutation per run over every retired path
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: No hook command a 0.62 render shipped errors after the upgrade
+  type: property
+  test_ids:
+  - tests/integration/test_overhaul_p1_hook_commands.py::test_ac008_every_shipped_hook_command_is_safe
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: PR-C and PR-S. Covers the leftover .cursor/hooks.json and the three stubbed entry points.
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The command corpus and the reference exits come from db19f023 renders and
+    db19f023 modules loaded via `git show`; the relation (never fail where the old command did
+    not block) holds for any stub or kept module.
+  oracle_independence_waiver: null
+  input_domain: every hook command in .claude/settings.json, .codex/hooks.json and .cursor/hooks.json
+    of db19f023 renders over targets x preset x strictness x worktree, with `--with` pointed
+    at HEAD; payloads {empty stdin, garbage, Claude, Codex and Cursor payloads for the event,
+    a live .hm-loop-active and .hm-autopilot marker}
+  transformation: run the command at HEAD and at db19f023 on the same tmp project
+  expected_relation: exit(HEAD) == 0, or exit(HEAD) == exit(db19f023) == 2; no 'Traceback' on
+    stderr(HEAD)
+  preconditions:
+  - same project fixture for both runs
+  observable_output: cells violating the relation, empty
+  generator_hint: itertools.product
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Kept behaviour is unchanged from db19f023
+  type: property
+  test_ids:
+  - tests/unit/test_overhaul_p1_kept.py::test_ac009_hook_modules_equal_reference
+  - tests/unit/test_overhaul_p1_kept.py::test_ac009_digest_and_spec_machine_equal_reference
+  - tests/unit/test_overhaul_p1_kept.py::test_ac009_stage_cli_invocations_preserved
+  - tests/unit/test_overhaul_p1_kept.py::test_ac009_bench_contract
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: 'PR-S. Invocation golden (db19f023, Side, worktree on): spec {spec_machine check, approve,
+    approval-status, worktree task-preflight, task-refresh}; execute {spec_machine validate,
+    approve, approval-status, task-preflight, task-refresh}; wrapup {memory_md upsert-wiki,
+    upsert-failure, spec_machine approval-status, approve, find-unbound, find-unjudged, mark-judged,
+    mark-tested, waiver-check, wrapup_land, worktree task-land, commit-base-memory, task-preflight,
+    task-refresh}. Declared move: mark-tested wrapup -> execute. Declared additions: hm check.'
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: Reference modules are loaded from `git show db19f023:` into a temp package
+    and reference stage renders come from a db19f023 checkout; the relation holds for any change
+    that leaves these behaviours alone.
+  oracle_independence_waiver: null
+  input_domain: payload corpora for permission_gate (incl. curl|sh), flush_session, sessionstart_drift,
+    sessionid_envfile, worktree_gate, loop_gate --mode stop-hook; digest and spec_machine fixtures;
+    stage renders over worktree {off,on} x targets
+  transformation: run each under the db19f023 module or render and under HEAD on the same fixture
+  expected_relation: stdout, exit code and written files equal; the union of kept CLI invocations
+    over the three stages equals the reference union minus the declared moves, plus the declared
+    additions; make --autoloop --preset Side --targets claude-code --autonomy-level auto_full
+    exits 0 and spec.md matches `uv run --with (\S+) hm `
+  preconditions:
+  - freeze_time and HOME pinned
+  observable_output: differing cells, empty
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: The eval re-run meets the ship bar
+  type: mechanical
+  test_ids:
+  - tests/integration/test_overhaul_p1_ship_bar.py::test_ac010_scorecard_meets_bar
+  executable_predicate: t1_cost_ratio <= 8 and hm_hidden_pass_rate >= plain_hidden_pass_rate
+  golden_table: []
+  rubric_id: null
+  note: PR-S. Measured by scripts/bench_light_lane.py on tiers 1-2, 3 runs per cell; rows with
+    the new runner_hash only. A ratio <= 5 meets the intent metric; over 8x, trace with `economics
+    stages` before cutting further.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The thresholds are the DRI's 2026-10-15 ship bar and the pass-rate counter-signal
+    from the draft section 4, fixed before the re-run.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Drop the Cursor target (targets cursor ignored with a warning, no .cursor/ render,
+    .cursor-plugin/plugin.json deleted, version sync 4 files, Cursor-only Python deleted)
+  category: public API/CLI contract
+  rationale: Users and the Cursor Marketplace lose a supported target; restoring it means restoring
+    code and the listing.
+  source: spec
+- id: IRR-002
+  decision: /hm:review, /hm:verify, /hm:configure and /hm:loop (and Codex $hm-review, $hm-verify,
+    $hm-loop) are no longer rendered
+  category: public API/CLI contract
+  rationale: Scripts and habits that call them break; kept user-edited copies call CLI a later
+    phase may delete.
+  source: spec
+- id: IRR-003
+  decision: New `hm check` CLI with its flags, JSON line and exit codes 0/1/2/3/4/5 and their precedence
+  category: public API/CLI contract
+  rationale: Stage prompts and users script against it.
+  source: spec
+- id: IRR-004
+  decision: hm check security scope is touched paths only, never counts self-imports, gates on
+    secrets and hook-injection only, and checks CVEs by default, gating only on added or re-pinned
+    dependencies
+  category: security/permission boundary
+  rationale: It decides what can ship; a finding in an untouched file or dependency is reported
+    but never blocks.
+  source: spec
+- id: IRR-005
+  decision: Retire the telemetry, post_write_reminder and autopilot_autoarm hooks through the
+    append-only retired set, stub their entry points, and end autopilot auto-advance
+  category: public API/CLI contract
+  rationale: The retired set is append-only by test and re-rendering strips these hooks from
+    every user's settings.
+  source: spec
