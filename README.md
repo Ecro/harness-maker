@@ -637,34 +637,34 @@ Other harnesses give everyone the same starting point. harness-maker reads YOUR 
 harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static template gives you a starting point. harness-maker gives you a starting point that knows who it was created for, and can be updated without losing your changes.
 
 <!-- hm:eval:start -->
-**Measured: plain prompt vs `/hm:`** at harness `0289e72412ce-dirty-e7b80b46`, same model and budget; n is the number of runs behind each figure. Leads follow the fixed bands in [docs/evals/README.md](docs/evals/README.md); the full scorecard is [docs/evals/RESULTS.md](docs/evals/RESULTS.md).
+**Measured: plain prompt vs `/hm:`** at harness `d25e6bb5261f-dirty-e7b80b46`, same model and budget; n is the number of runs behind each figure. Leads follow the fixed bands in [docs/evals/README.md](docs/evals/README.md); the full scorecard is [docs/evals/RESULTS.md](docs/evals/RESULTS.md).
 
 **What the extra cost buys, tier 1: 5 task(s) x 3 run(s) per arm (t1, t2, t3, t4, t5)**
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.062 (n=15) | $1.401 (n=15) | 26.25x (CLI 22.63x, transcript 26.25x) | plain |
-| Δ solved runs | 15 (n=15) | 12 (n=15) | -3 | plain |
-| Δ hidden-case pass fraction | 1.00 (n=15) | 0.77 (n=15) | -0.23 | plain |
-| Δ regressions per run | 0.00 (n=12) | 0.00 (n=12) | +0.00 | tie |
-| Δ new lint+type errors per run | 0.42 (n=12) | 0.08 (n=12) | -0.33 | hm |
+| cost ratio (cells: mean CLI $/run) | $0.057 (n=15) | $1.371 (n=15) | 26.63x (CLI 24.13x, transcript 26.63x) | plain |
+| Δ solved runs | 15 (n=15) | 13 (n=15) | -2 | plain |
+| Δ hidden-case pass fraction | 1.00 (n=15) | 0.85 (n=15) | -0.15 | plain |
+| Δ regressions per run | 0.00 (n=13) | 0.00 (n=13) | +0.00 | tie |
+| Δ new lint+type errors per run | 0.31 (n=13) | 0.15 (n=13) | -0.15 | hm |
 | traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
-| Δ judge overall | 4.25 (n=12) | 4.06 (n=12) | -0.19 (single-sample scores, judge noise ±0.67; tie band 0.25 over 12 pairs) | tie |
-| cost per solved run | $0.062 (n=15) | $1.751 (n=12) |  | plain |
+| Δ judge overall | 4.36 (n=13) | 3.82 (n=13) | -0.54 (single-sample scores, judge noise ±0.67; tie band 0.25 over 13 pairs) | plain |
+| cost per solved run | $0.057 (n=15) | $1.582 (n=13) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
 **What the extra cost buys, tier 2: 7 task(s) x 3 run(s) per arm (t10, t11, t12, t6, t7, t8, t9)**
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.051 (n=21) | $0.910 (n=21) | 20.60x (CLI 17.99x, transcript 20.60x) | plain |
-| Δ solved runs | 21 (n=21) | 15 (n=21) | -6 | plain |
-| Δ hidden-case pass fraction | 1.00 (n=21) | 0.82 (n=21) | -0.18 | plain |
-| Δ regressions per run | 0.00 (n=15) | 0.00 (n=15) | +0.00 | tie |
-| Δ new lint+type errors per run | 0.20 (n=15) | 0.27 (n=15) | +0.07 | plain |
-| traps caught | 9/9 | 7/7 | +0.00 | n/a |
-| Δ judge overall | 4.62 (n=15) | 4.22 (n=15) | -0.40 (single-sample scores, judge noise ±0.67; tie band 0.25 over 15 pairs) | plain |
-| cost per solved run | $0.051 (n=21) | $1.274 (n=15) |  | plain |
+| cost ratio (cells: mean CLI $/run) | $0.052 (n=21) | $0.914 (n=21) | 20.06x (CLI 17.66x, transcript 20.06x) | plain |
+| Δ solved runs | 21 (n=21) | 17 (n=21) | -4 | plain |
+| Δ hidden-case pass fraction | 1.00 (n=21) | 0.92 (n=21) | -0.08 | plain |
+| Δ regressions per run | 0.00 (n=17) | 0.00 (n=17) | +0.00 | tie |
+| Δ new lint+type errors per run | 0.12 (n=17) | 0.06 (n=17) | -0.06 | hm |
+| traps caught | 9/9 | 6/6 | +0.00 | n/a |
+| Δ judge overall | 4.51 (n=17) | 4.37 (n=17) | -0.14 (single-sample scores, judge noise ±0.67; tie band 0.25 over 17 pairs) | tie |
+| cost per solved run | $0.052 (n=21) | $1.129 (n=17) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 <!-- hm:eval:end -->
 
