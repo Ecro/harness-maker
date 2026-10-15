@@ -1,6 +1,7 @@
 {#- SPEC-hm-light-lane-s3a ADR-004: verify Check 2 (regression smoke), shared by verify's checks and execute's light check, so the
     text has one source. Moved verbatim from verify_checks.md.j2 — edit it here only. `light_check` (default false, so verify
-    renders unchanged) is execute's light check: no Check 3 to skip to, and no guessed-gates `mark-pass` path. -#}
+    renders unchanged) is execute's light check: no Check 3 to skip to, and no guessed-gates `mark-pass` path; it also passes
+    `--spec-slug` (SPEC-hm-light-lane-s3d: with no CI file the gates come from the trusted SPEC). -#}
 ### Check 2 — Regression smoke
 
 **One verb runs the gates and owns the marker.** It takes the gates from the project's CI (a
@@ -8,11 +9,11 @@ narrower guess passes locally, fails on push) and marks only a pass on an unchan
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant")
+Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant{% if light_check | default(false) %} --spec-slug <slug>{% endif %}")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant --timeout-s 3600 --deadline-s 3600
+!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache run --root . --mode relevant --timeout-s 3600 --deadline-s 3600{% if light_check | default(false) %} --spec-slug <slug>{% endif %}
 ```
 {% endif %}
 
@@ -24,8 +25,8 @@ host's status; no JSON line = not a pass.
 - `1` → a gate failed or timed out, not a pass — stderr names the command and its output tail.
 - `4` → the tree changed during the run, not a pass (stderr lists the paths); re-run.
 - Killed by the host (no exit code) → not a pass, no marker.
-{% if light_check | default(false) %}- `3` → degraded: no readable CI (stderr says why), not a pass here: the light check never
-  guesses the gates, so it writes no record and review runs next.
+{% if light_check | default(false) %}- `3` → degraded: neither readable CI nor a usable SPEC plan (stderr says why), not a pass here:
+  the light check never guesses the gates, so it writes no record and review runs next.
 {% else %}- `3` → degraded: no readable CI (stderr says why). Only then:
 
 <!-- @hm:verify-degraded -->

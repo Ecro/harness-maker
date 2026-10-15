@@ -117,6 +117,26 @@ that any pass comes from the fixture's own `.venv`.
    `INTEGRATION=1` with harness-maker's dev venv off `PATH` · risk: medium (needs a warm uv
    cache or network) · rollback: revert the phase.
 
+### Execution notes (2026-10-15)
+
+- **ADR-005 as built.** The light check's command gains `--spec-slug <slug>` through an inline
+  `{% if light_check %}` at the end of the shared command line rather than a separate block: the
+  verify render is the same bytes either way (AC-006), and the template stays one source. The
+  record body line is one parenthesis, and the `0` bullet is unchanged, to keep the reference
+  file's growth to the two named additions.
+- **Exit 3 on the SPEC path** carries `reason` = the CI reason plus `; no usable SPEC plan: <why>`,
+  and no `gate_source` key: no SPEC gate ran. `gate_source: spec` is on exits 0, 1 and 4.
+- **Older suites that froze the light check** (s3a `test_light_check_runs_the_kept_gates`, s3c
+  `test_full_lane_changes_only_by_named_deltas` and `test_surface_meets_bounds`, phase3
+  `test_the_stage_does_not_touch_the_verification_cache`) now undo exactly 3d's bytes with
+  `tests/unit/light_lane_s3d_fixture.py::without_s3d` (each addition must occur exactly once)
+  and compare with their frozen text, so any other addition still fails there.
+- **The RESULTS note.** `docs/evals/RESULTS.md` is written by `bench_light_lane.py publish`
+  ("do not edit"), so the fixture-change note went to `docs/evals/README.md`; the next
+  `publish` run is where the RESULTS page changes.
+- **Snapshots** were regenerated with `tests/snapshot/regenerate.py`: only
+  `hm/execute-light-check.md`'s body hash moved, in all four profiles.
+
 ## 🚧 Contract Boundaries
 
 ### Do not change

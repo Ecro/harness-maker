@@ -269,3 +269,37 @@ def capture_ac001(module: ModuleType, work: Path) -> dict[str, Any]:
 
 def dumps(doc: object) -> str:
     return json.dumps(doc, indent=1, sort_keys=True) + "\n"
+
+
+#: Every byte stage 3d adds to the light check's Check 2 (verify_check_2.md.j2 under
+#: `light_check`), as (3d text, the text before it). Older suites that froze that section
+#: compare `without_s3d(section)` with their frozen text, so anything else added still fails.
+S3D_CHECK2_DELTA: tuple[tuple[str, str], ...] = (
+    (" --spec-slug <slug>", ""),
+    (
+        "- `3` → degraded: neither readable CI nor a usable SPEC plan (stderr says why), not a "
+        "pass here:\n  the light check never guesses the gates, so it writes no record and review "
+        "runs next.",
+        "- `3` → degraded: no readable CI (stderr says why), not a pass here: the light check "
+        "never\n  guesses the gates, so it writes no record and review runs next.",
+    ),
+)
+
+
+#: The light-check record's body line (execute_light_check.md.j2), the other 3d addition.
+S3D_RECORD_DELTA: tuple[str, str] = (
+    'a one-line body naming the gates\n(after Check 2\'s `"gate_source": "spec"`, '
+    "`regression: pytest from SPEC (no CI file)`):",
+    "a one-line body naming the gates:",
+)
+
+
+def without_s3d(text: str, *, record: bool = False) -> str:
+    """`text` with stage 3d's Check 2 additions (and, given `record`, its record line) undone.
+
+    Each addition must occur exactly once, so the reversal is exact and nothing else hides in it.
+    """
+    for added, before in (*S3D_CHECK2_DELTA, *((S3D_RECORD_DELTA,) if record else ())):
+        assert text.count(added) == 1, added
+        text = text.replace(added, before)
+    return text
