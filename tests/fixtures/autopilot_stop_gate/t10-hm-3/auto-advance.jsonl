@@ -1,0 +1,2 @@
+{"stage": "spec", "level": "auto_full", "advanced": true, "ts": "2026-10-15T06:40:04.429337+00:00", "event": "gate_auto_answered"}
+{"to": "execute", "ts": "2026-10-15T06:40:04.451563+00:00", "event": "advance_authorized"}
