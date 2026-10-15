@@ -22,6 +22,7 @@ Text before the block, with a table:
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
 | cost ratio (cells: mean CLI $/run) | $0.100 (n=3) | $0.400 (n=3) | 4.00x | plain |
+| wall time per run | 20s (n=3) | 1m 20s (n=3) | 4.00x | plain |
 | Δ solved runs | 3 (n=3) | 3 (n=3) | +0 | tie |
 | Δ hidden-case pass fraction | 1.00 (n=3) | 1.00 (n=3) | +0.00 | tie |
 | Δ regressions per run | 0.00 (n=3) | 0.00 (n=3) | +0.00 | tie |
@@ -36,6 +37,7 @@ Text before the block, with a table:
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
 | cost ratio (cells: mean CLI $/run) | $0.175 (n=6) | $0.650 (n=6) | 3.71x | plain |
+| wall time per run | 35s (n=6) | 2m 10s (n=6) | 3.71x | plain |
 | Δ solved runs | 5 (n=6) | 4 (n=6) | -1 | tie |
 | Δ hidden-case pass fraction | 0.93 (n=6) | 0.78 (n=6) | -0.15 | plain |
 | Δ regressions per run | 0.20 (n=5) | 0.00 (n=5) | -0.20 | hm |

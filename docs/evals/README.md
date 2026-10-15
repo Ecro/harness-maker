@@ -108,11 +108,13 @@ number of usable runs). An incomplete task is listed as excluded. Every value pr
 ### What the extra cost buys
 
 The first block, per tier, sets hm against plain over the same balanced cells as the rest of the
-scorecard. The `hm vs plain` column is hm minus plain, except on the cost line, where it is a ratio.
+scorecard. The `hm vs plain` column is hm minus plain, except on the cost and wall time lines,
+where it is a ratio.
 
 | Line | What it is |
 |---|---|
 | cost ratio (cells: mean CLI $/run) | The arm cells are mean run cost (`cost_usd`: the CLI total, or the transcript price for a lost result). The ratio is the larger of two, by the intent metric's rule: mean CLI cost (`total_cost_usd`) hm over plain, and mean transcript-priced cost hm over plain. 5.00x means hm costs five times as much per run. When the two differ, both are printed, and `suspect` is added when they are more than 20% apart (the CLI total may leave out subagent spend). When one arm has no CLI cost at all, the transcript ratio is used and the note says so. |
+| wall time per run | Each arm's mean `wall_s` (the runner's clock around one `claude -p` run), as `18s` or `8m 05s`. The `hm vs plain` column is the ratio hm over plain, like the cost line, taken from the unrounded means, so it can differ by a few percent from dividing the rounded cells. Lower is better, exact compare. An arm with no recorded time reads `n/a (n=0)`. A run stopped at the runner's `timeout_s` counts with its capped time, and `--jobs` above 1 runs share the machine, so their times are longer than serial ones. |
 | Δ solved runs | hm solved runs minus plain solved runs. |
 | Δ hidden-case pass fraction | hm minus plain hidden-case pass fraction. |
 | Δ regressions per run | hm minus plain mean regressions, over paired runs; negative is good for hm. |

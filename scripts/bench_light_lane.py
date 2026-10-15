@@ -1885,6 +1885,7 @@ _LINES = (
 VALUE_TITLE = "What the extra cost buys"
 _VALUE_LINES = (
     ("cost", "cost ratio (cells: mean CLI $/run)"),
+    ("wall", "wall time per run"),
     ("solved", "Δ solved runs"),
     ("case_fraction", "Δ hidden-case pass fraction"),
     ("regressions", "Δ regressions per run"),
@@ -2085,6 +2086,10 @@ def _value(kept: list[dict[str, Any]], totals: dict[str, int]) -> dict[str, Any]
             if metric.startswith("judge_") and p[1]:
                 line["note"] = (f"single-sample scores, judge noise ±{JUDGE_NOISE:.2f}; "
                                 f"tie band {judge_band(p[1]):.2f} over {p[1]} pairs")  # fmt: skip
+        elif metric == "wall":
+            p, h = (_measure(metric, by_arm[a], totals) for a in ARMS)
+            delta = _ratio(h[0], p[0]) if p[1] and h[1] else None
+            how = "n/a" if delta is None else lead(metric, p[0], h[0])
         elif metric == "traps":
             p, h = (_measure(metric, by_arm[a], totals) for a in ARMS)
             rp, rh = (x[0] / x[1] if x[0] is not None and x[1] else None for x in (p, h))
@@ -2211,7 +2216,7 @@ def judge_cost_text(tier: dict[str, Any]) -> str:
 
 
 def format_delta(metric: str, delta: float | None) -> str:
-    if metric == "cost":
+    if metric in ("cost", "wall"):
         return format_ratio(delta)
     if metric == "cost_per_solved":
         return ""
@@ -2220,7 +2225,16 @@ def format_delta(metric: str, delta: float | None) -> str:
     return f"{delta:+.0f}" if _FORMATS[metric] == "int" else f"{delta:+.2f}"
 
 
+def format_duration(seconds: float, n: int) -> str:
+    """`18s`, or `8m 05s` from a minute on: minutes read at a glance where 485 seconds does not."""
+    whole = round(seconds)
+    text = f"{whole}s" if whole < 60 else f"{whole // 60}m {whole % 60:02d}s"
+    return f"{text} (n={n})"
+
+
 def _arm_cell(metric: str, side: dict[str, Any]) -> str:
+    if metric == "wall" and side["value"] is not None and side["n"]:
+        return format_duration(side["value"], side["n"])
     text = format_value(metric, side["value"], side["n"])
     return f"{text} ({side['unpriced']} unpriced)" if side.get("unpriced") else text
 
