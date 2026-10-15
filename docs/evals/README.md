@@ -311,8 +311,10 @@ family; residual self-preference is not corrected.
 
 1. Change the harness.
 2. Re-run: `INTEGRATION=1 uv run python scripts/bench_light_lane.py run --tier all --out DIR`.
-3. Publish: `uv run python scripts/bench_light_lane.py publish --out DIR`, and commit
-   `docs/evals/RESULTS.md` with the README block.
+3. Publish: `uv run python scripts/bench_light_lane.py publish --out DIR`, then copy
+   `DIR/results.jsonl` to `docs/evals/results.jsonl` and commit it with `docs/evals/RESULTS.md`
+   and the README block. A test republishes the committed rows and requires the committed page
+   to match, so the page cannot drift from the data behind it.
 4. Read the trend: `git log -p docs/evals/RESULTS.md`. Each version names `bench_hash`,
    `harness_sha`, `runner_hash`, the models, the rubric id and the ruff and mypy versions, so a
    moved number can be traced to what changed.

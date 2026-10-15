@@ -2319,10 +2319,12 @@ def test_publish_refuses_bad_markers_mixed_empty_or_unbalanced_results(
     assert sorted(p.name for p in (repo / "docs" / "evals").iterdir()) == ["RESULTS.md"]
 
 
-def test_the_committed_results_and_readme_block_are_the_published_seed(
+def test_the_committed_results_and_readme_block_are_published_from_the_committed_rows(
     bench: ModuleType, tmp_path: Path
 ) -> None:
-    out = _results_dir(tmp_path / "out", _pre_eval_rows())
+    rows = [json.loads(line) for line in (_ROOT / "docs" / "evals" / "results.jsonl")
+            .read_text().splitlines()]  # fmt: skip
+    out = _results_dir(tmp_path / "out", rows)
     readme = (_ROOT / "README.md").read_text()
     repo = _repo(tmp_path / "repo", readme)
     proc = _publish(out, repo)
@@ -2330,8 +2332,7 @@ def test_the_committed_results_and_readme_block_are_the_published_seed(
     published = (repo / "docs" / "evals" / "RESULTS.md").read_text()
     assert published == (_ROOT / "docs" / "evals" / "RESULTS.md").read_text()
     assert (repo / "README.md").read_text() == readme
-    assert "n/a (n=0)" in published
-    assert "Pre-eval" in published
+    assert "Pre-eval" not in published
 
 
 def test_docs_readme_explains_every_scorecard_metric(bench: ModuleType) -> None:
