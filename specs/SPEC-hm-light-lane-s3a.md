@@ -28,11 +28,17 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 ## 🌅 Outcomes
 
 - **A trusted lane.** `light_lane.lane_of` returns `light` only when the SPEC frontmatter's `lane`
-  is exactly `light`, `spec_machine.approval_state` is `approved` or `exempt`, and
-  `irreversible_decisions` is empty. Anything else, including an unreadable SPEC, is `full`.
-- **Light SPECs with no irreversible decisions are stamped exempt.** When the DRI did not choose
-  "Approve this SPEC and end interview", `/hm:spec` Step 5 stamps a `lane: light` SPEC whose
-  `irreversible_decisions` is `[]` with the Step 0 skip path's command,
+  is exactly `light`, `spec_machine.approval_state` is `approved` or `exempt`,
+  `irreversible_decisions` is empty, and the approval stamp's `lane` (IRR-005, recorded by
+  `approve` from the `.md` at approval time, human and `--exempt` alike) is also `light`. The
+  approval hash covers only the machine yaml, so without that field a `full` → `light` edit after
+  approval would earn the skip. A stamp without the field is `full`. Anything else, including an
+  unreadable SPEC, is `full`.
+- **Light SPECs with no irreversible decisions are stamped exempt.** When the DRI was not asked
+  (the level is `auto_full`, or there is no question tool), Step 4 passed and the SPEC is
+  `status: approved` with no open questions, `/hm:spec` Step 5 stamps a `lane: light` SPEC whose
+  `irreversible_decisions` is `[]` with the Step 0 skip path's command. It never stamps exempt over
+  a DRI who was asked and did not approve. The command is
   `hm spec_machine approve --yaml … --exempt`, so the trust rule also holds on unattended
   `auto_full` runs. A DRI approval is still stamped `human`. A non-empty list still turns `light`
   into `full` before Step 3 writes it, and `approve --exempt` refuses a SPEC whose list is not
@@ -46,16 +52,23 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
   - the `reviewers.mechanical_checks` commands, when configured (review Phase 0);
   - verify **Check 2** (regression smoke), **Check 4** (unresolved high security findings) and
     **Check 6** (SPEC requirement), from partials that verify's `verify_checks.md.j2` also
-    includes, so verify renders byte-identical and the text has one source;
+    includes, so verify renders byte-identical and the text has one source. Under the partials'
+    `light_check` flag, Check 2 has no guessed-gates `mark-pass` path (exit 3 is not a pass), and
+    Check 6 has no BLOCKED box or 6a/6b prose;
   - `hm cli security-scan <checkout> --force` first, uncached, against the checkout that holds
-    the change (`<WT>` when worktree is on, else `.`). Check 4 then reads that checkout's findings;
+    the change (`<WT>` when worktree is on, else `.`), in the background and bounded, as Check 2
+    runs. A non-zero exit, or no `Security scan:` summary line, is a failed gate. Check 4 then
+    reads only this scan's rows: the last N lines of that checkout's
+    `.claude/observability/security/findings-<today>.jsonl`, N being the scan's own count;
   - review **Step 2**'s drift rule, from partials review also includes. Review keeps the sentence
     "reviewers still run on the actual diff" in `review.md.j2`, outside the shared text.
 - **The record.** When every check passes (Check 6 may report `WARN`) and drift is `clean`, the
   light check writes a light-check record `REVIEW-{slug}-{date}.md` under
   `<checkout>/work-docs/`, the name review uses, with frontmatter `type: review`,
   `review_kind: light-check`, `task_slug`, `status: PASSED`, `created`, `drift_verdict` (review
-  Step 2's block, `computed_at` included) and `checks` (`mechanical`, `regression`, `security`:
+  Step 2's block, `computed_at` from `date -u +%Y-%m-%dT%H:%M:%SZ`), `verification_key` (the
+  relevant skip key after Check 2, from `hm observability.verification_cache key --mode relevant`)
+  and `checks` (`mechanical`, `regression`, `security`:
   `pass` or `n-a`; `spec_requirement`: `pass`, `warn` or `n-a`; `structural: not-run`). Wrapup
   Step 3 and verify Check 1 read its `drift_verdict` unchanged, and `wrapup_land` stages it through
   the existing optional `REVIEW-{slug}-*.md` path.
@@ -67,14 +80,19 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 - **The skip.** Under autopilot, only execute's `hm autopilot_caps boundary` call may skip `review`
   and `verify`. It does so when `light_lane.light_check_passed(base, slug, since=marker.created_at)`
   holds. That requires a trusted light lane; no real REVIEW for the slug in the checkout; a newest
-  light-check record with `status: PASSED` for this slug; `drift_verdict.computed_at` at or after
-  the marker's `created_at`; and a fresh verification cache for the current tree
-  (`verification_cache.is_fresh(compute_relevant_skip_key(checkout))`). The checkout is resolved as
+  light-check record with `status: PASSED` for this slug, `drift_verdict.result: clean` with this
+  slug's `task_slug`, and `checks` passing (`regression` and `security` `pass`, `mechanical` in
+  {pass, n-a}, `spec_requirement` in {pass, warn, n-a}); `drift_verdict.computed_at` with a zone,
+  at or after the marker's `created_at`; a `verification_key` equal to
+  `compute_relevant_skip_key(checkout)`; and a fresh verification cache marker for that key written
+  by `run`, not `mark-pass`. A narrowed marker (`restore_pipeline` set) is not skipped: the human
+  asked for review. The checkout is resolved as
   `approval_state` resolves it: the per-task worktree, else the base. With the default pipeline
   execute's boundary then reports `next_stage: wrapup`, which is human-gated: `halt_kind:
   merge_gate` and the marker is cleared, as verify's boundary does today. The JSON keys do not
   change; `reason` names the skipped stages. The ledger gets one new `stage_skipped` row
-  `{from, skipped, to, reason: "lane light"}`.
+  `{from, skipped, to, reason: "lane light"}`, written only on a path that advances or ends (never
+  before an objective-gate halt).
 - **Fails closed.** When `light_check_passed` is false, at any other stage, or with no slug, the
   boundary is byte-identical to `e7dd6648`: same JSON, same ledger rows, same marker.
 - **Typed stages and the loop are untouched.** A user who types `/hm:review` or `/hm:verify` runs
@@ -101,23 +119,24 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 **Then** the JSON, the ledger rows and the marker equal the `e7dd6648` output for the same inputs
 
 ### S3: A stale or contradicted record does not skip
-**Given** a light SPEC and a light-check record that is not PASSED, names another slug, predates the marker, sits beside any real REVIEW for the slug, or was written for a tree that has changed since
+**Given** a light SPEC and a light-check record that is not PASSED, names another slug, predates the marker, sits beside any real REVIEW for the slug, was written for a tree that has changed since (its `verification_key` is not the current key, even when a later Check 2 marked the new tree), reports drift or a check that did not pass, or a cache marker written by `mark-pass`
 **When** execute runs its boundary
 **Then** the next stage is `review`, as today, and no `stage_skipped` row is written
 
 ### S4: The skip respects narrowed and custom pipelines
 **Given** a passing light check and a pipeline that ends at `verify`, is narrowed to `review`, or lists `[execute, verify, wrapup]`
 **When** execute runs its boundary
-**Then** the skip continues to the first stage after execute that is neither `review` nor `verify`; with none left, the boundary returns `pipeline_complete` (or `narrow_end` on a narrowed marker), as at a pipeline's last stage
+**Then** the skip continues to the first stage after execute that is neither `review` nor `verify`; with none left, the boundary returns `pipeline_complete`, as at a pipeline's last stage
+**And** a narrowed marker is not skipped (next stage `review`), and no `stage_skipped` row precedes an objective-gate halt
 
 ### S5: The light check runs the gates that must not be lost
 **Given** a rendered execute command (Claude Code) and execute stage skill (Codex)
 **When** the light check's text is read
-**Then** it runs the configured mechanical checks, the forced security scan on the change's checkout, verify Checks 2, 4 and 6, and review Step 2's drift rule
+**Then** it runs the configured mechanical checks, the forced security scan on the change's checkout (background, bounded, with a failure clause), verify Checks 2, 4 (on this scan's rows) and 6, and review Step 2's drift rule, and records the verification key Check 2 marked
 **And** it dispatches no reviewer or other subagent
 
 ### S6: Any non-pass writes no record
-**Given** a light check that is skipped, fails a check, finds drift, or meets a real review under today's file name
+**Given** a light check that is skipped, fails a check (a scan without exit 0 or its `Security scan:` line included), finds drift, or meets a real review under today's file name
 **When** it ends
 **Then** it writes no record and says review runs next
 
@@ -139,8 +158,18 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 ### S10: An unattended light SPEC is stamped exempt
 **Given** a rendered spec command (Claude Code) and spec stage skill (Codex), and a SPEC whose `irreversible_decisions` is not empty
 **When** Step 5 is read, and `hm spec_machine approve --exempt` runs on that SPEC
-**Then** Step 5 stamps a `lane: light` SPEC with an empty list `exempt` with Step 0's command when the DRI did not approve
+**Then** Step 5 stamps a `lane: light` SPEC with an empty list `exempt` with Step 0's command only when Step 4 passed, the SPEC is `status: approved` with no open questions, and the DRI was not asked (`auto_full`, or no question tool), never over a DRI who was asked
 **And** the command refuses the non-empty list, writes no approval and exits non-zero
+
+### S11: The light lane is bound to the lane the SPEC was accepted on
+**Given** a SPEC approved or stamped exempt on `lane: full` whose `.md` is later edited to `lane: light`, or a light SPEC whose stamp predates the `approval.lane` field
+**When** `light_lane.lane_of` reads it
+**Then** the lane is `full`; it is `light` only when the stamp's `lane` and the `.md` `lane` are both `light`
+
+### S12: A record counts only for the tree it checked
+**Given** a PASSED light-check record from an earlier run, a later change to the tree, and a later Check 2 that marked the new tree while its run failed security and wrote no record
+**When** execute's boundary or the digest reads it
+**Then** neither skips: the record's `verification_key` is not the current relevant key
 
 ## 🚫 Non-Goals
 
@@ -180,6 +209,7 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 | IRR-002 | The light-check record is `REVIEW-{slug}-{date}.md` under the change's checkout, with `review_kind: light-check`, `status: PASSED` and review's `drift_verdict` | schema/file format/storage layout | Wrapup commits it, so it persists in history. The boundary, the digest, wrapup Step 3 and verify Check 1 read it, and a reader may not later drop `review_kind` |
 | IRR-003 | Add the generated file `.claude/hm/execute-light-check.md`, the name the execute command reads | schema/file format/storage layout | Renaming it needs a retire step for copies on disk (as SPEC-hm-light-lane-s2b IRR-001) |
 | IRR-004 | Add `--force` to `hm cli security-scan`, mapping to `scan_all(force=True)` | public API/CLI contract | Rendered stage text calls it, so removing or renaming the flag breaks every harness rendered with it |
+| IRR-005 | Add the optional field `lane` to the SPEC approval stamp (`approval.lane`), the `.md` `lane` when `approve` runs (human and `--exempt`) | schema/file format/storage layout | Every new stamp carries it and the light lane trusts only a `light` one; removing it later turns every light SPEC full. Additive and outside the content hash, so no stamp is released; a stamp without it reads `full` |
 
 ## ✅ Verification Criteria
 
@@ -194,6 +224,8 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 | S7 | unit | `tests/unit/test_light_lane.py::test_record_satisfies_wrapup_and_verify` |
 | S8 | unit (render, differential) | `tests/render/test_render_light_lane_s3a.py::test_typed_stages_and_loop_unchanged` |
 | S9 | unit | `tests/unit/test_light_lane.py::test_digest_routes_checked_light_task_to_wrapup` |
+| S11 | unit | `tests/unit/test_light_lane.py::test_lane_is_bound_to_the_approved_lane`, `tests/unit/test_light_lane.py::test_the_stamp_lane_releases_no_stamp_and_keeps_the_cli_output` |
+| S12 | unit (CLI) | `tests/unit/test_autopilot_caps_light_lane.py::test_probe_b_a_later_failed_run_does_not_skip`, `tests/unit/test_light_lane.py::test_record_is_bound_to_the_checked_tree` |
 | S10 | unit (render, CLI) | `tests/render/test_render_light_lane_s3a.py::test_spec_stamps_light_exempt`, `tests/unit/test_spec_approve_exempt.py::test_exempt_refuses_irreversible_decisions` |
 | Outcome (reader) | unit | `tests/unit/test_light_lane.py::test_lane_of`, `tests/unit/test_light_lane.py::test_light_check_passed` |
 | Outcome (pointer) | unit (render) | `tests/render/test_render_light_lane_s3a.py::test_execute_points_at_the_light_check` |
@@ -213,13 +245,18 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
 ### AC-012: The digest routes a checked light task to wrapup
 ### AC-013: stage_skipped is a ledger event that does not count as an entered stage
 ### AC-014: A light SPEC with no irreversible decisions is stamped exempt, and an exempt stamp refuses irreversible decisions
+### AC-015: The light lane is bound to the lane the SPEC was accepted on
+### AC-016: A light-check record counts only for the tree it checked, with its own checks passing
 
 ## ❓ Open Questions
 
 - `hm cli security-scan --force` walks the whole checkout, queries OSV.dev and may try an LLM pass
   for prompt injection (it falls back to regex). Uncached, its wall time on a large repo is
-  unmeasured. `_persist` appends to today's findings file, so Check 4 also sees earlier findings
-  from the same day (verify has the same behaviour today).
+  unmeasured. (Check 4 in the light check reads only this scan's rows, the last N lines of today's
+  findings file, N being the scan's own count; verify's Check 4 still reads the whole file.)
+- Finding rows carry no timestamp, so "this scan's rows" is by count, not by time (review item K
+  asked for `timestamp ≥ scan start`). A second scan of the same checkout appending at the same
+  moment would interleave; nothing runs one there.
 - Whether removing two stage turns moves `hm_cost_ratio_small` toward ≤ 5 is unmeasured until the
   stage 4 bench is re-run on this change.
 
@@ -276,5 +313,14 @@ stage turns. Stage 3b (light execute and verify in subagents) comes later and is
   a revert of the amendment commit and the Step 5 sentence; nothing else depends on it.
 - Evaluated, not irreversible: the exempt stamp on light. It is the existing `exempt` kind, no new
   format or key; a revert stops new stamps, and a stamp already written means what Step 0's does.
+- Review of 2026-10-15 (two reviews, no P0; dispositions decided by the coordinator): the skip
+  is bound to what was approved (IRR-005, AC-015) and to what was checked (`verification_key`,
+  `checks`, a `run` marker, a zoned `computed_at`: AC-016); the forced scan has a failure clause
+  and Check 4 reads its own rows; Step 5's exempt branch names its three conditions; the
+  partials' `light_check` flag drops the guessed-gates and BLOCKED paths; a narrowed marker is
+  not skipped; `stage_skipped` is written only on a path that advances or ends; the typed-run
+  banner names wrapup after a passing light check. Deferred to the PLAN's follow-ups: a Python
+  `hm light_check run` for the deterministic gates, and a `remeasure_on` note for "drop review on
+  light". The DRI re-approves this SPEC: the amendment invalidates the 2026-10-15 stamp.
 - Work stays on the session's designated branch instead of an `hm/<slug>` task worktree, as in
   stages 1, 2a and 2b.

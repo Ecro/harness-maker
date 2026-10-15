@@ -8,7 +8,7 @@ research_doc: "[[RESEARCH-hm-light-lane]]"
 intent: HM-LIGHT-LANE
 lane: full
 tdd: true
-adrs: 9
+adrs: 10
 summary: "Light lane runs spec → execute (+ light check) → wrapup; boundary skips review and verify on a passing light-check record"
 ---
 
@@ -101,6 +101,20 @@ approve it, so `lane_of` trusts it on unattended `auto_full` runs. `spec_machine
 `--exempt` on a non-empty list (a stamp `approval_state` would read as `invalid` anyway). It lives
 in its own amendment commit plus the Step 5 sentence and its two tests, so it can still revert alone.
 
+### ADR-010: The skip is bound to what was approved and to what was checked (review of 2026-10-15)
+**Decided by:** coordinator, 2026-10-15, from two reviews of 3a (no P0). The approval hash covers
+only the machine yaml, so `approve` records the `.md` lane in the stamp (`approval.lane`, IRR-005)
+and `lane_of` requires stamp lane == `.md` lane == `light`; a stamp without it is `full` (AC-015).
+The record carries `verification_key`, which must equal the tree's current relevant key, and
+`checks` that Python reads. The cache marker must be `run`'s, and `computed_at` must carry a
+zone (AC-016). Without the key, an old PASSED record plus a later Check 2 marker would skip review
+after a failed run 2 (probe B). The partials gain a `light_check` flag (default false, so verify
+is byte-identical) that drops the guessed-gates `mark-pass`, Check 6's stop box and the 6a/6b
+prose. The forced scan has a failure clause, and Check 4 reads only its rows: finding rows carry
+no timestamp, so this is the last N lines, N being the scan's own count. Step 5 stamps exempt
+only when Step 4 passed, the SPEC has no open questions, and the DRI was not asked. A narrowed
+marker is not skipped. `stage_skipped` is written only on a path that advances or ends.
+
 ## 📝 Implementation Plan
 
 1. **Phase 1 — reader, ledger event, boundary skip.** depends_on: none · parallel_group: 1 ·
@@ -127,6 +141,12 @@ in its own amendment commit plus the Step 5 sentence and its two tests, so it ca
    the aggregate ratchet requires, `CHANGELOG.md` · exit: AC-007..009, 011 and 014 green;
    `uv run pytest tests -n auto` green except the known environment failures · risk: medium
    (golden churn) · rollback: revert the PR.
+3. **Phase 3 — review fixes (ADR-010).** depends_on: 2 · scope: `spec_machine.py` (`approval.lane`,
+   `_md_lane`), `light_lane.py`, `autopilot_caps.py` (narrowed marker, `record_skip`), the three
+   verify partials (`light_check`), `ref_pointer.md.j2` (`ref_missing`), `execute_light_check`,
+   `execute.md.j2`, `spec.md.j2`, the tests and goldens they move, the SPEC's IRR-005, AC-015 and
+   AC-016 · exit: AC-001..016 green; ruff, format, mypy --strict clean; full suite green except the
+   known environment failures · rollback: revert the phase's commits.
 
 ## 🚧 Contract Boundaries
 
@@ -135,7 +155,7 @@ in its own amendment commit plus the Step 5 sentence and its two tests, so it ca
 - Verify's rendered output: `verify.md.j2` and `_partials/verify_checks.md.j2` may change only to include the Check 2/4/6 partials, and verify must render byte-identical (AC-011).
 - Review's rendered output: `review.md.j2` may change only to include the drift partials, and review must render byte-identical (AC-011).
 - `src/harness_maker/templates/commands/hm/loop.md.j2` — the loop is unchanged (AC-011).
-- `src/harness_maker/wrapup_land.py`, `src/harness_maker/spec_machine.py` approval-state and land-hold logic. The one exception is ADR-009: `approve(exempt=True)` refuses a non-empty irreversible list.
+- `src/harness_maker/wrapup_land.py`, `src/harness_maker/spec_machine.py` approval-state and land-hold logic. The exceptions: ADR-009, `approve(exempt=True)` refuses a non-empty irreversible list; ADR-010, `approve` records `approval.lane` (IRR-005), which the content hash does not cover, and the machine yaml dump leaves an older stamp without it.
 - `_HUMAN_GATED_STAGES` and `_JUDGMENT_GATED_STAGES` in `autopilot_caps.py`.
 - The boundary JSON key set (AC-003 asserts it).
 
@@ -160,6 +180,16 @@ implement (GREEN). No live model: the security scan's LLM pass is not exercised 
 
 ## ✅ Success Criteria
 
-- [ ] AC-001 … AC-013 of SPEC-hm-light-lane-s3a pass.
+- [ ] AC-001 … AC-016 of SPEC-hm-light-lane-s3a pass.
 - [ ] Full-lane boundary and typed review/verify/wrapup/loop renders byte-identical to e7dd6648.
 - [ ] Re-run the stage 4 bench on light tasks and record `hm_cost_ratio_small` (follow-up).
+
+## 🔜 Follow-ups (deferred by the review of 2026-10-15)
+
+- A Python `hm light_check run` that runs the deterministic gates (mechanical checks, Check 2's
+  `run`, the forced scan + Check 4 on its own rows, Check 6's two commands) and writes the record,
+  so the model judges only the drift. It would take the round trips and the transcription risk
+  out of the prose.
+- A `remeasure_on` note in `step_sensitivity.py` for "drop review on light" (execute Step 4.2,
+  graded `*` today): re-measure when the stage 4 bench re-runs on light tasks or a new model
+  ships, before the skip widens.

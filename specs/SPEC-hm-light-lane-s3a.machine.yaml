@@ -272,6 +272,7 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_autopilot_caps_light_lane.py::test_skip_respects_pipeline_shape
+  - tests/unit/test_autopilot_caps_light_lane.py::test_no_stage_skipped_row_before_an_objective_halt
   executable_predicate: all(boundary(pipeline, narrowed)[key] == expected for pipeline,
     narrowed, key, expected in SHAPE_TABLE)
   golden_table:
@@ -288,7 +289,8 @@ ac:
     note: ''
   - input:
       case: default pipeline narrowed to review, passing light check, current execute
-    expected: narrow_end true, pipeline restored, stage_skipped skipped [review]
+    expected: next_stage review, proceed true, no stage_skipped row (a narrowed marker
+      is a human asking for review)
     edge: false
     note: ''
   - input:
@@ -297,14 +299,23 @@ ac:
     expected: next_stage execute, proceed true, no stage_skipped row
     edge: false
     note: ''
+  - input:
+      case: '[execute, review, verify, spec], passing light check, PLAN objective
+        link that halts'
+    expected: halt_kind objective_gate, no stage_skipped row, no 'lane light' in the
+      reason
+    edge: false
+    note: ''
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The rows follow from S4 and from the e7dd6648 handling of a pipeline's
-    last stage (pipeline_complete clears the marker; a narrowed end restores it),
-    which is copied from those code paths' existing tests, not from the new branch.
-    'Passing light check' is AC-003's fixture.
+  oracle_evidence: 'The rows follow from S4 and from the e7dd6648 handling of a pipeline''s
+    last stage (pipeline_complete clears the marker), which is copied from those code
+    paths'' existing tests, not from the new branch. A narrowed marker (restore_pipeline
+    set) is not skipped (review item M), so its row is e7dd6648''s execute -> review.
+    The objective-gate row is review item L: the skip is recorded only on a path that
+    advances or ends. ''Passing light check'' is AC-003''s fixture.'
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -322,6 +333,8 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_autopilot_caps_light_lane.py::test_no_passing_record_no_skip
+  - tests/unit/test_autopilot_caps_light_lane.py::test_a_mark_pass_marker_does_not_skip
+  - tests/unit/test_autopilot_caps_light_lane.py::test_probe_b_a_later_failed_run_does_not_skip
   executable_predicate: all(out['next_stage'] == 'review' and out['proceed'] is True
     and 'stage_skipped' not in events for out, events in NO_SKIP_CASES)
   golden_table:
@@ -364,6 +377,24 @@ ac:
   - input:
       case: PASSED record, fresh cache, but the light SPEC is unapproved
     expected: next_stage review, no stage_skipped
+    edge: false
+    note: ''
+  - input:
+      case: PASSED record whose own fields fail AC-016 (drift not clean, nested slug
+        mismatch, a check not passing, another or no verification_key, a naive, date-only
+        or earlier computed_at)
+    expected: next_stage review, no stage_skipped
+    edge: false
+    note: ''
+  - input:
+      case: PASSED record and a fresh cache marker written by mark-pass, not run
+    expected: next_stage review, no stage_skipped
+    edge: false
+    note: ''
+  - input:
+      case: 'probe B: run 1 PASSED; the tree changed; run 2 passed Check 2 (fresh
+        run marker) and failed security, so it wrote no record'
+    expected: next_stage review, no stage_skipped; the digest does not route to wrapup
     edge: false
     note: ''
   rubric_id: null
@@ -427,12 +458,13 @@ ac:
   test_ids:
   - tests/render/test_render_light_lane_s3a.py::test_light_check_runs_the_kept_gates
   - tests/unit/test_cli_security_scan_force.py::test_force_bypasses_the_fresh_scan_cache
-  executable_predicate: all(SCAN_CMD[wt] in text and 'hm spec_machine approval-status'
-    in text and all(section in text for section in E7DD_CHECKS) and DRIFT_RULE in
-    text and REVIEWERS_STILL_RUN not in text and not DISPATCH_RE.search(text) and
-    (all(c in text for c in MECH) if MECH else '## MECHANICAL_BLOCK' not in text)
-    for wt, text, MECH in LIGHT_CHECK_RENDERS) and scan_all_mock.call_args.kwargs['force']
-    is True
+  executable_predicate: 'all(SCAN_CMD[wt] in text and ''hm spec_machine approval-status''
+    in text and RUN_CMD in text and ''mark-pass'' not in text and CHECK4_RULE in text
+    and FINDINGS_FILE[wt] in text and all(c in text for c in CHECK6_CMDS) and ''BLOCKED:
+    check 6'' not in text and DRIFT_RULE in text and REVIEWERS_STILL_RUN not in text
+    and not DISPATCH_RE.search(text) and (all(c in text for c in MECH) if MECH else
+    ''## MECHANICAL_BLOCK'' not in text) for wt, text, MECH in LIGHT_CHECK_RENDERS)
+    and scan_all_mock.call_args.kwargs[''force''] is True'
   golden_table: []
   rubric_id: null
   note: ''
@@ -440,13 +472,17 @@ ac:
   oracle_source: golden
   oracle_evidence: 'SCAN_CMD is pinned here before the edit: worktree on -> ''hm cli
     security-scan <WT> --force'', worktree off -> ''hm cli security-scan . --force''.
-    E7DD_CHECKS are verify''s Check 2, Check 4 and Check 6 sections sliced by heading
-    from the e7dd6648 verify render (Claude and Codex arms), so the shared partials
-    must reproduce them byte for byte. DRIFT_RULE is review Step 2''s body from the
-    e7dd6648 review render minus REVIEWERS_STILL_RUN, the sentence ''Drift findings
-    get severity `P1` and surface in the REVIEW report; reviewers still run on the
-    actual diff.'' DISPATCH_RE matches the dispatch macro''s rendered forms (Agent(,
-    subagent_type, spawn_agent) from agents/_partials/dispatch.md.j2 at e7dd6648.
+    RUN_CMD, CHECK4_RULE (Check 4''s ''FAIL when:'' line) and CHECK6_CMDS (the op-check
+    and waiver-check command lines) are sliced from verify''s Check 2, 4 and 6 in
+    the e7dd6648 verify render (Claude and Codex arms). Under the partials'' light_check
+    flag (review item F) the light check keeps those lines and drops the guessed-gates
+    mark-pass path, the BLOCKED box and the 6a/6b prose; verify''s own render is unchanged
+    (AC-011). FINDINGS_FILE is ''<WTR>/.claude/observability/security/findings-<today>.jsonl''
+    (review item K: the scan''s own rows only). DRIFT_RULE is review Step 2''s body
+    from the e7dd6648 review render minus REVIEWERS_STILL_RUN, the sentence ''Drift
+    findings get severity `P1` and surface in the REVIEW report; reviewers still run
+    on the actual diff.'' DISPATCH_RE matches the dispatch macro''s rendered forms
+    (Agent(, subagent_type, spawn_agent) from agents/_partials/dispatch.md.j2 at e7dd6648.
     Fixtures: worktree on and off, mechanical_checks unset and set to two commands.
     The CLI test mocks scan_all and asserts --force reaches it and that no flag keeps
     force=False.'
@@ -492,6 +528,12 @@ ac:
     edge: false
     note: ''
   - input:
+      case: the forced scan exits non-zero, or prints no `Security scan:` summary
+        line
+    expected: no record, review runs next
+    edge: false
+    note: ''
+  - input:
       case: drift result not clean
     expected: no record, review runs next
     edge: false
@@ -531,24 +573,23 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_light_lane.py::test_record_satisfies_wrapup_and_verify
-  executable_predicate: fm['drift_verdict']['task_slug'] == slug and fm['drift_verdict']['result']
-    == 'clean' and 'computed_at' in fm['drift_verdict'] and fm['review_kind'] == 'light-check'
-    and fm['status'] == 'PASSED' and fm['checks']['spec_requirement'] in {'pass',
-    'warn', 'n-a'} and fm['checks']['structural'] == 'not-run' and RECORD_DIR[wt]
-    in record_path_line and light_lane.light_check_passed(base, slug) and fnmatch(record.name,
-    'REVIEW-' + slug + '-*.md') and world_model_digest._reviews(docs, slug) == [record]
+  executable_predicate: all(lookup(fm, field) is present and (lookup(fm, field) ==
+    slug if field.endswith('task_slug') else True) for field in READ_FIELDS(E7DD_READERS))
+    and fm['review_kind'] == 'light-check' and fm['status'] == 'PASSED' and RECORD_DIR[wt]
+    in record_path_line and fnmatch('REVIEW-' + slug + '-' + date + '.md', 'REVIEW-'
+    + slug + '-*.md')
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: fm is the YAML example block in the rendered light-check reference
-    file with the slug filled in, one fixture per spec_requirement value. The required
-    keys are what wrapup Step 3 and verify Check 1 read at e7dd6648 (drift_verdict
-    present, task_slug matching the PLAN), and the glob is wrapup_land's optional
-    REVIEW path in the e7dd6648 wrapup render; both are copied from those renders,
-    not from the new template. RECORD_DIR is '<WT>/work-docs/' with worktree on and
-    './work-docs/' off, as review Step 5 writes at e7dd6648.
+  oracle_evidence: E7DD_READERS are wrapup Step 3 and verify Check 1 sliced by heading
+    from the e7dd6648 renders (Claude and Codex, all 32 configs, review item J); READ_FIELDS
+    is every backticked `drift_verdict` / `task_slug` path in those texts. fm is the
+    YAML example block in the rendered light-check reference file with the slug filled
+    in, one fixture per spec_requirement value; it is not run through the new reader.
+    RECORD_DIR is '<WT>/work-docs/' with worktree on and './work-docs/' off, as review
+    Step 5 writes at e7dd6648.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -685,8 +726,8 @@ ac:
   - tests/render/test_render_light_lane_s3a.py::test_spec_stamps_light_exempt
   - tests/unit/test_spec_approve_exempt.py::test_exempt_refuses_irreversible_decisions
   executable_predicate: 'all(EXEMPT_CMD in step5 and ''lane: light'' in step5 and
-    ''irreversible_decisions: []'' in step5 for step5 in SPEC_STEP5_RENDERS) and rc
-    != 0 and load(yaml).approval is None'
+    ''irreversible_decisions: []'' in step5 and all(c in step5 for c in EXEMPT_CONDITIONS)
+    for step5 in SPEC_STEP5_RENDERS) and rc != 0 and load(yaml).approval is None'
   golden_table: []
   rubric_id: null
   note: Decided 2026-10-15 by the DRI ('Approve + exempt light').
@@ -699,7 +740,156 @@ ac:
     refusal row follows from approval_state_of''s e7dd6648 rule that an exempt stamp
     with irreversible ids is invalid, so refusing at write time cannot change any
     state a valid stamp produces. Fixture: a v3 machine SPEC with irreversible_decisions
-    [IRR-001] and no approval.'
+    [IRR-001] and no approval. EXEMPT_CONDITIONS (review item E) are the three conditions
+    the exempt branch must name: Step 4 passed; `status: approved` with no open questions;
+    the DRI was not asked (`auto_full`, or no question tool), and the sentence that
+    it never stamps exempt over a DRI who was asked.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-015
+  title: The light lane is bound to the lane the SPEC was accepted on
+  type: mechanical
+  test_ids:
+  - tests/unit/test_light_lane.py::test_lane_is_bound_to_the_approved_lane
+  - tests/unit/test_light_lane.py::test_the_stamp_lane_releases_no_stamp_and_keeps_the_cli_output
+  executable_predicate: all(light_lane.lane_of(base, slug) == expected and load(yaml).approval.lane
+    == stamp_lane for base, expected, stamp_lane in BINDING_TABLE)
+  golden_table:
+  - input:
+      case: lane full approved, then the .md flipped to light
+    expected: full
+    edge: false
+    note: ''
+  - input:
+      case: lane full stamped exempt, then the .md flipped to light
+    expected: full
+    edge: false
+    note: ''
+  - input:
+      case: lane light approved by a stamp written before the lane field (no approval.lane)
+    expected: full
+    edge: false
+    note: ''
+  - input:
+      case: lane light approved, then the .md flipped to full
+    expected: full
+    edge: false
+    note: ''
+  - input:
+      case: lane light approved
+    expected: light
+    edge: false
+    note: ''
+  - input:
+      case: lane light stamped exempt
+    expected: light
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'Review item A (2026-10-15): the content hash covers only the machine
+    yaml, so the `.md` lane could change after approval and still earn the skip. The
+    rows are fixed by IRR-005 before the code: the stamp records the `.md` lane at
+    approval, the lane is light only when stamp lane == `.md` lane == light, and a
+    stamp without the field is full.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-016
+  title: A light-check record counts only for the tree it checked, with its own checks
+    passing
+  type: mechanical
+  test_ids:
+  - tests/unit/test_light_lane.py::test_record_is_bound_to_the_checked_tree
+  - tests/unit/test_autopilot_caps_light_lane.py::test_computed_at_equal_to_since_skips
+  executable_predicate: all(light_lane.light_check_passed(base, slug, since=since)
+    is expected for base, since, expected in READER_TABLE)
+  golden_table:
+  - input:
+      case: PASSED record, verification_key = the current relevant key, computed_at
+        after since
+    expected: true
+    edge: false
+    note: ''
+  - input:
+      case: computed_at exactly equal to since
+    expected: true
+    edge: false
+    note: ''
+  - input:
+      case: computed_at one second before since
+    expected: false
+    edge: false
+    note: ''
+  - input:
+      case: computed_at without a zone, or a date only
+    expected: false
+    edge: false
+    note: ''
+  - input:
+      case: verification_key missing, or not the current relevant key
+    expected: false
+    edge: false
+    note: ''
+  - input:
+      case: the cache marker was written by mark-pass, not run
+    expected: false
+    edge: false
+    note: ''
+  - input:
+      case: checks.regression or checks.security not pass
+    expected: false
+    edge: false
+    note: ''
+  - input:
+      case: checks.mechanical not pass/n-a, or checks.spec_requirement not pass/warn/n-a
+    expected: false
+    edge: false
+    note: ''
+  - input:
+      case: drift_verdict.result scope_violation or scenario_miss
+    expected: false
+    edge: false
+    note: ''
+  - input:
+      case: drift_verdict.task_slug another slug, the top-level task_slug this one
+    expected: false
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'Review items B, C, F, H and I (2026-10-15), fixed before the code.
+    B: the record carries `verification_key`, the relevant skip key Check 2 marked,
+    and must equal the key of the tree now, so an old PASSED record plus a later Check
+    2 marker does not pass. C: `checks.regression` and `checks.security` are `pass`,
+    `checks.mechanical` in {pass, n-a}, `checks.spec_requirement` in {pass, warn,
+    n-a}. F: the cache marker''s writer is `run` (verification_cache.RUN_WRITER at
+    e7dd6648). H: computed_at carries a zone and is >= since. I: drift result clean
+    and the nested task_slug this slug. Every fixture is a trusted light lane with
+    a run marker for the current tree.'
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -739,6 +929,17 @@ irreversible_decisions:
   category: public API/CLI contract
   rationale: Rendered stage text calls it, so removing or renaming the flag breaks
     every harness rendered with it
+  source: spec
+- id: IRR-005
+  decision: 'Add the optional field `lane` to the SPEC approval stamp (`approval.lane`):
+    the `.md` frontmatter `lane` at the moment `hm spec_machine approve` runs, human
+    and `--exempt` alike'
+  category: schema/file format/storage layout
+  rationale: Every stamp written from now on carries it, and the light lane trusts
+    only a stamp whose lane is `light`; removing or renaming it later turns every
+    light SPEC full until re-approved. Additive, and inside `approval`, which the
+    content hash excludes, so no existing stamp is released; a stamp without it reads
+    as the full lane (fail closed)
   source: spec
 approval:
   kind: human
