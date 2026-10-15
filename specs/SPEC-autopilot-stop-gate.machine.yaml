@@ -3,8 +3,9 @@ spec_slug: autopilot-stop-gate
 parent_spec: null
 verification_tier: 2
 mutation_threshold: null
-mutation_threshold_rationale: One branch in one hook; the golden state table, the df070f6c
-  differential and the real-run replay pin it, and mutation testing adds little over them.
+mutation_threshold_rationale: One branch in one hook; the golden state table, the
+  df070f6c differential and the real-run replay pin it, and mutation testing adds
+  little over them.
 last_mutation_run: null
 paths_to_mutate: []
 mutation_runner: null
@@ -12,15 +13,15 @@ spec_quality_score: null
 spec_quality_score_at: null
 ac:
 - id: AC-001
-  title: The stop-hook decision is the golden function of marker, ledger, transcript and
-    payload state
+  title: The stop-hook decision is the golden function of marker, ledger, transcript
+    and payload state
   type: parametric
   test_ids: []
   executable_predicate: null
   golden_table:
   - input:
-      case: own active auto marker, no peer; ledger [authorized execute]; transcript has
-        nothing after it; stop_hook_active false
+      case: own active auto marker, no peer; ledger [authorized execute]; transcript
+        has nothing after it; stop_hook_active false
     expected: exit 2, decision block, reason names /hm:execute
     edge: false
     note: the t5/t7/t10/t11 end state
@@ -45,8 +46,8 @@ ac:
     edge: true
     note: conservative; any non-tool-result, non-meta user entry ends the gate's interest
   - input:
-      case: as row 1, transcript has only isMeta text and tool_result user entries after
-        the authorization
+      case: as row 1, transcript has only isMeta text and tool_result user entries
+        after the authorization
     expected: exit 2, decision block, reason names /hm:execute
     edge: true
     note: tool output and skill expansions are not a new turn
@@ -136,10 +137,21 @@ ac:
   oracle_source: golden
   oracle_evidence: The rows come from the eval-2 run end states, the marker contract
     (active, gated, foreign, expired, narrowed, peer as autopilot.status reports them),
-    the Claude Code transcript fields observed in the eval-2 transcripts (isMeta, origin
-    task-notification, tool_result) and the Stop-hook stop_hook_active rule; none is derived
-    from the new branch.
+    the Claude Code transcript fields observed in the eval-2 transcripts (isMeta,
+    origin task-notification, tool_result) and the Stop-hook stop_hook_active rule;
+    none is derived from the new branch.
   oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
 - id: AC-002
   title: Without a refusing state the stop hook equals the df070f6c loop gate
   type: property
@@ -150,16 +162,16 @@ ac:
   note: ''
   pending_test: true
   oracle_source: differential
-  oracle_evidence: The reference is the df070f6c hooks/loop_gate.py, loaded from `git show`
-    into a temp module before any edit; any implementation that confines its change to the
-    refusing state satisfies the relation.
+  oracle_evidence: The reference is the df070f6c hooks/loop_gate.py, loaded from `git
+    show` into a temp module before any edit; any implementation that confines its
+    change to the refusing state satisfies the relation.
   oracle_independence_waiver: null
-  input_domain: loop marker {own content match, foreign content, legacy global with an
-    id-less payload, legacy global with an id payload, none} x stop_hook_active {true,
-    false} x autopilot marker {none, gated, foreign, expired} x ledger {absent, [authorized
-    execute]} x transcript {absent, nothing after the authorization}
-  transformation: run `_stop_hook(payload)` under the reference module and under the new
-    module on the same tmp project
+  input_domain: loop marker {own content match, foreign content, legacy global with
+    an id-less payload, legacy global with an id payload, none} x stop_hook_active
+    {true, false} x autopilot marker {none, gated, foreign, expired} x ledger {absent,
+    [authorized execute]} x transcript {absent, nothing after the authorization}
+  transformation: run `_stop_hook(payload)` under the reference module and under the
+    new module on the same tmp project
   expected_relation: stdout(new) == stdout(ref) and exit(new) == exit(ref)
   preconditions:
   - the same fixture builder is used for both modules
@@ -171,15 +183,15 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-003
-  title: Replaying the eval-2 hm runs blocks exactly the five stalled runs, and no other
-    run at its end or at any stage start
+  title: Replaying the eval-2 hm runs blocks exactly the five stalled runs, and no
+    other run at its end or at any stage start
   type: parametric
   test_ids: []
   executable_predicate: null
   golden_table:
   - input:
-      case: t5-hm-1, t5-hm-3, t7-hm-3, t10-hm-3, t11-hm-1 at their end, with an own active
-        marker created before the first row
+      case: t5-hm-1, t5-hm-3, t7-hm-3, t10-hm-3, t11-hm-1 at their end, with an own
+        active marker created before the first row
     expected: exit 2, reason names /hm:execute
     edge: false
     note: the post-spec stalls
@@ -187,7 +199,8 @@ ac:
       case: t4-hm-1 at its end, same marker
     expected: exit 0, no stdout
     edge: true
-    note: verify authorized and unconfirmed, but Skill(hm:verify) ran and STOPped at Check 4
+    note: verify authorized and unconfirmed, but Skill(hm:verify) ran and STOPped
+      at Check 4
   - input:
       case: the other 29 runs with a ledger, at their end, same marker
     expected: exit 0, no stdout
@@ -202,11 +215,23 @@ ac:
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The five run ids and their stage were read by hand from the eval-2 ledger
-    tails and transcripts on 2026-10-15, before any implementation; t4-hm-1's verify STOP was
-    read from its transcript. dangling_authorizations was a cross-check only. The cut points are the Skill tool_use timestamps in those transcripts, where the
-    stage demonstrably started.
+  oracle_evidence: The five run ids and their stage were read by hand from the eval-2
+    ledger tails and transcripts on 2026-10-15, before any implementation; t4-hm-1's
+    verify STOP was read from its transcript. dangling_authorizations was a cross-check
+    only. The cut points are the Skill tool_use timestamps in those transcripts, where
+    the stage demonstrably started.
   oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
 - id: AC-004
   title: The block reason names the stage and how to proceed or stop
   type: parametric
@@ -215,15 +240,44 @@ ac:
   golden_table:
   - input:
       case: block for stage execute
-    expected: reason contains `/hm:execute`, `Skill`, and a sentence that ending the turn
-      again stops
+    expected: reason contains `/hm:execute`, `Skill`, and a sentence that ending the
+      turn again stops
     edge: false
     note: the second stop is honoured by stop_hook_active
   rubric_id: null
   note: ''
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The names are the rendered Claude Code entry point (the `hm:<stage>` skill
-    invoked through the `Skill` tool) and the Stop-hook protocol's one-refusal rule.
+  oracle_evidence: The names are the rendered Claude Code entry point (the `hm:<stage>`
+    skill invoked through the `Skill` tool) and the Stop-hook protocol's one-refusal
+    rule.
   oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
 irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 218ead7320066994b66c0a9f0e6015f9381c9f4b1cec0b45320e1dd2e5835aae
+  approved_by: Ecro
+  approved_at: '2026-10-15T15:41:19Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 03e77dfb3d755c42aec4c32c9dc82ae55673d1ea7bfc381b379e0ebfdff5710a
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: dc0355d034ae5930ac00a03483dc3c8124caf34fb9c12a51c6b5cf31beb35b47
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: f0e6abbbc3b22a19a4e75c499dbbb15ca7bb7628bc32e75318845f39f38310d7
+    AC-002: 7afc12bc8e1a00ea00c1e6873eea2a28e4549671dcb0270475d4bcd9c34290fa
+    AC-003: 757c6cfd3142d5e173b392050571d0fc8b0b54b3b7b5cb8eebfeb6f5368773a8
+    AC-004: ebf370222c9813ebfc3acdad5ac8d31db1147895330f5b74bc8fc7849acb759d
+    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591
+  lane: full

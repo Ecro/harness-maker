@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: autopilot-stop-gate
-status: draft
+status: approved
 created: 2026-10-15
 tags: [harness-maker, spec, python, autopilot, hooks, stop-hook]
 test_framework: pytest
