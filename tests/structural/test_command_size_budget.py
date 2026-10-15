@@ -393,7 +393,13 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # moved text is byte-identical, pinned by test_render_light_lane_s2b); the floor moves with
     # the ceiling because the 0.80 floor would otherwise sit above the render. Folded here, not
     # declared, per the ADR-010 rule above. work-docs/BASELINE-DELTA-hm-light-lane-s2b.md.
-    "execute": 43710,
+    # 43710 → 37591 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -6731 on the
+    # a7403f2f render (44322): the preamble left for `.claude/hm/stage-preamble.md` (-4228 here) and
+    # Step 0's full PLAN text and Step 0.3's body for `.claude/hm/execute-plan.md`, behind the
+    # approval-status read, the routing sentence and the light PLAN block. The moved text is
+    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
+    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
+    "execute": 37591,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -423,7 +429,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # so a Codex session read its own rendered skill and stood down — while the CLI it
     # would have called armed fine the whole time. Arming writes a marker and works in
     # any runtime; only end-of-stage auto-advance needs the `Skill` tool.
-    "research": 25770,
+    # 25770 → 17292 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -4228 on the
+    # a7403f2f render (21520): the preamble (loop check, start banner, autopilot picker, output
+    # language) left for `.claude/hm/stage-preamble.md` behind one pointer. The moved text is
+    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
+    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
+    "research": 17292,
     # 34760 → 35828 (review round 4): the `CHANGES_REQUESTED` resolution bullet gained an
     # autopilot carve-out, and the APPROVED+human_review_needed bullet was split so the
     # interactive and autopilot paths stop saying the same thing. Both were live
@@ -564,7 +575,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # the command keeps both headings, their start conditions, the light-lane skip rule and a
     # pointer each. `verify` and `wrapup` do not move here: this fixture delegates neither stage,
     # and a non-delegated stage keeps its body inline (s2b ADR-006).
-    "review": 56211,
+    # 56211 → 52462 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -4228 on the
+    # a7403f2f render (56690): the preamble (loop check, start banner, autopilot picker, output
+    # language) left for `.claude/hm/stage-preamble.md` behind one pointer. The moved text is
+    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
+    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
+    "review": 52462,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text
@@ -585,14 +601,25 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # here from the removed plan stage — CLAUDE.md documents that matrix as a Production
     # guarantee over the judgment-gated stages, which are now `review` and `spec`. Also the
     # ledger pass-cap / over-cap / one-terminal contracts and the barrier-index integer note.
-    "spec": 46621,
+    # 46621 → 34867 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -5737 on the
+    # a7403f2f render (40604): the preamble left for `.claude/hm/stage-preamble.md` (-4228 here),
+    # Step 3.5's full schema for `.claude/hm/spec-machine-full.md` behind the minimal one, and Step
+    # 4 describes the quiet `check --all`. The moved text is byte-identical
+    # (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling, as for 2b.
+    # work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
+    "spec": 34867,
     # 23796 → 24935 (+1139, 2026-08-16, cross-runtime test-execution recipe). One paragraph,
     # in the stage that owns the whole-suite pass, saying: ask `hm test_runners plan` for THIS
     # runner rather than pasting a parallel flag. The flag is not portable advice — `cargo`,
     # `go`, `vitest`, `jest` and `flutter` are ALREADY parallel and a worker flag there caps or
     # nests instead of accelerating, while `pytest` is the one common runner that is serial by
     # default. Attributed in work-docs/BASELINE-DELTA-plan-validator-transfer.md.
-    "verify": 25387,
+    # 25387 → 16266 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -4228 on the
+    # a7403f2f render (20494): the preamble (loop check, start banner, autopilot picker, output
+    # language) left for `.claude/hm/stage-preamble.md` behind one pointer. The moved text is
+    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
+    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
+    "verify": 16266,
     # 41345 → 42452 (PLAN-workflow-time-token-savings B3/B4): the shared
     # `stage_end_summary` partial gained the judgment-gate discriminator and
     # `step_manifest` gained the `ask-pending` picker branch, both of which every stage
@@ -627,7 +654,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # 52162 → 52323 (understanding-handoff follow-up, 2026-09-27): +161, the closing print takes
     # `steps.understanding_block` from the receipt (resume-safe) and handles a receipt without
     # the key. Attributed in the same document.
-    "wrapup": 52323,
+    # 52323 → 45631 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -4228 on the
+    # a7403f2f render (49859): the preamble (loop check, start banner, autopilot picker, output
+    # language) left for `.claude/hm/stage-preamble.md` behind one pointer. The moved text is
+    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
+    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
+    "wrapup": 45631,
 }
 
 

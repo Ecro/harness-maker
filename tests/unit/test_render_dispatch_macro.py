@@ -392,7 +392,12 @@ def test_rendered_claude_arm_still_matches_the_frozen_baseline(preset: Preset) -
             continue
         if path in _REMOVED_COMMANDS:
             continue
-        current = {_norm(line) for line in files.get(path, "").splitlines()}
+        body = files.get(path, "")
+        # A line moved into a `.claude/hm/` file the command reads is moved, not lost: the
+        # preamble went to `stage-preamble.md` (2026-10-15, SPEC-hm-light-lane-s3c ADR-001).
+        pointed = re.findall(r"^Read `(\.claude/hm/[a-z0-9-]+\.md)`", body, re.M)
+        body = "\n".join([body, *(files.get(p, "") for p in pointed)])
+        current = {_norm(line) for line in body.splitlines()}
         for line in lines:
             if _norm(line) in current or line.strip() in _COLLAPSED_MULTILINE:
                 continue

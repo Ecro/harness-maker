@@ -1,0 +1,94 @@
+{
+ "refs": {
+  "autopilot-advance": 4921,
+  "execute-a5": 7841,
+  "execute-light-check": 8202,
+  "review-autofix": 10507,
+  "review-confirmation": 8891,
+  "verify-checks": 8642,
+  "wrapup-steps": 22338
+ },
+ "source_sha": "a7403f2f",
+ "surface": {
+  "claude": {
+   "configure": {
+    "chars": 12704,
+    "round_trips": 4
+   },
+   "execute": {
+    "chars": 45572,
+    "round_trips": 18
+   },
+   "health": {
+    "chars": 8643,
+    "round_trips": 6
+   },
+   "help": {
+    "chars": 2183,
+    "round_trips": 0
+   },
+   "make": {
+    "chars": 6647,
+    "round_trips": 1
+   },
+   "metrics": {
+    "chars": 15447,
+    "round_trips": 7
+   },
+   "research": {
+    "chars": 20461,
+    "round_trips": 7
+   },
+   "review": {
+    "chars": 60617,
+    "round_trips": 20
+   },
+   "spec": {
+    "chars": 43234,
+    "round_trips": 10
+   },
+   "uninstall": {
+    "chars": 1731,
+    "round_trips": 3
+   },
+   "verify": {
+    "chars": 16435,
+    "round_trips": 7
+   },
+   "wrapup": {
+    "chars": 33099,
+    "round_trips": 20
+   }
+  },
+  "codex": {
+   "hm-execute": {
+    "chars": 62541,
+    "round_trips": 26
+   },
+   "hm-help": {
+    "chars": 2030,
+    "round_trips": 0
+   },
+   "hm-research": {
+    "chars": 22222,
+    "round_trips": 8
+   },
+   "hm-review": {
+    "chars": 80213,
+    "round_trips": 29
+   },
+   "hm-spec": {
+    "chars": 45284,
+    "round_trips": 11
+   },
+   "hm-verify": {
+    "chars": 24590,
+    "round_trips": 11
+   },
+   "hm-wrapup": {
+    "chars": 55348,
+    "round_trips": 32
+   }
+  }
+ }
+}

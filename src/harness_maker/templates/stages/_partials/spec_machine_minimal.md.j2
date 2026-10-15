@@ -1,0 +1,23 @@
+{#- SPEC-hm-light-lane-s3c ADR-008 / IRR-003: the minimal machine.yaml a `lane: light` SPEC authors, shown inline on
+    both runtimes. Today's validator, scorer and `approve` accept it; tooling may materialise the defaults. -#}
+On `lane: light` author only this; on `lane: full` the full schema {{ 'below' if is_codex else 'named next' }}:
+
+```yaml
+schema_version: 3
+spec_slug: {slug}
+verification_tier: 1 | 2 | 3
+irreversible_decisions: []
+mutation_threshold: 85  # tier 1, both
+paths_to_mutate: [src/<module>.py]
+ac:
+  - id: AC-001
+    title: <AC-001 heading title>
+    type: mechanical | parametric | judgment | property, each with its slot:
+    executable_predicate: <runnable expr>
+    golden_table: [{input: {<arg>: <value>}, expected: <value>}]
+    rubric_id: <id>  # + judgment_subject_paths: [<p>]
+    # property: input_domain, transformation, expected_relation, observable_output
+    pending_test: true  # or test_ids: [<test id>]
+    oracle_source: golden | differential | property | rubric | consensus
+    oracle_evidence: <why it is independent>
+```

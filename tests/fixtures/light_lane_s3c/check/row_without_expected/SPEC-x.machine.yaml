@@ -1,0 +1,29 @@
+schema_version: 3
+spec_slug: x
+verification_tier: 1
+mutation_threshold: 85
+paths_to_mutate:
+- src/x.py
+irreversible_decisions: []
+ac:
+- id: AC-001
+  title: render emits content_hash
+  type: mechanical
+  pending_test: true
+  executable_predicate: '''content_hash:'' in render(answers())'
+  oracle_source: differential
+  oracle_evidence: compared against the reference renderer golden captured before
+    the edit
+- id: AC-002
+  title: format_duration caps the units
+  type: parametric
+  pending_test: true
+  golden_table:
+  - input:
+      seconds: 3700
+      max_units: 1
+  - input:
+      seconds: 3700
+      max_units: 2
+  oracle_source: golden
+  oracle_evidence: rows written by hand from the SPEC table before the code exists

@@ -1,0 +1,125 @@
+"""Capture the a7403f2f oracles for SPEC-hm-light-lane-s3c, before any template or module changed.
+
+Run with the a7403f2f source first on the path and this repo second, from an export of that
+commit (`git archive a7403f2f | tar -x -C <dir>`; an export, not a worktree, so nothing is added
+to the repo's worktree list):
+
+    PYTHONPATH=<dir>/src:<repo> <repo>/.venv/bin/python <this file> <repo>/tests/fixtures/light_lane_s3c
+
+It writes:
+- arms_a7403f2f.json — S1/S2/S3/S7/S8/S12 over the A arms (autonomy x worktree x locale): each
+  Claude command's and Codex skill's preamble span, the CLAUDE.md / AGENTS.md output-language
+  section, execute Step 0's head and part 1 and the Step 0.3 body (Claude and Codex), spec Step
+  3.5 and Step 4 + 4.5's length (Claude and Codex). Texts are stored once, keyed by SHA-256.
+- full_a7403f2f.json — S13: SHA-256 of every compared path on each full-lane arm (preset x
+  worktree x strictness x loop), spec with its Step 3.5 and Step 4 + 4.5 sections left out and
+  the frontmatter `content_hash` (a hash of the file's own body) masked.
+- check_a7403f2f.json — S4/S5: stdout and exit code of `spec_machine check --all` per fixture.
+- cli_a7403f2f.json — S6: each light-path CLI's masked stdout and exit code.
+- surface_a7403f2f.json — S14: `measure_surface()` and the reference files' lengths.
+- boundary_a7403f2f.json — S13: the boundary observation SHA on the execute and verify cases.
+- readiness_a7403f2f.json — S2: workflow_clarity on the default a7403f2f render.
+"""
+import hashlib, json, sys, tempfile
+from pathlib import Path
+
+import harness_maker
+
+SOURCE = Path(harness_maker.__file__).resolve()
+assert "/src/harness_maker" in str(SOURCE), SOURCE
+# Provenance: the imported package is an a7403f2f export — the tree carries none of the files
+# this SPEC adds. A path check alone passes on any checkout with a `src/` layout.
+_TEMPLATES = SOURCE.parent / "templates"
+assert not (_TEMPLATES / "hm" / "stage-preamble.md.j2").exists(), SOURCE
+assert not (_TEMPLATES / "hm" / "execute-plan.md.j2").exists(), SOURCE
+assert (_TEMPLATES / "hm" / "execute-light-check.md.j2").exists(), SOURCE
+
+from tests.unit import light_lane_s3c_fixture as fx
+
+out_dir = Path(sys.argv[1])
+texts: dict[str, str] = {}
+
+
+def keep(t: str) -> str:
+    h = hashlib.sha256(t.encode()).hexdigest()
+    texts[h] = t
+    return h
+
+
+def sha(t: str | None) -> str | None:
+    return None if t is None else hashlib.sha256(t.encode()).hexdigest()
+
+
+# ── A arms ────────────────────────────────────────────────────────────────
+arms = {"source_sha": fx.SOURCE_SHA, "configs": {}, "texts": texts}
+for key in fx.A_CONFIGS:
+    files = fx.render_files(fx.a_answers(key))
+    cfg = {"preamble": {}, "lang": {}, "step0_head": {}, "step0_part1": {}, "step03": {},
+           "step35": {}, "step4_len": {}}
+    for rel in (*fx.CLAUDE_COMMANDS, *fx.CODEX_SKILLS):
+        cfg["preamble"][rel] = keep(fx.preamble_span(files[rel]))
+    for doc in fx.DOCS:
+        cfg["lang"][doc] = keep(fx.output_language_section(files[doc]))
+    for rel in ("commands/hm/execute.md", "skills/hm-execute"):
+        cfg["step0_head"][rel] = keep(fx.step0_head(files[rel]))
+        cfg["step0_part1"][rel] = keep(fx.step0_part1(files[rel]))
+        cfg["step03"][rel] = keep(fx.step03_body(files[rel]))
+    for rel in ("commands/hm/spec.md", "skills/hm-spec"):
+        cfg["step35"][rel] = keep(fx.step35(files[rel]))
+        cfg["step4_len"][rel] = len(fx.step4(files[rel]))
+    arms["configs"][key] = cfg
+(out_dir / "arms_a7403f2f.json").write_text(fx.dump(arms), encoding="utf-8")
+print("A arms:", len(arms["configs"]), "texts:", len(texts))
+
+# ── full-lane arms ─────────────────────────────────────────────────────────
+compared = (*fx.CLAUDE_COMMANDS, "commands/hm/loop.md", *fx.A7403F2F_REFS, *fx.CODEX_SKILLS,
+            *fx.VBC_SKILLS)
+full = {"source_sha": fx.SOURCE_SHA, "paths": list(compared), "configs": {}}
+for key in fx.FULL_CONFIGS:
+    files = fx.render_files(fx.full_answers(key))
+    cfg = {}
+    for rel in compared:
+        text = files[rel]
+        if text is not None and rel in ("commands/hm/spec.md", "skills/hm-spec"):
+            text = fx.without_spec_steps_35_4(text)
+        cfg[rel] = sha(None if text is None else fx.mask_content_hash(text))
+    full["configs"][key] = cfg
+(out_dir / "full_a7403f2f.json").write_text(fx.dump(full), encoding="utf-8")
+print("full arms:", len(full["configs"]))
+
+# ── check / CLI outputs ────────────────────────────────────────────────────
+checks = {"source_sha": fx.SOURCE_SHA, "cases": fx.run_all_checks()}
+(out_dir / "check_a7403f2f.json").write_text(fx.dump(checks), encoding="utf-8")
+print("check cases:", len(checks["cases"]))
+clis = {"source_sha": fx.SOURCE_SHA, "outputs": fx.light_path_outputs()}
+(out_dir / "cli_a7403f2f.json").write_text(fx.dump(clis), encoding="utf-8")
+print("clis:", len(clis["outputs"]))
+
+# ── surface ────────────────────────────────────────────────────────────────
+from tests.structural import _surface_baseline as sb
+
+surface = {
+    "source_sha": fx.SOURCE_SHA,
+    "surface": sb.measure_surface(),
+    "refs": {n: len(t) for n, t in sb.render_surface(with_refs=True)[sb.REFS_VARIANT].items()},
+}
+(out_dir / "surface_a7403f2f.json").write_text(fx.dump(surface), encoding="utf-8")
+print("surface:", {k: v["chars"] for k, v in surface["surface"]["claude"].items()})
+
+# ── boundary ───────────────────────────────────────────────────────────────
+from tests.unit import light_lane_s3a_fixture as s3a
+
+boundary = {"source_sha": fx.SOURCE_SHA, "cases": {}}
+with tempfile.TemporaryDirectory() as td:
+    s3a.isolate_env(Path(td) / "home")
+    for i, case in enumerate(c for c in s3a.ac004_cases() if fx.boundary_case(c)):
+        root = Path(td) / f"c{i}"
+        argv = s3a.build(root, case)
+        boundary["cases"][case.key] = s3a.observation_sha(s3a.observe(root, argv))
+(out_dir / "boundary_a7403f2f.json").write_text(fx.dump(boundary), encoding="utf-8")
+print("boundary cases:", len(boundary["cases"]))
+
+# ── readiness ──────────────────────────────────────────────────────────────
+readiness = {"source_sha": fx.SOURCE_SHA, "workflow_clarity": fx.workflow_clarity_of_default()}
+(out_dir / "readiness_a7403f2f.json").write_text(fx.dump(readiness), encoding="utf-8")
+print("readiness:", readiness["workflow_clarity"]["score"])

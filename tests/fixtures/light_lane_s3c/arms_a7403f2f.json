@@ -1,0 +1,674 @@
+{
+ "configs": {
+  "ask/wt-off/en": {
+   "lang": {
+    "AGENTS.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6",
+    "CLAUDE.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/research.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/review.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/spec.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/verify.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/wrapup.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "skills/hm-execute": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-research": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-review": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-spec": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-verify": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-wrapup": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "da22f2a20de3710188d611e660ab3f3d09b26acbca28242b0ffb00b6365a5d3d",
+    "skills/hm-execute": "753e1d994e7f3c6f65b933fa6c60abffb149455edb8faac149a1232300b05904"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "ask/wt-off/ko": {
+   "lang": {
+    "AGENTS.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815",
+    "CLAUDE.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/research.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/review.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/spec.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/verify.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/wrapup.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "skills/hm-execute": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-research": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-review": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-spec": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-verify": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-wrapup": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "da22f2a20de3710188d611e660ab3f3d09b26acbca28242b0ffb00b6365a5d3d",
+    "skills/hm-execute": "753e1d994e7f3c6f65b933fa6c60abffb149455edb8faac149a1232300b05904"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "ask/wt-on/en": {
+   "lang": {
+    "AGENTS.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6",
+    "CLAUDE.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/research.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/review.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/spec.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/verify.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "commands/hm/wrapup.md": "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5",
+    "skills/hm-execute": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-research": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-review": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-spec": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-verify": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d",
+    "skills/hm-wrapup": "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "f636ec4da3fcb2db3d08c67350c84967af22103e22c8583af6ba281049f1263c",
+    "skills/hm-execute": "7e8e43629d8a016ad9212dcdaa2ca28b32d2a6071b8a7d9a0e12cb900617862b"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "ask/wt-on/ko": {
+   "lang": {
+    "AGENTS.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815",
+    "CLAUDE.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/research.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/review.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/spec.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/verify.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "commands/hm/wrapup.md": "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2",
+    "skills/hm-execute": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-research": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-review": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-spec": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-verify": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545",
+    "skills/hm-wrapup": "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "f636ec4da3fcb2db3d08c67350c84967af22103e22c8583af6ba281049f1263c",
+    "skills/hm-execute": "7e8e43629d8a016ad9212dcdaa2ca28b32d2a6071b8a7d9a0e12cb900617862b"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "auto_full/wt-off/en": {
+   "lang": {
+    "AGENTS.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6",
+    "CLAUDE.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/research.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/review.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/spec.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/verify.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/wrapup.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "skills/hm-execute": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-research": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-review": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-spec": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-verify": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-wrapup": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "da22f2a20de3710188d611e660ab3f3d09b26acbca28242b0ffb00b6365a5d3d",
+    "skills/hm-execute": "753e1d994e7f3c6f65b933fa6c60abffb149455edb8faac149a1232300b05904"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "auto_full/wt-off/ko": {
+   "lang": {
+    "AGENTS.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815",
+    "CLAUDE.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/research.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/review.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/spec.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/verify.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/wrapup.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "skills/hm-execute": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-research": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-review": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-spec": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-verify": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-wrapup": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "da22f2a20de3710188d611e660ab3f3d09b26acbca28242b0ffb00b6365a5d3d",
+    "skills/hm-execute": "753e1d994e7f3c6f65b933fa6c60abffb149455edb8faac149a1232300b05904"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "auto_full/wt-on/en": {
+   "lang": {
+    "AGENTS.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6",
+    "CLAUDE.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/research.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/review.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/spec.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/verify.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "commands/hm/wrapup.md": "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb",
+    "skills/hm-execute": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-research": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-review": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-spec": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-verify": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae",
+    "skills/hm-wrapup": "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "f636ec4da3fcb2db3d08c67350c84967af22103e22c8583af6ba281049f1263c",
+    "skills/hm-execute": "7e8e43629d8a016ad9212dcdaa2ca28b32d2a6071b8a7d9a0e12cb900617862b"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "auto_full/wt-on/ko": {
+   "lang": {
+    "AGENTS.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815",
+    "CLAUDE.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/research.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/review.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/spec.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/verify.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "commands/hm/wrapup.md": "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699",
+    "skills/hm-execute": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-research": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-review": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-spec": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-verify": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3",
+    "skills/hm-wrapup": "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "f636ec4da3fcb2db3d08c67350c84967af22103e22c8583af6ba281049f1263c",
+    "skills/hm-execute": "7e8e43629d8a016ad9212dcdaa2ca28b32d2a6071b8a7d9a0e12cb900617862b"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "auto_safe/wt-off/en": {
+   "lang": {
+    "AGENTS.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6",
+    "CLAUDE.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/research.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/review.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/spec.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/verify.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/wrapup.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "skills/hm-execute": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-research": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-review": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-spec": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-verify": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-wrapup": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "da22f2a20de3710188d611e660ab3f3d09b26acbca28242b0ffb00b6365a5d3d",
+    "skills/hm-execute": "753e1d994e7f3c6f65b933fa6c60abffb149455edb8faac149a1232300b05904"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "auto_safe/wt-off/ko": {
+   "lang": {
+    "AGENTS.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815",
+    "CLAUDE.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/research.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/review.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/spec.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/verify.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/wrapup.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "skills/hm-execute": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-research": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-review": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-spec": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-verify": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-wrapup": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "da22f2a20de3710188d611e660ab3f3d09b26acbca28242b0ffb00b6365a5d3d",
+    "skills/hm-execute": "753e1d994e7f3c6f65b933fa6c60abffb149455edb8faac149a1232300b05904"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "auto_safe/wt-on/en": {
+   "lang": {
+    "AGENTS.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6",
+    "CLAUDE.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/research.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/review.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/spec.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/verify.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "commands/hm/wrapup.md": "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b",
+    "skills/hm-execute": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-research": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-review": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-spec": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-verify": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065",
+    "skills/hm-wrapup": "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "f636ec4da3fcb2db3d08c67350c84967af22103e22c8583af6ba281049f1263c",
+    "skills/hm-execute": "7e8e43629d8a016ad9212dcdaa2ca28b32d2a6071b8a7d9a0e12cb900617862b"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "auto_safe/wt-on/ko": {
+   "lang": {
+    "AGENTS.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815",
+    "CLAUDE.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/research.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/review.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/spec.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/verify.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "commands/hm/wrapup.md": "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4",
+    "skills/hm-execute": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-research": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-review": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-spec": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-verify": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72",
+    "skills/hm-wrapup": "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "f636ec4da3fcb2db3d08c67350c84967af22103e22c8583af6ba281049f1263c",
+    "skills/hm-execute": "7e8e43629d8a016ad9212dcdaa2ca28b32d2a6071b8a7d9a0e12cb900617862b"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "gated/wt-off/en": {
+   "lang": {
+    "AGENTS.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6",
+    "CLAUDE.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/research.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/review.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/spec.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/verify.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/wrapup.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "skills/hm-execute": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-research": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-review": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-spec": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-verify": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-wrapup": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "da22f2a20de3710188d611e660ab3f3d09b26acbca28242b0ffb00b6365a5d3d",
+    "skills/hm-execute": "753e1d994e7f3c6f65b933fa6c60abffb149455edb8faac149a1232300b05904"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "gated/wt-off/ko": {
+   "lang": {
+    "AGENTS.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815",
+    "CLAUDE.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/research.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/review.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/spec.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/verify.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/wrapup.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "skills/hm-execute": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-research": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-review": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-spec": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-verify": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-wrapup": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "da22f2a20de3710188d611e660ab3f3d09b26acbca28242b0ffb00b6365a5d3d",
+    "skills/hm-execute": "753e1d994e7f3c6f65b933fa6c60abffb149455edb8faac149a1232300b05904"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "gated/wt-on/en": {
+   "lang": {
+    "AGENTS.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6",
+    "CLAUDE.md": "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/research.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/review.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/spec.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/verify.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "commands/hm/wrapup.md": "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0",
+    "skills/hm-execute": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-research": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-review": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-spec": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-verify": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf",
+    "skills/hm-wrapup": "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "f636ec4da3fcb2db3d08c67350c84967af22103e22c8583af6ba281049f1263c",
+    "skills/hm-execute": "7e8e43629d8a016ad9212dcdaa2ca28b32d2a6071b8a7d9a0e12cb900617862b"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  },
+  "gated/wt-on/ko": {
+   "lang": {
+    "AGENTS.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815",
+    "CLAUDE.md": "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815"
+   },
+   "preamble": {
+    "commands/hm/execute.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/research.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/review.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/spec.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/verify.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "commands/hm/wrapup.md": "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70",
+    "skills/hm-execute": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-research": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-review": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-spec": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-verify": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1",
+    "skills/hm-wrapup": "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1"
+   },
+   "step03": {
+    "commands/hm/execute.md": "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba",
+    "skills/hm-execute": "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f"
+   },
+   "step0_head": {
+    "commands/hm/execute.md": "f636ec4da3fcb2db3d08c67350c84967af22103e22c8583af6ba281049f1263c",
+    "skills/hm-execute": "7e8e43629d8a016ad9212dcdaa2ca28b32d2a6071b8a7d9a0e12cb900617862b"
+   },
+   "step0_part1": {
+    "commands/hm/execute.md": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1",
+    "skills/hm-execute": "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1"
+   },
+   "step35": {
+    "commands/hm/spec.md": "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6",
+    "skills/hm-spec": "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76"
+   },
+   "step4_len": {
+    "commands/hm/spec.md": 1654,
+    "skills/hm-spec": 1654
+   }
+  }
+ },
+ "source_sha": "a7403f2f",
+ "texts": {
+  "007078acc6bf7296dabc469d14b8b0490ff74e2631a29f07d46bc52230d54ab1": "**Required frontmatter** (this block is the document's contract — every later stage reads from\nit):\n\n```yaml\n---\ntype: plan\ntask_slug: {slug}\nstatus: planning\ncreated: {YYYY-MM-DD}\ntags: [{project}, plan, {tech-stack}, {2-5 domain tags}]\nspec: \"[[SPEC-{slug}]]\"          # OR omit when no SPEC exists\nresearch_doc: \"[[RESEARCH-{slug}]]\"  # OR omit when /hm:research did not run\ninterview_rounds: 0              # this stage holds no interview; the SPEC's count is the task's\nadrs: {M}\nvalidator_outcome: NOT_RUN       # no plan-validator exists; `spec-validator` critiques the SPEC\nsummary: \"{≤100 char one-line TL;DR}\"\nintent: <id>                  # ONLY when the SPEC names one; omit otherwise\nobjective: <id>               # preserve legacy only; omit with intent\n---\n```\n\n`spec_need_verdict` / `spec_need_target` are deliberately **not** in that list. Step 0.1 judges\nthem from evidence and writes them, and the writer preserves whatever is already there — so a\nvalue guessed here, before the evidence is gathered, would be the one that survives.\n\n`validator_outcome: NOT_RUN` is deliberate and is not one of the four values the removed stage\ndocumented. Nothing parses this field, so an honest value costs no reader — and borrowing\n`APPROVED` would make an uncritiqued PLAN indistinguishable from a critiqued one.\n\n**Required sections (in this order):**\n\n1. **🎯 Executive Summary** — TL;DR, what/why, the key decisions and where they came from.\n2. **📚 Prior Work** — similar PLANs, lessons from `failures.md` / `wiki.md`, RESEARCH findings.\n3. **📐 Architecture Decision Records** — the design records this stage locks. The SPEC owns\n   the irreversible ones; these are the reversible calls you make while building. Every ADR\n   carries a provenance line: `**Decided by:** user (source: <SPEC section or conversation>)`\n   only when the user explicitly made that call, otherwise `**Decided by:** agent`.\n4. **🏗️ Technical Design** — current state, affected components, dependencies, data flow.\n5. **📝 Implementation Plan** — numbered phases. **Each phase MUST have** `depends_on`,\n   `parallel_group`, `merge_hazards`, scope (files in / out), an exit criterion that is a\n   runnable command or check, `risk` (`low` / `medium` / `high`), and a rollback point.\n6. **🚧 Contract Boundaries** — one list, `### Do not change`: surfaces the implementation must\n   leave alone. The only behaviour that moves across a long review is the one the contract never\n   fixed, so an unwritten hole is the defect this section closes.\n   - **Exactly three admitted forms**, one per `- ` bullet: (a) a **repo-relative** path in\n     backticks — `` - `src/pkg/mod.py` `` or a directory prefix `` - `src/pkg/` `` — optionally\n     ` — {why}`; (b) `- Advisory: {intent no path expresses}`; (c)\n     `- none — this task has no contract boundaries`, valid **only as the sole bullet**. No\n     absolute paths, `..` or globs.\n   - An empty list is **written, never omitted** — form (c). \"Nobody was asked\" and \"the author\n     said there are none\" are different facts.\n7. **🧪 Testing Strategy** — unit / integration / manual steps.\n8. **⚠️ Risks & Mitigation** — a risk register table.\n9. **✅ Success Criteria** — a checklist mirroring the SPEC's verification criteria.\n\n",
+  "0d04f13e1d0b10ecb7dbc300187edd18eee2944864a1cc4acf8fb5fee92739e4": "> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: auto_safe`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - anything else → offer ONCE via `AskUserQuestion`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level auto_safe --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **ko**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "1c8a2527e4269113cb8a466b5c8a9571cd95b34d5bfa9bd9d7fb551d54d5cb76": "### Step 3.5 — Write SPEC.machine.yaml (ADR-006 dual-file)\n\nAlongside SPEC.md write the machine-readable companion at\n`specs/SPEC-{slug}.machine.yaml`. This carries the\nfields that AI verifiers consume directly (test_ids[], executable_predicate,\ngolden_table, rubric_id, mutation_threshold, verification_tier) — values\nthe human SPEC.md describes but doesn't structure.\n\n**Required machine.yaml schema (schema_version=3):**\n\n> **Version note (ADR-006 of spec-tetrad):** new specs declare `schema_version: 2`.\n> An **omitted** version pins to v1 (oracle_source NOT required) so legacy specs\n> keep working; do NOT hand-edit a v2 oracle field into a v1 file — declare the\n> version. v2 requires `oracle_source` + `oracle_evidence` on **every** AC.\n> **v3 (SPEC approval)** additionally requires `irreversible_decisions` (a list, possibly empty).\n> Never hand-write `approval:` — `hm spec_machine approve` writes it, bound to a hash of every\n> authored field (tooling fields such as `test_ids` / `pending_test` are excluded).\n\n```yaml\nschema_version: 3\nspec_slug: {slug}\nirreversible_decisions:               # [] when none — the key is required at v3\n  - id: IRR-001\n    decision: \"<what is decided>\"\n    category: public API/CLI contract   # one of the five categories\n    rationale: \"<why it cannot be cheaply undone>\"\n    source: spec                        # execute when appended during /hm:execute\nparent_spec: SPEC-{l1-cluster-slug}   # null OR L1 file in same specs/ dir\nverification_tier: 1 | 2 | 3          # T1/T2/T3 per ADR-008\nmutation_threshold: 85 | 70 | null    # Python only; null = ADR-009 3-layer\nmutation_threshold_rationale: \"...\"\nlast_mutation_run: null | \"YYYY-MM-DD\"\npaths_to_mutate:                       # Python source files; reject `..` or absolute\n  - src/<module>.py\nspec_quality_score: null               # filled by Step 4.5\nspec_quality_score_at: null\nac:\n  - id: AC-001\n    title: \"<matches the ### AC-001 heading in .md within fuzzy ≥ 0.85>\"\n    type: mechanical | parametric | judgment | property   # ADR-003 + spec-tetrad\n    test_ids:\n      - tests/<path>::<fn_name>         # must resolve via `pytest --collect-only`\n    executable_predicate: \"<runnable Python expr>\" # mechanical only (else null) — see note\n    golden_table: []                              # parametric only\n    rubric_id: null                               # judgment only\n    pending_test: true                            # false ONLY when test_ids verified\n    # --- oracle axis (v2, ADR-001/007) — REQUIRED on every AC ---\n    oracle_source: golden | differential | property | rubric | consensus\n    oracle_evidence: \"<one-line independence justification the gate scores>\"\n    oracle_independence_waiver: null  # warn strictness only: durable override reason\n    # --- structured property fields (type: property only) ---\n    input_domain: null        # e.g. \"arbitrary UTF-8 strings\"\n    transformation: null      # e.g. \"encode then decode\"\n    expected_relation: null   # e.g. \"decode(encode(x)) == x\"  (metamorphic/invariant)\n    preconditions: []         # optional list\n    observable_output: null   # e.g. \"bytes\"\n    generator_hint: null      # advisory only — NOT a generator\n```\n\n**`executable_predicate` must be a *runnable* expression, not prose**\n(PLAN-spec-test-accumulation ADR-007). `spec_machine.validate` now rejects a\nmechanical AC unless its predicate `ast.parse`s as a Python expression whose\ntop-level node is a comparison / call / bool-op / unary-op and references at\nleast one symbol — `$hm-execute` turns it directly into a test assertion. Write\n`result.retry_count <= 3` or `is_idempotent(send(msg))`, never `\"retries are\nbounded\"` or the tautology `True`. Bind the free symbols to the system under\ntest; if you cannot yet name them, leave the AC `parametric`/`judgment` instead\nof forcing a fake mechanical predicate.\n\nEach AC's heading in SPEC.md must be `### AC-NNN: <title>` (NNN ≥ 3 digits)\nto satisfy `spec_machine.cross_validate` rule 1. The title in `.md` and the\n`title:` field in `.machine.yaml` must be similar within fuzzy ratio 0.85\n(rule 2). At least one of `(test_ids != [])` OR `pending_test=true` per AC.\n\n",
+  "24fadaa3d91615f911495a3e18de127304ca25c56100cf39beaa587a60a649e6": "> **Output language.** Respond to the user in **en**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->",
+  "26579cf5db78a4adf4aa0c422743d157bcc69dac932b63f06cded034fd612f0b": "> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: auto_safe`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - anything else → offer ONCE via `AskUserQuestion`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level auto_safe --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **en**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "3b82aa11d16cc6b3fb286bcb403bb4935afaa550642066f1c207345d01535bc0": "> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n\n> **Output language.** Respond to the user in **en**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "3c447c3140e63ee2a5a9818f8f2afc2eaee8ca3759cd3e158edd206cf224b065": "\n> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: auto_safe`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - anything else → offer ONCE via `request_user_input`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level auto_safe --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **en**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "3d0e9975eb15043ae500540d49088755feb4482572bfc582c96dcfb074bdcb9d": "\n> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: ask`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - `reason: \"ask-pending\"` → the normal path here (`level: ask`). Offer three options via\n>   `request_user_input` for the `research → spec → execute → review → verify → wrapup` pipeline:\n>   **`auto_safe`** (stops at the plan interview), **`auto_full`** (answers it, and an\n>   APPROVED review's `human_review_needed`), or **gated**. A CHANGES_REQUESTED review and\n>   the wrapup land stop at every level. Arm with the PICKED level:\n> - anything else → offer ONCE via `request_user_input`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level <the level the user picked> --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **en**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "46403447722e62a4921e0b1d0286f015fe0fd1006cb07259b9e7a6684151efae": "\n> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: auto_full`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - anything else → offer ONCE via `request_user_input`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level auto_full --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **en**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "47c086aa147c648fe3cd4c09bef5fb1f51cd2f1c07f7fbdc3bd69c4e15360dba": "Read the file back and assert:\n\n- It starts with `---` frontmatter and the frontmatter carries every key listed above.\n- Every phase has all seven required fields. A phase missing one is a phase Step 4 cannot decide\n  about later.\n- `## 🚧 Contract Boundaries` is present, sits between **📝 Implementation Plan** and\n  **🧪 Testing Strategy**, and its `### Do not change` list is **non-empty** — an explicit `none`\n  line satisfies this, an absent section does not.\n- Every `### Do not change` bullet is one of the three **admitted forms**, and a form-(c) bullet\n  is the only bullet. Anything else — an empty list included, repaired by writing the entries,\n  **never** by fabricating `none` — is **self-repaired inline**: rewrite and continue. This never\n  triggers the retry rule below, because a consumer cannot act on an undecidable entry and will\n  silently drop it. A `none` bullet coexisting with others: **delete the `none`**, never a path\n  or `Advisory:` bullet.\n- The frontmatter contains `spec_need_verdict` with a valid value. A missing key closes the\n  absent-case fail-open that defeats `/hm:verify` Check 6.\n\nIf verification fails, retry the write **once**. If it still fails, surface the path and the\nerror and stop — do not proceed to Step 1 with a PLAN later stages cannot read.\n\n",
+  "6b7fe957a2bee64d1c8c4532a5fe321d6c6e4e4ef9ba2c11c8746d5431b2d9a2": "> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: ask`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - `reason: \"ask-pending\"` → the normal path here (`level: ask`). Offer three options via\n>   `AskUserQuestion` for the `research → spec → execute → review → verify → wrapup` pipeline:\n>   **`auto_safe`** (stops at the plan interview), **`auto_full`** (answers it, and an\n>   APPROVED review's `human_review_needed`), or **gated**. A CHANGES_REQUESTED review and\n>   the wrapup land stop at every level. Arm with the PICKED level:\n> - anything else → offer ONCE via `AskUserQuestion`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level <the level the user picked> --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **ko**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "6e04b6220bd2f1b54c2fd1cfc44924ef973b650f48d6c3b15b7f3d1342dc7815": "> **Output language.** Respond to the user in **ko**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->",
+  "73d06622f97a5ca2ae6a0ae81b99e759d647d08a2e2c5ecae217f6e1e0873f72": "\n> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: auto_safe`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - anything else → offer ONCE via `request_user_input`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level auto_safe --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **ko**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "73d556214abc02fcc4025b4e2cbe6d1ad46f41460c91e95a3c84d51314b95b7f": "Read the file back and assert:\n\n- It starts with `---` frontmatter and the frontmatter carries every key listed above.\n- Every phase has all seven required fields. A phase missing one is a phase Step 4 cannot decide\n  about later.\n- `## 🚧 Contract Boundaries` is present, sits between **📝 Implementation Plan** and\n  **🧪 Testing Strategy**, and its `### Do not change` list is **non-empty** — an explicit `none`\n  line satisfies this, an absent section does not.\n- Every `### Do not change` bullet is one of the three **admitted forms**, and a form-(c) bullet\n  is the only bullet. Anything else — an empty list included, repaired by writing the entries,\n  **never** by fabricating `none` — is **self-repaired inline**: rewrite and continue. This never\n  triggers the retry rule below, because a consumer cannot act on an undecidable entry and will\n  silently drop it. A `none` bullet coexisting with others: **delete the `none`**, never a path\n  or `Advisory:` bullet.\n- The frontmatter contains `spec_need_verdict` with a valid value. A missing key closes the\n  absent-case fail-open that defeats `$hm-verify` Check 6.\n\nIf verification fails, retry the write **once**. If it still fails, surface the path and the\nerror and stop — do not proceed to Step 1 with a PLAN later stages cannot read.\n\n",
+  "753e1d994e7f3c6f65b933fa6c60abffb149455edb8faac149a1232300b05904": "There is no `$hm-plan` stage. Its DRI-owned content — the decisions that cannot be cheaply\nundone, and the objective link — lives in the SPEC, which already elicits both. What is left is\nauthorship: phases, file lists, order, risks and exit criteria are IC work, and you write them\nhere with **no human gate**.\n\nThe PLAN *document* did not go away with the stage. It is the state that survives a context\nwindow on a long task, every later stage reads it, and `$hm-verify` Check 6 reads two of its\nfrontmatter keys. Producing it is therefore not optional.\n\nWrite to `./work-docs/PLAN-{slug}.md`. The path is\nrooted on purpose: under isolation a bare `work-docs/PLAN-…` lands in the base\ntree, which dirties it independently of anything the preflight preamble said.\n\n**If that file already exists, do not rewrite it** — skip to\nthe SPEC-need write below. A PLAN carried from an earlier session, or from a `$hm-loop`\niteration, is the record you extend, not a draft you replace.\n\n",
+  "7e8e43629d8a016ad9212dcdaa2ca28b32d2a6071b8a7d9a0e12cb900617862b": "There is no `$hm-plan` stage. Its DRI-owned content — the decisions that cannot be cheaply\nundone, and the objective link — lives in the SPEC, which already elicits both. What is left is\nauthorship: phases, file lists, order, risks and exit criteria are IC work, and you write them\nhere with **no human gate**.\n\nThe PLAN *document* did not go away with the stage. It is the state that survives a context\nwindow on a long task, every later stage reads it, and `$hm-verify` Check 6 reads two of its\nfrontmatter keys. Producing it is therefore not optional.\n\nWrite to `<WT>/work-docs/PLAN-{slug}.md`. The path is\nrooted on purpose: under isolation a bare `work-docs/PLAN-…` lands in the base\ntree, which dirties it independently of anything the preflight preamble said.\n\n**If that file already exists, do not rewrite it** — skip to\nthe SPEC-need write below. A PLAN carried from an earlier session, or from a `$hm-loop`\niteration, is the record you extend, not a draft you replace.\n\n",
+  "80d668c05b9f7a8684ee2c27ac7370894c2c064faca2f0c1857560945e356699": "> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: auto_full`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - anything else → offer ONCE via `AskUserQuestion`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level auto_full --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **ko**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "893b6e871f5371c2697b6facfcbd823386ecb251f29cdf49e1808d227a7bfbcb": "> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: auto_full`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - anything else → offer ONCE via `AskUserQuestion`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level auto_full --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **en**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "91e93b605384d0bb7e3e670dd28e59472c1539dde7dad46f1b310ba3a8d2deaf": "\n> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n\n> **Output language.** Respond to the user in **en**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "9514fd97a01feae59fc61c357ee451b79d0a14f313b191fa2864a2a2b0ae25a3": "\n> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: auto_full`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - anything else → offer ONCE via `request_user_input`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level auto_full --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **ko**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "b1644963bb401c7cac1b547a3312212a5971fa16036419bbf5caaaa804b83fb6": "### Step 3.5 — Write SPEC.machine.yaml (ADR-006 dual-file)\n\nAlongside SPEC.md write the machine-readable companion at\n`specs/SPEC-{slug}.machine.yaml`. This carries the\nfields that AI verifiers consume directly (test_ids[], executable_predicate,\ngolden_table, rubric_id, mutation_threshold, verification_tier) — values\nthe human SPEC.md describes but doesn't structure.\n\n**Required machine.yaml schema (schema_version=3):**\n\n> **Version note (ADR-006 of spec-tetrad):** new specs declare `schema_version: 2`.\n> An **omitted** version pins to v1 (oracle_source NOT required) so legacy specs\n> keep working; do NOT hand-edit a v2 oracle field into a v1 file — declare the\n> version. v2 requires `oracle_source` + `oracle_evidence` on **every** AC.\n> **v3 (SPEC approval)** additionally requires `irreversible_decisions` (a list, possibly empty).\n> Never hand-write `approval:` — `hm spec_machine approve` writes it, bound to a hash of every\n> authored field (tooling fields such as `test_ids` / `pending_test` are excluded).\n\n```yaml\nschema_version: 3\nspec_slug: {slug}\nirreversible_decisions:               # [] when none — the key is required at v3\n  - id: IRR-001\n    decision: \"<what is decided>\"\n    category: public API/CLI contract   # one of the five categories\n    rationale: \"<why it cannot be cheaply undone>\"\n    source: spec                        # execute when appended during /hm:execute\nparent_spec: SPEC-{l1-cluster-slug}   # null OR L1 file in same specs/ dir\nverification_tier: 1 | 2 | 3          # T1/T2/T3 per ADR-008\nmutation_threshold: 85 | 70 | null    # Python only; null = ADR-009 3-layer\nmutation_threshold_rationale: \"...\"\nlast_mutation_run: null | \"YYYY-MM-DD\"\npaths_to_mutate:                       # Python source files; reject `..` or absolute\n  - src/<module>.py\nspec_quality_score: null               # filled by Step 4.5\nspec_quality_score_at: null\nac:\n  - id: AC-001\n    title: \"<matches the ### AC-001 heading in .md within fuzzy ≥ 0.85>\"\n    type: mechanical | parametric | judgment | property   # ADR-003 + spec-tetrad\n    test_ids:\n      - tests/<path>::<fn_name>         # must resolve via `pytest --collect-only`\n    executable_predicate: \"<runnable Python expr>\" # mechanical only (else null) — see note\n    golden_table: []                              # parametric only\n    rubric_id: null                               # judgment only\n    pending_test: true                            # false ONLY when test_ids verified\n    # --- oracle axis (v2, ADR-001/007) — REQUIRED on every AC ---\n    oracle_source: golden | differential | property | rubric | consensus\n    oracle_evidence: \"<one-line independence justification the gate scores>\"\n    oracle_independence_waiver: null  # warn strictness only: durable override reason\n    # --- structured property fields (type: property only) ---\n    input_domain: null        # e.g. \"arbitrary UTF-8 strings\"\n    transformation: null      # e.g. \"encode then decode\"\n    expected_relation: null   # e.g. \"decode(encode(x)) == x\"  (metamorphic/invariant)\n    preconditions: []         # optional list\n    observable_output: null   # e.g. \"bytes\"\n    generator_hint: null      # advisory only — NOT a generator\n```\n\n**`executable_predicate` must be a *runnable* expression, not prose**\n(PLAN-spec-test-accumulation ADR-007). `spec_machine.validate` now rejects a\nmechanical AC unless its predicate `ast.parse`s as a Python expression whose\ntop-level node is a comparison / call / bool-op / unary-op and references at\nleast one symbol — `/hm:execute` turns it directly into a test assertion. Write\n`result.retry_count <= 3` or `is_idempotent(send(msg))`, never `\"retries are\nbounded\"` or the tautology `True`. Bind the free symbols to the system under\ntest; if you cannot yet name them, leave the AC `parametric`/`judgment` instead\nof forcing a fake mechanical predicate.\n\nEach AC's heading in SPEC.md must be `### AC-NNN: <title>` (NNN ≥ 3 digits)\nto satisfy `spec_machine.cross_validate` rule 1. The title in `.md` and the\n`title:` field in `.machine.yaml` must be similar within fuzzy ratio 0.85\n(rule 2). At least one of `(test_ids != [])` OR `pending_test=true` per AC.\n\n",
+  "cbc45e9515cdfc2ac5e7d611a36592dd0aeba397aa7cd682e0f91257611d1d70": "> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n\n> **Output language.** Respond to the user in **ko**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "da22f2a20de3710188d611e660ab3f3d09b26acbca28242b0ffb00b6365a5d3d": "There is no `/hm:plan` stage. Its DRI-owned content — the decisions that cannot be cheaply\nundone, and the objective link — lives in the SPEC, which already elicits both. What is left is\nauthorship: phases, file lists, order, risks and exit criteria are IC work, and you write them\nhere with **no human gate**.\n\nThe PLAN *document* did not go away with the stage. It is the state that survives a context\nwindow on a long task, every later stage reads it, and `/hm:verify` Check 6 reads two of its\nfrontmatter keys. Producing it is therefore not optional.\n\nWrite to `./work-docs/PLAN-{slug}.md`. The path is\nrooted on purpose: under isolation a bare `work-docs/PLAN-…` lands in the base\ntree, which dirties it independently of anything the preflight preamble said.\n\n**If that file already exists, do not rewrite it** — skip to\nthe SPEC-need write below. A PLAN carried from an earlier session, or from a `/hm:loop`\niteration, is the record you extend, not a draft you replace.\n\n",
+  "da4aac47faf4fcf0bdfa02d7369008babd33208c581bb087bd92269d6e6e0fa1": "\n> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n\n> **Output language.** Respond to the user in **ko**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "e84a6e4e6be4df2fce648acc2522571ae9bc98e701ddb4fef8c79212094a99b5": "> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: ask`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - `reason: \"ask-pending\"` → the normal path here (`level: ask`). Offer three options via\n>   `AskUserQuestion` for the `research → spec → execute → review → verify → wrapup` pipeline:\n>   **`auto_safe`** (stops at the plan interview), **`auto_full`** (answers it, and an\n>   APPROVED review's `human_review_needed`), or **gated**. A CHANGES_REQUESTED review and\n>   the wrapup land stop at every level. Arm with the PICKED level:\n> - anything else → offer ONCE via `AskUserQuestion`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level <the level the user picked> --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **en**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n",
+  "f636ec4da3fcb2db3d08c67350c84967af22103e22c8583af6ba281049f1263c": "There is no `/hm:plan` stage. Its DRI-owned content — the decisions that cannot be cheaply\nundone, and the objective link — lives in the SPEC, which already elicits both. What is left is\nauthorship: phases, file lists, order, risks and exit criteria are IC work, and you write them\nhere with **no human gate**.\n\nThe PLAN *document* did not go away with the stage. It is the state that survives a context\nwindow on a long task, every later stage reads it, and `/hm:verify` Check 6 reads two of its\nfrontmatter keys. Producing it is therefore not optional.\n\nWrite to `<WT>/work-docs/PLAN-{slug}.md`. The path is\nrooted on purpose: under isolation a bare `work-docs/PLAN-…` lands in the base\ntree, which dirties it independently of anything the preflight preamble said.\n\n**If that file already exists, do not rewrite it** — skip to\nthe SPEC-need write below. A PLAN carried from an earlier session, or from a `/hm:loop`\niteration, is the record you extend, not a draft you replace.\n\n",
+  "f678b5d5117e859bf1c37595edbbdeb4d5f0af2f64bd6c2e2656d8a0310c4545": "\n> **Before you begin — outline your plan.** First check whether an autoloop is\n> active **for THIS session** (session-scoped — a loop in another session must\n> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a\n> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy\n> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is\n> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip\n> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk\n> up out of `.worktrees/`).\n> **If loop-mode is active for this session, skip this banner entirely and operate\n> without it** — the autoloop runs silently and a per-iteration banner would flood\n> the transcript. Otherwise, print the start banner below (in the configured output\n> language), then begin.\n\n<!-- @hm:banner:start -->\n> 🎯 **Goal:** one line — what this command will accomplish for the user.\n> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —\n> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused\n> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.\n> Present them as **intended, conditional** steps — skip heuristics, early-exit /\n> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override\n> this plan; never treat the banner as a commitment to run past a STOP.\n\n<!-- @hm:autopilot-picker -->\n> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: ask`).\n> **Arming works in any runtime**; end-of-stage auto-advance uses Claude Code's `Skill`\n> tool or Codex's next-skill read/execute procedure. Cursor retains the handoff path.\n> If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI\n> whether autopilot is already active — **never decide this from whether the marker file\n> exists.** Nothing collects a stale one, so file-existence reads as \"already armed\" and\n> autopilot silently never turns on — the usual reason it looks dead.\n>\n> `uv run --with $HOME/harness-maker hm autopilot status --root . --session-id \"$HM_SESSION_ID\"`\n>\n> Branch on **both** fields of the JSON (it always exits 0):\n> - `active: true` → armed already. Skip the picker; do not re-arm.\n> - `reason: \"foreign\"` → **rare** (one file per session): the file at YOUR key holds someone\n>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not\n>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's\n>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*\n>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.\n> - `reason: \"degraded-idless\"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.\n>   Arm either way — unset expands to `\"\"` and arms the shared degraded marker.\n> - `reason: \"ask-pending\"` → the normal path here (`level: ask`). Offer three options via\n>   `request_user_input` for the `research → spec → execute → review → verify → wrapup` pipeline:\n>   **`auto_safe`** (stops at the plan interview), **`auto_full`** (answers it, and an\n>   APPROVED review's `human_review_needed`), or **gated**. A CHANGES_REQUESTED review and\n>   the wrapup land stop at every level. Arm with the PICKED level:\n> - anything else → offer ONCE via `request_user_input`: \"Run the\n>   `research → spec → execute → review → verify → wrapup` pipeline on autopilot this session\n>   (stages auto-advance when no mandatory gate is pending), or stay gated?\" On **yes**:\n>   `uv run --with $HOME/harness-maker hm autopilot on --level <the level the user picked> --pipeline research,spec,execute,review,verify,wrapup --session-id \"$HM_SESSION_ID\"`\n>   On **no**, proceed gated — do not re-prompt unless the user asks.\n>\n> **Persistence:** the marker lives at the **project root** (a stage inside\n> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two\n> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,\n> hook failure) → you share `.hm-autopilot-degraded`. Commit\n> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `true`.\n<!-- @hm:/autopilot-picker -->\n\n\n\n> **Output language.** Respond to the user in **ko**\n> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —\n> the live chat output and the start/end summary banners, not only the onboarding\n> interview. Code, identifiers, file paths, and the persisted deliverable documents\n> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.\n<!-- @hm:output_language -->\n\n\n"
+ }
+}

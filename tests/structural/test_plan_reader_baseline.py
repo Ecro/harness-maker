@@ -193,7 +193,13 @@ def test_execute_is_a_plan_author() -> None:
     # frontmatter and the loop per-iter one — and only the first carries the keys other
     # templates read. Asserting mere membership would stay green if that block were deleted
     # and the per-iter one left behind, which is the wrong implementation this guards.
-    declared = authors["stages/execute.md.j2"]
+    # SPEC-hm-light-lane-s3c moved the full PLAN text into a partial that execute.md.j2 includes
+    # (inline on Codex; `.claude/hm/execute-plan.md` renders it for Claude), so the PLAN's own
+    # block is declared there. It counts as execute's only while execute.md.j2 includes it.
+    part = "stages/_partials/execute_plan_step0.md.j2"
+    assert f'include "{part}"' in (_TEMPLATES / "stages/execute.md.j2").read_text(encoding="utf-8")
+    assert part in authors, f"{part} does not declare a `type: plan` frontmatter block"
+    declared = authors["stages/execute.md.j2"] | authors[part]
     read_by_others = plan_key_readers(_ORPHAN_KEYS)
     needed: set[str] = set().union(*read_by_others.values()) if read_by_others else set()
     missing = sorted(needed - declared)

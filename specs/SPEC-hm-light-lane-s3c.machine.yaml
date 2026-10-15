@@ -1,0 +1,789 @@
+schema_version: 3
+spec_slug: hm-light-lane-s3c
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Mostly template moves pinned by byte-level differentials
+  against a7403f2f, plus one output formatter and one readiness check; goldens and
+  the AC-016 differential pin the outcome, so mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Every Claude stage command carries the read-once, apply-every-stage preamble
+    pointer
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s3c.py::test_stage_commands_point_at_the_preamble
+  executable_predicate: all(preamble_span(render(cfg)[stage]) == POINTER[cfg] and
+    len(POINTER[cfg]) <= 650 and all(p in POINTER[cfg] for p in POINTER_PHRASES) and
+    POINTER[cfg].index('either way') < POINTER[cfg].index('banner') and not any(s
+    in render(cfg)[stage] for s in PREAMBLE_SENTENCES[cfg]) for cfg in CONFIGS for
+    stage in STAGES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: PREAMBLE_SENTENCES are the sentences of each config's preamble
+    span (text before '# Stage:') in the a7403f2f render captured in a detached worktree
+    under the scratchpad before any edit; CONFIGS cover autonomy gated, auto_safe,
+    auto_full and ask, worktree on and off, and locales en and ko. POINTER_PHRASES
+    (stage-preamble.md, project root, read unless already in context, 'either way'
+    apply to this stage, loop check, banner, picker only if not yet answered this
+    session, missing-file rule) are fixed by this SPEC's Outcomes before the template
+    exists. S1's runtime clause (a later stage applies the preamble without reading
+    the file again) is bench-measured in stage 4, not asserted here.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: stage-preamble.md holds the a7403f2f preamble byte-for-byte in every config
+    arm
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s3c.py::test_preamble_moved_byte_for_byte
+  executable_predicate: all(ref_slice(render(cfg)['hm/stage-preamble.md']) == A7403F2F_PREAMBLE[cfg]
+    for cfg in CONFIGS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: A7403F2F_PREAMBLE[cfg] is the preamble span sliced from the a7403f2f
+    render captured in a detached worktree under the scratchpad before any edit for
+    each config arm (CONFIGS cover autonomy gated, auto_safe, auto_full and ask, worktree
+    on and off, and locales en and ko); the new file is sliced between @hm:ref:start
+    and @hm:ref:end, the s2b convention, so the comparison does not depend on where
+    the include sits.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Codex stage skills, CLAUDE.md and AGENTS.md keep the inline preamble
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s3c.py::test_codex_and_claude_md_keep_the_preamble
+  executable_predicate: all(preamble_span(render(cfg)[skill]) == A7403F2F_CODEX_PREAMBLE[cfg][skill]
+    for cfg in CONFIGS for skill in CODEX_SKILLS) and all(output_language_section(render(cfg)[doc])
+    == A7403F2F_LANG[cfg][doc] for cfg in CONFIGS for doc in ('CLAUDE.md', 'AGENTS.md'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: Both references are sliced from the a7403f2f render captured in
+    a detached worktree under the scratchpad before any edit with the codex target
+    on; only the preamble span and the Output Language section are compared, so C's
+    edits to the Codex execute and spec bodies cannot mask or fake a preamble change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: The health audit requires the preamble file and its markers when a stage
+    command names it
+  type: parametric
+  test_ids:
+  - tests/unit/test_readiness_stage_preamble.py::test_health_checks_the_preamble_file
+  - tests/unit/test_readiness_stage_preamble.py::test_health_scores_an_old_render_as_today
+  executable_predicate: null
+  golden_table:
+  - input:
+      render: full render
+    expected:
+      output_language_present: true
+      start_end_summary_present: true
+    edge: false
+    note: ''
+  - input:
+      render: stage-preamble.md deleted
+    expected:
+      output_language_present: false
+      start_end_summary_present: false
+      detail_names: .claude/hm/stage-preamble.md
+    edge: true
+    note: ''
+  - input:
+      render: '@hm:output_language removed from stage-preamble.md'
+    expected:
+      output_language_present: false
+      start_end_summary_present: true
+    edge: true
+    note: ''
+  - input:
+      render: '@hm:banner:start removed from stage-preamble.md'
+    expected:
+      output_language_present: true
+      start_end_summary_present: false
+    edge: true
+    note: ''
+  - input:
+      render: a7403f2f render (no command names stage-preamble.md, no file)
+    expected:
+      output_language_present: true
+      start_end_summary_present: true
+      equals_a7403f2f_readiness: true
+    edge: true
+    note: old renders stay valid
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The signal names and their marker rule are readiness._dim_workflow_clarity
+    at a7403f2f; the expected values per row are fixed by this SPEC's A outcome (the
+    file is required, with both markers, only when a stage command names stage-preamble.md)
+    before the code. The old-render row's expected values are a7403f2f's own readiness
+    output on the a7403f2f render.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: A check run with no failed gate prints one line, and a scoring exception
+    keeps the verdict
+  type: parametric
+  test_ids:
+  - tests/unit/test_spec_machine_check_quiet.py::test_no_failed_gate_prints_one_line
+  executable_predicate: null
+  golden_table:
+  - input:
+      quality: clean (overall 80, no dim < 60)
+      strictness: warn
+    expected:
+      lines: 1
+      keys:
+      - ok
+      - overall
+      - strictness
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      quality: weak (one dim 30, overall 70)
+      strictness: warn
+    expected:
+      lines: 1
+      keys:
+      - ok
+      - overall
+      - strictness
+      - weak_dimensions
+      - low_dimensions
+      exit: 0
+    edge: false
+    note: a7403f2f printed the full payload here
+  - input:
+      quality: low (overall 55, no dim < 40)
+      strictness: warn
+    expected:
+      lines: 1
+      keys:
+      - ok
+      - overall
+      - strictness
+      - weak_dimensions
+      - low_dimensions
+      low_dimensions_nonempty: true
+      exit: 0
+    edge: true
+    note: ''
+  - input:
+      quality: evaluate_spec raises RuntimeError
+      strictness: warn
+    expected:
+      keys:
+      - ok
+      - strictness
+      - validate
+      - cross_validate
+      - quality
+      quality_keys:
+      - error
+      - strictness
+      ok: true
+      exit: 0
+    edge: true
+    note: scoring-exception path, gates pass
+  - input:
+      quality: evaluate_spec raises RuntimeError
+      validate: fails
+      strictness: warn
+    expected:
+      keys:
+      - ok
+      - strictness
+      - validate
+      - cross_validate
+      - quality
+      quality_keys:
+      - error
+      - strictness
+      ok: false
+      exit: 1
+    edge: true
+    note: scoring-exception path plus a failed gate
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Rows are fixed from this SPEC's B contract before the code (key
+    set, line count, exit code); quality cases are produced by monkeypatching evaluate_spec,
+    as test_spec_machine_check_all.py does at a7403f2f. The raise rows' exit codes
+    are a7403f2f's for a raising scorer with passing gates (0) and with a failing
+    validate (1).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: A failing check prints each error once and names its low dimensions with
+    scores
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_machine_check_quiet.py::test_failure_prints_each_error_once
+  - tests/unit/test_spec_machine_check_quiet.py::test_a_validator_exception_is_not_a_load_failure
+  - tests/unit/test_spec_machine_check_quiet.py::test_an_unreadable_yaml_keeps_its_reason
+  executable_predicate: all(verdict(new[f]) == verdict(OLD[f]) and distinct_errors(new[f])
+    == distinct_errors(OLD[f]) and no_duplicate_errors(new[f]) and 'errors.pydantic.dev'
+    not in new[f] and 'input_value' not in new[f] and set(payload(new[f])) == FAIL_KEYS
+    for f in FAILURE_FIXTURES) and all(isinstance(score, int) and score < 60 for score
+    in payload(new['block_overall_55'])['quality']['low_dimensions'].values()) and
+    payload(new['block_overall_55'])['quality']['low_dimensions'] and re.fullmatch(YAML_SYNTAX_ERR,
+    payload(new['unparseable_yaml'])['validate']['errors'][0]) and re.fullmatch(MISSING_FILE_ERR,
+    payload(new['missing_yaml_file'])['validate']['errors'][0]) and set(payload(new['raise_and_validate_fails'])['quality'])
+    == {'error', 'strictness'}
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: 'OLD[f] is the stdout and exit code of the a7403f2f spec_machine
+    module on the same fixture, captured before the edit; FAILURE_FIXTURES replay
+    the bench failure kinds (string golden input, row without expected, missing AC
+    heading, title mismatch, v2 AC without oracle_evidence, unparseable yaml) plus
+    missing_yaml_file, raise_and_validate_fails (evaluate_spec raising while validate
+    fails) and block_overall_55 (block strictness, overall 55, no dim < 40), whose
+    dimension scores are those OLD prints under ''scores''. verdict = ok, exit code,
+    validate.ok, cross_validate.ok, quality.blocked. FAIL_KEYS = {ok, strictness,
+    validate, cross_validate, quality} and the two load-error formats (YAML_SYNTAX_ERR
+    ''yaml load failed: YAMLError: <problem> (line L, column C)'', MISSING_FILE_ERR
+    ''yaml load failed: FileNotFoundError: <path>'') are this SPEC''s B contract,
+    written before the code. Amended 2026-10-15 (review round 1): distinct_errors
+    is each error''s full string (a7403f2f''s pydantic dump read as its <loc>: <msg>
+    lines, the other load failures as one marker whose format the regexes pin), so
+    dropping one of two errors on the same AC fails; another OSError reads ''yaml
+    load failed: <OSError subclass>: <path> (<reason>)'', and an exception inside
+    validate() after a successful load reads ''validate failed: <Type>: <message>''
+    with cross-validate''s own errors kept.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Check output on the failure fixtures is at most half of a7403f2f's
+  type: mechanical
+  test_ids:
+  - tests/unit/test_spec_machine_check_quiet.py::test_failure_output_is_at_most_half
+  executable_predicate: sum(len(new[f]) for f in FAILURE_FIXTURES) * 2 <= sum(len(OLD[f])
+    for f in FAILURE_FIXTURES) and all(len(new[f]) <= len(OLD[f]) for f in FAILURE_FIXTURES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: 'Same OLD captures as AC-006. The bound is looser than the bench
+    replay (~29%, 26 runs: 9.9k to 2.9k per run, text-level estimate), so it tests
+    the contract, not one formatter.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: The other light-path CLIs print the same single success line as a7403f2f
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cli_output_one_line.py::test_light_path_clis_unchanged
+  executable_predicate: all(out.count(chr(10)) <= 1 and out == A7403F2F_OUT[cli] for
+    cli, out in run_all(LIGHT_PATH_CLIS).items())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: A7403F2F_OUT is each CLI's stdout from the a7403f2f module on the
+    same fixture at a fixed clock and session id (autopilot status, autopilot_caps
+    boundary proceed and merge-gate paths, spec_machine approval-status, spec_need
+    record, frontmatter-upsert, op-check, waiver-check, observability.verification_cache
+    run).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: The spec stage describes the quiet check output
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s3c.py::test_spec_describes_quiet_check
+  executable_predicate: all(all(p in step4(render(cfg)[s]) for p in QUIET_PHRASES)
+    and 'scores' not in step4(render(cfg)[s]) and len(step4(render(cfg)[s])) <= A7403F2F_STEP4_LEN[cfg][s]
+    + 300 for cfg in CONFIGS for s in ('spec', 'hm-spec'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'step4 slices from the ''### Step 4 + 4.5'' heading to the next
+    ''### '' heading (''### Step 4.5''), so the bound is per section. QUIET_PHRASES
+    are the B contract''s names from this SPEC''s Outcomes: the one-line success form,
+    weak_dimensions, low_dimensions, blocked, by_rule counts, and the scoring-exception
+    form. Step 4.5 reads overall, weak_dimensions and low_dimensions on both forms
+    and blocked only on the failure payload: blocked is a failed gate, so the success
+    line never carries it. A7403F2F_STEP4_LEN is the slice length in the a7403f2f
+    render captured in a detached worktree under the scratchpad before any edit.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: A trusted light execute outside loop mode writes the short light PLAN
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s3c.py::test_light_execute_writes_the_short_plan
+  - tests/render/test_render_light_lane_s3c.py::test_loop_on_routing_runs_the_loop_check
+  executable_predicate: all(b.startswith(A7403F2F_STEP0_HEAD[cfg]) and all(x in A7403F2F_STEP0_HEAD[cfg]
+    for x in SHARED_RULES[cfg]) and len(A7403F2F_STEP0_HEAD[cfg]) <= b.index(APPROVAL_STATUS_CMD)
+    < b.index(ROUTING) < b.index(POINTER_EXECUTE_PLAN) < b.index(LIGHT_OPEN) and b.count(LIGHT_OPEN)
+    == 1 and b.count(LIGHT_CLOSE) == 1 and len(light_span(r)) <= 2400 and all(p in
+    light_span(r) for p in LIGHT_BRANCH_PHRASES) and all(k in light_template(r) for
+    k in LIGHT_TEMPLATE_KEYS) and STEP03_SENTENCE in step03_heading_line(r) for cfg
+    in CONFIGS for e in ('execute', 'hm-execute') for r in [render(cfg)[e]] for b
+    in [step0_body(r)])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'A7403F2F_STEP0_HEAD[cfg] is the a7403f2f Step 0 body from its
+    first line through the do-not-rewrite paragraph (the two intro paragraphs, then
+    the two shared rules), sliced from the a7403f2f render captured in a detached
+    worktree under the scratchpad before any edit; SHARED_RULES[cfg] are those two
+    paragraphs at execute.md.j2:126-132 (the <WT>/ or ./ rooted write path per worktree
+    on/off, and ''If that file already exists, do not rewrite it''). APPROVAL_STATUS_CMD
+    is the light check''s own command in the a7403f2f execute-light-check.md. ROUTING,
+    STEP03_SENTENCE, LIGHT_OPEN (''<!-- @hm:light-plan -->'') and LIGHT_CLOSE (''<!--
+    @hm:/light-plan -->'') are exact strings written in this SPEC''s Outcomes. LIGHT_BRANCH_PHRASES
+    (the four read-back assertions: every template frontmatter key; scope:/exit:/risk:/rollback:
+    on every phase line; a non-empty Do not change list in the three admitted forms
+    with none only alone; spec_need_verdict after Step 0.1; plus Step 1.5 not applying
+    and the oversize rule) and LIGHT_TEMPLATE_KEYS (the frontmatter keys, the three
+    section headings and the phase-line literal ''- [ ] {N}. **Phase {N} — {name}**
+    — scope: {files} · exit: `{command}` · risk: {risk} · rollback: {rollback}'')
+    are fixed by the SPEC before the template exists. CONFIGS cover autonomy gated,
+    auto_safe, auto_full and ask, worktree on and off, and locales en and ko. Amended
+    2026-10-15 (review round 1): ROUTING is the loop-off sentence and ROUTING_LOOP
+    the loop-on one, after a block that also runs hm worktree loop-mode-active (asserted
+    on the loop-on full-lane configs); LIGHT_BRANCH_PHRASES add the full Step 0 /
+    0.3 guards (no absolute, .. or globs; user provenance only when the user explicitly
+    made that call; none never invented, the none deleted beside other bullets; a
+    re-read that still fails stops before Step 1), matched on whitespace-normalised
+    text; STEP03_SENTENCE carries the read rule (project root, never a worktree, STOP
+    if missing), spelled $hm-make on Codex; the execute-plan pointer says it is read
+    only when not writing the light PLAN.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: Every other execute writes the full PLAN from execute-plan.md, whose text
+    is a7403f2f's
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s3c.py::test_full_execute_reads_the_moved_plan_text
+  executable_predicate: all(ref_slice(render(cfg)['hm/execute-plan.md']).split(SEPARATOR)
+    == [A7403F2F_STEP0_PART1[cfg], A7403F2F_STEP03_BODY[cfg]] and ref_slice(render(cfg)['hm/execute-plan.md']).count(SEPARATOR)
+    == 1 and POINTER_EXECUTE_PLAN in step0(render(cfg)['execute']) and A7403F2F_STEP0_PART1[cfg]
+    in render(cfg)['hm-execute'] and A7403F2F_STEP03_BODY[cfg] in render(cfg)['hm-execute']
+    for cfg in CONFIGS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: A7403F2F_STEP0_PART1 is the a7403f2f Step 0 body after A7403F2F_STEP0_HEAD
+    (from '**Required frontmatter**' to the end), so HEAD + PART1 is the whole body,
+    and A7403F2F_STEP03_BODY is the Step 0.3 body, all sliced by heading from the
+    a7403f2f render captured in a detached worktree under the scratchpad before any
+    edit per config arm (CONFIGS cover autonomy gated, auto_safe, auto_full and ask,
+    worktree on and off, and locales en and ko). SEPARATOR is the fixed line '<!--
+    @hm:ref:step-0.3 --> Apply the rest of this file at the command's Step 0.3 heading,
+    after Step 0.1 has run.' from this SPEC's Outcomes; the two slices are compared
+    separately so a byte moved across the separator fails. The Codex arm must still
+    carry both parts inline. The routing (full lane, untrusted light, loop mode, oversize
+    light block) is asserted by the exact ROUTING sentence in AC-010.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: The light PLAN carries every key and section a gate reads
+  type: mechanical
+  test_ids:
+  - tests/unit/test_light_plan.py::test_light_plan_feeds_every_reader
+  executable_predicate: LIGHT_PLAN_FIXTURE == upsert(fill(extract_fenced_template(light_span(render(cfg)['execute'])),
+    T1_VALUES), verdict='add', target='SPEC-format-max-units') and all(reader_finds(LIGHT_PLAN_FIXTURE,
+    reader) for reader in PLAN_READERS) and autopilot_caps._plan_link(checkout, 'format-max-units')
+    == (True, 'TIMEPARSE-UNITS', False) and manifest_disposition(LIGHT_PLAN_PATH)
+    == 'staged'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'T1_VALUES is the S9 value table in this SPEC (bench t1 format-max-units,
+    2026-10-14, intent TIMEPARSE-UNITS, two phases, one boundary, ADR-001 user and
+    ADR-002 agent), written before the template exists; fill substitutes placeholders
+    and repeats the phase, boundary and ADR lines once per row, so the fixture follows
+    whatever template the render ships. upsert is the real a7403f2f spec_need frontmatter-upsert.
+    PLAN_READERS matches S9: the reader table in this SPEC''s Outcomes (task_slug,
+    status and ''- [ ]'', intent, ADR ids with Decided by, spec_need fields, numbered
+    phases with scope/exit/risk/rollback, the Do-not-change list in an admitted form,
+    spec) plus the two code readers autopilot_caps._plan_link and wrapup_land (PLAN
+    --required); next_stage is not a reader here (the digest reads only a PLAN''s
+    existence). _plan_link and wrapup_land are a7403f2f code, unchanged.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-013
+  title: The template-derived light PLAN fixture is at most 1,200 chars
+  type: mechanical
+  test_ids:
+  - tests/unit/test_light_plan.py::test_light_plan_is_short
+  executable_predicate: len(LIGHT_PLAN_FIXTURE) <= 1200
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: LIGHT_PLAN_FIXTURE is AC-012's template-derived fixture (the rendered
+    light template filled from the S9 T1_VALUES table, after the real upsert), so
+    the bound covers the template the model fills, not a hand draft. The values are
+    fixed before the template exists; the bench's full-template light PLANs were 1.5k
+    to 2.9k chars, and a draft of the template filled from T1_VALUES measures 925.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-014
+  title: A minimal light machine.yaml passes check, approve and approval-status, and
+    survives write-back
+  type: mechanical
+  test_ids:
+  - tests/unit/test_light_plan.py::test_minimal_machine_yaml_validates_and_approves
+  - tests/unit/test_light_plan.py::test_mark_tested_write_back_keeps_the_stamp
+  executable_predicate: all(check(y, 'block').ok and not check(y, 'block').blocked
+    and approve_exempt(y) == 0 and approval_status(y)['trusted_lane'] == 'light' and
+    mark_tested(y, TEST_IDS[y]) == 0 and approval_status(y)['state'] == 'exempt' and
+    approval_status(y)['trusted_lane'] == 'light' for y in MINIMAL_YAMLS) and all(mark_tested(y,
+    TEST_IDS[y]) == 0 and approval_status(y)['state'] == 'approved' and approval_status(y)['trusted_lane']
+    == 'light' for y in HUMAN_APPROVED_COPIES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: MINIMAL_YAMLS hold only the keys this SPEC's Outcomes list (tiers
+    1, 2 and 3; mechanical, parametric, judgment and property ACs; irreversible_decisions
+    []), written from the SPEC text, not from the validator; a validator that started
+    requiring an optional key fails the test (IRR-003). mark_tested is the real a7403f2f
+    command light wrapup Step 3.5 runs, which materialises every default into the
+    file; the expected states after it are the ones approve wrote before it, so a
+    hash walk that stopped excluding defaults fails here. HUMAN_APPROVED_COPIES are
+    the same yamls approved without --exempt.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-015
+  title: Spec Step 3.5 shows the minimal schema inline and the full-lane fields on
+    demand
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s3c.py::test_spec_step_3_5_minimal_inline
+  executable_predicate: all(all(k in step35(render(cfg)['spec']) for k in MINIMAL_KEYS
+    + ['input:', 'expected:', 'paths_to_mutate']) and ref_slice(render(cfg)['hm/spec-machine-full.md'])
+    == A7403F2F_STEP35_MOVED[cfg] and POINTER_SPEC_FULL in step35(render(cfg)['spec'])
+    for cfg in CONFIGS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: A7403F2F_STEP35_MOVED is the part of the a7403f2f Step 3.5 render
+    the PLAN names as full-lane-only, captured before the edit; MINIMAL_KEYS are this
+    SPEC's minimal key list.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-016
+  title: The full lane and the typed stages differ from a7403f2f only by the named
+    deltas
+  type: property
+  test_ids:
+  - tests/render/test_render_light_lane_s3c.py::test_full_lane_changes_only_by_named_deltas
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: 'The reference is the a7403f2f render captured in a detached worktree
+    under the scratchpad before any edit for every full-lane config; the normalisation
+    is a fixed list written from this SPEC''s S13 before the code: the A pointer is
+    replaced by the preamble; in execute, exactly one span from ''<!-- @hm:light-plan
+    -->'' to ''<!-- @hm:/light-plan -->'' (at most 2,400 chars, right after the full-lane
+    pointer; zero or two spans fail) is deleted, the exact ROUTING sentence (ROUTING_LOOP
+    when the loop is rendered), the approval-status call block (with its loop-mode-active
+    line when the loop is rendered; amended 2026-10-15) and the exact STEP03_SENTENCE
+    are deleted, and the full-lane pointer and SEPARATOR are replaced by execute-plan.md''s
+    part 1 and part 2 (the inline Step 0 head is an a7403f2f prefix, so this is concatenation);
+    in spec, the Step 3.5 and Step 4 + 4.5 sections are left out because AC-015 and
+    AC-009 compare them. Every deleted string is an exact literal from the SPEC, so
+    no implementation-chosen text is excused and any other byte that moved fails.
+    review, verify, wrapup, loop and the verify-before-completion skill need only
+    the first rule.'
+  oracle_independence_waiver: null
+  input_domain: every (config, path) with config in Side and Production x worktree
+    on/off x warn/block x loop on/off and path in the six Claude stage commands, the
+    existing .claude/hm reference files, the six Codex stage skills and the verify-before-completion
+    skill
+  transformation: render at a7403f2f and after the change; in the new render, replace
+    the pointers with the referenced text, delete the single light-plan span and the
+    three exact light-routing literals, and leave out spec Step 3.5 and Step 4 + 4.5
+  expected_relation: normalised(new) == a7403f2f for every (config, path), and the
+    boundary JSON for the same inputs is byte-equal
+  preconditions: []
+  observable_output: the list of (config, path) pairs that differ, empty
+  generator_hint: itertools.product over the configs; no hypothesis needed
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-017
+  title: The rendered surface meets the per-stage bounds
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_light_lane_s3c.py::test_surface_meets_bounds
+  executable_predicate: all(measure_surface()[variant][name]['chars'] <= BOUND[variant][name]
+    for variant, name in BOUND_KEYS) and all(len(ref) <= REF_BOUND[n] for n, ref in
+    refs().items())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: BOUND is a7403f2f's measure_surface numbers (research 20461, spec
+    43234, execute 45572, review 60617, verify 16435, wrapup 33099), captured before
+    the edit, plus this SPEC's per-cut bounds; the numbers do not come from the new
+    render.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: 'spec_machine check --all prints one line whenever no gate failed (with
+    weak_dimensions and low_dimensions on a weak or low score); its failure payload
+    drops scores, yaml_path and md_path, adds low_dimensions, prints each error once
+    (pydantic as <loc>: <msg>) and turns by_rule into counts'
+  category: public API/CLI contract
+  rationale: Rendered spec text and any script parsing the payload read these keys;
+    restoring them later breaks readers written against the quiet form
+  source: spec
+- id: IRR-002
+  decision: A trusted light task outside loop mode carries the short light PLAN (the
+    inline template's frontmatter keys and three sections) instead of the full nine-section
+    template
+  category: schema/file format/storage layout
+  rationale: Light PLANs land in history; no reader may later require a full-template
+    section or a phase field the light template omits
+  source: spec
+- id: IRR-003
+  decision: A light machine.yaml is authored minimal (the Step 3.5 key set); tooling
+    may materialise defaults; no validator may require an optional key
+  category: schema/file format/storage layout
+  rationale: Committed light SPECs lack the optional keys; requiring one later invalidates
+    them
+  source: spec
+- id: IRR-004
+  decision: Add the generated files .claude/hm/stage-preamble.md, .claude/hm/execute-plan.md
+    and .claude/hm/spec-machine-full.md, the names the commands and /hm:health read
+  category: schema/file format/storage layout
+  rationale: Renaming needs a retire step for copies on disk (s2b IRR-001, s3a IRR-003)
+  source: spec
+approval:
+  kind: human
+  content_hash: 8a2c7e23aced76380d7d659da63ea6c968983170bfcc2aa44c345d98a80dbf28
+  approved_by: Ecro
+  approved_at: '2026-10-15T14:50:29Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: eec348d5d868e8cb3f13840f8d6654e1b99015a77b7a3fa9c76d8998d8d3862d
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: d31c1cd3259619c0a34aa6e19025367172e74cd860ecbff9318d207ec85deea0
+    irreversible_decisions: ab6f3db225650a55e2d95cc27850cfa98d2defd624b094b956ae26d9a3a1062a
+    AC-001: 7d277c437a731bc3c00b437be333430e310431c46804e1ae990de2ab0f1c44b2
+    AC-002: adc2b954c9c4febb324714f93f1ffb25266e7215e8cbf3a59aca633fb68d895a
+    AC-003: 863c7f697b8676f88e29282d90ec78dcc7714aa79906dbc00a3b55f8c5937a49
+    AC-004: c3961e7dfa352dbaaf2b2cf3bfd4e6547242c87fb0a34b7f261421b35f5703e6
+    AC-005: b126bea06b34166f3055c83dbfc85791f7a4c419580c8a8b105ce8814ea26edb
+    AC-006: 1cde46bedfc116f1fd86692efe35b0671d7db2e3d8eefeec9dc29111ca757978
+    AC-007: 7365b3f47a62f0827afb4dfb229c594103c802feb015fa396ed2788288f0cc42
+    AC-008: 8d3d3ed871901fb28efe4331ba94748bc6c1a7b570bd23a492a60735c855a5e3
+    AC-009: fa176549b7af29acd1677febf2cb9800a7fa64a33cad375bb6e55b5ed1d6e1ff
+    AC-010: 8207d74a86278b3cb1782354d4720e120fabe71c546e0ef35d4a143a2a756d7c
+    AC-011: cb0da37c72ca7a360554bdc6f268830fed761ecf604de05be76180f2f9de37e3
+    AC-012: 68d14540be3efaeff24e45a13497834465c1a6492aa9172dfab63ee1dfa63d18
+    AC-013: 82685aefc4cc4cbb137b5b1a1cd81297254375f5fb25ce20cebcf0202ecae64e
+    AC-014: 9f2b566162cc49e10af61e897145c92259018ae0ec67d22923bddcb70ddfdf1a
+    AC-015: 3287f5a2db419f5fec01d9cbf28fb0710b9a26a032ad4b0d7e1fcbfd11eb824f
+    AC-016: aff7b2ad28eaf79fcc1c628896438d1f016f87ee14865e7c615db940beeb61a2
+    AC-017: 82a5749115cc9ca34278c0ce22a6ceadb7b74115542661413bdf7fde65d4acc1
+    ac_order: 8345e880dc19dc733f60d154c7457a99f34c22971e18e88229034b51947b7620
+  lane: full

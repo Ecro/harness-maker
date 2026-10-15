@@ -78,11 +78,21 @@ def _render(tpl: str, ctx: dict[str, object]) -> str:
     return _make_env().get_template(tpl).render(**ctx)
 
 
+def _claude_stage(ctx: dict[str, object]) -> str:
+    """A Claude stage command plus `.claude/hm/stage-preamble.md`, which it reads first.
+
+    SPEC-hm-light-lane-s3c moved the directive and the start banner's text out of the command into
+    that file; the command keeps the two markers and a pointer, so a stage receives both.
+    """
+    command = _render("commands/hm/atomic_command.md.j2", ctx)
+    return command + _render("hm/stage-preamble.md.j2", ctx)
+
+
 # --- Locale directive (ADR-001/005) ---------------------------------------
 
 
 def test_atomic_command_carries_locale_directive() -> None:
-    out = _render("commands/hm/atomic_command.md.j2", _wrapper_ctx())
+    out = _claude_stage(_wrapper_ctx())
     assert OL_MARKER in out
     assert "Korean" in out
 
@@ -109,13 +119,13 @@ def test_codex_stage_skill_carries_locale_directive() -> None:
 
 
 def test_locale_directive_preserves_english_deliverable_carveout() -> None:
-    out = _render("commands/hm/atomic_command.md.j2", _wrapper_ctx())
+    out = _claude_stage(_wrapper_ctx())
     # ADR-001: code + persisted deliverables stay English.
     assert "English" in out
 
 
 def test_unknown_locale_keeps_english_fallback_mapping() -> None:
-    out = _render("commands/hm/atomic_command.md.j2", _wrapper_ctx(locale="fr"))
+    out = _claude_stage(_wrapper_ctx(locale="fr"))
     assert OL_MARKER in out
     assert "English fallback" in out
 
@@ -126,15 +136,14 @@ def test_unknown_locale_keeps_english_fallback_mapping() -> None:
 def test_start_banner_present_in_wrappers() -> None:
     # `workflow_command.md.j2` was the second wrapper; it died with the fused axis
     # (PLAN-harness-diet ADR-001), leaving the atomic command as the only one.
-    tpl = "commands/hm/atomic_command.md.j2"
-    out = _render(tpl, _wrapper_ctx())
-    assert START_MARKER in out, tpl
-    assert "🎯" in out, tpl
-    assert "📋" in out, tpl
+    out = _claude_stage(_wrapper_ctx())
+    assert START_MARKER in out
+    assert "🎯" in out
+    assert "📋" in out
 
 
 def test_start_banner_keeps_autoloop_skip() -> None:
-    out = _render("commands/hm/atomic_command.md.j2", _wrapper_ctx())
+    out = _claude_stage(_wrapper_ctx())
     assert ".hm-loop-active" in out
 
 
@@ -242,7 +251,7 @@ def test_locale_directive_none_or_empty_falls_back_to_english() -> None:
         cfg = dict(_config())
         cfg["locale"] = bad
         ctx["config"] = cfg
-        out = _render("commands/hm/atomic_command.md.j2", ctx)
+        out = _claude_stage(ctx)
         assert "**None**" not in out
         assert "****" not in out
         assert "Respond to the user in **en**" in out

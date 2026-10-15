@@ -27,6 +27,19 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-15, `hm-light-lane-s3c`** — the six stage commands (`research`, `spec`, `execute`,
+  `review`, `verify`, `wrapup`) moved in all four arms: the preamble (loop check, start banner,
+  autopilot picker, output language) left each for `.claude/hm/stage-preamble.md` behind one
+  pointer; `spec` Step 4 describes the quiet `check --all` and Step 3.5 shows the minimal schema
+  with a pointer to `.claude/hm/spec-machine-full.md`; `execute` Step 0 gained the approval-status
+  read, the routing sentence and the light PLAN block, and points at `.claude/hm/execute-plan.md`
+  for the full PLAN text. Verified before re-capture that these six are the ONLY moved commands
+  in each arm and none was added or removed. The picker and boundary assertions above now also
+  read the preamble file (`_render_at_level`).
+  Re-captured again the same day after `/hm:review` round 1 (SPEC amendment): `execute` Step 0
+  runs `loop-mode-active` beside approval-status when the loop renders, the light read-back keeps
+  the full guards, and the pointer and the Step 0.3 sentence gained their read rules. Only
+  `execute` moved, in all four arms.
 - **2026-10-15, `hm-light-lane-s3a`** — `execute` and `spec` moved in all four arms. `execute`
   gained Step 4.2, the light lane's combined check (a pointer to `.claude/hm/execute-light-check.md`
   in the Claude command); `spec` Step 5 now stamps a light SPEC with an empty irreversible list
@@ -452,7 +465,12 @@ def _render_at_level(level: str, tmp: Path) -> dict[str, str]:
             freeze_time=DEFAULT_FREEZE_TIME,
         )
     root = tmp / "commands" / "hm"
-    return {p.stem: p.read_text(encoding="utf-8") for p in sorted(root.glob("*.md"))}
+    commands = {p.stem: p.read_text(encoding="utf-8") for p in sorted(root.glob("*.md"))}
+    # SPEC-hm-light-lane-s3c moved the preamble, picker included, out of every stage command into
+    # `.claude/hm/stage-preamble.md`, which each command reads first; it is carried here so the
+    # picker and boundary assertions still see everything a stage receives.
+    preamble = tmp / "hm" / "stage-preamble.md"
+    return {**commands, "hm/stage-preamble": preamble.read_text(encoding="utf-8")}
 
 
 @pytest.fixture(scope="module")

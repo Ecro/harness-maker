@@ -131,61 +131,19 @@ tree, which dirties it independently of anything the preflight preamble said.
 the SPEC-need write below. A PLAN carried from an earlier session, or from a `/hm:loop`
 iteration, is the record you extend, not a draft you replace.
 
-**Required frontmatter** (this block is the document's contract — every later stage reads from
-it):
+{% if is_codex %}```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine approval-status --root . --slug <slug>")
+{% if loop_enabled(config) %}Bash("uv run --with {{ harness_maker_src_path }} hm worktree loop-mode-active '<PROJECT_ROOT>' --claude-session-id \"$HM_SESSION_ID\"")
+{% endif %}```{% else %}```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_machine approval-status --root . --slug <slug>
+{% if loop_enabled(config) %}!uv run --with {{ harness_maker_src_path }} hm worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
+{% endif %}```{% endif %}
 
-```yaml
----
-type: plan
-task_slug: {slug}
-status: planning
-created: {YYYY-MM-DD}
-tags: [{project}, plan, {tech-stack}, {2-5 domain tags}]
-spec: "[[SPEC-{slug}]]"          # OR omit when no SPEC exists
-research_doc: "[[RESEARCH-{slug}]]"  # OR omit when /hm:research did not run
-interview_rounds: 0              # this stage holds no interview; the SPEC's count is the task's
-adrs: {M}
-validator_outcome: NOT_RUN       # no plan-validator exists; `spec-validator` critiques the SPEC
-summary: "{≤100 char one-line TL;DR}"
-intent: <id>                  # ONLY when the SPEC names one; omit otherwise
-objective: <id>               # preserve legacy only; omit with intent
----
-```
+{% if loop_enabled(config) %}If approval-status prints `"trusted_lane": "light"` and loop-mode-active (`<PROJECT_ROOT>`: cwd without any `/.worktrees/<name>/` suffix) exits 1, write the light PLAN from the light block below. Otherwise (full lane, untrusted light, or loop mode) follow the full PLAN text instead.{% else %}{# Loop off: /hm:loop does not render, so loop mode cannot be active (review round 1). #}If that prints `"trusted_lane": "light"`, write the light PLAN from the light block below. Otherwise (full lane or untrusted light) follow the full PLAN text instead.{% endif %}
 
-`spec_need_verdict` / `spec_need_target` are deliberately **not** in that list. Step 0.1 judges
-them from evidence and writes them, and the writer preserves whatever is already there — so a
-value guessed here, before the evidence is gathered, would be the one that survives.
-
-`validator_outcome: NOT_RUN` is deliberate and is not one of the four values the removed stage
-documented. Nothing parses this field, so an honest value costs no reader — and borrowing
-`APPROVED` would make an uncritiqued PLAN indistinguishable from a critiqued one.
-
-**Required sections (in this order):**
-
-1. **🎯 Executive Summary** — TL;DR, what/why, the key decisions and where they came from.
-2. **📚 Prior Work** — similar PLANs, lessons from `failures.md` / `wiki.md`, RESEARCH findings.
-3. **📐 Architecture Decision Records** — the design records this stage locks. The SPEC owns
-   the irreversible ones; these are the reversible calls you make while building. Every ADR
-   carries a provenance line: `**Decided by:** user (source: <SPEC section or conversation>)`
-   only when the user explicitly made that call, otherwise `**Decided by:** agent`.
-4. **🏗️ Technical Design** — current state, affected components, dependencies, data flow.
-5. **📝 Implementation Plan** — numbered phases. **Each phase MUST have** `depends_on`,
-   `parallel_group`, `merge_hazards`, scope (files in / out), an exit criterion that is a
-   runnable command or check, `risk` (`low` / `medium` / `high`), and a rollback point.
-6. **🚧 Contract Boundaries** — one list, `### Do not change`: surfaces the implementation must
-   leave alone. The only behaviour that moves across a long review is the one the contract never
-   fixed, so an unwritten hole is the defect this section closes.
-   - **Exactly three admitted forms**, one per `- ` bullet: (a) a **repo-relative** path in
-     backticks — `` - `src/pkg/mod.py` `` or a directory prefix `` - `src/pkg/` `` — optionally
-     ` — {why}`; (b) `- Advisory: {intent no path expresses}`; (c)
-     `- none — this task has no contract boundaries`, valid **only as the sole bullet**. No
-     absolute paths, `..` or globs.
-   - An empty list is **written, never omitted** — form (c). "Nobody was asked" and "the author
-     said there are none" are different facts.
-7. **🧪 Testing Strategy** — unit / integration / manual steps.
-8. **⚠️ Risks & Mitigation** — a risk register table.
-9. **✅ Success Criteria** — a checklist mirroring the SPEC's verification criteria.
-
+{% if is_codex %}{% include "stages/_partials/execute_plan_step0.md.j2" %}
+{% else %}{% with ref_file="execute-plan.md", ref_use="only when not writing the light PLAN, for the full PLAN text: Step 0 part now, Step 0.3 part at that heading", ref_missing="STOP", ref_stop="" %}{% include "stages/_partials/ref_pointer.md.j2" %}{% endwith %}
+{% endif %}{% include "stages/_partials/execute_light_plan.md.j2" %}
 #### Step 0.1 — SPEC-need fields
 
 **Judge with evidence, then record, then write.** The old `/hm:plan` Step 1.7 also *halted*
@@ -311,27 +269,10 @@ the current code state.
 {% endif -%}
 #### Step 0.3 — Verify the PLAN write
 
-Read the file back and assert:
+Light PLAN: run the light read-back from Step 0's light block. Any other PLAN: apply the Step 0.3 part of `.claude/hm/execute-plan.md`, read from the project root, never a worktree; if it is missing, say to re-render with `/hm:make` and STOP.
 
-- It starts with `---` frontmatter and the frontmatter carries every key listed above.
-- Every phase has all seven required fields. A phase missing one is a phase Step 4 cannot decide
-  about later.
-- `## 🚧 Contract Boundaries` is present, sits between **📝 Implementation Plan** and
-  **🧪 Testing Strategy**, and its `### Do not change` list is **non-empty** — an explicit `none`
-  line satisfies this, an absent section does not.
-- Every `### Do not change` bullet is one of the three **admitted forms**, and a form-(c) bullet
-  is the only bullet. Anything else — an empty list included, repaired by writing the entries,
-  **never** by fabricating `none` — is **self-repaired inline**: rewrite and continue. This never
-  triggers the retry rule below, because a consumer cannot act on an undecidable entry and will
-  silently drop it. A `none` bullet coexisting with others: **delete the `none`**, never a path
-  or `Advisory:` bullet.
-- The frontmatter contains `spec_need_verdict` with a valid value. A missing key closes the
-  absent-case fail-open that defeats `/hm:verify` Check 6.
-
-If verification fails, retry the write **once**. If it still fails, surface the path and the
-error and stop — do not proceed to Step 1 with a PLAN later stages cannot read.
-
-### Step 1 — Load PLAN + flag parsing
+{% if is_codex %}{% include "stages/_partials/execute_plan_step03.md.j2" %}
+{% endif %}### Step 1 — Load PLAN + flag parsing
 
 ```bash
 PLAN={{ config.work_docs.dir }}PLAN-${slug}.md

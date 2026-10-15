@@ -23,7 +23,10 @@ def bodies() -> dict[str, str]:
     render(synthesize(profile, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
     codex = (out / ".." / ".agents" / "skills" / "hm-spec" / "SKILL.md").resolve()
     return {
-        "claude": (out / "commands" / "hm" / "spec.md").read_text(encoding="utf-8"),
+        # SPEC-hm-light-lane-s3c: the Claude command reads its preamble (picker included) from
+        # `.claude/hm/stage-preamble.md` first, so the stage receives both.
+        "claude": (out / "commands" / "hm" / "spec.md").read_text(encoding="utf-8")
+        + (out / "hm" / "stage-preamble.md").read_text(encoding="utf-8"),
         "codex": codex.read_text(encoding="utf-8"),
     }
 
