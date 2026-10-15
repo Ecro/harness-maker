@@ -6,7 +6,7 @@ created: 2026-10-15
 tags: [harness-maker, plan, autopilot, hooks, stop-hook]
 lane: full
 spec: specs/SPEC-autopilot-stop-gate.md
-adrs: 8
+adrs: 9
 summary: "loop_gate --mode stop-hook refuses once when this turn authorized a stage it never invoked"
 ---
 
@@ -42,24 +42,34 @@ settings, CLI or ledger-format change.
 - **ADR-004 — transcript reading.** `isSidechain` records are ignored. A record counts only when
   its `timestamp` parses and is strictly after the row's `ts` (both as UTC instants). "Started" is
   an assistant `tool_use` named `Skill` with `input.skill == "hm:<stage>"` (a leading `/` is
-  tolerated). "A later turn" is any `type: user` record that is not `isMeta` and whose content is
-  not a non-empty list made only of `tool_result` blocks; ambiguity reads as a later turn, which
-  fails open. A transcript with no `type: user|assistant` record carrying a `message` dict fails
-  open with a warn line.
+  tolerated; review round 1 widened this to the first whitespace token, leading `/` stripped,
+  fullmatching `(?:[\w.-]+:)*(?:hm[:-])?<stage>`). "A later turn" is any `type: user` record that
+  is not `isMeta` and whose content is not a non-empty list made only of `tool_result` blocks, or a
+  `type: attachment` record of inner type `queued_command`; a user record or queued command with no
+  parseable timestamp also counts. Ambiguity reads as a later turn, which fails open. A transcript
+  with no `type: user|assistant` record carrying a `message` dict fails open with a warn line.
 - **ADR-005 — fail open, one line.** Any exception in the check, an unreadable/absent transcript,
   or an authorization row whose `ts` does not parse: exit 0, no stdout, exactly one
   `[loop-gate] warn:` line on stderr.
 - **ADR-006 — peers.** A peer is any file `other_keyed_markers` returns that parses as an
-  `AutopilotMarker`, carries a `claude_session_id` and is `fresh`. Any peer → fail open, silently
-  (a peer is a normal state, not an error).
+  `AutopilotMarker`, carries a `claude_session_id`, is not `gated`, and is live: `idle_minutes`
+  ≤ 30 when it has `last_seen`, else TTL-fresh by `created_at`. Any peer → fail open, silently
+  (a peer is a normal state, not an error). An abandoned marker does not switch the gate off.
 - **ADR-007 — fixtures.** Ledgers are byte copies. Transcripts keep only `user` records and the
-  `assistant` records that carry a `Skill` tool_use — the only records whose content can change the
-  decision. Kept fields: `type`, `timestamp`, `isMeta`/`isSidechain` (when true), `origin.kind`,
+  `assistant` records that carry a `Skill` tool_use and the `attachment` records of inner type
+  `queued_command` — the only records whose content can change the decision. Kept fields: `type`, `timestamp`, `isMeta`/`isSidechain` (when true), `origin.kind`,
   a `toolUseResult: true` marker, content block `type`s, and for `Skill` only `input.skill`
   (`args`, the task slug, is text and is dropped). String content becomes `""`. The reducer was a
-  one-off and is not committed; `manifest.json` records the source hashes.
+  one-off and is not committed; `manifest.json` records the source and fixture hashes and the
+  kept-record counts, which a test recomputes.
 - **ADR-008 — reason delivery.** The block prints `{"decision": "block", "reason": …}` on stdout
   and exits 2, as the SPEC says. With exit 2 Claude Code reads the reason from **stderr**, so the
   autopilot block also writes the reason there. The loop-marker block is left byte-for-byte as it
   is (AC-002); its stdout-only reason is a pre-existing question outside this SPEC. `now` is a
   keyword-only parameter on `_stop_hook` so the 18 h freshness window is testable on fixed dates.
+- **ADR-009 — cost and trust bounds (review round 1).** The autopilot modules and pydantic are
+  imported inside the guarded check, so an import failure fails open and the loop path and
+  `--mode pretooluse` load nothing new. The transcript is streamed with `errors="replace"`, stops
+  once every pending stage has moved on, and is not read above 256 MiB (warn, fail open). An
+  authorization stamped more than 5 min after `now` is not pending. The `harness_maker.autopilot`
+  logger is disabled for the check so a foreign or stale marker adds no stderr line.

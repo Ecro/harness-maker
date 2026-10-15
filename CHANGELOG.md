@@ -121,7 +121,7 @@
   with `advance_authorized(to=execute)` as the last ledger row and no `Skill(hm:execute)` call after it.
   The Claude Code Stop hook (`loop_gate --mode stop-hook`) now refuses that stop once, naming `/hm:<stage>`
   and the `Skill` call. It refuses only when this session's armed, non-`gated` marker has an unconfirmed
-  authorization in its window, no other session is armed, and the transcript shows neither that stage's
+  authorization in its window, no other session's marker is live, and the transcript shows neither that stage's
   `Skill` call nor a user entry after the authorization. A stage that started and then halted or asked a
   question is never refused, and a second stop is honoured. Every other state, every read failure, Codex
   and Cursor behave as before, and a loop marker still takes precedence. Replayed against the 35 eval-2
