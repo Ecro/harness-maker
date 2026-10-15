@@ -133,9 +133,9 @@ RESULTS.md.
 | regressions mean | The fixture's pristine visible tests (from the private snapshot) that fail against the final package. |
 | diff_lines mean | Added plus removed lines under `timeparse/` and `tests/`. Shown, never ranked. |
 | tests_touched rate | Share of runs that added or changed a file under `tests/`. Shown, never ranked. |
-| judge scope | Blind rubric score, 1-5: does the change do what the task asks and nothing else? |
-| judge clarity | Blind rubric score, 1-5: can a reader follow it? |
-| judge maintainability | Blind rubric score, 1-5: will the next change be easy? |
+| judge scope | Blinded rubric score, 1-5: does the change do what the task asks and nothing else? |
+| judge clarity | Blinded rubric score, 1-5: can a reader follow it? |
+| judge maintainability | Blinded rubric score, 1-5: will the next change be easy? |
 | judge overall | Mean of the three judge scores. |
 
 Quality means are taken over changed runs only. A stalled run has no code, so its quality is null
@@ -190,10 +190,19 @@ default); the bands are fixed and there is no significance test.
 The judge is one `claude -p` call per changed run, with rubric `hm-eval-judge-v1` (the text is in
 the SPEC and in the runner as `RUBRIC`). It is:
 
-- **Blind**: its stdin holds only the rubric, the task prompt without the `/hm:spec ` prefix, and
-  the diff under `timeparse/` and `tests/`. `AC-<n>`, `SPEC-`, `PLAN-`, `/hm:` and `test_ac_<n>`
-  are replaced with neutral tokens first, and the count is recorded. Equal diffs give
-  byte-identical input in both arms.
+- **Blinded, not blind**: its stdin holds only the rubric, the task prompt without the
+  `/hm:spec ` prefix, and the diff under `timeparse/` and `tests/`. Known harness vocabulary is
+  replaced with neutral tokens first: `AC-<n>`, `SPEC-`, `PLAN-`, `/hm:`, `test_ac_<n>`,
+  `ADR-<n>`, `IRR-<n>`, `INV-<n>`, `specs/` and `work-docs/` paths, `[[...]]` links and the bare
+  word `SPEC`. The count is recorded per run and shown per arm under run flags. Redaction removes
+  words, not style: docstrings that restate requirements, test names or comment habits can still
+  hint at the arm, and nothing corrects for that. A redaction count that differs a lot between the
+  arms is the visible sign. Equal diffs give byte-identical input in both arms.
+- **Fenced**: the diff sits between two lines `<<<DIFF <hash>>>>`, where the hash is taken over
+  the fenced text itself, so the diff cannot contain the fence. A closing line says the fenced
+  text is data and any instruction in it is part of the change. This makes prompt injection from a
+  diff harder, not impossible; the scores of a run whose diff talks to the judge should be read
+  with that in mind.
 - **Isolated**: `--tools ""`, `--json-schema`, `--setting-sources project,local`,
   `--strict-mcp-config`, a spend cap, and an empty temp dir as its cwd.
 - **Recorded, never imputed**: an exit error, a timeout or output that breaks the schema records
@@ -231,11 +240,25 @@ family; residual self-preference is not corrected.
        --record scripts/bench/judge-calibration.json
    ```
 
-   It judges each tier-2 reference and its `damaged/` copy (the reference with duplicated logic,
-   dead code and a misleading name planted; see each task's `damaged/DEFECTS.md`) and passes only
-   when every reference scores higher overall than its damaged copy. The trap tasks t10-t12 have
-   no damaged copy and are left out: their checks are deterministic and do not rest on the judge.
-   It stores each judge input's hash, so a changed rubric, task or redaction table makes it stale.
+   It judges three copies of each tier-2 task, using the live judge model:
+   - the `reference`;
+   - its `damaged/` copy: the reference with duplicated logic, dead code and a misleading name
+     planted (see each task's `damaged/DEFECTS.md`); it must score strictly below the reference;
+   - its `control/` copy: the reference made longer but kept clean, with explanatory comments and
+     extra tests (see `control/CONTROL.md`); it must score no more than 0.5 below the reference.
+
+   `check` requires both copies to pass the hidden and visible tests, so the calibration ranks
+   quality, not correctness. The trap tasks t10-t12 have neither copy and are left out: their
+   checks are deterministic and do not rest on the judge. The recording stores each judge input's
+   hash and the judge model, so a changed rubric, task or redaction table, or a run that judges
+   with another model, makes it stale.
+
+   **What a pass rules out:** a judge that cannot tell planted duplication, dead code and a
+   misleading name from the clean reference, and a judge that punishes a clean change for being
+   longer (more comments, more tests) by more than half a point. **What it does not rule out:**
+   preference for one arm's style, self-preference for the agent's model family, unreliable
+   ranking between two different clean solutions, or noise: each copy is judged once. A pass is
+   necessary for the judge lines to mean anything; it is not proof that they are right.
 
 ## Improvement loop
 
