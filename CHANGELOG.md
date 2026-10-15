@@ -31,7 +31,8 @@
   smaller (205,430 → 155,136). Re-render with `/hm:make` to get the five new files.
 - **The light lane skips review and verify after a passing light check (HM-LIGHT-LANE, stage 3a).** On a
   trusted light lane (`lane: light`, an approved or exempt SPEC whose stamp recorded `lane: light`, no
-  irreversible decisions) `/hm:execute`
+  irreversible decisions; `hm spec_machine approval-status` now prints that answer as `trusted_lane`, and
+  the light check runs only on `light`) `/hm:execute`
   ends with Step 4.2, one deterministic light check that dispatches nothing: the configured mechanical
   checks, verify Checks 2, 4 and 6 (Check 4 after an uncached `hm cli security-scan <checkout> --force`)
   and review Step 2's drift rule, all from the same partials verify and review render. A clean pass writes

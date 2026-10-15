@@ -115,6 +115,18 @@ no timestamp, so this is the last N lines, N being the scan's own count. Step 5 
 only when Step 4 passed, the SPEC has no open questions, and the DRI was not asked. A narrowed
 marker is not skipped. `stage_skipped` is written only on a path that advances or ends.
 
+Consequence, from the confirmation pass (2026-10-15): execute Step 4.2 gates on the same
+predicate as the boundary, not on the `.md` lane alone. Otherwise, in a manual session, a
+`full` → `light` edit after a full approval would let Step 4.2 write a PASSED record, the banner
+would name `/hm:wrapup`, and wrapup Step 3 would accept the record. `hm spec_machine
+approval-status` prints an additive `trusted_lane` field (`lane_of`'s answer: `light` / `full`;
+the CLI only, so the land receipt's `as_json` is unchanged). The light check runs only on
+`"trusted_lane": "light"`; otherwise it writes no record and review runs next. The banner names
+wrapup only when a record was written, which now implies a trusted light lane. This stays within
+IRR-005 / AC-015. The same pass moved the light check's Check 4 onto the scan's own stdout: a
+`high` or `P0` count above 0, or a missing or unparseable `Severity:` line, is not a pass, and
+the findings file is read for detail only. Verify's Check 4 is unchanged.
+
 ## 📝 Implementation Plan
 
 1. **Phase 1 — reader, ledger event, boundary skip.** depends_on: none · parallel_group: 1 ·
@@ -193,3 +205,9 @@ implement (GREEN). No live model: the security scan's LLM pass is not exercised 
 - A `remeasure_on` note in `step_sensitivity.py` for "drop review on light" (execute Step 4.2,
   graded `*` today): re-measure when the stage 4 bench re-runs on light tasks or a new model
   ships, before the skip widens.
+- Bind `approval.lane` into a hash (`lane_hash`, as `content_hash` binds the machine yaml), as
+  defence in depth: today an edit to `approval.lane` itself is not detected.
+- Verify's Check 4 ignores `P0` findings (its rule names only `high`). This gap predates stage 3a
+  and needs its own task; the light check already fails on `P0`.
+- Product follow-up, separate from HM-LIGHT-LANE: hm telemetry should redact `tp_live_`-style
+  tokens in Bash command text (found by the eval).

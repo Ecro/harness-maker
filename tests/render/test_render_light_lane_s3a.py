@@ -57,6 +57,10 @@ NO_RECORD_PHRASES = (
     "review runs next",
     # Review item D: the forced scan's own failure clause.
     "no `Security scan:` line",
+    # Confirmation pass item 1: Step 4.2 runs only on the boundary's own predicate.
+    '`"trusted_lane": "light"`',
+    # Confirmation pass item 2: the security gate reads the scan's own summary.
+    "a missing or unparseable `Severity:` line",
 )
 #: The summary's next step after a passing light check (review item P).
 WRAPUP_NEXT = {
@@ -210,6 +214,12 @@ def test_light_check_runs_the_kept_gates(key: str) -> None:
         assert rule in text, arm
         assert f"`{wtr}/.claude/observability/security/findings-<today>.jsonl`" in text, arm
         assert "Security scan: N finding(s)" in text, arm
+        # Confirmation pass item 2: the gate counts `high` and `P0` on the scan's `Severity:`
+        # line; the findings file is read for detail only.
+        assert "`Severity: high=K, …`" in text, arm
+        assert "`high` or `P0`" in text, arm
+        assert "for detail only" in text, arm
+        assert "last N lines" in text, arm
         # Check 6 keeps verify's two commands, without the BLOCKED box or the 6a/6b prose.
         assert _commands(checks["6"]), arm
         for c in _commands(checks["6"]):

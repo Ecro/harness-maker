@@ -8,8 +8,10 @@ a command or a read. It replaces the separate review and verify stage turns on a
 lane; anything short of a clean pass leaves them in place.
 
 **Skip it** — it writes no record, and review runs next as on the full lane — when any of these holds:
-- the SPEC's acceptance below is not `approved` or `exempt`, or it lists irreversible ids (the
-  boundary trusts the light lane only then);
+- the approval status below does not print `"trusted_lane": "light"`. That field is the
+  boundary's own predicate: it is `full` when the SPEC is not `approved` or `exempt`, when it lists
+  irreversible ids, or when its stamp did not record `lane: light`. An edit to the `.md` after a
+  full approval stays `full`;
 - loop mode is active for this session (`/hm:loop` runs every stage it lists and checks a
   receipt from each);
 - the diff is well over five files, which review's own rule reads as `full`.
@@ -69,7 +71,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm cli security-scan {{ WTR }} 
 {% endif %}
 
 The gate does not pass when the scan does not exit 0, or prints no `Security scan:` line (its
-summary). Otherwise apply verify's Check 4 to the findings this scan wrote:
+summary). Otherwise apply verify's Check 4 to the summary this scan printed:
 
 {% with light_check = true %}{% include "stages/_partials/verify_check_4.md.j2" %}{% endwith %}
 **4. SPEC requirement** — verify's Check 6. `PASS`, `WARN` and `N-A` all pass here.

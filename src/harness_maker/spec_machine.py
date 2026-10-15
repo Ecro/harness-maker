@@ -2172,8 +2172,14 @@ def _run_approve(args: argparse.Namespace) -> int:
 
 
 def _run_approval_status(args: argparse.Namespace) -> int:
+    from harness_maker import light_lane
+
     state = approval_state(args.root, args.slug, args.checkout)
-    print(json.dumps(state.as_json()))
+    # Additive (SPEC-hm-light-lane-s3a ADR-010): the boundary's own lane predicate, so execute's
+    # light check gates on the answer the skip uses instead of re-deriving it in prose. Only the
+    # CLI carries it; `as_json` also feeds the land receipt, which stays as it was.
+    trusted = light_lane.lane_of(args.root, args.slug, args.checkout)
+    print(json.dumps({**state.as_json(), "trusted_lane": trusted}))
     return 0
 
 

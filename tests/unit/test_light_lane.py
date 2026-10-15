@@ -381,7 +381,11 @@ def test_binding_table_covers_the_spec() -> None:
 
 
 @pytest.mark.parametrize("case", list(BINDING_FIXTURES))
-def test_lane_is_bound_to_the_approved_lane(tmp_path: Path, case: str) -> None:
+def test_lane_is_bound_to_the_approved_lane(
+    tmp_path: Path, case: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from harness_maker import spec_machine
+
     build, lane, stamp_lane = BINDING_FIXTURES[case]
     base = tmp_path / "repo"
     fx.init_repo(base)
@@ -390,6 +394,12 @@ def test_lane_is_bound_to_the_approved_lane(tmp_path: Path, case: str) -> None:
     assert approval is not None
     assert approval.lane == stamp_lane
     assert light_lane.lane_of(base, SLUG) == lane == BINDING_EXPECTED[case]
+    # Execute Step 4.2 gates on the same predicate through `approval-status` (2026-10-15,
+    # confirmation pass item 1): its additive `trusted_lane` is `lane_of`'s answer.
+    capsys.readouterr()
+    assert spec_machine.main(["approval-status", "--root", str(base), "--slug", SLUG]) == 0
+    status = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert status["trusted_lane"] == lane
 
 
 def test_the_stamp_lane_releases_no_stamp_and_keeps_the_cli_output(
