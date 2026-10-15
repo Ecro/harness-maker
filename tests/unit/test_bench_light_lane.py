@@ -3054,3 +3054,67 @@ def test_live_commands_need_a_sandbox(
     canary = ["canary", "--judge-calibration", "--record", str(tmp_path / "c.json")]
     if not flag:
         assert bench.main(canary) == 2
+
+
+# --- CI robustness: git maintenance, template copy, STOP and reap -----------------------------
+
+
+def test_runner_git_never_forks_background_maintenance(bench: ModuleType) -> None:
+    """A detached `git maintenance run --auto` wrote .git/objects/maintenance.lock while the
+    template was copied, and the copy failed with setup_error (CI, 2026-10-15)."""
+    pairs = list(zip(bench._GIT, bench._GIT[1:], strict=False))
+    assert ("-c", "maintenance.auto=false") in pairs
+    assert ("-c", "gc.auto=0") in pairs
+
+
+def test_prepare_work_skips_git_lock_files(bench: ModuleType, tmp_path: Path) -> None:
+    template = tmp_path / "template"
+    (template / ".git" / "objects").mkdir(parents=True)
+    (template / ".git" / "objects" / "maintenance.lock").write_text("")
+    (template / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+    (template / "keep.lock").write_text("not git's\n")
+    bench.prepare_work(tmp_path / "work", template)
+    assert (tmp_path / "work" / ".git" / "HEAD").is_file()
+    assert not (tmp_path / "work" / ".git" / "objects" / "maintenance.lock").exists()
+    assert (tmp_path / "work" / "keep.lock").is_file()
+
+
+def test_the_grid_clears_the_stop_flag_when_it_exits(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inprocess: None
+) -> None:
+    """An interrupted grid sets STOP to halt its cells; it must not leave it set for the next
+    run_cell in the same process, which would record a runner-side `interrupted` row."""
+
+    def interrupting(task: Any, arm: str, rep: int, opts: Any) -> dict[str, Any]:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(bench, "run_cell", interrupting)
+    assert bench.main(_inprocess_args(tmp_path / "out", tmp_path)) == 130
+    assert not bench.STOP.is_set()
+    monkeypatch.setattr(bench, "run_cell", lambda t, a, r, o: _canned_row(t, a, r, o))
+    assert bench.main(_inprocess_args(tmp_path / "out2", tmp_path)) == 0
+    assert not bench.STOP.is_set()
+
+
+def test_a_reap_that_times_out_never_raises(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """P3-6: the reap after killpg can time out on a loaded host; that is not a grading error."""
+    real_wait = subprocess.Popen.wait
+
+    def wait(self: subprocess.Popen[Any], timeout: float | None = None) -> int:
+        if timeout is not None and timeout == bench.REAP_TIMEOUT_S:
+            raise subprocess.TimeoutExpired(self.args, timeout)
+        return real_wait(self, timeout)
+
+    monkeypatch.setattr(subprocess.Popen, "wait", wait)
+    _out, _err, code = bench._run_tool(
+        [sys.executable, "-c", "pass"], tmp_path, dict(os.environ), 60, tmp_path / "logs"
+    )
+    assert code == 0
+    task = next(t for t in bench.load_tasks() if t.id == "t1")
+    work = _work_from(_start_tree(tmp_path / "start", "t1"), tmp_path / "w", task.reference_dir)
+    assert bench.grade(work, task.hidden_dir, tmp_path / "g").passed
+    work2 = tmp_path / "agent"
+    work2.mkdir()
+    assert bench._invoke([sys.executable, "-c", "pass"], work2, 60)[2] == 0

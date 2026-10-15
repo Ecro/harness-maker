@@ -187,6 +187,9 @@ _AGENT_ENV = (
 _GRADE_ENV = ("PATH", "LANG", "TERM", "TMPDIR", "SYSTEMROOT")
 _GIT = ["git", "-c", "user.name=hm-bench", "-c", "user.email=bench@localhost"]
 _GIT += ["-c", "commit.gpgsign=false"]
+# No background maintenance or auto-gc: a detached `git maintenance run --auto` keeps writing in
+# .git after the command returns, and a template copied meanwhile loses files mid-copy.
+_GIT += ["-c", "maintenance.auto=false", "-c", "gc.auto=0"]
 
 # Set on Ctrl-C / SIGTERM or a failed run: workers stop before spending or recording more.
 STOP = threading.Event()
@@ -500,7 +503,8 @@ def _run_tool(
                 _LIVE.discard(proc.pid)
             if proc.poll() is None:
                 proc.kill()
-            proc.wait(timeout=REAP_TIMEOUT_S)
+            with contextlib.suppress(subprocess.TimeoutExpired):  # a slow reap is not an error
+                proc.wait(timeout=REAP_TIMEOUT_S)
     return _read_capped(out_path), _read_capped(err_path), code
 
 
@@ -541,7 +545,7 @@ def grade(
     argv += ["--rootdir", str(tests), "-p", "no:cacheprovider", "--junitxml", str(xml_path)]
     try:
         _out, _err, code = _run_tool(argv, tests, env, timeout_s, scratch / "out")
-    except OSError:
+    except (OSError, subprocess.SubprocessError):
         return Grade(0, 0, 1, 0)
     if code is None:
         return Grade(0, 0, 1, 0)
@@ -1230,8 +1234,13 @@ def build_template(
         _git(dest, "commit", "-q", "-m", "harness")
 
 
+def _git_locks(directory: str, names: list[str]) -> set[str]:
+    """Lock files under .git, which git may still be releasing while the template is copied."""
+    return {n for n in names if n.endswith(".lock")} if ".git" in Path(directory).parts else set()
+
+
 def prepare_work(work: Path, template: Path) -> None:
-    shutil.copytree(template, work, symlinks=True)
+    shutil.copytree(template, work, symlinks=True, ignore=_git_locks)
 
 
 def template_key(task: Task, arm: str) -> str:
@@ -1332,7 +1341,8 @@ def _invoke(
                 code = proc.wait(timeout=timeout_s)
             except subprocess.TimeoutExpired:
                 _killpg(proc.pid)
-                proc.wait(timeout=REAP_TIMEOUT_S)
+                with contextlib.suppress(subprocess.TimeoutExpired):
+                    proc.wait(timeout=REAP_TIMEOUT_S)
                 code = None
         finally:
             _killpg(proc.pid)
@@ -2385,7 +2395,10 @@ def _run_grid(
         STOP.set()
         pool.shutdown(wait=False, cancel_futures=True)
         kill_live()
+        pool.shutdown(wait=True)  # in-flight cells see STOP and return, so none outlives the grid
         raise
+    finally:
+        STOP.clear()  # a later run_cell in this process must not inherit the interrupt
     pool.shutdown()
     return skipped
 
@@ -2595,6 +2608,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             print(f"stopped: spend passed --total-budget-usd {args.total_budget_usd:g}; "
                   f"{skipped} cell(s) not run", flush=True)  # fmt: skip
     finally:
+        STOP.clear()
         if in_main:
             signal.signal(signal.SIGTERM, previous)
         if snap_root is not None:
