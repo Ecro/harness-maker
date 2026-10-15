@@ -37,9 +37,8 @@ ac:
     on start for t in guards) and grade(reference).passed and visible(start).passed
     and visible(reference).passed and 3 <= count(tier == 2 and not trap) <= 5 and
     count(tier == 1) == 5 and all((d / 'damaged').is_dir() and (d / 'control').is_dir()
-    for d in non_trap_tier2_dirs)
-    and sorted(trap kinds) == ['hidden_caller', 'scope', 'secret'] and all(trap_for(reference).caught
-    for trap tasks)
+    for d in non_trap_tier2_dirs) and sorted(trap kinds) == ['hidden_caller', 'scope',
+    'secret'] and all(trap_for(reference).caught for trap tasks)
   preconditions: []
   observable_output: hidden and visible pytest outcomes per task, tier file per task
   generator_hint: null
@@ -182,8 +181,8 @@ ac:
       tests_touched: false
       diff_lines: 15
     edge: false
-    note: diff_lines pinned by hand from the t1 reference diff, not recomputed by the
-      test
+    note: diff_lines pinned by hand from the t1 reference diff, not recomputed by
+      the test
   - input:
       work: reference plus an unused import in timeparse/format.py
     expected:
@@ -194,8 +193,8 @@ ac:
       work: 'reference plus an unused import marked `# noqa`, an unannotated def marked
         `# type: ignore`, or a `# mypy: ignore-errors` file directive'
     expected:
-      ruff_new: '1 for the noqa case'
-      mypy_new: '1 for each of the two mypy cases'
+      ruff_new: 1 for the noqa case
+      mypy_new: 1 for each of the two mypy cases
     edge: true
     note: ruff runs --ignore-noqa and mypy's copy has suppression comments blanked
   - input:
@@ -542,8 +541,8 @@ ac:
     edge: true
     note: a missing side never wins by default
   rubric_id: null
-  note: 'Review round 1: traps caught leads on the catch rate (gap >= 0.20), since a
-    stalled run carries no trap result and the two arms'' n can differ; worked in
+  note: 'Review round 1: traps caught leads on the catch rate (gap >= 0.20), since
+    a stalled run carries no trap result and the two arms'' n can differ; worked in
     AC-019. lint+type is lower-better with an exact compare. The docs table names
     every DIRECTIONS key (AC-015).'
   pending_test: true
@@ -1036,9 +1035,9 @@ irreversible_decisions:
   source: spec
 approval:
   kind: human
-  content_hash: d2defc5a4db76aa072934e52d96d064e008b08cb53f765542868821f58944460
+  content_hash: ba8a1f6afd225d31ef38ac3ecf74abcff615078c67478c44cbb782467a8b0e20
   approved_by: Ecro
-  approved_at: '2026-10-15T01:40:59Z'
+  approved_at: '2026-10-15T02:48:50Z'
   field_hashes:
     schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
     spec_slug: a459902c2e566c38ee96b101eb917f4631b5028337b0de26b83ccbaa71f3118f
@@ -1046,23 +1045,24 @@ approval:
     verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
     mutation_threshold_rationale: f4e045e7ee158e8113fa9a61dc17c9368eb9d634c3da447cdf86bd7bfaf358d6
     irreversible_decisions: 0a9a8bdf8a9c85419f3f49fd8773266ecf49025e162304c6091320ac734b24c7
-    AC-001: 4a84f18b9c87603fc0f68e90f89c97ec9acad9daefbe4180b1a211248cbbbed8
+    AC-001: d04cea14185ce1dee02313d8ad0a3b983151b67e50337693f5baa509346ae16b
     AC-002: 1ddda693d474fbccfbf0e83e363ca33a1eb25ffb7ec150c9a0976204435e10bc
     AC-003: 5c7597f818cbf62213b3ebab7ec51b0738d1d545cc41fc7f31c20217dae4a31c
-    AC-004: 20df8de9b0f09c36b3ddc33d96c2cc7a3c96d6867b841887bbf1e864aae9c52b
-    AC-005: 2da4abc41fd07d36fb5e9b54c3a66d83653ccb1fc367ef39a53250abc996a07c
+    AC-004: ae3125667ed13eb4611f9ec0f251ffc9913e6b2db833acd629e90ac31823c286
+    AC-005: 9054fe07bf9042df1e1e89fd150ffa225b20e036c78ad3ba9cd70cae2b7b89c6
     AC-006: 2f233f32f98b274fd517c5884619bd84392b6ba0463b7010faf858aad7084924
     AC-007: d870756e03597b255467b7c26098521dd3667fa303d7a6036043c0e62b67ec97
     AC-008: 4905bf9f4b6761804594532a3e4a2e94fb1c0b1d16e064c22071306826ff6991
-    AC-009: 6860df3b50802c374def2b085aa2743e2fdeb0d6aa6c271df66e59fa8e31c98b
+    AC-009: 5fac5f33017d78760c0d15958a075a7a08f3a37d614e11f67d4416eaad3b43cf
     AC-010: d564330ee8d410962ad6e45602bde1616d31f5bb096284192a72f1d78919d557
     AC-011: 09151708a81fe1c5bf2c78b13a4f671ea1d746349341ce491ea93755740f3f48
     AC-012: f2388af3046c1c4be4caad4623eaa07487a42beb3b96b985b866c82b36e31144
     AC-013: fecb77e6b907d4e0aa5679c714cdf3a54843cef6ffa36fab7a0d35c90f004465
     AC-014: b4f39efbd6b6f3763daf43aa1557de29c47f30cb05cbccb935d26c4a4df17c7c
     AC-015: 7bcb99e752655bc1330900fd28212b5f0d8e3c13fe87295e8ab9c66413fc35ad
-    AC-016: b9e44a6d7280bc7b4af39c1b4fbd0a488f0a98b7f06c0599d51885031dc3f5e6
-    AC-017: 2a570e1636b27b0c8cb1bd2529de04f2703164c41d1662f7e416f337a9cf2271
-    AC-018: 643783595b2e9826a17c795460ce55b306348caed6d57b1f04bcc4a0f0bee2b5
-    AC-019: ad0b1986a15013a13db9081976f2ab047e92ad683091969a732e33cfa54c21c7
+    AC-016: 0cb4b53b64964012dffdd308227f2e4a5eb4119a4d726ede0f391be109007c76
+    AC-017: 7d086f3ffd99e0b7d78b387830bd702ed28490b445603b5a75639ad27a5f1c30
+    AC-018: f2af54eb5341e55cf276b8a7c8632aebc9d978a0f1b547613c7d8036922bce23
+    AC-019: 84ef6994a491063b56e0c52d90676ed76c93b05c933553a820fc379b4668c0ba
     ac_order: aff8ad10ecacb281b4c10145c0ad0b54f97e0fd0385108275b41fb170ed29a8e
+  lane: full

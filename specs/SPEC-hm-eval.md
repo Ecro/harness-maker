@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: hm-eval
-status: draft
+status: approved
 created: 2026-10-14
 tags: [harness-maker, spec, eval, code-quality, cost, hidden-tests, llm-judge]
 test_framework: pytest
