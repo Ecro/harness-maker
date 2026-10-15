@@ -1290,6 +1290,67 @@ def build_template(
         _git(dest, "commit", "-q", "-m", "harness")
 
 
+class CliProvenanceError(Exception):
+    """The hm arm would run a different harness_maker than the checkout holds."""
+
+
+_CLI_PREFIX = re.compile(r"uv run --with (\S+) hm ")
+
+
+_VAR = re.compile(r"\$(?:\{(\w+)\}|(\w+))")
+
+
+def package_digest(pkg: Path) -> str:
+    """Every byte uv_build ships from the package directory: all files but `__pycache__`."""
+    if not pkg.is_dir():
+        raise CliProvenanceError(f"{pkg} is not a package directory")
+    digest = hashlib.sha256()
+    for path in sorted(p for p in pkg.rglob("*") if p.is_file()):
+        rel = path.relative_to(pkg)
+        if "__pycache__" in rel.parts or path.suffix == ".pyc":
+            continue
+        digest.update(rel.as_posix().encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()[:12]
+
+
+def _installed_package_dir(src: str, cwd: Path, env: dict[str, str]) -> Path:
+    """Where `uv run --with <src>` imports harness_maker from, under the agent's environment
+    (the same uv cache). `--no-project` writes no `.venv` into the template."""
+    code = "import harness_maker, pathlib; print(pathlib.Path(harness_maker.__file__).parent)"
+    proc = subprocess.run(
+        ["uv", "run", "--no-project", "--with", src, "python", "-c", code],
+        cwd=cwd, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+        timeout=SETUP_TIMEOUT_S, check=False,
+    )  # fmt: skip
+    lines = proc.stdout.strip().splitlines()
+    if proc.returncode != 0 or not lines:
+        raise CliProvenanceError(f"cannot import the hm arm's CLI: {proc.stderr.strip()[-400:]}")
+    return Path(lines[-1])
+
+
+def check_cli_fresh(template: Path, pass_env: tuple[str, ...] = ()) -> None:
+    """Refuse a stale CLI. uv rebuilt `--with` installs only when pyproject.toml changed, so a
+    full eval once graded new templates against a day-old CLI and measured the mismatch."""
+    command = template / ".claude" / "commands" / "hm" / "spec.md"
+    match = _CLI_PREFIX.search(command.read_text(encoding="utf-8"))
+    if match is None:
+        raise CliProvenanceError(f"{command} carries no `uv run --with <path> hm` prefix")
+    env = agent_env(pass_env)
+    # The renderer writes `$HOME/...` for a checkout under home; the agent's shell expands it.
+    src = _VAR.sub(lambda m: env.get(m.group(1) or m.group(2), m.group(0)), match.group(1))
+    root = Path(src)
+    if not root.is_absolute():
+        raise CliProvenanceError(f"the hm arm installs {src!r}, not a checkout path")
+    want = package_digest(root / "src" / "harness_maker")
+    installed = _installed_package_dir(src, template, env)
+    got = package_digest(installed)
+    if got != want:
+        raise CliProvenanceError(
+            f"the hm arm would run a stale CLI: {installed} is {got}, "
+            f"{src}/src/harness_maker is {want}; run `uv cache clean harness-maker` and retry"
+        )
+
+
 def _git_locks(directory: str, names: list[str]) -> set[str]:
     """Lock files under .git, which git may still be releasing while the template is copied."""
     return {n for n in names if n.endswith(".lock")} if ".git" in Path(directory).parts else set()
@@ -2667,6 +2728,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 build_template(templates[key], arm, snap / "timeparse", task.seed_dir)
             except (OSError, shutil.Error, subprocess.SubprocessError) as exc:
                 print(f"cannot build the {key} template: {failure_text(exc)}", file=sys.stderr)
+                return 2
+        hm_templates = [templates[k] for k, (_, arm) in sorted(needed.items()) if arm == "hm"]
+        if hm_templates:
+            try:
+                check_cli_fresh(hm_templates[0], opts.pass_env)
+            except (CliProvenanceError, OSError, subprocess.SubprocessError) as exc:
+                print(f"refusing to run: {exc}", file=sys.stderr)
                 return 2
         opts = replace(opts, templates=templates)
         print(f"bench {BENCH_ID}: {len(cells)} run(s) to go, results in {out / RESULTS}",

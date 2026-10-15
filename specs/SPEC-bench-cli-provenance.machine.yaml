@@ -1,0 +1,111 @@
+schema_version: 3
+spec_slug: bench-cli-provenance
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 0
+mutation_threshold_rationale: config plus one bench preflight; behaviour is covered
+  by golden and live-probe tests, mutation adds nothing here
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: A source edit at an unchanged version reaches `uv run --with <checkout>`
+  type: mechanical
+  test_ids: []
+  executable_predicate: probe_after_edit == 'edited'
+  golden_table: []
+  rubric_id: null
+  note: pyproject.toml [tool.uv] cache-keys lists pyproject.toml, src/**/*.py and
+    src/harness_maker/templates/**/*
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Observed failure on 2026-10-15 - the cached build under ~/.cache/uv
+    lacked spec_machine._md_lane while the checkout had it; the expected value (the
+    edited attribute is visible after the edit) is the uv documented cache-keys contract,
+    not derived from our code
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: bench run refuses before any model spend when the hm arm's CLI differs from
+    the checkout
+  type: mechanical
+  test_ids: []
+  executable_predicate: exit_code == 2 and not results_written and not runs_started
+  golden_table: []
+  rubric_id: null
+  note: exit 2, message names both digests and the fix; no runs/ dir entry and no
+    results row is written
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The refusal condition is a byte comparison of the installed harness_maker
+    package (all files but __pycache__) against src/harness_maker; the tests build
+    both sides from independent fixture trees, so the expectation does not come from
+    the digest code
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: bench run proceeds when the installed CLI matches the checkout
+  type: mechanical
+  test_ids: []
+  executable_predicate: check_cli_fresh(template) is None
+  golden_table: []
+  rubric_id: null
+  note: the check runs once per run, from the first hm template, with the exact `uv
+    run --with <path>` prefix the rendered commands carry
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Same fixture trees with identical bytes; equality is the expected
+    value
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: b9d3696b7d20c98ad13ee8944a05867c17ce67a5617253e5fc3ee7d70ab2fbc3
+  approved_by: null
+  approved_at: '2026-10-15T06:09:05Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 32f80976ef3a8ef0d68949ce641e6f5a812801d34d007188925bd2a3765759e1
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    mutation_threshold: 5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9
+    mutation_threshold_rationale: 22b17b67e8b3eeba3ee4d3cd858611fb1c006366a85e8c341273019213699690
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 8ac57480a90c3a739090b2510b4065e4fe4f8111bde6b90d09c0bb6943d43290
+    AC-002: 1ad7d6db611b03ec7788e57bea2e3ad6cc77f0aa632dd672945303186970ff4f
+    AC-003: d0dcc4302b3fa376bf47f59c580e1de50c16f152fbdf46581441e060e8464b37
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d
+  lane: light

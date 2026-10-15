@@ -78,6 +78,16 @@ hm = "harness_maker.hm:main"
 requires = ["uv_build>=0.5"]
 build-backend = "uv_build"
 
+[tool.uv]
+# uv rebuilds a `--with <path>` install only when a cache key changes; the default key is
+# pyproject.toml alone, so source edits at an unchanged version ran a stale CLI.
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "src/**/*.py" },
+    { file = "src/harness_maker/templates/**/*" },
+    { file = "src/harness_maker/**/*.yaml" },
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
