@@ -297,6 +297,19 @@ def _head_tool_dropped(tool: str) -> Any:
     return build
 
 
+def _head_pyproject_not_utf8(root: Path) -> None:
+    _light_repo(root, pyproject=_PROJECT)
+    (root / "pyproject.toml").write_bytes(_PROJECT.encode() + b"# caf\xe9\n")
+    fx._git(root, "add", "pyproject.toml")
+    fx._git(root, "commit", "-q", "-m", "latin-1 comment")
+    (root / "pyproject.toml").write_text(_PROJECT, encoding="utf-8")
+
+
+def _unborn_head(root: Path) -> None:
+    _light_repo(root)
+    fx._git(root, "update-ref", "-d", "HEAD")
+
+
 def _other_config(name: str) -> Any:
     def build(root: Path) -> None:
         _light_repo(root)
@@ -342,6 +355,8 @@ TRUST_TABLE: dict[str, tuple[Any, str, int, str | None]] = {
     "mypy.ini present": (_other_config("mypy.ini"), SLUG, 3, "mypy.ini"),
     ".mypy.ini present": (_other_config(".mypy.ini"), SLUG, 3, ".mypy.ini"),
     "pyproject.toml does not parse": (_broken_pyproject, SLUG, 3, "pyproject.toml"),
+    "HEAD's pyproject.toml is not UTF-8": (_head_pyproject_not_utf8, SLUG, 3, "HEAD"),
+    "unborn HEAD": (_unborn_head, SLUG, 3, "cannot read HEAD"),
     "slug ..": (_light_repo, "..", 3, _NOT_LIGHT),
     "slug containing /": (_light_repo, "specs/demo", 3, _NOT_LIGHT),
     "no SPEC for the slug": (_light_repo, "other", 3, _NOT_LIGHT),

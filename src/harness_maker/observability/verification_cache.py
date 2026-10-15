@@ -539,7 +539,7 @@ def _git_out(root: Path, *args: str) -> str | None:
         proc = subprocess.run(
             ["git", *args], cwd=root, capture_output=True, text=True, timeout=30, check=False
         )
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    except (subprocess.TimeoutExpired, OSError, ValueError):  # ValueError: undecodable output
         return None
     return proc.stdout if proc.returncode == 0 else None
 
@@ -560,7 +560,7 @@ def _head_drift(root: Path, tool: dict[str, Any]) -> str | None:
         return "HEAD tracks a workflow file under .github/workflows that the working tree lacks"
     if not head_pyproject.strip("\0"):
         return None
-    text = _git_out(root, "show", "HEAD:pyproject.toml")
+    text = _git_out(root, "show", "HEAD:./pyproject.toml")
     try:
         head_tool = _tool_table(text) if text is not None else None
     except tomllib.TOMLDecodeError:
