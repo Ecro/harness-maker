@@ -1,0 +1,229 @@
+schema_version: 3
+spec_slug: autopilot-stop-gate
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: One branch in one hook; the golden state table, the df070f6c
+  differential and the real-run replay pin it, and mutation testing adds little over them.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: The stop-hook decision is the golden function of marker, ledger, transcript and
+    payload state
+  type: parametric
+  test_ids: []
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: own active auto marker, no peer; ledger [authorized execute]; transcript has
+        nothing after it; stop_hook_active false
+    expected: exit 2, decision block, reason names /hm:execute
+    edge: false
+    note: the t5/t7/t10/t11 end state
+  - input:
+      case: as row 1, ledger [authorized execute, entered execute, authorized review]
+    expected: exit 2, decision block, reason names /hm:review
+    edge: false
+    note: the later stage is the one named
+  - input:
+      case: as row 1, transcript has Skill(hm:execute) after the authorization
+    expected: exit 0, no stdout
+    edge: false
+    note: execute is running (question, halt, or died mid-body)
+  - input:
+      case: as row 1, transcript has a non-meta user string entry after the authorization
+    expected: exit 0, no stdout
+    edge: false
+    note: a later turn; covers a user's pause
+  - input:
+      case: as row 1, transcript has a task-notification user entry after the authorization
+    expected: exit 0, no stdout
+    edge: true
+    note: conservative; any non-tool-result, non-meta user entry ends the gate's interest
+  - input:
+      case: as row 1, transcript has only isMeta text and tool_result user entries after
+        the authorization
+    expected: exit 2, decision block, reason names /hm:execute
+    edge: true
+    note: tool output and skill expansions are not a new turn
+  - input:
+      case: as row 1, stop_hook_active true
+    expected: exit 0, no stdout
+    edge: false
+    note: one refusal per stop
+  - input:
+      case: as row 1, ledger [authorized execute, entered execute]
+    expected: exit 0, no stdout
+    edge: false
+    note: confirmed
+  - input:
+      case: as row 1, ledger [authorized execute, authorized execute, entered execute]
+    expected: exit 0, no stdout
+    edge: true
+    note: a re-run boundary; pairing collapses per session window
+  - input:
+      case: as row 1, ledger absent or []
+    expected: exit 0, no stdout
+    edge: false
+    note: ''
+  - input:
+      case: no marker; ledger [authorized execute]
+    expected: exit 0, no stdout
+    edge: false
+    note: ''
+  - input:
+      case: own marker at level gated; ledger [authorized execute]
+    expected: exit 0, no stdout
+    edge: true
+    note: a gated session sees peers' rows
+  - input:
+      case: marker at this session's key holding another id; ledger [authorized execute]
+    expected: exit 0, no stdout
+    edge: true
+    note: foreign
+  - input:
+      case: own marker past its expiry; ledger [authorized execute]
+    expected: exit 0, no stdout
+    edge: true
+    note: expired
+  - input:
+      case: as row 1, plus a fresh id-bearing marker of another session
+    expected: exit 0, no stdout
+    edge: true
+    note: the ledger is shared; fail open while a peer is armed
+  - input:
+      case: own marker created after the only authorized row
+    expected: exit 0, no stdout
+    edge: true
+    note: the window starts at created_at
+  - input:
+      case: own marker narrowed to pipeline [research, spec]; ledger [authorized execute]
+    expected: exit 0, no stdout
+    edge: true
+    note: the stage must be in marker.pipeline
+  - input:
+      case: own loop marker and row 1's autopilot state
+    expected: exit 2, the loop reason unchanged
+    edge: true
+    note: loop precedence
+  - input:
+      case: as row 1, payload without transcript_path, or the path unreadable
+    expected: exit 0, no stdout
+    edge: true
+    note: fail open
+  - input:
+      case: as row 1, transcript readable but with no Claude Code record
+    expected: exit 0, no stdout, one stderr line starting [loop-gate] warn
+    edge: true
+    note: a foreign format must not read as never invoked
+  - input:
+      case: as row 1, the ledger has a garbage line before the authorization
+    expected: exit 2, decision block, reason names /hm:execute
+    edge: true
+    note: the ledger reader skips unparseable lines
+  - input:
+      case: as row 1, the marker or ledger read raises OSError
+    expected: exit 0, no stdout, one stderr line starting [loop-gate] warn
+    edge: true
+    note: fail open
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The rows come from the eval-2 run end states, the marker contract
+    (active, gated, foreign, expired, narrowed, peer as autopilot.status reports them),
+    the Claude Code transcript fields observed in the eval-2 transcripts (isMeta, origin
+    task-notification, tool_result) and the Stop-hook stop_hook_active rule; none is derived
+    from the new branch.
+  oracle_independence_waiver: null
+- id: AC-002
+  title: Without a refusing state the stop hook equals the df070f6c loop gate
+  type: property
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference is the df070f6c hooks/loop_gate.py, loaded from `git show`
+    into a temp module before any edit; any implementation that confines its change to the
+    refusing state satisfies the relation.
+  oracle_independence_waiver: null
+  input_domain: loop marker {own content match, foreign content, legacy global with an
+    id-less payload, legacy global with an id payload, none} x stop_hook_active {true,
+    false} x autopilot marker {none, gated, foreign, expired} x ledger {absent, [authorized
+    execute]} x transcript {absent, nothing after the authorization}
+  transformation: run `_stop_hook(payload)` under the reference module and under the new
+    module on the same tmp project
+  expected_relation: stdout(new) == stdout(ref) and exit(new) == exit(ref)
+  preconditions:
+  - the same fixture builder is used for both modules
+  observable_output: the list of cells whose stdout or exit differ, empty
+  generator_hint: itertools.product over the domain
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Replaying the eval-2 hm runs blocks exactly the five stalled runs, and no other
+    run at its end or at any stage start
+  type: parametric
+  test_ids: []
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: t5-hm-1, t5-hm-3, t7-hm-3, t10-hm-3, t11-hm-1 at their end, with an own active
+        marker created before the first row
+    expected: exit 2, reason names /hm:execute
+    edge: false
+    note: the post-spec stalls
+  - input:
+      case: t4-hm-1 at its end, same marker
+    expected: exit 0, no stdout
+    edge: true
+    note: verify authorized and unconfirmed, but Skill(hm:verify) ran and STOPped at Check 4
+  - input:
+      case: the other 29 runs with a ledger, at their end, same marker
+    expected: exit 0, no stdout
+    edge: false
+    note: t12-hm-2 has no ledger and is not a fixture
+  - input:
+      case: every run, cut right after each Skill(hm:<stage>) call
+    expected: exit 0, no stdout
+    edge: false
+    note: a stage that started is never refused; this is the mid-body state
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The five run ids and their stage were read by hand from the eval-2 ledger
+    tails and transcripts on 2026-10-15, before any implementation; t4-hm-1's verify STOP was
+    read from its transcript. dangling_authorizations was a cross-check only. The cut points are the Skill tool_use timestamps in those transcripts, where the
+    stage demonstrably started.
+  oracle_independence_waiver: null
+- id: AC-004
+  title: The block reason names the stage and how to proceed or stop
+  type: parametric
+  test_ids: []
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: block for stage execute
+    expected: reason contains `/hm:execute`, `Skill`, and a sentence that ending the turn
+      again stops
+    edge: false
+    note: the second stop is honoured by stop_hook_active
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The names are the rendered Claude Code entry point (the `hm:<stage>` skill
+    invoked through the `Skill` tool) and the Stop-hook protocol's one-refusal rule.
+  oracle_independence_waiver: null
+irreversible_decisions: []
