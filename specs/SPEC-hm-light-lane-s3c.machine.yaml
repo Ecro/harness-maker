@@ -314,13 +314,13 @@ ac:
     validate, cross_validate, quality} and the two load-error formats (YAML_SYNTAX_ERR
     ''yaml load failed: YAMLError: <problem> (line L, column C)'', MISSING_FILE_ERR
     ''yaml load failed: FileNotFoundError: <path>'') are this SPEC''s B contract,
-    written before the code. Amended 2026-10-15 (review round 1): distinct_errors is
-    each error''s full string (a7403f2f''s pydantic dump read as its <loc>: <msg> lines,
-    the other load failures as one marker whose format the regexes pin), so dropping
-    one of two errors on the same AC fails; another OSError reads ''yaml load failed:
-    <OSError subclass>: <path> (<reason>)'', and an exception inside validate() after
-    a successful load reads ''validate failed: <Type>: <message>'' with cross-validate''s
-    own errors kept.'
+    written before the code. Amended 2026-10-15 (review round 1): distinct_errors
+    is each error''s full string (a7403f2f''s pydantic dump read as its <loc>: <msg>
+    lines, the other load failures as one marker whose format the regexes pin), so
+    dropping one of two errors on the same AC fails; another OSError reads ''yaml
+    load failed: <OSError subclass>: <path> (<reason>)'', and an exception inside
+    validate() after a successful load reads ''validate failed: <Type>: <message>''
+    with cross-validate''s own errors kept.'
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -458,15 +458,15 @@ ac:
     — scope: {files} · exit: `{command}` · risk: {risk} · rollback: {rollback}'')
     are fixed by the SPEC before the template exists. CONFIGS cover autonomy gated,
     auto_safe, auto_full and ask, worktree on and off, and locales en and ko. Amended
-    2026-10-15 (review round 1): ROUTING is the loop-off sentence and ROUTING_LOOP the
-    loop-on one, after a block that also runs hm worktree loop-mode-active (asserted on
-    the loop-on full-lane configs); LIGHT_BRANCH_PHRASES add the full Step 0 / 0.3 guards
-    (no absolute, .. or globs; user provenance only when the user explicitly made that
-    call; none never invented, the none deleted beside other bullets; a re-read that still
-    fails stops before Step 1), matched on whitespace-normalised text; STEP03_SENTENCE
-    carries the read rule (project root, never a worktree, STOP if missing), spelled
-    $hm-make on Codex; the execute-plan pointer says it is read only when not writing
-    the light PLAN.'
+    2026-10-15 (review round 1): ROUTING is the loop-off sentence and ROUTING_LOOP
+    the loop-on one, after a block that also runs hm worktree loop-mode-active (asserted
+    on the loop-on full-lane configs); LIGHT_BRANCH_PHRASES add the full Step 0 /
+    0.3 guards (no absolute, .. or globs; user provenance only when the user explicitly
+    made that call; none never invented, the none deleted beside other bullets; a
+    re-read that still fails stops before Step 1), matched on whitespace-normalised
+    text; STEP03_SENTENCE carries the read rule (project root, never a worktree, STOP
+    if missing), spelled $hm-make on Codex; the execute-plan pointer says it is read
+    only when not writing the light PLAN.'
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -672,13 +672,13 @@ ac:
     pointer; zero or two spans fail) is deleted, the exact ROUTING sentence (ROUTING_LOOP
     when the loop is rendered), the approval-status call block (with its loop-mode-active
     line when the loop is rendered; amended 2026-10-15) and the exact STEP03_SENTENCE
-    are deleted, and the full-lane pointer and
-    SEPARATOR are replaced by execute-plan.md''s part 1 and part 2 (the inline Step
-    0 head is an a7403f2f prefix, so this is concatenation); in spec, the Step 3.5
-    and Step 4 + 4.5 sections are left out because AC-015 and AC-009 compare them.
-    Every deleted string is an exact literal from the SPEC, so no implementation-chosen
-    text is excused and any other byte that moved fails. review, verify, wrapup, loop
-    and the verify-before-completion skill need only the first rule.'
+    are deleted, and the full-lane pointer and SEPARATOR are replaced by execute-plan.md''s
+    part 1 and part 2 (the inline Step 0 head is an a7403f2f prefix, so this is concatenation);
+    in spec, the Step 3.5 and Step 4 + 4.5 sections are left out because AC-015 and
+    AC-009 compare them. Every deleted string is an exact literal from the SPEC, so
+    no implementation-chosen text is excused and any other byte that moved fails.
+    review, verify, wrapup, loop and the verify-before-completion skill need only
+    the first rule.'
   oracle_independence_waiver: null
   input_domain: every (config, path) with config in Side and Production x worktree
     on/off x warn/block x loop on/off and path in the six Claude stage commands, the
@@ -759,9 +759,9 @@ irreversible_decisions:
   source: spec
 approval:
   kind: human
-  content_hash: 765e6696221337400da92d0b66b95957d32881b996be62f0c97946b33fd84415
+  content_hash: 8a2c7e23aced76380d7d659da63ea6c968983170bfcc2aa44c345d98a80dbf28
   approved_by: Ecro
-  approved_at: '2026-10-15T05:19:49Z'
+  approved_at: '2026-10-15T14:50:29Z'
   field_hashes:
     schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
     spec_slug: eec348d5d868e8cb3f13840f8d6654e1b99015a77b7a3fa9c76d8998d8d3862d
@@ -773,17 +773,17 @@ approval:
     AC-003: 863c7f697b8676f88e29282d90ec78dcc7714aa79906dbc00a3b55f8c5937a49
     AC-004: c3961e7dfa352dbaaf2b2cf3bfd4e6547242c87fb0a34b7f261421b35f5703e6
     AC-005: b126bea06b34166f3055c83dbfc85791f7a4c419580c8a8b105ce8814ea26edb
-    AC-006: 374c3897727cef2adbee69bf2de6a780d28620e63db3b945138d19a3c65b8887
+    AC-006: 1cde46bedfc116f1fd86692efe35b0671d7db2e3d8eefeec9dc29111ca757978
     AC-007: 7365b3f47a62f0827afb4dfb229c594103c802feb015fa396ed2788288f0cc42
     AC-008: 8d3d3ed871901fb28efe4331ba94748bc6c1a7b570bd23a492a60735c855a5e3
     AC-009: fa176549b7af29acd1677febf2cb9800a7fa64a33cad375bb6e55b5ed1d6e1ff
-    AC-010: c90fd4fc84ecb3693bcd1dec541ec2cc0aba61bfcf4b21336665233a0f0bacff
+    AC-010: 8207d74a86278b3cb1782354d4720e120fabe71c546e0ef35d4a143a2a756d7c
     AC-011: cb0da37c72ca7a360554bdc6f268830fed761ecf604de05be76180f2f9de37e3
     AC-012: 68d14540be3efaeff24e45a13497834465c1a6492aa9172dfab63ee1dfa63d18
     AC-013: 82685aefc4cc4cbb137b5b1a1cd81297254375f5fb25ce20cebcf0202ecae64e
     AC-014: 9f2b566162cc49e10af61e897145c92259018ae0ec67d22923bddcb70ddfdf1a
     AC-015: 3287f5a2db419f5fec01d9cbf28fb0710b9a26a032ad4b0d7e1fcbfd11eb824f
-    AC-016: 3ee013b12eb11672d1783428fb664f9c9da1a9df9441bd2b35ae538ebe856590
+    AC-016: aff7b2ad28eaf79fcc1c628896438d1f016f87ee14865e7c615db940beeb61a2
     AC-017: 82a5749115cc9ca34278c0ce22a6ceadb7b74115542661413bdf7fde65d4acc1
     ac_order: 8345e880dc19dc733f60d154c7457a99f34c22971e18e88229034b51947b7620
   lane: full
