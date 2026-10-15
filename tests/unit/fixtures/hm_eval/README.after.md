@@ -38,10 +38,10 @@ Text before the block, with a table:
 | cost ratio (hm/plain) | $0.175 (n=6) | $0.650 (n=6) | 3.71x | plain |
 | Δ solved runs | 5 (n=6) | 4 (n=6) | -1 | tie |
 | Δ hidden-case pass fraction | 0.93 (n=6) | 0.78 (n=6) | -0.15 | plain |
-| Δ regressions per run | 0.17 (n=6) | 0.00 (n=5) | -0.17 | hm |
+| Δ regressions per run | 0.20 (n=5) | 0.00 (n=5) | -0.20 | hm |
 | Δ new lint+type errors per run | 0.20 (n=5) | 0.80 (n=5) | +0.60 | plain |
 | traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
-| Δ judge overall | 3.60 (n=5) | 4.20 (n=5) | +0.60 | hm |
+| Δ judge overall | 3.75 (n=4) | 4.17 (n=4) | +0.42 | hm |
 | cost per solved run | $0.210 (n=5) | $0.975 (n=4) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 <!-- hm:eval:end -->

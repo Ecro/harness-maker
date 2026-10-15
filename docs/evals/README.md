@@ -87,15 +87,20 @@ scorecard. The `hm vs plain` column is hm minus plain, except on the cost line, 
 
 | Line | What it is |
 |---|---|
-| cost ratio (hm/plain) | hm's mean run cost over plain's. 5.00x means hm costs five times as much per run. |
+| cost ratio (hm/plain) | The larger of two ratios, by the intent metric's rule: mean CLI cost (`total_cost_usd`) hm over plain, and mean transcript-priced cost hm over plain. 5.00x means hm costs five times as much per run. When the two differ, both are printed, and `suspect` is added when they are more than 20% apart (the CLI total may leave out subagent spend). |
 | Δ solved runs | hm solved runs minus plain solved runs. |
 | Δ hidden-case pass fraction | hm minus plain hidden-case pass fraction. |
-| Δ regressions per run | hm minus plain mean regressions; negative is good for hm. |
-| Δ new lint+type errors per run | hm minus plain mean of ruff_new + mypy_new, over runs where both checks ran; negative is good for hm. |
-| traps caught | Per arm, trap runs that avoided the trap over trap runs that carry a result (`caught/n`); the `hm vs plain` column is the difference in caught runs. A tier with no trap task reads `n/a (n=0)`. |
-| Δ judge overall | hm minus plain mean judge overall. |
-| cost per solved run | Each arm's total priced run cost divided by its solved runs; `n/a (n=0)` when the arm solved nothing. Lower is better. |
-| extra $ per additional solved run | (hm total cost - plain total cost) / (hm solved - plain solved). When hm solves no more runs than plain it reads `n/a: no additional solved runs for the extra cost`. |
+| Δ regressions per run | hm minus plain mean regressions, over paired runs; negative is good for hm. |
+| Δ new lint+type errors per run | hm minus plain mean of ruff_new + mypy_new, over paired runs; negative is good for hm. |
+| traps caught | Per arm, trap runs that avoided the trap over trap runs that carry a result (`caught/n`). The `hm vs plain` column and the lead use the caught rate (band 0.20). A tier with no trap task reads `n/a (n=0)`. |
+| Δ judge overall | hm minus plain mean judge overall, over paired runs. |
+| cost per solved run | Each arm's priced run cost divided by its priced solved runs; `n/a (n=0)` when the arm solved nothing. Runs with no price are left out and counted, as `(k unpriced)`. Lower is better. |
+| extra $ per additional solved run | (hm priced cost - plain priced cost) / (hm priced solved - plain priced solved). When hm solves no more runs than plain it reads `n/a: no additional solved runs for the extra cost`. When Δ solved runs reads `tie`, it adds `(Δ solved within the tie band)`: the extra solved runs are inside the noise the lead rule allows. Unpriced runs add `(k unpriced)`. |
+
+**Paired runs.** The three quality Δ lines compare the same (task, rep) in both arms and use only
+pairs where both arms changed code and the signal exists; `n` is the number of pairs. A pair never
+mixes tasks, so a hard task that one arm stalled on cannot be set against an easy task the other
+arm solved. The detailed Quality section below keeps the unpaired per-arm means.
 
 Each Δ line's lead uses the direction and band of its metric in the table below, so a Δ that sits
 inside the band reads `tie`.
@@ -103,8 +108,8 @@ inside the band reads `tie`.
 **Is the extra cost worth it?** Read the block top down. The cost ratio is the price. The Δ lines
 show what the price bought, and their leads say whether the gap clears the fixed band. A high cost
 ratio is worth paying when the Δ lines lead `hm`: more solved runs, a higher case fraction, fewer
-regressions and new errors, more traps caught, or a better judge score. Extra $ per additional solved run puts the
-first of those in dollars: what one more solved run costs over plain. If that line reads `n/a`, or
+regressions and new errors, more traps caught, or a better judge score. Extra $ per additional
+solved run puts the first of those in dollars: what one more solved run costs over plain. If that line reads `n/a`, or
 every Δ line reads `tie` or `plain`, the extra spend bought nothing this eval can see, whatever the
 cost ratio. The verdict is the reader's; the scorecard only prints the figures and leads.
 
@@ -151,6 +156,7 @@ work dir is never modified.
 | turns | Mean CLI-reported turns per run. |
 | wall s | Mean wall time per run, in seconds. |
 | judge cost | Total judge spend in the tier, with the number of judge calls and of unpriced calls (no cost reported, counted as 0). Kept out of every arm mean. |
+| run flags | Per arm: runs that hit the per-run budget cap (`budget-capped`), runs whose output or transcript named a hidden-test path (`leak-suspect`), runs whose diff was cut at 60,000 characters for the judge (`judge-truncated`), and how many redactions were made in how many runs' judge input. Any non-zero count is a reason to read those runs before trusting the tier's figures. |
 
 In the Efficiency block, the `hm/plain` column is the ratio of the two means. Tokens and prices come from
 `harness_maker.economics`.
@@ -165,15 +171,16 @@ unchanged in rule and output. Its last line is `hm_cost_ratio_small=<ratio|n/a>`
 Each line's lead is `hm`, `plain`, `tie`, `—` (no lead) or `n/a` (a side has n = 0), from this
 table and nothing else. No word in the report or these docs is picked by hand.
 
-| Metric | Better | Lead rule |
+| Metric (`DIRECTIONS` key) | Better | Lead rule |
 |---|---|---|
-| hidden all-pass, solved (and Δ solved runs), traps caught | higher | gap of at least 2 runs, else `tie` |
-| wrong, stalled | lower | gap of at least 2 runs, else `tie` |
-| hidden-case pass fraction | higher | gap of at least 0.05, else `tie` |
-| ruff_new mean, mypy_new mean, regressions mean | lower | exact compare |
-| judge scope, judge clarity, judge maintainability, judge overall | higher | gap of at least 0.25, else `tie` |
-| cost $/run, cost per solved run, tokens, turns, wall s | lower | exact compare |
-| runs, diff_lines mean, tests_touched rate | none | always `—` |
+| hidden all-pass (`all_pass`), solved (`solved`, also Δ solved runs) | higher | gap of at least 2 runs, else `tie` |
+| wrong (`wrong`), stalled (`stalled`) | lower | gap of at least 2 runs, else `tie` |
+| hidden-case pass fraction (`case_fraction`) | higher | gap of at least 0.05, else `tie` |
+| traps caught (`traps`) | higher | caught-rate gap of at least 0.2, else `tie` |
+| ruff_new mean (`ruff_new`), mypy_new mean (`mypy_new`), regressions mean (`regressions`), new lint+type errors (`lint_type`) | lower | exact compare |
+| judge scope (`judge_scope`), clarity (`judge_clarity`), maintainability (`judge_maintainability`), overall (`judge_overall`) | higher | gap of at least 0.25, else `tie` |
+| cost $/run (`cost`), cost per solved run (`cost_per_solved`), tokens (`tokens_input`, `tokens_output`, `tokens_cache_read`, `tokens_cache_write`), turns (`turns`), wall s (`wall`) | lower | exact compare |
+| runs (`runs`), diff_lines mean (`diff_lines`), tests_touched rate (`tests_touched`) | none | always `—` |
 
 Count lines compare equal-sized arms, because cells are balanced. n is small (3 runs per cell by
 default); the bands are fixed and there is no significance test.

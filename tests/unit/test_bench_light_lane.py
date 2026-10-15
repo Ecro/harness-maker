@@ -2235,6 +2235,7 @@ def test_docs_readme_explains_every_scorecard_metric(bench: ModuleType) -> None:
                    bench.RUBRIC_ID):  # fmt: skip
         assert needle in docs, needle
     for metric, (better, band) in bench.DIRECTIONS.items():
+        assert f"`{metric}`" in docs, metric
         if better is not None and band:
             assert f"{band:g}" in docs, metric
     readme = (_ROOT / "README.md").read_text(encoding="utf-8")
@@ -2503,7 +2504,7 @@ def test_each_run_records_its_trap(bench: ModuleType, tmp_path: Path, case: str)
 
 
 # (arm, task) -> per-rep trap results; None is a stalled run. Worked by hand: plain caught 2 of
-# the 5 runs that carry a trap, hm 5 of 6, a gap of 3 >= 2, so hm leads.
+# the 5 runs that carry a trap (0.40), hm 5 of 6 (0.83), a rate gap of 0.43 >= 0.20: hm leads.
 _TRAP_ROWS = {
     ("plain", "t10"): (True, False),
     ("plain", "t11"): (False, False),
@@ -2537,14 +2538,14 @@ def test_traps_caught_leads_the_value_section_by_the_count_gap(bench: ModuleType
     assert line["label"] == "traps caught"
     assert line["plain"] == {"value": 2.0, "n": 5}
     assert line["hm"] == {"value": 5.0, "n": 6}
-    assert line["delta"] == 3.0
+    assert line["delta"] == pytest.approx(5 / 6 - 2 / 5)  # the lead is on the caught rate
     assert line["lead"] == "hm"
-    assert bench.DIRECTIONS["traps"] == ("higher", 2)
+    assert bench.DIRECTIONS["traps"] == ("higher", 0.2)
     text = bench.report_text(rows)
-    assert re.search(r"\n  traps caught +2/5 +5/6 +\+3  hm\n", text)
-    assert "| traps caught | 2/5 | 5/6 | +3 | hm |" in bench.render_readme_block(rows)
-    assert "| traps caught | 2/5 | 5/6 | +3 | hm |" in bench.render_results_md(rows)
-    # a gap of 1 is a tie, and a tier with no trap rows reads n/a
+    assert re.search(r"\n  traps caught +2/5 +5/6 +\+0\.43  hm\n", text)
+    assert "| traps caught | 2/5 | 5/6 | +0.43 | hm |" in bench.render_readme_block(rows)
+    assert "| traps caught | 2/5 | 5/6 | +0.43 | hm |" in bench.render_results_md(rows)
+    # 4/5 vs 5/6 is a rate gap of 0.03 < 0.20, a tie; a tier with no trap rows reads n/a
     flipped = [dict(r, trap={**r["trap"], "caught": True}) if (r["arm"], r["task"], r["rep"])
                == ("plain", "t11", 1) else r for r in rows]  # fmt: skip
     flipped = [dict(r, trap={**r["trap"], "caught": True}) if (r["arm"], r["task"], r["rep"])
@@ -2556,3 +2557,140 @@ def test_traps_caught_leads_the_value_section_by_the_count_gap(bench: ModuleType
     tier1 = next(t for t in plain_only["tiers"] if t["tier"] == 1)
     line = next(x for x in tier1["value"]["lines"] if x["metric"] == "traps")
     assert (line["plain"]["n"], line["hm"]["n"], line["lead"]) == (0, 0, "n/a")
+
+
+# --- review round 1: headline integrity ----------------------------------------------------------
+
+
+def _quality_row(row: dict[str, Any], *, reg: int | None, judge: float | None) -> dict[str, Any]:
+    row["tier"] = 1
+    row["outcome"] = "solved" if reg is not None else "stalled"
+    row["quality"] = {"ruff_new": 0 if reg is not None else None,
+                      "mypy_new": 0 if reg is not None else None, "regressions": reg}  # fmt: skip
+    row["judge"] = (
+        {"status": "ok", "scores": {"overall": judge}}
+        if judge is not None
+        else {"status": "stalled"}
+    )
+    return row
+
+
+def _value_line(bench: ModuleType, rows: list[dict[str, Any]], metric: str) -> dict[str, Any]:
+    tier = bench.scorecard(rows)["tiers"][0]
+    return next(x for x in tier["value"]["lines"] if x["metric"] == metric)
+
+
+def test_quality_deltas_pair_runs_by_task_and_rep(bench: ModuleType) -> None:
+    """Item 3: a Δ line compares the same (task, rep) in both arms, never a mix of tasks."""
+    # (task, rep) -> (plain regressions, hm regressions); None is a stalled run
+    table = {("t1", 1): (1, 0), ("t1", 2): (None, 0), ("t1", 3): (2, None),
+             ("t2", 1): (0, 0), ("t2", 2): (3, None), ("t2", 3): (None, 5)}  # fmt: skip
+    rows = []
+    for arm, index in (("plain", 0), ("hm", 1)):
+        for row in _rows(arm, 0.1, tasks=("t1", "t2")):
+            reg = table[(row["task"], row["rep"])][index]
+            rows.append(_quality_row(row, reg=reg, judge=None if reg is None else 4.0 + index))
+    # pairs where both arms changed: (t1, 1) and (t2, 1): plain (1 + 0) / 2, hm (0 + 0) / 2
+    line = _value_line(bench, rows, "regressions")
+    assert line["plain"] == {"value": 0.5, "n": 2}
+    assert line["hm"] == {"value": 0.0, "n": 2}
+    assert line["delta"] == -0.5
+    assert line["lead"] == "hm"
+    judge = _value_line(bench, rows, "judge_overall")
+    assert (judge["plain"], judge["hm"], judge["delta"]) == (
+        {"value": 4.0, "n": 2}, {"value": 5.0, "n": 2}, 1.0,
+    )  # fmt: skip
+    assert _value_line(bench, rows, "lint_type")["plain"]["n"] == 2
+    text = bench.report_text(rows)
+    assert re.search(r"\n  Δ regressions per run +0\.50 \(n=2\) +0\.00 \(n=2\) +-0\.50  hm", text)
+    # the detailed Quality section still takes the unpaired means
+    tier = bench.scorecard(rows)["tiers"][0]
+    detail = next(x for x in tier["lines"] if x["metric"] == "regressions")
+    assert detail["plain"]["n"] == 4
+
+
+def test_cost_ratio_takes_the_larger_of_cli_and_transcript(bench: ModuleType) -> None:
+    """Item 4: the headline ratio follows the intent metric's rule."""
+    same = _rows("plain", 0.1) + _rows("hm", 0.4)
+    line = _value_line(bench, same, "cost")
+    assert line["delta"] == pytest.approx(4.0)
+    assert line["note"] == ""
+    split = _rows("plain", 0.1, transcript=0.1) + _rows("hm", 0.4, transcript=0.6)
+    line = _value_line(bench, split, "cost")
+    assert line["delta"] == pytest.approx(6.0)
+    assert line["note"] == "CLI 4.00x, transcript 6.00x; suspect: they differ by 33%"
+    assert line["lead"] == "plain"
+    assert "6.00x (CLI 4.00x, transcript 6.00x; suspect: they differ by 33%)" in (
+        bench.render_readme_block(split)
+    )
+    near = _rows("plain", 0.1, transcript=0.1) + _rows("hm", 0.4, transcript=0.44)
+    assert _value_line(bench, near, "cost")["note"] == "CLI 4.00x, transcript 4.40x"
+
+
+def test_cost_per_solved_and_extra_use_priced_runs_only(bench: ModuleType) -> None:
+    """Items 9 and 10: unpriced runs are left out and counted; a gain inside the band says so."""
+    plain = _rows("plain", 0.1, fail=2)
+    plain[5]["cost_usd"] = None  # a solved run with no price
+    hm = _rows("hm", 0.4, fail=1)
+    rows = plain + hm
+    line = _value_line(bench, rows, "cost_per_solved")
+    # plain priced: 5 runs, $0.50, solved 3 of them; hm priced 6, $2.40, solved 5
+    assert line["plain"] == {"value": pytest.approx(0.5 / 3), "n": 3, "unpriced": 1}
+    assert line["hm"] == {"value": pytest.approx(0.48), "n": 5, "unpriced": 0}
+    text = bench.scorecard(rows)["tiers"][0]["value"]["extra_per_solved"]["text"]
+    # (2.40 - 0.50) / (5 - 3) = 0.95; Δ solved over all runs is 5 - 4 = 1, inside the band of 2
+    assert text == ("$0.950 per additional solved run (+2 solved for +$1.900) "
+                    "(Δ solved within the tie band) (1 unpriced)")  # fmt: skip
+    block = bench.render_readme_block(rows)
+    assert "$0.167 (n=3) (1 unpriced)" in block
+
+
+def _flag_rows() -> list[dict[str, Any]]:
+    rows = _rows("plain", 0.1) + _rows("hm", 0.4)
+    for row in rows:
+        row["tier"] = 1
+        row["judge"] = {"status": "ok", "scores": {"overall": 4.0}, "redactions": 0,
+                        "diff_truncated": False}  # fmt: skip
+    rows[0]["subtype"] = "error_max_budget_usd"
+    rows[1]["leak_suspect"] = True
+    rows[6]["judge"] |= {"diff_truncated": True, "redactions": 3}
+    rows[7]["judge"] |= {"redactions": 2}
+    return rows
+
+
+def test_run_flags_count_caps_leaks_truncation_and_redactions(bench: ModuleType) -> None:
+    """Items 2, 8 and 11: per tier and arm, under Efficiency."""
+    rows = _flag_rows()
+    flags = bench.scorecard(rows)["tiers"][0]["flags"]
+    assert flags == {
+        "plain": {"budget_capped": 1, "leak_suspect": 1, "judge_truncated": 0, "redactions": 0,
+                  "redacted_runs": 0},
+        "hm": {"budget_capped": 0, "leak_suspect": 0, "judge_truncated": 1, "redactions": 5,
+               "redacted_runs": 2},
+    }  # fmt: skip
+    expected = ("plain: 1 budget-capped, 1 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 "
+                "run(s); hm: 0 budget-capped, 0 leak-suspect, 1 judge-truncated, 5 redaction(s) "
+                "in 2 run(s)")  # fmt: skip
+    text = bench.report_text(rows)
+    efficiency = text[text.index("Efficiency:") : text.index(_METRIC_HEADER)]
+    assert f"  run flags{' ' * 17}{expected}" in efficiency
+    assert f"Run flags: {expected}." in bench.render_results_md(rows)
+
+
+def test_a_diff_over_the_cap_is_truncated_and_counted(bench: ModuleType, tmp_path: Path) -> None:
+    """T1: the judge sees the first JUDGE_DIFF_CAP characters and the row says it was cut."""
+    task = next(t for t in bench.load_tasks() if t.id == "t1")
+    start = _start_tree(tmp_path / "start", "t1")
+    work = _work_from(start, tmp_path / "work", task.reference_dir)
+    (work / "tests" / "test_big.py").write_text("x = 1\n" * (bench.JUDGE_DIFF_CAP // 4))
+    opts, logs = _judge_opts(bench, tmp_path)
+    judged = bench.judge_change(task, start, work, opts)
+    assert judged["diff_truncated"] is True
+    stdin = json.loads(next(logs.glob("judge-*.json")).read_text())["stdin"]
+    assert "[diff truncated]" in stdin
+    assert len(stdin) < bench.JUDGE_DIFF_CAP + len(bench.RUBRIC) + len(task.prompt) + 2000
+    small = _work_from(start, tmp_path / "small", task.reference_dir)
+    assert bench.judge_change(task, start, small, opts)["diff_truncated"] is False
+    rows = _flag_rows()
+    rows[6]["judge"] = judged
+    assert bench.scorecard(rows)["tiers"][0]["flags"]["hm"]["judge_truncated"] == 1

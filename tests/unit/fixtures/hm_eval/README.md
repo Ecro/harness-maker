@@ -16,18 +16,22 @@
   - tier 2 tokens and turns: hm cache_read (40000 + 40000 + 8000) / 3 = 29333, ratio 2.93; turns
     (20 + 24 + 8) / 3 = 17.3, ratio 2.89.
   - The intent block is tier 1 only: plain $0.100, hm $0.400, ratio 4.000, met.
-  - What the extra cost buys, tier 2 (t6 only): cost $0.200 vs $0.700, 3.50x; solved 2 vs 2
-    (+0, tie); Δ case -0.20 (plain); Δ regressions 0.00 - 0.33 = -0.33 (hm); Δ lint+type over runs
-    with both checks, plain (0 + 1) / 2 = 0.50, hm (0 + 3) / 2 = 1.50, +1.00 (plain); Δ judge
-    4.67 - 3.50 = +1.17 (hm); cost per solved plain 0.60 / 2 = $0.300, hm 2.10 / 2 = $1.050; Δ
-    solved = 0, so extra $ per additional solved run is n/a.
+  - What the extra cost buys, tier 2 (t6 only): cost $0.200 vs $0.700, 3.50x (CLI and transcript
+    agree); solved 2 vs 2 (+0, tie); Δ case -0.20 (plain). The quality Δ lines use (task, rep)
+    pairs where both arms carry the signal; hm rep 3 stalled, so: Δ regressions over reps 1-2,
+    plain (0 + 1) / 2 = 0.50, hm 0.00, -0.50 (hm); Δ lint+type over reps 1-2 (plain rep 3 has no
+    mypy), plain 0.50, hm (0 + 3) / 2 = 1.50, +1.00 (plain); Δ judge over rep 1 only (plain rep 2
+    is a judge error), 4.00 vs 5.00, +1.00 (hm); cost per solved plain 0.60 / 2 = $0.300, hm
+    2.10 / 2 = $1.050; Δ solved = 0, so extra $ per additional solved run is n/a.
 - `RESULTS.md`, `README.before.md`, `README.after.md` — `publish` over all 18 rows. What the extra
   cost buys, by hand:
   - tier 1: $0.100 vs $0.400, 4.00x; 3 vs 3 solved; Δ judge (4 + 4 + 5) / 3 - 4 = +0.33 (hm); cost
     per solved $0.100 vs $0.400; extra $ n/a (Δ solved 0).
   - tier 2 (t6, t7): cost 1.05 / 6 = $0.175 vs 3.90 / 6 = $0.650, 3.71x; solved 5 vs 4 (-1, gap 1,
-    tie); regressions 1 / 6 = 0.17 vs 0 / 5 (hm); lint+type 1 / 5 = 0.20 vs 4 / 5 = 0.80 (plain);
-    judge 18 / 5 = 3.60 vs 21 / 5 = 4.20 (hm); cost per solved 1.05 / 5 = $0.210 vs
+    tie); paired Δ regressions over t6 r1-r2 and t7 r1-r3, plain 1 / 5 = 0.20 vs 0 / 5 (hm);
+    paired Δ lint+type over the same five pairs, plain 1 / 5 = 0.20 vs hm 4 / 5 = 0.80 (plain);
+    paired Δ judge over t6 r1 and t7 r1-r3, plain (4 + 11) / 4 = 3.75 vs hm
+    (5 + 14/3 + 3 + 4) / 4 = 4.17, +0.42 (hm); cost per solved 1.05 / 5 = $0.210 vs
     3.90 / 4 = $0.975; extra $ n/a (Δ solved -1).
 - AC-018's four extra-$ cases are built in the test from `_rows` (2 tasks x 3 runs per arm): hm
   solves more ($1.800 extra / 3 more solved = $0.600), plain solves at least as many (n/a), hm
@@ -37,5 +41,8 @@
 - Trap figures (AC-019) are built in the test from `_rows` with the `_TRAP_ROWS` table, not from
   `rows.jsonl`, whose tiers hold no trap task: there every tier's "traps caught" line reads
   `n/a (n=0)` with lead `n/a`. By hand: plain caught t10 1 of 2, t11 0 of 2, t12 1 of 1 (rep 2
-  stalled, null) = 2/5; hm 2 + 1 + 2 = 5/6; gap 3, lead hm. Flipping plain's two t11 runs to
-  caught gives 4/5 vs 5/6, gap 1, tie.
+  stalled, null) = 2/5 = 0.40; hm 2 + 1 + 2 = 5/6 = 0.83; the lead is on the rate, gap 0.43 >= 0.20,
+  hm. Flipping plain's two t11 runs to caught gives 4/5 = 0.80 vs 0.83, gap 0.03, tie.
+- The whole-file goldens (`scorecard.txt`, `RESULTS.md`, `README.after.md`) are runner output,
+  regenerated after a reviewed change; the figures above are the hand check that each regeneration
+  is compared against. Their prose is the runner's, not a separate oracle.

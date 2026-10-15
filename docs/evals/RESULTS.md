@@ -26,7 +26,7 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (hm/plain) | $0.058 (n=15) | $0.707 (n=15) | 12.29x | plain |
+| cost ratio (hm/plain) | $0.058 (n=15) | $0.707 (n=15) | 13.79x (CLI 12.29x, transcript 13.79x) | plain |
 | Δ solved runs | 15 (n=15) | 9 (n=15) | -6 | plain |
 | Δ hidden-case pass fraction | 1.00 (n=15) | 0.64 (n=15) | -0.36 | plain |
 | Δ regressions per run | n/a (n=0) | n/a (n=0) | n/a | n/a |
@@ -73,6 +73,8 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 | wall s | 16 (n=15) | 159 (n=15) | 9.95x | plain |
 
 Judge cost, kept out of the arm costs: $0.000 total over 0 call(s), 0 unpriced.
+
+Run flags: plain: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s); hm: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s).
 
 ## Intent metric (tier 1 only)
 

@@ -1563,7 +1563,7 @@ DIRECTIONS: dict[str, tuple[str | None, float]] = {
     "lint_type": ("lower", 0), "diff_lines": (None, 0), "tests_touched": (None, 0),
     **{f"judge_{name}": ("higher", 0.25) for name in (*CRITERIA, "overall")},
     "cost": ("lower", 0), "turns": ("lower", 0), "wall": ("lower", 0),
-    "cost_per_solved": ("lower", 0), "traps": ("higher", 2),
+    "cost_per_solved": ("lower", 0), "traps": ("higher", 0.2),  # traps: on the caught rate
     **{f"tokens_{kind}": ("lower", 0) for kind in ("input", "output", "cache_read", "cache_write")},
 }  # fmt: skip
 # (metric, label, section, number format), in print order.
@@ -1605,9 +1605,12 @@ _VALUE_LINES = (
 )
 EXTRA_LABEL = "extra $ per additional solved run"
 NO_GAIN = "n/a: no additional solved runs for the extra cost"
+# Quality Δ lines compare the same (task, rep) in both arms, over pairs where both changed code.
+PAIRED = ("regressions", "lint_type", "judge_overall")
+SOLVED_TIE = "(Δ solved within the tie band)"
 SCORECARD_LABELS = (
     *(label for _m, label in _VALUE_LINES), EXTRA_LABEL,
-    *(label for _m, label, _s, _f in _LINES), "judge cost",
+    *(label for _m, label, _s, _f in _LINES), "judge cost", "run flags",
 )  # fmt: skip
 _FORMATS = {metric: fmt for metric, _l, _s, fmt in _LINES} | {
     "lint_type": "2f", "cost_per_solved": "usd", "traps": "frac",
@@ -1714,48 +1717,126 @@ def _usd(value: float, *, sign: bool = False) -> str:
     return f"{prefix}${abs(value):.3f}"
 
 
-def _value(kept: list[dict[str, Any]], totals: dict[str, int]) -> dict[str, Any]:
-    """What hm's extra spend bought over plain in one tier's balanced cells."""
-    by_arm = {arm: [r for r in kept if r["arm"] == arm] for arm in ARMS}
-    solved = {arm: sum(1 for r in by_arm[arm] if outcome_of(r) == "solved") for arm in ARMS}
-    spend = {
-        arm: math.fsum(float(r["cost_usd"]) for r in by_arm[arm]
-                       if isinstance(r.get("cost_usd"), int | float))
-        for arm in ARMS
+def _paired(
+    metric: str, by_arm: dict[str, list[dict[str, Any]]]
+) -> tuple[tuple[float | None, int], tuple[float | None, int], float | None]:
+    """Means over the (task, rep) pairs where both arms carry the signal, so a Δ never sets one
+    task's runs against another's, nor a changed run against a stall."""
+    keyed = {arm: {(r["task"], r["rep"]): r for r in by_arm[arm]} for arm in ARMS}
+    values: dict[str, list[float]] = {arm: [] for arm in ARMS}
+    for key in sorted(set(keyed["plain"]) & set(keyed["hm"]), key=str):
+        plain, hm = (_signal(metric, keyed[arm][key]) for arm in ARMS)
+        if plain is not None and hm is not None:
+            values["plain"].append(plain)
+            values["hm"].append(hm)
+    p, h = (_mean(values[arm]) for arm in ARMS)
+    n = len(values["plain"])
+    delta = h - p if p is not None and h is not None else None
+    return (p, n), (h, n), delta
+
+
+def _cost_line(by_arm: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    """The headline cost ratio by the intent metric's rule: the larger of the CLI and transcript
+    ratios, flagged when they differ by more than SUSPECT_GAP."""
+    cells = {arm: _cell(by_arm[arm]) for arm in ARMS}
+    cli = _ratio(cells["hm"]["mean_cost"], cells["plain"]["mean_cost"])
+    transcript = _ratio(cells["hm"]["mean_transcript"], cells["plain"]["mean_transcript"])
+    judged = cli if cli is None or transcript is None else max(cli, transcript)
+    note = ""
+    if cli is not None and transcript is not None and judged:
+        gap = abs(cli - transcript) / judged
+        if format_ratio(cli) != format_ratio(transcript):
+            note = f"CLI {format_ratio(cli)}, transcript {format_ratio(transcript)}"
+        if gap > SUSPECT_GAP:
+            note += f"; suspect: they differ by {gap:.0%}"
+    p, h = ((cells[a]["mean_cost"], cells[a]["runs"] - cells[a]["cost_unknown"]) for a in ARMS)
+    return {
+        "plain": {"value": p[0], "n": p[1]}, "hm": {"value": h[0], "n": h[1]},
+        "delta": judged, "note": note,
+        "lead": "n/a" if judged is None else lead("cost", 1.0, judged),
     }  # fmt: skip
-    lines = []
+
+
+def _value(kept: list[dict[str, Any]], totals: dict[str, int]) -> dict[str, Any]:
+    """What hm's extra spend bought over plain in one tier's balanced cells. Dollar figures use
+    priced runs only, and say how many runs had no price."""
+    by_arm = {arm: [r for r in kept if r["arm"] == arm] for arm in ARMS}
+    priced = {arm: [r for r in by_arm[arm] if isinstance(r.get("cost_usd"), int | float)]
+              for arm in ARMS}  # fmt: skip
+    unpriced = {arm: len(by_arm[arm]) - len(priced[arm]) for arm in ARMS}
+    solved = {arm: sum(1 for r in priced[arm] if outcome_of(r) == "solved") for arm in ARMS}
+    spend = {arm: math.fsum(float(r["cost_usd"]) for r in priced[arm]) for arm in ARMS}
+    lines: list[dict[str, Any]] = []
     for metric, label in _VALUE_LINES:
-        delta: float | None
+        line: dict[str, Any] = {"metric": metric, "label": label, "note": ""}
+        if metric == "cost":
+            line |= _cost_line(by_arm)
+            lines.append(line)
+            continue
+        delta: float | None = None
         if metric == "cost_per_solved":
             p, h = ((spend[a] / solved[a] if solved[a] else None, solved[a]) for a in ARMS)
-            delta = None
+            how = lead(metric, p[0] if p[1] else None, h[0] if h[1] else None)
+        elif metric in PAIRED:
+            p, h, delta = _paired(metric, by_arm)
+            how = lead(metric, p[0] if p[1] else None, h[0] if h[1] else None)
+        elif metric == "traps":
+            p, h = (_measure(metric, by_arm[a], totals) for a in ARMS)
+            rp, rh = (x[0] / x[1] if x[0] is not None and x[1] else None for x in (p, h))
+            delta = rh - rp if rp is not None and rh is not None else None
+            how = lead(metric, rp, rh)
         else:
             p, h = (_measure(metric, by_arm[a], totals) for a in ARMS)
-            known = p[1] and h[1] and p[0] is not None and h[0] is not None
-            if metric == "cost":
-                delta = _ratio(h[0], p[0])
-            else:
-                delta = h[0] - p[0] if known and p[0] is not None and h[0] is not None else None
-        lines.append({
-            "metric": metric, "label": label, "plain": {"value": p[0], "n": p[1]},
-            "hm": {"value": h[0], "n": h[1]}, "delta": delta,
-            "lead": lead(metric, p[0] if p[1] else None, h[0] if h[1] else None),
-        })  # fmt: skip
+            if p[1] and h[1] and p[0] is not None and h[0] is not None:
+                delta = h[0] - p[0]
+            how = lead(metric, p[0] if p[1] else None, h[0] if h[1] else None)
+        line |= {"plain": {"value": p[0], "n": p[1]}, "hm": {"value": h[0], "n": h[1]},
+                 "delta": delta, "lead": how}  # fmt: skip
+        if metric == "cost_per_solved":
+            line["plain"]["unpriced"], line["hm"]["unpriced"] = unpriced["plain"], unpriced["hm"]
+        lines.append(line)
     gained, extra = solved["hm"] - solved["plain"], spend["hm"] - spend["plain"]
     per = extra / gained if gained > 0 else None
     text = NO_GAIN
     if per is not None:
         text = (f"{_usd(per)} per additional solved run ({gained:+d} solved for "
                 f"{_usd(extra, sign=True)})")  # fmt: skip
+        if next(x for x in lines if x["metric"] == "solved")["lead"] == "tie":
+            text += f" {SOLVED_TIE}"
+    if sum(unpriced.values()):
+        text += f" ({sum(unpriced.values())} unpriced)"
     return {
         "lines": lines,
         "extra_per_solved": {
-            "value": per,
-            "extra_usd": extra,
-            "extra_solved": gained,
-            "text": text,
+            "value": per, "extra_usd": extra, "extra_solved": gained, "text": text,
         },
-    }
+    }  # fmt: skip
+
+
+def _flags(kept: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Per arm: runs that hit the budget cap, may have read the hidden tests, or had their diff
+    cut for the judge, and how much harness vocabulary was redacted before judging."""
+    flags = {}
+    for arm in ARMS:
+        mine = [r for r in kept if r["arm"] == arm]
+        judged = [r["judge"] for r in mine if isinstance(r.get("judge"), dict)]
+        counts = [int(j.get("redactions") or 0) for j in judged]
+        flags[arm] = {
+            "budget_capped": sum(1 for r in mine if r.get("subtype") == BUDGET_SUBTYPE),
+            "leak_suspect": sum(1 for r in mine if r.get("leak_suspect")),
+            "judge_truncated": sum(1 for j in judged if j.get("diff_truncated") is True),
+            "redactions": sum(counts), "redacted_runs": sum(1 for c in counts if c),
+        }  # fmt: skip
+    return flags
+
+
+def flags_text(tier: dict[str, Any]) -> str:
+    return "; ".join(
+        f"{arm}: {f['budget_capped']} budget-capped, {f['leak_suspect']} leak-suspect, "
+        f"{f['judge_truncated']} judge-truncated, {f['redactions']} redaction(s) in "
+        f"{f['redacted_runs']} run(s)"
+        for arm, f in tier["flags"].items()
+    )
 
 
 def scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1783,7 +1864,7 @@ def scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
         costs = [j.get("cost_usd") for j in called]
         tiers.append({
             "tier": tier, "tasks": tasks, "excluded": excluded, "runs_per_cell": per_cell,
-            "value": _value(kept, totals), "lines": lines,
+            "value": _value(kept, totals), "lines": lines, "flags": _flags(kept),
             "judge_cost": {
                 "usd": math.fsum(float(c) for c in costs if isinstance(c, int | float)),
                 "calls": len(called), "unpriced": sum(1 for c in costs if c is None),
@@ -1829,14 +1910,18 @@ def format_delta(metric: str, delta: float | None) -> str:
         return ""
     if delta is None:
         return "n/a"
-    return f"{delta:+.0f}" if _FORMATS[metric] in ("int", "frac") else f"{delta:+.2f}"
+    return f"{delta:+.0f}" if _FORMATS[metric] == "int" else f"{delta:+.2f}"
+
+
+def _arm_cell(metric: str, side: dict[str, Any]) -> str:
+    text = format_value(metric, side["value"], side["n"])
+    return f"{text} ({side['unpriced']} unpriced)" if side.get("unpriced") else text
 
 
 def _value_cells(line: dict[str, Any]) -> tuple[str, str, str]:
-    p, h = line["plain"], line["hm"]
-    return (format_value(line["metric"], p["value"], p["n"]),
-            format_value(line["metric"], h["value"], h["n"]),
-            format_delta(line["metric"], line["delta"]))  # fmt: skip
+    metric = line["metric"]
+    return (_arm_cell(metric, line["plain"]), _arm_cell(metric, line["hm"]),
+            format_delta(metric, line["delta"]))  # fmt: skip
 
 
 def render_value(card: dict[str, Any]) -> list[str]:
@@ -1848,7 +1933,8 @@ def render_value(card: dict[str, Any]) -> list[str]:
         out.append(f"  {'metric':<36}{'plain':>16}{'hm':>16}{'hm vs plain':>13}  lead")
         for line in tier["value"]["lines"]:
             plain, hm, delta = _value_cells(line)
-            out.append(f"  {line['label']:<36}{plain:>16}{hm:>16}{delta:>13}  {line['lead']}")
+            note = f"  ({line['note']})" if line["note"] else ""
+            out.append(f"  {line['label']:<36}{plain:>16}{hm:>16}{delta:>13}  {line['lead']}{note}")
         out.append(f"  {EXTRA_LABEL:<36}{tier['value']['extra_per_solved']['text']}")
     return out
 
@@ -1859,9 +1945,10 @@ def render_value_md(card: dict[str, Any], title: Callable[[str], str]) -> list[s
         lines += [title(tier_title(tier)), ""]
         lines += ["| Metric | plain | hm | hm vs plain | Lead |", "|---|---|---|---|---|"]
         for line in tier["value"]["lines"]:
-            lines.append(
-                "| " + " | ".join([line["label"], *_value_cells(line), line["lead"]]) + " |"
-            )
+            plain, hm, delta = _value_cells(line)
+            if line["note"]:
+                delta += f" ({line['note']})"
+            lines.append("| " + " | ".join([line["label"], plain, hm, delta, line["lead"]]) + " |")
         lines += [f"| {EXTRA_LABEL} | | | {tier['value']['extra_per_solved']['text']} | — |", ""]
     return lines
 
@@ -1895,6 +1982,7 @@ def render_scorecard(card: dict[str, Any]) -> str:
                     f"{format_ratio(line['ratio']):>10}  {line['lead']}"
                 )
         out.append(f"  {'judge cost':<26}{judge_cost_text(tier)}")
+        out.append(f"  {'run flags':<26}{flags_text(tier)}")
     return "\n".join(out)
 
 
@@ -2027,7 +2115,8 @@ def render_results_md(rows: list[dict[str, Any]]) -> str:
                     cells.append(format_ratio(line["ratio"]))
                 lines.append("| " + " | ".join([*cells, line["lead"]]) + " |")
             if ratio:
-                lines += ["", f"Judge cost, kept out of the arm costs: {judge_cost_text(tier)}."]
+                lines += ["", f"Judge cost, kept out of the arm costs: {judge_cost_text(tier)}.",
+                          "", f"Run flags: {flags_text(tier)}."]  # fmt: skip
             lines.append("")
     lines += [f"## {METRIC_HEADER}", "", "```text", render_report(summary), "```"]
     return "\n".join(lines) + "\n"

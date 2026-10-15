@@ -41,10 +41,10 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 | cost ratio (hm/plain) | $0.175 (n=6) | $0.650 (n=6) | 3.71x | plain |
 | Δ solved runs | 5 (n=6) | 4 (n=6) | -1 | tie |
 | Δ hidden-case pass fraction | 0.93 (n=6) | 0.78 (n=6) | -0.15 | plain |
-| Δ regressions per run | 0.17 (n=6) | 0.00 (n=5) | -0.17 | hm |
+| Δ regressions per run | 0.20 (n=5) | 0.00 (n=5) | -0.20 | hm |
 | Δ new lint+type errors per run | 0.20 (n=5) | 0.80 (n=5) | +0.60 | plain |
 | traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
-| Δ judge overall | 3.60 (n=5) | 4.20 (n=5) | +0.60 | hm |
+| Δ judge overall | 3.75 (n=4) | 4.17 (n=4) | +0.42 | hm |
 | cost per solved run | $0.210 (n=5) | $0.975 (n=4) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
@@ -106,6 +106,8 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 
 Judge cost, kept out of the arm costs: $0.150 total over 6 call(s), 0 unpriced.
 
+Run flags: plain: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s); hm: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s).
+
 ### tier 2: 2 task(s) x 3 run(s) per arm (t6, t7)
 
 | Metric | plain | hm | hm/plain | Lead |
@@ -119,6 +121,8 @@ Judge cost, kept out of the arm costs: $0.150 total over 6 call(s), 0 unpriced.
 | wall s | 35 (n=6) | 130 (n=6) | 3.71x | plain |
 
 Judge cost, kept out of the arm costs: $0.250 total over 11 call(s), 1 unpriced.
+
+Run flags: plain: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s); hm: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s).
 
 ## Intent metric (tier 1 only)
 
