@@ -644,6 +644,7 @@ harness-maker generates and **owns the lifecycle** of your `.claude/` directory.
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
 | cost ratio (cells: mean CLI $/run) | $0.061 (n=15) | $1.396 (n=15) | 26.42x (CLI 22.79x, transcript 26.42x) | plain |
+| wall time per run | 18s (n=15) | 7m 59s (n=15) | 26.16x | plain |
 | Δ solved runs | 15 (n=15) | 15 (n=15) | +0 | tie |
 | Δ hidden-case pass fraction | 1.00 (n=15) | 1.00 (n=15) | +0.00 | tie |
 | Δ regressions per run | 0.00 (n=15) | 0.00 (n=15) | +0.00 | tie |
@@ -658,6 +659,7 @@ harness-maker generates and **owns the lifecycle** of your `.claude/` directory.
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
 | cost ratio (cells: mean CLI $/run) | $0.051 (n=21) | $1.011 (n=21) | 22.68x (CLI 19.76x, transcript 22.68x) | plain |
+| wall time per run | 13s (n=21) | 4m 26s (n=21) | 19.84x | plain |
 | Δ solved runs | 21 (n=21) | 19 (n=21) | -2 | plain |
 | Δ hidden-case pass fraction | 1.00 (n=21) | 0.96 (n=21) | -0.04 | tie |
 | Δ regressions per run | 0.00 (n=20) | 0.00 (n=20) | +0.00 | tie |

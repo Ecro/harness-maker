@@ -2222,8 +2222,8 @@ def test_publish_writes_results_and_readme_block(bench: ModuleType, tmp_path: Pa
             < results_md.index("## Efficiency"))  # fmt: skip
     block = readme[readme.index(_START) : readme.index(_END)]
     table = [line for line in block.splitlines() if line.startswith("| ") and "---" not in line]
-    # per tier: header + eight value lines (traps caught included) + the extra-$ line
-    assert len(table) == 2 * 10
+    # per tier: header + nine value lines (traps caught, wall time included) + the extra-$ line
+    assert len(table) == 2 * 11
     for line in table:
         cells = [c.strip() for c in line.strip("|").split("|")]
         if cells[0] in ("Metric", bench.EXTRA_LABEL):
@@ -2838,6 +2838,51 @@ def test_cost_per_solved_and_extra_use_priced_runs_only(bench: ModuleType) -> No
                     "(Δ solved within the tie band) (1 unpriced)")  # fmt: skip
     block = bench.render_readme_block(rows)
     assert "$0.167 (n=3) (1 unpriced)" in block
+
+
+def test_value_block_shows_wall_time_per_run(bench: ModuleType) -> None:
+    """SPEC-hm-eval-wall-time AC-001: mean wall time per arm, the hm/plain ratio and the lead,
+    right after the cost ratio, in the scorecard and the README block."""
+    rows = _rows("plain", 0.1) + _rows("hm", 0.4)
+    for row in rows:
+        row["wall_s"] = 10.0 if row["arm"] == "plain" else 485.0
+    line = _value_line(bench, rows, "wall")
+    plain, hm, delta = bench._value_cells(line)
+    assert [line["label"], plain, hm, delta, line["lead"]] == [
+        "wall time per run", "10s (n=6)", "8m 05s (n=6)", "48.50x", "plain",
+    ]  # fmt: skip
+    metrics = [x["metric"] for x in bench.scorecard(rows)["tiers"][0]["value"]["lines"]]
+    assert metrics[:2] == ["cost", "wall"]
+    assert "| wall time per run | 10s (n=6) | 8m 05s (n=6) | 48.50x | plain |" in (
+        bench.render_readme_block(rows)
+    )
+
+
+def test_value_block_wall_time_missing_is_not_zero(bench: ModuleType) -> None:
+    """SPEC-hm-eval-wall-time AC-002: an arm with no wall_s reads n/a, never 0s."""
+    rows = _rows("plain", 0.1) + _rows("hm", 0.4)
+    for row in rows:
+        if row["arm"] == "hm":
+            del row["wall_s"]
+    line = _value_line(bench, rows, "wall")
+    plain, hm, delta = bench._value_cells(line)
+    assert [plain, hm, delta, line["lead"]] == ["10s (n=6)", "n/a (n=0)", "n/a", "n/a"]
+    for row in rows:
+        row["wall_s"] = 10.0 if row["arm"] == "hm" else None
+    line = _value_line(bench, rows, "wall")
+    plain, hm, delta = bench._value_cells(line)
+    assert [plain, hm, delta, line["lead"]] == ["n/a (n=0)", "10s (n=6)", "n/a", "n/a"]
+
+
+@pytest.mark.parametrize(
+    ("seconds", "text"),
+    [(0.0, "0s"), (59.4, "59s"), (59.5, "1m 00s"), (60.0, "1m 00s"), (119.5, "2m 00s"),
+     (485.0, "8m 05s")],
+)  # fmt: skip
+def test_format_duration_switches_to_minutes_at_sixty_rounded_seconds(
+    bench: ModuleType, seconds: float, text: str
+) -> None:
+    assert bench.format_duration(seconds, 3) == f"{text} (n=3)"
 
 
 def _flag_rows() -> list[dict[str, Any]]:

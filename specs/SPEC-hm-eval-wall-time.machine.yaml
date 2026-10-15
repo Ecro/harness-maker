@@ -1,0 +1,84 @@
+schema_version: 3
+spec_slug: hm-eval-wall-time
+parent_spec: null
+verification_tier: 1
+mutation_threshold: 0
+mutation_threshold_rationale: one rendered line pinned by golden strings; mutation
+  adds nothing here
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: The headline block shows mean wall time per run, the hm/plain ratio and the
+    lead
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_value_block_shows_wall_time_per_run
+  executable_predicate: line == ['wall time per run', '10s (n=6)', '8m 05s (n=6)',
+    '48.50x', 'plain']
+  golden_table: []
+  rubric_id: null
+  note: plain 10s (n=6), hm 8m 05s (n=6), 48.50x, lead plain, in the scorecard and
+    the README block
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected strings are computed by hand from the fixture rows
+    (10.0 and 485.0 seconds; 485 / 10 = 48.5) and the existing lower-is-better direction
+    for wall, not from the new code
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: An arm with no recorded wall time reads n/a, never zero
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_light_lane.py::test_value_block_wall_time_missing_is_not_zero
+  executable_predicate: line[2:] == ['n/a (n=0)', 'n/a', 'n/a']
+  golden_table: []
+  rubric_id: null
+  note: the arm cell is n/a (n=0), the ratio n/a and the lead n/a
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The n/a strings are the scorecard's existing convention for a side
+    with no value (format_value, format_ratio, lead)
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: 4f37d869d21b7aedb9bfbf6f24a75aa8a9b60b6c441fab56ad0cecdd91ca4817
+  approved_by: null
+  approved_at: '2026-10-15T22:42:29Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: a8982051e4462884a72a82525477311918ff87c9e1bd43f1e4d0f6d5f134c7e6
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    mutation_threshold: 5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9
+    mutation_threshold_rationale: 2211e299a80e29d749ecc76b1e56ee148e6e81fa8f8baff5dc2f62050b160f3c
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 4353c62906d10403c7affd2530297b06d719733607b17d80134118a48dd33bf1
+    AC-002: 677b88a6f093e692ac892f652157b2a7cf251ad258dcbc2f123821fa851edf46
+    ac_order: acedf6abc72ca928b69febf10f5e209a5243efc125aa0e9150bcf4ce39705bd5
+  lane: light
