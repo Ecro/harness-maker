@@ -3324,3 +3324,13 @@ def test_judge_tie_band_widens_with_the_measured_noise(bench: ModuleType) -> Non
     tier = bench.scorecard(plain + hm)["tiers"][0]
     quality = next(x for x in tier["lines"] if x["metric"] == "judge_overall")
     assert quality["lead"] == "tie"  # the Quality section uses the same band
+
+
+def test_the_fixture_declares_pytest_for_its_own_venv() -> None:
+    """SPEC-hm-light-lane-s3d: without pytest in the dev group, the `.venv` uv syncs for the
+    fixture has no pytest, and the light check's SPEC plan can never pass on the bench."""
+    import tomllib
+
+    doc = tomllib.loads((_FIXTURE / "pyproject.toml").read_text(encoding="utf-8"))
+    dev = doc["dependency-groups"]["dev"]
+    assert any(re.match(r"pytest(?![\w.-])", spec) for spec in dev), dev

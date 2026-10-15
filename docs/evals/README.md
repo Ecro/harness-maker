@@ -14,7 +14,7 @@ better code, or the extra spend buys nothing, the scorecard says so. The latest 
 run. SPEC: `specs/SPEC-hm-eval.md`.
 
 **Fixture change, 2026-10-15 (HM-LIGHT-LANE stage 3d).** The fixture's `pyproject.toml` now declares
-`[dependency-groups] dev = ["pytest"]`, so the first `uv run` in a work dir syncs a `.venv` with pytest,
+`[dependency-groups] dev = ["pytest>=8"]`, so the first `uv run` in a work dir syncs a `.venv` with pytest,
 from which the light check runs the gates on a repo with no CI file. Both arms start from the changed
 file, so runs before and after this date are not strictly comparable.
 

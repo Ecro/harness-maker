@@ -103,12 +103,14 @@
   directory (or no `*.yml`/`*.yaml` in it), a trusted light SPEC (`trusted_lane: light`) whose `.md`
   `test_framework` is exactly `pytest` supplies the gates, run by `<root>/.venv/bin/python`:
   `-m ruff check .` and `-m mypy` only when `pyproject.toml` configures them, then `-m pytest`. No
-  `.venv/bin/python`, an untrusted SPEC, another framework or an unparseable `pyproject.toml` is exit 3
-  with no gates; trust is checked before a marker is reused. The JSON line says `"gate_source": "spec"`
+  `.venv/bin/python` (or no `.venv/pyvenv.cfg`), an untrusted SPEC, another framework, an unparseable
+  `pyproject.toml`, a `ruff.toml`/`.ruff.toml`/`mypy.ini`/`.mypy.ini`, a workflow file or a
+  `[tool.ruff]`/`[tool.mypy]` that HEAD has and the working tree lacks is exit 3 with no gates; trust is
+  checked before a marker is reused. The JSON line says `"gate_source": "spec"`
   on that path only; any other CI state ignores the flag, and `run` without it is unchanged. Only
   execute's light check passes the flag, and its record names the source
-  (`regression: pytest from SPEC (no CI file)`); verify, review, wrapup and the loop render unchanged.
-  The bench fixture `scripts/bench/timeparse` gains `[dependency-groups] dev = ["pytest"]`, so both eval
+  (`regression: gates from SPEC (no CI file)`); verify, review, wrapup and the loop render unchanged.
+  The bench fixture `scripts/bench/timeparse` gains `[dependency-groups] dev = ["pytest>=8"]`, so both eval
   arms now start from a project whose `.venv` has pytest. Re-render with `/hm:make` to get the new flag.
 - **Less always-loaded context.** A clean `hm spec_machine check --all` prints one line
   (`{"ok": true, "overall", "strictness"}`); failures still print the full payload. Five internal skills
