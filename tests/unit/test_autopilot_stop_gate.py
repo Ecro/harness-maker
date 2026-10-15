@@ -8,8 +8,8 @@ the replay of the 35 eval-2 hm runs (fixtures in `tests/fixtures/autopilot_stop_
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import importlib.util
-import inspect
 import io
 import itertools
 import json
@@ -26,6 +26,7 @@ from typing import Any
 
 import pytest
 
+import harness_maker
 from harness_maker import autopilot, autopilot_ledger
 from harness_maker.hooks import loop_gate
 from harness_maker.loop_marker import format_marker_content
@@ -118,6 +119,21 @@ def skill_call(m: float, stage: str) -> dict[str, Any]:
     }
 
 
+def skill_at(timestamp: str, skill: str = "hm:execute") -> dict[str, Any]:
+    """A `Skill` call with a literal timestamp and skill string."""
+    record = skill_call(0, "execute")
+    record["timestamp"] = timestamp
+    record["message"]["content"][0]["input"] = {"skill": skill}
+    return record
+
+
+def queued_command(m: float | None) -> dict[str, Any]:
+    record: dict[str, Any] = {"type": "attachment", "attachment": {"type": "queued_command"}}
+    if m is not None:
+        record["timestamp"] = _z(m)
+    return record
+
+
 def authorized(stage: str, m: float = 5) -> dict[str, Any]:
     return {"to": stage, "ts": _at(m), "event": "advance_authorized"}
 
@@ -138,7 +154,7 @@ class World:
     marker_created_m: float = 30
     pipeline: list[str] = field(default_factory=lambda: list(PIPELINE))
     task_slug: str | None = None
-    peer: bool = False
+    peer: str | None = None  # live | fresh-unseen | idle | gated | idless | old
     ledger: list[dict[str, Any]] | None = field(default_factory=lambda: [authorized("execute")])
     ledger_prefix_lines: list[str] = field(default_factory=list)
     # The row-1 end state: a prompt before the authorization; after it only the boundary's own
@@ -158,8 +174,8 @@ class World:
         (self.root / ".git").mkdir(exist_ok=True)
         if self.marker is not None:
             self._write_marker()
-        if self.peer:
-            _write_marker_file(self.root, key=PEER, claude_session_id=PEER, created=_at(10))
+        if self.peer is not None:
+            self._write_peer()
         if self.ledger is not None:
             path = autopilot_ledger.ledger_path(self.root)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -198,6 +214,19 @@ class World:
             task_slug=self.task_slug,
         )
 
+    def _write_peer(self) -> None:
+        kind = self.peer
+        _write_marker_file(
+            self.root,
+            key=PEER,
+            claude_session_id=None if kind == "idless" else PEER,
+            created=_at(19 * 60) if kind == "old" else _at(60),
+            level="gated" if kind == "gated" else "auto_full",
+            last_seen={"live": _at(5), "idle": _at(45), "gated": _at(5), "idless": _at(5)}.get(
+                str(kind)
+            ),
+        )
+
     def _write_loop(self) -> None:
         if self.loop is None:
             return
@@ -216,11 +245,12 @@ def _write_marker_file(
     root: Path,
     *,
     key: str,
-    claude_session_id: str,
+    claude_session_id: str | None,
     created: str,
     level: OperationalLevel = "auto_full",
     pipeline: list[str] = PIPELINE,
     task_slug: str | None = None,
+    last_seen: str | None = None,
 ) -> None:
     """Write a marker at `key`'s path holding `claude_session_id`; they differ for a foreign one."""
     marker = autopilot.AutopilotMarker(
@@ -230,6 +260,7 @@ def _write_marker_file(
         created_at=created,
         claude_session_id=claude_session_id,
         task_slug=task_slug,
+        last_seen=last_seen,
     )
     path = autopilot.marker_path(root, session_id=key)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -243,13 +274,22 @@ class Outcome:
     err: str
 
 
-def _run(hook: Callable[..., int], payload: str, *, now: datetime = NOW) -> Outcome:
-    """Call a `_stop_hook`, passing `now` only to a hook that takes it (the reference does not)."""
-    kwargs = {"now": now} if "now" in inspect.signature(hook).parameters else {}
+def _capture(call: Callable[[], int]) -> Outcome:
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = hook(payload, **kwargs)
+        code = call()
     return Outcome(code, out.getvalue(), err.getvalue())
+
+
+def _run(payload: str, *, now: datetime = NOW) -> Outcome:
+    """The module under test, always on a fixed clock."""
+    return _capture(lambda: loop_gate._stop_hook(payload, now=now))
+
+
+def _run_reference(reference: ModuleType, payload: str) -> Outcome:
+    """The df070f6c module, whose `_stop_hook` takes no clock."""
+    hook: Callable[[str], int] = reference._stop_hook
+    return _capture(lambda: hook(payload))
 
 
 def _reason(outcome: Outcome) -> str:
@@ -332,7 +372,12 @@ GOLDEN: list[tuple[str, Setup, tuple[str, str | None]]] = [
     ("r12-gated-marker", _set(marker="gated"), _ALLOW),
     ("r13-foreign-marker", _set(marker="foreign"), _ALLOW),
     ("r14-expired-marker", _set(marker="expired"), _ALLOW),
-    ("r15-peer-armed", _set(peer=True), _ALLOW),
+    ("r15-peer-armed", _set(peer="live"), _ALLOW),
+    ("r15b-peer-without-last-seen-but-fresh", _set(peer="fresh-unseen"), _ALLOW),
+    ("r15c-idle-peer", _set(peer="idle"), _BLOCK_EXECUTE),
+    ("r15d-gated-peer", _set(peer="gated"), _BLOCK_EXECUTE),
+    ("r15e-idless-peer", _set(peer="idless"), _BLOCK_EXECUTE),
+    ("r15f-19h-old-peer", _set(peer="old"), _BLOCK_EXECUTE),
     ("r16-marker-after-authorization", _set(marker_created_m=2), _ALLOW),
     ("r17-stage-outside-pipeline", _set(pipeline=["research", "spec"]), _ALLOW),
     ("r18-loop-precedence", _set(loop="own"), _LOOP),
@@ -351,6 +396,118 @@ GOLDEN: list[tuple[str, Setup, tuple[str, str | None]]] = [
         _ALLOW_WARN,
     ),
     ("r21-garbage-ledger-line", _set(ledger_prefix_lines=["{not json"]), _BLOCK_EXECUTE),
+    # ── review round 1 ──
+    (
+        "b1-skill-before-authorization",
+        _set(transcript=[user_prompt(20), skill_call(6, "execute"), tool_result(4.9)]),
+        _BLOCK_EXECUTE,
+    ),
+    (
+        "b2-skill-at-the-authorization-instant",
+        _append_after(skill_call(5, "execute")),
+        _BLOCK_EXECUTE,
+    ),
+    ("c1-other-hm-skill-after", _append_after(skill_call(4.5, "review")), _BLOCK_EXECUTE),
+    ("c2-non-hm-skill-after", _append_after(skill_at(_z(4.5), "simplify")), _BLOCK_EXECUTE),
+    ("s1-skill-with-args", _append_after(skill_at(_z(4.5), "hm:execute ratelimit")), _ALLOW),
+    ("s2-skill-with-slash", _append_after(skill_at(_z(4.5), "/hm:execute")), _ALLOW),
+    ("s3-plugin-namespaced", _append_after(skill_at(_z(4.5), "harness-maker:execute")), _ALLOW),
+    ("s4-hyphen-form", _append_after(skill_at(_z(4.5), "hm-execute")), _ALLOW),
+    ("s5-longer-name", _append_after(skill_at(_z(4.5), "hm:executor")), _BLOCK_EXECUTE),
+    ("s6-stage-only-as-arg", _append_after(skill_at(_z(4.5), "hm:review execute")), _BLOCK_EXECUTE),
+    (
+        "d1-same-second-skill-500us-before",
+        _set(
+            ledger=[
+                {
+                    "to": "execute",
+                    "ts": "2026-10-15T11:55:00.000500+00:00",
+                    "event": "advance_authorized",
+                }
+            ],
+            transcript=[user_prompt(20), skill_at("2026-10-15T11:55:00.000Z")],
+        ),
+        _BLOCK_EXECUTE,
+    ),
+    (
+        "d2-same-second-skill-500us-after",
+        _set(
+            ledger=[
+                {
+                    "to": "execute",
+                    "ts": "2026-10-15T11:55:00.000500+00:00",
+                    "event": "advance_authorized",
+                }
+            ],
+            transcript=[user_prompt(20), skill_at("2026-10-15T11:55:00.001Z")],
+        ),
+        _ALLOW,
+    ),
+    (
+        "d3-offset-transcript-after",
+        _append_after(skill_at("2026-10-15T13:55:30.000+02:00")),
+        _ALLOW,
+    ),
+    (
+        "d4-offset-transcript-before",
+        _append_after(skill_at("2026-10-15T12:54:30.000+01:00")),
+        _BLOCK_EXECUTE,
+    ),
+    (
+        "d5-naive-ledger-ts-is-utc-skill-after",
+        _set(
+            ledger=[{"to": "execute", "ts": "2026-10-15T11:55:00", "event": "advance_authorized"}],
+            transcript=[user_prompt(20), skill_at("2026-10-15T11:55:30.000Z")],
+        ),
+        _ALLOW,
+    ),
+    (
+        "d6-naive-ledger-ts-is-utc-skill-before",
+        _set(
+            ledger=[{"to": "execute", "ts": "2026-10-15T11:55:00", "event": "advance_authorized"}],
+            transcript=[user_prompt(20), skill_at("2026-10-15T11:54:30.000Z")],
+        ),
+        _BLOCK_EXECUTE,
+    ),
+    ("f1-authorization-10min-in-the-future", _set(ledger=[authorized("execute", -10)]), _ALLOW),
+    (
+        "f2-authorization-3min-in-the-future",
+        _set(ledger=[authorized("execute", -3)]),
+        _BLOCK_EXECUTE,
+    ),
+    ("q1-queued-command-after", _append_after(queued_command(4.5)), _ALLOW),
+    (
+        "q2-queued-command-before",
+        _set(transcript=[user_prompt(20), queued_command(6), tool_result(4.9)]),
+        _BLOCK_EXECUTE,
+    ),
+    ("q3-queued-command-without-timestamp", _append_after(queued_command(None)), _ALLOW),
+    (
+        "q4-user-record-without-timestamp",
+        _append_after({k: v for k, v in user_prompt(0).items() if k != "timestamp"}),
+        _ALLOW,
+    ),
+    (
+        "g1-sidechain-user-entry-after",
+        _append_after(user_prompt(4.5) | {"isSidechain": True}),
+        _BLOCK_EXECUTE,
+    ),
+    (
+        "g2-unparseable-authorization-ts",
+        _set(ledger=[{"to": "execute", "ts": "yesterday", "event": "advance_authorized"}]),
+        _ALLOW_WARN,
+    ),
+    (
+        "g3-two-pending-latest-named",
+        _set(ledger=[authorized("execute", 8), authorized("review", 5)]),
+        _BLOCK_REVIEW,
+    ),
+    (
+        "g4-two-pending-latest-named-reversed",
+        _set(ledger=[authorized("review", 8), authorized("execute", 5)]),
+        _BLOCK_EXECUTE,
+    ),
+    ("g5-idless-payload-own-key-marker", _set(session_id=None), _ALLOW),
 ]
 
 
@@ -360,7 +517,7 @@ def test_ac001_golden_state_table(
 ) -> None:
     world = World(tmp_path)
     setup(world)
-    outcome = _run(loop_gate._stop_hook, world.build())
+    outcome = _run(world.build())
     kind, stage = expected
     if kind == "block":
         assert stage is not None
@@ -368,6 +525,7 @@ def test_ac001_golden_state_table(
     elif kind == "loop":
         assert outcome.code == 2, outcome
         assert outcome.out == json.dumps({"decision": "block", "reason": LOOP_REASON}) + "\n"
+        assert "Autopilot" not in outcome.err, outcome.err
     else:
         _assert_allows(outcome)
         if kind == "allow_warn":
@@ -386,7 +544,7 @@ def test_ac001_r22_read_oserror_fails_open_with_one_warn_line(
 
     module = autopilot if target == "active_marker" else autopilot_ledger
     monkeypatch.setattr(module, target, boom)
-    outcome = _run(loop_gate._stop_hook, World(tmp_path).build())
+    outcome = _run(World(tmp_path).build())
     _assert_allows(outcome)
     assert len(_warn_lines(outcome)) == 1, outcome.err
     assert len(outcome.err.splitlines()) == 1, outcome.err
@@ -394,15 +552,101 @@ def test_ac001_r22_read_oserror_fails_open_with_one_warn_line(
 
 def test_block_reason_also_reaches_stderr(tmp_path: Path) -> None:
     """With exit 2 Claude Code hands the model stderr, not stdout (PLAN ADR-008)."""
-    outcome = _run(loop_gate._stop_hook, World(tmp_path).build())
+    outcome = _run(World(tmp_path).build())
     _assert_blocks(outcome, "execute")
     assert _reason(outcome) in outcome.err
 
 
 def test_task_slug_rides_in_the_reason(tmp_path: Path) -> None:
     world = World(tmp_path, task_slug="ratelimit")
-    reason = _reason(_run(loop_gate._stop_hook, world.build()))
-    assert "ratelimit" in reason
+    reason = _reason(_run(world.build()))
+    assert 'call the Skill tool with skill "hm:execute" and args "ratelimit".' in reason
+
+
+def test_no_slug_means_no_args_clause(tmp_path: Path) -> None:
+    reason = _reason(_run(World(tmp_path).build()))
+    assert 'call the Skill tool with skill "hm:execute".' in reason
+    assert "args" not in reason
+
+
+def test_an_import_failure_fails_open_with_one_warn_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The autopilot modules load inside the guarded path, so a broken import cannot crash it."""
+    monkeypatch.delattr(harness_maker, "autopilot")
+    monkeypatch.setitem(sys.modules, "harness_maker.autopilot", None)
+    outcome = _run(World(tmp_path).build())
+    _assert_allows(outcome)
+    assert len(_warn_lines(outcome)) == 1, outcome.err
+    assert len(outcome.err.splitlines()) == 1, outcome.err
+
+
+def test_importing_the_hook_does_not_load_the_autopilot_stack() -> None:
+    """The loop path and `--mode pretooluse` stay as light as at df070f6c."""
+    code = (
+        "import sys, harness_maker.hooks.loop_gate\n"
+        "heavy = ('harness_maker.autopilot', 'harness_maker.autopilot_ledger',"
+        " 'harness_maker.models', 'pydantic')\n"
+        "print(sorted(m for m in heavy if m in sys.modules))\n"
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=60, check=False
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == "[]", proc.stdout
+
+
+def test_a_transcript_over_the_size_cap_fails_open_with_one_warn_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(loop_gate, "_TRANSCRIPT_CAP_BYTES", 64)
+    outcome = _run(World(tmp_path).build())
+    _assert_allows(outcome)
+    assert len(_warn_lines(outcome)) == 1, outcome.err
+    assert len(outcome.err.splitlines()) == 1, outcome.err
+
+
+def test_undecodable_bytes_do_not_stop_the_read(tmp_path: Path) -> None:
+    world = World(tmp_path)
+    payload = world.build()
+    tpath = tmp_path / "transcript.jsonl"
+    tpath.write_bytes(b"\xff\xfe not json\n" + tpath.read_bytes())
+    _assert_blocks(_run(payload), "execute")
+
+
+def _run_cli(root: Path, payload: dict[str, Any]) -> subprocess.CompletedProcess[str]:
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"CLAUDE_PROJECT_DIR", "CURSOR_PROJECT_DIR", "HM_HOOK_HOST"}
+    }
+    return subprocess.run(
+        [sys.executable, "-m", "harness_maker.hooks.loop_gate", "--mode", "stop-hook"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        cwd=root,
+        env=env,
+    )
+
+
+@pytest.mark.parametrize(("owner", "age_minutes"), [(PEER, 30), (SID, 19 * 60)])
+def test_a_foreign_or_stale_marker_adds_no_stderr_line(
+    tmp_path: Path, owner: str, age_minutes: int
+) -> None:
+    """`harness_maker.autopilot` logs a warning for both; in the hook process that is stderr."""
+    real_now = datetime.now(UTC)
+    payload = json.loads(World(tmp_path, marker=None).build())
+    _write_marker_file(
+        tmp_path,
+        key=SID,
+        claude_session_id=owner,
+        created=(real_now - timedelta(minutes=age_minutes)).isoformat(),
+    )
+    proc = _run_cli(tmp_path, payload)
+    assert (proc.returncode, proc.stdout, proc.stderr) == (0, "", "")
 
 
 def test_sidechain_skill_call_does_not_count_as_started(tmp_path: Path) -> None:
@@ -410,7 +654,7 @@ def test_sidechain_skill_call_does_not_count_as_started(tmp_path: Path) -> None:
     call = skill_call(4.5, "execute") | {"isSidechain": True}
     world = World(tmp_path)
     _append_after(call)(world)
-    _assert_blocks(_run(loop_gate._stop_hook, world.build()), "execute")
+    _assert_blocks(_run(world.build()), "execute")
 
 
 def test_the_cli_entry_point_blocks_on_the_real_clock(tmp_path: Path) -> None:
@@ -456,6 +700,49 @@ def test_the_cli_entry_point_blocks_on_the_real_clock(tmp_path: Path) -> None:
     assert "/hm:execute" in json.loads(proc.stdout)["reason"]
 
 
+def test_the_cli_entry_point_stands_down_in_cursor(tmp_path: Path) -> None:
+    """The Claude-settings copy exits before any check when Cursor runs it (row 1's state)."""
+    real_now = datetime.now(UTC)
+    world = World(tmp_path, marker=None, ledger=None)
+    payload = json.loads(world.build())
+    _write_marker_file(
+        tmp_path,
+        key=SID,
+        claude_session_id=SID,
+        created=(real_now - timedelta(minutes=30)).isoformat(),
+    )
+    row = {
+        "to": "execute",
+        "ts": (real_now - timedelta(minutes=5)).isoformat(),
+        "event": "advance_authorized",
+    }
+    ledger = autopilot_ledger.ledger_path(tmp_path)
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".cursor" / "hooks.json").write_text(
+        '{"version": 1, "hooks": {"stop": [{"command": "HM_HOOK_HOST=cursor true"}]}}',
+        encoding="utf-8",
+    )
+    payload |= {"cursor_version": "2.4.0", "workspace_roots": [str(tmp_path)]}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"CLAUDE_PROJECT_DIR", "CURSOR_PROJECT_DIR", "HM_HOOK_HOST"}
+    }
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness_maker.hooks.loop_gate", "--mode", "stop-hook"],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        cwd=tmp_path,
+        env=env,
+    )
+    assert (proc.returncode, proc.stdout) == (0, ""), (proc.stdout, proc.stderr)
+
+
 # ── AC-002: the df070f6c loop gate, everywhere nothing refuses ───────────────
 
 
@@ -477,6 +764,8 @@ def reference_loop_gate() -> ModuleType:
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     exec(compile(proc.stdout, f"loop_gate@{_REFERENCE_REV}", "exec"), module.__dict__)  # noqa: S102
+    # The reference must be the code from before this change, not a copy of it.
+    assert not hasattr(module, "_autopilot_stop")
     return module
 
 
@@ -501,6 +790,28 @@ def _differential_world(root: Path, cell: tuple[Any, ...]) -> World:
     return world
 
 
+_OWN_LEDGER_DOMAIN = ["confirmed", "authorized"]
+_OWN_TRANSCRIPT_DOMAIN = ["skill-after", "user-after", "absent"]
+_PEER_DOMAIN = [None, "live"]
+
+
+def _own_marker_world(root: Path, cell: tuple[Any, ...]) -> World:
+    """An own active marker in a state that must not refuse; the reference ignores the marker."""
+    loop, active, ledger, transcript, peer = cell
+    world = _differential_world(root, (loop, active, "own", "authorized", "nothing-after"))
+    world.peer = peer
+    if ledger == "confirmed":
+        world.ledger = [authorized("execute"), entered("execute")]
+    if transcript == "skill-after":
+        _append_after(skill_call(4.5, "execute"))(world)
+    elif transcript == "user-after":
+        _append_after(user_prompt(4.5))(world)
+    else:
+        world.transcript = None
+        world.transcript_key = False
+    return world
+
+
 def test_ac002_equals_the_reference_loop_gate_without_a_refusing_state(
     tmp_path: Path, reference_loop_gate: ModuleType
 ) -> None:
@@ -512,12 +823,23 @@ def test_ac002_equals_the_reference_loop_gate_without_a_refusing_state(
     for index, cell in enumerate(domain):
         root = tmp_path / f"cell{index:03d}"
         payload = _differential_world(root, cell).build()
-        new = _run(loop_gate._stop_hook, payload)
-        ref = _run(reference_loop_gate._stop_hook, payload)
+        new = _run(payload)
+        ref = _run_reference(reference_loop_gate, payload)
         if (new.out, new.code) != (ref.out, ref.code):
             differing.append((cell, ref.code, new.code))
         cells += 1
-    assert cells == 160
+    own = itertools.product(
+        _LOOP_DOMAIN, _ACTIVE_DOMAIN, _OWN_LEDGER_DOMAIN, _OWN_TRANSCRIPT_DOMAIN, _PEER_DOMAIN
+    )
+    for index, own_cell in enumerate(own):
+        root = tmp_path / f"own{index:03d}"
+        payload = _own_marker_world(root, own_cell).build()
+        new = _run(payload)
+        ref = _run_reference(reference_loop_gate, payload)
+        if (new.out, new.code) != (ref.out, ref.code):
+            differing.append((("own", *own_cell), ref.code, new.code))
+        cells += 1
+    assert cells == 160 + 120
     assert differing == []
 
 
@@ -530,13 +852,16 @@ def test_ac002_domain_reaches_both_reference_outcomes(
         [("own", False, None, "absent", "absent"), (None, False, None, "absent", "absent")]
     ):
         payload = _differential_world(tmp_path / f"c{index}", cell).build()
-        codes.add(_run(reference_loop_gate._stop_hook, payload).code)
+        codes.add(_run_reference(reference_loop_gate, payload).code)
     assert codes == {0, 2}
 
 
 # ── AC-003: replaying the eval-2 hm runs ─────────────────────────────────────
 
 STALLED = {"t5-hm-1", "t5-hm-3", "t7-hm-3", "t10-hm-3", "t11-hm-1"}
+#: Observed on the eval-2 fixtures (see `Replay.controls`); a change means the fixtures or the
+#: reading of them changed, which is worth a look either way.
+CONTROLS = 89
 
 
 def _cells() -> list[str]:
@@ -567,12 +892,53 @@ class Replay:
     def first_row(self) -> datetime:
         return min(_parse(json.loads(line)["ts"]) for line in self.ledger)
 
+    def records(self) -> list[dict[str, Any]]:
+        return [json.loads(line) for line in self.transcript]
+
+    def rows(self) -> list[dict[str, Any]]:
+        return [json.loads(line) for line in self.ledger]
+
     def skill_cuts(self) -> Iterator[tuple[datetime, str]]:
-        for line in self.transcript:
-            record = json.loads(line)
+        for record in self.records():
+            if record["type"] != "assistant":
+                continue
             for block in record["message"]["content"] or []:
                 if block.get("name") == "Skill":
                     yield _parse(record["timestamp"]), block["input"]["skill"]
+
+    def controls(self) -> Iterator[tuple[datetime, str]]:
+        """Cuts 1 ms before each `Skill(hm:<stage>)` that must block, by this test's own reading.
+
+        Eligible when, up to the cut, the stage's last ledger row is an authorization (no entry
+        after it) and nothing between that authorization and the cut gave the person the floor:
+        no non-meta, non-tool-result user record and no queued command.
+        """
+        rows, records = self.rows(), self.records()
+        for skill_ts, skill in self.skill_cuts():
+            stage = skill.removeprefix("hm:")
+            cut = skill_ts - timedelta(milliseconds=1)
+            mine = [r for r in rows if r.get("to") == stage and _parse(r["ts"]) <= cut]
+            if not mine or mine[-1]["event"] != "advance_authorized":
+                continue
+            entered_at = [i for i, r in enumerate(mine) if r["event"] == "advance_entered"]
+            first_open = mine[entered_at[-1] + 1 if entered_at else 0]
+            since = _parse(first_open["ts"])
+            if any(self._gives_floor(r) and since < _parse(r["timestamp"]) <= cut for r in records):
+                continue
+            yield cut, stage
+
+    @staticmethod
+    def _gives_floor(record: dict[str, Any]) -> bool:
+        if record["type"] == "attachment":
+            return True
+        if record["type"] != "user" or record.get("isMeta"):
+            return False
+        content = record["message"]["content"]
+        return not (
+            isinstance(content, list)
+            and content
+            and all(b["type"] == "tool_result" for b in content)
+        )
 
     def run(self, root: Path, cut: datetime | None = None) -> Outcome:
         """An own active marker created before the first row; `cut` drops everything after it."""
@@ -601,7 +967,7 @@ class Replay:
                 "hook_event_name": "Stop",
             }
         )
-        return _run(loop_gate._stop_hook, payload, now=created + timedelta(hours=2))
+        return _run(payload, now=created + timedelta(hours=2))
 
 
 def test_ac003_fixture_set_is_the_35_runs_with_a_ledger() -> None:
@@ -618,6 +984,7 @@ def test_ac003_fixture_set_is_the_35_runs_with_a_ledger() -> None:
 @pytest.mark.parametrize("cell", _cells())
 def test_ac003_replay_at_run_end(tmp_path: Path, cell: str) -> None:
     outcome = Replay.load(cell).run(tmp_path)
+    assert _warn_lines(outcome) == [], outcome.err
     if cell in STALLED:
         _assert_blocks(outcome, "execute")
     else:
@@ -631,9 +998,51 @@ def test_ac003_no_skill_call_cut_blocks(tmp_path: Path, cell: str) -> None:
     blocked = []
     for index, (cut, skill) in enumerate(cuts):
         outcome = replay.run(tmp_path / f"cut{index}", cut)
-        if (outcome.code, outcome.out) != (0, ""):
-            blocked.append((skill, cut.isoformat(), outcome.out))
+        if (outcome.code, outcome.out, _warn_lines(outcome)) != (0, "", []):
+            blocked.append((skill, cut.isoformat(), outcome.out, outcome.err))
     assert blocked == []
+
+
+def test_ac003_one_ms_before_each_skill_call_the_gate_blocks(tmp_path: Path) -> None:
+    """Positive control for the cuts: just before an unrefused stage starts, the gate refuses.
+
+    Without it the cut half could pass on a gate that never blocks anything.
+    """
+    misses: list[tuple[str, str, str, str]] = []
+    controls = 0
+    for cell in _cells():
+        replay = Replay.load(cell)
+        for index, (cut, stage) in enumerate(replay.controls()):
+            controls += 1
+            outcome = replay.run(tmp_path / f"{cell}-{index}", cut)
+            ok = outcome.code == 2 and f"/hm:{stage}" in outcome.out
+            if not ok or _warn_lines(outcome):
+                misses.append((cell, stage, cut.isoformat(), outcome.out + outcome.err))
+    assert misses == []
+    assert controls == CONTROLS
+
+
+def test_ac003_fixtures_match_the_manifest() -> None:
+    """The fixtures are what the manifest says they are: hashes and kept-record counts."""
+    manifest = json.loads((_FIXTURES / "manifest.json").read_text(encoding="utf-8"))
+    mismatched = []
+    for cell, entry in manifest["cells"].items():
+        ledger = (_FIXTURES / cell / "auto-advance.jsonl").read_bytes()
+        transcript = (_FIXTURES / cell / "transcript.jsonl").read_bytes()
+        actual = (
+            hashlib.sha256(ledger).hexdigest(),
+            hashlib.sha256(transcript).hexdigest(),
+            len([line for line in transcript.split(b"\n") if line.strip()]),
+        )
+        expected = (
+            entry["ledger_sha256"],
+            entry["transcript_sha256"],
+            entry["transcript_records_kept"],
+        )
+        if actual != expected:
+            mismatched.append(cell)
+    assert mismatched == []
+    assert len(manifest["cells"]) == 35
 
 
 def test_ac003_cuts_exist() -> None:
@@ -646,7 +1055,7 @@ def test_ac003_cuts_exist() -> None:
 
 
 def test_ac004_reason_names_stage_skill_and_the_second_stop(tmp_path: Path) -> None:
-    reason = _reason(_run(loop_gate._stop_hook, World(tmp_path).build()))
+    reason = _reason(_run(World(tmp_path).build()))
     assert "/hm:execute" in reason
     assert "Skill" in reason
     sentences = re.split(r"(?<=[.!?])\s+", reason)
