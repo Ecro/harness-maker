@@ -1,0 +1,6 @@
+schema_version: 3
+spec_slug: x
+ac:
+  - id: AC-001
+    title: [render emits
+    type: mechanical

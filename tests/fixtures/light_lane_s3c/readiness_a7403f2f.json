@@ -1,0 +1,53 @@
+{
+ "source_sha": "a7403f2f",
+ "workflow_clarity": {
+  "score": 100,
+  "signals": [
+   {
+    "action": null,
+    "evidence": "12 /hm: command(s)",
+    "hard_gate": false,
+    "id": "commands_present",
+    "not_applicable": false,
+    "passed": true,
+    "weight": 30
+   },
+   {
+    "action": null,
+    "evidence": "All 6 atomic stage commands present",
+    "hard_gate": false,
+    "id": "atomic_stages_complete",
+    "not_applicable": false,
+    "passed": true,
+    "weight": 30
+   },
+   {
+    "action": null,
+    "evidence": "12/12 commands have provenance frontmatter",
+    "hard_gate": false,
+    "id": "commands_have_provenance",
+    "not_applicable": false,
+    "passed": true,
+    "weight": 20
+   },
+   {
+    "action": null,
+    "evidence": "6/6 stage/fused commands carry the locale directive",
+    "hard_gate": false,
+    "id": "output_language_present",
+    "not_applicable": false,
+    "passed": true,
+    "weight": 15
+   },
+   {
+    "action": null,
+    "evidence": "6/6 stage/fused commands carry start + end summary banners",
+    "hard_gate": false,
+    "id": "start_end_summary_present",
+    "not_applicable": false,
+    "passed": true,
+    "weight": 15
+   }
+  ]
+ }
+}
