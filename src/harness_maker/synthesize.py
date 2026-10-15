@@ -632,6 +632,7 @@ _STAGE_REFERENCE_FILES: tuple[str, ...] = (
     "review-autofix",
     "review-confirmation",
     "execute-a5",
+    "execute-light-check",
 )
 
 
@@ -639,7 +640,7 @@ def _reference_files(config_dump: dict[str, object] | None) -> list[FileSpec]:
     """On-demand reference files under ``.claude/hm/`` (SPEC-hm-light-lane-s2 / -s2b IRR-001).
 
     The auto-advance procedure renders only where the stage stubs that point at it do: a
-    ``gated`` harness carries neither. The five stage-body files always render, because the
+    ``gated`` harness carries neither. The six stage-body files always render, because the
     review and execute paths that read them exist in every harness, and a delegated stage that
     meets a missing file stops (s2b ADR-002); an unused one is harmless. No config (the
     module-level skeletons) is the full inventory.

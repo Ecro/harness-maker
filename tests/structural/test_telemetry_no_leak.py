@@ -83,6 +83,10 @@ _OBSERVABILITY_ALLOWLIST: frozenset[str] = frozenset(
         "src/harness_maker/templates/stages/_partials/review_confirmation.md.j2",
         "src/harness_maker/templates/stages/_partials/verify_checks.md.j2",
         "src/harness_maker/templates/stages/_partials/wrapup_steps.md.j2",
+        # SPEC-hm-light-lane-s3a — verify Check 4 moved verbatim into its own partial, which
+        # verify and execute's light check share; the light check names the scan's findings dir.
+        "src/harness_maker/templates/stages/_partials/verify_check_4.md.j2",
+        "src/harness_maker/templates/stages/_partials/execute_light_check.md.j2",
     }
 )
 

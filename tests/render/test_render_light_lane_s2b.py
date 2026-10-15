@@ -387,12 +387,39 @@ def test_moved_text_is_preserved(key: str) -> None:
             assert lost == [], f"{key}/{stage}: {kind} lost in the move: {lost}"
 
 
+_LIGHT_NEXT = "`$hm-wrapup` when Step 4.2 wrote a light-check record, else "
+
+
+def _without_light_check(stage: str, text: str) -> str:
+    """The Codex execute skill minus Step 4.2 (2026-10-15, SPEC-hm-light-lane-s3a).
+
+    Stage 3a added the light check to execute, inlined in the Codex skill. Everything else in that
+    skill must still be the d2c0ab0 bytes, so the section is cut — heading through its last
+    sentence and the blank line after it — rather than the hash being re-captured. The
+    frontmatter's `content_hash` is the body's sha256, so it is recomputed over the cut body: it
+    equals the old line exactly when the cut body equals the old body.
+    """
+    if stage != "execute" or "### Step 4.2 — Light check" not in text:
+        return text
+    i = text.index("### Step 4.2 — Light check")
+    end = "still runs in full.\n\n"
+    j = text.index(end, i) + len(end)
+    # The stage-end banner's next step names wrapup after a passing light check (review item P,
+    # same day); the rest of the banner line is unchanged, so that clause is cut too.
+    cut = (text[:i] + text[j:]).replace(_LIGHT_NEXT, "", 1)
+    fm_end = cut.index("\n---\n", 4) + len("\n---\n")
+    body_hash = hashlib.sha256(cut[fm_end:].encode()).hexdigest()
+    head = re.sub(r"^content_hash: .*$", f"content_hash: {body_hash}", cut[:fm_end], flags=re.M)
+    return head + cut[fm_end:]
+
+
 # AC-007
 @pytest.mark.parametrize("key", list(CONFIGS))
 def test_codex_stage_skills_unchanged(key: str) -> None:
     r = render_config(key)
     for stage in STAGES:
-        assert _sha(r.codex[stage]) == PRE["configs"][key]["codex_sha256"][stage], (
+        codex = _without_light_check(stage, r.codex[stage])
+        assert _sha(codex) == PRE["configs"][key]["codex_sha256"][stage], (
             f"{key}: the Codex {stage} skill changed; it runs the bodies inline"
         )
         assert ".claude/hm/" not in r.codex[stage].replace(".claude/hm/autopilot-advance.md", "")

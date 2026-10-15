@@ -236,6 +236,10 @@ class SpecApproval(BaseModel):
     #: before this feature — the read path says so rather than naming nothing (ADR-003).
     #: Inside `approval`, which `HASH_DENYLIST_TOP` excludes, so adding it releases no stamp.
     field_hashes: dict[str, str] | None = None
+    #: The `.md` frontmatter `lane` when the stamp was written (SPEC-hm-light-lane-s3a IRR-005).
+    #: The content hash covers only this machine yaml, so the light lane trusts the `.md` lane
+    #: only when the stamp recorded the same one. Absent on older stamps, which read as `full`.
+    lane: str | None = None
 
 
 class SpecMachine(BaseModel):
@@ -742,6 +746,9 @@ def _dump_machine_yaml(yaml_path: Path, model: SpecMachine) -> None:
     for key in ("approval", "irreversible_decisions"):
         if payload.get(key) is None:
             payload.pop(key, None)
+    # A stamp written before IRR-005 stays as it was, without `lane: null`.
+    if isinstance(payload.get("approval"), dict) and payload["approval"].get("lane") is None:
+        payload["approval"].pop("lane", None)
     for ac in payload.get("ac", []):
         if ac.get("superseded_by") is None:
             ac.pop("superseded_by", None)
@@ -2105,12 +2112,34 @@ def _spec_write_lock(yaml_path: Path) -> Iterator[None]:
         raise ApprovalError(f"{yaml_path.name} is being written by another process") from exc
 
 
+def _md_lane(yaml_path: Path) -> str | None:
+    """The sibling `SPEC-<slug>.md`'s `lane`; None when absent, unreadable or not text."""
+    from harness_maker.frontmatter import split_frontmatter
+
+    md = yaml_path.with_name(yaml_path.name.removesuffix(".machine.yaml") + ".md")
+    try:
+        mapping = split_frontmatter(md.read_bytes()).mapping
+    except Exception:  # noqa: BLE001 — no readable lane is recorded as none, which reads full
+        return None
+    lane = mapping.get("lane") if isinstance(mapping, dict) else None
+    return lane if isinstance(lane, str) else None
+
+
 def approve(yaml_path: Path, *, exempt: bool = False) -> SpecApproval:
     """Stamp the SPEC. The identity is read at the BASE root, like objective approval."""
     from harness_maker.second_opinion_invoke import resolve_base_root
 
     with _spec_write_lock(yaml_path):
         model = load(yaml_path)
+        # An exempt stamp means "nothing here needs a human" (Step 0, and a light SPEC with an
+        # empty list — SPEC-hm-light-lane-s3a ADR-009); `approval_state_of` reads one beside
+        # irreversible ids as `invalid`, so it is refused before it is written.
+        if exempt and model.irreversible_decisions:
+            ids = ", ".join(i.id for i in model.irreversible_decisions)
+            raise ApprovalError(
+                f"an exempt stamp cannot cover irreversible decisions ({ids}); "
+                "the DRI approves this SPEC instead"
+            )
         name: str | None = None
         if not exempt:
             name = _git_user_name(resolve_base_root(yaml_path.parent))
@@ -2123,6 +2152,7 @@ def approve(yaml_path: Path, *, exempt: bool = False) -> SpecApproval:
             approved_by=name,
             approved_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             field_hashes=field_digests(model),
+            lane=_md_lane(yaml_path),
         )
         model.approval = stamp
         _dump_machine_yaml(yaml_path, model)
@@ -2137,13 +2167,19 @@ def _run_approve(args: argparse.Namespace) -> int:
         return 1
     # The four established keys, explicitly: a declared model field reaches this dump
     # automatically, and IRR-001 authorised a disk-format extension, not a CLI change.
-    print(json.dumps(stamp.model_dump(mode="json", exclude={"field_hashes"})))
+    print(json.dumps(stamp.model_dump(mode="json", exclude={"field_hashes", "lane"})))
     return 0
 
 
 def _run_approval_status(args: argparse.Namespace) -> int:
+    from harness_maker import light_lane
+
     state = approval_state(args.root, args.slug, args.checkout)
-    print(json.dumps(state.as_json()))
+    # Additive (SPEC-hm-light-lane-s3a ADR-010): the boundary's own lane predicate, so execute's
+    # light check gates on the answer the skip uses instead of re-deriving it in prose. Only the
+    # CLI carries it; `as_json` also feeds the land receipt, which stays as it was.
+    trusted = light_lane.lane_of(args.root, args.slug, args.checkout)
+    print(json.dumps({**state.as_json(), "trusted_lane": trusted}))
     return 0
 
 

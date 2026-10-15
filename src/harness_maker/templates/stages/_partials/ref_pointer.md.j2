@@ -3,6 +3,7 @@
     before the include. One physical line, because a pointer that wraps is read as two. The file is
     read from the project root, never `<WT>`: a worktree copy can be stale (SPEC-hm-light-lane-s2 S3).
     With worktree isolation off there is no `<WT>` to name, so the pointer says "a worktree" (the
-    worktree-off renders carry no `<WT>` at all). -#}
+    worktree-off renders carry no `<WT>` at all). `ref_missing` replaces `STOP` for a file whose absence only skips an
+    optional step (execute's light check: review runs next instead). -#}
 {% set ptr_wt = config.worktree is defined and config.worktree.get('enabled') -%}
-Read `.claude/hm/{{ ref_file }}` from the project root (above `.worktrees/`), never from {{ '`<WT>`' if ptr_wt else 'a worktree' }}, {{ ref_use }}. If it is missing or unreadable, name `{{ ref_file }}`, say to re-render with `/hm:make`, and STOP{{ ref_stop | default('') }}.
+Read `.claude/hm/{{ ref_file }}` from the project root (above `.worktrees/`), never from {{ '`<WT>`' if ptr_wt else 'a worktree' }}, {{ ref_use }}. If it is missing or unreadable, name `{{ ref_file }}`, say to re-render with `/hm:make`, and {{ ref_missing | default('STOP') }}{{ ref_stop | default('') }}.

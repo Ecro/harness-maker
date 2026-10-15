@@ -34,6 +34,8 @@ from ._surface_baseline import (
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # +7 total, 133→140 (2026-10-15, SPEC-hm-light-lane-s3a): execute 19→25 and spec 9→10; see
+    # those entries. No call was removed.
     # Counted per command PLUS the `.claude/hm/` files it points at (2026-10-14, stage 2b
     # confirmation pass), the way `_instruction_baseline.stage_text` reads a stage. The entries
     # below counted the bare command, so the drops they record for stage 2b were calls that had
@@ -150,7 +152,14 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # recorded, which is the evidence half the removed Step 1.7 gate left behind.
     # 21 → 25 (same task, second fold): `worktree loop-mode-active` in Step 0.2 plus the
     # is_codex-branched call sites ADR-011's counting rule includes.
-    "execute": 19,
+    # 19 → 25 (2026-10-15, SPEC-hm-light-lane-s3a): Step 4.2's light check, read from
+    # `.claude/hm/execute-light-check.md`, adds approval-status, Check 2's verification_cache
+    # run and the `key` read for the record, `security-scan --force`, and Check 6's op-check and
+    # waiver-check. (The first version had Check 2's degraded mark-pass where the `key` read is;
+    # the review of 3a, item F, dropped it.) Those calls are the gates that replace the review
+    # and verify turns on a trusted light lane. No call was removed. Attributed in
+    # work-docs/BASELINE-DELTA-hm-light-lane-s3a.md.
+    "execute": 25,
     # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml
     # second_opinion.models` dropped `antigravity`, and `/hm:health` runs ONE per-model
     # positive smoke-test per enabled model, so its `second_opinion_invoke` smoke call for that
@@ -263,7 +272,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 12 → 10 (intent-surface-diet, 2026-10-04): Step 0.5 drops the second `hm intent status`
     # read (the `rejected[]`/`revisits` check) and Step 4.9's `hm intent new --from-proposal`
     # went with the step. Attributed in work-docs/BASELINE-DELTA-intent-surface-diet.md.
-    "spec": 9,
+    # 9 → 10 (2026-10-15, SPEC-hm-light-lane-s3a ADR-009): Step 5 stamps a light SPEC with no
+    # irreversible decisions `--exempt`. Attributed in
+    # work-docs/BASELINE-DELTA-hm-light-lane-s3a.md.
+    "spec": 10,
     "uninstall": 3,
     # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.
     # 15 → 12: SPEC-ci-derived-verification-plan replaces the four EXAMPLE gate commands

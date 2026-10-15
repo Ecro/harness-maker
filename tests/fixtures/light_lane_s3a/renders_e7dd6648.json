@@ -1,0 +1,1553 @@
+{
+ "configs": {
+  "loop-off/wt-off/block/mech-set/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 43514,
+   "execute_sha256": "49fcb9a17b98b7131e19ee932baf1ac041f422db9dc669d3e6ed313cca554180",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "b0a1e73b4ead4096924f0d32648b27dc762b56bbe76a046716850a841cf8b79b",
+    "commands/hm/verify.md": "52c652612c33efe4c5a82f7ef09129fdd57b8d405f0ec6c3e200be436c387d47",
+    "commands/hm/wrapup.md": "36192d091d337e78e58d499e6f1c41b015cc3fa2d7c6052b944a792ca176d9dd",
+    "hm/review-autofix.md": "74de712ea21cd1d5091533ed6e0e679d4834966c674d97bfaff6ca76ee97d545",
+    "hm/review-confirmation.md": "b28b6f2c177453919e8bbe3889ed5c65c2ec2630c938734f54af9d60a906dc42",
+    "hm/verify-checks.md": "c41b0bd4dc8da3033e5b8805907c675c95e904fa5d11d172061d9bf917380a78",
+    "hm/wrapup-steps.md": "305579c7a0aa4097da64e7af73bed0d29d8c1990bdaf244cfaf0a970cde36e70",
+    "skills/hm-review": "2a2597b19fd557c5674e9ef79a1110bb5f53e6cc5bdf14cbaa2e05e6d7bad073",
+    "skills/hm-verify": "d9d6e96e64b5e4b45ecac574b07017fba2713fdca00b3f3938dc0a48aeb47df3",
+    "skills/hm-wrapup": "20843cd7a56b69a8cbe3df8e0f75849382707e530584c31ead708138ba3ff67c"
+   }
+  },
+  "loop-off/wt-off/block/mech-set/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 43514,
+   "execute_sha256": "49fcb9a17b98b7131e19ee932baf1ac041f422db9dc669d3e6ed313cca554180",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "85dd444152b842af035d608d8f703ed7aeab2c65082c7b9b650d7771e3a08c5e",
+    "commands/hm/verify.md": "52c652612c33efe4c5a82f7ef09129fdd57b8d405f0ec6c3e200be436c387d47",
+    "commands/hm/wrapup.md": "36192d091d337e78e58d499e6f1c41b015cc3fa2d7c6052b944a792ca176d9dd",
+    "hm/review-autofix.md": "a57a901a3f3f2cee58e14cf05ac6f1c5b84eed5bf9558d60ee51c9fcb8441896",
+    "hm/review-confirmation.md": "6b61cb508feadcac216a9ed530e3537bc65a7e178d8ed832e95f4cb69968bbea",
+    "hm/verify-checks.md": "14a58621bb80b5e8f04758f17d08594d7f06229a104b800531bf254ccea67555",
+    "hm/wrapup-steps.md": "d0b4e698cf2dd1f3a38fa5818460a83a0dc86fd60945d34c881eb90f0cbd9bca",
+    "skills/hm-review": "d9e88a2c386e90c0eb9dd39fb44c988da1cd2b0ae7d2751bbd416788174e15f2",
+    "skills/hm-verify": "67843ded45d67a446ae72e8348ec552d8aba4e147680a1b681cc21b9f971122c",
+    "skills/hm-wrapup": "b19f5af7f37f555e15479b058c38fb74a626d893db792db29a4f8dca7d8c1478"
+   }
+  },
+  "loop-off/wt-off/block/mech-unset/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 43514,
+   "execute_sha256": "49fcb9a17b98b7131e19ee932baf1ac041f422db9dc669d3e6ed313cca554180",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "520bb9578c770e6e12e3ffb39f6e68b51fbb45081b254b2626f974b3b1c7599b",
+    "commands/hm/verify.md": "52c652612c33efe4c5a82f7ef09129fdd57b8d405f0ec6c3e200be436c387d47",
+    "commands/hm/wrapup.md": "36192d091d337e78e58d499e6f1c41b015cc3fa2d7c6052b944a792ca176d9dd",
+    "hm/review-autofix.md": "74de712ea21cd1d5091533ed6e0e679d4834966c674d97bfaff6ca76ee97d545",
+    "hm/review-confirmation.md": "b28b6f2c177453919e8bbe3889ed5c65c2ec2630c938734f54af9d60a906dc42",
+    "hm/verify-checks.md": "c41b0bd4dc8da3033e5b8805907c675c95e904fa5d11d172061d9bf917380a78",
+    "hm/wrapup-steps.md": "305579c7a0aa4097da64e7af73bed0d29d8c1990bdaf244cfaf0a970cde36e70",
+    "skills/hm-review": "7933aa786df3dbb5c11a3744ea00740922343a6de913f8c4982962533d9d455a",
+    "skills/hm-verify": "d9d6e96e64b5e4b45ecac574b07017fba2713fdca00b3f3938dc0a48aeb47df3",
+    "skills/hm-wrapup": "20843cd7a56b69a8cbe3df8e0f75849382707e530584c31ead708138ba3ff67c"
+   }
+  },
+  "loop-off/wt-off/block/mech-unset/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 43514,
+   "execute_sha256": "49fcb9a17b98b7131e19ee932baf1ac041f422db9dc669d3e6ed313cca554180",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "d4c65ebbef93990622fa3500687de3699818eb5524f79c65f7faba61679fdde7",
+    "commands/hm/verify.md": "52c652612c33efe4c5a82f7ef09129fdd57b8d405f0ec6c3e200be436c387d47",
+    "commands/hm/wrapup.md": "36192d091d337e78e58d499e6f1c41b015cc3fa2d7c6052b944a792ca176d9dd",
+    "hm/review-autofix.md": "a57a901a3f3f2cee58e14cf05ac6f1c5b84eed5bf9558d60ee51c9fcb8441896",
+    "hm/review-confirmation.md": "6b61cb508feadcac216a9ed530e3537bc65a7e178d8ed832e95f4cb69968bbea",
+    "hm/verify-checks.md": "14a58621bb80b5e8f04758f17d08594d7f06229a104b800531bf254ccea67555",
+    "hm/wrapup-steps.md": "d0b4e698cf2dd1f3a38fa5818460a83a0dc86fd60945d34c881eb90f0cbd9bca",
+    "skills/hm-review": "06a135dddf01401a707dafdcfb0831fed328441b91c182280e8ec456950aa9fe",
+    "skills/hm-verify": "67843ded45d67a446ae72e8348ec552d8aba4e147680a1b681cc21b9f971122c",
+    "skills/hm-wrapup": "b19f5af7f37f555e15479b058c38fb74a626d893db792db29a4f8dca7d8c1478"
+   }
+  },
+  "loop-off/wt-off/warn/mech-set/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 43561,
+   "execute_sha256": "7e16c6cd188175f4b9da4b0577032c7262531a2f1dc6508c5709ba3275b8b3e5",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "b0a1e73b4ead4096924f0d32648b27dc762b56bbe76a046716850a841cf8b79b",
+    "commands/hm/verify.md": "52c652612c33efe4c5a82f7ef09129fdd57b8d405f0ec6c3e200be436c387d47",
+    "commands/hm/wrapup.md": "36192d091d337e78e58d499e6f1c41b015cc3fa2d7c6052b944a792ca176d9dd",
+    "hm/review-autofix.md": "74de712ea21cd1d5091533ed6e0e679d4834966c674d97bfaff6ca76ee97d545",
+    "hm/review-confirmation.md": "b28b6f2c177453919e8bbe3889ed5c65c2ec2630c938734f54af9d60a906dc42",
+    "hm/verify-checks.md": "c0c71372d2b17828a49e83c88a76b1886b70c7f74d9c4ba0362cb5f669845f0f",
+    "hm/wrapup-steps.md": "e68d01cf5d60b5fc1174dd30d188636739a667182b393d5ab0023bd0426c5ce9",
+    "skills/hm-review": "2a2597b19fd557c5674e9ef79a1110bb5f53e6cc5bdf14cbaa2e05e6d7bad073",
+    "skills/hm-verify": "171fcd2e2cdc27c16b344b1cf135b198d938c9d0c7c752a4c61c032adc8a9d51",
+    "skills/hm-wrapup": "74e46590d6223f4959df7d97f14951d3c88da1687c312784ec3e10c567bce353"
+   }
+  },
+  "loop-off/wt-off/warn/mech-set/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 43561,
+   "execute_sha256": "7e16c6cd188175f4b9da4b0577032c7262531a2f1dc6508c5709ba3275b8b3e5",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "85dd444152b842af035d608d8f703ed7aeab2c65082c7b9b650d7771e3a08c5e",
+    "commands/hm/verify.md": "52c652612c33efe4c5a82f7ef09129fdd57b8d405f0ec6c3e200be436c387d47",
+    "commands/hm/wrapup.md": "36192d091d337e78e58d499e6f1c41b015cc3fa2d7c6052b944a792ca176d9dd",
+    "hm/review-autofix.md": "a57a901a3f3f2cee58e14cf05ac6f1c5b84eed5bf9558d60ee51c9fcb8441896",
+    "hm/review-confirmation.md": "6b61cb508feadcac216a9ed530e3537bc65a7e178d8ed832e95f4cb69968bbea",
+    "hm/verify-checks.md": "c0c71372d2b17828a49e83c88a76b1886b70c7f74d9c4ba0362cb5f669845f0f",
+    "hm/wrapup-steps.md": "d90b9ee548b6e611bcf744dcf92e0ad58a1084c28a85a606a832e8b0ca7a7660",
+    "skills/hm-review": "d9e88a2c386e90c0eb9dd39fb44c988da1cd2b0ae7d2751bbd416788174e15f2",
+    "skills/hm-verify": "171fcd2e2cdc27c16b344b1cf135b198d938c9d0c7c752a4c61c032adc8a9d51",
+    "skills/hm-wrapup": "0b7a8c2b59cb74a12af7c6d177da62c3dad20b2678cf7751d3d7cac1d29b431e"
+   }
+  },
+  "loop-off/wt-off/warn/mech-unset/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 43561,
+   "execute_sha256": "7e16c6cd188175f4b9da4b0577032c7262531a2f1dc6508c5709ba3275b8b3e5",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "520bb9578c770e6e12e3ffb39f6e68b51fbb45081b254b2626f974b3b1c7599b",
+    "commands/hm/verify.md": "52c652612c33efe4c5a82f7ef09129fdd57b8d405f0ec6c3e200be436c387d47",
+    "commands/hm/wrapup.md": "36192d091d337e78e58d499e6f1c41b015cc3fa2d7c6052b944a792ca176d9dd",
+    "hm/review-autofix.md": "74de712ea21cd1d5091533ed6e0e679d4834966c674d97bfaff6ca76ee97d545",
+    "hm/review-confirmation.md": "b28b6f2c177453919e8bbe3889ed5c65c2ec2630c938734f54af9d60a906dc42",
+    "hm/verify-checks.md": "c0c71372d2b17828a49e83c88a76b1886b70c7f74d9c4ba0362cb5f669845f0f",
+    "hm/wrapup-steps.md": "e68d01cf5d60b5fc1174dd30d188636739a667182b393d5ab0023bd0426c5ce9",
+    "skills/hm-review": "7933aa786df3dbb5c11a3744ea00740922343a6de913f8c4982962533d9d455a",
+    "skills/hm-verify": "171fcd2e2cdc27c16b344b1cf135b198d938c9d0c7c752a4c61c032adc8a9d51",
+    "skills/hm-wrapup": "74e46590d6223f4959df7d97f14951d3c88da1687c312784ec3e10c567bce353"
+   }
+  },
+  "loop-off/wt-off/warn/mech-unset/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 43561,
+   "execute_sha256": "7e16c6cd188175f4b9da4b0577032c7262531a2f1dc6508c5709ba3275b8b3e5",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "d4c65ebbef93990622fa3500687de3699818eb5524f79c65f7faba61679fdde7",
+    "commands/hm/verify.md": "52c652612c33efe4c5a82f7ef09129fdd57b8d405f0ec6c3e200be436c387d47",
+    "commands/hm/wrapup.md": "36192d091d337e78e58d499e6f1c41b015cc3fa2d7c6052b944a792ca176d9dd",
+    "hm/review-autofix.md": "a57a901a3f3f2cee58e14cf05ac6f1c5b84eed5bf9558d60ee51c9fcb8441896",
+    "hm/review-confirmation.md": "6b61cb508feadcac216a9ed530e3537bc65a7e178d8ed832e95f4cb69968bbea",
+    "hm/verify-checks.md": "c0c71372d2b17828a49e83c88a76b1886b70c7f74d9c4ba0362cb5f669845f0f",
+    "hm/wrapup-steps.md": "d90b9ee548b6e611bcf744dcf92e0ad58a1084c28a85a606a832e8b0ca7a7660",
+    "skills/hm-review": "06a135dddf01401a707dafdcfb0831fed328441b91c182280e8ec456950aa9fe",
+    "skills/hm-verify": "171fcd2e2cdc27c16b344b1cf135b198d938c9d0c7c752a4c61c032adc8a9d51",
+    "skills/hm-wrapup": "0b7a8c2b59cb74a12af7c6d177da62c3dad20b2678cf7751d3d7cac1d29b431e"
+   }
+  },
+  "loop-off/wt-on/block/mech-set/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 44985,
+   "execute_sha256": "5df5ca38ec2f19357158398a3c7ff916c16d5f68c0550df24a9d00ee01141f25",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "de26dc056196fd3f330311690b353b35f2a1ca7fa04842d62438affc61bbf646",
+    "commands/hm/verify.md": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+    "commands/hm/wrapup.md": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8",
+    "hm/review-autofix.md": "749b97ec61ec262f0f68e4220a102047647d51e07d61403c1cd00c6d06de16c9",
+    "hm/review-confirmation.md": "e2c8ae69a51f95cec9bf7e9c6af09f4b0a474de4764d766f0b22eb226f43ba58",
+    "hm/verify-checks.md": "e155037a6b2281333d98ab997aefab8d870032db5a89ca405459b785b954b08b",
+    "hm/wrapup-steps.md": "f741450bd573886ecc2f06e3a033e52b813ae800f532b9db4d6e2c3296268f87",
+    "skills/hm-review": "c6153e91dd92159cf2455d9685f8430488603e5dff808cd4f0e81dda94d6b902",
+    "skills/hm-verify": "5af7705f09d0d8b152ef480910284d3bd8439e577a1bbf202f062728542c875f",
+    "skills/hm-wrapup": "0f4b2bcfd1a4f9b927060cb512bacef278b4c1090c00f33f74f64c7f7aca2eb1"
+   }
+  },
+  "loop-off/wt-on/block/mech-set/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 44985,
+   "execute_sha256": "5df5ca38ec2f19357158398a3c7ff916c16d5f68c0550df24a9d00ee01141f25",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "833e89550f4e178e46ba181a7a0773be2616fff28049bef4ef4a338140b58b07",
+    "commands/hm/verify.md": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+    "commands/hm/wrapup.md": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8",
+    "hm/review-autofix.md": "f7edadb31dd6af5e6d74a40083cbe410a857d6255d265f1d588f17f1510e2c2a",
+    "hm/review-confirmation.md": "474ef0963596936f31892f12d9e1bfb21fd1675cbe45f0c0b4af247ea1060578",
+    "hm/verify-checks.md": "e2fb34f503c01286428f72d0e1d0b0149c247c8bef043ad04b32ba95c03ce45f",
+    "hm/wrapup-steps.md": "c8c1cc1a5487bc2740875dcd52620955e6d266360909d9450b61fb03f0b8fbd8",
+    "skills/hm-review": "fd55acdd54b9cf073c979b7057fdcfc7d189cce8b19b61b3a4ba990a68b8270f",
+    "skills/hm-verify": "90186f5d5aef17cd5ec58746854b3b2c8212f827659d02347b9cb3a573ed8c35",
+    "skills/hm-wrapup": "4a2f611b78cf22fa21f1f226991bb316cd93e927ebd64330bb3951c3051bd1d7"
+   }
+  },
+  "loop-off/wt-on/block/mech-unset/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 44985,
+   "execute_sha256": "5df5ca38ec2f19357158398a3c7ff916c16d5f68c0550df24a9d00ee01141f25",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "1b71d2fd53cf497d432be85dcf41aa2927d8f7048c627f143c3d62beec0d3408",
+    "commands/hm/verify.md": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+    "commands/hm/wrapup.md": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8",
+    "hm/review-autofix.md": "749b97ec61ec262f0f68e4220a102047647d51e07d61403c1cd00c6d06de16c9",
+    "hm/review-confirmation.md": "e2c8ae69a51f95cec9bf7e9c6af09f4b0a474de4764d766f0b22eb226f43ba58",
+    "hm/verify-checks.md": "e155037a6b2281333d98ab997aefab8d870032db5a89ca405459b785b954b08b",
+    "hm/wrapup-steps.md": "f741450bd573886ecc2f06e3a033e52b813ae800f532b9db4d6e2c3296268f87",
+    "skills/hm-review": "dd59176954d4593dffc377c936795889b35f199a30e3f42f6f78e7a9ffd7f52f",
+    "skills/hm-verify": "5af7705f09d0d8b152ef480910284d3bd8439e577a1bbf202f062728542c875f",
+    "skills/hm-wrapup": "0f4b2bcfd1a4f9b927060cb512bacef278b4c1090c00f33f74f64c7f7aca2eb1"
+   }
+  },
+  "loop-off/wt-on/block/mech-unset/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 44985,
+   "execute_sha256": "5df5ca38ec2f19357158398a3c7ff916c16d5f68c0550df24a9d00ee01141f25",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "76f56f383f852397e0ef2171717238220d47107d39af45bce39c3937d7fd933c",
+    "commands/hm/verify.md": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+    "commands/hm/wrapup.md": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8",
+    "hm/review-autofix.md": "f7edadb31dd6af5e6d74a40083cbe410a857d6255d265f1d588f17f1510e2c2a",
+    "hm/review-confirmation.md": "474ef0963596936f31892f12d9e1bfb21fd1675cbe45f0c0b4af247ea1060578",
+    "hm/verify-checks.md": "e2fb34f503c01286428f72d0e1d0b0149c247c8bef043ad04b32ba95c03ce45f",
+    "hm/wrapup-steps.md": "c8c1cc1a5487bc2740875dcd52620955e6d266360909d9450b61fb03f0b8fbd8",
+    "skills/hm-review": "fba46801c5a72b486bf0f52caa1acb42f2ff1eda17ef0ac8806d6783107e1484",
+    "skills/hm-verify": "90186f5d5aef17cd5ec58746854b3b2c8212f827659d02347b9cb3a573ed8c35",
+    "skills/hm-wrapup": "4a2f611b78cf22fa21f1f226991bb316cd93e927ebd64330bb3951c3051bd1d7"
+   }
+  },
+  "loop-off/wt-on/warn/mech-set/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 45032,
+   "execute_sha256": "243f81412312d0d1dab4ca9ab8cabab97ff0d34f5c2df27f793dac96ae0be6d5",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "de26dc056196fd3f330311690b353b35f2a1ca7fa04842d62438affc61bbf646",
+    "commands/hm/verify.md": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+    "commands/hm/wrapup.md": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8",
+    "hm/review-autofix.md": "749b97ec61ec262f0f68e4220a102047647d51e07d61403c1cd00c6d06de16c9",
+    "hm/review-confirmation.md": "e2c8ae69a51f95cec9bf7e9c6af09f4b0a474de4764d766f0b22eb226f43ba58",
+    "hm/verify-checks.md": "1a332ae957d1151fbd829fe95afbcdaa9f3b7cb5453d23f850f2a2a7dbd8b188",
+    "hm/wrapup-steps.md": "f3dbba102b0cbc2b6077a2da54b274e66298ccf5b0453658f2d0bf087453b9e9",
+    "skills/hm-review": "c6153e91dd92159cf2455d9685f8430488603e5dff808cd4f0e81dda94d6b902",
+    "skills/hm-verify": "7e5f9b7eb841c731b1c8434f1f8a44b94d42a8ba2a8b650f67e321d1962f0199",
+    "skills/hm-wrapup": "45dd18cc80bf7ed53e4b639e59dbba4bf9417f78b4b13a0b2481207ac10f009f"
+   }
+  },
+  "loop-off/wt-on/warn/mech-set/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 45032,
+   "execute_sha256": "243f81412312d0d1dab4ca9ab8cabab97ff0d34f5c2df27f793dac96ae0be6d5",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "833e89550f4e178e46ba181a7a0773be2616fff28049bef4ef4a338140b58b07",
+    "commands/hm/verify.md": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+    "commands/hm/wrapup.md": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8",
+    "hm/review-autofix.md": "f7edadb31dd6af5e6d74a40083cbe410a857d6255d265f1d588f17f1510e2c2a",
+    "hm/review-confirmation.md": "474ef0963596936f31892f12d9e1bfb21fd1675cbe45f0c0b4af247ea1060578",
+    "hm/verify-checks.md": "1a332ae957d1151fbd829fe95afbcdaa9f3b7cb5453d23f850f2a2a7dbd8b188",
+    "hm/wrapup-steps.md": "763343ba1627b334b887ad9d61713550fde1f08191770a953702796300c3baed",
+    "skills/hm-review": "fd55acdd54b9cf073c979b7057fdcfc7d189cce8b19b61b3a4ba990a68b8270f",
+    "skills/hm-verify": "7e5f9b7eb841c731b1c8434f1f8a44b94d42a8ba2a8b650f67e321d1962f0199",
+    "skills/hm-wrapup": "664a846f002863bdf8cc760de619c5a811123229877c9250246654dd5bc6acc0"
+   }
+  },
+  "loop-off/wt-on/warn/mech-unset/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 45032,
+   "execute_sha256": "243f81412312d0d1dab4ca9ab8cabab97ff0d34f5c2df27f793dac96ae0be6d5",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "1b71d2fd53cf497d432be85dcf41aa2927d8f7048c627f143c3d62beec0d3408",
+    "commands/hm/verify.md": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+    "commands/hm/wrapup.md": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8",
+    "hm/review-autofix.md": "749b97ec61ec262f0f68e4220a102047647d51e07d61403c1cd00c6d06de16c9",
+    "hm/review-confirmation.md": "e2c8ae69a51f95cec9bf7e9c6af09f4b0a474de4764d766f0b22eb226f43ba58",
+    "hm/verify-checks.md": "1a332ae957d1151fbd829fe95afbcdaa9f3b7cb5453d23f850f2a2a7dbd8b188",
+    "hm/wrapup-steps.md": "f3dbba102b0cbc2b6077a2da54b274e66298ccf5b0453658f2d0bf087453b9e9",
+    "skills/hm-review": "dd59176954d4593dffc377c936795889b35f199a30e3f42f6f78e7a9ffd7f52f",
+    "skills/hm-verify": "7e5f9b7eb841c731b1c8434f1f8a44b94d42a8ba2a8b650f67e321d1962f0199",
+    "skills/hm-wrapup": "45dd18cc80bf7ed53e4b639e59dbba4bf9417f78b4b13a0b2481207ac10f009f"
+   }
+  },
+  "loop-off/wt-on/warn/mech-unset/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 45032,
+   "execute_sha256": "243f81412312d0d1dab4ca9ab8cabab97ff0d34f5c2df27f793dac96ae0be6d5",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": null,
+    "commands/hm/review.md": "76f56f383f852397e0ef2171717238220d47107d39af45bce39c3937d7fd933c",
+    "commands/hm/verify.md": "e02759d113cc2dfa0237adf8f84cd26ca1a99ba908b49c09017fa18f1ffcf31a",
+    "commands/hm/wrapup.md": "f4a51ef5fde85bec0f3276b457cf745c21b8af314d498defcc55f612a12732d8",
+    "hm/review-autofix.md": "f7edadb31dd6af5e6d74a40083cbe410a857d6255d265f1d588f17f1510e2c2a",
+    "hm/review-confirmation.md": "474ef0963596936f31892f12d9e1bfb21fd1675cbe45f0c0b4af247ea1060578",
+    "hm/verify-checks.md": "1a332ae957d1151fbd829fe95afbcdaa9f3b7cb5453d23f850f2a2a7dbd8b188",
+    "hm/wrapup-steps.md": "763343ba1627b334b887ad9d61713550fde1f08191770a953702796300c3baed",
+    "skills/hm-review": "fba46801c5a72b486bf0f52caa1acb42f2ff1eda17ef0ac8806d6783107e1484",
+    "skills/hm-verify": "7e5f9b7eb841c731b1c8434f1f8a44b94d42a8ba2a8b650f67e321d1962f0199",
+    "skills/hm-wrapup": "664a846f002863bdf8cc760de619c5a811123229877c9250246654dd5bc6acc0"
+   }
+  },
+  "loop-on/wt-off/block/mech-set/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 46672,
+   "execute_sha256": "e6185a312945a735dbd6869e137da535cf355aca3ed6bf9490dd2fb5ba3a6dab",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
+    "commands/hm/review.md": "9e4f7f766c599a26f7059fa8472c1696ba9e8bf5b9e7fbea1094f2e94ea64e72",
+    "commands/hm/verify.md": "ef9c94b8375053998fb86c690a5e426232ced39857e328bfe27d0f4399362986",
+    "commands/hm/wrapup.md": "2225630a1b7d2920385ea9f92be9f6718f4278d635a4728348895297ff69029b",
+    "hm/review-autofix.md": "74de712ea21cd1d5091533ed6e0e679d4834966c674d97bfaff6ca76ee97d545",
+    "hm/review-confirmation.md": "08caf67013dfadcc538bd672abeac07764571e22e76fafe75e683d97db0f3585",
+    "hm/verify-checks.md": "4d1fa68cfe9d07e010c33070c15aa628cc23f0e9c45d28c3d18e5899c2df8912",
+    "hm/wrapup-steps.md": "305579c7a0aa4097da64e7af73bed0d29d8c1990bdaf244cfaf0a970cde36e70",
+    "skills/hm-review": "3e1dfd70079a26e02aabbdf35ba8648d92f146ee695537e484198204b3f79532",
+    "skills/hm-verify": "f0cfe93a1866605a2e3346247eb64329c6bb3ecd8e97025a096a8eb51ac2fb65",
+    "skills/hm-wrapup": "cd2572ec037c0b2c688c10948d1b010133e8ebf9ee606a4bc988bed77102860d"
+   }
+  },
+  "loop-on/wt-off/block/mech-set/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 46672,
+   "execute_sha256": "e6185a312945a735dbd6869e137da535cf355aca3ed6bf9490dd2fb5ba3a6dab",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
+    "commands/hm/review.md": "438eb236a43e42ca6b5a18e7ca5670d59ad85753e9fa13d116ba972eae97f501",
+    "commands/hm/verify.md": "ef9c94b8375053998fb86c690a5e426232ced39857e328bfe27d0f4399362986",
+    "commands/hm/wrapup.md": "2225630a1b7d2920385ea9f92be9f6718f4278d635a4728348895297ff69029b",
+    "hm/review-autofix.md": "a57a901a3f3f2cee58e14cf05ac6f1c5b84eed5bf9558d60ee51c9fcb8441896",
+    "hm/review-confirmation.md": "18d8fb6c27a89bc19f3f9db9d60fba01537c3e3480eca5908aa996714b869d5f",
+    "hm/verify-checks.md": "82a26077d5d0a923ef0be9d3da9d1c35e34b865d467ae9ffb600abb159d8fee7",
+    "hm/wrapup-steps.md": "d0b4e698cf2dd1f3a38fa5818460a83a0dc86fd60945d34c881eb90f0cbd9bca",
+    "skills/hm-review": "a5dc3749669a6b6e3e336033ae89b4d6722a15ec79ce005cdf5e2b581e8fca8c",
+    "skills/hm-verify": "41684fc7562b9c2292d03105dc3a960310f09ecb62da8c457dbffa87e6defb70",
+    "skills/hm-wrapup": "5be6c3aa7a5b8c746d1cb2577dc8c7938110063092a68a6a8ec6109ca4d52248"
+   }
+  },
+  "loop-on/wt-off/block/mech-unset/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 46672,
+   "execute_sha256": "e6185a312945a735dbd6869e137da535cf355aca3ed6bf9490dd2fb5ba3a6dab",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
+    "commands/hm/review.md": "b156234aa1061d8eccc194b72e826f68e2f585153d72753899ac887d581dfa35",
+    "commands/hm/verify.md": "ef9c94b8375053998fb86c690a5e426232ced39857e328bfe27d0f4399362986",
+    "commands/hm/wrapup.md": "2225630a1b7d2920385ea9f92be9f6718f4278d635a4728348895297ff69029b",
+    "hm/review-autofix.md": "74de712ea21cd1d5091533ed6e0e679d4834966c674d97bfaff6ca76ee97d545",
+    "hm/review-confirmation.md": "08caf67013dfadcc538bd672abeac07764571e22e76fafe75e683d97db0f3585",
+    "hm/verify-checks.md": "4d1fa68cfe9d07e010c33070c15aa628cc23f0e9c45d28c3d18e5899c2df8912",
+    "hm/wrapup-steps.md": "305579c7a0aa4097da64e7af73bed0d29d8c1990bdaf244cfaf0a970cde36e70",
+    "skills/hm-review": "1956ee087985eea65c5b8fb644400600b9894be519905b259c7fb282feaa788f",
+    "skills/hm-verify": "f0cfe93a1866605a2e3346247eb64329c6bb3ecd8e97025a096a8eb51ac2fb65",
+    "skills/hm-wrapup": "cd2572ec037c0b2c688c10948d1b010133e8ebf9ee606a4bc988bed77102860d"
+   }
+  },
+  "loop-on/wt-off/block/mech-unset/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 46672,
+   "execute_sha256": "e6185a312945a735dbd6869e137da535cf355aca3ed6bf9490dd2fb5ba3a6dab",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
+    "commands/hm/review.md": "8148db4e2d39cf5cef1c393fcc275e5f3440307b7272e61af7bc3a77b102fea6",
+    "commands/hm/verify.md": "ef9c94b8375053998fb86c690a5e426232ced39857e328bfe27d0f4399362986",
+    "commands/hm/wrapup.md": "2225630a1b7d2920385ea9f92be9f6718f4278d635a4728348895297ff69029b",
+    "hm/review-autofix.md": "a57a901a3f3f2cee58e14cf05ac6f1c5b84eed5bf9558d60ee51c9fcb8441896",
+    "hm/review-confirmation.md": "18d8fb6c27a89bc19f3f9db9d60fba01537c3e3480eca5908aa996714b869d5f",
+    "hm/verify-checks.md": "82a26077d5d0a923ef0be9d3da9d1c35e34b865d467ae9ffb600abb159d8fee7",
+    "hm/wrapup-steps.md": "d0b4e698cf2dd1f3a38fa5818460a83a0dc86fd60945d34c881eb90f0cbd9bca",
+    "skills/hm-review": "c1378a057560260335809a5cccf5f1812c8ce44bf720c3439090e8897d35ad3d",
+    "skills/hm-verify": "41684fc7562b9c2292d03105dc3a960310f09ecb62da8c457dbffa87e6defb70",
+    "skills/hm-wrapup": "5be6c3aa7a5b8c746d1cb2577dc8c7938110063092a68a6a8ec6109ca4d52248"
+   }
+  },
+  "loop-on/wt-off/warn/mech-set/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 46719,
+   "execute_sha256": "05b6034a38e93b39515ec08c0e00f25376367d42b4b8df14de3753c34ba24a1a",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
+    "commands/hm/review.md": "9e4f7f766c599a26f7059fa8472c1696ba9e8bf5b9e7fbea1094f2e94ea64e72",
+    "commands/hm/verify.md": "ef9c94b8375053998fb86c690a5e426232ced39857e328bfe27d0f4399362986",
+    "commands/hm/wrapup.md": "2225630a1b7d2920385ea9f92be9f6718f4278d635a4728348895297ff69029b",
+    "hm/review-autofix.md": "74de712ea21cd1d5091533ed6e0e679d4834966c674d97bfaff6ca76ee97d545",
+    "hm/review-confirmation.md": "08caf67013dfadcc538bd672abeac07764571e22e76fafe75e683d97db0f3585",
+    "hm/verify-checks.md": "8caab805473c809203344d6134e62e9bdb2700f72084d26fb6cf732be4e77d40",
+    "hm/wrapup-steps.md": "e68d01cf5d60b5fc1174dd30d188636739a667182b393d5ab0023bd0426c5ce9",
+    "skills/hm-review": "3e1dfd70079a26e02aabbdf35ba8648d92f146ee695537e484198204b3f79532",
+    "skills/hm-verify": "e93f8e597f2b233782bda2d27bf9b1b18fd44c59e5bae7c772913f392bd69b3c",
+    "skills/hm-wrapup": "dd242b7671d60e31444943b121e142949e8ffe5bae5301bad1aedcb70e25a8ab"
+   }
+  },
+  "loop-on/wt-off/warn/mech-set/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 46719,
+   "execute_sha256": "05b6034a38e93b39515ec08c0e00f25376367d42b4b8df14de3753c34ba24a1a",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
+    "commands/hm/review.md": "438eb236a43e42ca6b5a18e7ca5670d59ad85753e9fa13d116ba972eae97f501",
+    "commands/hm/verify.md": "ef9c94b8375053998fb86c690a5e426232ced39857e328bfe27d0f4399362986",
+    "commands/hm/wrapup.md": "2225630a1b7d2920385ea9f92be9f6718f4278d635a4728348895297ff69029b",
+    "hm/review-autofix.md": "a57a901a3f3f2cee58e14cf05ac6f1c5b84eed5bf9558d60ee51c9fcb8441896",
+    "hm/review-confirmation.md": "18d8fb6c27a89bc19f3f9db9d60fba01537c3e3480eca5908aa996714b869d5f",
+    "hm/verify-checks.md": "8caab805473c809203344d6134e62e9bdb2700f72084d26fb6cf732be4e77d40",
+    "hm/wrapup-steps.md": "d90b9ee548b6e611bcf744dcf92e0ad58a1084c28a85a606a832e8b0ca7a7660",
+    "skills/hm-review": "a5dc3749669a6b6e3e336033ae89b4d6722a15ec79ce005cdf5e2b581e8fca8c",
+    "skills/hm-verify": "e93f8e597f2b233782bda2d27bf9b1b18fd44c59e5bae7c772913f392bd69b3c",
+    "skills/hm-wrapup": "59a2b97290997ffb7898346d9145fe401bdc79c81a322054f5fb6dd4bfc1e0ba"
+   }
+  },
+  "loop-on/wt-off/warn/mech-unset/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 46719,
+   "execute_sha256": "05b6034a38e93b39515ec08c0e00f25376367d42b4b8df14de3753c34ba24a1a",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
+    "commands/hm/review.md": "b156234aa1061d8eccc194b72e826f68e2f585153d72753899ac887d581dfa35",
+    "commands/hm/verify.md": "ef9c94b8375053998fb86c690a5e426232ced39857e328bfe27d0f4399362986",
+    "commands/hm/wrapup.md": "2225630a1b7d2920385ea9f92be9f6718f4278d635a4728348895297ff69029b",
+    "hm/review-autofix.md": "74de712ea21cd1d5091533ed6e0e679d4834966c674d97bfaff6ca76ee97d545",
+    "hm/review-confirmation.md": "08caf67013dfadcc538bd672abeac07764571e22e76fafe75e683d97db0f3585",
+    "hm/verify-checks.md": "8caab805473c809203344d6134e62e9bdb2700f72084d26fb6cf732be4e77d40",
+    "hm/wrapup-steps.md": "e68d01cf5d60b5fc1174dd30d188636739a667182b393d5ab0023bd0426c5ce9",
+    "skills/hm-review": "1956ee087985eea65c5b8fb644400600b9894be519905b259c7fb282feaa788f",
+    "skills/hm-verify": "e93f8e597f2b233782bda2d27bf9b1b18fd44c59e5bae7c772913f392bd69b3c",
+    "skills/hm-wrapup": "dd242b7671d60e31444943b121e142949e8ffe5bae5301bad1aedcb70e25a8ab"
+   }
+  },
+  "loop-on/wt-off/warn/mech-unset/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 46719,
+   "execute_sha256": "05b6034a38e93b39515ec08c0e00f25376367d42b4b8df14de3753c34ba24a1a",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
+    "commands/hm/review.md": "8148db4e2d39cf5cef1c393fcc275e5f3440307b7272e61af7bc3a77b102fea6",
+    "commands/hm/verify.md": "ef9c94b8375053998fb86c690a5e426232ced39857e328bfe27d0f4399362986",
+    "commands/hm/wrapup.md": "2225630a1b7d2920385ea9f92be9f6718f4278d635a4728348895297ff69029b",
+    "hm/review-autofix.md": "a57a901a3f3f2cee58e14cf05ac6f1c5b84eed5bf9558d60ee51c9fcb8441896",
+    "hm/review-confirmation.md": "18d8fb6c27a89bc19f3f9db9d60fba01537c3e3480eca5908aa996714b869d5f",
+    "hm/verify-checks.md": "8caab805473c809203344d6134e62e9bdb2700f72084d26fb6cf732be4e77d40",
+    "hm/wrapup-steps.md": "d90b9ee548b6e611bcf744dcf92e0ad58a1084c28a85a606a832e8b0ca7a7660",
+    "skills/hm-review": "c1378a057560260335809a5cccf5f1812c8ce44bf720c3439090e8897d35ad3d",
+    "skills/hm-verify": "e93f8e597f2b233782bda2d27bf9b1b18fd44c59e5bae7c772913f392bd69b3c",
+    "skills/hm-wrapup": "59a2b97290997ffb7898346d9145fe401bdc79c81a322054f5fb6dd4bfc1e0ba"
+   }
+  },
+  "loop-on/wt-on/block/mech-set/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 51461,
+   "execute_sha256": "f882d5255efa061fee23fd230ab80d8c0de1864b741da67e485711ef5e9f9dc4",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
+    "commands/hm/review.md": "336a17820031310601817acd3d81acf136cd6b53beac667c23894b98574208cd",
+    "commands/hm/verify.md": "5f513a970a7e03997d897edfa4d41204e51e94c582945df5aef620df25fde8b0",
+    "commands/hm/wrapup.md": "5f270d2ff4cf94ce88eb9ea8174fd311fcd09b0dbc9bd476636c8a72d3df76b6",
+    "hm/review-autofix.md": "749b97ec61ec262f0f68e4220a102047647d51e07d61403c1cd00c6d06de16c9",
+    "hm/review-confirmation.md": "84c34e64377cffdcfd520f2ee745d67a0c6061b8e4fafe0ecdac51df6327a525",
+    "hm/verify-checks.md": "71325e38836772d032470faf0b809dc38fbef13b7a0303f9f07e558ac246573a",
+    "hm/wrapup-steps.md": "f741450bd573886ecc2f06e3a033e52b813ae800f532b9db4d6e2c3296268f87",
+    "skills/hm-review": "fb405e1ba03a8d98832d88e483062406554e3c615188c0b9a38522f54f19dfaa",
+    "skills/hm-verify": "fa4219eaaeb0cfa9265561ff8a607d2ad24d0d6cf110e4f0f912b99eebcbbb14",
+    "skills/hm-wrapup": "9bd21636b072f13d002e5d37dbcfe48b4aa2d5fc5a7bd4f180e9cc2eb6ef3902"
+   }
+  },
+  "loop-on/wt-on/block/mech-set/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 51461,
+   "execute_sha256": "f882d5255efa061fee23fd230ab80d8c0de1864b741da67e485711ef5e9f9dc4",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
+    "commands/hm/review.md": "b0fbe2abdbf2d367d0de4db21f81d2fa74bed8eaef82f3f86be9f7043cc1534f",
+    "commands/hm/verify.md": "5f513a970a7e03997d897edfa4d41204e51e94c582945df5aef620df25fde8b0",
+    "commands/hm/wrapup.md": "5f270d2ff4cf94ce88eb9ea8174fd311fcd09b0dbc9bd476636c8a72d3df76b6",
+    "hm/review-autofix.md": "f7edadb31dd6af5e6d74a40083cbe410a857d6255d265f1d588f17f1510e2c2a",
+    "hm/review-confirmation.md": "2e80b043939c1334b3c48331cfb5e450cace7441d46c5eeda53254a13c46672e",
+    "hm/verify-checks.md": "ce748a537e3d0e75f93ac6ffa5b9fbb1f4c1c0aa2da0ca3984a1b9d6981c0380",
+    "hm/wrapup-steps.md": "c8c1cc1a5487bc2740875dcd52620955e6d266360909d9450b61fb03f0b8fbd8",
+    "skills/hm-review": "312a402fb13b9464fe2daf067c0ee54d104ae6f7be605b1b5a74cd7ff437875b",
+    "skills/hm-verify": "3511e9913a7de4bfdc4513c039863effff9267639b042d0abfb37603da6f3aea",
+    "skills/hm-wrapup": "461cbb805794290a9969f62534bc78f91a19c5805f26938393457154c292fe0e"
+   }
+  },
+  "loop-on/wt-on/block/mech-unset/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 51461,
+   "execute_sha256": "f882d5255efa061fee23fd230ab80d8c0de1864b741da67e485711ef5e9f9dc4",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
+    "commands/hm/review.md": "d8962cee08aff9a7f6d7734fedd18d995bdaeb62d0639e030fdb92508b83a78d",
+    "commands/hm/verify.md": "5f513a970a7e03997d897edfa4d41204e51e94c582945df5aef620df25fde8b0",
+    "commands/hm/wrapup.md": "5f270d2ff4cf94ce88eb9ea8174fd311fcd09b0dbc9bd476636c8a72d3df76b6",
+    "hm/review-autofix.md": "749b97ec61ec262f0f68e4220a102047647d51e07d61403c1cd00c6d06de16c9",
+    "hm/review-confirmation.md": "84c34e64377cffdcfd520f2ee745d67a0c6061b8e4fafe0ecdac51df6327a525",
+    "hm/verify-checks.md": "71325e38836772d032470faf0b809dc38fbef13b7a0303f9f07e558ac246573a",
+    "hm/wrapup-steps.md": "f741450bd573886ecc2f06e3a033e52b813ae800f532b9db4d6e2c3296268f87",
+    "skills/hm-review": "5331fec5391d747075c8ae09bfd72589ce3fb3846230fb6993145ca8c707d04d",
+    "skills/hm-verify": "fa4219eaaeb0cfa9265561ff8a607d2ad24d0d6cf110e4f0f912b99eebcbbb14",
+    "skills/hm-wrapup": "9bd21636b072f13d002e5d37dbcfe48b4aa2d5fc5a7bd4f180e9cc2eb6ef3902"
+   }
+  },
+  "loop-on/wt-on/block/mech-unset/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 51461,
+   "execute_sha256": "f882d5255efa061fee23fd230ab80d8c0de1864b741da67e485711ef5e9f9dc4",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
+    "commands/hm/review.md": "60eb9d502a4e53bcc867eea4ad4c87b2b831c7b95d07530fb4de97a13aaeca10",
+    "commands/hm/verify.md": "5f513a970a7e03997d897edfa4d41204e51e94c582945df5aef620df25fde8b0",
+    "commands/hm/wrapup.md": "5f270d2ff4cf94ce88eb9ea8174fd311fcd09b0dbc9bd476636c8a72d3df76b6",
+    "hm/review-autofix.md": "f7edadb31dd6af5e6d74a40083cbe410a857d6255d265f1d588f17f1510e2c2a",
+    "hm/review-confirmation.md": "2e80b043939c1334b3c48331cfb5e450cace7441d46c5eeda53254a13c46672e",
+    "hm/verify-checks.md": "ce748a537e3d0e75f93ac6ffa5b9fbb1f4c1c0aa2da0ca3984a1b9d6981c0380",
+    "hm/wrapup-steps.md": "c8c1cc1a5487bc2740875dcd52620955e6d266360909d9450b61fb03f0b8fbd8",
+    "skills/hm-review": "3265c967939e4c545ec0759109578cce8fcc49cd8ff044c8d858cb4658b55fb0",
+    "skills/hm-verify": "3511e9913a7de4bfdc4513c039863effff9267639b042d0abfb37603da6f3aea",
+    "skills/hm-wrapup": "461cbb805794290a9969f62534bc78f91a19c5805f26938393457154c292fe0e"
+   }
+  },
+  "loop-on/wt-on/warn/mech-set/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 51508,
+   "execute_sha256": "3eab807cf853d78beffd02ce3dbd11e00590a9c7ac36bed90b202ceeb3b7f336",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
+    "commands/hm/review.md": "336a17820031310601817acd3d81acf136cd6b53beac667c23894b98574208cd",
+    "commands/hm/verify.md": "5f513a970a7e03997d897edfa4d41204e51e94c582945df5aef620df25fde8b0",
+    "commands/hm/wrapup.md": "5f270d2ff4cf94ce88eb9ea8174fd311fcd09b0dbc9bd476636c8a72d3df76b6",
+    "hm/review-autofix.md": "749b97ec61ec262f0f68e4220a102047647d51e07d61403c1cd00c6d06de16c9",
+    "hm/review-confirmation.md": "84c34e64377cffdcfd520f2ee745d67a0c6061b8e4fafe0ecdac51df6327a525",
+    "hm/verify-checks.md": "3c197a92cf6746febad41909d7c2ba597f133caac61da2d900496fb7e5d17f06",
+    "hm/wrapup-steps.md": "f3dbba102b0cbc2b6077a2da54b274e66298ccf5b0453658f2d0bf087453b9e9",
+    "skills/hm-review": "fb405e1ba03a8d98832d88e483062406554e3c615188c0b9a38522f54f19dfaa",
+    "skills/hm-verify": "049dfe9751c3baa2631ee9f3f93fbc69e60b4a6b1e6bdebf83132d0be8227ab6",
+    "skills/hm-wrapup": "e90bc23ed60c12f4a85950bd77bd455492318e215e07066a3ac66d08bd95926a"
+   }
+  },
+  "loop-on/wt-on/warn/mech-set/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 51508,
+   "execute_sha256": "3eab807cf853d78beffd02ce3dbd11e00590a9c7ac36bed90b202ceeb3b7f336",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
+    "commands/hm/review.md": "b0fbe2abdbf2d367d0de4db21f81d2fa74bed8eaef82f3f86be9f7043cc1534f",
+    "commands/hm/verify.md": "5f513a970a7e03997d897edfa4d41204e51e94c582945df5aef620df25fde8b0",
+    "commands/hm/wrapup.md": "5f270d2ff4cf94ce88eb9ea8174fd311fcd09b0dbc9bd476636c8a72d3df76b6",
+    "hm/review-autofix.md": "f7edadb31dd6af5e6d74a40083cbe410a857d6255d265f1d588f17f1510e2c2a",
+    "hm/review-confirmation.md": "2e80b043939c1334b3c48331cfb5e450cace7441d46c5eeda53254a13c46672e",
+    "hm/verify-checks.md": "3c197a92cf6746febad41909d7c2ba597f133caac61da2d900496fb7e5d17f06",
+    "hm/wrapup-steps.md": "763343ba1627b334b887ad9d61713550fde1f08191770a953702796300c3baed",
+    "skills/hm-review": "312a402fb13b9464fe2daf067c0ee54d104ae6f7be605b1b5a74cd7ff437875b",
+    "skills/hm-verify": "049dfe9751c3baa2631ee9f3f93fbc69e60b4a6b1e6bdebf83132d0be8227ab6",
+    "skills/hm-wrapup": "3da5db77ff56183f2c2fa2610cb55b4d5ae391eb29d97aebd92673abd44ce3c2"
+   }
+  },
+  "loop-on/wt-on/warn/mech-unset/Production": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 51508,
+   "execute_sha256": "3eab807cf853d78beffd02ce3dbd11e00590a9c7ac36bed90b202ceeb3b7f336",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
+    "commands/hm/review.md": "d8962cee08aff9a7f6d7734fedd18d995bdaeb62d0639e030fdb92508b83a78d",
+    "commands/hm/verify.md": "5f513a970a7e03997d897edfa4d41204e51e94c582945df5aef620df25fde8b0",
+    "commands/hm/wrapup.md": "5f270d2ff4cf94ce88eb9ea8174fd311fcd09b0dbc9bd476636c8a72d3df76b6",
+    "hm/review-autofix.md": "749b97ec61ec262f0f68e4220a102047647d51e07d61403c1cd00c6d06de16c9",
+    "hm/review-confirmation.md": "84c34e64377cffdcfd520f2ee745d67a0c6061b8e4fafe0ecdac51df6327a525",
+    "hm/verify-checks.md": "3c197a92cf6746febad41909d7c2ba597f133caac61da2d900496fb7e5d17f06",
+    "hm/wrapup-steps.md": "f3dbba102b0cbc2b6077a2da54b274e66298ccf5b0453658f2d0bf087453b9e9",
+    "skills/hm-review": "5331fec5391d747075c8ae09bfd72589ce3fb3846230fb6993145ca8c707d04d",
+    "skills/hm-verify": "049dfe9751c3baa2631ee9f3f93fbc69e60b4a6b1e6bdebf83132d0be8227ab6",
+    "skills/hm-wrapup": "e90bc23ed60c12f4a85950bd77bd455492318e215e07066a3ac66d08bd95926a"
+   }
+  },
+  "loop-on/wt-on/warn/mech-unset/Side": {
+   "checks": {
+    "claude": {
+     "2": "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c"
+    },
+    "codex": {
+     "2": "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d",
+     "4": "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30",
+     "6": "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c"
+    }
+   },
+   "drift_rule": {
+    "claude": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9",
+    "codex": "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9"
+   },
+   "execute_chars": 51508,
+   "execute_sha256": "3eab807cf853d78beffd02ce3dbd11e00590a9c7ac36bed90b202ceeb3b7f336",
+   "exempt_cmd": {
+    "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
+    "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
+   "sha256": {
+    "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
+    "commands/hm/review.md": "60eb9d502a4e53bcc867eea4ad4c87b2b831c7b95d07530fb4de97a13aaeca10",
+    "commands/hm/verify.md": "5f513a970a7e03997d897edfa4d41204e51e94c582945df5aef620df25fde8b0",
+    "commands/hm/wrapup.md": "5f270d2ff4cf94ce88eb9ea8174fd311fcd09b0dbc9bd476636c8a72d3df76b6",
+    "hm/review-autofix.md": "f7edadb31dd6af5e6d74a40083cbe410a857d6255d265f1d588f17f1510e2c2a",
+    "hm/review-confirmation.md": "2e80b043939c1334b3c48331cfb5e450cace7441d46c5eeda53254a13c46672e",
+    "hm/verify-checks.md": "3c197a92cf6746febad41909d7c2ba597f133caac61da2d900496fb7e5d17f06",
+    "hm/wrapup-steps.md": "763343ba1627b334b887ad9d61713550fde1f08191770a953702796300c3baed",
+    "skills/hm-review": "3265c967939e4c545ec0759109578cce8fcc49cd8ff044c8d858cb4658b55fb0",
+    "skills/hm-verify": "049dfe9751c3baa2631ee9f3f93fbc69e60b4a6b1e6bdebf83132d0be8227ab6",
+    "skills/hm-wrapup": "3da5db77ff56183f2c2fa2610cb55b4d5ae391eb29d97aebd92673abd44ce3c2"
+   }
+  }
+ },
+ "events": [
+  "advance_authorized",
+  "advance_entered",
+  "advanced",
+  "gate_auto_answered",
+  "gate_blocked",
+  "halted_cap",
+  "objective_proposed"
+ ],
+ "source_sha": "e7dd6648",
+ "texts": {
+  "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9": "Before reviewers run, scan the diff against PLAN scope:\n- Files changed that are NOT in any PLAN phase's \"scope\" → flag as **scope drift**.\n- Files in PLAN phase's scope that have NOT changed → flag as **incomplete phase**.\n\n**Emit drift_verdict** in the REVIEW report frontmatter (mandatory — wrapup and verify depend on this):\n\n```yaml\ndrift_verdict:\n  result: clean | scope_violation | scenario_miss\n  scope_violations: [<list of files outside PLAN scope>]\n  scenario_misses: [<list of SPEC scenarios without coverage>]\n  task_slug: <current task slug from PLAN frontmatter>\n  computed_at: <ISO timestamp>\n```\n\nWhen no drift is detected, emit `result: clean` with empty lists. This record is the single source of truth for drift status — wrapup and verify read it without re-running the analysis.\n\n",
+  "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b": "### Check 6 — SPEC requirement\n\n> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never\n> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.\n\nRead `spec_need_verdict` / `spec_need_target` from `work-docs/PLAN-{slug}.md`.\nNo PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run\n`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root . --changed-file <f1> --changed-file <f2> …\n!uv run --with $HOME/harness-maker hm spec_need waiver-check --root . --slug <task_slug> --changed-file <f1> --changed-file <f2> …\n```\n\n\nEither exiting 0 → `PASS`. Both exiting 1 → report\n`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via\n`/hm:spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.\n\n\n",
+  "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run /hm:review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `/hm:execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. `/hm:wrapup` Step 3.5's\n`spec_machine find-unbound` scan runs on this preset too but is **advisory only** (Side never STOPs),\nso an AC still `pending_test` after `--no-tdd` is surfaced in the wrapup report, not blocked.\n\n",
+  "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3": "### Check 6 — SPEC requirement\n\n\nRead the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `work-docs/PLAN-{slug}.md`.\n\n**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.\n\n**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.\n\nEvaluation sequence when `spec_need_verdict` is one of the above values:\n\n**Step 6a — operation check:**\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …\n```\n\n\nExit 0 → operation satisfied → **PASS**. Proceed to next check.\n\n**Step 6b — waiver check** (only if Step 6a exits 1):\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …\n```\n\n\nThe `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.\n\n**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:\n\n```\nBLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>\nThe required SPEC operation was not performed and no valid waiver exists.\nTo resolve: author the SPEC via /hm:spec <slug> (the\nresume-marker skips re-detection and routes directly to /hm:spec) or record\na fresh, non-empty-rationale waiver with:\n  uv run --with $HOME/harness-maker hm spec_need waiver-set --root <WT> --slug <slug> \\\n    --verdict <verdict> --target <target> --rationale \"<reason>\" \\\n    --changed-file <f1> …\nNote: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.\n```\n\n",
+  "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09": "### Check 6 — SPEC requirement\n\n\nRead the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `work-docs/PLAN-{slug}.md`.\n\n**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.\n\n**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.\n\nEvaluation sequence when `spec_need_verdict` is one of the above values:\n\n**Step 6a — operation check:**\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nExit 0 → operation satisfied → **PASS**. Proceed to next check.\n\n**Step 6b — waiver check** (only if Step 6a exits 1):\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nThe `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.\n\n**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:\n\n```\nBLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>\nThe required SPEC operation was not performed and no valid waiver exists.\nTo resolve: author the SPEC via $hm-spec <slug> (the\nresume-marker skips re-detection and routes directly to $hm-spec) or record\na fresh, non-empty-rationale waiver with:\n  uv run --with $HOME/harness-maker hm spec_need waiver-set --root <WT> --slug <slug> \\\n    --verdict <verdict> --target <target> --rationale \"<reason>\" \\\n    --changed-file <f1> …\nNote: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.\n```\n\n",
+  "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355": "### Check 2 — Regression smoke\n\n**One verb runs the gates and owns the marker.** It takes the gates from the project's CI (a\nnarrower guess passes locally, fails on push) and marks only a pass on an unchanged tree.\n\n\n```bash\n!uv run --with $HOME/harness-maker hm observability.verification_cache run --root . --mode relevant --timeout-s 3600 --deadline-s 3600\n```\n\n\nRun it in the **background** (`run_in_background: true`): a full suite outlives the 10-minute\nforeground cap. Branch on the `\"exit\"` field of the JSON line it prints, never on the\nhost's status; no JSON line = not a pass.\n\n- `0` → PASS (`cached: true` = its own marker reused). Skip to Check 3.\n- `1` → a gate failed or timed out, not a pass — stderr names the command and its output tail.\n- `4` → the tree changed during the run, not a pass (stderr lists the paths); re-run.\n- Killed by the host (no exit code) → not a pass, no marker.\n- `3` → degraded: no readable CI (stderr says why). Only then:\n\n<!-- @hm:verify-degraded -->\nfall back to the project's toolchain (`pytest -q` / `ruff check .` / `ruff format --check .` / `mypy --strict`; `cargo test`; `pnpm test`) and say the gates were guessed. If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it. After every command passes — and only then — write the marker:\n\n\n```bash\n!uv run --with $HOME/harness-maker hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest\n```\n\n<!-- @hm:/verify-degraded -->\n\nFAIL when: any subprocess returns non-zero.\n\n",
+  "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run /hm:review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `/hm:execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. Task-driven mode has no machine\nSPEC to scan, so on that path an uncovered scenario reaches wrapup unflagged — the accepted\ncost of `--no-tdd` without a SPEC contract.\n\n",
+  "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695": "### Check 6 — SPEC requirement\n\n> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never\n> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.\n\nRead `spec_need_verdict` / `spec_need_target` from `work-docs/PLAN-{slug}.md`.\nNo PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run\n`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root . --changed-file <f1> --changed-file <f2> …\")\nBash(\"uv run --with $HOME/harness-maker hm spec_need waiver-check --root . --slug <task_slug> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nEither exiting 0 → `PASS`. Both exiting 1 → report\n`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via\n`$hm-spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.\n\n\n",
+  "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30": "### Check 4 — Security high findings\n\nRead the most recent `.claude/observability/security/findings-*.jsonl`.\n\nFAIL when: any finding has `severity == \"high\"` AND `resolution != \"accepted-risk-with-rationale\"`. Resolutions must be deliberate (recorded in PLAN ADR or wrapup commit body).\n\nPASS when: zero unresolved high findings.\n\n",
+  "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run $hm-review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `$hm-execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `$hm-wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. Task-driven mode has no machine\nSPEC to scan, so on that path an uncovered scenario reaches wrapup unflagged — the accepted\ncost of `--no-tdd` without a SPEC contract.\n\n",
+  "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run $hm-review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `$hm-execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `$hm-wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. `$hm-wrapup` Step 3.5's\n`spec_machine find-unbound` scan runs on this preset too but is **advisory only** (Side never STOPs),\nso an AC still `pending_test` after `--no-tdd` is surfaced in the wrapup report, not blocked.\n\n",
+  "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d": "### Check 6 — SPEC requirement\n\n\nRead the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `work-docs/PLAN-{slug}.md`.\n\n**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.\n\n**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.\n\nEvaluation sequence when `spec_need_verdict` is one of the above values:\n\n**Step 6a — operation check:**\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root . --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nExit 0 → operation satisfied → **PASS**. Proceed to next check.\n\n**Step 6b — waiver check** (only if Step 6a exits 1):\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need waiver-check --root . --slug <task_slug> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nThe `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.\n\n**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:\n\n```\nBLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>\nThe required SPEC operation was not performed and no valid waiver exists.\nTo resolve: author the SPEC via $hm-spec <slug> (the\nresume-marker skips re-detection and routes directly to $hm-spec) or record\na fresh, non-empty-rationale waiver with:\n  uv run --with $HOME/harness-maker hm spec_need waiver-set --root . --slug <slug> \\\n    --verdict <verdict> --target <target> --rationale \"<reason>\" \\\n    --changed-file <f1> …\nNote: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.\n```\n\n",
+  "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c": "### Check 6 — SPEC requirement\n\n> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never\n> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.\n\nRead `spec_need_verdict` / `spec_need_target` from `work-docs/PLAN-{slug}.md`.\nNo PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run\n`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …\n!uv run --with $HOME/harness-maker hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …\n```\n\n\nEither exiting 0 → `PASS`. Both exiting 1 → report\n`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via\n`/hm:spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.\n\n\n",
+  "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c": "### Check 6 — SPEC requirement\n\n> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never\n> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.\n\nRead `spec_need_verdict` / `spec_need_target` from `work-docs/PLAN-{slug}.md`.\nNo PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run\n`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …\")\nBash(\"uv run --with $HOME/harness-maker hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nEither exiting 0 → `PASS`. Both exiting 1 → report\n`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via\n`$hm-spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.\n\n\n",
+  "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run /hm:review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `/hm:execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. The mechanical backstop is `/hm:wrapup` Step 3.5's\n`spec_machine find-unbound` gate (fail-closed, STOP on this preset): a closed-type AC still `pending_test`\nafter the write-back cannot be committed, whichever way execute ran.\n\n",
+  "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d": "### Check 2 — Regression smoke\n\n**One verb runs the gates and owns the marker.** It takes the gates from the project's CI (a\nnarrower guess passes locally, fails on push) and marks only a pass on an unchanged tree.\n\n\n```\nBash(\"uv run --with $HOME/harness-maker hm observability.verification_cache run --root . --mode relevant\")\n```\n\n\nForeground call: the defaults (540 s/gate, 570 s total) report their own timeout. Branch on the `\"exit\"` field of the JSON line it prints, never on the\nhost's status; no JSON line = not a pass.\n\n- `0` → PASS (`cached: true` = its own marker reused). Skip to Check 3.\n- `1` → a gate failed or timed out, not a pass — stderr names the command and its output tail.\n- `4` → the tree changed during the run, not a pass (stderr lists the paths); re-run.\n- Killed by the host (no exit code) → not a pass, no marker.\n- `3` → degraded: no readable CI (stderr says why). Only then:\n\n<!-- @hm:verify-degraded -->\nfall back to the project's toolchain (`pytest -q` / `ruff check .` / `ruff format --check .` / `mypy --strict`; `cargo test`; `pnpm test`) and say the gates were guessed. If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it. After every command passes — and only then — write the marker:\n\n\n```\nBash(\"uv run --with $HOME/harness-maker hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest\")\n```\n\n<!-- @hm:/verify-degraded -->\n\nFAIL when: any subprocess returns non-zero.\n\n",
+  "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f": "### Check 6 — SPEC requirement\n\n\nRead the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `work-docs/PLAN-{slug}.md`.\n\n**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.\n\n**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.\n\nEvaluation sequence when `spec_need_verdict` is one of the above values:\n\n**Step 6a — operation check:**\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root . --changed-file <f1> --changed-file <f2> …\n```\n\n\nExit 0 → operation satisfied → **PASS**. Proceed to next check.\n\n**Step 6b — waiver check** (only if Step 6a exits 1):\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need waiver-check --root . --slug <task_slug> --changed-file <f1> --changed-file <f2> …\n```\n\n\nThe `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.\n\n**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:\n\n```\nBLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>\nThe required SPEC operation was not performed and no valid waiver exists.\nTo resolve: author the SPEC via /hm:spec <slug> (the\nresume-marker skips re-detection and routes directly to /hm:spec) or record\na fresh, non-empty-rationale waiver with:\n  uv run --with $HOME/harness-maker hm spec_need waiver-set --root . --slug <slug> \\\n    --verdict <verdict> --target <target> --rationale \"<reason>\" \\\n    --changed-file <f1> …\nNote: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.\n```\n\n",
+  "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea": "### Step 3 — Drift verdict check (read-only — no LLM re-analysis)\n\nRead the most recent REVIEW report frontmatter for `drift_verdict`.\n\n1. **Locate**: find `work-docs/REVIEW-{slug}.md` matching the current task slug.\n2. **Validate**: check that `drift_verdict.task_slug` matches the current PLAN's `task_slug`.\n3. **Decide**:\n   - `drift_verdict` present AND `task_slug` matches → log the verdict, continue.\n   - `drift_verdict` absent OR `task_slug` mismatch → **FAIL** with message: `BLOCKED: step 3 (drift) — run $hm-review first (no drift_verdict found for current task)`.\n\n> Advisory: if you made changes after `$hm-review`, re-run `$hm-review` to refresh the drift verdict.\n\nThis step does NOT re-run the drift analysis. Review is the single owner (ADR-006).\n\n",
+  "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run $hm-review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `$hm-execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `$hm-wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. The mechanical backstop is `$hm-wrapup` Step 3.5's\n`spec_machine find-unbound` gate (fail-closed, STOP on this preset): a closed-type AC still `pending_test`\nafter the write-back cannot be committed, whichever way execute ran.\n\n",
+  "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb": "### Step 3 — Drift verdict check (read-only — no LLM re-analysis)\n\nRead the most recent REVIEW report frontmatter for `drift_verdict`.\n\n1. **Locate**: find `work-docs/REVIEW-{slug}.md` matching the current task slug.\n2. **Validate**: check that `drift_verdict.task_slug` matches the current PLAN's `task_slug`.\n3. **Decide**:\n   - `drift_verdict` present AND `task_slug` matches → log the verdict, continue.\n   - `drift_verdict` absent OR `task_slug` mismatch → **FAIL** with message: `BLOCKED: step 3 (drift) — run /hm:review first (no drift_verdict found for current task)`.\n\n> Advisory: if you made changes after `/hm:review`, re-run `/hm:review` to refresh the drift verdict.\n\nThis step does NOT re-run the drift analysis. Review is the single owner (ADR-006).\n\n"
+ },
+ "unchanged_paths": [
+  "commands/hm/review.md",
+  "commands/hm/verify.md",
+  "commands/hm/wrapup.md",
+  "commands/hm/loop.md",
+  "hm/verify-checks.md",
+  "hm/wrapup-steps.md",
+  "hm/review-autofix.md",
+  "hm/review-confirmation.md",
+  "skills/hm-review",
+  "skills/hm-verify",
+  "skills/hm-wrapup"
+ ]
+}

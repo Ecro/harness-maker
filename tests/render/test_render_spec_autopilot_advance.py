@@ -50,7 +50,11 @@ def test_auto_full_step5_says_the_stage_advances(tmp_path: Path) -> None:
         assert "does not end this stage by itself" in text, target
         assert "`proceed: true` advances WITHOUT an approval" in text, target
         assert "`/hm:wrapup` asks again before landing" in text, target
-    claude_tail, codex_tail = (step5[t].split("Otherwise leave")[1] for t in ("claude", "codex"))
+    # 2026-10-15, SPEC-hm-light-lane-s3a AC-014: a light SPEC with an empty irreversible list is
+    # now stamped exempt first, so the unstamped sentence opens "On `full`, leave"; review item E
+    # (same day) made it "On `full`, or when any of the three does not hold, leave".
+    anchor = "On `full`, or when any of the three does not hold, leave"
+    claude_tail, codex_tail = (step5[t].split(anchor)[1] for t in ("claude", "codex"))
     assert claude_tail == codex_tail
 
 

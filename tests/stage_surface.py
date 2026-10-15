@@ -18,12 +18,12 @@ STAGE_REFERENCE_FILES: dict[str, tuple[str, ...]] = {
     "wrapup": ("wrapup-steps",),
     "verify": ("verify-checks",),
     "review": ("review-autofix", "review-confirmation"),
-    "execute": ("execute-a5",),
+    "execute": ("execute-a5", "execute-light-check"),
 }
 REF_START, REF_END = "<!-- @hm:ref:start -->\n", "<!-- @hm:ref:end -->"
 _POINTER = re.compile(
     r"^Read `\.claude/hm/(?P<name>(?:wrapup-steps|verify-checks|review-autofix"
-    r"|review-confirmation|execute-a5)\.md)` from the project root.*\n",
+    r"|review-confirmation|execute-a5|execute-light-check)\.md)` from the project root.*\n",
     re.M,
 )
 #: An INDENTED pointer is a reference, not the body's position (the wrapup receipt-mismatch bullet
@@ -31,7 +31,7 @@ _POINTER = re.compile(
 #: expanding it would put the block in Step 0.5, ahead of where the stage reads it.
 _INLINE_POINTER = re.compile(
     r"^[ \t]+Read `\.claude/hm/(?P<name>(?:wrapup-steps|verify-checks|review-autofix"
-    r"|review-confirmation|execute-a5)\.md)` from the project root.*$",
+    r"|review-confirmation|execute-a5|execute-light-check)\.md)` from the project root.*$",
     re.M,
 )
 

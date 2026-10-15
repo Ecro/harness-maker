@@ -1,0 +1,5 @@
+{#- SPEC-hm-light-lane-s3a ADR-004: review Step 2's scan, shared by review and execute's light check so the
+    drift rule has one owner. Moved verbatim from review.md.j2 — edit it here only. -#}
+Before reviewers run, scan the diff against PLAN scope:
+- Files changed that are NOT in any PLAN phase's "scope" → flag as **scope drift**.
+- Files in PLAN phase's scope that have NOT changed → flag as **incomplete phase**.

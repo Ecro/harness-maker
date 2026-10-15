@@ -1,0 +1,161 @@
+"""Capture the e7dd6648 oracles for SPEC-hm-light-lane-s3a, before any template or module changed.
+
+Run with the e7dd6648 source first on the path and this repo's tests second, from a detached
+worktree of e7dd6648 (`git worktree add --detach <dir> e7dd6648`):
+
+    PYTHONPATH=<dir>/src:<repo> <repo>/.venv/bin/python <this file> <repo>/tests/fixtures/light_lane_s3a <repo>/.claude/harness.yaml
+
+It writes three goldens:
+- boundary_e7dd6648.json — AC-004: the SHA-256 of `hm autopilot_caps boundary`'s JSON, ledger
+  rows and marker (volatile fields masked, `observation_sha`) for every case of
+  `light_lane_s3a_fixture.ac004_cases()`, with the full observation kept for every execute case
+  and for verify's default-pipeline auto_full case (AC-003's E7DD_KEYS and merge_gate oracle);
+- digest_e7dd6648.json — AC-012: `world_model_digest.next_stage` on DIGEST_CASES;
+- renders_e7dd6648.json — AC-011 SHAs of the unchanged paths over CONFIGS, the Claude execute
+  command length (AC-007), verify Checks 2/4/6 sliced by heading and review Step 2's drift rule
+  (AC-008), spec Step 0's exempt command (AC-014), wrapup Step 3 and verify Check 1 sliced by
+  heading (AC-010) and the autopilot ledger EVENTS (AC-013).
+"""
+import hashlib, json, sys, tempfile
+from itertools import product
+from pathlib import Path
+
+import harness_maker
+from harness_maker.observability import verification_cache
+
+assert "/src/harness_maker" in harness_maker.__file__, harness_maker.__file__
+SOURCE = Path(harness_maker.__file__).resolve()
+# Provenance: the imported package is the e7dd6648 tree, or at least one without the light
+# lane. A path check alone passes on any checkout that has a `src/` layout.
+import importlib.util, subprocess
+_HEAD = subprocess.run(["git", "rev-parse", "HEAD"], cwd=SOURCE.parents[2], capture_output=True,
+                       text=True, timeout=30).stdout.strip()
+assert _HEAD.startswith("e7dd6648") or importlib.util.find_spec("harness_maker.light_lane") is None, (
+    _HEAD, str(SOURCE))
+verification_cache._tool_versions = lambda root: {}  # speed only; no golden carries a key
+
+from tests.unit import light_lane_s3a_fixture as fx
+
+out_dir, harness_yaml = Path(sys.argv[1]), Path(sys.argv[2])
+
+# ── AC-004 boundary ────────────────────────────────────────────────────────
+boundary = {"source_sha": "e7dd6648", "cases": {}}
+with tempfile.TemporaryDirectory() as td:
+    old = fx.isolate_env(Path(td) / "home")
+    for i, case in enumerate(fx.ac004_cases()):
+        root = Path(td) / f"c{i}"
+        argv = fx.build(root, case)
+        obs = fx.observe(root, argv)
+        boundary["cases"][case.key] = {"sha256": fx.observation_sha(obs)}
+        if fx.keeps_observation(case):
+            boundary["cases"][case.key]["observation"] = obs
+(out_dir / "boundary_e7dd6648.json").write_text(json.dumps(boundary, indent=1, sort_keys=True) + "\n")
+print("boundary cases:", len(boundary["cases"]))
+
+# ── AC-012 digest ──────────────────────────────────────────────────────────
+from harness_maker import world_model_digest
+digest = {"source_sha": "e7dd6648", "cases": {}}
+with tempfile.TemporaryDirectory() as td:
+    fx.isolate_env(Path(td) / "home")
+    for i, (name, lane, record, fresh) in enumerate(fx.DIGEST_CASES):
+        root = Path(td) / f"d{i}"
+        fx.build_digest(root, lane, record, fresh)
+        digest["cases"][name] = world_model_digest.next_stage(root, fx.SLUG, root)
+(out_dir / "digest_e7dd6648.json").write_text(json.dumps(digest, indent=1) + "\n")
+print("digest:", digest["cases"])
+
+# ── AC-011 / AC-007 / AC-008 / AC-014 renders ─────────────────────────────
+sys.path.insert(0, str(Path(sys.argv[0]).resolve().parents[3]))
+from tests.structural._surface_baseline import pinned_install_ref
+from harness_maker import autopilot_ledger
+from harness_maker.interview import answers_from_harness_yaml
+from harness_maker.models import LoopConfig, Preset, ProjectProfile
+from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.synthesize import synthesize
+
+MECH = ["uv run ruff check .", "uv run pytest -q"]
+UNCHANGED = (
+    "commands/hm/review.md", "commands/hm/verify.md", "commands/hm/wrapup.md", "commands/hm/loop.md",
+    "hm/verify-checks.md", "hm/wrapup-steps.md", "hm/review-autofix.md", "hm/review-confirmation.md",
+    "skills/hm-review", "skills/hm-verify", "skills/hm-wrapup",
+)
+DRIFT_SENTENCE = (
+    "Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run on "
+    "the actual diff.\n\n"
+)
+
+def config_key(loop, wt, strictness, mech, preset):
+    return f"loop-{'on' if loop else 'off'}/wt-{'on' if wt else 'off'}/{strictness}/mech-{'set' if mech else 'unset'}/{preset}"
+
+def section(text, start, ends):
+    i = text.index("\n" + start + "\n") + 1
+    j = min(text.index("\n" + e, i) + 1 for e in ends if ("\n" + e) in text[i:])
+    return text[i:j]
+
+def read(root, rel):
+    if rel.startswith("skills/"):
+        p = root / ".agents" / "skills" / rel.split("/", 1)[1] / "SKILL.md"
+    else:
+        p = root / ".claude" / rel
+    return p.read_text() if p.is_file() else None
+
+texts: dict[str, str] = {}
+def keep(t):
+    h = hashlib.sha256(t.encode()).hexdigest()
+    texts[h] = t
+    return h
+
+renders = {"source_sha": "e7dd6648", "unchanged_paths": list(UNCHANGED), "configs": {}, "texts": texts,
+           "events": sorted(autopilot_ledger.EVENTS)}
+base = answers_from_harness_yaml(harness_yaml)
+for loop, wt, strictness, mech, preset in product((False, True), (False, True), ("warn", "block"), (False, True), ("Side", "Production")):
+    answers = base.model_copy(update={
+        "loop": LoopConfig(enabled=loop),
+        "worktree": {**base.worktree, "enabled": wt},
+        "strictness": strictness,
+        "mechanical_checks": list(MECH) if mech else [],
+        "preset": Preset(preset),
+    })
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        with pinned_install_ref():
+            render(synthesize(ProjectProfile(), answers), root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
+        cfg = {"sha256": {}, "checks": {}, "drift_rule": {}, "exempt_cmd": {}}
+        for rel in UNCHANGED:
+            t = read(root, rel)
+            cfg["sha256"][rel] = None if t is None else hashlib.sha256(t.encode()).hexdigest()
+        execute = read(root, "commands/hm/execute.md")
+        cfg["execute_chars"] = len(execute)
+        cfg["execute_sha256"] = hashlib.sha256(execute.encode()).hexdigest()
+        for arm, verify_text, review_text, spec_text in (
+            ("claude", read(root, "hm/verify-checks.md"), read(root, "commands/hm/review.md"), read(root, "commands/hm/spec.md")),
+            ("codex", read(root, "skills/hm-verify"), read(root, "skills/hm-review"), read(root, "skills/hm-spec")),
+        ):
+            cfg["checks"][arm] = {
+                "2": keep(section(verify_text, "### Check 2 — Regression smoke", ["### Check 3"])),
+                "4": keep(section(verify_text, "### Check 4 — Security high findings", ["<!-- @hm:loop-only -->", "### Check 5", "### Check 6"])),
+                "6": keep(section(verify_text, "### Check 6 — SPEC requirement", ["## Advisory probes"])),
+            }
+            step2 = section(review_text, "### Step 2 — Drift gate (PLAN/SPEC vs actual diff) — SINGLE OWNER", ["### Step 3"])
+            body = step2.split("\n", 2)[2]
+            assert DRIFT_SENTENCE in body
+            cfg["drift_rule"][arm] = keep(body.replace(DRIFT_SENTENCE, ""))
+            line = next(ln for ln in spec_text.splitlines() if "spec_machine approve" in ln and "--exempt" in ln)
+            cfg["exempt_cmd"][arm] = line
+        # AC-010: what wrapup Step 3 and verify Check 1 read, sliced from the readers themselves.
+        cfg["record_readers"] = {}
+        for arm, wrapup_files, verify_files in (
+            ("claude", ("hm/wrapup-steps.md", "commands/hm/wrapup.md"), ("hm/verify-checks.md", "commands/hm/verify.md")),
+            ("codex", ("skills/hm-wrapup",), ("skills/hm-verify",)),
+        ):
+            step3_head = "### Step 3 — Drift verdict check (read-only — no LLM re-analysis)"
+            check1_head = "### Check 1 — Drift verdict (REVIEW present)"
+            wrapup_text = next(t for t in map(lambda r: read(root, r), wrapup_files) if t and step3_head in t)
+            verify_text = next(t for t in map(lambda r: read(root, r), verify_files) if t and check1_head in t)
+            cfg["record_readers"][arm] = {
+                "wrapup_step3": keep(section(wrapup_text, step3_head, ["### Step 3.5"])),
+                "verify_check1": keep(section(verify_text, check1_head, ["### Check 2"])),
+            }
+        renders["configs"][config_key(loop, wt, strictness, mech, preset)] = cfg
+(out_dir / "renders_e7dd6648.json").write_text(json.dumps(renders, indent=1, sort_keys=True, ensure_ascii=False) + "\n")
+print("render configs:", len(renders["configs"]), "unique texts:", len(texts))

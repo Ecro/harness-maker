@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import time
 from datetime import UTC, date, datetime
@@ -27,7 +26,6 @@ PARK_DAYS = 7
 NO_DATA = "—"
 _SUBJECT_MAX = 60
 _ID_MAX = 40
-_REVIEW_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # Total budget for the artifact checks; past it a task reports `next_stage: null` (REVIEW 6d4374d1).
 DEADLINE_S = 5.0
 _INTENT_KEYS: tuple[str, ...] = (
@@ -162,14 +160,17 @@ def _has(directory: Path, pattern: str) -> bool:
 
 
 def _reviews(docs: Path, slug: str) -> list[Path]:
-    # Exact names only: a hyphen-prefix slug (`world-model` vs `world-model-name`) must not
-    # pick up a sibling task's committed REVIEW/SPEC (REVIEW a003ff68).
-    prefix = f"REVIEW-{slug}-"
-    return sorted(
-        p
-        for p in (docs.glob(f"{prefix}*.md") if docs.is_dir() else [])
-        if _REVIEW_DATE.fullmatch(p.name[len(prefix) : -len(".md")])
-    )
+    # One lister for the digest and the light-lane boundary (SPEC-hm-light-lane-s3a ADR-003).
+    from harness_maker import light_lane
+
+    return light_lane.review_records(docs, slug)
+
+
+def _light_check_passed(base: Path, slug: str, wt: Path) -> bool:
+    from harness_maker import light_lane
+
+    # No `since`: the digest reads no marker. The cache freshness check still applies.
+    return light_lane.light_check_passed(base, slug, checkout=wt)
 
 
 def artifact_files(slug: str, wt: Path) -> list[Path]:
@@ -250,6 +251,8 @@ def next_stage(base: Path, slug: str, wt: Path) -> str:
         return "spec"
     if not reviews:
         return "execute"
+    if _light_check_passed(base, slug, wt):
+        return "wrapup"
     if _review_status(reviews[-1]) != "APPROVED":
         return "review"
     if not _verify_done(wt):
