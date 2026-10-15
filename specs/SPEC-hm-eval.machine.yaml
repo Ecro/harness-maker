@@ -418,6 +418,7 @@ ac:
   type: parametric
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_lead_labels_follow_the_direction_table
+  - tests/unit/test_bench_light_lane.py::test_judge_tie_band_widens_with_the_measured_noise
   executable_predicate: null
   golden_table:
   - input:
@@ -547,7 +548,9 @@ ac:
   note: 'Review round 1: traps caught leads on the catch rate (gap >= 0.20), since
     a stalled run carries no trap result and the two arms'' n can differ; worked in
     AC-019. lint+type is lower-better with an exact compare. The docs table names
-    every DIRECTIONS key (AC-015).'
+    every DIRECTIONS key (AC-015). Review round 3: a judge line''s tie band is max(0.25,
+    0.67 / sqrt(n)), 0.67 being the measured single-sample judge noise; 4.00 vs 4.33
+    over 3 pairs is a tie (band 0.38), 3.75 vs 4.17 over 4 pairs leads hm (band 0.33).'
   pending_test: true
   oracle_source: golden
   oracle_evidence: The direction table and bands are written in SPEC S8 and docs/evals/README.md
@@ -784,10 +787,11 @@ ac:
   test_ids:
   - tests/unit/test_bench_light_lane.py::test_judge_calibration_ranks_reference_above_damaged
   executable_predicate: calibrate(fake_scores_all_higher) == 0 and calibrate(fake_scores_t7_equal)
-    == 1 and calibrate(fake_scores_low_control) == 1 and calibrate(stale_recording)
+    == 1 and calibrate(fake_scores_low_control) == 1 and calibrate(fake_scores_noisy_control_mean_ok)
+    == 0 and calibrate(single_sample_recording) == 1 and calibrate(stale_recording)
     == 1 and calibrate(recording_with_other_judge_model) == 1 and (not RECORDING.exists()
-    or (fresh(RECORDING) and all(r['reference']['overall'] > r['damaged']['overall']
-    and r['control']['overall'] >= r['reference']['overall'] - 0.5 for r in recorded_tasks)
+    or (fresh(RECORDING) and all(r['reference']['mean'] > r['damaged']['mean']
+    and r['control']['mean'] >= r['reference']['mean'] - 0.5 for r in recorded_tasks)
     and {r['task'] for r in recorded_tasks} == non_trap_tier2_ids))
   golden_table: []
   rubric_id: null

@@ -253,7 +253,7 @@ from this table, which lives once in the runner and once in `docs/evals/README.m
 | wrong count, stalled count | lower | gap ≥ 2 runs, else `tie` |
 | hidden-case pass fraction | higher | gap ≥ 0.05, else `tie` |
 | mean `ruff_new`, `mypy_new`, `regressions`, lint+type | lower | exact compare |
-| judge mean (each criterion, overall) | higher | gap ≥ 0.25, else `tie` |
+| judge mean (each criterion, overall) | higher | gap ≥ max(0.25, 0.67 / √n), else `tie`; n = pairs (S16) or the smaller arm's n |
 | mean cost, tokens, turns, wall, cost per solved run | lower | exact compare |
 | `diff_lines`, `tests_touched` rate | none | always `—` |
 
@@ -316,8 +316,10 @@ reference made longer but kept clean: explanatory comments and extra tests), eac
 hidden and visible tests
 **When** `INTEGRATION=1 … canary --judge-calibration --record PATH` judges the three diffs per task
 with the real judge, or a test replays such a recording offline
-**Then** the calibration passes only when, for every such task, `overall(reference) >
-overall(damaged)` and `overall(control) ≥ overall(reference) − 0.5`. Trap tasks (S17) are left out:
+**Then** each item is judged 3 times, and the calibration passes only when, for every such task,
+`mean(reference) > mean(damaged)` and `mean(control) ≥ mean(reference) − 0.5`. Each item records
+its samples, mean and spread; a recording without 3 samples per item is stale. One sample moved by
+up to 0.67 between two recordings of byte-identical inputs, more than the 0.5 band. Trap tasks (S17) are left out:
 their checks are deterministic, so they ship neither overlay. The recording stores each judge
 input's hash and the judge model. A changed rubric, task or redaction table makes it stale, a
 recording made with another judge model than the run's does not pass, and a stale recording does
@@ -359,7 +361,8 @@ as S7, with these lines:
   cells are mean CLI cost per run;
 - **Δ solved runs** (hm − plain) and **Δ hidden-case pass fraction**;
 - **Δ regressions per run** and **Δ new lint+type errors per run** (negative is good);
-- **Δ judge overall**;
+- **Δ judge overall**, noted as single-sample scores with the measured judge noise (0.67) and the
+  tie band in use, max(0.25, 0.67 / √n pairs);
 - **traps caught** for each arm, as `caught/n` (S17); the `hm vs plain` column is the difference in
   catch rate, and the lead is `n/a` when the arms' n differ by 2 or more;
 - **cost per solved run** for each arm: the arm's priced cost divided by its priced solved runs,
@@ -496,7 +499,7 @@ row fields are additive in a dev-only file whose readers tolerate their absence 
 | S6 | unit (fake claude) | `test_judge_argv_is_isolated_and_schema_bound`, `test_judge_failure_is_recorded_not_imputed`, `test_judge_cost_stays_out_of_the_arm_cost`, `test_no_judge_and_stalled_runs_make_no_judge_call`, `test_the_judge_runs_with_the_allowlisted_environment`, `test_a_diff_over_the_cap_is_truncated_and_counted` |
 | S7 | unit (golden rows) | `test_scorecard_leads_with_quality_over_balanced_changed_runs`, `test_run_flags_count_caps_leaks_truncation_and_redactions` |
 | S7 (metric) | unit (property) | `test_intent_metric_ignores_tier_two_rows` |
-| S8 | unit (golden rows) | `test_lead_labels_follow_the_direction_table` |
+| S8 | unit (golden rows) | `test_lead_labels_follow_the_direction_table`, `test_judge_tie_band_widens_with_the_measured_noise` |
 | S9 | unit (golden rows → golden files) | `test_publish_writes_results_and_readme_block`, `test_atomic_write_keeps_the_mode_and_fsyncs`, `test_publish_writes_the_readme_before_the_results` |
 | S10 | unit (property) | `test_publish_is_idempotent_and_order_independent` |
 | S11 | unit | `test_publish_refuses_bad_markers_mixed_empty_or_unbalanced_results` |
