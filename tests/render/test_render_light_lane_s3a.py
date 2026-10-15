@@ -27,6 +27,7 @@ from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 from tests.structural._surface_baseline import HARNESS_YAML, pinned_install_ref
 from tests.unit import light_lane_s3c_fixture as s3c
+from tests.unit import light_lane_s3d_fixture as s3d
 
 GOLDEN: dict[str, Any] = json.loads(
     (Path(__file__).parents[1] / "fixtures/light_lane_s3a/renders_e7dd6648.json").read_text(
@@ -207,7 +208,9 @@ def test_light_check_runs_the_kept_gates(key: str) -> None:
         # Check 2 keeps verify's `run` and its stop line; the guessed-gates mark-pass is gone
         # (review item F): exit 3 is not a pass here.
         (run,) = [c for c in _commands(checks["2"]) if "verification_cache run" in c]
-        assert run in text, arm
+        # 2026-10-15, SPEC-hm-light-lane-s3d: the light check's run also passes `--spec-slug`
+        # (no CI file -> the trusted SPEC's gates); undoing exactly 3d's bytes gives verify's.
+        assert run in s3d.without_s3d(text), arm
         assert "FAIL when: any subprocess returns non-zero." in text, arm
         assert "mark-pass" not in text, arm
         assert "not a pass" in next(ln for ln in text.splitlines() if ln.startswith("- `3`")), arm

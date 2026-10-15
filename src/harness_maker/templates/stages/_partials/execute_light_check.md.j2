@@ -91,7 +91,8 @@ review runs next.
 
 Otherwise every gate passed and the drift is `result: clean`:
 Write `{{ WTR }}/{{ config.work_docs.dir }}REVIEW-{slug}-{date}.md` (review's own file name) with
-this frontmatter — the drift block is the one from gate 5 — and a one-line body naming the gates:
+this frontmatter — the drift block is the one from gate 5 — and a one-line body naming the gates
+(after Check 2's `"gate_source": "spec"`, `regression: gates from SPEC (no CI file)`):
 
 ```yaml
 ---

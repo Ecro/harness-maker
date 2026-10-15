@@ -21,6 +21,7 @@ from typing import Any
 import pytest
 
 from tests.unit import light_lane_s3c_fixture as fx
+from tests.unit import light_lane_s3d_fixture as s3d
 
 ARMS: dict[str, Any] = json.loads((fx.GOLDENS / "arms_a7403f2f.json").read_text(encoding="utf-8"))
 TEXTS: dict[str, str] = ARMS["texts"]
@@ -406,6 +407,10 @@ def _normalise(key: str, rel: str) -> str | None:
         text = fx.undo_execute(text, parts, claude=rel.startswith("commands"))
     if rel in ("commands/hm/spec.md", "skills/hm-spec"):
         text = fx.without_spec_steps_35_4(text)
+    if rel in ("hm/execute-light-check.md", "skills/hm-execute"):
+        # 2026-10-15, SPEC-hm-light-lane-s3d: the light check's Check 2 passes `--spec-slug` and
+        # its record line names the gate source. Undoing exactly those bytes gives a7403f2f's.
+        text = s3d.without_s3d(text, record=True)
     return fx.mask_content_hash(text)
 
 
@@ -473,4 +478,9 @@ def test_surface_meets_bounds() -> None:
     for name, bound in REF_BOUND.items():
         assert len(refs[name]) <= bound, (name, len(refs[name]))
     for name, size in SURFACE["refs"].items():
-        assert len(refs[name]) <= size, name
+        ref = refs[name]
+        if name == "execute-light-check":
+            # 2026-10-15, SPEC-hm-light-lane-s3d adds `--spec-slug` and the gate-source record
+            # line to this file; the bound applies to it with exactly those bytes undone.
+            ref = s3d.without_s3d(ref, record=True)
+        assert len(ref) <= size, name

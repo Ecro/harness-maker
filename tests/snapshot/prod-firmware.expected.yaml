@@ -97,7 +97,7 @@ files:
   body_sha256: 1d0dc3830db2da4ea121f002dceaa018fc691193fdfbaeff531d043249ae8f94
 - path: hm/execute-light-check.md
   template: hm/execute-light-check.md.j2
-  body_sha256: 3dade35eaa2a59e05bcc1197316ed1c9cd70395b6d3875cc61c7bc8cb7f9fb47
+  body_sha256: ec010945dea809e42cab8f9bab8c74d443a03612134397eae207c7bbce347b11
 - path: hm/execute-plan.md
   template: hm/execute-plan.md.j2
   body_sha256: be3b7863316524e66160b71809e9da6033beccf13a3a52c9c89af281dd8d8d3f

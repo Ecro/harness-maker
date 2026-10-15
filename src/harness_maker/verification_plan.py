@@ -125,6 +125,10 @@ class VerificationPlan:
     non_gating: list[str] = field(default_factory=list)
     degraded: bool = False
     reason: str | None = None
+    #: No CI file at all: no workflows directory, or no `*.yml`/`*.yaml` in it. Only this
+    #: degraded cause lets `verification_cache run --spec-slug` derive the gates from a SPEC
+    #: (SPEC-hm-light-lane-s3d); `to_json` leaves it out, so `show`'s output is unchanged.
+    ci_absent: bool = False
 
     def blocking_commands(self) -> list[str]:
         """Deduplicated blocking commands, first occurrence wins.
@@ -272,11 +276,15 @@ def read_plan(root: Path) -> VerificationPlan:
     """
     wf_dir = root / ".github" / "workflows"
     if not wf_dir.is_dir():
-        return VerificationPlan(degraded=True, reason=f"no workflows directory at {wf_dir}")
+        return VerificationPlan(
+            degraded=True, reason=f"no workflows directory at {wf_dir}", ci_absent=True
+        )
 
     files = sorted(p for p in wf_dir.iterdir() if p.suffix in (".yml", ".yaml"))
     if not files:
-        return VerificationPlan(degraded=True, reason=f"no workflow files in {wf_dir}")
+        return VerificationPlan(
+            degraded=True, reason=f"no workflow files in {wf_dir}", ci_absent=True
+        )
 
     plan = VerificationPlan()
     unreadable: list[str] = []

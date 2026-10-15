@@ -1,0 +1,390 @@
+schema_version: 3
+spec_slug: hm-light-lane-s3d
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: One plan-derivation function, a trust check and template
+  text; the 4bd3d3d8 goldens and the golden tables pin the outcome, and mutation testing
+  adds little over them.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Outside the opt-in case, run is byte-identical to 4bd3d3d8
+  type: property
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference is the 4bd3d3d8 verification_cache module run on
+    the same fixtures, captured into tests/fixtures/light_lane_s3d/ before any edit;
+    the relation holds for any implementation that confines its change to the CI-absent
+    + flag-on cell, wherever that branch sits.
+  oracle_independence_waiver: null
+  input_domain: the product of CI state {absent (no dir), workflows dir with no yml,
+    readable pytest+ruff+mypy, unreadable YAML, no recognised command, all continue-on-error}
+    x flag {off, on} x SPEC {none, trusted light pytest, untrusted} x suite {passing,
+    failing}, excluding every cell where CI is absent and the flag is on
+  transformation: run `hm observability.verification_cache run --root . --mode relevant
+    [--spec-slug <slug>]` under the 4bd3d3d8 module (without the flag, which it does
+    not know) and under the new module, with a fixed HARNESS_MAKER_CACHE_DIR and a
+    fake gate runner that records argv and returns a fixed rc
+  expected_relation: stdout(new) == stdout(4bd3d3d8) and exit(new) == exit(4bd3d3d8)
+    and the marker bytes are equal after the call, modulo passed_at
+  preconditions:
+  - the same fixture builder is used for both modules
+  observable_output: the list of cells whose stdout, exit or marker differ, empty
+  generator_hint: itertools.product over the domain minus the excluded cells
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: The SPEC plan's command list is the golden function of the project's configuration
+  type: parametric
+  test_ids: []
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: no [tool.ruff], no [tool.mypy]
+    expected:
+    - <py> -m pytest
+    edge: false
+    note: the timeparse shape
+  - input:
+      case: '[tool.ruff], no [tool.mypy]'
+    expected:
+    - <py> -m ruff check .
+    - <py> -m pytest
+    edge: false
+    note: ''
+  - input:
+      case: '[tool.mypy] without files, no [tool.ruff]'
+    expected:
+    - <py> -m mypy .
+    - <py> -m pytest
+    edge: false
+    note: ''
+  - input:
+      case: '[tool.mypy] with files, no [tool.ruff]'
+    expected:
+    - <py> -m mypy
+    - <py> -m pytest
+    edge: false
+    note: ''
+  - input:
+      case: '[tool.ruff.lint] only, [tool.mypy] with files'
+    expected:
+    - <py> -m ruff check .
+    - <py> -m mypy
+    - <py> -m pytest
+    edge: true
+    note: a subtable implies the ruff key
+  - input:
+      case: '[tool.ruffx] or [tool.mypy_extra] only'
+    expected:
+    - <py> -m pytest
+    edge: true
+    note: only the exact ruff and mypy keys count
+  - input:
+      case: pyproject.toml absent
+    expected:
+    - <py> -m pytest
+    edge: true
+    note: nothing configures ruff or mypy
+  - input:
+      case: root path containing a space
+    expected: every command starts with the shell-quoted <py>, and shlex.split yields
+      it as one token
+    edge: true
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The rows are fixed from the DRI's 2026-10-15 option ("test_framework
+    plus ruff/mypy only if pyproject configures them") and the coordinator's interpreter
+    rule before any code; <py> is the literal absolute path <root>/.venv/bin/python
+    of the test's tmp fixture, so the table does not read the implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Only a trusted pytest SPEC with a project .venv yields a plan
+  type: mechanical
+  test_ids: []
+  executable_predicate: all(run_spec(fixture, slug)['exit'] == expected for fixture,
+    slug, expected in TRUST_TABLE)
+  golden_table:
+  - input:
+      case: no CI file, lane light, exempt, irreversible [], md test_framework pytest,
+        .venv/bin/python, passing suite
+    expected: 0
+    edge: false
+    note: also asserts gate_source == spec, commands == ['<py> -m pytest'], and a
+      writer run marker
+  - input:
+      case: same, approved by a human stamp
+    expected: 0
+    edge: false
+    note: ''
+  - input:
+      case: lane full, approved
+    expected: 3
+    edge: false
+    note: ''
+  - input:
+      case: lane light, no approval (missing)
+    expected: 3
+    edge: false
+    note: ''
+  - input:
+      case: lane light, machine yaml edited after approval (invalid)
+    expected: 3
+    edge: false
+    note: ''
+  - input:
+      case: lane light, approved, irreversible [IRR-001]
+    expected: 3
+    edge: false
+    note: ''
+  - input:
+      case: md test_framework in {Pytest, 'pytest ', pytest + hypothesis, unittest,
+        '', missing, non-string}
+    expected: 3
+    edge: true
+    note: closed map, exact match
+  - input:
+      case: no .venv/bin/python
+    expected: 3
+    edge: false
+    note: no PATH fallback
+  - input:
+      case: pyproject.toml does not parse
+    expected: 3
+    edge: true
+    note: ''
+  - input:
+      case: slug '..', containing '/', or no SPEC for the slug
+    expected: 3
+    edge: true
+    note: ''
+  - input:
+      case: a passing SPEC run, then the SPEC made invalid with spec.dir under work-docs/
+        (outside the relevant key), then run again
+    expected: 3
+    edge: true
+    note: trust is checked before freshness; the second run must not report cached
+      true
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'The rows come from the trust rule this SPEC fixes before code:
+    light_lane.lane_of == light (stage 3a''s reader, already pinned by its own table)
+    AND md test_framework == ''pytest'' AND <root>/.venv/bin/python exists AND pyproject
+    parses; every 3 row also asserts commands [] and no marker file.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: The SPEC plan fails closed on any non-pass
+  type: parametric
+  test_ids: []
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: pytest exits 1
+    expected: exit 1, no marker
+    edge: false
+    note: ''
+  - input:
+      case: pytest exits 5 (no tests collected)
+    expected: exit 1, no marker
+    edge: true
+    note: ''
+  - input:
+      case: ruff configured and its command exits non-zero
+    expected: exit 1, pytest not run, no marker
+    edge: false
+    note: ''
+  - input:
+      case: a gate exceeds --timeout-s
+    expected: exit 1, no marker
+    edge: false
+    note: ''
+  - input:
+      case: .venv/bin/python cannot start, or the tool is not installed in it
+    expected: exit 1, no marker
+    edge: true
+    note: no install, no fallback
+  - input:
+      case: a relevant file changes while the gates run
+    expected: exit 4, no marker
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The exit meanings are the 4bd3d3d8 EXIT_* contract (1 failed, 4
+    tree changed) already pinned by tests/unit/test_verification_cache_run.py; the
+    rows apply it unchanged to the SPEC path and add pytest's documented exit code
+    5.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Only the light check passes --spec-slug and names the gate source
+  type: mechanical
+  test_ids: []
+  executable_predicate: '''--spec-slug <slug>'' in light_check_text and ''from SPEC
+    (no CI file)'' in light_check_text and ''--spec-slug'' not in verify_text'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The strings are fixed by this SPEC's Outcomes; the test reads both
+    rendered light-check surfaces (.claude/hm/execute-light-check.md and the Codex
+    execute skill) and verify's render for both targets, not the template source.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Verify, review, wrapup, the loop and the Claude execute command render byte-identical
+    to 4bd3d3d8
+  type: property
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference SHAs are rendered from 4bd3d3d8 in a detached scratch
+    worktree and stored before any template edit; the relation holds for any change
+    confined to the light_check branch of verify_check_2.md.j2 and the light-check
+    partial.
+  oracle_independence_waiver: null
+  input_domain: the render answer sets of stage 3a's AC-011 test, targets claude-code
+    and codex, worktree on and off
+  transformation: render with the 4bd3d3d8 templates and with the new templates
+  expected_relation: sha256 equal for the verify, review, wrapup and loop commands,
+    their reference files, the Claude execute command and the Codex review, verify
+    and wrapup skills; no new Step/Phase/Check heading in any render
+  preconditions:
+  - HARNESS_MAKER_FREEZE and HOME pinned as the snapshot tests pin them
+  observable_output: the list of rendered paths whose sha256 differs, empty
+  generator_hint: reuse tests/render/test_render_light_lane_s3a.py's answer builder
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: The timeparse bench fixture passes from its SPEC with harness-maker's dev
+    venv off PATH
+  type: mechanical
+  test_ids: []
+  executable_predicate: result['exit'] == 0 and result['gate_source'] == 'spec' and
+    dev_venv_bin not in path_used
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The fixture is scripts/bench/timeparse plus the dev group this
+    SPEC adds, whose own suite passed 20/20 under .venv/bin/python -m pytest in the
+    2026-10-15 probe; hm is invoked as the bench invokes it (uv run --with <src> hm)
+    with harness-maker's .venv/bin removed from PATH, so exit 0 comes from the fixture's
+    own .venv, not from the new code or the dev venv.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Add `--spec-slug <slug>` to `hm observability.verification_cache run`
+  category: public API/CLI contract
+  rationale: The rendered light check calls it; removing or renaming it breaks every
+    harness rendered with it.
+  source: spec
+- id: IRR-002
+  decision: run's stdout JSON gains "gate_source" "spec" on the SPEC path only; a
+    CI-derived run prints no new key and the slug is not echoed
+  category: public API/CLI contract
+  rationale: The light check reads it to name the source in the record body; once
+    harnesses read the key it cannot be renamed or dropped.
+  source: spec
+approval:
+  kind: human
+  content_hash: 158c26f21e2c087e9b9b5a12577c4e1b1768a0e3ebd9fa1f54a40d84a33372c3
+  approved_by: Ecro
+  approved_at: '2026-10-15T15:26:20Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 19cd02916fd47e4d32e89711442be3cb45ade2bf1229a6c94b3082e61ea7ee66
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 1af3de4abb7dd22af34b83ff80a051ce40acbd0af7fec74a9e870d5d982723f8
+    irreversible_decisions: 5edc4f35df5d7d306e234a10570e1d861ec7a26a2662a1d7333f90ea58050521
+    AC-001: 185777f1674b5a9a64246c4d366a4b8be71037c86bc5ece1172c6e52cafa00a3
+    AC-002: c7b9b73ab6ef3d03276ab2fd8897082fdfaeb19de052448b70d216ae45bd16dc
+    AC-003: b9c9f237210b8e41bcfb36839cb62969999ba2b6d89a6f4f216ce59c3de44d48
+    AC-004: 2fcefb8b88ab46ec9660497c605295c107d971d8fa2c8e3fcd6f7e9ff24441e6
+    AC-005: e23e3215e94cb223434c9a3a8a02c6c0c6554448c51c4a4851f272766ebb8455
+    AC-006: b5200e4d8fbd1ac8b1abd16954cdeff84e5a630ac15da0d9885f3de94f89c013
+    AC-007: 2e523209b21badf2fbf0de77151ce38499fe9b09f37ea60642647b42c9be72ca
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c
+  lane: full

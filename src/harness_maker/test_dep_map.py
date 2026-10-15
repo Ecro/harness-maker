@@ -617,6 +617,9 @@ CONFIG_SUITES: tuple[str, ...] = (
     # below, changing this repo's CI genuinely changes this suite's expected result — that
     # coupling IS the test, so a CI edit must select it.
     "tests/unit/test_verification_plan.py",
+    # Runs `uv run --with <this repo> hm` on the bench fixture, so the hm it runs is built from
+    # THIS repo's `pyproject.toml`: a dependency edit there can change its result.
+    "tests/integration/test_light_lane_s3d_timeparse.py",
 )
 
 #: Suites the detector flags as touching a routed path but which do NOT read this repository's

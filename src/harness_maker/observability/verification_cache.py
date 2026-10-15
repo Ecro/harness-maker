@@ -52,6 +52,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -503,6 +504,122 @@ class _TerminatedError(Exception):
     """SIGTERM raised as an exception, so `_run_gate`'s cleanup runs before the process exits."""
 
 
+# ── the SPEC plan: gates from a trusted light SPEC when there is no CI file ─────
+# (SPEC-hm-light-lane-s3d). SPEC text only selects a key of this closed map; it never reaches a
+# command string. The interpreter is the project's own `.venv`, and nothing else.
+
+GATE_SOURCE_SPEC = "spec"
+_SPEC_FRAMEWORKS: dict[str, str] = {"pytest": "pytest"}
+
+
+#: Lint or type config outside `pyproject.toml`: unsupported, so a SPEC plan would drop it.
+_OTHER_TOOL_CONFIGS = ("ruff.toml", ".ruff.toml", "mypy.ini", ".mypy.ini")
+#: `[tool.mypy]` keys that name mypy's own targets, so the command adds none.
+_MYPY_TARGET_KEYS = ("files", "modules", "packages")
+
+
+def _spec_test_framework(root: Path, slug: str) -> object:
+    """The `.md` frontmatter's `test_framework`, read where `light_lane.lane_of` reads the lane."""
+    from harness_maker.frontmatter import split_frontmatter
+    from harness_maker.spec_machine import _is_plain_slug, _named_spec_dir, _resolve_checkout
+
+    if not _is_plain_slug(slug):
+        return None
+    spec_dir = _named_spec_dir(root, slug, _resolve_checkout(root, slug, None))
+    try:
+        mapping = split_frontmatter((spec_dir / f"SPEC-{slug}.md").read_bytes()).mapping
+    except OSError:
+        return None
+    return mapping.get("test_framework") if isinstance(mapping, dict) else None
+
+
+def _git_out(root: Path, *args: str) -> str | None:
+    """stdout of a bounded git call, or None when it did not succeed (no shell)."""
+    try:
+        proc = subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, text=True, timeout=30, check=False
+        )
+    except (subprocess.TimeoutExpired, OSError, ValueError):  # ValueError: undecodable output
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _tool_table(text: str) -> dict[str, Any]:
+    tool = tomllib.loads(text).get("tool", {})
+    return tool if isinstance(tool, dict) else {}
+
+
+def _head_drift(root: Path, tool: dict[str, Any]) -> str | None:
+    """Why the tree may have shed a gate HEAD declares: a deleted workflow or tool table would
+    otherwise turn a gated repo into a pytest-only one."""
+    listed = _git_out(root, "ls-tree", "-z", "--name-only", "HEAD", "--", ".github/workflows/")
+    head_pyproject = _git_out(root, "ls-tree", "-z", "--name-only", "HEAD", "--", "pyproject.toml")
+    if listed is None or head_pyproject is None:
+        return "cannot read HEAD to compare the working tree with it"
+    if any(n.endswith((".yml", ".yaml")) for n in listed.split("\0") if n):
+        return "HEAD tracks a workflow file under .github/workflows that the working tree lacks"
+    if not head_pyproject.strip("\0"):
+        return None
+    text = _git_out(root, "show", "HEAD:./pyproject.toml")
+    try:
+        head_tool = _tool_table(text) if text is not None else None
+    except tomllib.TOMLDecodeError:
+        head_tool = None
+    if head_tool is None:
+        return "HEAD's pyproject.toml does not parse"
+    dropped = [k for k in ("ruff", "mypy") if k in head_tool and k not in tool]
+    if dropped:
+        return (
+            f"HEAD's pyproject.toml configures {', '.join(dropped)} and the working copy does not"
+        )
+    return None
+
+
+def spec_plan(root: Path, py: str, module: str = "pytest") -> list[str] | str:
+    """The gates, or why there are none: a config this plan cannot read must not drop a gate."""
+    present = [name for name in _OTHER_TOOL_CONFIGS if (root / name).exists()]
+    if present:
+        return f"{', '.join(present)} is not supported (only pyproject.toml configures ruff/mypy)"
+    tool: dict[str, Any] = {}
+    pyproject = root / "pyproject.toml"
+    if pyproject.is_file():
+        try:
+            tool = _tool_table(pyproject.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+            return f"pyproject.toml does not parse: {exc}"
+    drift = _head_drift(root, tool)
+    if drift is not None:
+        return drift
+    commands: list[str] = []
+    if "ruff" in tool:
+        commands.append(f"{py} -m ruff check .")
+    if "mypy" in tool:
+        mypy = tool["mypy"]
+        targeted = isinstance(mypy, dict) and any(k in mypy for k in _MYPY_TARGET_KEYS)
+        commands.append(f"{py} -m mypy" if targeted else f"{py} -m mypy .")
+    commands.append(f"{py} -m {module}")
+    return commands
+
+
+def _spec_commands(root: Path, slug: str) -> list[str] | str:
+    """Trust is checked on every call, before any marker is reused, so lost trust never caches."""
+    from harness_maker.light_lane import lane_of
+
+    if lane_of(root, slug) != "light":
+        return "the SPEC is not on a trusted light lane (approved or exempt, no irreversible ids)"
+    framework = _spec_test_framework(root, slug)
+    module = _SPEC_FRAMEWORKS.get(framework) if isinstance(framework, str) else None
+    if module is None:
+        return "the SPEC's test_framework is not exactly 'pytest'"
+    venv = root / ".venv"
+    py = venv / "bin" / "python"
+    if not py.is_file():
+        return "no .venv/bin/python in the project (no other interpreter is used)"
+    if not (venv / "pyvenv.cfg").is_file():
+        return "no .venv/pyvenv.cfg: .venv is not a virtual environment (no other is used)"
+    return spec_plan(root, shlex.quote(str(py)), module)
+
+
 def run_gates(
     root: Path,
     *,
@@ -510,6 +627,7 @@ def run_gates(
     docs_are_behavior: bool = False,
     timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
     deadline_s: float = RUN_DEADLINE_S,
+    spec_slug: str | None = None,
 ) -> tuple[int, dict[str, Any]]:
     """Run the CI-derived primary gate commands and write the marker only on a clean pass.
 
@@ -524,6 +642,18 @@ def run_gates(
         return compute_skip_key(root)
 
     plan = read_plan(root.resolve())
+    # `spec_slug` counts only with no CI file at all (SPEC-hm-light-lane-s3d): the gates then
+    # come from that SPEC and the summary says `gate_source: spec`; any other CI state ignores it.
+    if plan.degraded and spec_slug is not None and plan.ci_absent:
+        spec = _spec_commands(root.resolve(), spec_slug)
+        if isinstance(spec, str):
+            reason = f"{plan.reason}; no usable SPEC plan: {spec}"
+            sys.stderr.write(f"[verify] degraded plan, nothing run: {reason}\n")
+            return EXIT_DEGRADED, {"cached": False, "commands": [], "reason": reason}
+        sys.stderr.write("[verify] no CI file: gates from the SPEC's test_framework\n")
+        return _run_commands(
+            root, spec, key_now, timeout_s, deadline_s, {"gate_source": GATE_SOURCE_SPEC}
+        )
     if plan.degraded:
         sys.stderr.write(f"[verify] degraded plan, nothing run: {plan.reason}\n")
         return EXIT_DEGRADED, {"cached": False, "commands": [], "reason": plan.reason}
@@ -536,8 +666,20 @@ def run_gates(
         return EXIT_DEGRADED, {"cached": False, "commands": [], "reason": "no blocking gate"}
     for extra in plan.additional_commands():
         sys.stderr.write(f"[verify] not run (additional CI gate): {extra}\n")
+    return _run_commands(root, commands, key_now, timeout_s, deadline_s, {})
+
+
+def _run_commands(
+    root: Path,
+    commands: list[str],
+    key_now: Any,
+    timeout_s: float,
+    deadline_s: float,
+    tags: dict[str, Any],
+) -> tuple[int, dict[str, Any]]:
+    """Reuse this exact list's own marker, or run it and mark only a pass on an unchanged tree."""
     key_before = key_now()
-    summary: dict[str, Any] = {"cached": False, "commands": commands, "key": key_before}
+    summary: dict[str, Any] = {"cached": False, "commands": commands, "key": key_before, **tags}
     if is_run_fresh(key_before, commands) is not None:
         return EXIT_PASSED, {**summary, "cached": True}
 
@@ -671,6 +813,11 @@ def main(argv: list[str] | None = None) -> int:
     add_common(run_p)
     run_p.add_argument("--timeout-s", type=float, default=DEFAULT_RUN_TIMEOUT_S)
     run_p.add_argument("--deadline-s", type=float, default=RUN_DEADLINE_S)
+    run_p.add_argument(
+        "--spec-slug",
+        default=None,
+        help="with no CI file, take the gates from this trusted light SPEC (pytest only)",
+    )
 
     args = parser.parse_args(argv)
     if args.command == "run":
@@ -681,6 +828,7 @@ def main(argv: list[str] | None = None) -> int:
                 docs_are_behavior=args.docs_are_behavior,
                 timeout_s=args.timeout_s,
                 deadline_s=args.deadline_s,
+                spec_slug=args.spec_slug,
             )
         except _TerminatedError:
             sys.stderr.write(
