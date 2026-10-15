@@ -171,6 +171,11 @@ LIGHT_BRANCH_PHRASES = (
     "well over five files",
     "follow the full PLAN text instead",
     "reads as `full`",
+    # The full Step 0 / 0.3 guards, kept on the light arm (SPEC amendment 2026-10-15).
+    "no absolute, `..` or globs",
+    "only when the user explicitly made that call",
+    "never invented for an empty list; beside others, delete the `none`",
+    "if a re-read still fails, surface the path and error and stop before Step 1",
 )
 PHASE_LINE = (
     "- [ ] {N}. **Phase {N} — {name}** — scope: {files} · exit: `{command}` · risk: {risk} · "
@@ -251,12 +256,31 @@ def test_light_execute_writes_the_short_plan(key: str) -> None:
         assert b.count(LIGHT_CLOSE) == 1, rel
         span = light_span(r)
         assert len(span) <= 2400, (rel, len(span))
+        flat = " ".join(span.split())  # the prose is wrapped; a phrase may span a line break
         for phrase in LIGHT_BRANCH_PHRASES:
-            assert phrase in span, (rel, phrase)
+            assert phrase in flat, (rel, phrase)
         template = light_template(r)
         for k in LIGHT_TEMPLATE_KEYS:
             assert k in template, (rel, k)
-        assert step03_paragraph(r) == STEP03_SENTENCE, rel
+        claude = rel.startswith("commands")
+        assert step03_paragraph(r) == (STEP03_SENTENCE if claude else fx.STEP03_SENTENCE_CODEX), rel
+        # Loop off: `/hm:loop` does not render, so no loop check and no loop clause.
+        assert fx.LOOP_MODE_CMD not in b, rel
+
+
+LOOP_ON_KEYS = [k for k in FULL_KEYS if fx.FULL_CONFIGS[k][3]]
+
+
+@pytest.mark.parametrize("key", LOOP_ON_KEYS)
+def test_loop_on_routing_runs_the_loop_check(key: str) -> None:
+    """AC-010 with the loop renderable: the routing reads `loop-mode-active`, not the preamble."""
+    files = _full_render(key)
+    for rel in EXECUTES:
+        b = fx.step0_body(files[rel] or "")
+        block = fx.approval_block(b)
+        assert fx.LOOP_MODE_CMD in block, rel
+        assert b.index(block) < b.index(fx.ROUTING_LOOP) < b.index(LIGHT_OPEN), rel
+        assert fx.ROUTING not in b, rel
 
 
 @pytest.mark.parametrize("key", A_KEYS)
@@ -276,6 +300,8 @@ def test_full_execute_reads_the_moved_plan_text(key: str) -> None:
     assert "project root" in pointer
     assert "STOP" in pointer
     assert "Step 0.3" in pointer
+    # Off the light path (SPEC amendment 2026-10-15): a light run never Reads the file.
+    assert "only when not writing the light PLAN" in pointer
     codex = _text(key, "skills/hm-execute")
     assert _golden(key, "step0_part1", "skills/hm-execute") in codex
     assert _golden(key, "step03", "skills/hm-execute") in codex
@@ -418,7 +444,9 @@ SURFACE: dict[str, Any] = json.loads(
 CUTS: dict[tuple[str, str], int] = {
     ("claude", "research"): -3712,
     ("claude", "spec"): -3712 + 300 - 1000,
-    ("claude", "execute"): -3712 - 2500,
+    # C amended to -2150 (SPEC amendment 2026-10-15, review round 1): the light read-back
+    # keeps the full Step 0 / 0.3 guards, and Step 0.3 carries the read rule.
+    ("claude", "execute"): -3712 - 2150,
     ("claude", "review"): -3712,
     ("claude", "verify"): -3712,
     ("claude", "wrapup"): -3712,

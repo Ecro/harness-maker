@@ -79,8 +79,11 @@ Measured on this repo's committed `.claude/harness.yaml` with
   - A non-pydantic load error is one line, `yaml load failed: <Type>: <message>`:
     - a yaml syntax error: `yaml load failed: YAMLError: <problem> (line L, column C)`, the
       problem being the parser's first line;
-    - a missing or unreadable file: `yaml load failed: FileNotFoundError: <path>` (or
-      `OSError`);
+    - a missing file: `yaml load failed: FileNotFoundError: <path>`; any other unreadable
+      file: `yaml load failed: <OSError subclass>: <path> (<reason>)`, e.g.
+      `IsADirectoryError` or `PermissionError` with its reason;
+    - an exception inside `validate()` after a successful load is not a load failure:
+      `validate failed: <Type>: <message>`, and cross-validate keeps its own errors;
     - a missing `.md`: cross-validate's existing message, once.
   - When the yaml failed to load, `cross_validate.errors` holds
     `yaml load failed (see validate.errors)` instead of a second copy.
@@ -115,11 +118,15 @@ text inline):
    - the rooted write path: `` Write to `<WT>/work-docs/PLAN-{slug}.md` ``, or
      `` `./work-docs/PLAN-{slug}.md` `` with worktree off;
    - "**If that file already exists, do not rewrite it** — skip to the SPEC-need write below".
-2. **The `approval-status` call**, then the routing sentence, exactly:
-   `` If that prints `"trusted_lane": "light"` and loop mode is not active for this session, write the light PLAN from the light block below. Otherwise (full lane, untrusted light, or loop mode) follow the full PLAN text instead. ``
+2. **The `approval-status` call**, then the routing sentence. With the loop not rendered
+   (`loop.enabled: false`, so `/hm:loop` cannot run and loop mode cannot be active), exactly:
+   `` If that prints `"trusted_lane": "light"`, write the light PLAN from the light block below. Otherwise (full lane or untrusted light) follow the full PLAN text instead. ``
+   With the loop rendered, the same block also runs `hm worktree loop-mode-active` (the call
+   Step 0.2 makes), and the sentence is exactly:
+   `` If approval-status prints `"trusted_lane": "light"` and loop-mode-active (`<PROJECT_ROOT>`: cwd without any `/.worktrees/<name>/` suffix) exits 1, write the light PLAN from the light block below. Otherwise (full lane, untrusted light, or loop mode) follow the full PLAN text instead. ``
 3. **The full-lane pointer** (`ref_pointer` partial, STOP on a missing file):
-   `.claude/hm/execute-plan.md`, its Step 0 part now and its Step 0.3 part at the Step 0.3
-   heading.
+   `.claude/hm/execute-plan.md`, read only when not writing the light PLAN, its Step 0 part
+   now and its Step 0.3 part at the Step 0.3 heading.
 4. **The light block.** One span per file, between `<!-- @hm:light-plan -->` and
    `<!-- @hm:/light-plan -->`, anchored right after the full-lane pointer, at most 2,400 chars.
    It holds:
@@ -139,10 +146,15 @@ text inline):
      - (a) the frontmatter carries every key of the template;
      - (b) every phase line carries `scope:`, `exit:`, `risk:` and `rollback:`;
      - (c) `### Do not change` is present and non-empty, every bullet is one of the three
-       admitted forms, and a `none` bullet appears only as the sole bullet;
+       admitted forms, and a `none` bullet appears only as the sole bullet, never invented
+       for an empty list (beside other bullets, the `none` is deleted);
      - (d) the frontmatter carries `spec_need_verdict` after Step 0.1.
 
-     A failure is self-repaired inline, as in Step 0.3.
+     A failure is self-repaired inline, as in Step 0.3; if a re-read still fails, the stage
+     surfaces the path and the error and stops before Step 1.
+   - **The full Step 0 rules that bind a light PLAN too:** paths are repo-relative (no
+     absolute paths, `..` or globs), and `user` provenance only when the user explicitly made
+     that call, else `agent`.
    - **The Step 1.5 note:** Step 1.5 (parallel split) does not apply to a light PLAN, because
      its phases run in order.
    - **The oversize rule:** if the light phases touch well over five files, the task is not
@@ -150,7 +162,8 @@ text inline):
      and the 3a light check's five-file skip agree.
 5. **Step 0.1** (the spec_need upsert) and **Step 0.2** (loop mode only) stay as they are.
    **Step 0.3**'s heading carries, exactly:
-   `` Light PLAN: run the light read-back from Step 0's light block. Any other PLAN: apply the Step 0.3 part of `.claude/hm/execute-plan.md`. ``
+   `` Light PLAN: run the light read-back from Step 0's light block. Any other PLAN: apply the Step 0.3 part of `.claude/hm/execute-plan.md`, read from the project root, never a worktree; if it is missing, say to re-render with `/hm:make` and STOP. ``
+   (The Codex skill spells the command `$hm-make`.)
 
 **Size.** A light PLAN filled from the template for the bench t1 task (the value table under S9)
 is ≤ 1,200 chars after Step 0.1. A draft of the template filled from that table measures 925
@@ -228,7 +241,7 @@ at each phase commit.
 |---|---|---|---|---|---|
 | research | 20,461 | ≤ −3,712 | 0 | 0 | ≤ 16,749 |
 | spec | 43,234 | ≤ −3,712 | ≤ +300 | ≤ −1,000 | ≤ 38,822 |
-| execute | 45,572 | ≤ −3,712 | 0 | ≤ −2,500 | ≤ 39,360 |
+| execute | 45,572 | ≤ −3,712 | 0 | ≤ −2,150 | ≤ 39,710 |
 | review | 60,617 | ≤ −3,712 | 0 | 0 | ≤ 56,905 |
 | verify | 16,435 | ≤ −3,712 | 0 | 0 | ≤ 12,723 |
 | wrapup | 33,099 | ≤ −3,712 | 0 | 0 | ≤ 29,387 |
@@ -294,7 +307,7 @@ at each phase commit.
 ### S7: A trusted light execute writes the short light PLAN
 **Given** a rendered execute command (Claude) and execute skill (Codex)
 **When** Step 0 and the Step 0.3 heading are read, with worktree on and off
-**Then** Step 0 opens with its `a7403f2f` head, the intro and then the two shared rules (the rooted write path, `<WT>/` or `./`, and "if that file already exists, do not rewrite it"), then the `approval-status` call and the exact routing sentence, then the full-lane pointer, then exactly one light block between the `@hm:light-plan` markers
+**Then** Step 0 opens with its `a7403f2f` head, the intro and then the two shared rules (the rooted write path, `<WT>/` or `./`, and "if that file already exists, do not rewrite it"), then the `approval-status` call (with the `loop-mode-active` call when the loop is rendered) and the exact routing sentence for that render, then the full-lane pointer, then exactly one light block between the `@hm:light-plan` markers
 **And** the light block holds the template with the phase-line literal, the four read-back assertions (a)–(d), the Step 1.5 note and the oversize rule, and the Step 0.3 heading carries its exact sentence
 **And** the two shared rules sit above the lane split, so they apply to the light arm and the full arm alike
 
@@ -346,7 +359,7 @@ The phase, boundary and ADR lines repeat once per row; `research_doc` is dropped
 **When** each `a7403f2f` stage command, reference file, Codex skill and the `verify-before-completion` skill is compared to the new render after a fixed normalisation:
 - the A pointer is restored to the preamble;
 - in execute, exactly one `@hm:light-plan` span (≤ 2,400 chars, right after the full-lane pointer) is deleted;
-- the exact routing sentence, the `approval-status` call and the exact Step 0.3 heading sentence are deleted;
+- the exact routing sentence, the `approval-status` call block (with its `loop-mode-active` line when the loop is rendered) and the exact Step 0.3 heading sentence are deleted;
 - the full-lane pointer and the separator are replaced by `execute-plan.md`'s two parts;
 - in spec, the Step 3.5 and Step 4 + 4.5 sections are left out (AC-015 and AC-009 compare them)
 
@@ -501,3 +514,31 @@ The phase, boundary and ADR lines repeat once per row; `research_doc` is dropped
 - Evaluated, not irreversible: execute Step 0's `approval-status` call, and Step 1.5 not applying
   to a light PLAN.
 - Work stays on the session's designated branch, as in stages 1–3a.
+- **Amendment 2026-10-15 (review round 1).** `/hm:review` of the implementation found no P0 or
+  P1; these P2/P3 findings changed pinned text or bounds (IRR ids unchanged):
+  1. The light read-back keeps the full Step 0 / 0.3 guards: a re-read that still fails stops
+     before Step 1; `none` is never invented for an empty list and, beside other bullets, the
+     `none` is the one deleted; paths are repo-relative (no absolute, `..` or globs); `user`
+     provenance only when the user explicitly made that call. The execute C bound moves from
+     ≤ −2,500 to ≤ −2,150 (bound after ≤ 39,710): the guards and item 3's read rule cost about
+     300 chars, measured C is −2,201, and a 51-char margin is left. Dropping guards to meet the
+     old bound would reintroduce the fail-open the full text closes.
+  2. Routing no longer depends on the preamble's loop-mode check, which sits in a reference
+     file whose absence skips it. With the loop rendered, Step 0 runs `hm worktree
+     loop-mode-active` beside `approval-status` and the routing sentence reads its exit code;
+     with the loop not rendered, loop mode cannot be active and the sentence drops the clause.
+     Outcomes C item 2, S7 and S13 are amended to the two exact sentences. This is the one
+     loop-dependent edit outside a loop-only span, so s2's loop differential
+     (`test_loop_on_adds_exactly_the_loop_branches`) maps it back to the loop-off form
+     (`loop_routing_as_off`) before comparing; every other loop-on byte still must sit in a span.
+  3. The execute-plan pointer is off the light path ("read only when not writing the light
+     PLAN"), so a light run does not Read the 5.4k file. The Step 0.3 sentence gains the
+     pointer's read rule: from the project root, never a worktree, STOP if missing.
+  4. `check --all` separates `load()` from `validate()`: a validator exception reports as
+     `validate failed: <Type>: <message>` and leaves cross-validate's own errors in place, and
+     an unreadable yaml keeps its OSError type and reason.
+  5. AC-006 compares the full distinct error strings with `a7403f2f`, not their AC ids.
+
+  Left as residuals, not fixed: the Codex Step 0.3 sentence names a `.claude/` file (Codex
+  carries part 2 inline below it); the Step 1.5 note's wording; the scoring-exception fail-open
+  (pre-existing; this SPEC keeps it).

@@ -36,7 +36,7 @@ _POINTER = re.compile(rf"^Read `\.claude/hm/{_NAMES}` from the project root.*\n"
 #: execute-plan.md's second part belongs at the command's Step 0.3, where this sentence stands.
 _STEP03_SENTENCE = re.compile(
     r"^Light PLAN: run the light read-back from Step 0's light block\. Any other PLAN: apply the "
-    r"Step 0\.3 part of `\.claude/hm/execute-plan\.md`\.\n\n",
+    r"Step 0\.3 part of `\.claude/hm/execute-plan\.md`, read from the project root[^\n]*\n\n",
     re.M,
 )
 _PLAN_PART_SEPARATOR = re.compile(r"<!-- @hm:ref:step-0\.3 -->.*\n\n")

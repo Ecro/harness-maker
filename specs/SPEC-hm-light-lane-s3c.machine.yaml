@@ -287,8 +287,10 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_spec_machine_check_quiet.py::test_failure_prints_each_error_once
-  executable_predicate: all(verdict(new[f]) == verdict(OLD[f]) and error_locations(new[f])
-    == error_locations(OLD[f]) and no_duplicate_errors(new[f]) and 'errors.pydantic.dev'
+  - tests/unit/test_spec_machine_check_quiet.py::test_a_validator_exception_is_not_a_load_failure
+  - tests/unit/test_spec_machine_check_quiet.py::test_an_unreadable_yaml_keeps_its_reason
+  executable_predicate: all(verdict(new[f]) == verdict(OLD[f]) and distinct_errors(new[f])
+    == distinct_errors(OLD[f]) and no_duplicate_errors(new[f]) and 'errors.pydantic.dev'
     not in new[f] and 'input_value' not in new[f] and set(payload(new[f])) == FAIL_KEYS
     for f in FAILURE_FIXTURES) and all(isinstance(score, int) and score < 60 for score
     in payload(new['block_overall_55'])['quality']['low_dimensions'].values()) and
@@ -311,8 +313,14 @@ ac:
     validate.ok, cross_validate.ok, quality.blocked. FAIL_KEYS = {ok, strictness,
     validate, cross_validate, quality} and the two load-error formats (YAML_SYNTAX_ERR
     ''yaml load failed: YAMLError: <problem> (line L, column C)'', MISSING_FILE_ERR
-    ''yaml load failed: FileNotFoundError: <path>'', or OSError) are this SPEC''s
-    B contract, written before the code.'
+    ''yaml load failed: FileNotFoundError: <path>'') are this SPEC''s B contract,
+    written before the code. Amended 2026-10-15 (review round 1): distinct_errors is
+    each error''s full string (a7403f2f''s pydantic dump read as its <loc>: <msg> lines,
+    the other load failures as one marker whose format the regexes pin), so dropping
+    one of two errors on the same AC fails; another OSError reads ''yaml load failed:
+    <OSError subclass>: <path> (<reason>)'', and an exception inside validate() after
+    a successful load reads ''validate failed: <Type>: <message>'' with cross-validate''s
+    own errors kept.'
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -419,6 +427,7 @@ ac:
   type: mechanical
   test_ids:
   - tests/render/test_render_light_lane_s3c.py::test_light_execute_writes_the_short_plan
+  - tests/render/test_render_light_lane_s3c.py::test_loop_on_routing_runs_the_loop_check
   executable_predicate: all(b.startswith(A7403F2F_STEP0_HEAD[cfg]) and all(x in A7403F2F_STEP0_HEAD[cfg]
     for x in SHARED_RULES[cfg]) and len(A7403F2F_STEP0_HEAD[cfg]) <= b.index(APPROVAL_STATUS_CMD)
     < b.index(ROUTING) < b.index(POINTER_EXECUTE_PLAN) < b.index(LIGHT_OPEN) and b.count(LIGHT_OPEN)
@@ -448,7 +457,16 @@ ac:
     section headings and the phase-line literal ''- [ ] {N}. **Phase {N} — {name}**
     — scope: {files} · exit: `{command}` · risk: {risk} · rollback: {rollback}'')
     are fixed by the SPEC before the template exists. CONFIGS cover autonomy gated,
-    auto_safe, auto_full and ask, worktree on and off, and locales en and ko.'
+    auto_safe, auto_full and ask, worktree on and off, and locales en and ko. Amended
+    2026-10-15 (review round 1): ROUTING is the loop-off sentence and ROUTING_LOOP the
+    loop-on one, after a block that also runs hm worktree loop-mode-active (asserted on
+    the loop-on full-lane configs); LIGHT_BRANCH_PHRASES add the full Step 0 / 0.3 guards
+    (no absolute, .. or globs; user provenance only when the user explicitly made that
+    call; none never invented, the none deleted beside other bullets; a re-read that still
+    fails stops before Step 1), matched on whitespace-normalised text; STEP03_SENTENCE
+    carries the read rule (project root, never a worktree, STOP if missing), spelled
+    $hm-make on Codex; the execute-plan pointer says it is read only when not writing
+    the light PLAN.'
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -651,8 +669,10 @@ ac:
     is a fixed list written from this SPEC''s S13 before the code: the A pointer is
     replaced by the preamble; in execute, exactly one span from ''<!-- @hm:light-plan
     -->'' to ''<!-- @hm:/light-plan -->'' (at most 2,400 chars, right after the full-lane
-    pointer; zero or two spans fail) is deleted, the exact ROUTING sentence, the approval-status
-    call and the exact STEP03_SENTENCE are deleted, and the full-lane pointer and
+    pointer; zero or two spans fail) is deleted, the exact ROUTING sentence (ROUTING_LOOP
+    when the loop is rendered), the approval-status call block (with its loop-mode-active
+    line when the loop is rendered; amended 2026-10-15) and the exact STEP03_SENTENCE
+    are deleted, and the full-lane pointer and
     SEPARATOR are replaced by execute-plan.md''s part 1 and part 2 (the inline Step
     0 head is an a7403f2f prefix, so this is concatenation); in spec, the Step 3.5
     and Step 4 + 4.5 sections are left out because AC-015 and AC-009 compare them.

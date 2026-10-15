@@ -24,8 +24,6 @@ FAIL_KEYS = {"ok", "strictness", "validate", "cross_validate", "quality"}
 QUALITY_KEYS = {"overall", "weak_dimensions", "low_dimensions", "blocked", "strictness"}
 YAML_SYNTAX_ERR = re.compile(r"yaml load failed: YAMLError: [^\n]+ \(line \d+, column \d+\)")
 MISSING_FILE_ERR = re.compile(r"yaml load failed: (FileNotFoundError|OSError): [^\n]+")
-#: A pydantic error in the quiet form, `<loc>: <msg>`; a loc is dotted field names and indices.
-_PYDANTIC_LINE = re.compile(r"^([A-Za-z_]\w*(?:\.\w+)*): ")
 
 #: AC-005's golden table: (fixture, scorer kind) -> expected.
 ROWS: dict[str, tuple[str, str, dict[str, Any]]] = {
@@ -103,31 +101,33 @@ def _verdict(case: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _locations(error: str) -> set[tuple[str, str]]:
-    """What an error points at, readable from both the a7403f2f and the quiet form."""
+def _errors_of(error: str) -> set[str]:
+    """The distinct errors one payload entry carries, readable from both forms.
+
+    Every error is compared as its full string (review round 1: a key on the AC id alone let a
+    dropped second error on the same AC pass). Only the load failures changed format by design:
+    a7403f2f's pydantic dump becomes its `<loc>: <msg>` lines, and the other load failures,
+    whose one-line forms are pinned by regex below, compare as one marker.
+    """
     if error == "yaml load failed (see validate.errors)":
         return set()
-    first = error.splitlines()[0]
-    if first.startswith("yaml load failed"):
-        if "validation error" in first:
-            # a7403f2f's pydantic dump: the loc lines are the unindented lines after the first.
-            return {("pydantic", ln) for ln in error.splitlines()[1:] if ln and ln[0] != " "}
-        return {("yaml", "load")}
-    rule = re.match(r"(rule-\d): ", error)
-    if rule:
-        ac = re.search(r"AC-\d+", error)
-        return {(rule.group(1), ac.group(0) if ac else "")}
-    m = _PYDANTIC_LINE.match(error)
-    if m:
-        return {("pydantic", m.group(1))}
-    ac = re.match(r"(AC-\d+): ", error)
-    return {("validate", ac.group(1) if ac else error)}
+    lines = error.splitlines()
+    if "validation error" in lines[0] and lines[0].startswith("yaml load failed"):
+        # a7403f2f's pydantic dump: an unindented loc line, then its indented message line.
+        out = set()
+        for k, ln in enumerate(lines[1:], start=1):
+            if ln and ln[0] != " " and k + 1 < len(lines):
+                out.add(f"{ln}: {lines[k + 1].strip().split(' [type=')[0]}")
+        return out
+    if lines[0].startswith("yaml load failed"):
+        return {"<yaml load failed>"}
+    return {error}
 
 
-def _error_locations(out: str) -> set[tuple[str, str]]:
+def _error_set(out: str) -> set[str]:
     p = _payload(out)
     errors = [*p["validate"]["errors"], *p["cross_validate"]["errors"]]
-    return set().union(*(_locations(e) for e in errors)) if errors else set()
+    return set().union(*(_errors_of(e) for e in errors)) if errors else set()
 
 
 def _all_errors(p: dict[str, Any]) -> list[str]:
@@ -148,7 +148,7 @@ def test_failure_prints_each_error_once(new: dict[str, dict[str, Any]], name: st
     out = case["stdout"]
     p = _payload(out)
     assert _verdict(case) == _verdict(old), name
-    assert _error_locations(out) == _error_locations(old["stdout"]), name
+    assert _error_set(out) == _error_set(old["stdout"]), name
     errors = _all_errors(p)
     assert len(errors) == len(set(errors)), (name, errors)
     assert "errors.pydantic.dev" not in out, name
@@ -183,3 +183,55 @@ def test_failure_output_is_at_most_half(new: dict[str, dict[str, Any]]) -> None:
     sizes = {n: (len(new[n]["stdout"]), len(OLD[n]["stdout"])) for n in fx.FAILURE_FIXTURES}
     assert sum(a for a, _ in sizes.values()) * 2 <= sum(b for _, b in sizes.values()), sizes
     assert all(a <= b for a, b in sizes.values()), sizes
+
+
+def test_a_validator_exception_is_not_a_load_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Review round 1: `load()` and `validate()` fail differently, so they report differently.
+
+    A validator bug must not read as `yaml load failed`, and must not replace cross-validate's
+    own errors with the load placeholder: `missing_ac_heading` keeps its rule-1 error.
+    """
+    from harness_maker import spec_machine
+
+    def boom(*_a: Any, **_k: Any) -> list[str]:
+        raise RuntimeError("validator exploded")
+
+    monkeypatch.setattr(spec_machine, "validate", boom)
+    rc, out = fx.run_check("missing_ac_heading", "warn", "clean")
+    p = _payload(out)
+    assert rc == 1
+    assert p["validate"]["errors"] == ["validate failed: RuntimeError: validator exploded"]
+    assert (
+        p["cross_validate"]["errors"]
+        == _payload(OLD["missing_ac_heading"]["stdout"])["cross_validate"]["errors"]
+    )
+
+
+def test_an_unreadable_yaml_keeps_its_reason(tmp_path: Any) -> None:
+    """An OSError other than a missing file names its type and reason (here, a directory)."""
+    import contextlib
+    import io
+
+    from harness_maker import spec_machine
+
+    (tmp_path / "SPEC-x.machine.yaml").mkdir()
+    (tmp_path / "SPEC-x.md").write_text("---\ntier: 1\n---\n", encoding="utf-8")
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = spec_machine.main(
+            [
+                "check",
+                "--all",
+                "--yaml",
+                str(tmp_path / "SPEC-x.machine.yaml"),
+                "--md",
+                str(tmp_path / "SPEC-x.md"),
+                "--strictness",
+                "warn",
+            ]
+        )
+    (error,) = _payload(buf.getvalue())["validate"]["errors"]
+    assert rc == 1
+    assert error == (
+        f"yaml load failed: IsADirectoryError: {tmp_path / 'SPEC-x.machine.yaml'} (Is a directory)"
+    )

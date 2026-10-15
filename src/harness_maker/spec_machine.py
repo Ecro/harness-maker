@@ -1601,7 +1601,9 @@ def _load_error_lines(exc: Exception, yaml_path: Path) -> list[str]:
     if isinstance(exc, FileNotFoundError):
         return [f"yaml load failed: FileNotFoundError: {yaml_path}"]
     if isinstance(exc, OSError):
-        return [f"yaml load failed: OSError: {yaml_path}"]
+        # Keep the reason: a directory or a permission problem needs a different fix.
+        reason = exc.strerror or str(exc)
+        return [f"yaml load failed: {type(exc).__name__}: {yaml_path} ({reason})"]
     first = str(exc).splitlines()[0] if str(exc) else ""
     return [f"yaml load failed: {type(exc).__name__}: {first}"]
 
@@ -1618,11 +1620,20 @@ def _run_check_all(args: argparse.Namespace) -> int:
     from harness_maker.spec_quality import evaluate_spec
 
     loaded = True
+    validate_errors: list[str]
     try:
-        validate_errors = validate(load(args.yaml_path), spec_dir=args.yaml_path.parent)
+        model = load(args.yaml_path)
     except Exception as e:  # noqa: BLE001 — an unloadable yaml is a reportable verdict
         loaded = False
         validate_errors = _load_error_lines(e, args.yaml_path)
+    else:
+        # Separate from the load: a validator exception is not a load failure, and must not
+        # replace cross-validate's own errors with the load placeholder below.
+        try:
+            validate_errors = validate(model, spec_dir=args.yaml_path.parent)
+        except Exception as e:  # noqa: BLE001 — reported as a failed gate, not a traceback
+            first = str(e).splitlines()[0] if str(e) else ""
+            validate_errors = [f"validate failed: {type(e).__name__}: {first}"]
 
     try:
         cross_errors = cross_validate(args.md_path, args.yaml_path)

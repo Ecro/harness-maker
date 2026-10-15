@@ -196,16 +196,26 @@ def restore_preamble(command: str, preamble_file: str) -> str:
 
 
 # ── C: the execute delta, undone (AC-016, and the older byte-identity goldens) ──
-#: Exact strings written in the SPEC's Outcomes C.
+#: Exact strings written in the SPEC's Outcomes C (as amended 2026-10-15, review round 1). The
+#: routing sentence depends on whether the loop renders: with it, `loop-mode-active` decides.
 ROUTING = (
-    'If that prints `"trusted_lane": "light"` and loop mode is not active for this session, '
-    "write the light PLAN from the light block below. Otherwise (full lane, untrusted light, or "
-    "loop mode) follow the full PLAN text instead."
+    'If that prints `"trusted_lane": "light"`, write the light PLAN from the light block below. '
+    "Otherwise (full lane or untrusted light) follow the full PLAN text instead."
+)
+ROUTING_LOOP = (
+    'If approval-status prints `"trusted_lane": "light"` and loop-mode-active (`<PROJECT_ROOT>`: '
+    "cwd without any `/.worktrees/<name>/` suffix) exits 1, write the light PLAN from the light "
+    "block below. Otherwise (full lane, untrusted light, or loop mode) follow the full PLAN text "
+    "instead."
 )
 STEP03_SENTENCE = (
     "Light PLAN: run the light read-back from Step 0's light block. Any other PLAN: apply the "
-    "Step 0.3 part of `.claude/hm/execute-plan.md`."
+    "Step 0.3 part of `.claude/hm/execute-plan.md`, read from the project root, never a "
+    "worktree; if it is missing, say to re-render with `/hm:make` and STOP."
 )
+#: The Codex render spells the re-render command `$hm-make` (AGENTS.md rewrite).
+STEP03_SENTENCE_CODEX = STEP03_SENTENCE.replace("`/hm:make`", "`$hm-make`")
+LOOP_MODE_CMD = "hm worktree loop-mode-active"
 LIGHT_OPEN, LIGHT_CLOSE = "<!-- @hm:light-plan -->", "<!-- @hm:/light-plan -->"
 #: The fixed separator line, as its own paragraph.
 SEPARATOR = (
@@ -229,11 +239,32 @@ def delete_once(text: str, literal: str) -> str:
 
 def approval_block(step0: str) -> str:
     blocks: list[str] = re.findall(
-        r"```[a-z]*\n[^\n]*hm spec_machine approval-status --root \. --slug <slug>[^\n]*\n```\n\n",
+        r"```[a-z]*\n[^\n]*hm spec_machine approval-status --root \. --slug <slug>[^\n]*\n"
+        r"(?:[^\n]*hm worktree loop-mode-active [^\n]*\n)?```\n\n",
         step0,
     )
     assert len(blocks) == 1, blocks
     return blocks[0]
+
+
+def loop_routing_as_off(text: str) -> str:
+    """The one loop-dependent edit 3c makes outside a loop-only span, mapped to its loop-off form.
+
+    Review round 1 (2026-10-15) made the light route read `loop-mode-active` when the loop renders:
+    the Step 0 block gains that call and the routing sentence becomes `ROUTING_LOOP`. A body
+    without the call is returned unchanged.
+    """
+    if ROUTING_LOOP not in text:
+        return text
+    i = text.index(STEP0_HEADING) + len(STEP0_HEADING)
+    j = text.index(STEP01_HEADING, i)
+    step0 = text[i:j]
+    block = approval_block(step0)
+    off_block = "\n".join(ln for ln in block.split("\n") if LOOP_MODE_CMD not in ln)
+    assert len(off_block) < len(block), "one loop-mode-active line in the block"
+    assert step0.count(ROUTING_LOOP) == 1, "one loop routing sentence"
+    step0 = step0.replace(block, off_block, 1).replace(ROUTING_LOOP, ROUTING, 1)
+    return text[:i] + step0 + text[j:]
 
 
 def undo_execute(text: str, parts: list[str], claude: bool) -> str:
@@ -246,7 +277,8 @@ def undo_execute(text: str, parts: list[str], claude: bool) -> str:
     j = text.index(STEP01_HEADING, i)
     step0 = text[i:j]
     step0 = delete_once(step0, approval_block(step0))
-    step0 = delete_once(step0, ROUTING + "\n\n")
+    routing = ROUTING_LOOP if LOOP_MODE_CMD in approval_block(text[i:j]) else ROUTING
+    step0 = delete_once(step0, routing + "\n\n")
     span = light_span(step0)
     assert len(span) <= 2400
     anchor_end = step0.index(span)
@@ -261,8 +293,9 @@ def undo_execute(text: str, parts: list[str], claude: bool) -> str:
         step0 = step0.replace(anchor, parts[0], 1)
     text = text[:i] + step0 + text[j:]
     k = text.index(STEP03_HEADING) + len(STEP03_HEADING)
-    assert text[k:].startswith(STEP03_SENTENCE + "\n\n")
-    rest = text[k + len(STEP03_SENTENCE) + 2 :]
+    sentence = STEP03_SENTENCE if claude else STEP03_SENTENCE_CODEX
+    assert text[k:].startswith(sentence + "\n\n")
+    rest = text[k + len(sentence) + 2 :]
     return text[:k] + (parts[1] if claude else "") + rest
 
 

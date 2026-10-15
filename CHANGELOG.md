@@ -59,8 +59,13 @@
   `hm spec_machine check --all` prints one line whenever no gate failed, naming `weak_dimensions` and
   `low_dimensions` (`{dim: score}`, dims under 60) on a weak score; a failed gate prints each error once,
   pydantic errors as `<loc>: <msg>` and the full `scores` map replaced by `low_dimensions`, and a missing
-  `.md` is reported instead of a traceback. On `lane: light`, `/hm:execute` writes a short PLAN (one line
-  per phase, boundary and ADR) with an inline read-back that every PLAN reader already accepts, and
+  `.md` is reported instead of a traceback (an unreadable yaml keeps its OS reason, and a validator crash
+  reads as `validate failed` without hiding the cross-file errors). On `lane: light`, `/hm:execute` writes
+  a short PLAN (one line per phase, boundary and ADR) with an inline read-back that every PLAN reader
+  already accepts and that keeps the full read-back's guards (repo-relative paths only, no invented
+  `none`, `user` provenance only for the user's own call, stop before Step 1 if a repair fails); with
+  `/hm:loop` rendered, the light route also requires `hm worktree loop-mode-active` to say loop mode is
+  off, and
   `/hm:spec` authors only the minimal `machine.yaml`; the full PLAN text and the full schema moved to
   `.claude/hm/execute-plan.md` and `.claude/hm/spec-machine-full.md` (Codex keeps both inline). Re-render
   with `/hm:make` to get the three new files.

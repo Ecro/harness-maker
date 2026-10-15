@@ -447,7 +447,7 @@ def test_codex_stage_skills_unchanged(key: str) -> None:
         )
         # The SPEC's exact Step 0.3 sentence names `.claude/hm/execute-plan.md` on every target
         # (SPEC-hm-light-lane-s3c Outcomes C); the Codex skill still carries part 2 inline below it.
-        rest = r.codex[stage].replace(s3c.STEP03_SENTENCE, "")
+        rest = r.codex[stage].replace(s3c.STEP03_SENTENCE_CODEX, "")
         assert ".claude/hm/" not in rest.replace(".claude/hm/autopilot-advance.md", "")
 
 

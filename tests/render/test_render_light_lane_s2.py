@@ -24,6 +24,7 @@ from harness_maker.models import Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import _TYPED_ONLY_SKILLS, synthesize
 from tests.stage_surface import STAGE_REFERENCE_FILES
+from tests.unit import light_lane_s3c_fixture as s3c
 
 REPO = Path(__file__).parents[2]
 TEMPLATES = REPO / "src" / "harness_maker" / "templates"
@@ -203,7 +204,10 @@ def test_loop_on_adds_exactly_the_loop_branches(loop_off: Path, loop_on: Path) -
             assert got.strip().startswith(want), f"{name}: {got!r} is not {want!r}"
     for name in on:
         assert LOOP_OPEN not in off[name], f"{name}: a loop marker rendered with loop off"
-        assert _strip_loop(on[name]) == re.sub(r"\n{3,}", "\n\n", _no_frontmatter(off[name])), (
+        # Stage 3c review round 1: the execute light route reads `loop-mode-active` when the loop
+        # renders, a deliberate loop-dependent edit outside the spans (SPEC-hm-light-lane-s3c).
+        on_body = s3c.loop_routing_as_off(on[name]) if name.endswith("execute") else on[name]
+        assert _strip_loop(on_body) == re.sub(r"\n{3,}", "\n\n", _no_frontmatter(off[name])), (
             f"{name}: the loop flag changed text outside the loop-only sections"
         )
     claude_on = {k.split(":")[1]: v for k, v in on.items() if k.startswith("claude:")}
