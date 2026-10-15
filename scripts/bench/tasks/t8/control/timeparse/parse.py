@@ -1,0 +1,47 @@
+"""Turn duration strings such as '1h30m' into a number of seconds."""
+
+from __future__ import annotations
+
+import re
+
+# Largest first; the order is also the order units must appear in a string.
+UNITS: dict[str, int] = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+
+_TOKEN = re.compile(r"([0-9]+)([a-z])")
+# The largest total accepted, so a duration always fits a signed 64-bit integer.
+MAX_SECONDS = 2**63 - 1
+
+
+def parse_duration(text: str) -> int:
+    """Return the number of seconds in `text`, e.g. '1h30m' -> 5400.
+
+    Surrounding spaces, tabs and newlines are ignored and units are case-insensitive. Each
+    unit may appear once, largest first, with an ASCII amount. A total above MAX_SECONDS and
+    anything else raises ValueError.
+    """
+    # Only ASCII spaces, tabs and newlines are surrounding whitespace; str.strip() would also
+    # remove no-break and em spaces, which the input contract rejects.
+    cleaned = text.strip(" \t\n").lower()
+    if not cleaned:
+        raise ValueError("empty duration")
+    total = 0
+    pos = 0
+    last_rank = -1
+    order = list(UNITS)
+    for match in _TOKEN.finditer(cleaned):
+        if match.start() != pos:
+            raise ValueError(f"invalid duration: {text!r}")
+        amount, unit = match.groups()
+        if unit not in UNITS:
+            raise ValueError(f"unknown unit {unit!r} in {text!r}")
+        rank = order.index(unit)
+        if rank <= last_rank:
+            raise ValueError(f"units out of order or repeated in {text!r}")
+        last_rank = rank
+        total += int(amount) * UNITS[unit]
+        pos = match.end()
+    if pos != len(cleaned):
+        raise ValueError(f"invalid duration: {text!r}")
+    if total > MAX_SECONDS:
+        raise ValueError(f"duration too large: {text!r}")
+    return total

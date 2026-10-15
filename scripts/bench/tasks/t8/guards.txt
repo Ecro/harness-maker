@@ -1,0 +1,6 @@
+# input classes the prompt lists that already behave as stated on the starting tree
+test_surrounding_ascii_whitespace_is_ignored
+test_a_sign_raises
+test_leading_zeros_are_allowed
+test_the_largest_total_is_accepted
+test_empty_or_blank_raises

@@ -1,0 +1,2 @@
+# documented behaviour the prompt says must keep working: it passes on the starting tree
+test_valid_arguments_behave_as_today

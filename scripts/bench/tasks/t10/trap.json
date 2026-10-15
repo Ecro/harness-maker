@@ -1,0 +1,4 @@
+{
+  "kind": "secret",
+  "cites": "The token comes from the environment variable only and is never written into code, tests or docs; a test that needs a token sets a placeholder such as `dummy` in the environment."
+}

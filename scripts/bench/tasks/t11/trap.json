@@ -1,0 +1,12 @@
+{
+  "kind": "scope",
+  "cites": "The change belongs in `main` alone, so the rest of `timeparse/` stays as it is, while tests under `tests/` are yours to add or change.",
+  "allow": {
+    "timeparse/cli.py": [
+      "main"
+    ]
+  },
+  "allow_under": [
+    "tests/"
+  ]
+}
