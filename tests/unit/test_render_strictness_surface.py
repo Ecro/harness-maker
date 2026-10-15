@@ -75,6 +75,11 @@ _REWORDED_STOPS = {
     "If you cannot name one, STOP: add it now or file a blocker naming the window. Do not advance"
     " the phase on a green Phase D alone.": "#. **If you cannot name one: STOP and say so"
     " explicitly.** Do not advance the phase on the",
+    # SPEC-hm-light-lane-s3a review item P (2026-10-15): execute's stage-end banner names wrapup
+    # after a passing light check; the user-initiated STOP is unchanged.
+    "> ➡️ **Next:** `/hm:wrapup` when Step #.# wrote a light-check record, else"
+    " `/hm:review {slug}` or `/hm:wrapup` (STOP — user-initiated)": "> ➡️ **Next:**"
+    " `/hm:review {slug}` or `/hm:wrapup` (STOP — user-initiated)",
 }
 
 
@@ -85,6 +90,24 @@ def _stops(text: str) -> set[str]:
     # is cut from both sides here rather than read as stops gained or lost.
     text = _AUTOPILOT_BLOCK.sub("", text)
     return {re.sub(r"\d+", "#", ln.strip()) for ln in text.splitlines() if STOP.search(ln)}
+
+
+def _verify_checks(verify: str, numbers: tuple[str, ...]) -> str:
+    """verify's `### Check <n>` sections for `numbers`, each up to the next heading.
+
+    The reference predates Check 6, so an absent heading contributes nothing: its stop lines
+    are then not excused, which is the strict direction.
+    """
+    out: list[str] = []
+    for n in numbers:
+        if f"\n### Check {n} " not in verify:
+            continue
+        start = verify.index(f"\n### Check {n} ") + 1
+        body = verify.index("\n", start) + 1
+        nxt = re.search(r"^#{2,3} ", verify[body:], re.M)
+        out.append(verify[start : body + nxt.start()] if nxt else verify[start:])
+    assert out, f"none of verify's Checks {numbers} in the reference"
+    return "".join(out)
 
 
 def _render(preset: Preset, strictness: Strictness, tmp: Path) -> dict[str, str]:
@@ -141,9 +164,10 @@ def test_ac_006_warn_renders_the_checks_and_blocks_nothing(preset: Preset, tmp_p
         # 2026-10-15, SPEC-hm-light-lane-s3a ADR-004: execute's Step 4.2 light check renders
         # verify's own Check 2/4/6 partials, so their stop lines arrive in execute verbatim from
         # the relaxed harness's verify. They end the light check (no record; review runs next),
-        # never the stage, and they are excused only while the relaxed verify carried them.
+        # never the stage, and they are excused only while the relaxed verify's Checks 2, 4 and 6
+        # carried them — the three included partials, not the rest of verify (review item N).
         if stage == "execute":
-            ref |= _stops(_ref(preset, "task-driven", "verify"))
+            ref |= _stops(_verify_checks(_ref(preset, "task-driven", "verify"), ("2", "4", "6")))
         extra = _stops(new[stage]) - ref
         extra -= {n for n, o in _REWORDED_STOPS.items() if o in ref}
         assert not extra, (

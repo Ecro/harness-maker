@@ -10,10 +10,12 @@ from __future__ import annotations
 import json
 import re
 import tempfile
+from collections.abc import Callable
 from datetime import UTC, datetime
 from fnmatch import fnmatch
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -216,13 +218,40 @@ def _record_example(text: str) -> str:
 
 
 RECORD_DIR = {True: "<WT>/work-docs/", False: "./work-docs/"}
+RENDERS = json.loads(
+    (REPO / "tests/fixtures/light_lane_s3a/renders_e7dd6648.json").read_text(encoding="utf-8")
+)
+#: A backticked frontmatter path in a reader's text: `drift_verdict`, `drift_verdict.task_slug`.
+READ_FIELD = re.compile(r"`((?:drift_verdict|task_slug)(?:\.\w+)*)`")
+
+
+def _readers(wt_on: bool) -> list[str]:
+    """wrapup Step 3 and verify Check 1 at e7dd6648, for every config with this worktree arm."""
+    texts: list[str] = []
+    for key, cfg in RENDERS["configs"].items():
+        if ("/wt-on/" in key) is wt_on:
+            for readers in cfg["record_readers"].values():
+                texts += [RENDERS["texts"][sha] for sha in readers.values()]
+    return texts
+
+
+def _lookup(fm: dict[str, Any], path: str) -> Any:
+    node: Any = fm
+    for part in path.split("."):
+        assert isinstance(node, dict), path
+        assert part in node, path
+        node = node[part]
+    return node
 
 
 @pytest.mark.parametrize("wt_on", [True, False], ids=["wt-on", "wt-off"])
 @pytest.mark.parametrize("spec_requirement", ["pass", "warn", "n-a"])
-def test_record_satisfies_wrapup_and_verify(
-    tmp_path: Path, wt_on: bool, spec_requirement: str
-) -> None:
+def test_record_satisfies_wrapup_and_verify(wt_on: bool, spec_requirement: str) -> None:
+    """Every field wrapup Step 3 and verify Check 1 read at e7dd6648 is in the record example.
+
+    The fields come from the e7dd6648 readers' own text, not from the new reader: a bare
+    `task_slug` is the PLAN's, which the record must carry both at the top and in the verdict.
+    """
     text = _light_check_reference(wt_on)
     record_path_line = next(
         ln for ln in text.splitlines() if "REVIEW-{slug}-{date}.md" in ln and "Write" in ln
@@ -232,29 +261,23 @@ def test_record_satisfies_wrapup_and_verify(
         _record_example(text)
         .replace("{slug}", SLUG)
         .replace("{YYYY-MM-DD}", fx.RECORD_DATE)
-        .replace("<ISO timestamp>", datetime.now(UTC).isoformat())
         .replace("pass | warn | n-a", spec_requirement)
         .replace("pass | n-a", "pass")
     )
     fm = yaml.safe_load(example.strip().strip("-"))
-    assert fm["drift_verdict"]["task_slug"] == SLUG
-    assert fm["drift_verdict"]["result"] == "clean"
-    assert "computed_at" in fm["drift_verdict"]
+    readers = _readers(wt_on)
+    assert len(readers) == 64  # 16 configs per worktree arm x 2 runtimes x 2 readers
+    fields = {f for t in readers for f in READ_FIELD.findall(t)}
+    assert {"drift_verdict", "drift_verdict.task_slug", "task_slug"} <= fields
+    for field in fields:
+        value = _lookup(fm, field)
+        if field.endswith("task_slug"):
+            assert value == SLUG, field
+            assert fm["drift_verdict"]["task_slug"] == SLUG
+    assert isinstance(fm["drift_verdict"], dict)
     assert fm["review_kind"] == "light-check"
     assert fm["status"] == "PASSED"
-    assert fm["checks"]["spec_requirement"] in {"pass", "warn", "n-a"}
-    assert fm["checks"]["structural"] == "not-run"
-    base = tmp_path / "repo"
-    fx.init_repo(base)
-    fx.write_spec(base, "light")
-    docs = base / "work-docs"
-    docs.mkdir()
-    record = docs / f"REVIEW-{SLUG}-{fx.RECORD_DATE}.md"
-    record.write_text(example if example.startswith("---") else f"---\n{example}---\n")
-    fx.mark_fresh(base)
-    assert light_lane.light_check_passed(base, SLUG)
-    assert fnmatch(record.name, "REVIEW-" + SLUG + "-*.md")
-    assert world_model_digest._reviews(docs, SLUG) == [record]
+    assert fnmatch(f"REVIEW-{SLUG}-{fx.RECORD_DATE}.md", "REVIEW-" + SLUG + "-*.md")
 
 
 # ── AC-012 ─────────────────────────────────────────────────────────────────
@@ -279,3 +302,174 @@ def test_digest_rows_match_the_spec_table() -> None:
         row.expected for row in next(a for a in load(SPEC_YAML).ac if a.id == "AC-012").golden_table
     ]
     assert list(DIGEST_EXPECTED.values()) == expected
+
+
+# ── AC-015: the light lane is bound to the lane the SPEC was accepted on ───────────────
+
+
+def _flip(checkout: Path, lane: str) -> None:
+    md = checkout / "specs" / f"SPEC-{SLUG}.md"
+    md.write_text(md.read_text(encoding="utf-8").replace("lane: light\n", f"lane: {lane}\n"))
+
+
+def _flip_full_to_light(checkout: Path) -> None:
+    md = checkout / "specs" / f"SPEC-{SLUG}.md"
+    md.write_text(md.read_text(encoding="utf-8").replace("lane: full\n", "lane: light\n"))
+
+
+def _strip_stamp_lane(checkout: Path) -> None:
+    yml = checkout / "specs" / f"SPEC-{SLUG}.machine.yaml"
+    raw = yaml.safe_load(yml.read_text(encoding="utf-8"))
+    raw["approval"].pop("lane", None)
+    yml.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+
+
+def _exempt_full(checkout: Path) -> None:
+    from harness_maker import spec_machine
+
+    fx.write_spec(checkout, "untrusted")
+    md = checkout / "specs" / f"SPEC-{SLUG}.md"
+    md.write_text(md.read_text(encoding="utf-8").replace("lane: light\n", "lane: full\n"))
+    spec_machine.approve(checkout / "specs" / f"SPEC-{SLUG}.machine.yaml", exempt=True)
+
+
+def _full_then_light(c: Path) -> None:
+    fx.write_spec(c, "full")
+    _flip_full_to_light(c)
+
+
+def _exempt_full_then_light(c: Path) -> None:
+    _exempt_full(c)
+    _flip_full_to_light(c)
+
+
+def _old_stamp(c: Path) -> None:
+    fx.write_spec(c, "light")
+    _strip_stamp_lane(c)
+
+
+def _light_then_full(c: Path) -> None:
+    fx.write_spec(c, "light")
+    _flip(c, "full")
+
+
+#: AC-015 case → (build the SPEC, expected lane, expected stamp lane).
+BINDING_FIXTURES: dict[str, tuple[Callable[[Path], None], str, str | None]] = {
+    "lane full approved, then the .md flipped to light": (_full_then_light, "full", "full"),
+    "lane full stamped exempt, then the .md flipped to light": (
+        _exempt_full_then_light,
+        "full",
+        "full",
+    ),
+    "lane light approved by a stamp written before the lane field (no approval.lane)": (
+        _old_stamp,
+        "full",
+        None,
+    ),
+    "lane light approved, then the .md flipped to full": (_light_then_full, "full", "light"),
+    "lane light approved": (lambda c: fx.write_spec(c, "light"), "light", "light"),
+    "lane light stamped exempt": (lambda c: fx.write_spec(c, "exempt"), "light", "light"),
+}
+BINDING_EXPECTED = {
+    str(row.input["case"]): row.expected
+    for row in next(a for a in load(SPEC_YAML).ac if a.id == "AC-015").golden_table
+}
+
+
+def test_binding_table_covers_the_spec() -> None:
+    assert set(BINDING_FIXTURES) == set(BINDING_EXPECTED)
+
+
+@pytest.mark.parametrize("case", list(BINDING_FIXTURES))
+def test_lane_is_bound_to_the_approved_lane(tmp_path: Path, case: str) -> None:
+    build, lane, stamp_lane = BINDING_FIXTURES[case]
+    base = tmp_path / "repo"
+    fx.init_repo(base)
+    build(base)
+    approval = load(base / "specs" / f"SPEC-{SLUG}.machine.yaml").approval
+    assert approval is not None
+    assert approval.lane == stamp_lane
+    assert light_lane.lane_of(base, SLUG) == lane == BINDING_EXPECTED[case]
+
+
+def test_the_stamp_lane_releases_no_stamp_and_keeps_the_cli_output(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`approval` is outside the content hash, so the field moves no stamp; an old stamp written
+    back stays without it; the CLI keeps its four keys (IRR-005 is a disk-format extension)."""
+    from harness_maker import spec_machine
+
+    base = tmp_path / "repo"
+    fx.init_repo(base)
+    fx.write_spec(base, "light")
+    yml = base / "specs" / f"SPEC-{SLUG}.machine.yaml"
+    assert spec_machine.approval_state(base, SLUG).state == "approved"
+    _strip_stamp_lane(base)
+    assert spec_machine.approval_state(base, SLUG).state == "approved"
+    spec_machine._dump_machine_yaml(yml, load(yml))
+    assert "lane" not in yaml.safe_load(yml.read_text(encoding="utf-8"))["approval"]
+    capsys.readouterr()
+    assert spec_machine.main(["approve", "--yaml", str(yml), "--exempt"]) == 0
+    printed = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert set(printed) == {"kind", "content_hash", "approved_by", "approved_at"}
+    stamp = load(yml).approval
+    assert stamp is not None
+    assert stamp.lane == "light"
+
+
+# ── AC-016: a record counts only for the tree it checked, with its own checks passing ──
+
+#: AC-016 case → [(record kind, run marker writer)]; every fixture is a trusted light lane, a
+#: run marker for the current tree, and `since` = the marker time the records are built around.
+READER_FIXTURES: dict[str, list[tuple[str, str | None]]] = {
+    "PASSED record, verification_key = the current relevant key, computed_at after since": [
+        ("passed", "run")
+    ],
+    "computed_at exactly equal to since": [("at_since", "run")],
+    "computed_at one second before since": [("second_before", "run")],
+    "computed_at without a zone, or a date only": [
+        ("naive_computed_at", "run"),
+        ("date_only", "run"),
+    ],
+    "verification_key missing, or not the current relevant key": [
+        ("no_key", "run"),
+        ("other_key", "run"),
+    ],
+    "the cache marker was written by mark-pass, not run": [("passed", None)],
+    "checks.regression or checks.security not pass": [
+        ("regression_fail", "run"),
+        ("security_fail", "run"),
+    ],
+    "checks.mechanical not pass/n-a, or checks.spec_requirement not pass/warn/n-a": [
+        ("mechanical_fail", "run"),
+        ("spec_requirement_fail", "run"),
+    ],
+    "drift_verdict.result scope_violation or scenario_miss": [
+        ("drift_scope", "run"),
+        ("drift_scenario", "run"),
+    ],
+    "drift_verdict.task_slug another slug, the top-level task_slug this one": [
+        ("nested_slug", "run")
+    ],
+}
+READER_EXPECTED = {
+    str(row.input["case"]): row.expected
+    for row in next(a for a in load(SPEC_YAML).ac if a.id == "AC-016").golden_table
+}
+
+
+def test_reader_table_covers_the_spec() -> None:
+    assert set(READER_FIXTURES) == set(READER_EXPECTED)
+
+
+@pytest.mark.parametrize("case", list(READER_FIXTURES))
+def test_record_is_bound_to_the_checked_tree(tmp_path: Path, case: str) -> None:
+    since = datetime.now(UTC).replace(microsecond=0)
+    for i, (record, writer) in enumerate(READER_FIXTURES[case]):
+        base = tmp_path / f"base{i}"
+        fx.init_repo(base)
+        fx.write_spec(base, "light")
+        fx.write_record(base, record, marker_created=since)
+        fx.mark_fresh(base, writer=writer)
+        got = light_lane.light_check_passed(base, SLUG, since=since.isoformat())
+        assert got is READER_EXPECTED[case], record

@@ -3,24 +3,32 @@
 Re-frozen inside this task: `test_aggregate_shipped_surface_does_not_grow` refuses any growth, and
 the execute and spec commands grew.
 
-Direction: the aggregate **rose** on both variants: `aggregate_chars.claude` by 858 chars
-(265463 → 266321) and `aggregate_chars.codex` by 8601 chars (283848 → 292449). The Codex jump is
+Direction: the aggregate **rose** on both variants: `aggregate_chars.claude` by 1310 chars
+(265463 → 266773) and `aggregate_chars.codex` by 7878 chars (283848 → 291726). The Codex jump is
 almost all execute. The Codex skill inlines the light check, because it has no `.claude/hm/`
 reference file to point at. The Claude command carries a pointer, and the light check's body lives
 in `.claude/hm/execute-light-check.md`, which this baseline does not measure.
 
 | Key | Before → After | Attribution |
 |---|---|---|
-| `surface.claude.execute.chars` (`execute`) | 44985 → 45421 | Step 4.2 "Light check": the entry condition (`lane` exactly `light`, every phase GREEN) and the pointer to `.claude/hm/execute-light-check.md` (SPEC-hm-light-lane-s3a AC-007). Round trips unchanged at 18: the light check's calls live in the reference file |
-| `surface.codex.hm-execute.chars`, `.round_trips` (`hm-execute`) | 54887 → 63063, 20 → 26 | The same Step 4.2 with the light check inline: approval-status, verify's Check 2 (the verification_cache run and the degraded mark-pass), `security-scan --force` plus Check 4, Check 6 (op-check, waiver-check), review Step 2's drift rule, and the light-check record (AC-008/009/010) |
-| `surface.claude.spec.chars`, `.round_trips` (`spec`) | 42511 → 42933, 9 → 10 | Step 5 stamps a `lane: light` SPEC with `irreversible_decisions: []` **exempt** with `approve --exempt` (AC-014, ADR-009) |
-| `surface.codex.hm-spec.chars`, `.round_trips` (`hm-spec`) | 44558 → 44983, 10 → 11 | The same Step 5 exempt stamp in the Codex skill |
-| `aggregate_chars.claude`, `.codex` (`aggregate_chars`) | 265463 → 266321, 283848 → 292449 | The four rows above |
+| `surface.claude.execute.chars` (`execute`) | 44985 → 45572 | Step 4.2 "Light check": the entry condition (`lane` exactly `light`, every phase GREEN, loop mode off) and the pointer to `.claude/hm/execute-light-check.md`, whose absence skips the check (SPEC-hm-light-lane-s3a AC-007); the stage-end banner names wrapup after a passing light check. Round trips unchanged at 18: the light check's calls live in the reference file |
+| `surface.codex.hm-execute.chars`, `.round_trips` (`hm-execute`) | 54887 → 62039, 20 → 26 | The same Step 4.2 with the light check inline: approval-status; verify's Check 2 under `light_check` (the verification_cache run, no guessed-gates mark-pass) and the `key` read for the record; `security-scan --force` with its failure clause, plus Check 4 on this scan's rows; Check 6 under `light_check` (op-check, waiver-check, no stop box or 6a/6b prose); review Step 2's drift rule; and the light-check record (AC-008/009/010/016) |
+| `surface.claude.spec.chars`, `.round_trips` (`spec`) | 42511 → 43234, 9 → 10 | Step 5 stamps a `lane: light` SPEC with `irreversible_decisions: []` **exempt** with `approve --exempt`, only when Step 4 passed, the SPEC has no open questions and the DRI was not asked (AC-014, ADR-009) |
+| `surface.codex.hm-spec.chars`, `.round_trips` (`hm-spec`) | 44558 → 45284, 10 → 11 | The same Step 5 exempt stamp in the Codex skill |
+| `aggregate_chars.claude`, `.codex` (`aggregate_chars`) | 265463 → 266773, 283848 → 291726 | The four rows above |
 | `payload_digest`, `render_sha` | mechanical | `render_sha` is the merge-base `e7dd6648` (= `origin/main`) |
+
+Re-frozen a second time the same day, after the review of 3a (items A–P). The Codex execute
+skill fell 1024 chars from the first freeze (63063 → 62039), because the `light_check` flag drops
+verify's guessed-gates path, Check 6's stop box and its 6a/6b prose. Part of that is spent again
+on the scan's failure clause, Check 4's own-rows rule, the `key` read and the `computed_at` rule.
+Claude execute rose 151 (the stub's loop-mode condition, the missing-file skip, the banner) and
+spec 301 on both variants (the exempt branch's three conditions).
 
 The `test_roundtrip_budget._CLAUDE_ROUND_TRIPS` table counts each command together with the
 `.claude/hm/` files it points at, so it moves differently from this baseline: execute 19 → 25
-(the six light-check calls), spec 9 → 10, total 133 → 140.
+(the six light-check calls; the review swapped the degraded mark-pass for the `key` read, so the
+count held), spec 9 → 10, total 133 → 140.
 
 Freeze path: `_surface_baseline.main()` refused because this checkout's local `main` ref is stale
 (`d2c0ab0`, behind `origin/main`). That is the same cause as the known

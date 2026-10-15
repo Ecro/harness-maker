@@ -13,7 +13,8 @@ It writes three goldens:
 - digest_e7dd6648.json — AC-012: `world_model_digest.next_stage` on DIGEST_CASES;
 - renders_e7dd6648.json — AC-011 SHAs of the unchanged paths over CONFIGS, the Claude execute
   command length (AC-007), verify Checks 2/4/6 sliced by heading and review Step 2's drift rule
-  (AC-008), spec Step 0's exempt command (AC-014) and the autopilot ledger EVENTS (AC-013).
+  (AC-008), spec Step 0's exempt command (AC-014), wrapup Step 3 and verify Check 1 sliced by
+  heading (AC-010) and the autopilot ledger EVENTS (AC-013).
 """
 import hashlib, json, sys, tempfile
 from itertools import product
@@ -24,6 +25,13 @@ from harness_maker.observability import verification_cache
 
 assert "/src/harness_maker" in harness_maker.__file__, harness_maker.__file__
 SOURCE = Path(harness_maker.__file__).resolve()
+# Provenance: the imported package is the e7dd6648 tree, or at least one without the light
+# lane. A path check alone passes on any checkout that has a `src/` layout.
+import importlib.util, subprocess
+_HEAD = subprocess.run(["git", "rev-parse", "HEAD"], cwd=SOURCE.parents[2], capture_output=True,
+                       text=True, timeout=30).stdout.strip()
+assert _HEAD.startswith("e7dd6648") or importlib.util.find_spec("harness_maker.light_lane") is None, (
+    _HEAD, str(SOURCE))
 verification_cache._tool_versions = lambda root: {}  # speed only; no golden carries a key
 
 from tests.unit import light_lane_s3a_fixture as fx
@@ -134,6 +142,20 @@ for loop, wt, strictness, mech, preset in product((False, True), (False, True), 
             cfg["drift_rule"][arm] = keep(body.replace(DRIFT_SENTENCE, ""))
             line = next(ln for ln in spec_text.splitlines() if "spec_machine approve" in ln and "--exempt" in ln)
             cfg["exempt_cmd"][arm] = line
+        # AC-010: what wrapup Step 3 and verify Check 1 read, sliced from the readers themselves.
+        cfg["record_readers"] = {}
+        for arm, wrapup_files, verify_files in (
+            ("claude", ("hm/wrapup-steps.md", "commands/hm/wrapup.md"), ("hm/verify-checks.md", "commands/hm/verify.md")),
+            ("codex", ("skills/hm-wrapup",), ("skills/hm-verify",)),
+        ):
+            step3_head = "### Step 3 — Drift verdict check (read-only — no LLM re-analysis)"
+            check1_head = "### Check 1 — Drift verdict (REVIEW present)"
+            wrapup_text = next(t for t in map(lambda r: read(root, r), wrapup_files) if t and step3_head in t)
+            verify_text = next(t for t in map(lambda r: read(root, r), verify_files) if t and check1_head in t)
+            cfg["record_readers"][arm] = {
+                "wrapup_step3": keep(section(wrapup_text, step3_head, ["### Step 3.5"])),
+                "verify_check1": keep(section(verify_text, check1_head, ["### Check 2"])),
+            }
         renders["configs"][config_key(loop, wt, strictness, mech, preset)] = cfg
 (out_dir / "renders_e7dd6648.json").write_text(json.dumps(renders, indent=1, sort_keys=True, ensure_ascii=False) + "\n")
 print("render configs:", len(renders["configs"]), "unique texts:", len(texts))

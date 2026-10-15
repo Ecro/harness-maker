@@ -236,6 +236,10 @@ class SpecApproval(BaseModel):
     #: before this feature — the read path says so rather than naming nothing (ADR-003).
     #: Inside `approval`, which `HASH_DENYLIST_TOP` excludes, so adding it releases no stamp.
     field_hashes: dict[str, str] | None = None
+    #: The `.md` frontmatter `lane` when the stamp was written (SPEC-hm-light-lane-s3a IRR-005).
+    #: The content hash covers only this machine yaml, so the light lane trusts the `.md` lane
+    #: only when the stamp recorded the same one. Absent on older stamps, which read as `full`.
+    lane: str | None = None
 
 
 class SpecMachine(BaseModel):
@@ -742,6 +746,9 @@ def _dump_machine_yaml(yaml_path: Path, model: SpecMachine) -> None:
     for key in ("approval", "irreversible_decisions"):
         if payload.get(key) is None:
             payload.pop(key, None)
+    # A stamp written before IRR-005 stays as it was, without `lane: null`.
+    if isinstance(payload.get("approval"), dict) and payload["approval"].get("lane") is None:
+        payload["approval"].pop("lane", None)
     for ac in payload.get("ac", []):
         if ac.get("superseded_by") is None:
             ac.pop("superseded_by", None)
@@ -2105,6 +2112,19 @@ def _spec_write_lock(yaml_path: Path) -> Iterator[None]:
         raise ApprovalError(f"{yaml_path.name} is being written by another process") from exc
 
 
+def _md_lane(yaml_path: Path) -> str | None:
+    """The sibling `SPEC-<slug>.md`'s `lane`; None when absent, unreadable or not text."""
+    from harness_maker.frontmatter import split_frontmatter
+
+    md = yaml_path.with_name(yaml_path.name.removesuffix(".machine.yaml") + ".md")
+    try:
+        mapping = split_frontmatter(md.read_bytes()).mapping
+    except Exception:  # noqa: BLE001 — no readable lane is recorded as none, which reads full
+        return None
+    lane = mapping.get("lane") if isinstance(mapping, dict) else None
+    return lane if isinstance(lane, str) else None
+
+
 def approve(yaml_path: Path, *, exempt: bool = False) -> SpecApproval:
     """Stamp the SPEC. The identity is read at the BASE root, like objective approval."""
     from harness_maker.second_opinion_invoke import resolve_base_root
@@ -2132,6 +2152,7 @@ def approve(yaml_path: Path, *, exempt: bool = False) -> SpecApproval:
             approved_by=name,
             approved_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             field_hashes=field_digests(model),
+            lane=_md_lane(yaml_path),
         )
         model.approval = stamp
         _dump_machine_yaml(yaml_path, model)
@@ -2146,7 +2167,7 @@ def _run_approve(args: argparse.Namespace) -> int:
         return 1
     # The four established keys, explicitly: a declared model field reaches this dump
     # automatically, and IRR-001 authorised a disk-format extension, not a CLI change.
-    print(json.dumps(stamp.model_dump(mode="json", exclude={"field_hashes"})))
+    print(json.dumps(stamp.model_dump(mode="json", exclude={"field_hashes", "lane"})))
     return 0
 
 

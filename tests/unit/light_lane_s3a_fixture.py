@@ -36,9 +36,15 @@ PIPELINES: dict[str, tuple[str, ...]] = {
 EXTRA_PIPELINES: dict[str, tuple[str, ...]] = {
     "no_wrapup": ("research", "spec", "execute", "review", "verify"),
     "from_spec": ("spec", "execute", "review", "verify", "wrapup"),
+    # A stage after verify that is not human-gated, so an objective-gate halt can follow the
+    # skip (SPEC-hm-light-lane-s3a AC-016, review item L).
+    "then_spec": ("execute", "review", "verify", "spec"),
 }
 #: Volatile values masked before a comparison: wall-clock stamps and the per-project uuid.
 MASKED_ROW_KEYS = ("ts", "elapsed_s")
+#: Where this SPEC's goldens live; suites outside `tests/unit` import it instead of anchoring on
+#: their own `__file__`.
+GOLDENS = Path(__file__).resolve().parents[1] / "fixtures" / "light_lane_s3a"
 MASKED_MARKER_KEYS = ("created_at", "last_seen", "session_uuid")
 
 MACHINE_DOC: dict[str, Any] = {
@@ -151,8 +157,15 @@ def record_text(
     review_kind: str | None = "light-check",
     computed_at: str | None,
     spec_requirement: str = "pass",
+    verification_key: str | None = None,
+    checks: dict[str, str] | None = None,
+    drift: dict[str, Any] | None = None,
 ) -> str:
-    """A REVIEW-shaped record; `review_kind=None` is a real review."""
+    """A REVIEW-shaped record; `review_kind=None` is a real review.
+
+    `verification_key` is the relevant skip key Check 2 marked (the record's tree binding);
+    `checks` and `drift` override keys of the default all-pass `checks` and clean verdict.
+    """
     fm: dict[str, Any] = {"type": "review"}
     if review_kind is not None:
         fm["review_kind"] = review_kind
@@ -168,52 +181,93 @@ def record_text(
     }
     if computed_at is not None:
         verdict["computed_at"] = computed_at
+    verdict.update(drift or {})
     fm["drift_verdict"] = verdict
     if review_kind is not None:
+        if verification_key is not None:
+            fm["verification_key"] = verification_key
         fm["checks"] = {
             "mechanical": "n-a",
             "regression": "pass",
             "security": "pass",
             "spec_requirement": spec_requirement,
             "structural": "not-run",
+            **(checks or {}),
         }
     return "---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n\n# Review\n"
 
 
+#: Record kinds whose one difference from `passed` is a key of the record itself
+#: (SPEC-hm-light-lane-s3a AC-016): (record_text overrides, computed_at offset from the marker).
+_VARIANTS: dict[str, tuple[dict[str, Any], timedelta | None]] = {
+    "drift_scope": ({"drift": {"result": "scope_violation", "scope_violations": ["x.py"]}}, None),
+    "drift_scenario": ({"drift": {"result": "scenario_miss", "scenario_misses": ["S1"]}}, None),
+    "nested_slug": ({"drift": {"task_slug": "other"}}, None),
+    "regression_fail": ({"checks": {"regression": "fail"}}, None),
+    "security_fail": ({"checks": {"security": "fail"}}, None),
+    "mechanical_fail": ({"checks": {"mechanical": "fail"}}, None),
+    "spec_requirement_fail": ({"checks": {"spec_requirement": "fail"}}, None),
+    "other_key": ({"verification_key": "0" * 64}, None),
+    "no_key": ({"verification_key": None}, None),
+    "at_since": ({}, timedelta(0)),
+    "second_before": ({}, timedelta(seconds=-1)),
+}
+
+
 def write_record(checkout: Path, kind: str, *, marker_created: datetime) -> None:
-    """Write the REVIEW record(s) one record kind names, under `<checkout>/work-docs/`."""
+    """Write the REVIEW record(s) one record kind names, under `<checkout>/work-docs/`.
+
+    A light-check record carries the relevant skip key of the checkout as it stands now, the
+    key the light check's Check 2 marked (AC-016).
+    """
+    from harness_maker.observability import verification_cache
+
     docs = checkout / "work-docs"
     docs.mkdir(parents=True, exist_ok=True)
+    key = verification_cache.compute_relevant_skip_key(checkout)
     after = (marker_created + timedelta(minutes=5)).isoformat()
     before = (marker_created - timedelta(hours=1)).isoformat()
     name = f"REVIEW-{SLUG}-{RECORD_DATE}.md"
     older = f"REVIEW-{SLUG}-{OLDER_DATE}.md"
     real = record_text(status="CHANGES_REQUESTED", review_kind=None, computed_at=after)
     texts: dict[str, str] = {}
+
+    def light(**kw: Any) -> str:
+        return record_text(**{"verification_key": key, **kw})
+
     if kind in ("passed", "tree_changed"):
-        texts[name] = record_text(computed_at=after)
+        texts[name] = light(computed_at=after)
+    elif kind in _VARIANTS:
+        overrides, offset = _VARIANTS[kind]
+        at = after if offset is None else (marker_created + offset).isoformat()
+        texts[name] = light(computed_at=at, **overrides)
+    elif kind == "naive_computed_at":
+        naive = (marker_created + timedelta(minutes=5)).replace(tzinfo=None).isoformat()
+        texts[name] = light(computed_at=naive)
+    elif kind == "date_only":
+        texts[name] = light(computed_at=RECORD_DATE)
     elif kind == "failed":
-        texts[name] = record_text(status="FAILED", computed_at=after)
+        texts[name] = light(status="FAILED", computed_at=after)
     elif kind == "no_status":
-        texts[name] = record_text(status=None, computed_at=after)
+        texts[name] = light(status=None, computed_at=after)
     elif kind == "other_slug":
-        texts[name] = record_text(task_slug="other", computed_at=after)
+        texts[name] = light(task_slug="other", computed_at=after)
     elif kind == "stale_since":
-        texts[name] = record_text(computed_at=before)
+        texts[name] = light(computed_at=before)
     elif kind == "no_computed_at":
-        texts[name] = record_text(computed_at=None)
+        texts[name] = light(computed_at=None)
     elif kind == "bad_computed_at":
-        texts[name] = record_text(computed_at="yesterday-ish")
+        texts[name] = light(computed_at="yesterday-ish")
     elif kind == "real_newest":
-        texts[older] = record_text(computed_at=after)
+        texts[older] = light(computed_at=after)
         texts[name] = real
     elif kind == "real_beside":
         texts[older] = real
-        texts[name] = record_text(computed_at=after)
+        texts[name] = light(computed_at=after)
     elif kind == "real_approved":
         texts[name] = record_text(status="APPROVED", review_kind=None, computed_at=after)
     elif kind == "sibling_only":
-        texts[f"REVIEW-{SLUG}-extra-{RECORD_DATE}.md"] = record_text(computed_at=after)
+        texts[f"REVIEW-{SLUG}-extra-{RECORD_DATE}.md"] = light(computed_at=after)
     elif kind == "unparseable":
         texts[name] = "---\nstatus: [PASSED\n---\n"
     elif kind != "none":
@@ -222,12 +276,16 @@ def write_record(checkout: Path, kind: str, *, marker_created: datetime) -> None
         (docs / file_name).write_text(text, encoding="utf-8")
 
 
-def mark_fresh(checkout: Path) -> None:
-    """A passing verification marker for the checkout's current tree (verify Check 2's)."""
+def mark_fresh(checkout: Path, *, writer: str | None = "run") -> None:
+    """A passing verification marker for the checkout's current tree (verify Check 2's).
+
+    `writer="run"` is the marker `verification_cache run` writes; `None` is a `mark-pass`
+    marker, a claim that the gates passed (AC-016 rejects it).
+    """
     from harness_maker.observability import verification_cache
 
     key = verification_cache.compute_relevant_skip_key(checkout)
-    verification_cache.mark_passed(key, project_root=str(checkout))
+    verification_cache.mark_passed(key, project_root=str(checkout), writer=writer)
 
 
 def change_tree(checkout: Path) -> None:

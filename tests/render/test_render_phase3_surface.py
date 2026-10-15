@@ -48,6 +48,7 @@ act on, so it is the thing to pin.
 
 from __future__ import annotations
 
+import json
 import re
 import tempfile
 from functools import cache
@@ -65,6 +66,7 @@ from harness_maker.models import (
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 from tests.stage_surface import stage_text
+from tests.unit.light_lane_s3a_fixture import GOLDENS
 
 from .conftest import pin_install_ref
 
@@ -204,6 +206,13 @@ def test_the_pre_repair_block_avoids_the_two_collided_words(variant: str) -> Non
 # ── ADR-008 (revised): neither stage touches the verification cache ──────────
 
 
+#: The light check's Check 2 section per variant, frozen 2026-10-15 (SPEC-hm-light-lane-s3a
+#: review item F) from the render of these answers.
+_LIGHT_CHECK2: dict[str, str] = json.loads(
+    (GOLDENS / "light_check_check2.json").read_text(encoding="utf-8")
+)
+
+
 def _without_light_check_check2(body: str) -> tuple[str, str]:
     """`body` minus the light check's verify Check 2 section, and that section."""
     start = body.find("### Check 2 — Regression smoke")
@@ -228,17 +237,22 @@ def test_the_stage_does_not_touch_the_verification_cache(variant: str, stage: st
     halves, so theirs can actually hit. This asserts only that these two stages stay out of it;
     re-adding a read here without a producer is the regression.
 
-    One scoped exception (2026-10-15, SPEC-hm-light-lane-s3a ADR-004): execute's Step 4.2 light
-    check renders verify's OWN Check 2 partial, on a trusted light lane only, in place of the
-    verify stage turn. That is verify's full-gate `run` (it marks only a full pass on an unchanged
-    tree), not a mark after a targeted run, so the hazard above does not apply; the boundary's
-    skip needs exactly that marker. The carve-out is that one section, and it must not mention a
-    targeted mode."""
+    One scoped exception (2026-10-15, SPEC-hm-light-lane-s3a ADR-004; corrected the same day
+    after review item F): execute's Step 4.2 light check renders verify's own Check 2 partial
+    with `light_check` set, on a trusted light lane only, in place of the verify stage turn. That
+    section holds two cache calls. One is verify's full-gate `run`, which writes its marker only
+    on a full pass of the CI gates on an unchanged tree. The other is a read-only `key` that
+    prints the key `run` marked, for the record. The partial's degraded path (guess
+    the gates, then `mark-pass`) is dropped under the flag, so this section never writes a marker
+    after a narrower run, and the hazard above does not apply. The boundary's skip accepts only a
+    `run` marker. The carve-out is that one section, and it must equal the frozen text in
+    `tests/fixtures/light_lane_s3a/light_check_check2.json`, so any cache call added to it
+    fails here."""
     body, light_check2 = _without_light_check_check2(_body(f"{variant}:{stage}"))
     if light_check2:
         assert stage == "execute"
         assert "### Step 4.2 — Light check" in body
-        assert "targeted" not in light_check2
+        assert light_check2 == _LIGHT_CHECK2[variant]
     assert "verification_cache" not in body, (
         f"{stage} touches the verification cache. A read here cannot hit (the fingerprint always "
         "moved) and a write here would poison `verify`/`wrapup` — see this test's docstring"

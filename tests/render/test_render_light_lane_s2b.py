@@ -387,6 +387,9 @@ def test_moved_text_is_preserved(key: str) -> None:
             assert lost == [], f"{key}/{stage}: {kind} lost in the move: {lost}"
 
 
+_LIGHT_NEXT = "`$hm-wrapup` when Step 4.2 wrote a light-check record, else "
+
+
 def _without_light_check(stage: str, text: str) -> str:
     """The Codex execute skill minus Step 4.2 (2026-10-15, SPEC-hm-light-lane-s3a).
 
@@ -401,7 +404,9 @@ def _without_light_check(stage: str, text: str) -> str:
     i = text.index("### Step 4.2 — Light check")
     end = "still runs in full.\n\n"
     j = text.index(end, i) + len(end)
-    cut = text[:i] + text[j:]
+    # The stage-end banner's next step names wrapup after a passing light check (review item P,
+    # same day); the rest of the banner line is unchanged, so that clause is cut too.
+    cut = (text[:i] + text[j:]).replace(_LIGHT_NEXT, "", 1)
     fm_end = cut.index("\n---\n", 4) + len("\n---\n")
     body_hash = hashlib.sha256(cut[fm_end:].encode()).hexdigest()
     head = re.sub(r"^content_hash: .*$", f"content_hash: {body_hash}", cut[:fm_end], flags=re.M)

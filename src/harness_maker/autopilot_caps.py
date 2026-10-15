@@ -375,11 +375,14 @@ def _light_skip(
     Returns execute's ordinary next stage and nothing skipped unless the light check passed for
     this slug since this session armed (`light_lane.light_check_passed`): no slug, an untrusted
     lane, a stale or contradicted record, or a pipeline with nothing skippable after execute all
-    fall through to today's answer.
+    fall through to today's answer. So does a narrowed marker (`restore_pipeline` set): the
+    human who narrowed the run asked for the stages it lists.
     """
     stages = list(marker.pipeline)
     nxt = next_stage(stages, "execute")
     if not slug or nxt is None or _stage_name(nxt) not in _LIGHT_SKIPPABLE:
+        return nxt, []
+    if marker.restore_pipeline is not None:
         return nxt, []
     from harness_maker import light_lane
 
@@ -615,19 +618,27 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
     # SPEC-hm-light-lane-s3a ADR-002: placed where `nxt` is computed, after every halt above, so
     # each keeps its precedence; an empty `skip_note` leaves every reason below byte-identical.
     skip_note = ""
+    skipped: list[str] = []
     if args.current == "execute":
         nxt, skipped = _light_skip(marker, root, slug)
+        if skipped:
+            skip_note = f" (lane light: skipped {', '.join(skipped)})"
+
+    def record_skip() -> None:
+        # Only on the paths below that advance or end: an objective-gate halt re-runs execute's
+        # boundary later, so nothing was skipped yet (review item L).
         if skipped:
             autopilot_ledger.append_event(
                 root,
                 event="stage_skipped",
                 fields={"from": "execute", "skipped": skipped, "to": nxt, "reason": "lane light"},
             )
-            skip_note = f" (lane light: skipped {', '.join(skipped)})"
+
     if nxt is None and marker.restore_pipeline is not None:
         # PLAN-maker-front-door-improvements ADR-002: a NARROWED end is not pipeline
         # completion. Restore the armed pipeline instead of clearing, so the session stays
         # armed for its next run; stop here either way.
+        record_skip()
         cause = autopilot.restore_narrowed(
             root,
             session_id=args.session_id,
@@ -643,6 +654,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         return 0
     if nxt is None:
         # `current` IS the last stage → end the session (ADR-006).
+        record_skip()
         autopilot.clear(root, session_id=args.session_id)
         out["pipeline_complete"] = True
         out["reason"] = "pipeline complete — autopilot session finished" + skip_note
@@ -654,6 +666,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         # records the gate, and clears the marker (Stop-hook stands down) — the human
         # then invokes `/hm:wrapup` deliberately. This is what enforces ADR-002's
         # "always stop at the wrapup merge/push" at the auto-advance layer.
+        record_skip()
         autopilot_ledger.append_event(root, event="gate_blocked", fields={"stage": nxt})
         autopilot.clear(root, session_id=args.session_id)
         out["halt_kind"] = "merge_gate"
@@ -670,12 +683,13 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
     objective_halt = _objective_check(root, cwd=Path.cwd(), slug=slug, stage=args.current)
     if objective_halt is not None:
         out["halt_kind"] = "objective_gate"
-        out["reason"] = objective_halt + skip_note
+        out["reason"] = objective_halt
         print(json.dumps(out))
         return 0
     # AUTHORIZED, not entered — the next stage's own boundary/gate-blocked call confirms
     # entry (ADR-004/005). Writing "advanced" here was the bug: it recorded permission as
     # if it were progress.
+    record_skip()
     autopilot_ledger.append_event(root, event="advance_authorized", fields={"to": nxt})
     out["proceed"] = True
     out["next_stage"] = nxt

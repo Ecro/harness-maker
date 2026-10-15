@@ -23,6 +23,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": null,
     "commands/hm/review.md": "b0a1e73b4ead4096924f0d32648b27dc762b56bbe76a046716850a841cf8b79b",
@@ -59,6 +69,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": null,
@@ -97,6 +117,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": null,
     "commands/hm/review.md": "520bb9578c770e6e12e3ffb39f6e68b51fbb45081b254b2626f974b3b1c7599b",
@@ -133,6 +163,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": null,
@@ -171,6 +211,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": null,
     "commands/hm/review.md": "b0a1e73b4ead4096924f0d32648b27dc762b56bbe76a046716850a841cf8b79b",
@@ -207,6 +257,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": null,
@@ -245,6 +305,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": null,
     "commands/hm/review.md": "520bb9578c770e6e12e3ffb39f6e68b51fbb45081b254b2626f974b3b1c7599b",
@@ -281,6 +351,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": null,
@@ -319,6 +399,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": null,
     "commands/hm/review.md": "de26dc056196fd3f330311690b353b35f2a1ca7fa04842d62438affc61bbf646",
@@ -355,6 +445,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": null,
@@ -393,6 +493,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": null,
     "commands/hm/review.md": "1b71d2fd53cf497d432be85dcf41aa2927d8f7048c627f143c3d62beec0d3408",
@@ -429,6 +539,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": null,
@@ -467,6 +587,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": null,
     "commands/hm/review.md": "de26dc056196fd3f330311690b353b35f2a1ca7fa04842d62438affc61bbf646",
@@ -503,6 +633,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": null,
@@ -541,6 +681,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": null,
     "commands/hm/review.md": "1b71d2fd53cf497d432be85dcf41aa2927d8f7048c627f143c3d62beec0d3408",
@@ -577,6 +727,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": null,
@@ -615,6 +775,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
     "commands/hm/review.md": "9e4f7f766c599a26f7059fa8472c1696ba9e8bf5b9e7fbea1094f2e94ea64e72",
@@ -651,6 +821,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
@@ -689,6 +869,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
     "commands/hm/review.md": "b156234aa1061d8eccc194b72e826f68e2f585153d72753899ac887d581dfa35",
@@ -725,6 +915,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
@@ -763,6 +963,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
     "commands/hm/review.md": "9e4f7f766c599a26f7059fa8472c1696ba9e8bf5b9e7fbea1094f2e94ea64e72",
@@ -799,6 +1009,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
@@ -837,6 +1057,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
     "commands/hm/review.md": "b156234aa1061d8eccc194b72e826f68e2f585153d72753899ac887d581dfa35",
@@ -873,6 +1103,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": "b4d935154b77686bf13ffea5e7836969650cdc2ea9bd09f78220e2944b65544e",
@@ -911,6 +1151,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
     "commands/hm/review.md": "336a17820031310601817acd3d81acf136cd6b53beac667c23894b98574208cd",
@@ -947,6 +1197,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
@@ -985,6 +1245,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
     "commands/hm/review.md": "d8962cee08aff9a7f6d7734fedd18d995bdaeb62d0639e030fdb92508b83a78d",
@@ -1021,6 +1291,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
@@ -1059,6 +1339,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
     "commands/hm/review.md": "336a17820031310601817acd3d81acf136cd6b53beac667c23894b98574208cd",
@@ -1095,6 +1385,16 @@
    "exempt_cmd": {
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
+   },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
    },
    "sha256": {
     "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
@@ -1133,6 +1433,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
     "commands/hm/review.md": "d8962cee08aff9a7f6d7734fedd18d995bdaeb62d0639e030fdb92508b83a78d",
@@ -1170,6 +1480,16 @@
     "claude": "!uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt",
     "codex": "Bash(\"uv run --with $HOME/harness-maker hm spec_machine approve --yaml specs/SPEC-{slug}.machine.yaml --exempt\")"
    },
+   "record_readers": {
+    "claude": {
+     "verify_check1": "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a",
+     "wrapup_step3": "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb"
+    },
+    "codex": {
+     "verify_check1": "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f",
+     "wrapup_step3": "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea"
+    }
+   },
    "sha256": {
     "commands/hm/loop.md": "d9ca7dcf7a1ccee65c6da7d890764df32beb73241911efd2c67ee3e522e2aab6",
     "commands/hm/review.md": "60eb9d502a4e53bcc867eea4ad4c87b2b831c7b95d07530fb4de97a13aaeca10",
@@ -1198,16 +1518,24 @@
  "texts": {
   "047017d0069faff3f5ccf48e078614e16ea75abada46fd30ad4401e42e7270c9": "Before reviewers run, scan the diff against PLAN scope:\n- Files changed that are NOT in any PLAN phase's \"scope\" → flag as **scope drift**.\n- Files in PLAN phase's scope that have NOT changed → flag as **incomplete phase**.\n\n**Emit drift_verdict** in the REVIEW report frontmatter (mandatory — wrapup and verify depend on this):\n\n```yaml\ndrift_verdict:\n  result: clean | scope_violation | scenario_miss\n  scope_violations: [<list of files outside PLAN scope>]\n  scenario_misses: [<list of SPEC scenarios without coverage>]\n  task_slug: <current task slug from PLAN frontmatter>\n  computed_at: <ISO timestamp>\n```\n\nWhen no drift is detected, emit `result: clean` with empty lists. This record is the single source of truth for drift status — wrapup and verify read it without re-running the analysis.\n\n",
   "236c814458e348ecf9a448543bbcd73a688470628af3de6580e05ab2feb6c90b": "### Check 6 — SPEC requirement\n\n> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never\n> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.\n\nRead `spec_need_verdict` / `spec_need_target` from `work-docs/PLAN-{slug}.md`.\nNo PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run\n`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root . --changed-file <f1> --changed-file <f2> …\n!uv run --with $HOME/harness-maker hm spec_need waiver-check --root . --slug <task_slug> --changed-file <f1> --changed-file <f2> …\n```\n\n\nEither exiting 0 → `PASS`. Both exiting 1 → report\n`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via\n`/hm:spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.\n\n\n",
+  "24771e270bb8295a526ef4dd0b0870bc11fd5e1f7a14a3d73b1ca5514e639804": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run /hm:review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `/hm:execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. `/hm:wrapup` Step 3.5's\n`spec_machine find-unbound` scan runs on this preset too but is **advisory only** (Side never STOPs),\nso an AC still `pending_test` after `--no-tdd` is surfaced in the wrapup report, not blocked.\n\n",
   "2c437d56185365cd7e37888fb1e271b44234f505c86ca9109e07c8d226cc86b3": "### Check 6 — SPEC requirement\n\n\nRead the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `work-docs/PLAN-{slug}.md`.\n\n**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.\n\n**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.\n\nEvaluation sequence when `spec_need_verdict` is one of the above values:\n\n**Step 6a — operation check:**\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …\n```\n\n\nExit 0 → operation satisfied → **PASS**. Proceed to next check.\n\n**Step 6b — waiver check** (only if Step 6a exits 1):\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …\n```\n\n\nThe `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.\n\n**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:\n\n```\nBLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>\nThe required SPEC operation was not performed and no valid waiver exists.\nTo resolve: author the SPEC via /hm:spec <slug> (the\nresume-marker skips re-detection and routes directly to /hm:spec) or record\na fresh, non-empty-rationale waiver with:\n  uv run --with $HOME/harness-maker hm spec_need waiver-set --root <WT> --slug <slug> \\\n    --verdict <verdict> --target <target> --rationale \"<reason>\" \\\n    --changed-file <f1> …\nNote: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.\n```\n\n",
   "372809885d2a976f1132825a847370fdbce2164ff6748b412744aa3886c35a09": "### Check 6 — SPEC requirement\n\n\nRead the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `work-docs/PLAN-{slug}.md`.\n\n**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.\n\n**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.\n\nEvaluation sequence when `spec_need_verdict` is one of the above values:\n\n**Step 6a — operation check:**\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nExit 0 → operation satisfied → **PASS**. Proceed to next check.\n\n**Step 6b — waiver check** (only if Step 6a exits 1):\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nThe `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.\n\n**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:\n\n```\nBLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>\nThe required SPEC operation was not performed and no valid waiver exists.\nTo resolve: author the SPEC via $hm-spec <slug> (the\nresume-marker skips re-detection and routes directly to $hm-spec) or record\na fresh, non-empty-rationale waiver with:\n  uv run --with $HOME/harness-maker hm spec_need waiver-set --root <WT> --slug <slug> \\\n    --verdict <verdict> --target <target> --rationale \"<reason>\" \\\n    --changed-file <f1> …\nNote: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.\n```\n\n",
   "444c7fcdbad00804772ffbe7fe867e8a9aa0221009351573fd936fdac2947355": "### Check 2 — Regression smoke\n\n**One verb runs the gates and owns the marker.** It takes the gates from the project's CI (a\nnarrower guess passes locally, fails on push) and marks only a pass on an unchanged tree.\n\n\n```bash\n!uv run --with $HOME/harness-maker hm observability.verification_cache run --root . --mode relevant --timeout-s 3600 --deadline-s 3600\n```\n\n\nRun it in the **background** (`run_in_background: true`): a full suite outlives the 10-minute\nforeground cap. Branch on the `\"exit\"` field of the JSON line it prints, never on the\nhost's status; no JSON line = not a pass.\n\n- `0` → PASS (`cached: true` = its own marker reused). Skip to Check 3.\n- `1` → a gate failed or timed out, not a pass — stderr names the command and its output tail.\n- `4` → the tree changed during the run, not a pass (stderr lists the paths); re-run.\n- Killed by the host (no exit code) → not a pass, no marker.\n- `3` → degraded: no readable CI (stderr says why). Only then:\n\n<!-- @hm:verify-degraded -->\nfall back to the project's toolchain (`pytest -q` / `ruff check .` / `ruff format --check .` / `mypy --strict`; `cargo test`; `pnpm test`) and say the gates were guessed. If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it. After every command passes — and only then — write the marker:\n\n\n```bash\n!uv run --with $HOME/harness-maker hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest\n```\n\n<!-- @hm:/verify-degraded -->\n\nFAIL when: any subprocess returns non-zero.\n\n",
+  "501db44f816b34e95034c9cb4c07aadf0dea06f92f3acaa1c72d7988a7dcdd4a": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run /hm:review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `/hm:execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. Task-driven mode has no machine\nSPEC to scan, so on that path an uncovered scenario reaches wrapup unflagged — the accepted\ncost of `--no-tdd` without a SPEC contract.\n\n",
   "5226844843a3a8d903531d1e854735a6d2a0d8e5ffeddaa9d2ecefac4f91d695": "### Check 6 — SPEC requirement\n\n> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never\n> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.\n\nRead `spec_need_verdict` / `spec_need_target` from `work-docs/PLAN-{slug}.md`.\nNo PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run\n`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root . --changed-file <f1> --changed-file <f2> …\")\nBash(\"uv run --with $HOME/harness-maker hm spec_need waiver-check --root . --slug <task_slug> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nEither exiting 0 → `PASS`. Both exiting 1 → report\n`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via\n`$hm-spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.\n\n\n",
   "614b11f9d67948646ce29d1d4d93ca2a55ee829102a8dca011f8f0b95ad17c30": "### Check 4 — Security high findings\n\nRead the most recent `.claude/observability/security/findings-*.jsonl`.\n\nFAIL when: any finding has `severity == \"high\"` AND `resolution != \"accepted-risk-with-rationale\"`. Resolutions must be deliberate (recorded in PLAN ADR or wrapup commit body).\n\nPASS when: zero unresolved high findings.\n\n",
+  "643a51d7e47ca8c193f077057b1ead1f8561aa7114e3950c351fc995715fe76f": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run $hm-review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `$hm-execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `$hm-wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. Task-driven mode has no machine\nSPEC to scan, so on that path an uncovered scenario reaches wrapup unflagged — the accepted\ncost of `--no-tdd` without a SPEC contract.\n\n",
+  "6763409b3a17ae3c937c34e8e48e662ea0c2c4e9aea28ae5cb1594e8d4e0890b": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run $hm-review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `$hm-execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `$hm-wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. `$hm-wrapup` Step 3.5's\n`spec_machine find-unbound` scan runs on this preset too but is **advisory only** (Side never STOPs),\nso an AC still `pending_test` after `--no-tdd` is surfaced in the wrapup report, not blocked.\n\n",
   "68f6cbed9170cfceadbbd5b3058d354a05e6d52eb1e6d08f884e2ccb3ac7f20d": "### Check 6 — SPEC requirement\n\n\nRead the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `work-docs/PLAN-{slug}.md`.\n\n**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.\n\n**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.\n\nEvaluation sequence when `spec_need_verdict` is one of the above values:\n\n**Step 6a — operation check:**\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root . --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nExit 0 → operation satisfied → **PASS**. Proceed to next check.\n\n**Step 6b — waiver check** (only if Step 6a exits 1):\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need waiver-check --root . --slug <task_slug> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nThe `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.\n\n**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:\n\n```\nBLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>\nThe required SPEC operation was not performed and no valid waiver exists.\nTo resolve: author the SPEC via $hm-spec <slug> (the\nresume-marker skips re-detection and routes directly to $hm-spec) or record\na fresh, non-empty-rationale waiver with:\n  uv run --with $HOME/harness-maker hm spec_need waiver-set --root . --slug <slug> \\\n    --verdict <verdict> --target <target> --rationale \"<reason>\" \\\n    --changed-file <f1> …\nNote: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.\n```\n\n",
   "9408dcfd404ac449883910046339a28651cc04bf5320cb37d883067aeb90939c": "### Check 6 — SPEC requirement\n\n> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never\n> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.\n\nRead `spec_need_verdict` / `spec_need_target` from `work-docs/PLAN-{slug}.md`.\nNo PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run\n`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …\n!uv run --with $HOME/harness-maker hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …\n```\n\n\nEither exiting 0 → `PASS`. Both exiting 1 → report\n`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via\n`/hm:spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.\n\n\n",
   "969a0e82542980df83ec7c0e0e3d0aa25c1b4d3ca6b582348e6979ca4af63b7c": "### Check 6 — SPEC requirement\n\n> **Advisory — this harness runs at `warn` strictness.** Check 6 runs and reports; it never\n> ends the verify run, and a missing SPEC operation is a `WARN`, not a stop.\n\nRead `spec_need_verdict` / `spec_need_target` from `work-docs/PLAN-{slug}.md`.\nNo PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `PASS (N-A)`. Otherwise run\n`op-check`, then — only if it exits 1 — `waiver-check`, exactly as below:\n\n```\nBash(\"uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …\")\nBash(\"uv run --with $HOME/harness-maker hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …\")\n```\n\n\nEither exiting 0 → `PASS`. Both exiting 1 → report\n`WARN: check 6 (SPEC requirement) — verdict=<v>, target=<t>` with the remedy (author it via\n`$hm-spec <slug>`, or record a waiver with `hm spec_need waiver-set`) and continue to the result.\n\n\n",
+  "969da971a33335aa73c8bd3716ae11d9457801aed0757e61e65f458aa55b35a2": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run /hm:review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `/hm:execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `/hm:wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. The mechanical backstop is `/hm:wrapup` Step 3.5's\n`spec_machine find-unbound` gate (fail-closed, STOP on this preset): a closed-type AC still `pending_test`\nafter the write-back cannot be committed, whichever way execute ran.\n\n",
   "a1d2eee37c17d5481832a637372d58a54a6d2102ce27038a81131d80235a099d": "### Check 2 — Regression smoke\n\n**One verb runs the gates and owns the marker.** It takes the gates from the project's CI (a\nnarrower guess passes locally, fails on push) and marks only a pass on an unchanged tree.\n\n\n```\nBash(\"uv run --with $HOME/harness-maker hm observability.verification_cache run --root . --mode relevant\")\n```\n\n\nForeground call: the defaults (540 s/gate, 570 s total) report their own timeout. Branch on the `\"exit\"` field of the JSON line it prints, never on the\nhost's status; no JSON line = not a pass.\n\n- `0` → PASS (`cached: true` = its own marker reused). Skip to Check 3.\n- `1` → a gate failed or timed out, not a pass — stderr names the command and its output tail.\n- `4` → the tree changed during the run, not a pass (stderr lists the paths); re-run.\n- Killed by the host (no exit code) → not a pass, no marker.\n- `3` → degraded: no readable CI (stderr says why). Only then:\n\n<!-- @hm:verify-degraded -->\nfall back to the project's toolchain (`pytest -q` / `ruff check .` / `ruff format --check .` / `mypy --strict`; `cargo test`; `pnpm test`) and say the gates were guessed. If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it. After every command passes — and only then — write the marker:\n\n\n```\nBash(\"uv run --with $HOME/harness-maker hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest\")\n```\n\n<!-- @hm:/verify-degraded -->\n\nFAIL when: any subprocess returns non-zero.\n\n",
-  "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f": "### Check 6 — SPEC requirement\n\n\nRead the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `work-docs/PLAN-{slug}.md`.\n\n**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.\n\n**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.\n\nEvaluation sequence when `spec_need_verdict` is one of the above values:\n\n**Step 6a — operation check:**\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root . --changed-file <f1> --changed-file <f2> …\n```\n\n\nExit 0 → operation satisfied → **PASS**. Proceed to next check.\n\n**Step 6b — waiver check** (only if Step 6a exits 1):\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need waiver-check --root . --slug <task_slug> --changed-file <f1> --changed-file <f2> …\n```\n\n\nThe `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.\n\n**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:\n\n```\nBLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>\nThe required SPEC operation was not performed and no valid waiver exists.\nTo resolve: author the SPEC via /hm:spec <slug> (the\nresume-marker skips re-detection and routes directly to /hm:spec) or record\na fresh, non-empty-rationale waiver with:\n  uv run --with $HOME/harness-maker hm spec_need waiver-set --root . --slug <slug> \\\n    --verdict <verdict> --target <target> --rationale \"<reason>\" \\\n    --changed-file <f1> …\nNote: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.\n```\n\n"
+  "b84ffc28f0cb0673eb555139cd40ad8c305fbdf898e2b5b2288cc4799ce1c17f": "### Check 6 — SPEC requirement\n\n\nRead the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `work-docs/PLAN-{slug}.md`.\n\n**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.\n\n**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.\n\nEvaluation sequence when `spec_need_verdict` is one of the above values:\n\n**Step 6a — operation check:**\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root . --changed-file <f1> --changed-file <f2> …\n```\n\n\nExit 0 → operation satisfied → **PASS**. Proceed to next check.\n\n**Step 6b — waiver check** (only if Step 6a exits 1):\n\n```bash\n!uv run --with $HOME/harness-maker hm spec_need waiver-check --root . --slug <task_slug> --changed-file <f1> --changed-file <f2> …\n```\n\n\nThe `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.\n\n**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:\n\n```\nBLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>\nThe required SPEC operation was not performed and no valid waiver exists.\nTo resolve: author the SPEC via /hm:spec <slug> (the\nresume-marker skips re-detection and routes directly to /hm:spec) or record\na fresh, non-empty-rationale waiver with:\n  uv run --with $HOME/harness-maker hm spec_need waiver-set --root . --slug <slug> \\\n    --verdict <verdict> --target <target> --rationale \"<reason>\" \\\n    --changed-file <f1> …\nNote: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.\n```\n\n",
+  "c00523f2c6e029e627a081597c19e8a915b8d1139beea005a3c0fc72312745ea": "### Step 3 — Drift verdict check (read-only — no LLM re-analysis)\n\nRead the most recent REVIEW report frontmatter for `drift_verdict`.\n\n1. **Locate**: find `work-docs/REVIEW-{slug}.md` matching the current task slug.\n2. **Validate**: check that `drift_verdict.task_slug` matches the current PLAN's `task_slug`.\n3. **Decide**:\n   - `drift_verdict` present AND `task_slug` matches → log the verdict, continue.\n   - `drift_verdict` absent OR `task_slug` mismatch → **FAIL** with message: `BLOCKED: step 3 (drift) — run $hm-review first (no drift_verdict found for current task)`.\n\n> Advisory: if you made changes after `$hm-review`, re-run `$hm-review` to refresh the drift verdict.\n\nThis step does NOT re-run the drift analysis. Review is the single owner (ADR-006).\n\n",
+  "d9dbe6b8afc76b84016423ee4855a0f1a363dd654a1585dd05c70ba82f0130eb": "### Check 1 — Drift verdict (REVIEW present)\n\n**Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.\n- `drift_verdict` present AND `task_slug` matches current PLAN → **PASS**.\n- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run $hm-review first`.\n\nThis check is mechanical on purpose. The LLM PLAN/SPEC coverage judgement that used to sit here\nas \"1b\" is gone (PLAN-workflow-steps-vs-model-capability ADR-003). Per-scenario coverage is\nenforced where the tests are written: `$hm-execute` Phase A authors one test per SPEC scenario\nand Phase A.5's coverage lens blocks implementation on any `scenarios_missing` (A.5 is a\nTUNE-class gate graded `**` — Side-preset evidence only; see the\nstep-sensitivity registry); `$hm-wrapup` Step 3.5 writes the covering test ids back into the machine SPEC\n(`pending_test`). Test-expressed PLAN exit criteria are re-run by Check 2 below; a script or\nmanual-checklist exit criterion has **no** automated re-check at this stage, and Check 6 gates the SPEC operation, not scenario coverage.\n**`--no-tdd` / `lane: light` path:** `--no-tdd` skips Phase A/A.5 and `lane: light` skips A.5; this stage does not\nre-derive scenario coverage. The mechanical backstop is `$hm-wrapup` Step 3.5's\n`spec_machine find-unbound` gate (fail-closed, STOP on this preset): a closed-type AC still `pending_test`\nafter the write-back cannot be committed, whichever way execute ran.\n\n",
+  "fa58b9d0047fec2e38874fb3010b5b1e8bdb60b0be9630961ccb87c3abaefcfb": "### Step 3 — Drift verdict check (read-only — no LLM re-analysis)\n\nRead the most recent REVIEW report frontmatter for `drift_verdict`.\n\n1. **Locate**: find `work-docs/REVIEW-{slug}.md` matching the current task slug.\n2. **Validate**: check that `drift_verdict.task_slug` matches the current PLAN's `task_slug`.\n3. **Decide**:\n   - `drift_verdict` present AND `task_slug` matches → log the verdict, continue.\n   - `drift_verdict` absent OR `task_slug` mismatch → **FAIL** with message: `BLOCKED: step 3 (drift) — run /hm:review first (no drift_verdict found for current task)`.\n\n> Advisory: if you made changes after `/hm:review`, re-run `/hm:review` to refresh the drift verdict.\n\nThis step does NOT re-run the drift analysis. Review is the single owner (ADR-006).\n\n"
  },
  "unchanged_paths": [
   "commands/hm/review.md",

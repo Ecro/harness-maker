@@ -154,9 +154,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # is_codex-branched call sites ADR-011's counting rule includes.
     # 19 → 25 (2026-10-15, SPEC-hm-light-lane-s3a): Step 4.2's light check, read from
     # `.claude/hm/execute-light-check.md`, adds approval-status, Check 2's verification_cache
-    # run and degraded mark-pass, `security-scan --force`, and Check 6's op-check and
-    # waiver-check. Those calls are the gates that replace the review and verify turns on a
-    # trusted light lane. No call was removed. Attributed in
+    # run and the `key` read for the record, `security-scan --force`, and Check 6's op-check and
+    # waiver-check. (The first version had Check 2's degraded mark-pass where the `key` read is;
+    # the review of 3a, item F, dropped it.) Those calls are the gates that replace the review
+    # and verify turns on a trusted light lane. No call was removed. Attributed in
     # work-docs/BASELINE-DELTA-hm-light-lane-s3a.md.
     "execute": 25,
     # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml

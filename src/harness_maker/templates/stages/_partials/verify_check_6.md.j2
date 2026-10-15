@@ -1,7 +1,25 @@
 {#- SPEC-hm-light-lane-s3a ADR-004: verify Check 6 (SPEC requirement), shared by verify's checks and execute's light check, so the
-    text has one source. Moved verbatim from verify_checks.md.j2 — edit it here only. -#}
+    text has one source. Moved verbatim from verify_checks.md.j2 — edit it here only. `light_check` (default false, so verify
+    renders unchanged) is execute's light check: the same two commands, without the stop box or the 6a/6b prose. -#}
 ### Check 6 — SPEC requirement
-{% if strictness_of(config) == 'block' %}
+{% if light_check | default(false) %}
+Read `spec_need_verdict` / `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
+No PLAN, a foreign `task_slug`, or no `spec_need_verdict` key → `N-A`. Otherwise run
+`op-check`, then — only if it exits 1 — `waiver-check`:
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …
+```
+{% endif %}
+
+Either exiting 0 → `PASS`. Both exiting 1 → {% if strictness_of(config) == 'block' %}the check fails (a `not-evaluated` verdict included){% else %}`WARN` (this harness runs at `warn` strictness){% endif %}.
+{% elif strictness_of(config) == 'block' %}
 
 Read the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
 

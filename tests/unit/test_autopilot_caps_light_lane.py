@@ -116,7 +116,13 @@ def test_ac004_domain_is_the_captured_one() -> None:
                 "to": None,
             },
         ),
-        ("narrowed_review", "execute", None, {"narrow_end": True, "skipped": ["review"]}),
+        # A narrowed marker is a human asking for the stages it lists (review item M).
+        (
+            "narrowed_review",
+            "execute",
+            None,
+            {"next_stage": "review", "proceed": True, "skipped": None},
+        ),
         ("from_spec", "spec", "clear", {"next_stage": "execute", "proceed": True, "skipped": None}),
     ],
     ids=["execute-verify-wrapup", "ends-at-verify", "narrowed-to-review", "spec-stage"],
@@ -144,8 +150,7 @@ def test_skip_respects_pipeline_shape(
     if pipeline == "narrowed_review":
         marker = autopilot.load(root, session_id=None)
         assert marker is not None
-        assert marker.restore_pipeline is None
-        assert [s.value for s in marker.pipeline] == list(fx.DEFAULT_PIPELINE)
+        assert marker.restore_pipeline is not None
 
 
 @pytest.mark.parametrize(
@@ -160,6 +165,19 @@ def test_skip_respects_pipeline_shape(
         ("light", "no_computed_at"),
         ("light", "bad_computed_at"),
         ("untrusted", "passed"),
+        # AC-016: the record's own drift, checks, tree binding and timestamps.
+        ("light", "drift_scope"),
+        ("light", "drift_scenario"),
+        ("light", "nested_slug"),
+        ("light", "regression_fail"),
+        ("light", "security_fail"),
+        ("light", "mechanical_fail"),
+        ("light", "spec_requirement_fail"),
+        ("light", "other_key"),
+        ("light", "no_key"),
+        ("light", "naive_computed_at"),
+        ("light", "date_only"),
+        ("light", "second_before"),
     ],
 )
 def test_no_passing_record_no_skip(tmp_path: Path, lane: str, record: str) -> None:
@@ -191,3 +209,66 @@ def test_stage_skipped_is_a_ledger_event(tmp_path: Path) -> None:
     )
     assert autopilot_ledger.count_entries(root, since=t0) == entries_before
     assert autopilot_ledger._total_entries(root) == total_before + 1
+
+
+# ── AC-016: the skip is bound to the checked tree and the record's own checks ────────────
+
+
+def _no_skip(obs: dict[str, Any], new_rows: list[dict[str, Any]]) -> None:
+    assert obs["json"]["next_stage"] == "review"
+    assert obs["json"]["proceed"] is True
+    assert "stage_skipped" not in [r["event"] for r in new_rows]
+
+
+def test_computed_at_equal_to_since_skips(tmp_path: Path) -> None:
+    _root, obs, new_rows = _run(tmp_path, fx.Case("light", "at_since", "execute", "auto_full"))
+    assert obs["json"]["next_stage"] == "wrapup"
+    assert "stage_skipped" in [r["event"] for r in new_rows]
+
+
+def test_probe_b_a_later_failed_run_does_not_skip(tmp_path: Path) -> None:
+    """Run 1 passes and writes its record; the code changes; run 2 passes Check 2 (a fresh
+    `run` marker for the new tree) but fails security, so it writes no record. The run 1 record
+    must not be read as a pass for the new tree — at the boundary or in the digest."""
+    from harness_maker import world_model_digest
+
+    root = tmp_path / "repo"
+    argv = fx.build(root, fx.Case("light", "passed", "execute", "auto_safe"))
+    fx.change_tree(root)
+    fx.mark_fresh(root)
+    before = len(_rows(root))
+    obs = fx.observe(root, argv)
+    _no_skip(obs, obs["rows"][before:])
+
+    digest_root = tmp_path / "digest"
+    fx.build_digest(digest_root, "light", "passed", fresh=True)
+    fx.change_tree(digest_root)
+    fx.mark_fresh(digest_root)
+    assert world_model_digest.next_stage(digest_root, fx.SLUG, digest_root) != "wrapup"
+
+
+def test_a_mark_pass_marker_does_not_skip(tmp_path: Path) -> None:
+    """A `mark-pass` marker records that someone said the suite passed; only `run`'s counts."""
+    root = tmp_path / "repo"
+    argv = fx.build(root, fx.Case("light", "passed", "execute", "auto_safe"))
+    fx.mark_fresh(root, writer=None)
+    before = len(_rows(root))
+    obs = fx.observe(root, argv)
+    _no_skip(obs, obs["rows"][before:])
+
+
+def test_no_stage_skipped_row_before_an_objective_halt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repo"
+    argv = fx.build(root, fx.Case("light", "passed", "execute", "auto_safe", None, "then_spec"))
+    (root / "work-docs" / f"PLAN-{fx.SLUG}.md").write_text(
+        "---\ntype: plan\nobjective: OBJ-NOPE\n---\n", encoding="utf-8"
+    )
+    monkeypatch.chdir(root)
+    before = len(_rows(root))
+    obs = fx.observe(root, argv)
+    new_rows = obs["rows"][before:]
+    assert obs["json"]["halt_kind"] == "objective_gate"
+    assert "stage_skipped" not in [r["event"] for r in new_rows]
+    assert "lane light" not in obs["json"]["reason"]

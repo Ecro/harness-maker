@@ -55,6 +55,22 @@ NO_RECORD_PHRASES = (
     "already holds a real review",
     "writes no record",
     "review runs next",
+    # Review item D: the forced scan's own failure clause.
+    "no `Security scan:` line",
+)
+#: The summary's next step after a passing light check (review item P).
+WRAPUP_NEXT = {
+    "claude": "`/hm:wrapup` when Step 4.2 wrote",
+    "codex": "`$hm-wrapup` when Step 4.2 wrote",
+}
+#: Review item E: the conditions Step 5's exempt branch must name.
+EXEMPT_CONDITIONS = (
+    "Step 4 passed",
+    "no open questions",
+    "the DRI was not asked",
+    "`auto_full`",
+    "no question tool",
+    "Never stamp `exempt` over a DRI who was asked",
 )
 POINTER_START = "Read `.claude/hm/execute-light-check.md`"
 
@@ -133,6 +149,10 @@ def _light_checks(key: str) -> dict[str, str]:
     return {"claude": _text(key, "hm/execute-light-check.md"), "codex": _codex_light_check(key)}
 
 
+def _commands(text: str) -> list[str]:
+    return [ln for ln in text.splitlines() if ln.startswith(("!uv run", 'Bash("uv run'))]
+
+
 def _without_pointer(execute: str) -> str:
     return "\n".join(ln for ln in execute.splitlines() if not ln.startswith(POINTER_START))
 
@@ -149,7 +169,14 @@ def test_execute_points_at_the_light_check(key: str) -> None:
     assert "project root" in pointer
     wt_on = dict(CONFIGS)[key][1]
     assert ("never from `<WT>`" if wt_on else "never from a worktree") in pointer
-    assert "STOP" in pointer
+    # Review item G: a missing reference file skips the light check; it does not end execute.
+    assert "STOP" not in pointer
+    assert "skip the light check" in pointer
+    assert "review runs next" in pointer
+    stub = claude_execute[claude_execute.index("### Step 4.2 — Light check") :]
+    assert "loop mode is not active for this session" in stub[: stub.index(POINTER_START)]
+    for arm, rel in (("claude", "commands/hm/execute.md"), ("codex", "skills/hm-execute")):
+        assert WRAPUP_NEXT[arm] in _text(key, rel), arm
     rest = _without_pointer(claude_execute)
     assert not {m for m in LIGHT_CHECK_MARKERS if m in rest}
     ref = _text(key, "hm/execute-light-check.md")
@@ -166,11 +193,36 @@ def test_execute_points_at_the_light_check(key: str) -> None:
 def test_light_check_runs_the_kept_gates(key: str) -> None:
     _loop, wt, _strictness, mech, _preset = dict(CONFIGS)[key]
     golden = GOLDEN["configs"][key]
+    wtr = "<WT>" if wt else "."
     for arm, text in _light_checks(key).items():
         assert SCAN_CMD[wt] in text, arm
         assert "hm spec_machine approval-status" in text, arm
-        for check, sha in golden["checks"][arm].items():
-            assert GOLDEN["texts"][sha] in text, (arm, f"Check {check}")
+        checks = {n: GOLDEN["texts"][sha] for n, sha in golden["checks"][arm].items()}
+        # Check 2 keeps verify's `run` and its stop line; the guessed-gates mark-pass is gone
+        # (review item F): exit 3 is not a pass here.
+        (run,) = [c for c in _commands(checks["2"]) if "verification_cache run" in c]
+        assert run in text, arm
+        assert "FAIL when: any subprocess returns non-zero." in text, arm
+        assert "mark-pass" not in text, arm
+        assert "not a pass" in next(ln for ln in text.splitlines() if ln.startswith("- `3`")), arm
+        # Check 4 keeps verify's rule, on this scan's own rows (review item K).
+        rule = next(ln for ln in checks["4"].splitlines() if ln.startswith("FAIL when:"))
+        assert rule in text, arm
+        assert f"`{wtr}/.claude/observability/security/findings-<today>.jsonl`" in text, arm
+        assert "Security scan: N finding(s)" in text, arm
+        # Check 6 keeps verify's two commands, without the BLOCKED box or the 6a/6b prose.
+        assert _commands(checks["6"]), arm
+        for c in _commands(checks["6"]):
+            assert c in text, (arm, c)
+        assert "BLOCKED: check 6" not in text, arm
+        assert "Step 6a" not in text, arm
+        # The record's tree binding and timestamp (review items B and H).
+        assert "hm observability.verification_cache key --root . --mode relevant" in text, arm
+        assert "verification_key: <" in text, arm
+        assert "date -u +%Y-%m-%dT%H:%M:%SZ" in text, arm
+        if arm == "claude":
+            gate3 = text[text.index("**3. Security**") : text.index("**4. SPEC requirement**")]
+            assert "run_in_background" in gate3
         assert GOLDEN["texts"][golden["drift_rule"][arm]] in text, arm
         assert REVIEWERS_STILL_RUN not in text, arm
         assert not DISPATCH_RE.search(text), arm
@@ -211,3 +263,6 @@ def test_spec_stamps_light_exempt(key: str) -> None:
         assert GOLDEN["configs"][key]["exempt_cmd"][arm] in step5, arm
         assert "lane: light" in step5, arm
         assert "irreversible_decisions: []" in step5, arm
+        exempt = step5[step5.index("**exempt**") :]
+        for condition in EXEMPT_CONDITIONS:
+            assert condition in exempt, (arm, condition)

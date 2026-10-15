@@ -1,8 +1,11 @@
 {#- SPEC-hm-light-lane-s3a ADR-004: verify Check 4 (security high findings), shared by verify's checks and execute's light check, so the
-    text has one source. Moved verbatim from verify_checks.md.j2 — edit it here only. -#}
+    text has one source. Moved verbatim from verify_checks.md.j2 — edit it here only. `light_check` (default false, so verify
+    renders unchanged) reads only the forced scan's own rows: finding rows carry no timestamp, so they are counted. -#}
 ### Check 4 — Security high findings
 
-Read the most recent `.claude/observability/security/findings-*.jsonl`.
+{% if light_check | default(false) %}Read only this scan's rows: the last N lines of `{{ WTR }}/.claude/observability/security/findings-<today>.jsonl`
+(`<today>` is the UTC date, `date -u +%F`), where N is the count on the scan's `Security scan: N finding(s)`
+line. The file's earlier lines are earlier scans', from this checkout or a stale one. N = 0 → PASS.{% else %}Read the most recent `.claude/observability/security/findings-*.jsonl`.{% endif %}
 
 FAIL when: any finding has `severity == "high"` AND `resolution != "accepted-risk-with-rationale"`. Resolutions must be deliberate (recorded in PLAN ADR or wrapup commit body).
 
