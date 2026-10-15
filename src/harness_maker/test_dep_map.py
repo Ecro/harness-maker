@@ -604,6 +604,8 @@ CONFIG_SUITES: tuple[str, ...] = (
     "tests/unit/test_profile.py",
     # Reads the real `pyproject.toml` through `REPO_ROOT` for the five-file version sync.
     "tests/unit/test_version_sync.py",
+    # Builds a copy of the real `pyproject.toml` to prove its `[tool.uv]` cache keys.
+    "tests/unit/test_bench_cli_provenance.py",
     # Reads release.yml and real version/docs sources to enforce both identity boundaries.
     "tests/unit/test_release_identity.py",
     # Installed bootstrap checks the actual package manifest and engine release.
