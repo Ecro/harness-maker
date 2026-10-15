@@ -6,8 +6,8 @@ Re-frozen inside this task, after its own tests were green (ADR-010,
 `c3096d4c` for every rendered byte (the commits between them touch only `specs/` and
 `work-docs/`).
 
-Direction: `aggregate_chars.claude` **fell** by 26716 chars (266773 → 240057), and
-`aggregate_chars.codex` **rose** by 2822 chars (292228 → 295050). The Claude drop is the
+Direction: `aggregate_chars.claude` **fell** by 26414 chars (266773 → 240359), and
+`aggregate_chars.codex` **rose** by 3086 chars (292228 → 295314). The Claude drop is the
 preamble leaving six commands, plus the full PLAN text and the full machine.yaml schema leaving
 execute and spec. The Codex rise is the light PLAN block and the minimal schema, which Codex
 carries inline next to the full text it keeps. The three new `.claude/hm/` files are outside
@@ -24,18 +24,25 @@ skills, `CLAUDE.md` and `AGENTS.md` keep it inline (AC-003).
 |---|---|---|---|---|---|
 | `surface.claude.research.chars` (`research`) | 20461 → 16677 | −3784 | 0 | 0 | ≤ 16749 |
 | `surface.claude.spec.chars` (`spec`) | 43234 → 37941 | −3784 | +248 | −1757 | ≤ 38822 |
-| `surface.claude.execute.chars`, `.round_trips` (`execute`) | 45572 → 39285, 18 → 19 | −3784 | 0 | −2503 | ≤ 39360 |
+| `surface.claude.execute.chars`, `.round_trips` (`execute`) | 45572 → 39587, 18 → 19 | −3784 | 0 | −2201 | ≤ 39710 |
 | `surface.claude.review.chars` (`review`) | 60617 → 56833 | −3784 | 0 | 0 | ≤ 56905 |
 | `surface.claude.verify.chars` (`verify`) | 16435 → 12651 | −3784 | 0 | 0 | ≤ 12723 |
 | `surface.claude.wrapup.chars` (`wrapup`) | 33099 → 29315 | −3784 | 0 | 0 | ≤ 29387 |
-| `surface.codex.hm-execute.chars`, `.round_trips` (`hm-execute`) | 62541 → 64316, 26 → 27 | 0 | 0 | +1775 | ≤ +2500 |
+| `surface.codex.hm-execute.chars`, `.round_trips` (`hm-execute`) | 62541 → 64580, 26 → 27 | 0 | 0 | +2039 | ≤ +2500 |
 | `surface.codex.hm-spec.chars` (`hm-spec`) | 45284 → 46331 | 0 | +248 | +799 | ≤ +300 / ≤ +800 |
-| `aggregate_chars.claude`, `.codex` (`aggregate_chars`) | 266773 → 240057, 292228 → 295050 | | | | the rows above |
+| `aggregate_chars.claude`, `.codex` (`aggregate_chars`) | 266773 → 240359, 292228 → 295314 | | | | the rows above |
 | `payload_digest`, `render_sha` | mechanical | | | | `render_sha` is the merge-base `a7403f2f` (= `origin/main`) |
 
 The margins are thin by design of the bounds, not by accident of the render: execute C is
-−2503 against ≤ −2500, Codex hm-spec C is +799 against ≤ +800, and spec B is +248 against
+−2201 against ≤ −2150, Codex hm-spec C is +799 against ≤ +800, and spec B is +248 against
 ≤ +300. A later edit to the light block or the minimal schema has almost no room.
+
+**Re-frozen 2026-10-15 (review round 1).** The light read-back gained the full Step 0 / Step 0.3
+guards (retry-then-stop, no invented `none`, repo-relative paths, explicit `user` provenance) and
+the loop-on render gained the `hm worktree loop-mode-active` call in the Step 0 block. Execute C
+moved from −2503 to −2201, past the old ≤ −2500, so the SPEC amendment set the bound to ≤ −2150
+(a 51-char margin). Codex hm-execute moved from +1775 to +2039, still inside ≤ +2500. No other
+key moved.
 
 `/hm:health`: `workflow_clarity` checks `.claude/hm/stage-preamble.md` and its two markers only
 when a stage command names the file, so an a7403f2f render (inline preamble, no file) scores
@@ -79,13 +86,13 @@ once, with the Read tool's line-number prefix counted at 7 chars a line (stage-p
 |---|---|---|---|
 | A | 3 × −3784 + 5348 = **−6004** | 5 × −3784 + 5348 = **−13572** | −6.3k / −13.9k |
 | B | not measured (+248 instruction chars, both) | not measured (+248) | −7.0k / −7.0k |
-| C, instructions | −2503 − 1757 = **−4260** | (−2503 + 6124) + (−1757 + 3798) = **+5662** | −3.8k / +4.6k |
+| C, instructions | −2201 − 1757 = **−3958** | (−2201 + 6124) + (−1757 + 3798) = **+5964** | −3.8k / +4.6k |
 | C, artifacts | light PLAN 936 written, read back twice; yaml not measured | — | −3.6k / — |
 
-Measured instruction total: **−10264** on a light run and **−7910** on a full run. With the
+Measured instruction total: **−9962** on a light run and **−7608** on a full run. With the
 SPEC's unmeasured B and artifact estimates added, the light run lands near the SPEC's −20.7k;
-the full run is about 1.4k worse than its −16.3k, because the two full-lane Reads cost more than
-estimated (C full +5662 against +4.6k).
+the full run is about 1.7k worse than its −16.3k, because the two full-lane Reads cost more than
+estimated (C full +5964 against +4.6k).
 
 ## Other re-captures
 

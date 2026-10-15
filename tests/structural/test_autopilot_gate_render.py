@@ -36,6 +36,10 @@ Re-captures (append; never silently overwrite):
   for the full PLAN text. Verified before re-capture that these six are the ONLY moved commands
   in each arm and none was added or removed. The picker and boundary assertions above now also
   read the preamble file (`_render_at_level`).
+  Re-captured again the same day after `/hm:review` round 1 (SPEC amendment): `execute` Step 0
+  runs `loop-mode-active` beside approval-status when the loop renders, the light read-back keeps
+  the full guards, and the pointer and the Step 0.3 sentence gained their read rules. Only
+  `execute` moved, in all four arms.
 - **2026-10-15, `hm-light-lane-s3a`** — `execute` and `spec` moved in all four arms. `execute`
   gained Step 4.2, the light lane's combined check (a pointer to `.claude/hm/execute-light-check.md`
   in the Claude command); `spec` Step 5 now stamps a light SPEC with an empty irreversible list

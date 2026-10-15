@@ -2,7 +2,7 @@
   "arms": {
     "ask@flag_off": {
       "configure": "3a8ac6d3c54bed38e16c479bc02cd5976820c1a68eeb56264b71e2ebc7c00822",
-      "execute": "b9b331047e955e6b943858b87132ea207b1cfbb51468686bfeb1b65c23b0be77",
+      "execute": "e5b0c004a8cbc7743ff4e220843c05f859b94fa425922bd399c5035ab5f27680",
       "health": "03e472355dd04a65402baa065cf7fc749a493e0c8f79a8fe3ebba47f71a9783e",
       "help": "a61ced34d117362b76204e182a1e99685fc786de0a54cccd8aef12862b2423ea",
       "loop": "c9e02bdd83943d3bd4fb87d239a9b7bcd7ed95175fb4e6bfeefeb5e213bb9ea2",
@@ -18,7 +18,7 @@
     },
     "ask@flag_on": {
       "configure": "3a8ac6d3c54bed38e16c479bc02cd5976820c1a68eeb56264b71e2ebc7c00822",
-      "execute": "b1cac7cea1e924484daf4a9ece20f5f2d48d1d17d24dca04dbab6a30bdba62f6",
+      "execute": "711861eb018ad963262e7cbeee4802f32526d93c9807bf3642081d5b6e2da413",
       "health": "03e472355dd04a65402baa065cf7fc749a493e0c8f79a8fe3ebba47f71a9783e",
       "help": "a61ced34d117362b76204e182a1e99685fc786de0a54cccd8aef12862b2423ea",
       "loop": "955dc239b019ec90731ec23c0eae60f7176c5615a4729fe9d2ab0763fc0ba914",
@@ -34,7 +34,7 @@
     },
     "auto_safe@block": {
       "configure": "3a8ac6d3c54bed38e16c479bc02cd5976820c1a68eeb56264b71e2ebc7c00822",
-      "execute": "06ef1b8cf75c7ad1e411b448a8dc349f4d169289016531bf1d928ae7af2c77b7",
+      "execute": "e4e408456bd4b11cf55ef45b8342b35ed04c7e32d17d2a2efeb3ea4f2127cda7",
       "health": "c6eba270db86c0033e104151dd2c13bbd049b45f4a15cf31cd10f2a9572b05fc",
       "help": "16e8fcdd4c4d2d33df75bd3ef5b5e2dc200a4d58fd93c1e4b3a1791d24d46c56",
       "make": "6031a571771cd79e0cfb85afc9666e6a357638940b5f475ed634f6b5d6bdca87",
@@ -48,7 +48,7 @@
     },
     "auto_safe@warn": {
       "configure": "3a8ac6d3c54bed38e16c479bc02cd5976820c1a68eeb56264b71e2ebc7c00822",
-      "execute": "ca5a0ba54ffcea4dccc32dcbf22650a4f3f585842f1dae9fdbb616679db50afa",
+      "execute": "45ed60c8e353b7c8018cc0e69fba6b855906cd4c25bfecf7bce2f880967eb628",
       "health": "c6eba270db86c0033e104151dd2c13bbd049b45f4a15cf31cd10f2a9572b05fc",
       "help": "16e8fcdd4c4d2d33df75bd3ef5b5e2dc200a4d58fd93c1e4b3a1791d24d46c56",
       "make": "6031a571771cd79e0cfb85afc9666e6a357638940b5f475ed634f6b5d6bdca87",

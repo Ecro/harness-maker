@@ -94,12 +94,16 @@ _OPT_IN_COMMIT = "18714dd1"
 #   wrapup}.md`, `stages/execute.md` and `stages/spec.md`. Verified before capture that no other
 #   loop-ON path moved and that the three new reference files render the same with the loop on
 #   and off (they take today's loop-OFF snapshot rows).
+#   Re-captured again the same day after `/hm:review` round 1 (SPEC amendment): Step 0's
+#   routing runs `loop-mode-active` when the loop renders, the light read-back keeps the full
+#   guards, and the execute-plan pointer and Step 0.3 sentence gained their read rules. Only
+#   `commands/hm/execute.md` and `stages/execute.md` moved.
 _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
     "commands/hm/execute.md": {
-        "side-python-cli": "c5a186c8e2eba740ee615e5fde81ddf9de59673fb6454ccdff3afd43d4a8b21a",
-        "side-tauri-app": "c5a186c8e2eba740ee615e5fde81ddf9de59673fb6454ccdff3afd43d4a8b21a",
-        "prod-tauri-app": "b838588aaebcf0d001061453da98a32746bea5f2af649d151664f4f7225c8717",
-        "prod-firmware": "b838588aaebcf0d001061453da98a32746bea5f2af649d151664f4f7225c8717",
+        "side-python-cli": "247afd4eb8d2328de17661cb5d1e32fb86d2a517a5bec4e876bf299a9ee94145",
+        "side-tauri-app": "247afd4eb8d2328de17661cb5d1e32fb86d2a517a5bec4e876bf299a9ee94145",
+        "prod-tauri-app": "0205ffdf936f92ba634ab0a269e9131828d77e0b11bc5d76e316a2432788615d",
+        "prod-firmware": "0205ffdf936f92ba634ab0a269e9131828d77e0b11bc5d76e316a2432788615d",
     },
     "commands/hm/research.md": {
         "side-python-cli": "48f8e7daada31de0366f0c5117616f71f941546da272cef9d8e57a0170f28c52",
@@ -132,10 +136,10 @@ _LOOP_ON_RECAPTURES: dict[str, dict[str, str]] = {
         "prod-firmware": "6626d689dee3798653130c9371b8648dc2ee3bb36a87d3c64057508d4aa3d84b",
     },
     "stages/execute.md": {
-        "side-python-cli": "14673d1f4b92f465de43f52804888befb96b31a3a1fe7044be5f0fb813a812c3",
-        "side-tauri-app": "14673d1f4b92f465de43f52804888befb96b31a3a1fe7044be5f0fb813a812c3",
-        "prod-tauri-app": "a63d32ebb146709ed7df395aca50d2936e2a64df6c8498ba48a1cd5aa26af41d",
-        "prod-firmware": "a63d32ebb146709ed7df395aca50d2936e2a64df6c8498ba48a1cd5aa26af41d",
+        "side-python-cli": "a42c8676d74eaefda9553c039c8a6aeedab42caa954cbb58a3da37f34a71583e",
+        "side-tauri-app": "a42c8676d74eaefda9553c039c8a6aeedab42caa954cbb58a3da37f34a71583e",
+        "prod-tauri-app": "6444f622882101a83f08c9b291ae5e60814f2ea2168b2f5f97efa981ef381227",
+        "prod-firmware": "6444f622882101a83f08c9b291ae5e60814f2ea2168b2f5f97efa981ef381227",
     },
     "stages/research.md": {
         "side-python-cli": "dd5801166e5918f5572251551018d07e13cb3a241d54772435764ae4bfa5d9ea",
