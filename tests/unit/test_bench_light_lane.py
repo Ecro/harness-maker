@@ -41,7 +41,9 @@ _ROOT = Path(__file__).resolve().parents[2]
 _SCRIPT = _ROOT / "scripts" / "bench_light_lane.py"
 _TASKS = _ROOT / "scripts" / "bench" / "tasks"
 _FIXTURE = _ROOT / "scripts" / "bench" / "timeparse"
-_SESSION_KEYS = ("CLAUDECODE", "CLAUDE_ENV_FILE", "HM_SESSION_ID", "INTEGRATION", "HM_BENCH_TEST")
+_SESSION_KEYS = (
+    "CLAUDECODE", "CLAUDE_ENV_FILE", "HM_SESSION_ID", "INTEGRATION", "HM_BENCH_TEST", "IS_SANDBOX",
+)  # fmt: skip
 
 
 def _load() -> ModuleType:
@@ -197,7 +199,7 @@ def _run_bench(
     fake = _write_fake_agent(
         base, log_dir=str(logs), transcript_root=str(troot), pid_dir=str(base / "pids"), **cfg
     )
-    full_env = _env(home, INTEGRATION="1", HM_BENCH_TEST="1", **(env or {}))
+    full_env = _env(home, INTEGRATION="1", HM_BENCH_TEST="1", IS_SANDBOX="1", **(env or {}))
     argv = [sys.executable, str(_SCRIPT), command, "--out", str(out), "--claude-bin", str(fake)]
     argv += ["--transcript-root", str(troot), "--guard-top", str(base), *args]
     proc = subprocess.run(
@@ -773,6 +775,7 @@ def test_out_dir_with_project_context_is_refused(
     assert (bench.guard_out_dir(out, top=tmp_path) is not None) is refused
     if refused:
         monkeypatch.setenv("INTEGRATION", "1")
+        monkeypatch.setenv("IS_SANDBOX", "1")
         assert bench.main(["run", "--out", str(out), "--claude-bin", "/nonexistent"]) == 2
         assert not out.exists()
 
@@ -796,6 +799,7 @@ def test_guard_top_is_hidden_and_only_honoured_under_the_test_flag(
     out = tmp_path / "out"
     argv = ["run", "--out", str(out), "--guard-top", str(out), "--runs", "0", "--arms", "plain"]
     monkeypatch.setenv("INTEGRATION", "1")
+    monkeypatch.setenv("IS_SANDBOX", "1")
     monkeypatch.delenv("HM_BENCH_TEST", raising=False)
     assert bench.main(argv) == 2
     assert "refusing --out" in capsys.readouterr().err
@@ -826,7 +830,7 @@ def test_stop_signal_kills_live_agents_and_skips_queued_cells(tmp_path: Path, si
     argv = [sys.executable, str(_SCRIPT), "run", "--out", str(out), "--claude-bin", str(fake)]
     argv += ["--guard-top", str(tmp_path), "--tasks", "t1,t2,t3", "--arms", "plain"]
     argv += ["--runs", "1", "--jobs", "2", "--transcript-root", str(tmp_path / "t")]
-    env = _env(tmp_path, INTEGRATION="1", HM_BENCH_TEST="1")
+    env = _env(tmp_path, INTEGRATION="1", HM_BENCH_TEST="1", IS_SANDBOX="1")
     proc = subprocess.Popen(
         argv, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
@@ -861,6 +865,7 @@ def test_a_second_runner_on_the_same_out_is_refused(
     out = tmp_path / "out"
     out.mkdir()
     monkeypatch.setenv("INTEGRATION", "1")
+    monkeypatch.setenv("IS_SANDBOX", "1")
     monkeypatch.setenv("HM_BENCH_TEST", "1")
     with (out / ".run.lock").open("w") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX)
@@ -887,6 +892,7 @@ def _canned_row(task: Any, arm: str, rep: int, opts: Any, **over: Any) -> dict[s
 @pytest.fixture
 def inprocess(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INTEGRATION", "1")
+    monkeypatch.setenv("IS_SANDBOX", "1")
     monkeypatch.setenv("HM_BENCH_TEST", "1")
 
 
@@ -1468,6 +1474,9 @@ _QUALITY_CASES: dict[str, dict[str, Any]] = {
     "new_test_file": {"tests_touched": True},
     "regression": {"regressions": 1},
     "agent_config": {"ruff_new": 1, "mypy_new": 1},
+    "noqa": {"ruff_new": 1, "mypy_new": 0},
+    "type_ignore": {"mypy_new": 1, "ruff_new": 0},
+    "mypy_directive": {"mypy_new": 1, "ruff_new": 0},
     "stalled": {
         "ruff_new": None, "mypy_new": None, "regressions": None, "diff_lines": None,
         "tests_touched": None, "reason": "stalled",
@@ -1489,6 +1498,16 @@ def test_quality_checks_count_new_errors_on_the_source_diff_only(
         fmt.write_text(fmt.read_text().replace(imports, "import os\n\n" + imports))
     if case in ("untyped_def", "agent_config"):
         par.write_text(par.read_text() + "\n\ndef _helper(value):\n    return value\n")
+    if case == "noqa":  # suppressions the agent writes are not honoured (S6)
+        imports = "from timeparse.parse import UNITS\n"
+        fmt.write_text(fmt.read_text().replace(imports, "import os  # noqa: F401\n\n" + imports))
+    if case == "type_ignore":
+        par.write_text(
+            par.read_text() + "\n\ndef _helper(value):  # type: ignore\n    return value\n"
+        )
+    if case == "mypy_directive":
+        par.write_text("# mypy: ignore-errors\n" + par.read_text()
+                       + "\n\ndef _helper(value):\n    return value\n")  # fmt: skip
     if case == "new_test_file":
         (work / "tests" / "test_extra.py").write_text(
             '"""Extra."""\n\n\ndef test_extra() -> None:\n    assert True\n'
@@ -1512,6 +1531,7 @@ def test_quality_checks_count_new_errors_on_the_source_diff_only(
         assert quality[key] == value, (key, quality)
     if case == "reference":
         assert quality["diff_lines"] == _diff_lines(start, work) > 0
+        assert quality["diff_lines"] == 15  # T4: git diff --numstat of the t1 reference: 13 + 2
 
 
 def _version_of(tool: str) -> str:
@@ -2799,3 +2819,169 @@ def test_the_judge_runs_with_the_allowlisted_environment(
         assert key not in env
     assert env["ANTHROPIC_API_KEY"] == "k"
     assert env["LC_ALL"] == "C.UTF-8"
+
+
+# --- review round 1: grading and tool hardening -------------------------------------------------
+
+_FORGER = """
+import atexit, sys
+
+
+def _forge() -> None:
+    path = sys.argv[sys.argv.index("--junitxml") + 1]
+    with open(path, "w") as handle:
+        handle.write('<testsuite tests="1" failures="0" errors="0" skipped="0">'
+                     '<testcase classname="test_forged" name="test_forged"/></testsuite>')
+
+
+atexit.register(_forge)
+"""
+
+
+def test_grading_pins_the_collected_test_ids(bench: ModuleType, tmp_path: Path) -> None:
+    """S2: a package that rewrites the junit report at exit is caught by the node-id pin."""
+    task = next(t for t in bench.load_tasks() if t.id == "t1")
+    expected = bench.hidden_ids(task, bench.FIXTURE_DIR)
+    assert expected
+    assert all("::" in node for node in expected)
+    start = _start_tree(tmp_path / "start", "t1")
+    good = _work_from(start, tmp_path / "good", task.reference_dir)
+    assert bench.grade(good, task.hidden_dir, tmp_path / "g1", expected=expected).passed
+    forged = _work_from(start, tmp_path / "forged")
+    init = forged / "timeparse" / "__init__.py"
+    init.write_text(init.read_text() + _FORGER)
+    unpinned = bench.grade(forged, task.hidden_dir, tmp_path / "g2")
+    assert unpinned.passed, "without the pin the forged report is believed (the residual)"
+    pinned = bench.grade(forged, task.hidden_dir, tmp_path / "g3", expected=expected)
+    assert not pinned.passed
+    assert "test_forged" in pinned.mismatch
+
+
+def test_tools_run_in_their_own_process_group(bench: ModuleType, tmp_path: Path) -> None:
+    """S3: a grandchild holding the output open does not stall the runner and is killed."""
+    pid_file = tmp_path / "grandchild.pid"
+    script = (
+        "import subprocess, sys, time\n"
+        "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(300)'])\n"
+        f"open({str(pid_file)!r}, 'w').write(str(child.pid))\n"
+        "sys.stdout.write('x' * 5_000_000)\n"
+    )
+    started = time.monotonic()
+    out, _err, code = bench._run_tool(
+        [sys.executable, "-c", script], tmp_path, dict(os.environ), 60, tmp_path / "logs"
+    )
+    assert time.monotonic() - started < 30
+    assert code == 0
+    assert len(out) == bench.OUTPUT_CAP
+    pid = int(pid_file.read_text())
+    for _ in range(50):
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    else:
+        pytest.fail("the grandchild outlived its tool run")
+    _out, _err, code = bench._run_tool(
+        [sys.executable, "-c", "import time; time.sleep(30)"], tmp_path, dict(os.environ), 1,
+        tmp_path / "logs2",
+    )  # fmt: skip
+    assert code is None
+
+
+def test_scope_skips_symlinked_roots_and_caps_file_size(bench: ModuleType, tmp_path: Path) -> None:
+    """S8: a symlinked source root is not followed, a huge file is read up to the cap, and the
+    grader copies links as links."""
+    start = _start_tree(tmp_path / "start", "t1")
+    outside = tmp_path / "outside"
+    shutil.copytree(start / "timeparse", outside)
+    linked = _work_from(start, tmp_path / "linked")
+    shutil.rmtree(linked / "timeparse")
+    (linked / "timeparse").symlink_to(outside, target_is_directory=True)
+    assert not any(rel.startswith("timeparse/") for rel in bench.scope_files(linked))
+    big = _work_from(start, tmp_path / "big")
+    (big / "tests" / "huge.txt").write_bytes(b"a" * (bench.MAX_SOURCE_BYTES + 10))
+    data = bench.scope_files(big)["tests/huge.txt"]
+    assert len(data) < bench.MAX_SOURCE_BYTES + 200
+    assert data.endswith(b"[truncated: %d bytes]\n" % (bench.MAX_SOURCE_BYTES + 10))
+    task = next(t for t in bench.load_tasks() if t.id == "t1")
+    looped = _work_from(start, tmp_path / "looped", task.reference_dir)
+    (looped / "timeparse" / "loop").symlink_to(looped, target_is_directory=True)
+    assert bench.grade(looped, task.hidden_dir, tmp_path / "g").passed
+
+
+def test_atomic_write_keeps_the_mode_and_fsyncs(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 12: the published files keep their mode (0644 for a new one) and are fsynced."""
+    synced: list[int] = []
+    real_fsync = os.fsync
+
+    def fsync(fd: int) -> None:
+        synced.append(fd)
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    old = tmp_path / "old.md"
+    old.write_text("x")
+    old.chmod(0o664)
+    bench.atomic_write(old, "new\n")
+    assert old.read_text() == "new\n"
+    assert old.stat().st_mode & 0o777 == 0o664
+    new = tmp_path / "sub" / "new.md"
+    bench.atomic_write(new, "fresh\n")
+    assert new.stat().st_mode & 0o777 == 0o644
+    assert len(synced) == 2
+    assert not list(tmp_path.rglob("*.tmp"))
+
+
+def test_publish_writes_the_readme_before_the_results(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 12: the README, whose bytes outside the markers must survive, is written first. If
+    that write fails nothing has changed; if the RESULTS.md write then fails, re-running the
+    idempotent publish completes the pair."""
+    order: list[str] = []
+    real = bench.atomic_write
+
+    def write(path: Path, text: str) -> None:
+        order.append(path.name)
+        real(path, text)
+
+    monkeypatch.setattr(bench, "atomic_write", write)
+    out = _results_dir(tmp_path / "out", _golden_rows(drop_t7_hm_3=False))
+    repo = _repo(tmp_path / "repo", (_GOLDEN / "README.before.md").read_text())
+    bench.publish(out, repo / "docs" / "evals", repo / "README.md")
+    assert order == ["README.md", "RESULTS.md"]
+
+
+@pytest.mark.parametrize("flag", [False, True])
+def test_live_commands_need_a_sandbox(
+    bench: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, flag: bool,
+    capsys: pytest.CaptureFixture[str],
+) -> None:  # fmt: skip
+    """S4: both arms run with --dangerously-skip-permissions, so a live run needs a sandbox."""
+    monkeypatch.setenv("INTEGRATION", "1")
+    monkeypatch.setenv("HM_BENCH_TEST", "1")
+    monkeypatch.delenv("IS_SANDBOX", raising=False)
+    calls: list[str] = []
+
+    def cell(task: Any, arm: str, rep: int, opts: Any) -> dict[str, Any]:
+        calls.append(task.id)
+        return _canned_row(task, arm, rep, opts)
+
+    monkeypatch.setattr(bench, "run_cell", cell)
+    out = tmp_path / "out"
+    argv = ["run", "--out", str(out), "--guard-top", str(tmp_path), "--claude-bin", "unused",
+            "--tasks", "t1", "--runs", "1", "--arms", "plain"]  # fmt: skip
+    code = int(bench.main([*argv, "--no-sandbox-ok"] if flag else argv))
+    if flag:
+        assert code == 0
+        assert calls == ["t1"]
+    else:
+        assert code == 2
+        assert "IS_SANDBOX=1" in capsys.readouterr().err
+        assert not out.exists()
+    canary = ["canary", "--judge-calibration", "--record", str(tmp_path / "c.json")]
+    if not flag:
+        assert bench.main(canary) == 2

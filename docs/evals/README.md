@@ -29,9 +29,11 @@ uv run python scripts/bench_light_lane.py publish --out /var/tmp/hm-eval
 uv run python scripts/bench_light_lane.py check
 ```
 
-`run` and `canary` call a live model and refuse without `INTEGRATION=1`. `--out` must sit outside
-any git work tree or `CLAUDE.md`/`.claude/` ancestor. Both arms run with
-`--dangerously-skip-permissions`, so run live evals in a container or a throwaway VM.
+`run` and `canary` call a live model and refuse without `INTEGRATION=1`. Both arms run with
+`--dangerously-skip-permissions`, as you, with your file access, so `run` and `canary` also refuse
+unless `IS_SANDBOX=1` says they are in a container or a throwaway VM, or `--no-sandbox-ok` takes
+that risk explicitly. `--out` must sit outside any git work tree or `CLAUDE.md`/`.claude/`
+ancestor.
 `run` resumes when given the same `--out`, stops scheduling once spend passes `--total-budget-usd`
 (default 80, judge calls included), and refuses rows from another setup.
 
@@ -128,8 +130,8 @@ RESULTS.md.
 | solved | Runs with outcome `solved` (hidden tests all pass); with wrong and stalled it adds up to runs. Rows from before this eval carry no outcome: a passing one counts as solved, and wrong and stalled read `n/a`. |
 | wrong | Runs that changed a file under `timeparse/` or `tests/` but fail the hidden tests. |
 | stalled | Runs that changed nothing under `timeparse/` or `tests/`. Harness files, `specs/`, `work-docs/`, `.claude/` and `CLAUDE.md` are not a change, and the change is measured against the starting tree, not git history. |
-| ruff_new mean | New ruff errors in the changed `.py` files (final count minus the starting count), `ruff check --isolated` with the pinned rule set `E4,E7,E9,F,B`. |
-| mypy_new mean | New `mypy --strict` errors in the package, with an empty config, from a clean copy. |
+| ruff_new mean | New ruff errors in the changed `.py` files (final count minus the starting count), `ruff check --isolated --ignore-noqa` with the pinned rule set `E4,E7,E9,F,B`: a `# noqa` the agent writes does not hide an error. |
+| mypy_new mean | New `mypy --strict` errors in the package, with an empty config, from a clean copy in which `# type: ignore` and `# mypy:` comments are blanked. |
 | regressions mean | The fixture's pristine visible tests (from the private snapshot) that fail against the final package. |
 | diff_lines mean | Added plus removed lines under `timeparse/` and `tests/`. Shown, never ranked. |
 | tests_touched rate | Share of runs that added or changed a file under `tests/`. Shown, never ranked. |
@@ -142,7 +144,20 @@ Quality means are taken over changed runs only. A stalled run has no code, so it
 rather than zero: an arm that mostly stalls cannot win lint or regressions by writing nothing. A
 check that cannot run records null with a reason and never changes a run's status or outcome.
 The agent's own config files (`pyproject.toml`, `mypy.ini`, `conftest.py`) are never read, and the
-work dir is never modified.
+work dir is never modified. A `timeparse/` or `tests/` that is itself a symlink is not followed,
+links inside are copied as links, and a file is read up to 1,000,000 bytes (a longer one is cut and
+its size noted).
+
+### How far the grade can be trusted
+
+Grading imports the agent's package into the grader's pytest process, so it is only as trustworthy
+as that code. The grader, ruff and mypy each run in their own process group with output to files,
+read back up to 4,000,000 bytes, and the group is killed after every exit, so a child the code
+starts cannot stall or outlive the grade. The test ids the junit report lists must equal the ids
+the hidden tests report against the task's reference; a missing or extra id fails the run. That
+catches code that rewrites the report at exit with ids of its own. It does not catch code that
+reads the copied hidden tests and forges a report with the real ids: nothing short of running the
+tests in a separate sandbox would, and this eval does not.
 
 ### Efficiency
 
@@ -271,5 +286,8 @@ family; residual self-preference is not corrected.
    moved number can be traced to what changed.
 
 `publish` refuses (exit 2, nothing written) when the README has no single marker pair, when the
-results mix setups, when no row is usable, or when a tier's cells are incomplete. It is
+results mix setups, when no row is usable, or when a tier's cells are incomplete. It writes the
+README first, then RESULTS.md, each atomically (temp file, fsync, rename, keeping the file's mode):
+a failure on the README changes nothing, and a failure on RESULTS.md is completed by running
+`publish` again. It is
 deterministic: the same rows in any order give byte-identical files.

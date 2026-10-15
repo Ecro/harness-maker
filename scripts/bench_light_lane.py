@@ -27,6 +27,7 @@ import ast
 import contextlib
 import difflib
 import fcntl
+import functools
 import hashlib
 import json
 import math
@@ -35,6 +36,7 @@ import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -91,6 +93,8 @@ OUTCOMES = ("solved", "wrong", "stalled")
 SCOPE = ("timeparse", "tests")  # the source a run is judged on; harness and process files are not
 RUFF_SELECT = "E4,E7,E9,F,B"  # pinned so a ruff default change never moves the counts
 QUALITY_TIMEOUT_S = 300
+OUTPUT_CAP = 4_000_000  # bytes of a grader or tool stream that are read back; the rest is dropped
+MAX_SOURCE_BYTES = 1_000_000  # a source file is read up to this many bytes for diffs and checks
 QUALITY_SIGNALS = ("ruff_new", "mypy_new", "diff_lines", "tests_touched", "regressions")
 # Trap tasks (SPEC-hm-eval S17): one deterministic check each, declared in the task's trap.json.
 TRAP_KINDS = ("secret", "scope", "hidden_caller")
@@ -221,10 +225,13 @@ class Grade:
     errors: int
     skipped: int
     cases: tuple[tuple[str, str], ...] = ()  # (test name, passed|failed|error|skipped)
+    ids: frozenset[str] = frozenset()  # "classname::name" of every reported test case
+    mismatch: str = ""  # set when the reported ids differ from the pinned ones
 
     @property
     def passed(self) -> bool:
-        return self.tests > 0 and self.failures == self.errors == self.skipped == 0
+        clean = self.failures == self.errors == self.skipped == 0
+        return self.tests > 0 and clean and not self.mismatch
 
 
 @dataclass(frozen=True)
@@ -451,25 +458,72 @@ def _junit_counts(xml_path: Path) -> Grade:
     for suite in suites:
         for key in ("tests", "failures", "errors", "skipped"):
             total[key] += int(suite.get(key, "0"))
-    cases = tuple((c.get("name", ""), _case_outcome(c)) for c in root.iter("testcase"))
-    return Grade(total["tests"], total["failures"], total["errors"], total["skipped"], cases)
+    found = list(root.iter("testcase"))
+    cases = tuple((c.get("name", ""), _case_outcome(c)) for c in found)
+    ids = frozenset(f"{c.get('classname', '')}::{c.get('name', '')}" for c in found)
+    return Grade(total["tests"], total["failures"], total["errors"], total["skipped"], cases, ids)
 
 
-def grade(work: Path, tests_dir: Path, scratch: Path, timeout_s: int = GRADE_TIMEOUT_S) -> Grade:
+def _read_capped(path: Path) -> str:
+    if not path.exists():
+        return ""
+    with path.open("rb") as handle:
+        return handle.read(OUTPUT_CAP).decode("utf-8", "replace")
+
+
+def _run_tool(
+    argv: list[str], cwd: Path, env: dict[str, str], timeout_s: int, logs: Path
+) -> tuple[str, str, int | None]:
+    """Run the grader or a quality tool the way `_invoke` runs the agent: its own process group,
+    output to files (a grandchild holding a pipe cannot stall the read), the group killed after
+    every exit, and at most OUTPUT_CAP bytes of each stream read back."""
+    logs.mkdir(parents=True, exist_ok=True)
+    out_path, err_path = logs / "stdout", logs / "stderr"
+    with out_path.open("wb") as out_f, err_path.open("wb") as err_f:
+        proc = subprocess.Popen(
+            argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=out_f, stderr=err_f,
+            start_new_session=True,
+        )  # fmt: skip
+        with _LIVE_LOCK:
+            _LIVE.add(proc.pid)
+        code: int | None
+        try:
+            code = proc.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            code = None
+        finally:
+            _killpg(proc.pid)
+            with _LIVE_LOCK:
+                _LIVE.discard(proc.pid)
+            if proc.poll() is None:
+                proc.kill()
+            proc.wait(timeout=REAP_TIMEOUT_S)
+    return _read_capped(out_path), _read_capped(err_path), code
+
+
+def grade(
+    work: Path, tests_dir: Path, scratch: Path, timeout_s: int = GRADE_TIMEOUT_S,
+    *, expected: frozenset[str] | None = None,
+) -> Grade:  # fmt: skip
     """Run `tests_dir` against `work/timeparse` from a clean directory.
 
-    Only the package is copied out of `work`: a pytest.py, sitecustomize.py, conftest.py or
-    pytest config the agent left next to it is never importable or readable by the grader, which
-    also gets its own ini, rootdir, user-site-free interpreter and a minimal environment.
+    Only the package is copied out of `work`, links copied as links: a pytest.py,
+    sitecustomize.py, conftest.py or pytest config the agent left next to it is never importable
+    or readable by the grader, which also gets its own ini, rootdir, user-site-free interpreter
+    and a minimal environment. The package itself runs in the grader's process, so the report is
+    only as trustworthy as that code: `expected` pins the test ids the report must list (see
+    `hidden_ids`), which catches a package that rewrites the report with other ids, though not
+    one that copies the real ids.
     """
     if scratch.exists():
         shutil.rmtree(scratch)
     tests, pkg = scratch / "tests", scratch / "pkg"
     try:
-        shutil.copytree(tests_dir, tests, ignore=_IGNORED)
+        shutil.copytree(tests_dir, tests, ignore=_IGNORED, symlinks=True)
         pkg.mkdir()
-        if (work / "timeparse").is_dir():
-            shutil.copytree(work / "timeparse", pkg / "timeparse", ignore=_IGNORED)
+        source = work / "timeparse"
+        if source.is_dir() and not source.is_symlink():
+            shutil.copytree(source, pkg / "timeparse", ignore=_IGNORED, symlinks=True)
     except (OSError, shutil.Error):
         return Grade(0, 0, 1, 0)
     ini = scratch / "pytest.ini"
@@ -483,12 +537,27 @@ def grade(work: Path, tests_dir: Path, scratch: Path, timeout_s: int = GRADE_TIM
     argv = [sys.executable, "-s", "-m", "pytest", str(tests), "-q", "-c", str(ini)]
     argv += ["--rootdir", str(tests), "-p", "no:cacheprovider", "--junitxml", str(xml_path)]
     try:
-        subprocess.run(
-            argv, cwd=tests, env=env, capture_output=True, text=True, timeout=timeout_s, check=False
-        )
-    except subprocess.TimeoutExpired:
+        _out, _err, code = _run_tool(argv, tests, env, timeout_s, scratch / "out")
+    except OSError:
         return Grade(0, 0, 1, 0)
-    return _junit_counts(xml_path)
+    if code is None:
+        return Grade(0, 0, 1, 0)
+    graded = _junit_counts(xml_path)
+    if expected is not None and graded.ids != expected:
+        missing, extra = sorted(expected - graded.ids), sorted(graded.ids - expected)
+        graded = replace(graded, mismatch=f"missing {missing[:3]}, extra {extra[:3]}")
+    return graded
+
+
+@functools.cache
+def hidden_ids(task: Task, fixture: Path) -> frozenset[str]:
+    """The test ids the hidden tests report against the task's reference, pinned for every
+    grade of that task (S2)."""
+    with tempfile.TemporaryDirectory(prefix="hm-bench-ids-") as tmp:
+        work = Path(tmp) / "work"
+        start_tree(work, task, fixture)
+        apply_overlay(work, task.reference_dir)
+        return grade(work, task.hidden_dir, Path(tmp) / "g").ids
 
 
 def _by_function(graded: Grade) -> dict[str, list[str]]:
@@ -580,19 +649,31 @@ def tier2_hash(tasks_dir: Path = TASKS_DIR) -> str:
 # --- quality (SPEC-hm-eval S3, S4) ------------------------------------------------------------
 
 
+def _read_source(path: Path) -> bytes:
+    """At most MAX_SOURCE_BYTES of a file, with its full size noted when it is cut."""
+    size = path.stat().st_size
+    with path.open("rb") as handle:
+        data = handle.read(MAX_SOURCE_BYTES)
+    return data + b"\n[truncated: %d bytes]\n" % size if size > MAX_SOURCE_BYTES else data
+
+
 def scope_files(root: Path) -> dict[str, bytes]:
-    """Files under timeparse/ and tests/; caches and symlinks are not source."""
+    """Files under timeparse/ and tests/; caches and symlinks are not source, and a root that is
+    itself a symlink is not followed."""
     found: dict[str, bytes] = {}
     for sub in SCOPE:
         base = root / sub
-        if not base.is_dir():
+        if base.is_symlink() or not base.is_dir():
             continue
-        for path in sorted(base.rglob("*")):
+        paths = []
+        for dirpath, _dirs, files in os.walk(base, followlinks=False):
+            paths += [Path(dirpath) / name for name in files]
+        for path in sorted(paths):
             rel = path.relative_to(root)
             if _SKIP_PARTS & set(rel.parts) or path.suffix == ".pyc" or path.is_symlink():
                 continue
             if path.is_file():
-                found[rel.as_posix()] = path.read_bytes()
+                found[rel.as_posix()] = _read_source(path)
     return found
 
 
@@ -640,38 +721,42 @@ def _write_tree(root: Path, files: dict[str, bytes]) -> None:
         (root / rel).write_bytes(data)
 
 
+# The agent's own suppressions are not honoured: ruff runs with --ignore-noqa, and these comments
+# are blanked in mypy's scratch copy.
+_SUPPRESSION = re.compile(rb"#\s*(?:type:\s*ignore\b[^\n]*|mypy:[^\n]*)")
+
+
+def _logs(root: Path) -> Path:
+    return root.parent / f"{root.name}.out"
+
+
 def _ruff_errors(root: Path, files: dict[str, bytes]) -> int:
     """Ruff errors in `files`, with no config but the pinned rule set."""
     if not files:
         return 0
     _write_tree(root, files)
     argv = [sys.executable, "-m", "ruff", "check", "--isolated", "--no-cache", "--exit-zero"]
-    argv += ["--select", RUFF_SELECT, "--output-format", "json", *sorted(files)]
-    proc = subprocess.run(
-        argv, cwd=root, env=_tool_env(root), capture_output=True, text=True,
-        timeout=QUALITY_TIMEOUT_S, check=False,
-    )  # fmt: skip
-    if proc.returncode != 0:
-        raise ValueError(f"ruff exited {proc.returncode}: {proc.stderr.strip()[-200:]}")
-    return len(json.loads(proc.stdout))
+    argv += ["--ignore-noqa", "--select", RUFF_SELECT, "--output-format", "json", *sorted(files)]
+    out, err, code = _run_tool(argv, root, _tool_env(root), QUALITY_TIMEOUT_S, _logs(root))
+    if code != 0:
+        raise ValueError(f"ruff exited {code}: {err.strip()[-200:]}")
+    return len(json.loads(out))
 
 
 def _mypy_errors(root: Path, files: dict[str, bytes]) -> int:
     """`mypy --strict` errors in the package, with an empty config and a private cache."""
     pkg = root / "src"
-    _write_tree(pkg, {rel: data for rel, data in files.items() if rel.endswith((".py", ".pyi"))})
+    sources = {rel: data for rel, data in files.items() if rel.endswith((".py", ".pyi"))}
+    _write_tree(pkg, {rel: _SUPPRESSION.sub(b"#", data) for rel, data in sources.items()})
     config = root / "mypy.ini"
     config.write_text("[mypy]\n", encoding="utf-8")
     argv = [sys.executable, "-m", "mypy", "--strict", "--config-file", str(config)]
     argv += ["--cache-dir", str(root / "cache"), "--no-error-summary", "--hide-error-context"]
     argv += ["--no-color-output", "--no-pretty", "timeparse"]
-    proc = subprocess.run(
-        argv, cwd=pkg, env=_tool_env(root), capture_output=True, text=True,
-        timeout=QUALITY_TIMEOUT_S, check=False,
-    )  # fmt: skip
-    if proc.returncode not in (0, 1):
-        raise ValueError(f"mypy exited {proc.returncode}: {proc.stdout.strip()[-200:]}")
-    return sum(1 for line in proc.stdout.splitlines() if ": error:" in line)
+    out, _err, code = _run_tool(argv, pkg, _tool_env(root), QUALITY_TIMEOUT_S, _logs(root))
+    if code not in (0, 1):
+        raise ValueError(f"mypy exited {code}: {out.strip()[-200:]}")
+    return sum(1 for line in out.splitlines() if ": error:" in line)
 
 
 def quality_for(
@@ -940,11 +1025,20 @@ def judge_change(task: Task, start: Path, work: Path, opts: Options) -> dict[str
 
 
 def atomic_write(path: Path, text: str) -> None:
+    """Temp file, fsync, rename, as `harness_maker.io_utils.atomic_write` does, but keeping the
+    destination's mode (0644 for a new file) instead of the temp file's 0600."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = stat.S_IMODE(path.stat().st_mode)
+    except FileNotFoundError:
+        mode = 0o644
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
             handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
@@ -1332,7 +1426,9 @@ def _record(
     cost, source = pick_cost(cli_cost, spend)
     scratch = Path(tempfile.mkdtemp(prefix="hm-bench-grade-"))
     try:
-        graded = grade(work, task.hidden_dir, scratch / "g")
+        graded = grade(
+            work, task.hidden_dir, scratch / "g", expected=hidden_ids(task, opts.fixture)
+        )
         start = scratch / "start"
         start_tree(start, task, opts.fixture)
         outcome = outcome_for(start, work, graded.passed)
@@ -2162,13 +2258,13 @@ def render_results_md(rows: list[dict[str, Any]]) -> str:
 
 
 def publish(out: Path, docs: Path, readme: Path) -> None:
-    """Render RESULTS.md and the README block, then write both atomically; a refusal writes
-    nothing."""
+    """Render RESULTS.md and the README block, then write both atomically, the README first: a
+    refusal writes nothing, and a failure after the README is completed by re-running publish."""
     rows = publish_rows(out)
     results = render_results_md(rows)
     text = splice_readme(readme.read_bytes().decode("utf-8"), render_readme_block(rows))
-    atomic_write(docs / RESULTS_MD, results)
     atomic_write(readme, text)
+    atomic_write(docs / RESULTS_MD, results)
 
 
 # --- CLI --------------------------------------------------------------------------------------
@@ -2312,11 +2408,26 @@ def marker_hits(work: Path, marker: str, opts: Options) -> tuple[list[Path], int
     return [f for f in scanned if marker in _read(f)], len(scanned)
 
 
+def sandbox_refusal(args: argparse.Namespace, command: str) -> bool:
+    """Both arms run with --dangerously-skip-permissions, so a live command needs a container or
+    a throwaway VM: IS_SANDBOX=1 says it is in one, --no-sandbox-ok takes the risk explicitly."""
+    if os.environ.get("IS_SANDBOX") == "1" or getattr(args, "no_sandbox_ok", False):
+        return False
+    print(
+        f"{command} runs the agent with --dangerously-skip-permissions; run it in a container "
+        "or a throwaway VM and set IS_SANDBOX=1, or pass --no-sandbox-ok",
+        file=sys.stderr,
+    )
+    return True
+
+
 def _cmd_canary(args: argparse.Namespace) -> int:
     """One plain t1 cell, then a search of its transcript for a marker the operator put in the
     user-level ~/.claude/CLAUDE.md: if it shows up, user memory is leaking into the arms."""
     if os.environ.get("INTEGRATION") != "1":
         print("canary calls a live model; set INTEGRATION=1 to opt in", file=sys.stderr)
+        return 2
+    if sandbox_refusal(args, "canary"):
         return 2
     if args.judge_calibration:
         return _cmd_calibrate(args)
@@ -2385,6 +2496,8 @@ def _cmd_calibrate(args: argparse.Namespace) -> int:
 def _cmd_run(args: argparse.Namespace) -> int:
     if os.environ.get("INTEGRATION") != "1":
         print("run calls a live model; set INTEGRATION=1 to opt in", file=sys.stderr)
+        return 2
+    if sandbox_refusal(args, "run"):
         return 2
     out = _guarded_out(args)
     if out is None:
@@ -2568,7 +2681,7 @@ def _parser() -> argparse.ArgumentParser:
     canary.add_argument("--marker", default=None, help="line you put in ~/.claude/CLAUDE.md")
     canary.add_argument(
         "--judge-calibration", action="store_true", dest="judge_calibration",
-        help="judge every tier-2 reference and damaged copy instead (needs no marker)",
+        help="judge every tier-2 reference, damaged copy and control instead (needs no marker)",
     )  # fmt: skip
     canary.add_argument(
         "--record", default=None, help=f"calibration file (default {CALIBRATION_FILE})"
@@ -2576,6 +2689,10 @@ def _parser() -> argparse.ArgumentParser:
     canary.add_argument("--out", default=None, help="results dir (default: fresh temp dir)")
     for parser_ in (run, canary):
         _add_agent_args(parser_)
+        parser_.add_argument(
+            "--no-sandbox-ok", action="store_true", dest="no_sandbox_ok",
+            help="run live outside a sandbox (IS_SANDBOX=1 unset); the agent can touch your files",
+        )  # fmt: skip
     rep = sub.add_parser("report", help="summarize a results dir (offline)")
     rep.add_argument("--out", required=True)
     rep.add_argument("--json", action="store_true")
