@@ -362,11 +362,13 @@ uv run --with {{ harness_maker_src_path }} hm spec_machine check --all \
   --strictness {{ strictness_of(config) }}
 ```
 
-A clean pass prints one line, `{ok: true, overall, strictness}`. Otherwise it returns `{ok,
-validate: {ok, errors}, cross_validate: {ok, errors, by_rule}, quality: {overall, scores,
-weak_dimensions, blocked, strictness}}`. Exit 1 when validate or
-cross-validate has errors, or when `quality.blocked`. `by_rule` buckets the
-cross-validate errors under `rule-1`…`rule-6` plus `unattributed`.
+When no gate failed it prints one line, `{ok: true, overall, strictness}`; a weak or low score
+(Step 4.5's `overall < 60 OR any dim < 40`) adds `weak_dimensions` (dims < 40) and
+`low_dimensions` (`{dim: score}`, dims < 60). A failed gate prints `{ok, strictness, validate:
+{ok, errors}, cross_validate: {ok, errors, by_rule}, quality: {overall, weak_dimensions,
+low_dimensions, blocked, strictness}}`, each error once. Exit 1 when validate or cross-validate
+has errors, or when `quality.blocked`. `by_rule` counts the cross-validate errors per
+`rule-1`…`rule-6` plus `unattributed`. If scoring raised, `quality` is `{error, strictness}`.
 
 Cross-validate enforces (ADR-007):
 1. Every `ac.id` in .yaml has a matching `### AC-NNN` heading in .md.
