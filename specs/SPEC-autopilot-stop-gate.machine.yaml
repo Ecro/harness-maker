@@ -192,6 +192,8 @@ ac:
   test_ids:
   - tests/unit/test_autopilot_stop_gate.py::test_ac003_replay_at_run_end
   - tests/unit/test_autopilot_stop_gate.py::test_ac003_no_skill_call_cut_blocks
+  - tests/unit/test_autopilot_stop_gate.py::test_ac003_one_ms_before_each_skill_call_the_gate_blocks
+  - tests/unit/test_autopilot_stop_gate.py::test_ac003_fixtures_match_the_manifest
   executable_predicate: null
   golden_table:
   - input:
