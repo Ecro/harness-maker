@@ -61,10 +61,10 @@ def test_disabled_is_byte_zero_second_opinion(tmp_path: Path) -> None:
     settings = (root / "settings.json").read_text()
     assert "Bash(agy --sandbox --print:*)" not in settings
     assert "Bash(codex exec:*)" not in settings
-    review = (root / "commands/hm/review.md").read_text()
-    plan = (root / "commands/hm/spec.md").read_text()
-    assert "Cross-model heterogeneous" not in review
-    assert "second_opinion_results" not in plan
+    # 0.64.0: the review is execute's Step 6, and the block is execute's only.
+    review = (root / "commands/hm/execute.md").read_text()
+    assert "second_opinion_invoke" not in review
+    assert "**Second opinion**" not in review
     assert not (root / "schemas/second-opinion-finding.schema.json").exists()
 
 
@@ -85,24 +85,16 @@ def test_schema_rendered_when_enabled(tmp_path: Path) -> None:
 
 def test_dispatch_partial_loops_both_models_in_review(tmp_path: Path) -> None:
     root = _render(["codex", "antigravity"], tmp_path)
-    review = (root / "commands/hm/review.md").read_text()
-    assert "model: `codex`" in review
-    assert "model: `antigravity`" in review
-    # Both recipes now call the invoker, which owns argv construction. The old rendered
-    # `agy --print --sandbox …` shape was never a working command — `--print` takes the
-    # prompt as its VALUE, so `--sandbox` became the prompt and stdin was never read.
-    assert "hm second_opinion_invoke --model antigravity" in review
-    assert "hm second_opinion_invoke --model codex" in review
+    review = (root / "commands/hm/execute.md").read_text()
+    assert "**Second opinion** (codex, antigravity)" in review
+    # One recipe, run per model, through the invoker that owns argv construction. The old
+    # rendered `agy --print --sandbox …` shape was never a working command — `--print` takes
+    # the prompt as its VALUE, so `--sandbox` became the prompt and stdin was never read.
+    assert "hm second_opinion_invoke --model <model>" in review
     assert "agy --print --sandbox --print-timeout" not in review
     assert "timeout 240 agy" not in review  # NOT the external-timeout wrapper either
 
 
-def test_spec_uses_second_opinion_results_contract(tmp_path: Path) -> None:
-    root = _render(["codex"], tmp_path)
-    plan = (root / "commands/hm/spec.md").read_text()
-    assert "second_opinion_results" in plan
-    assert "codex_status" not in plan
-    assert "codex_reconciliation" not in plan
 
 
 def test_render_never_shells_out_to_agy(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -156,8 +148,10 @@ def test_custom_antigravity_model_is_persisted_for_the_invoker(tmp_path: Path) -
 
     harness_yaml = (tmp_path / "harness.yaml").read_text()
     assert "Gemini 3.5 Flash (High)" in harness_yaml
-    review = (tmp_path / "commands/hm/review.md").read_text()
-    assert "second_opinion_invoke --model antigravity" in review
+    review = (tmp_path / "commands/hm/execute.md").read_text()
+    assert "**Second opinion** (antigravity)" in review
+    assert "second_opinion_invoke --model <model>" in review
+    assert "Gemini" not in review
 
 
 def test_fresh_install_harness_yaml_pins_the_flash_default(tmp_path: Path) -> None:

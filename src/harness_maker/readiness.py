@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import os
 import shlex
-from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -1424,49 +1423,27 @@ def _dim_verification(project_dir: Path) -> DimensionScore:
         )
     )
 
-    verify_skill = project_dir / ".claude" / "skills" / "verify-before-completion" / "SKILL.md"
+    # SPEC-hm-overhaul-p1: the verify-before-completion skill retired with /hm:verify; the one
+    # deterministic gate is now `hm check`, which execute and wrapup must both run.
+    hm_dir = project_dir / ".claude" / "commands" / "hm"
+    gate_wired = all(
+        "hm check" in _read_text(hm_dir / f"{stage}.md")
+        for stage in ("execute", "wrapup")
+        if (hm_dir / f"{stage}.md").is_file()
+    ) and all((hm_dir / f"{stage}.md").is_file() for stage in ("execute", "wrapup"))
     signals.append(
         _signal(
-            "verify_skill_installed",
-            verify_skill.is_file(),
+            "hm_check_wired",
+            gate_wired,
             15,
-            "verify-before-completion skill installed"
-            if verify_skill.is_file()
-            else "verify-before-completion skill missing",
-            None
-            if verify_skill.is_file()
-            else "Run /hm:make to install the verify-before-completion skill",
+            "execute and wrapup run hm check"
+            if gate_wired
+            else "execute or wrapup does not run hm check",
+            None if gate_wired else "Run /hm:make --update to re-render the stage commands",
         )
     )
 
     return DimensionScore(name="verification", score=_score_signals(signals), signals=signals)
-
-
-#: SPEC-hm-light-lane-s3c IRR-004: the reference file the stage commands' preamble pointer names.
-_STAGE_PREAMBLE = ".claude/hm/stage-preamble.md"
-
-
-def _stage_preamble_gap(project_dir: Path, bodies: Iterable[str]) -> Callable[[str], str | None]:
-    """Why the preamble file fails a marker check, or None; only when a command names the file.
-
-    The commands keep both markers next to the pointer, which proves the pointer is there, not
-    that the text it points at is. A render whose commands still inline the preamble names no
-    file and is scored exactly as before, so a plugin upgrade never turns an un-re-rendered
-    project red (SPEC-hm-light-lane-s3c ADR-002).
-    """
-    if not any("stage-preamble.md" in t for t in bodies):
-        return lambda _marker: None
-    path = project_dir / _STAGE_PREAMBLE
-    text = _read_text(path) if path.is_file() else None
-
-    def gap(marker: str) -> str | None:
-        if text is None:
-            return f"{_STAGE_PREAMBLE} is missing"
-        if marker not in text:
-            return f"{_STAGE_PREAMBLE} lacks {marker}"
-        return None
-
-    return gap
 
 
 def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
@@ -1487,8 +1464,9 @@ def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
     # The fused-workflow axis was removed (PLAN-harness-diet ADR-001/002). Its
     # `fused_workflow_present` signal is NOT simply deleted — a weight-30 signal that
     # can never pass again is a permanent phantom penalty. The successor asks the
-    # question that still has an answer: is every atomic stage actually installed?
-    atomic_stages = {"research", "spec", "execute", "review", "wrapup", "verify"}
+    # question that still has an answer: is every stage actually installed? The four
+    # stages are SPEC-hm-overhaul-p1's (review and verify retired in 0.64.0).
+    atomic_stages = {"research", "spec", "execute", "wrapup"}
     present = {c.stem for c in commands} & atomic_stages
     missing = sorted(atomic_stages - present)
     signals.append(
@@ -1496,9 +1474,9 @@ def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
             "atomic_stages_complete",
             not missing,
             30,
-            f"All {len(atomic_stages)} atomic stage commands present"
+            f"All {len(atomic_stages)} stage commands present"
             if not missing
-            else f"Missing atomic stage command(s): {', '.join(missing)}",
+            else f"Missing stage command(s): {', '.join(missing)}",
             None if not missing else "Run /harness-maker:make --update to re-render them",
         )
     )
@@ -1523,62 +1501,24 @@ def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
         )
     )
 
-    # PLAN-locale-and-command-observability ADR-002/005: presence-audit that the
-    # locale directive + start/end summary banners landed in the rendered stage
-    # commands. Meta commands (make/help/loop/loop-p5-batch/…) use their own templates
-    # and rely on the persistent CLAUDE.md/AGENTS.md anchor instead, so they MUST be
-    # excluded, or both signals false-fail on every install (REVIEW P1). The old
-    # `fused` classifier ("-" in stem) is gone with the axis; `atomic_stages` alone is
-    # now the whole population, which also removes the loop-p5-batch false-sweep.
-    meta_cmds = {"make", "help", "health", "configure", "uninstall", "loop", "loop-p5-batch"}
-    stage_fused = [c for c in commands if c.stem in atomic_stages and c.stem not in meta_cmds]
-    _bodies = {c: _read_text(c) for c in stage_fused}
-    lang_marker, banner_marker = "<!-- @hm:output_language -->", "<!-- @hm:banner:start -->"
-    preamble_gap = _stage_preamble_gap(project_dir, _bodies.values())
-    loc_hits = sum(1 for t in _bodies.values() if lang_marker in t)
-    loc_file = preamble_gap(lang_marker)
-    loc_ok = ((not stage_fused) or loc_hits == len(stage_fused)) and loc_file is None
+    # PLAN-locale-and-command-observability ADR-002/005: presence-audit of the locale directive.
+    # Since 0.64.0 the stage commands no longer inline it (nor the start/end banners, which
+    # retired with the step manifest); the always-loaded CLAUDE.md / AGENTS.md carry it.
+    lang_marker = "<!-- @hm:output_language -->"
+    anchors = [project_dir / n for n in ("CLAUDE.md", "AGENTS.md") if (project_dir / n).is_file()]
+    loc_ok = bool(anchors) and all(lang_marker in _read_text(a) for a in anchors)
     signals.append(
         _signal(
             "output_language_present",
             loc_ok,
             15,
-            (
-                f"{loc_hits}/{len(stage_fused)} stage/fused commands carry the locale directive"
-                if stage_fused
-                else "No stage/fused commands to check"
-            )
-            + (f"; {loc_file}" if loc_file else ""),
+            "CLAUDE.md / AGENTS.md carry the locale directive"
+            if loc_ok
+            else "CLAUDE.md / AGENTS.md lack the locale directive",
             None
             if loc_ok
-            else "Re-render via /hm:make — commands missing the locale directive "
-            "(the output_language partial silently dropped from a wrapper"
-            + (f", or {_STAGE_PREAMBLE} missing it" if loc_file else "")
-            + ")",
-        )
-    )
-    ban_markers = (banner_marker, "<!-- @hm:banner:end -->")
-    ban_hits = sum(1 for t in _bodies.values() if all(m in t for m in ban_markers))
-    ban_file = preamble_gap(banner_marker)
-    ban_ok = ((not stage_fused) or ban_hits == len(stage_fused)) and ban_file is None
-    signals.append(
-        _signal(
-            "start_end_summary_present",
-            ban_ok,
-            15,
-            (
-                f"{ban_hits}/{len(stage_fused)} stage/fused commands carry start + end "
-                "summary banners"
-                if stage_fused
-                else "No stage/fused commands to check"
-            )
-            + (f"; {ban_file}" if ban_file else ""),
-            None
-            if ban_ok
-            else "Re-render via /hm:make — commands missing a start or end summary banner "
-            "(step_manifest or stage_end_summary partial silently dropped"
-            + (f", or {_STAGE_PREAMBLE} missing it" if ban_file else "")
-            + ")",
+            else "Re-render via /hm:make — the output_language partial is missing from "
+            "CLAUDE.md or AGENTS.md",
         )
     )
 

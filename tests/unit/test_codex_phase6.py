@@ -123,9 +123,16 @@ def test_codex_agent_files_correct_output_paths() -> None:
 
 
 def test_codex_target_files_includes_all_agent_tomls() -> None:
-    """_codex_target_files() must include all 12 .codex/agents/*.toml paths."""
+    """_codex_target_files() includes a .codex/agents/*.toml for every agent this config renders.
+
+    Since 0.64.0 a default render emits the three base agents; lens reviewers need
+    `reviewers.fanout`, the second-opinion pair needs `second_opinion.models` and the
+    stage delegate needs `delegation.stages`. `_ALL_AGENTS` still lists every template.
+    """
+    from harness_maker.synthesize import rendered_agents
+
     out_paths = {out for _, out, _ in _codex_target_files()}
-    for name in _ALL_AGENTS:
+    for name in rendered_agents(None):
         assert f".codex/agents/{name}.toml" in out_paths, (
             f"_codex_target_files missing agent {name!r}"
         )

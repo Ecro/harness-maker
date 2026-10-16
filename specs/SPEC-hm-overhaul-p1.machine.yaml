@@ -169,7 +169,7 @@ ac:
     note: ''
   rubric_id: null
   note: PR-S. The ledger is the SPEC.md 'Cut ledger' table; the test parses it.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The classes come from `git show db19f023:src/harness_maker/step_sensitivity.py`
     (the repo's own pre-change classification, graded against RESEARCH-workflow-steps-vs-model-capability);
@@ -317,7 +317,7 @@ ac:
     note: self-contained
   rubric_id: null
   note: PR-S
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The file lists come from the DRI-approved draft sections 1 and
     6 as amended by the 2026-10-15 corrections and the DRI card of 2026-10-16 (D-9,
@@ -657,7 +657,7 @@ ac:
   note: 'PR-S. Fixtures: db19f023 renders for [claude-code] and [claude-code,codex]
     x {Side, Production} x worktree {off,on}, and copies of the 36 eval-3 hm trees
     (pristine 0.62 claude-code, verified by git status on 2026-10-15).'
-  pending_test: true
+  pending_test: false
   oracle_source: property
   oracle_evidence: Expected sets are AC-004's golden list and the db19f023 render
     listing, both fixed before implementation; the edit-preservation relation holds
@@ -756,7 +756,7 @@ ac:
     wrapup_land}. Each drop or move is a row of the SPEC AC-009 table tied to a ledger
     row; additions are hm check. second_brain rows are checked with second_brain.enabled
     true.'
-  pending_test: true
+  pending_test: false
   oracle_source: differential
   oracle_evidence: Reference modules are loaded from `git show db19f023:` into a temp
     package and reference stage renders come from a db19f023 checkout; the relation

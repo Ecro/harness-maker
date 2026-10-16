@@ -545,8 +545,9 @@ def test_multiline_python_c_was_never_covered_even_by_the_blanket_grant(tmp_path
             re.S | re.M,
         )
     ]
-    assert len(bodies) >= 2, (
-        f"expected both emitting templates, found {len(bodies)} — the extraction is "
+    # One since 0.64.0: the other emitting template was `/hm:loop-p5-batch`, now retired.
+    assert len(bodies) >= 1, (
+        f"expected the emitting template, found {len(bodies)} — the extraction is "
         f"anchored too tightly again, or a template stopped shipping `python -c`"
     )
 

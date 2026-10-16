@@ -80,8 +80,8 @@ def test_interview_recommends_production_for_active_medium() -> None:
     result = interview(_profile(scale="medium", lifecycle="active"), autoloop_mode=True)
     assert result.preset == Preset.PRODUCTION
     assert result.consensus == "cross-check"
-    assert "code-reviewer" in result.reviewers["enabled"]
-    assert "security-reviewer" in result.reviewers["enabled"]
+    # 0.64.0: lens reviewers are opt-in through `reviewers.fanout` (SPEC-hm-overhaul-p1 D-9).
+    assert result.reviewers["enabled"] == ["code-reviewer"]
     assert result.autoloop["allowed"] is True
     assert result.context_lint["enabled"] is True
 
@@ -93,14 +93,14 @@ def test_interview_recommends_production_for_large_scale() -> None:
 
 
 def test_interview_installs_all_reviewers_and_skills() -> None:
-    """Both presets install full inventory; only `enabled` differs."""
+    """Both presets install the same inventory; Production enables no less than Side."""
     side = interview(_profile(), autoloop_mode=True)
     prod = interview(_profile(scale="medium", lifecycle="active"), autoloop_mode=True)
     # Same installed inventory regardless of preset
     assert side.reviewers["installed"] == prod.reviewers["installed"]
     assert side.skills["installed"] == prod.skills["installed"]
-    # Side enables fewer than Production
-    assert len(side.reviewers["enabled"]) < len(prod.reviewers["enabled"])
+    # Since 0.64.0 both enable only code-reviewer; lenses need `reviewers.fanout`.
+    assert len(side.reviewers["enabled"]) <= len(prod.reviewers["enabled"])
     assert len(side.skills["enabled"]) <= len(prod.skills["enabled"])
 
 
@@ -303,13 +303,13 @@ def test_interview_mechanical_checks_explicit_empty_list_clears(
 
 
 def test_focus_to_additional_reviewers_security_side() -> None:
-    """focus=security on Side preset adds security-reviewer + security-auditor."""
+    """focus=security on Side preset adds security-reviewer (0.64.0 retired security-auditor)."""
     from harness_maker.interview import _focus_to_additional_reviewers
     from harness_maker.models import Preset
 
     additional = _focus_to_additional_reviewers("security", Preset.SIDE)
     assert "security-reviewer" in additional
-    assert "security-auditor" in additional
+    assert "security-auditor" not in additional
 
 
 def test_focus_to_additional_reviewers_feature_side() -> None:
@@ -323,16 +323,15 @@ def test_focus_to_additional_reviewers_feature_side() -> None:
 
 
 def test_focus_to_additional_reviewers_security_production() -> None:
-    """focus=security on Production preset adds security-auditor only.
+    """focus=security on Production adds the security lens (0.64.0 retired security-auditor).
 
-    security-reviewer is already in Production defaults.
+    The lens only renders with `reviewers.fanout`; without it make warns that it is inert.
     """
     from harness_maker.interview import _focus_to_additional_reviewers
     from harness_maker.models import Preset
 
     additional = _focus_to_additional_reviewers("security", Preset.PRODUCTION)
-    assert "security-auditor" in additional
-    assert "security-reviewer" not in additional  # already in Production defaults
+    assert additional == ["security-reviewer"]
 
 
 def test_focus_to_additional_reviewers_unknown_focus() -> None:

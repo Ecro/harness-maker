@@ -28,327 +28,24 @@ from ._surface_baseline import (
     render_surface,
 )
 
-# Measured 2026-07-29 against this repo's `.claude/harness.yaml` through the SAME
-# generator the surface baseline uses. Phases 2–5 lowered `execute`, `wrapup` and their
-# fused descendants; `research` ROSE because the fan-out's three `Task(` dispatches are
-# counted individually by the ADR-011 rule even though they leave in one message — see
-# the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
+# Measured against this repo's `.claude/harness.yaml` through the SAME generator the surface
+# baseline uses (re-measured for 0.64.0; earlier movements are in git history).
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
-    # +3 total, 141→144 (2026-10-16, SPEC-hm-overhaul-p1 PR-C): research 7→10. This repo's
-    # harness lists `cursor`, which 0.63.0 drops, and the research fan-out was gated off only
-    # while `cursor` was a target; its three `Explore` dispatches now render, as they always did
-    # for a Claude-only harness. No call was removed.
-    # +1 total, 140→141 (2026-10-15, SPEC-hm-light-lane-s3c): execute 25→26, the
-    # `spec_machine approval-status` call Step 0 now makes before it picks the light or the full
-    # PLAN. The three new `.claude/hm/` files (preamble, full PLAN text, full schema) hold no
-    # mandated call, so moving their text changed no count. No call was removed.
-    # +7 total, 133→140 (2026-10-15, SPEC-hm-light-lane-s3a): execute 19→25 and spec 9→10; see
-    # those entries. No call was removed.
-    # Counted per command PLUS the `.claude/hm/` files it points at (2026-10-14, stage 2b
-    # confirmation pass), the way `_instruction_baseline.stage_text` reads a stage. The entries
-    # below counted the bare command, so the drops they record for stage 2b were calls that had
-    # MOVED, not left: a call in a reference file is still a call the stage makes. Against the
-    # pre-move d2c0ab0 counts nothing was removed: execute 19 and review 33 are back where they
-    # were, verify is 10→11 and wrapup 32→33 (the `!test -r` existence check before each dispatch,
-    # review round 1 S1).
-    # +2 total, 100→102 (2026-10-14, /hm:review round 1 of SPEC-hm-light-lane-s2b, finding S1).
-    # verify 6→7 and wrapup 19→20: one call ADDED to each delegated command, the `!test -r` check
-    # that the step list exists before the dispatch. It is deliberate: a delegate that cannot read
-    # its file returns nothing, and an empty wrapup receipt reconciles clean. No call was removed.
-    # −31 total, 131→100 (2026-10-14, SPEC-hm-light-lane-s2b). **No call was removed**: five blocks
-    # moved verbatim into `.claude/hm/*.md` and the rendered command keeps a pointer, so the
-    # calls they hold are read on demand instead of counted as the command's. This repo's
-    # `delegation.stages` holds wrapup and verify, which is why those two move here; a harness
-    # that delegates neither keeps both bodies, and their calls, inline.
-    # execute 19→18: the Phase A.5 `Task(` to `test-reviewer`.
-    # review 33→20 (−13): auto-fix rounds (`lens_coverage check`, `review_churn` x2,
-    # `review_consensus`) and the confirmation pass (`freeze commit`, `freeze read-base`,
-    # `lens_coverage check`, `freeze reap`, `stage_agent_ledger emit` and its four lens `Task(`).
-    # verify 10→6 (−4): `verification_cache run` and `mark-pass`, `spec_need op-check` and
-    # `waiver-check`.
-    # wrapup 32→19 (−13): `verification_cache run` and `mark-pass`; `spec_machine mark-tested`,
-    # `find-unbound`, `mark-judged`, `find-unjudged`; `memory_retrieve` x2; `memory_md` x3;
-    # `second_brain promote`; the `judgment-reviewer` `Task(`.
-    # −14 total, 145→131 (2026-10-14, SPEC-hm-light-lane-s2). This repo's harness.yaml has
-    # `loop.enabled: false`, and the loop-only branches stopped rendering there: the Gate 0
-    # `iter_receipts write` (−1 on each of execute/research/review/spec/verify/wrapup), execute
-    # Step 0.2 and Step 5 (`loop-mode-active`, `owned-crumb-add`, `finalize stage-only`,
-    # `finalize fail`, `post-commit-pop`), verify Check 5 (`git status`, `git diff --check`),
-    # and review 5c `review_churn complexity` (removed outright, AC-007). No call was added.
-    # execute 25→19, research 8→7, review 35→33, spec 10→9, verify 13→10, wrapup 33→32.
-    # +2 on `plan`, +1 on `review`, +2 on `wrapup` (2026-09-16,
-    # SPEC-intent-world-model-objective-layer P4): plan Step 0.5 → `hm world status --json` and
-    # `hm world objective revisit <objective-id>`; review Step 3.3 → `hm world objective show`;
-    # wrapup 5.7 → `hm world assume observe` and `hm world objective close`. Every call is
-    # skipped with one line when the project has no intent state; no call was removed.
-    # loop 12→10, plan 18→15, review 37→36, total 165→159 (2026-08-16,
-    # PLAN-codex-lens-dispatch). **No mandated call was removed and none was added** — the
-    # COUNTING RULE was corrected. `count_round_trips` used a bare `text.count("Task(")` for
-    # both variants, which charged backticked PROSE as a round trip (a paragraph reading
-    # "retry the `Task(...)` call" cost one) and named the CLAUDE tool for both arms. The
-    # second half was harmless only while Codex output still carried `Task(` — and this task
-    # is what stops it carrying it. Left alone, the rule would have scored `hm-review`'s
-    # fourteen lens dispatches at ZERO from this commit on. Both arms now count their own
-    # call-site form. The Claude drop is prose leaving the count plus `plan`'s multi-line
-    # `Task(` collapsing into one macro call.
-    # +1 on every review-bearing command (2026-07-30, PLAN-second-opinion-acceptance-gate):
-    # Step 3.4 gained ONE mandated call, `hm codex_adapter stamp-ids`. It exists because the
-    # step previously told an LLM to compute `sha256(...)[:16]` itself — which it cannot do, so
-    # Claude-side finding ids were invented per round and the merge-by-`id` contract keyed on
-    # values that changed every round. The call is the whole point of that fix; no call was
-    # removed. `review` 7→8. (The four fused commands that also inherited it were deleted
-    # with the fused axis — PLAN-harness-diet ADR-001.)
-    # +1 on `execute`, `plan` and `review` (2026-08-05, PLAN-workflow-loop-efficiency P3):
-    # each gained exactly ONE mandated call, and each is a ledger write, not a check:
-    #   execute Phase A.5 → `hm stage_agent_ledger emit`   (test-reviewer verdict per attempt)
-    #   plan    Step 4    → `hm stage_agent_ledger emit`   (validator verdict per pass)
-    #   review  Step 3.4  → `hm stage_agent_ledger persist-payload` (ADR-006 part 2 corpus)
-    # No call was removed. `execute` 14→15, `plan` 14→15, `review` 8→9, total 127→130.
-    # These three calls are the entire reason stage 2 will have a denominator; the round-trip
-    # cost is the price of that, and it is charged per stage invocation, not per round.
-    #
-    # configure 3→4, total 130→131 (PLAN-onboarding-interview-ux, 2026-08-06). ONE call added,
-    # none removed: `hm cli detect-tools --json` in the new "Cross-model second opinion"
-    # dimension. It is a check, not a ledger write, and it is conditional in spirit but not in
-    # render — the dimension only asks after showing which CLIs are on PATH, and detection
-    # cannot be cached (installing a CLI invalidates nothing `profile()` watches, ADR-001), so
-    # there is no cheaper shape. `health` is unchanged at 7 even though it gained the same call:
-    # that one renders under `{% if not config.second_opinion.models %}` and this fixture's
-    # harness has models set, so it is absent from the measured body. Do not "fix" that
-    # asymmetry by making health's call unconditional — the gate is the point.
-    "configure": 4,
-    # 15 → 17 (multi-lens-review-round, 2026-08-10). TWO calls added, none removed: Phase A.5
-    # now dispatches one `test-reviewer` per lens — red-correctness, discrimination, coverage —
-    # in a SINGLE message, and ADR-011's rule counts every `Task(` individually even though the
-    # three leave in one turn. Identical over-count to the `research` fan-out, for the identical
-    # reason — see `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
-    # The ledger did NOT gain a call: ADR-007 emits one row per ROUND, after the merge, so the
-    # three dispatches share one `emit`. Measured basis: a serially-retried single reviewer
-    # surfaces one failure category per round (2 then 3 findings), three concurrent lenses
-    # surfaced 9 and 12 with ZERO overlap between the two blocking lenses.
-    # Attributed in work-docs/BASELINE-DELTA-multi-lens-review-round.md.
-    # 17 → 18 (PLAN-ai-review-exit-criteria F1): Phase A.4 runs the test command once, before
-    # the A.5 dispatch. It is the cheapest round-trip in this table and it removes reviewer
-    # rounds — eleven findings across two tasks were decidable by exactly this call.
-    # 18 → 19 (stuck-dispatch, 2026-08-17): ONE call added, none removed — Step 4's blocker path
-    # now dispatches `stuck`. It fires only when A.5's budget is exhausted, Phase D is unfixable,
-    # or an ADR conflicts, so the round-trip is paid on runs that were already stopping. That
-    # off-happy-path claim is now true of the RENDERED TEXT and not only of the intent: the first
-    # draft left `dispatch_intro()` and the fence outside the conditional, so a run that exited
-    # Step 4 GREEN read an unqualified "Dispatch each item below" imperative and could have spent
-    # the call on a stage that never blocked. Attributed in
-    # work-docs/BASELINE-DELTA-stuck-dispatch.md.
-    # 19 -> 17 (2026-08-17, PLAN-self-induced-regression-gate). Net -2: ADR-010 collapses Phase
-    # A.5's three `test-reviewer` dispatches into ONE carrying all three lens questions.
-    # It was briefly 18 — ADR-008 added a `verification_cache check` to Phase D (+1) — and
-    # review withdrew that read: the producer half was already cut (`is_fresh` never compares
-    # check sets, so a marker written after a TARGETED run would let the next verify/wrapup skip
-    # the whole suite), which left a consumer that can never hit, because this stage changes
-    # files before it reaches the read.
-    # 17 -> 18 on 2026-09-19 (PLAN-observed-harness-gaps-salvage Phase 3): the warm tier now
-    # loads failure BODIES through `hm memory_retrieve` instead of a head-skim + slug `rg` — the
-    # one stage that writes code was the only one still reading slugs without bodies.
-    # 18 -> 19 on 2026-09-20 (SPEC-plan-stage-absorption Phase 1, IRR-004): Step 0.1 calls
-    # `hm spec_need frontmatter-upsert` once. The verb exists because AC-002's oracle is a
-    # property over arbitrary prior frontmatter states and a prose instruction has no
-    # execution surface to quantify over; `verify.md.j2` Check 6 reads the key this writes
-    # and treats an absent one as PASS, so a write that silently no-ops is invisible.
-    # Declared in that PLAN's `surface_allowance.round_trips.execute: 1` and attributed in
-    # work-docs/BASELINE-DELTA-plan-stage-absorption.md.
-    # 19 -> 21 on 2026-09-20, same task: Step 0.1 also calls `spec_need prefilter` and
-    # `spec_need record` — the verdict is judged against candidates and its rationale is
-    # recorded, which is the evidence half the removed Step 1.7 gate left behind.
-    # 21 → 25 (same task, second fold): `worktree loop-mode-active` in Step 0.2 plus the
-    # is_codex-branched call sites ADR-011's counting rule includes.
-    # 19 → 25 (2026-10-15, SPEC-hm-light-lane-s3a): Step 4.2's light check, read from
-    # `.claude/hm/execute-light-check.md`, adds approval-status, Check 2's verification_cache
-    # run and the `key` read for the record, `security-scan --force`, and Check 6's op-check and
-    # waiver-check. (The first version had Check 2's degraded mark-pass where the `key` read is;
-    # the review of 3a, item F, dropped it.) Those calls are the gates that replace the review
-    # and verify turns on a trusted light lane. No call was removed. Attributed in
-    # work-docs/BASELINE-DELTA-hm-light-lane-s3a.md.
-    "execute": 26,
-    # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml
-    # second_opinion.models` dropped `antigravity`, and `/hm:health` runs ONE per-model
-    # positive smoke-test per enabled model, so its `second_opinion_invoke` smoke call for that
-    # model stops rendering. Re-enabling the model restores the call and this row.
-    "health": 6,
+    # 144 → 14 (0.64.0, SPEC-hm-overhaul-p1). The four stages no longer carry `!` lines: each
+    # `hm …` call is an instruction the model runs (`_hm.md.j2`'s `cli()` prefix), so the
+    # ADR-011 rule counts only their `Task(subagent_type=` dispatches — execute's code-reviewer
+    # and second opinion, spec's validator, wrapup's stage-delegate and judgment reviewer.
+    # configure, review and verify no longer render; research's fan-out is prose ("fan out in
+    # one message") with no named dispatch. health, make and uninstall are unchanged.
+    "execute": 2,
+    "health": 5,
     "help": 0,
-    # `loop` (10) and `loop-p5-batch` (2) removed 2026-09-29: this repo set `loop.enabled:
-    # false` (SPEC-loop-opt-in follow-up), so neither renders from its harness.yaml. The
-    # templates still ship; setting the key back to true restores both rows.
     "make": 1,
-    "metrics": 7,
-    # `plan` removed 2026-09-20 (SPEC-plan-stage-absorption IRR-001). Its 29 round trips did
-    # not move elsewhere wholesale: the `spec_need` re-entry marker and waiver calls were
-    # DROPPED with the gate (see tests/unit/test_render_execute_spec_need.py), while
-    # `prefilter` / `record` moved to execute Step 0.1 and the validator + cross-model
-    # calls to spec Step 4.6 — both accounted for in those rows above.
-    "research": 10,
-    # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
-    #
-    # 8 → 16 (PLAN-ai-review-exit-criteria Phase 4). The largest single-stage round-trip rise
-    # in this table, and all of it is the declared failure space becoming real: five `Task(`
-    # lens dispatches in round 1 (+5), `hm freeze resolve-base` once at round 1 (+1), and
-    # `hm lens_coverage check` (+2 — once after the round-1 dispatch, once in the auto-fix
-    # loop after re-dispatching whatever the CLI's `missing` list named).
-    #
-    # The five are NOT compressible to one parameterised call. A single `Task(` with a
-    # `<lens>` placeholder was considered and rejected for the same reason the Phase A.5
-    # fan-out rejected it (see `execute` in the size table): the lenses run CONCURRENTLY in
-    # one message, which is the property AC-002 asserts, and a loop over one template is a
-    # serial reading. Merging them would also make `<lens>.json` unrenderable per lens, which
-    # is what the coverage CLI reads.
-    #
-    # The two CLI calls replace a judgement, not a cheaper call: before this, nothing computed
-    # which lenses had run — the executing model reported its own attendance. That is the
-    # self-report hole AC-011 exists to close, so the round-trips buy the gate its input.
-    # 16 → 19 (Phase 5): the confirmation pass adds `hm freeze commit` (+1), `hm freeze
-    # read-base` (+1) and one more `hm lens_coverage check` over the pass's own results (+1).
-    # `read-base` is a round-trip that exists to PREVENT a computation: re-resolving the base
-    # here would silently use one that drifted with the commits landed during the review.
-    # 19 → 20: the confirmation pass emits its own `stage_agent_ledger` row (F4). It is the
-    # only cap in the harness with no recorded episodes, so its two-pass bound can currently
-    # be defended only by assertion — the reviewer and validator caps both have rows, and
-    # reading them settled questions no argument could (5-of-9 release vs 0-of-12, calling for
-    # opposite responses). Behind the `instrumentation` axis, which defaults OFF.
-    # 20 → 22 (round-2 review repairs): the auto-fix loop's coverage re-check became its own
-    # rendered call (it now needs a repeatable `--round`), and `hm freeze reap` releases the
-    # frozen refs at the terminal state — nothing else reaps them under the Side preset.
-    # 22 → 39 (2026-08-16, PLAN-review-loop-empirics Phases 2–4). Seventeen calls, all
-    # deliberate, none removable:
-    #   +2  round 1 dispatches seven lenses instead of five. (It was nine before the
-    #       2026-08-16 merge folded `complexity` into `design` and `naming` into `consistency`
-    #       on measured redundancy — that merge is what took this row 39 -> 35.)
-    #   +7  Step C2 now renders its OWN dispatch list instead of saying "exactly as round 1
-    #       does". Under the old axis that back-reference was adequate because each lens had a
-    #       self-describing agent; six of the nine now share `code-reviewer` and are told apart
-    #       ONLY by their brief line, so a pass that never states the briefs cannot be run.
-    #   +2  `hm review_consensus finalize` and the disposition ledger write — Step 4 stopped
-    #       being prose (ADR-008), and prose has no executable surface to test. It was three
-    #       chained verbs over one rewritten file until 2026-08-16; folding them into one
-    #       stateless call took this row 35 -> 33 and removed the write-back defect class.
-    #   +2  Phase 5's churn measurement: two endpoint pins (pre-fix, post-fix) and one
-    #       `hm review_churn measure` per repair round. The measure shares a line with the
-    #       post pin, so the round costs two counted calls, not three. They run only inside
-    #       the auto-fix loop — a review that approves at round 1 pays none of them.
-    # The ADR-011 rule counts each `Task(` individually even though all seven leave in one
-    # message, so the dispatch half of this is a cost in the metric, not in turns.
-    #   +2  Phase 6 + 7: `hm review_consensus plan` decides the repair round's re-review
-    #       (gate-on render only), and one `hm review_churn oscillation` scan runs at the
-    #       terminal state. The gate-off render pays neither and keeps the old dispatch.
-    #   +1  ADR-003 of PLAN-self-induced-regression-gate (2026-08-17): Step 0's
-    #       `hm review_run open`, which mints the run identity every `<run-id>` below stands
-    #       for. `close` is prose on each terminal branch rather than a mandated call line, so
-    #       it is not charged here. (An auto-fix-loop cache read was also added and then
-    #       withdrawn in review — see the `execute` note above. It was inline prose either way,
-    #       so this count never moved for it.)
-    #   +1  The Telemetry Emit step's Claude arm gained the `!` auto-exec marker
-    #       (2026-08-20). It is not a new call — the step always existed and always had to
-    #       run — but it was the ONLY CLI line in this command rendered without `!`, so the
-    #       metric never charged for a step the operator was expected to run by reading prose.
-    #       That step is the one that writes `disposition_counts` and the four `churn_*` keys,
-    #       i.e. the entire deliverable of PLAN-review-loop-ledger-fixes; a review round found
-    #       it unmarked. The count rises because the command became honest, not longer.
-    # 38 -> 39: PLAN-bench-study-adoption Phase 3 adds Step 5c, the `hm review_churn complexity`
-    # measurement, as its OWN call rather than chaining it onto 5b's churn line. Chaining would
-    # have cost no round trip, and that is exactly why it was rejected: a record-only telemetry
-    # failure must not be able to take the churn measurement down with it. The call is
-    # Production-gated, so a Side render is unchanged.
-    # 39 -> 33: PLAN-reviewer-lens-fanout-merge. The four core lenses shared `code-reviewer` and
-    # differed only by one brief sentence, so four dispatches bought four independent re-reads of
-    # one diff for four questions one agent can hold at once. They now leave in ONE `Task(`
-    # carrying all four. -3 in round 1 and -3 in Step C2, because ADR-011's rule counts every
-    # `Task(` individually and both blocks render from the same grouping function. The three
-    # domain lenses have their own agents and are untouched, so Production and Side both go from
-    # seven dispatches to four. Nothing else about the command moved: no call was added, removed
-    # or chained, and this is the whole of the -6.
-    # 34 → 35 (top-issues-2026-09, 2026-09-30): Step 3.4 runs `hm review_churn attribute` on the
-    # merged temp file before `persist-payload`, so `caused_by` is stamped by code instead of
-    # being "determined" in prose that never reached the payload (621/621 findings unstamped).
-    "review": 33,
-    # 6 → 7 (ai-native-sdlc-vs-intent-world, 2026-09-19): spec runs `hm spec_machine approve`
-    # twice as rendered calls (Step 0 `--exempt`, Step 5 human stamp) and, now judgment-gated,
-    # no longer renders the gate-first `autopilot_caps gate-blocked` line: +2 -1. Declared in
-    # that PLAN's `surface_allowance.round_trips.spec` and attributed in
-    # `work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md` §3.
-    # 7 -> 9 on 2026-09-20 (SPEC-plan-stage-absorption): Step 4.6 adds the `spec-validator`
-    # ledger emit and the cross-model `second_opinion_invoke`, both relocated from the
-    # removed plan stage. Attributed in work-docs/BASELINE-DELTA-plan-stage-absorption.md.
-    # 9 → 12 (same task, second fold): the relocated cross-model second-opinion main loop
-    # brings `second_opinion_invoke` and its fenced call sites with it.
-    # 12 → 10 (intent-surface-diet, 2026-10-04): Step 0.5 drops the second `hm intent status`
-    # read (the `rejected[]`/`revisits` check) and Step 4.9's `hm intent new --from-proposal`
-    # went with the step. Attributed in work-docs/BASELINE-DELTA-intent-surface-diet.md.
-    # 9 → 10 (2026-10-15, SPEC-hm-light-lane-s3a ADR-009): Step 5 stamps a light SPEC with no
-    # irreversible decisions `--exempt`. Attributed in
-    # work-docs/BASELINE-DELTA-hm-light-lane-s3a.md.
-    "spec": 10,
+    "metrics": 0,
+    "research": 0,
+    "spec": 1,
     "uninstall": 3,
-    # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.
-    # 15 → 12: SPEC-ci-derived-verification-plan replaces the four EXAMPLE gate commands
-    # (`pytest -q`, `ruff check`, `ruff format --check`, `mypy --strict src/`) with ONE
-    # `verification_plan commands` call that reads the project's CI. Net -3, not -4: the
-    # examples were four charged lines, the derivation is one. The stage still runs four
-    # gates — it now runs the four CI runs, which is the point. A DROP here is the expected
-    # shape for this change; a rise would mean the examples survived alongside the call.
-    # 12 → 14 on 2026-09-27, config half like `health`: this repo's `harness.yaml`
-    # `delegation.stages` gained `verify`, which renders Step 0.5's `hm wrapup_brief
-    # --stage verify` and `hm wrapup_receipt --stage verify`. The inline checks stay as the
-    # degraded path, so nothing was removed. Dropping `verify` from the list restores 12.
-    # 14 → 13 (top-issues-2026-09, 2026-09-30): Check 2's `verification_cache check` +
-    # `verification_plan commands` + self-attested `mark-pass` became one `verification_cache run`
-    # that runs the CI gates and writes the marker itself; `mark-pass` survives only inside the
-    # degraded (no-CI) block. -2 +1.
-    "verify": 11,
-    # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
-    # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
-    # not render. A config flip that adds a gate in two commands and removes an advisory in a
-    # third is the shape to expect here, not a uniform rise.
-    # 28 → 25: SPEC-ci-derived-verification-plan, same four-examples-to-one-call swap as
-    # `verify` above and the same net -3. Wrapup's own full-suite run is NOT lost — it is
-    # now whatever the project's CI test gate is, with `uv run pytest -x` kept as the
-    # degraded fallback, which is also what keeps
-    # `test_review_verify_uses_dep_map::test_the_out_of_scope_wrapup_full_run_survives`
-    # pointed at a real witness.
-    # 25 → 26: PLAN-token-efficiency-autopilot-ux-speed, review fix P1-4. The added call is
-    # `hm autopilot_ledger rollup --root <WT> --write`, immediately before the `wrapup_land`
-    # manifest that already staged `work-docs/BASELINE-ledger-rollup.md` as `--optional` and that
-    # nothing wrote — so ADR-002's "the aggregate survives a fresh clone" was unreachable on any
-    # harness where an operator did not type the CLI by hand. Named here, and attributed in
-    # `work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md` together with the matching
-    # `surface_allowance.round_trips` entries for `wrapup` and `hm-wrapup`.
-    #
-    # Worth knowing: round-trip counts now have THREE normative sites — this table,
-    # `surface_baseline.json`'s per-command `round_trips`, and an in-flight PLAN's
-    # `surface_allowance.round_trips`. The first two are frozen descriptions and the third is the
-    # declared delta between them, so they are not three copies of one rule; but a change here has
-    # to move all three, which is worth saying out loud rather than rediscovering.
-    # 28 → 29 (outcome-measure, 2026-09-17): 5.7's third answer-gated block runs
-    # `hm world outcome measure --all` once on "yes". Declared in that PLAN's
-    # `surface_allowance.round_trips` with the call and attributed in
-    # `work-docs/BASELINE-DELTA-outcome-measure.md` §3.
-    # 29 → 30 (assumption-entry-and-evidence-locator, 2026-09-18): 5.7's assumption block runs
-    # `hm world assume add` once on "new". Declared in that PLAN's `surface_allowance.round_trips`
-    # and attributed in `work-docs/BASELINE-DELTA-assumption-entry-and-evidence-locator.md` §3.
-    # 30 → 31 (observed-harness-gaps-salvage, 2026-09-19): the main loop runs
-    # `hm proposals summary` once at the head of `Steps 6 → 7.6`, so the backlog warning is
-    # printed where the operator sees it (Step 5.3 runs inside stage-delegate). Declared in that
-    # PLAN's `surface_allowance.round_trips`, attributed in its BASELINE-DELTA.
-    # 31 → 32 (mission-context-loop, 2026-09-19): 5.1.0 runs `hm memory_retrieve` once before
-    # the wiki write (search-before-write, fact-safe). Declared in that PLAN's
-    # `surface_allowance.round_trips` and attributed in
-    # `work-docs/BASELINE-DELTA-mission-context-loop.md` §3.
-    # 32 → 33 (ai-native-sdlc-vs-intent-world, 2026-09-19): `hm spec_machine approval-status`
-    # once before the land call (the DRI's acceptance check). Declared in that PLAN's
-    # `surface_allowance.round_trips.wrapup`, attributed in its BASELINE-DELTA §3.
-    # 33 → 34 (intent-layer-improvements, 2026-09-29): Step 5.7's record batch replaced the three
-    # answer-gated questions and adds one `hm intent metric record` call for the measure:false
-    # verdict item. Declared in that PLAN's `surface_allowance.round_trips.wrapup`, attributed
-    # in `work-docs/BASELINE-DELTA-intent-layer-improvements.md`.
-    # 34 → 33 (top-issues-2026-09, 2026-09-30): Step 2's check + plan + mark-pass → one
-    # `verification_cache run`, same change as verify. -2 +1.
-    "wrapup": 33,
+    "wrapup": 2,
 }
 
 
@@ -401,26 +98,6 @@ def test_the_codex_variant_is_counted_by_its_own_call_form(
     assert len(re.findall(r"^!", execute, re.M)) == 0
 
 
-def test_the_fan_out_is_counted_as_three_though_it_costs_one_turn(
-    surface: dict[str, dict[str, str]],
-) -> None:
-    """Stated as a test so the discrepancy cannot be quietly forgotten.
-
-    ADR-011's rule adds every `Task(` to the call count. Three `Explore` dispatches sent
-    in ONE message are one main-loop turn, so for the fan-out the rule OVER-counts. The
-    rule is not being changed mid-flight — moving the goalposts to make a phase pass is
-    exactly what ADR-011 forbids — but the Phase 7 receipt reports main-loop turns and
-    subagent turns separately (ADR-012) precisely because this proxy conflates them.
-
-    Until 0.63.0 the fan-out did not render in THIS repo: `targets` included `cursor`, and
-    Cursor read the Claude command file. The Cursor target is gone, so it renders here too.
-    """
-    body = surface[CLAUDE_VARIANT]["research"]
-    assert body.count('Task(subagent_type="Explore"') == 3
-    without = body.replace('Task(subagent_type="Explore"', "")
-    assert (
-        count_round_trips(body, CLAUDE_VARIANT) - count_round_trips(without, CLAUDE_VARIANT) == 3
-    ), "ADR-011 counts each of the three dispatches"
 
 
 # ── the three mutations ADR-011 requires this arm to fail under ────────────────
@@ -447,15 +124,15 @@ def _mutate_delete_one_call(text: str) -> str:
 def test_chaining_two_calls_onto_one_line_fails_the_floor(
     surface: dict[str, dict[str, str]],
 ) -> None:
-    body = surface[CLAUDE_VARIANT]["wrapup"]
+    body = surface[CLAUDE_VARIANT]["health"]
     mutated = count_round_trips(_mutate_chain_two_calls(body), CLAUDE_VARIANT)
-    assert mutated != _CLAUDE_ROUND_TRIPS["wrapup"]
+    assert mutated != _CLAUDE_ROUND_TRIPS["health"]
 
 
 def test_deleting_one_call_fails_the_floor(surface: dict[str, dict[str, str]]) -> None:
-    body = surface[CLAUDE_VARIANT]["verify"]
+    body = surface[CLAUDE_VARIANT]["health"]
     mutated = count_round_trips(_mutate_delete_one_call(body), CLAUDE_VARIANT)
-    assert mutated != _CLAUDE_ROUND_TRIPS["verify"]
+    assert mutated != _CLAUDE_ROUND_TRIPS["health"]
 
 
 def test_moving_a_call_between_commands_fails_the_total(
@@ -464,6 +141,6 @@ def test_moving_a_call_between_commands_fails_the_total(
     """Per-command equality already catches this; the total is the arm that catches it
     when someone re-baselines one command and forgets the other."""
     bodies = dict(surface[CLAUDE_VARIANT])
-    bodies["verify"] = _mutate_delete_one_call(bodies["verify"])
+    bodies["health"] = _mutate_delete_one_call(bodies["health"])
     total = sum(count_round_trips(b, CLAUDE_VARIANT) for b in bodies.values())
     assert total != sum(_CLAUDE_ROUND_TRIPS.values())

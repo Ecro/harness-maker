@@ -4,7 +4,7 @@
 
 ## 워크플로우
 
-{% if config.loop.enabled %}stage 연결은 `/hm:loop` 또는 autopilot 이 담당합니다. 융합 워크플로우 명령은 없습니다. <!-- @hm:axis-removed -->{% else %}stage 연결은 autopilot 이 담당합니다. 융합 워크플로우 명령은 없습니다. `/hm:loop` 는 꺼져 있습니다 (켜려면 `.claude/harness.yaml` 에 `loop.enabled: true` 를 설정하고 `/hm:make` 를 실행하세요). <!-- @hm:axis-removed -->{% endif %}
+stage 는 4개입니다: `/hm:research` (선택), `/hm:spec`, `/hm:execute`, `/hm:wrapup`. 각 stage 는 끝나면 멈추고, 다음 stage 는 직접 입력합니다. 융합 워크플로우 명령은 없습니다. <!-- @hm:axis-removed -->
 
 ## 캐싱
 

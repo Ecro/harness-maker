@@ -24,9 +24,15 @@ from tempfile import mkdtemp
 import pytest
 
 from harness_maker.interview import interview
-from harness_maker.models import LoopConfig, Preset, ProjectProfile, Target
+from harness_maker.models import (
+    DelegationConfig,
+    Preset,
+    ProjectProfile,
+    SecondOpinionConfig,
+    Target,
+)
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
-from harness_maker.synthesize import synthesize
+from harness_maker.synthesize import LENS_REVIEWERS, synthesize
 
 _MATRIX = Path(__file__).resolve().parents[2] / "work-docs" / "MATRIX-native-redundancy.md"
 _VERDICTS = ("keep", "retire", "merge")
@@ -37,10 +43,13 @@ def _rendered_root() -> Path:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
     answers.targets = [Target.CLAUDE_CODE]
-    # The matrix documents every shipped subject, including the loop commands, so
-    # this render must not use the loop-off fresh-install default (SPEC-loop-opt-in
-    # AC-006).
-    answers.loop = LoopConfig(enabled=True)
+    # The matrix documents every shipped subject, so every opt-in that adds one is on (0.64.0:
+    # lens reviewers with `reviewers.fanout`, the second-opinion pair and its skill with
+    # `second_opinion.models`, the stage delegate with `delegation.stages`).
+    answers.reviewers = {"installed": ["code-reviewer", *LENS_REVIEWERS], "enabled": ["code-reviewer"]}
+    answers.reviewers_fanout = True
+    answers.second_opinion = SecondOpinionConfig(models=["codex"])
+    answers.delegation = DelegationConfig(stages=["wrapup"])
     bp = synthesize(profile, answers, preset=Preset.PRODUCTION)
     root = Path(mkdtemp(prefix="hm-matrix-"))
     render(bp, root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
@@ -85,14 +94,14 @@ def _subject_key(kind: str, name: str) -> str:
 def test_the_inventory_is_not_empty() -> None:
     """Positive control — subset checks over an empty inventory hold vacuously."""
     inv = inventory()
-    assert len(inv["command"]) >= 10
+    assert len(inv["command"]) >= 9  # nine since 0.64.0
     assert len(inv["agent"]) >= 10
     assert len(inv["skill"]) >= 8
 
 
 def test_the_matrix_parsed_into_rows() -> None:
     """A parser that silently matched nothing would make every check below vacuous."""
-    assert len(matrix_rows()) >= 40
+    assert len(matrix_rows()) >= 25  # 43 before 0.64.0 retired 15 subjects
 
 
 @pytest.mark.parametrize("kind", ["command", "agent", "skill"])

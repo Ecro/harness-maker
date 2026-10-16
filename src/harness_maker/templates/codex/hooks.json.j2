@@ -9,20 +9,6 @@
 -#}
 {
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.telemetry", "timeout": 5}
-        ]
-      },
-      {
-        "matcher": "Write|Edit|MultiEdit|apply_patch",
-        "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.post_write_reminder", "timeout": 5}
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -48,8 +34,7 @@
       {
         "hooks": [
           {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.sessionstart_drift"},
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.sessionid_envfile"},
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_autoarm"}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.sessionid_envfile"}
         ]
       }
     ],

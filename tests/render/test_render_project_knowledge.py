@@ -161,8 +161,9 @@ _WRAPUP_PATHS = {
 
 
 def _section_51(wrapup: str) -> str:
-    start = wrapup.index("#### 5.1 ")
-    return wrapup[start : wrapup.index("#### 5.2 ", start)]
+    """The memory step (wrapup 5.1 until 0.64.0 folded 5.1–5.6 into one "Step 5 — Memory")."""
+    start = wrapup.index("## Step 5 — Memory")
+    return wrapup[start : wrapup.index("\n## ", start + 1)]
 
 
 @pytest.mark.parametrize("preset", [Preset.PRODUCTION, Preset.SIDE], ids=["production", "side"])
@@ -183,7 +184,7 @@ def test_ac_006_wrapup_51_searches_before_write(
     assert "memory_retrieve" in section_51, "5.1 has no search step"
     assert section_51.index("memory_retrieve") < section_51.index("upsert-wiki")
     assert "reuse" in section_51
-    assert "never reuse a [wiki:fact] slug" in section_51
+    assert "reuse a found slug unless it is a `[wiki:fact]`" in section_51
 
 
 # ── AC-007 ───────────────────────────────────────────────────────────────────
@@ -232,7 +233,12 @@ def test_new_slug_is_checked_for_an_existing_heading(preset: Preset, variant: st
     files = _render(preset, TARGET_SETS["all"])
     wrapup = files[_WRAPUP_PATHS[variant]]
     skill_paths = [SKILL] + ([CODEX_SKILL] if variant == "codex" else [])
-    for text in [_section_51(wrapup)] + [files[p] for p in skill_paths]:
+    # 0.64.0's wrapup states the rule in one clause; the stale-copy half renders only with a
+    # worktree, where `<BASE>` and `<WT>` differ.
+    section = _section_51(wrapup)
+    assert "a new one must match no `## [wiki:` heading (Grep tool" in section
+    assert ("`<WT>` copy is stale" in section) is ("<WT>" in wrapup)
+    for text in [files[p] for p in skill_paths]:
         assert "check the exact slug" in text
         assert "Grep tool" in text
         assert "## [wiki:" in text

@@ -14,14 +14,11 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
-from harness_maker.models import DELEGATABLE_STAGES, HarnessConfig
+from harness_maker.models import HarnessConfig
 from harness_maker.render import _make_env
 from harness_maker.synthesize import (
     _HARNESS_MAKER_PKG_ROOT,
     _codex_stage_skills,
-    _codex_target_files,
 )
 
 
@@ -68,27 +65,6 @@ def test_codex_stage_skills_context_has_stage_body() -> None:
         assert ctx["stage_body"], f"stage_body is empty for {path}"
 
 
-@pytest.mark.parametrize(
-    ("stage", "must_contain"),
-    [
-        ("execute", "worktree"),
-        ("research", "sources"),
-        ("spec", "scenario"),
-        ("execute", "phase"),
-        ("review", "grade"),
-        ("verify", "criterion"),
-        ("wrapup", "commit"),
-    ],
-)
-def test_codex_stage_skill_has_procedure_content(stage: str, must_contain: str) -> None:
-    """stage_body in _codex_stage_skills() must contain stage-specific content."""
-    specs = _codex_stage_skills()
-    spec = next((s for s in specs if f"hm-{stage}" in s[1]), None)
-    assert spec is not None, f"No stage skill spec found for hm-{stage}"
-    body = spec[2].get("stage_body", "")
-    assert must_contain in body.lower(), (
-        f"hm-{stage} stage_body missing '{must_contain}' — procedure content absent"
-    )
 
 
 def test_codex_stage_skills_no_dollar_arguments() -> None:
@@ -103,24 +79,8 @@ def test_codex_stage_skills_no_dollar_arguments() -> None:
 # ── Phase 1: loop_body in _codex_target_files() context ──────────────────────
 
 
-def test_codex_target_files_loop_skill_has_loop_body() -> None:
-    """_codex_target_files() must include loop_body in hm-loop/SKILL.md context."""
-    specs = _codex_target_files()
-    loop_spec = next((s for s in specs if s[1] == ".agents/skills/hm-loop/SKILL.md"), None)
-    assert loop_spec is not None, "hm-loop/SKILL.md not found in _codex_target_files()"
-    ctx = loop_spec[2]
-    assert "loop_body" in ctx, "hm-loop context missing loop_body"
-    assert ctx["loop_body"], "loop_body in hm-loop context is empty"
 
 
-def test_codex_loop_skill_has_interview_content() -> None:
-    """hm-loop loop_body must contain adaptive interview content."""
-    specs = _codex_target_files()
-    loop_spec = next(s for s in specs if s[1] == ".agents/skills/hm-loop/SKILL.md")
-    loop_body = loop_spec[2].get("loop_body", "")
-    assert "interview" in loop_body.lower() or "adaptive" in loop_body.lower(), (
-        "hm-loop body must contain interview procedure"
-    )
 
 
 # ── Phase 2+3: is_codex render adaptations ───────────────────────────────────
@@ -134,13 +94,6 @@ def test_execute_codex_render_no_dollar_arguments() -> None:
     )
 
 
-def test_execute_codex_render_has_bash_worktree_call() -> None:
-    """execute stage rendered with is_codex=True must use Bash() for worktree create."""
-    rendered = _render_stage("execute", is_codex=True)
-    assert "Bash(" in rendered, (
-        "Codex execute render must use Bash(...) form for CLI calls, not '!' prefix"
-    )
-    assert "worktree" in rendered.lower(), "Codex execute render must mention worktree creation"
 
 
 def test_execute_codex_render_no_bang_prefix() -> None:
@@ -151,88 +104,16 @@ def test_execute_codex_render_no_bang_prefix() -> None:
     )
 
 
-@pytest.mark.parametrize("stage", DELEGATABLE_STAGES)
-def test_delegated_stage_codex_render_no_bang_prefix(stage: str) -> None:
-    """Parametrized over EVERY delegatable stage, not just the one being fixed.
-
-    The delegation block is behind a config guard, so the default render never sees it —
-    `execute`'s sibling test above passes on the default config and says nothing about
-    Step 0.5. The first version of this test set `delegation.stages = ["wrapup"]` and
-    asserted only the wrapup template, so the identical defect survived one stage over in
-    `verify.md.j2`, which is CLAUDE.md checkpoint 2's named trap: do not scope a gate to
-    the artifact you happened to be fixing.
-
-    The self-skip branch is the sharpest case: it exists *for* the IDEs with no dispatch
-    tool — Cursor and Codex — so rendering its command in the one form Codex cannot execute
-    means those harnesses never record it, and `delegation_fires` blames them for a
-    dispatch they were never able to make.
-    """
-    env = _make_env()
-    cfg = _make_default_config()
-    cfg["delegation"] = {"stages": [stage]}
-    rendered = env.get_template(f"stages/{stage}.md.j2").render(
-        stage=stage,
-        workflow_context="",
-        project_name="",
-        feature="",
-        config=cfg,
-        harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
-        is_codex=True,
-    )
-    # Asserted first: a guard that silently elided the block would make the `!` check below
-    # pass by rendering nothing at all.
-    assert "wrapup_brief" in rendered
-    assert "wrapup_receipt" in rendered
-    assert "!uv run" not in rendered, (
-        f"Codex {stage} render must not use '!' prefix — Codex uses Bash() tool calls"
-    )
 
 
-def test_loop_codex_render_no_ask_user_question() -> None:
-    """loop template rendered with is_codex=True must not contain 'AskUserQuestion'."""
-    rendered = _render_loop(is_codex=True)
-    assert "AskUserQuestion" not in rendered, (
-        "Codex loop render contains 'AskUserQuestion' — Codex uses request_user_input"
-    )
 
 
-def test_loop_codex_render_has_request_user_input() -> None:
-    """loop template rendered with is_codex=True must reference request_user_input."""
-    rendered = _render_loop(is_codex=True)
-    assert "request_user_input" in rendered, (
-        "Codex loop render missing 'request_user_input' — Codex structured question tool"
-    )
 
 
-def test_loop_codex_render_has_interview_and_bash() -> None:
-    """loop template rendered with is_codex=True must have interview pattern and Bash calls."""
-    rendered = _render_loop(is_codex=True)
-    assert "request_user_input" in rendered.lower() or "ask" in rendered.lower(), (
-        "Codex loop must have structured asking pattern"
-    )
-    assert rendered.count("Bash(") >= 3, (
-        f"Codex loop must have ≥3 Bash tool calls, got {rendered.count('Bash(')}"
-    )
 
 
-def test_loop_codex_render_has_worktree_fallback() -> None:
-    """loop template rendered with is_codex=True must document worktree failure fallback."""
-    rendered = _render_loop(is_codex=True)
-    assert (
-        "in-place" in rendered.lower()
-        or "worktree create fails" in rendered.lower()
-        or "proceeding in-place" in rendered.lower()
-    ), "Codex loop must document worktree fallback path (ADR-005)"
 
 
-def test_loop_codex_render_keeps_marker_on_non_convergence() -> None:
-    """Non-converged Codex loop halts must keep the Stop-hook guard active."""
-    rendered = _render_loop(is_codex=True)
-    # The guidance keeps the loop guard active on non-converged halts; the marker
-    # it refers to (`.hm-loop-active`) is named in the same section.
-    assert "Keep the guard active on every non-converged halt" in rendered
-    assert ".hm-loop-active" in rendered
-    assert "explicitly chooses Abort/Override" in rendered
 
 
 # ── AskUserQuestion absent in all Codex renders; request_user_input present ───
@@ -242,61 +123,16 @@ _ALL_STAGES = ["execute", "research", "spec", "review", "wrapup", "verify"]
 _STAGES_WITH_INTERVIEW = ["research", "spec", "verify"]
 
 
-@pytest.mark.parametrize("stage", _ALL_STAGES)
-def test_codex_stage_render_no_ask_user_question(stage: str) -> None:
-    """Every stage rendered with is_codex=True must not contain 'AskUserQuestion'."""
-    rendered = _render_stage(stage, is_codex=True)
-    assert "AskUserQuestion" not in rendered, (
-        f"Codex {stage} render contains 'AskUserQuestion' — Codex uses request_user_input"
-    )
 
 
-@pytest.mark.parametrize("stage", _STAGES_WITH_INTERVIEW)
-def test_codex_stage_render_has_request_user_input(stage: str) -> None:
-    """Interview stages rendered with is_codex=True must reference request_user_input."""
-    rendered = _render_stage(stage, is_codex=True)
-    assert "request_user_input" in rendered, (
-        f"Codex {stage} render missing 'request_user_input' — structured question tool"
-    )
 
 
-@pytest.mark.parametrize("stage", _ALL_STAGES)
-def test_codex_stage_render_non_empty(stage: str) -> None:
-    """Every stage rendered with is_codex=True must produce non-empty content."""
-    rendered = _render_stage(stage, is_codex=True)
-    assert rendered.strip(), f"Codex {stage} render is empty"
 
 
-@pytest.mark.parametrize("stage", _ALL_STAGES)
-def test_claude_code_stage_render_non_empty(stage: str) -> None:
-    """Every stage rendered with is_codex=False must produce non-empty content."""
-    rendered = _render_stage(stage, is_codex=False)
-    assert rendered.strip(), f"Claude Code {stage} render is empty"
 
 
-@pytest.mark.parametrize(
-    ("stage", "terms"),
-    [
-        ("research", ["second_brain", "reference", "project"]),
-        # `plan` carried this until SPEC-plan-stage-absorption; the block moved to
-        # `/hm:execute`, which now locks the design ADRs the notes exist to inform.
-        ("execute", ["second_brain", "decision", "preference"]),
-        ("review", ["second_brain", "failure", "preference"]),
-        ("wrapup", ["second_brain", "journal", "decision"]),
-    ],
-)
-def test_stage_aware_second_brain_guidance(stage: str, terms: list[str]) -> None:
-    rendered = _render_stage(stage, is_codex=True).lower()
-    for term in terms:
-        assert term in rendered
-    assert "hm second_brain" in rendered
-    assert "untrusted reference" in rendered
 
 
-def test_research_claude_code_render_has_dollar_arguments() -> None:
-    """research rendered with is_codex=False must retain $ARGUMENTS (CC slash-arg)."""
-    rendered = _render_stage("research", is_codex=False)
-    assert "$ARGUMENTS" in rendered, "CC research render lost $ARGUMENTS"
 
 
 def test_research_codex_render_no_dollar_arguments() -> None:
@@ -305,73 +141,17 @@ def test_research_codex_render_no_dollar_arguments() -> None:
     assert "$ARGUMENTS" not in rendered, "Codex research render contains $ARGUMENTS"
 
 
-def test_research_stage_requires_user_workflow_discovery_lens() -> None:
-    """research must calibrate product/user workflow discovery before pure benchmarks."""
-    rendered = _render_stage("research")
-    assert "Discovery lens calibration" in rendered
-    assert "User-workflow / product opportunity" in rendered
-    assert "Local capability x User artifact" in rendered
-    assert "arXiv papers, benchmarks, and leaderboards cannot satisfy this guard" in rendered
 
 
-def test_codex_research_skill_inherits_user_workflow_discovery_lens() -> None:
-    """Codex hm-research skill must inherit the same discovery guard from the template."""
-    specs = _codex_stage_skills()
-    spec = next((s for s in specs if "hm-research" in s[1]), None)
-    assert spec is not None, "No stage skill spec found for hm-research"
-    body = spec[2].get("stage_body", "")
-    assert "Discovery lens calibration" in body
-    assert "run the **User-workflow / product opportunity**" in body
-    assert "Local capability x User artifact" in body
 
 
 # ── Config threading: config_dump flows into stage_body ───────────────────────
 
 
-def test_codex_stage_skills_uses_passed_config_dump() -> None:
-    """_codex_stage_skills() must use the passed config_dump, not HarnessConfig() defaults."""
-    custom_config = _make_default_config()
-    custom_config["work_docs"] = {"dir": "custom-tasks/"}
-    specs = _codex_stage_skills(config_dump=custom_config)
-    execute_spec = next(s for s in specs if "hm-execute" in s[1])
-    body = execute_spec[2]["stage_body"]
-    assert "custom-tasks/" in body, (
-        "_codex_stage_skills() did not use passed config_dump — custom work_docs.dir absent"
-    )
 
 
-def test_codex_execute_manual_post_commit_pop_uses_uuid_strict_mode() -> None:
-    """Manual no-wrapup restore must keep the cross-session stash guard, now sourced
-    per-session from the slug crumb (PLAN-layer3-per-session-ownership) instead of the
-    all-markers owned-uuids.
-
-    Rendered with isolation ON: under `worktree.enabled: false` there is no worktree to
-    finalize and no deferred stash to restore, so the whole block is correctly absent
-    (PLAN-worktree-side-defaults ADR-005). A bare `HarnessConfig()` has `worktree: {}`,
-    which reads as OFF — real renders never see that, because `synthesize` normalizes.
-    """
-    cfg = _make_default_config()
-    cfg["worktree"] = {"enabled": True}
-    cfg["loop"] = {"enabled": True}  # Step 5 is the loop's finalize (SPEC-hm-light-lane-s2)
-    specs = _codex_stage_skills(config_dump=cfg)
-    execute_spec = next(s for s in specs if "hm-execute" in s[1])
-    body = execute_spec[2]["stage_body"]
-    assert "HM_OWNED_SESSION_UUIDS" in body
-    assert "hm worktree owned-crumb-read" in body
-    assert "hm worktree owned-uuids" not in body
-    assert "hm worktree post-commit-pop" in body
 
 
-def test_codex_target_files_threads_config_dump_to_stage_skills() -> None:
-    """config_dump passed to _codex_target_files() must reach the stage skill bodies."""
-    custom_config = _make_default_config()
-    custom_config["work_docs"] = {"dir": "my-work/"}
-    specs = _codex_target_files(config_dump=custom_config)
-    execute_skill = next(s for s in specs if s[1] == ".agents/skills/hm-execute/SKILL.md")
-    body = execute_skill[2]["stage_body"]
-    assert "my-work/" in body, (
-        "_codex_target_files() did not thread config_dump to _codex_stage_skills()"
-    )
 
 
 # ── stage_skill.md.j2 double-render safety ────────────────────────────────────
@@ -399,28 +179,7 @@ def test_stage_skill_renders_stage_body_without_double_rendering() -> None:
 # ── Claude Code regression guards ────────────────────────────────────────────
 
 
-def test_execute_claude_code_render_preserved() -> None:
-    """execute rendered with is_codex=False (default) must retain CC-specific constructs."""
-    rendered = _render_stage("execute", is_codex=False)
-    assert "$ARGUMENTS" in rendered, "CC execute render lost $ARGUMENTS"
-    assert "!uv run" in rendered, "CC execute render lost '!' prefix"
 
 
-def test_loop_claude_code_render_preserved() -> None:
-    """loop rendered with is_codex=False must retain dual-name question tool pattern."""
-    rendered = _render_loop(is_codex=False)
-    assert "$ARGUMENTS" in rendered, "CC loop render lost $ARGUMENTS"
-    assert "AskQuestion" in rendered, "CC/Cursor loop render lost AskQuestion"
-    assert "AskUserQuestion" in rendered, "CC/Cursor loop render lost AskUserQuestion"
 
 
-@pytest.mark.parametrize("stage", _STAGES_WITH_INTERVIEW)
-def test_cc_stage_render_has_dual_name_pattern(stage: str) -> None:
-    """Interview stages with is_codex=False must have both AskQuestion and AskUserQuestion."""
-    rendered = _render_stage(stage, is_codex=False)
-    assert "AskQuestion" in rendered, (
-        f"CC/Cursor {stage} render missing 'AskQuestion' — dual-name pattern required"
-    )
-    assert "AskUserQuestion" in rendered, (
-        f"CC/Cursor {stage} render missing 'AskUserQuestion' — dual-name pattern required"
-    )

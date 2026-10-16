@@ -14,16 +14,12 @@ import pytest
 from harness_maker.render import _extract_source_communication_variant, _make_env
 
 _ALL_AGENTS: list[str] = [
-    "autoloop-coder",
     "code-reviewer",
     "concurrency-reviewer",
     "consensus-arbiter",
-    "executor",
     "performance-reviewer",
     "spec-validator",
-    "security-auditor",
     "security-reviewer",
-    "stuck",
     "test-reviewer",
     "ux-reviewer",
 ]
@@ -89,6 +85,10 @@ def _render_body(name: str) -> str:
 # 5 reviewer entries below are the post-Phase-C hashes; the remaining 7
 # agents keep their pre-refactor hashes.
 _EXPECTED_SHA256: dict[str, str] = {
+    # Re-pinned 2026-10-16 (SPEC-hm-overhaul-p1, 0.64.0). THREE entries: `code-reviewer` became
+    # the one reviewer `/hm:execute` Step 6 runs (AC-004 budget <= 3,000 chars, D-1), and
+    # `consensus-arbiter` / `spec-validator` lost their references to the retired review and
+    # verify stages. The retired agents' pins were removed with their templates.
     # Re-pinned 2026-08-20 (review-scope-and-oracle). FIVE entries — exactly the agents that
     # include `_partials/hard_rules.md.j2`, whose `Diff scope` rule was rewritten from location
     # ("outside the changed lines") to causation ("does the change make it reachable"), and lost
@@ -127,14 +127,13 @@ _EXPECTED_SHA256: dict[str, str] = {
     # `_render_agent` uses a no-codex config, so these 3 revert to their
     # pre-0.28.5 hashes. The codex-ENABLED tools:Bash path is asserted in
     # test_render_codex_permission_injection.py. Pre-bump hashes in git history.
-    "autoloop-coder": "093210f0b4da3e0d0431c7fa4a0833f19f320d04ee349989fd8b5b5882483932",
     # PLAN-probe-envelope-contract Phase 2: these four moved BACK, because the
     # `return_envelope.md.j2` include they gained in PLAN-bench-study-adoption Phase 4 was
     # removed with the partial itself. Still EXACTLY four — the agents
     # `conditional_router.LENS_DISPATCH` names as backing the seven lenses — and that the same
     # four moved, and only those four, is the check worth making: a fifth would mean the
     # deletion reached past the include.
-    "code-reviewer": "d09023357e53929d9eee5059ecb624a0f502115da3f1dda7b00c4252de2e5169",
+    "code-reviewer": "3f6ccc632fe1a1563601c10b148bbf6d3264583aef81ac237d00e812b14b958e",
     "concurrency-reviewer": "ffc8b5f6bcc43dd33fc6353e87797216a5c8eb39494e8b762beaab50f31ff359",
     # consensus-arbiter + spec-validator (was plan-validator): hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.
@@ -152,19 +151,17 @@ _EXPECTED_SHA256: dict[str, str] = {
     # reconciled to forbid cross-tier severity resolution, and the user-extension
     # comment reworded to forbid tier bridging. Body change outside the codex
     # conditional, so the disabled-config hash moves. Pre-bump hash in git history.
-    "consensus-arbiter": "f7497cebbbde53b777c264a596619c4f436534a0b471227f9baadcff779a67df",
+    "consensus-arbiter": "92f36c7ef2fe875fe0f168f3af470ffc1caccaae03710879ba2163a9d04263ea",
     # executor: re-pinned 2026-06-03 (PLAN-techspec-audit F61). The description
     # + body claimed a runtime-enforced "never writes to repo root" boundary that
     # Claude Code does NOT enforce (subagent-frontmatter permissions are not
     # enforced — see CLAUDE.md §보안/권한). Reworded to "by convention, prompt-
     # level guidance, not runtime-enforced". Pre-bump hash in git history.
-    "executor": "0a4a5e34f5b7d985eab1b0b8b2ee79d898d3d95ddd4d68eea051536939e96874",
     "performance-reviewer": "869fa3131ffa6cae4be84232deca0174df7d9cd973cc203499f13f75977771e6",
     # spec-validator REPLACES plan-validator (SPEC-plan-stage-absorption ADR-004): relocated
     # to /hm:spec, re-scoped to ACs / circular oracles / implied-but-unlisted irreversible
     # decisions / scope boundary, single-pass and never-blocking. New body, new pin.
-    "spec-validator": "53421574d8ccc9bd63e6769225d3c8acae5ecac7e71e7757ddb9109f4e0c3662",
-    "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",
+    "spec-validator": "6be1f52d52461127170f7c29f0dbc02eeda6f8585b9ff04a90ee94c9be0ddfbd",
     # `return_envelope` include removed — see the code-reviewer note above.
     "security-reviewer": "aadcaf6606ce6b7483f4994f190c919cfba8e9a32d987a4a046e2d9491d19c0e",
     # stuck re-pinned 2026-09-20 (SPEC-plan-stage-absorption): its trigger list and two
@@ -187,7 +184,6 @@ _EXPECTED_SHA256: dict[str, str] = {
     # PATH that could not exist. Step 5 now returns the note inline. Found by four review lenses
     # independently, none of which was looking at this file. Body change outside the codex
     # conditional. Pre-bump hash in git history.
-    "stuck": "8bc2df773b8785717e392b39cdf56ca4e11dc6fcc633a3e57c2149cee4cd0945",
     # test-reviewer re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 2). Two
     # rules changed, both because Phase A.5 now runs three lens-scoped instances of this agent:
     # (a) `passing_tests[]` was declared FROZEN, which conflicted with the caller's merge rule —

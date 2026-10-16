@@ -876,7 +876,7 @@ def test_bound_ids_guard_sees_real_bindings() -> None:
     assert not _ids_resolves("tests/unit/no_such_file.py::test_x")
     assert not _ids_resolves("tests/unit/hooks/test_loop_gate.py::test_found_in_cwd")
     assert _ids_resolves("tests/unit/hooks/test_loop_gate.py::TestFindMarker::test_found_in_cwd")
-    assert set(_ids_known_dead()) == {"pr-c-cursor", "pre-existing"}
+    assert set(_ids_known_dead()) == {"pr-c-cursor", "pre-existing", "pr-s-stage-collapse"}
 
 
 def test_every_bound_test_id_resolves() -> None:

@@ -45,7 +45,13 @@ def _render_reviewer(name: str, verbosity: str) -> str:
     )
 
 
-@pytest.mark.parametrize("name", REVIEWERS)
+#: 0.64.0 (SPEC-hm-overhaul-p1 D-1): `code-reviewer` is the one default reviewer under an AC-004
+#: budget of 3,000 chars, so it carries its own compact severity and output rules instead of the
+#: four shared partials. The lens reviewers keep them.
+LENSES = [n for n in REVIEWERS if n != "code-reviewer"]
+
+
+@pytest.mark.parametrize("name", LENSES)
 def test_each_reviewer_includes_all_four_partials(name: str) -> None:
     body = _render_reviewer(name, "standard")
     assert "## Severity Rubric" in body
@@ -66,7 +72,7 @@ def test_terse_verbosity_drops_p2_p3_and_reasoning(name: str) -> None:
     assert "Reasoning Template" not in body
 
 
-@pytest.mark.parametrize("name", REVIEWERS)
+@pytest.mark.parametrize("name", LENSES)
 def test_full_verbosity_adds_p3_and_rationale(name: str) -> None:
     body = _render_reviewer(name, "full")
     assert "P3" in body

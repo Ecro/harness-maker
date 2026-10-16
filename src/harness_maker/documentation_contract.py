@@ -96,6 +96,7 @@ def _version_values(root: Path) -> dict[str, str]:
 
 def default_source_contract(root: Path) -> SourceContract:
     """Build the contract from live enums/templates and the reviewed mechanism fixture."""
+    from harness_maker.synthesize import _ATOMIC_STAGES  # local: synthesize is heavy
 
     versions = _version_values(root)
     agents = tuple(
@@ -115,7 +116,9 @@ def default_source_contract(root: Path) -> SourceContract:
     mechanism_data = json.loads((root / MECHANISM_FIXTURE).read_text(encoding="utf-8"))
     return SourceContract(
         version=versions["pyproject.toml"],
-        pipeline=tuple(stage.value for stage in AutonomyConfig().pipeline),
+        # The stages that render (0.64.0), not `AutonomyConfig().pipeline`: that default still
+        # names `review` / `verify` for the retired autopilot library and is inert.
+        pipeline=tuple(_ATOMIC_STAGES),
         agents=agents,
         skills=skills,
         mechanisms=tuple(str(item) for item in mechanism_data["ids"]),

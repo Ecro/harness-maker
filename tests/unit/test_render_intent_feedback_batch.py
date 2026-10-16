@@ -118,15 +118,6 @@ def _wrapup_regions(preset: Preset, host: str) -> tuple[str, str]:
     return delegated, inline
 
 
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_wrapup_delegated_path_resumes_at_5_7(preset: Preset, host: str) -> None:
-    delegated, inline = _wrapup_regions(preset, host)
-    # Delegation is on in this render, so BOTH regions must exist: an empty one would mean a
-    # heading rename silently dropped a path from the check.
-    assert delegated
-    assert inline
-    assert resumes_at_5_7(delegated)
-    assert resumes_at_5_7(inline)
 
 
 def test_resume_predicate_controls() -> None:
@@ -187,26 +178,10 @@ def record_batch_ok(section: str, host: str) -> bool:
     return all(c in block for c in _CODEX_CLAUSES) and "multiSelect" not in block
 
 
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_wrapup_5_7_record_batch(preset: Preset, host: str) -> None:
-    section = _step_5_7(preset, host)
-    assert record_batch_ok(section, host)
-    assert section.count("<!-- @hm:answer-gated:") == 2
 
 
-@pytest.mark.parametrize("clause", [*_RECORD_CLAUSES, "multiSelect", "at most 16 items"])
-def test_record_batch_controls_claude(clause: str) -> None:
-    section = _step_5_7(Preset.PRODUCTION, "claude")
-    block = _gated(section, "record-batch")
-    assert not record_batch_ok(section.replace(block, _without(block, clause)), "claude")
 
 
-@pytest.mark.parametrize("clause", _CODEX_CLAUSES)
-def test_record_batch_controls_codex(clause: str) -> None:
-    section = _step_5_7(Preset.PRODUCTION, "codex")
-    block = _gated(section, "record-batch")
-    assert not record_batch_ok(section.replace(block, _without(block, clause)), "codex")
-    assert not record_batch_ok(section.replace(block, block + " multiSelect"), "codex")
 
 
 _VERDICT_CLAUSES = (
@@ -226,19 +201,8 @@ def verdict_item_ok(section: str) -> bool:
     return all(c in block for c in _VERDICT_CLAUSES)
 
 
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_wrapup_5_7_judgment_verdict_item(preset: Preset, host: str) -> None:
-    assert verdict_item_ok(_step_5_7(preset, host))
 
 
-@pytest.mark.parametrize("clause", _VERDICT_CLAUSES)
-def test_verdict_item_controls(clause: str) -> None:
-    section = _step_5_7(Preset.PRODUCTION, "claude")
-    block = _gated(section, "record-batch")
-    mutated = section.replace(block, _without(block, clause))
-    assert not verdict_item_ok(mutated)
-    # Moving the clause outside the gated block must also fail.
-    assert not verdict_item_ok(mutated + "\n" + clause)
 
 
 _CLOSE_CLAUSES = (
@@ -269,29 +233,12 @@ def close_after_readback(section: str) -> bool:
     return all(c in block for c in _CLOSE_CLAUSES)
 
 
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_wrapup_5_7_close_after_readback(preset: Preset, host: str) -> None:
-    assert close_after_readback(_step_5_7(preset, host))
 
 
 def _whole(section: str, name: str, mark: str) -> str:
     return mark + _gated(section, name) + "<!-- /@hm:answer-gated -->"
 
 
-def test_close_after_readback_controls() -> None:
-    section = _step_5_7(Preset.PRODUCTION, "claude")
-    close = _whole(section, "intent-close", _CLOSE_MARK)
-    record = _whole(section, "record-batch", _RECORD_MARK)
-    # Close hoisted above the record block, even with the readback phrase left in a preamble.
-    hoisted = section.replace(close, "")
-    hoisted = hoisted.replace(record, _READBACK + "\n" + close + record)
-    assert not close_after_readback(hoisted)
-    # Readback removed from the record block but kept elsewhere in the section.
-    rb = _gated(section, "record-batch")
-    assert not close_after_readback(section.replace(rb, _without(rb, _READBACK)) + _READBACK)
-    block = _gated(section, "intent-close")
-    for clause in _CLOSE_CLAUSES:
-        assert not close_after_readback(section.replace(block, _without(block, clause)))
 
 
 # ── AC-007 ───────────────────────────────────────────────────────────────────

@@ -16,11 +16,8 @@ import re
 import subprocess
 from pathlib import Path
 
-import pytest
-
 from harness_maker import wrapup_brief as wb
 from harness_maker import wrapup_receipt as wr
-from harness_maker.context_lint import _count_body_lines
 from harness_maker.models import (
     DelegationConfig,
     InterviewAnswers,
@@ -114,17 +111,6 @@ def _memory(base: Path, *, record: bool = True) -> None:
 # ------------------------------------------------------------------ brief, generalised
 
 
-def test_a_verify_brief_derives_from_a_task_worktree(tmp_path: Path) -> None:
-    """The brief is stage-parameterised rather than duplicated: every derived field is
-    identical, and a second module would be two things to keep in step."""
-    wt = _task_repo(tmp_path)
-
-    brief, verdict = wb.derive_brief(wt, stage="verify")
-
-    assert verdict.ok is True, verdict
-    assert brief is not None
-    assert brief.stage == "verify"
-    assert brief.slug == "my-task"
 
 
 def test_a_stage_that_is_not_delegatable_is_still_rejected(tmp_path: Path) -> None:
@@ -297,81 +283,15 @@ def test_a_check_verdict_outside_the_enum_is_rejected() -> None:
 # ------------------------------------------------------------------ render
 
 
-def test_the_default_verify_render_carries_no_dispatch(tmp_path: Path) -> None:
-    body = _verify(tmp_path)
-
-    assert "stage-delegate" not in body
 
 
-def test_the_delegate_on_verify_render_carries_dispatch_and_inline_body(
-    tmp_path: Path,
-) -> None:
-    body = _verify(tmp_path, stages=["verify"])
-
-    assert "stage-delegate" in body
-    assert "hm wrapup_brief --root . --stage verify" in body
-
-    # `"Check 1 —" in body` alone is invariant over POSITION: the check definitions
-    # sit near the top of the document, so it holds even if the degraded heading
-    # points at nothing. What matters is that the heading is followed by the numbered
-    # procedure it claims to introduce.
-    degraded_at = body.lower().index("degraded")
-    procedure_at = _numbered_step_at(body, "Read inputs (PLAN, SPEC")
-    assert degraded_at < procedure_at
 
 
-def test_turning_on_wrapup_alone_leaves_verify_inline(tmp_path: Path) -> None:
-    body = _verify(tmp_path, stages=["wrapup"])
-
-    assert "stage-delegate" not in body
 
 
-def test_the_verify_gate_verdict_stays_with_the_main_loop(tmp_path: Path) -> None:
-    """Verify is a GATE. The delegate reports check verdicts; the decision to stop or
-    proceed — and the exit code — stay where the caller can see them."""
-    body = _verify(tmp_path, stages=["verify"])
-
-    # Scoped to the dispatch section: `"STOP" in body` is satisfied by the
-    # pre-existing "STOP on first FAIL" header and would hold even if the dispatch
-    # handed the gate decision to the subagent.
-    section = body[body.index("Step 0.5") : _numbered_step_at(body, "Read inputs (PLAN, SPEC")]
-    assert "wrapup_receipt" in section
-    assert "STOP" in section
-    assert "never a PASS" in section
 
 
-@pytest.mark.parametrize("preset", ["Side", "Production"])
-def test_delegation_adds_a_bounded_amount_of_prose_to_verify(tmp_path: Path, preset: str) -> None:
-    off = _count_body_lines(_verify(tmp_path / "off", preset=preset))
-    on = _count_body_lines(_verify(tmp_path / "on", preset=preset, stages=["verify"]))
-
-    assert on - off <= 60, f"{preset} verify delegation adds {on - off} body lines ({off} → {on})"
 
 
-def test_the_verify_receipt_temp_file_discipline_is_specified(tmp_path: Path) -> None:
-    """M-04, verify half. This gate adopts the receipt's verdict, so reading another
-    session's reply from a collidable path would adopt someone else's result."""
-    body = _verify(tmp_path, stages=["verify"])
-    section = " ".join(
-        body[body.index("Step 0.5") : _numbered_step_at(body, "Read inputs (PLAN, SPEC")].split()
-    )
-
-    assert "OUTSIDE the repo" in section
-    # The verify half of the CWE-377 fix, pinned here because the wrapup half was pinned
-    # first and alone: the gate was scoped to the artifact being edited, so a revert of
-    # THIS file's prose to a constructed `/tmp/hm-receipt-<slug>-$$.json` left the whole
-    # suite green. `$$` is a literal under the Write tool, so that path is predictable by a
-    # peer session and pre-plantable as a symlink — and the receipt is the artifact verify's
-    # anti-fabrication reconciliation depends on. (CLAUDE.md checkpoint 2: do not scope a
-    # gate to the output you happened to be fixing.)
-    assert "mktemp" in section
-    assert "--stage verify" in section
 
 
-def test_the_verify_reconcile_call_passes_the_worktree_root(tmp_path: Path) -> None:
-    """R2-01, verify half. Verify's record lives under the worktree-only gitignored
-    `.claude/observability/`, so without the flag the gate reports
-    `verify-record-missing` on every delegated run that actually worked."""
-    body = " ".join(_verify(tmp_path, stages=["verify"]).split())
-
-    assert "--worktree '<brief.worktree_root>'" in body

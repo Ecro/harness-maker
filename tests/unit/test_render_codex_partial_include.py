@@ -62,24 +62,8 @@ def _has_command_line(text: str, needle: str) -> bool:
     return False
 
 
-def test_recipe_present_in_review_and_plan_stages_when_enabled(tmp_path: Path) -> None:
-    files = _render(tmp_path, models=["codex"])
-    for stage in ("review", "spec"):
-        body = _stage(files, stage)
-        assert "second_opinion_invoke --model codex" in body, f"{stage} stage missing invoker call"
-        assert "dangerouslyDisableSandbox" in body, f"{stage} stage missing sandbox directive"
-        # Scoped to COMMAND lines. A bare `"codex exec" not in body` would also forbid
-        # the prose explaining why the raw CLI was retired — and a gate that bans naming
-        # the bug deletes its own rationale.
-        assert not _has_command_line(body, "codex exec"), f"{stage} stage re-inlined the raw CLI"
 
 
-def test_recipe_absent_from_stages_when_disabled(tmp_path: Path) -> None:
-    files = _render(tmp_path, models=[])
-    for stage in ("review", "spec"):
-        body = _stage(files, stage)
-        assert "codex exec" not in body
-        assert "dangerouslyDisableSandbox" not in body
 
 
 def test_old_exec_section_deleted_from_all_agents(tmp_path: Path) -> None:

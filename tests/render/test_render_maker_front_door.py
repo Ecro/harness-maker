@@ -29,7 +29,7 @@ from harness_maker.world_model import HANDLE_MAX, NAME_MAX
 _REPO = Path(__file__).resolve().parents[2]
 _SPEC_YAML = _REPO / "specs/SPEC-maker-front-door-improvements.machine.yaml"
 
-_STAGES = ("research", "spec", "execute", "review", "verify", "wrapup")
+_STAGES = ("research", "spec", "execute", "wrapup")  # four since 0.64.0
 _KNOWLEDGE_SKILLS = ("intent-layer", "project-knowledge")
 _MAKER_CAP = 4500
 _POINTER_CAP = 400
@@ -253,14 +253,13 @@ def test_ac003_stage_descriptions_gated(
     root = repo(config)
     if runtime == "codex":
         text = _read(root, f".agents/skills/hm-{stage}/SKILL.md")
-        loop = "$hm-loop"
     else:
         text = _read(root, f".claude/commands/hm/{stage}.md")
-        loop = "/hm:loop"
     fm = _frontmatter(text)
     desc = str(fm["description"])
-    gate = f"Only when typed, or via {name}, autopilot or {loop}."
-    for token in ("typed", name, "autopilot", loop):
+    # 0.64.0 retired autopilot and the loop, so Maker is the only other entrance.
+    gate = f"Only when typed, or via {name}."
+    for token in ("typed", name):
         assert token in desc, (token, desc)
     assert gate in desc, desc
     summary = desc.replace(gate, "").strip()

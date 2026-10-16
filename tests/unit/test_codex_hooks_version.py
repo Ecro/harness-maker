@@ -52,10 +52,14 @@ def test_codex_hooks_json_is_valid_json() -> None:
 
 
 def test_codex_hooks_json_has_required_events() -> None:
-    """codex/hooks.json must define PostToolUse and PreToolUse hooks."""
+    """codex/hooks.json must define PreToolUse (or PermissionRequest) hooks.
+
+    PostToolUse carried only the telemetry and post-write-reminder hooks, both retired in
+    0.64.0 (SPEC-hm-overhaul-p1 IRR-005), so the event no longer renders.
+    """
     rendered = _render_codex_hooks_json("/some/path/0.0.0")
     data = json.loads(rendered)
-    assert "PostToolUse" in data["hooks"], "hooks.json missing PostToolUse"
+    assert "PostToolUse" not in data["hooks"], "a retired PostToolUse hook came back"
     assert "PreToolUse" in data["hooks"] or "PermissionRequest" in data["hooks"], (
         "hooks.json missing PreToolUse or PermissionRequest"
     )

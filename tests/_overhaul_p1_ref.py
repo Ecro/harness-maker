@@ -15,9 +15,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HEAD_SRC = REPO_ROOT / "src"
 REF_SHA = "db19f023"
+#: The PR-C merge commit (0.63.0). AC-001 is PR-C's relation, so it is pinned to the render PR-C
+#: shipped; PR-S changes the render on purpose and would otherwise break it (PLAN-hm-overhaul-p1-s).
+PRC_MERGE_SHA = (
+    (REPO_ROOT / "tests" / "fixtures" / "overhaul_p1" / "prc_merge_sha").read_text().strip()
+)
 
 _LOCK = threading.Lock()
-_EXTRACTED: dict[Path, Path] = {}
+_EXTRACTED: dict[tuple[Path, str], Path] = {}
 
 # Ambient session state a hook or `make` would otherwise read from the developer's shell.
 _SCRUBBED_ENV = (
@@ -31,19 +36,19 @@ _SCRUBBED_ENV = (
 )
 
 
-def ref_root(cache_dir: Path) -> Path:
-    """A db19f023 copy of `src/` under `cache_dir`, extracted once per process.
+def ref_root(cache_dir: Path, sha: str = REF_SHA) -> Path:
+    """A copy of `src/` at `sha` (db19f023 by default) under `cache_dir`, once per process.
 
     `git archive` reads the commit's tree straight from the object store, so nothing is
     written into `.git/` (PLAN-hm-overhaul-p1-c ADR-001).
     """
     with _LOCK:
-        if cache_dir in _EXTRACTED:
-            return _EXTRACTED[cache_dir]
-        out = cache_dir / f"ref-{REF_SHA}"
+        if (cache_dir, sha) in _EXTRACTED:
+            return _EXTRACTED[(cache_dir, sha)]
+        out = cache_dir / f"ref-{sha}"
         if not (out / "src" / "harness_maker" / "__init__.py").is_file():
             blob = subprocess.run(
-                ["git", "-C", str(REPO_ROOT), "archive", "--format=tar", REF_SHA, "src"],
+                ["git", "-C", str(REPO_ROOT), "archive", "--format=tar", sha, "src"],
                 check=True,
                 capture_output=True,
                 timeout=120,
@@ -51,7 +56,7 @@ def ref_root(cache_dir: Path) -> Path:
             out.mkdir(parents=True, exist_ok=True)
             with tarfile.open(fileobj=io.BytesIO(blob)) as tar:
                 tar.extractall(out, filter="data")
-        _EXTRACTED[cache_dir] = out
+        _EXTRACTED[(cache_dir, sha)] = out
         return out
 
 

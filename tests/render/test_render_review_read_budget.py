@@ -367,57 +367,10 @@ def paired_review_renders_against_goldens() -> tuple[tuple[str, str], ...]:
 # ------------------------------------------------------------------ AC-008
 
 
-def test_bounded_read_with_escalation() -> None:
-    """AC-008's executable predicate, evaluated against the real renders.
-
-    The two leading non-emptiness conjuncts are the whole reason this is not vacuous:
-    `all()` over an empty discovery is True, so without them a broken
-    `reviewer_dispatch_sites` would satisfy every arm below.
-    """
-    assert all(len(reviewer_dispatch_sites(r)) >= 1 for r in reviewer_renders())
-    assert len(reviewer_dispatch_sites(single_reviewer_review_render())) >= 1
-
-    assert all(
-        has_bounded_read_default(site)
-        and has_escalation_clause(site)
-        and requires_visible_elision_marker(site)
-        and states_outside_diff_scope(site)
-        and not contains_unconditional_full_file_read(site)
-        for render_text in reviewer_renders()
-        for site in reviewer_dispatch_sites(render_text)
-    )
 
 
-def test_the_single_reviewer_branch_is_guarded_too() -> None:
-    """The fourth site lives in a `{% else %}` this harness's own config cannot emit.
-
-    Named separately, per ADR-011: folding it into `reviewer_renders()` would let an
-    empty discovery on this render alone hide behind the other two.
-    """
-    sites = reviewer_dispatch_sites(single_reviewer_review_render())
-    assert len(sites) == 1, f"expected the Direct-review site only, got {len(sites)}"
-    for predicate in _POSITIVE_PREDICATES:
-        assert predicate(sites[0]), f"{predicate.__name__} missing from the single-reviewer site"
-    assert not contains_unconditional_full_file_read(sites[0])
 
 
-def test_the_agent_body_precedence_is_stated_at_every_site() -> None:
-    """Separate from `test_bounded_read_with_escalation`, which is AC-008 verbatim.
-
-    The precedence sentence is NOT part of AC-008's `executable_predicate` — it was added
-    after review found six reviewer agent bodies still ordering unbounded end-to-end
-    reads — so it must not be smuggled into the AC test. It still needs a gate on EVERY
-    render: `_POSITIVE_PREDICATES` only reaches the single-reviewer site, so without this
-    a deletion from the multi-reviewer branch alone would pass everything.
-    """
-    for render_text in (*reviewer_renders(), single_reviewer_review_render()):
-        sites = reviewer_dispatch_sites(render_text)
-        assert sites
-        for site in sites:
-            assert states_precedence_over_agent_body(site), (
-                f"a dispatch site does not state precedence over the agent body: "
-                f"{site.splitlines()[0]}"
-            )
 
 
 # The anchor MOVED once, deliberately: ADR-001 of PLAN-workflow-loop-efficiency removed
@@ -436,29 +389,6 @@ def _site_headings(render_text: str) -> tuple[str, ...]:
     return tuple(site.splitlines()[0] for site in reviewer_dispatch_sites(render_text))
 
 
-def test_the_site_count_matches_the_pre_change_anchor() -> None:
-    """Non-emptiness is a floor; this pins the exact shape the discovery is anchored on.
-
-    Measured on the goldens BEFORE the read-budget edit: 3 sites per multi-reviewer
-    render. If that edit had to add or move a `####` block to make AC-008 pass, it would
-    show up here rather than being absorbed silently — that guard is unchanged.
-
-    The current expectation is 2 because ADR-001 removed exactly one site. The identity
-    assertions below are what make this a migration and not a rebaseline: the count alone
-    is satisfiable by removing the wrong pass.
-    """
-    for golden in (golden_atomic(),):
-        assert reviewer_pass_count(golden) == _PASS_COUNT_PRE_ADR001
-
-    for render_text in reviewer_renders():
-        assert reviewer_pass_count(render_text) == _PASS_COUNT_POST_ADR001
-        headings = _site_headings(render_text)
-        # The one that left is Pass 1.5 — and only it.
-        assert not any(h.startswith(_PASS_REMOVED_BY_ADR001) for h in headings)
-        golden_headings = _site_headings(golden_atomic())
-        assert [h for h in golden_headings if not h.startswith(_PASS_REMOVED_BY_ADR001)] == list(
-            headings
-        ), f"a site other than Pass 1.5 moved: {golden_headings} -> {headings}"
 
 
 def test_the_predicates_discriminate_against_the_pre_change_render() -> None:
@@ -486,72 +416,8 @@ def test_the_predicates_discriminate_against_the_pre_change_render() -> None:
 # ------------------------------------------------------------------ AC-009
 
 
-def test_verification_structure_unchanged() -> None:
-    """AC-009's executable predicate — the diff changed reviewer prose and nothing else.
-
-    ⚠️ In-file AC-009 (the read-budget SPEC's) — NOT the AC-009 of
-    SPEC-workflow-loop-efficiency, which is the cross-model hoist. Same id, different SPEC.
-
-    The `reviewer_pass_count` conjunct was dropped from this invariance set and re-pinned
-    in `test_the_site_count_matches_the_pre_change_anchor` above, because ADR-001 of
-    PLAN-workflow-loop-efficiency moved it on purpose (3 -> 2, Pass 1.5 removed). The
-    other three conjuncts are UNCHANGED and still compare against the frozen goldens —
-    they were verified still-equal at migration time, so the hoist (ADR-011) is confirmed
-    to reorder prose without touching the invoker set, the reviewer set, or K.
-    """
-    assert all(
-        consensus_threshold(after) == consensus_threshold(golden)
-        and second_opinion_invocation_points(after) == second_opinion_invocation_points(golden)
-        for after, golden in paired_review_renders_against_goldens()
-    )
 
 
-def test_the_reviewer_set_grew_by_exactly_the_mandatory_lens_agents() -> None:
-    """`enabled_reviewer_set` was dropped from the invariance set above — on purpose.
-
-    SPEC-ai-review-exit-criteria AC-002 dispatches five mandatory lenses in round 1, and three
-    of them name a specialist agent (`concurrency-reviewer`, `security-reviewer`) or the
-    optional pair that Step 1 must state routing may drop (`ux-reviewer`,
-    `performance-reviewer`). So the extractor now finds reviewer names the golden does not
-    carry. That is the change, not a side effect of it.
-
-    Re-pinned explicitly rather than rebaselined, exactly as `reviewer_pass_count` was when
-    ADR-001 moved it: the count alone is satisfiable by adding the WRONG agent, so the delta
-    is asserted by identity. Nothing may leave the set.
-    """
-    added = {
-        "concurrency-reviewer",
-        "performance-reviewer",
-        "security-reviewer",
-        "ux-reviewer",
-    }
-    for after, golden in paired_review_renders_against_goldens():
-        before = enabled_reviewer_set(golden)
-        assert before <= enabled_reviewer_set(after), (
-            "a reviewer present before this SPEC left the rendered review stage"
-        )
-        assert enabled_reviewer_set(after) - before == added, (
-            "the reviewer set moved by something other than the mandatory-lens agents: "
-            f"{sorted(enabled_reviewer_set(after) - before)}"
-        )
-    # RE-PINNED, not relaxed (SPEC-plan-stage-absorption). This used to assert equality with
-    # the frozen golden's headings. `validator_invocation_points`' own docstring says a heading
-    # moves when a dispatch is "relocated to a different step" — and that is exactly what this
-    # task did, on purpose: `/hm:plan` Step 4 became `/hm:spec` Step 4.6. Equality with a
-    # pre-migration golden can no longer hold, so the expectation is written out instead. Any
-    # FURTHER relocation, or a deleted dispatch, still fails — which is the sensitivity the
-    # equality was bought for.
-    after_validator = validator_invocation_points(rendered_validator_command())
-    assert after_validator == (
-        "### Step 4.6 —",
-        "### Step 4.6 — `spec-validator` (single pass, advisory)",
-        "### Step 4.6 — `spec-validator` (single pass, advisory)",
-        "#### Second opinion — model: `antigravity`",
-    ), f"the validator dispatch moved again: {after_validator}"
-    # The golden arm keeps the half that survives a rename: it must still witness a dispatch,
-    # so a golden that silently stopped containing one is still caught.
-    golden_validator = validator_invocation_points(golden_plan_bearing_fused())
-    assert len(golden_validator) >= 1
 
 
 def test_the_invariance_guards_are_not_vacuous() -> None:

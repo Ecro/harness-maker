@@ -70,63 +70,10 @@ def models_off(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     return _render_commands(tmp_path_factory.mktemp("off"), models=[])
 
 
-def test_ac_006_the_review_render_backgrounds_the_invoker(models_on: dict[str, str]) -> None:
-    """Precondition, not proof: the review stage must carry the backgrounding instruction."""
-    review = models_on["review"]
-
-    assert _BACKGROUND in review, "the review render does not tell the model to background the call"
-    assert _REFUSAL not in review, "the review render carries the spec stage's refusal"
 
 
-def test_ac_006_the_spec_render_refuses_to_background(models_on: dict[str, str]) -> None:
-    """The stage guard, from the other side — and this is the half a shared partial would break.
-
-    `/hm:spec` consumes the findings in its very next step (the `spec-validator` dispatch injects
-    them), so a backgrounded call there has nothing to inject. An unguarded `run_in_background` in
-    the shared partial would satisfy the review test above and silently make spec validation
-    Claude-only.
-    """
-    plan = models_on["spec"]
-
-    assert _REFUSAL in plan, "the spec render does not refuse to background"
-    assert _BACKGROUND not in plan, "the spec render tells the model to background the call"
 
 
-def test_ac_006_the_wiring_sits_inside_the_models_gate(models_off: dict[str, str]) -> None:
-    """The instruction must not ship into a harness with no model enabled — asserted STRUCTURALLY.
-
-    The render-level version of this claim (`_BACKGROUND not in models_off["review"]`) is kept below
-    as a cheap sanity arm, but it is **not** what this test rests on, because I could not construct
-    a mutation that makes it fail: byte-zero is enforced twice over — the caller wraps the include
-    in `{%- if config.second_opinion and config.second_opinion.models %}` (`review.md.j2`) and the
-    partial re-checks `{%- if _models %}` — and removing both still produced no leak. A test whose
-    failure I cannot demonstrate proves nothing, which is the whole defect class this unit removes.
-
-    So the load-bearing assertion is on the template SOURCE: the review block must appear AFTER the
-    partial's `{%- if _models %}` line. That has a demonstrated killer — hoisting the block above
-    that line turns this red — so it is a guard rather than a decoration.
-    """
-    partial = (
-        Path(__file__).parents[2]
-        / "src"
-        / "harness_maker"
-        / "templates"
-        / "agents"
-        / "_partials"
-        / "second_opinion_dispatch.md.j2"
-    ).read_text(encoding="utf-8")
-
-    gate_at = partial.index("{%- if _models %}")
-    review_block_at = partial.index("{%- if second_opinion_stage == 'review' %}")
-    plan_block_at = partial.index("{%- if second_opinion_stage == 'spec' %}")
-
-    assert review_block_at > gate_at, "the review backgrounding block escaped the models gate"
-    assert plan_block_at > gate_at, "the spec refusal block escaped the models gate"
-
-    # cheap sanity arm, deliberately not the load-bearing one (see the docstring)
-    for name in ("review", "spec"):
-        assert _BACKGROUND not in models_off[name]
-        assert _REFUSAL not in models_off[name]
 
 
 @pytest.mark.skipif(

@@ -4,7 +4,7 @@
 
 ## Workflow
 
-{% if config.loop.enabled %}Stages chain via `/hm:loop` or autopilot; there is no fused workflow command. <!-- @hm:axis-removed -->{% else %}Stages chain via autopilot; there is no fused workflow command. `/hm:loop` is off (set `loop.enabled: true` in `.claude/harness.yaml` and run `/hm:make` to enable it). <!-- @hm:axis-removed -->{% endif %}
+Four stages: `/hm:research` (optional), `/hm:spec`, `/hm:execute`, `/hm:wrapup`. Each stops when it is done; you type the next. There is no fused workflow command. <!-- @hm:axis-removed -->
 
 ## Caching
 

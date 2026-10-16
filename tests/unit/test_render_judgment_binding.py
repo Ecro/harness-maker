@@ -35,24 +35,7 @@ def test_judgment_reviewer_agent_renders(tmp_path: Path) -> None:
     assert "untrusted DATA" in body
 
 
-def test_wrapup_dispatches_independent_reviewer(tmp_path: Path) -> None:
-    _render(tmp_path, Preset.PRODUCTION)
-    body = _read(tmp_path, "stages/wrapup.md")
-    assert "judgment-reviewer" in body
-    assert "mark-judged" in body
-    # the deferred-bucket REPORT bullet is retired (the prose may still name it)
-    assert "**judgment, deferred**" not in body
-    assert "RETIRED" in body
 
 
-def test_wrapup_production_renders_find_unjudged_gate(tmp_path: Path) -> None:
-    body = _read(_render(tmp_path, Preset.PRODUCTION), "stages/wrapup.md")
-    assert "find-unjudged" in body
-    assert "Production judgment gate" in body
-    assert "STALE = unbound" in body
 
 
-def test_wrapup_side_judgment_advisory_not_gate(tmp_path: Path) -> None:
-    body = _read(_render(tmp_path, Preset.SIDE), "stages/wrapup.md")
-    assert "find-unjudged" in body  # named for listing
-    assert "Production judgment gate" not in body

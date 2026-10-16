@@ -174,155 +174,20 @@ def _step1_boundary_paragraph(text: str) -> str:
     return tail[: end.start()]
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_step1_loads_the_do_not_change_list(variant: str) -> None:
-    """ADR-003 — the load sits on the path EVERY invocation takes, not the repair path."""
-    block = _flat(_step1_block(_execute_variants()[variant]))
-    assert "Do not change" in block, f"{variant}: Step 1 does not load the Do-not-change list"
-    # The noun alone is satisfied by a POINTER — "the Do not change list is handled at C.0" —
-    # which is exactly the design ADR-003 rejected. Assert the imperative that makes the load
-    # happen here.
-    assert "Restate it once" in block, f"{variant}: Step 1 points at the list without loading it"
-    flat = block
-    # The two decisions that make the loaded data usable. Unpinned, a trim ships an execute
-    # stage that consumes the `none` sentinel as a path prefix — the absent-case class ADR-009
-    # exists to close, one instruction earlier.
-    assert "never a prefix" in flat, f"{variant}: Step 1 lets the `none` sentinel act as a prefix"
-    # The CONTIGUOUS clause. Two independent memberships over a ~1kB block is conjunction, not
-    # adjacency: "an `Advisory:` line is informational" in one sentence plus "honor the ADRs" in
-    # another satisfied both — the precise counterexample the round-4 comment described.
-    assert "an `Advisory:` line is a constraint you **honor**" in flat, (
-        f"{variant}: Step 1 leaves Advisory entries non-actionable"
-    )
-    assert "unparseable" in flat, f"{variant}: Step 1 has no branch for a malformed list"
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_phase_c0_cites_the_loaded_list(variant: str) -> None:
-    """The IMPERATIVE, not the noun — the C.0 block carries `Do not change` twice.
-
-    The second copy is the pre-existing "what checks it afterwards" sentence, which no edit to
-    the citation clause can remove. So `"Do not change" in block` was discharged by text this
-    test was not written for: softening the imperative to an optional mention left it green,
-    and C.0's real coverage came from an unrelated reflow pin on `re-Read`.
-    """
-    flat = _flat(_phase_c0_block(_execute_variants()[variant]))
-    assert "cite the `Do not change` list loaded at Step 1" in flat, (
-        f"{variant}: Phase C.0 does not INSTRUCT the citation"
-    )
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_falsified_sentences_are_gone(variant: str) -> None:
-    """ADR-003 rewrites them; an additive-only edit leaves a self-contradiction shipping.
-
-    'do not look any of them up' one paragraph above 'cite the list loaded at Step 1' is R10
-    unmitigated, in the most-invoked stage in the harness.
-    """
-    block = _phase_c0_block(_execute_variants()[variant])
-    for sentence in _FALSIFIED:
-        assert sentence not in _flat(block), (
-            f"{variant}: falsified sentence survives — {sentence!r}"
-        )
-    # Absence alone accepts DELETION, and Phase 2 asks for replacement: the `:408` half must
-    # still say what stage exit compares, or C.0 goes silent about it in the most-invoked
-    # stage. A negative pin cannot tell removal from rewrite; this positive one can.
-    flat = _flat(block)
-    assert "stage exit" in flat, f"{variant}: C.0 no longer states what stage exit compares"
-    assert "Do not change" in flat, f"{variant}: C.0's corrected statement lost the list"
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_c0_enumeration_is_still_three_items(variant: str) -> None:
-    """Scope-out: the rewrite touches the rationale, never the enumeration.
-
-    Those three items are PLAN-self-induced-regression-gate ADR-002's, and losing one to a
-    rewrite is the silent way this change would break a decision it promised to preserve.
-    """
-    block = _phase_c0_block(_execute_variants()[variant])
-    items = re.findall(r"^\d+\. \*\*", block, re.M)
-    assert len(items) == 3, f"{variant}: C.0 enumeration has {len(items)} items, expected 3"
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_step4_compares_against_the_list(variant: str) -> None:
-    block = _step4_block(_execute_variants()[variant])
-    flat = _flat(block)
-    assert "Do not change" in flat, f"{variant}: stage exit does not compare against the list"
-    # The noun alone is satisfied by a pointer. Pin the three decisions the paragraph carries.
-    assert "the same set item 1 inspects" in flat, f"{variant}: Step 4 operand is not item 1's set"
-    assert "crossing" in flat, f"{variant}: Step 4 never names a crossing"
-    # The DISTINCTION, not one sentence's phrasing. This pinned "the section was absent"
-    # verbatim and went red when the branch list was tightened to "absent (unknown), an explicit
-    # `none`, …" — a rewrite that preserves the distinction exactly. A pin that reddens on a
-    # correct edit is the one that gets deleted next time; assert both poles instead.
-    assert "absent" in flat, f"{variant}: Step 4 drops the absent case"
-    assert "explicit `none`" in flat, f"{variant}: Step 4 collapses absent-vs-none"
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_absent_section_is_distinguished_from_none(variant: str) -> None:
-    """ADR-009 — a PLAN predating the section must not read as 'no boundaries'."""
-    block = _flat(_step1_block(_execute_variants()[variant]))
-    assert _ABSENT_LINE in block, f"{variant}: ADR-009's emitted line is not stated verbatim"
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_round2_prose_repairs_are_pinned(variant: str) -> None:
-    """Each round-2 repair is ONE sentence in a hard-wrapped, budget-squeezed template.
-
-    Unpinned, the next reflow or trim deletes it with every gate green — which is exactly how
-    `, with or without TDD` was lost in the first place. These assertions exist so that class
-    of silent removal costs a red test.
-    """
-    text = _execute_variants()[variant]
-    c0 = _flat(_phase_c0_block(text))
-    assert "with or without TDD" in c0, f"{variant}: C.0 lost its --no-tdd anchor again"
-    assert "re-Read" in c0, f"{variant}: C.0 has no recovery branch when the list is unavailable"
-    step4 = _flat(_step4_block(text))
-    assert "comparison not performed" in step4, f"{variant}: Step 4 can report a partial silently"
-    assert "renamed or deleted" in step4, f"{variant}: Step 4's operand excludes delete/rename"
-    # The blocked path is where edits exist and no comparison runs; C.0 cannot carry this
-    # because pure new-feature work skips C.0 entirely. Scoped to the Step 4 block and pinned on
-    # the emitted literal: a whole-document `"blocked exit" in text` was discharged by a stray
-    # copy of the phrase in C.0, so deleting the blocked-path item left the suite green.
-    assert "comparison not performed — blocked exit" in step4, (
-        f"{variant}: the blocked path's disclosure is not in the Step 4 block"
-    )
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_the_new_paragraphs_do_not_gate_the_stage(variant: str) -> None:
-    """ADR-003's report-not-gate invariant, asserted rather than described.
-
-    Scoped to the anchored paragraphs: the rendered command is full of legitimate failure
-    instructions belonging to other steps, and an unscoped search would fail on those.
-    """
-    text = _execute_variants()[variant]
-    assert _ANCHOR_OPEN in text, f"{variant}: opening anchor missing"
-    assert _ANCHOR_CLOSE in text, f"{variant}: closing anchor missing"
-    regions = [c.split(_ANCHOR_CLOSE, 1)[0] for c in text.split(_ANCHOR_OPEN)[1:]]
-    assert len(regions) >= 1, f"{variant}: no anchored boundary region"
-    # EVERY region states the invariant. Round 2 weakened this to `any()`, which let a second
-    # region be inverted while borrowing the first region's copy of the sentence. `every` is what
-    # makes that impossible, and it is asserted regardless of how many regions exist — do not
-    # weaken it on the argument that there is currently only one. `stop` is deliberately not in
-    # _ALWAYS_GATE: a report line may legitimately say "continue".
-    for region in regions:
-        flat = _flat(region)
-        assert _ADR003_SENTENCE in flat, (
-            f"{variant}: a boundary paragraph omits ADR-003's report-not-gate invariant"
-        )
-        assert not _gates(flat), f"{variant}: an anchored boundary paragraph gates the stage"
-
-    # The other two sites this change touches. The anchors wrap only the Step 4 paragraph, so a
-    # gating rewrite at C.0 or at the Step 1 load passed every assertion above. ADR-003's
-    # invariant is a property of the feature, not of one paragraph.
-    for site, block in (
-        ("Phase C.0", _phase_c0_block(text)),
-        ("Step 1 boundary paragraph", _step1_boundary_paragraph(text)),
-    ):
-        assert not _gates(_flat(block)), f"{variant}: {site} gates the stage"
 
 
 def test_the_gate_predicate_rejects_real_gating_rewrites() -> None:

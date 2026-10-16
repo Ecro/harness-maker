@@ -50,7 +50,7 @@ SourceKind = Literal["yaml", "python"]
 
 CLASSES: tuple[str, ...] = get_args(Class)
 GRADES: tuple[str, ...] = get_args(Grade)
-STAGES: tuple[str, ...] = ("research", "spec", "execute", "review", "verify", "wrapup")
+STAGES: tuple[str, ...] = ("research", "spec", "execute", "wrapup")
 
 #: The render matrix the coverage gate is a union over (ADR-007). Targets are deliberately
 #: absent: commands render to one file family regardless of target. One arm per preset, each at
@@ -112,13 +112,6 @@ _R_PLAN = "RESEARCH-source-plan-steps Table 2"
 REGISTRY: tuple[StepEntry, ...] = (
     # ── research ───────────────────────────────────────────────────────────
     _u("research", "Phase 0", "INV", "spec Step 2 (human interview)", note="--deep only"),
-    _u(
-        "research",
-        "Phase 0.75",
-        "COMP",
-        "research Phase 0.5",
-        note="lens-choice prose the model applies by judgment",
-    ),
     _e("research", "Phase 1", "INV", "**", f"{_R}; cheapest stage ($44, economics)"),
     _e("research", "Phase 2", "INV", "**", _R),
     _e("research", "Phase 3", "INV", "**", f"{_R}; state that outlives the window"),
@@ -138,6 +131,10 @@ REGISTRY: tuple[StepEntry, ...] = (
         "INV",
         "***",
         f"{_R}; bench: the one region the contract left undefined was the only one that moved",
+        # SPEC-hm-overhaul-p1: lanes are gone, so the round cap is the interview's only knob.
+        knob="interview.main_loop.max_rounds",
+        source_kind="yaml",
+        ordering="le",
     ),
     _u("spec", "Step 3", "INV", "spec Step 2", note="SPEC.md write"),
     _u("spec", "Step 3.5", "INV", "spec Step 4", note="machine.yaml write"),
@@ -177,252 +174,33 @@ REGISTRY: tuple[StepEntry, ...] = (
     ),
     _u(
         "execute",
-        "Step 0.1",
-        "INV",
-        "plan Step 1.7",
-        note="SPEC-need pair; verify Check 6 is the deterministic oracle that reads it",
-    ),
-    _u(
-        "execute",
-        "Step 0.2",
-        "INV",
-        "plan Step 1.5",
-        note="per-iter PLAN under /hm:loop; per-iteration state",
-        renders_when="loop.enabled",
-    ),
-    _u(
-        "execute",
         "Step 0.3",
         "INV",
         "plan Step 6",
         note="PLAN write verification; the only guard of an absent spec_need_verdict",
     ),
     _u("execute", "Step 1", "INV", "execute Step 2", note="PLAN load + boundaries (state)"),
-    _u(
-        "execute",
-        "Step 1.5",
-        "HOST",
-        "plan Step 1",
-        note="parallel split; subagent dispatch is native",
-    ),
     _u("execute", "Step 2", "INV", "spec Step 1", note="SPEC/RESEARCH cache (state)"),
     _e("execute", "Step 3", "INV", "***", f"{_R}; RigorBench +17% outcome correctness"),
     _e("execute", "Phase A", "INV", "***", f"{_R}; tests are the oracle only when written first"),
-    _e("execute", "Phase A.4", "INV", "**", f"{_R}; mechanical false-RED screen"),
-    _e(
-        "execute",
-        "Phase A.5",
-        "TUNE",
-        "**",
-        f"{_R}; FAIL 39/52 (75%, {_LEDGER_SIDE}, n=52). Ground-truth arm "
-        "(RESEARCH-hm-light-lane, Side, n=15): blocked 2 small tasks whose plain arm passed "
-        "every hidden test; skipped on `lane: light`",
-        remeasure_on=("model_release",),
-        measure_cmd=_LEDGER,
-    ),
-    _e("execute", "Phase B", "INV", "***", f"{_R}; deterministic RED gate"),
-    _e(
-        "execute",
-        "Phase C.0",
-        "COMP",
-        "*",
-        f"{_R}; declared out of scope for this task (mutation-receipt coupling); "
-        "three lines since SPEC-hm-light-lane-s2",
-    ),
     _u("execute", "Phase C", "INV", "execute Phase B", note="implementation to GREEN"),
-    _u("execute", "Phase D", "INV", "execute Phase B", note="deterministic targeted verification"),
-    _e(
-        "execute",
-        "Phase D.5",
-        "COMP",
-        "*",
-        f"{_R}; out of scope for this task; three lines since SPEC-hm-light-lane-s2 "
-        "(the failure it targets recurred count:4 to count:19 under the long form)",
-    ),
     _u("execute", "Step 4", "INV", "execute Step 1", note="stage exit + boundary comparison"),
-    # SPEC-hm-light-lane-s3a ADR-008: the light check runs verify's deterministic gates in place of
-    # the review and verify stage turns. The Check headings are verify's own partials, read through
-    # `.claude/hm/execute-light-check.md` (Claude) or inlined (Codex), so they carry verify's rows.
-    _e(
-        "execute",
-        "Step 4.2",
-        "INV",
-        "*",
-        "SPEC-hm-light-lane-s3a ADR-001 (user decision 2026-10-15); deterministic gates, no "
-        "dispatch — judgement until the stage 4 bench re-runs on light tasks",
-    ),
-    _e("execute", "Check 2", "INV", "**", f"{_R}, verify Check 2's row: the same partial"),
-    _e("execute", "Check 4", "INV", "**", f"{_R}, verify Check 4's row: the same partial"),
-    _e("execute", "Check 6", "INV", "**", f"{_R}, verify Check 6's row: the same partial"),
+    # SPEC-hm-overhaul-p1: the one review, the new owner of review Steps 0-5's INV functions
+    # (cut ledger). Its fix-loop cap is review Step 4e's TUNE value, unchanged:
+    # `reviewers.max_review_rounds`, default 3; the fan-out (review Step 3) is the DRI's 1.
     _u(
         "execute",
-        "Step 4.5",
+        "Step 6",
         "INV",
-        "execute Step 4",
-        note="Gate 0 receipt (state)",
-        renders_when="loop.enabled",
-    ),
-    _e(
-        "execute",
-        "Step 5",
-        "HOST",
-        "**",
-        f"{_R}; Claude Code enforces worktree isolation natively; Codex/Cursor do not",
-        renders_when="loop.enabled",
-        knob="worktree.enabled",
-        source_kind="yaml",
-        ordering="bool_off",
-        note="Production arms only",
-    ),
-    # ── review ─────────────────────────────────────────────────────────────
-    _u("review", "Step 0", "INV", "review Step 5", note="open the run (state)"),
-    _u(
-        "review",
-        "Step 1",
-        "INV",
-        "review Step 3",
-        note="reviewer set selection — routing is preset-derived (conditional_router); "
-        "reviewers.enabled is NOT a dispatch knob (CLAUDE.md fan-out retraction)",
-    ),
-    _e("review", "Step 2", "INV", "**", f"{_R}; PLAN/SPEC drift is a state check"),
-    _e(
-        "review",
-        "Step 3",
-        "TUNE",
-        "***",
-        f"{_R}; +52% unique findings on Python, 43% vs 50% recall on C firmware (bench §13)",
-        knob="conditional_router.mandatory_lenses",
-        source_kind="python",
-        ordering="subset",
-        remeasure_on=("model_release", "language_mix_change"),
-        measure_cmd=_BENCH,
-    ),
-    _e(
-        "review",
-        "Step 3.3",
-        "INV",
-        "**",
-        _R_INTENT,
-        note="objective drift, P2, main loop",
-    ),
-    _e("review", "Step 3.4", "INV", "***", f"{_R}; stable ids make consensus ledgerable"),
-    _e(
-        "review",
-        "Step 3.5",
-        "INV",
-        "***",
-        f"{_R}; two models once each > one model twice (bench, reproduced)",
-        renders_when="second_opinion.models non-empty",
-        knob="second_opinion.models",
-        source_kind="yaml",
-        ordering="equal_by_design",
-        note="default [] on both presets by user decision",
-    ),
-    _e(
-        "review",
-        "Step 3.6",
-        "INV",
-        "**",
-        f"{_R}; PIDA acceptance gate",
-        renders_when="second_opinion.models non-empty",
-    ),
-    _e(
-        "review",
-        "Step 4",
-        "INV",
-        "***",
-        f"{_R}; agreement is not truth — consensus must be ledgered, not trusted",
-        note="K=2 is fixed in Python (conditional_router.scope_aware_consensus); "
-        "reviewers.consensus is display-only and deliberately NOT a knob here",
-    ),
-    _e("review", "Step 4a", "INV", "***", f"{_R} (consensus)"),
-    _e("review", "Step 4b", "INV", "***", f"{_R} (consensus)"),
-    _e("review", "Step 4c", "INV", "***", f"{_R} (consensus)"),
-    _e("review", "Step 4d", "INV", "***", f"{_R} (consensus)"),
-    _e(
-        "review",
-        "Step 4e",
-        "TUNE",
-        "***",
-        f"{_R}; disposition drives the auto-fix rounds, whose cap reverses per model "
-        "(bench: opus-5 loop_decay −1.25 / code 1.258×; gpt-5.6 −0.25 / 0.906×)",
+        "review Step 1",
+        note="one code-reviewer over code + tests; lens fan-out opt-in (reviewers.fanout)",
+        # Review Step 4e's TUNE cap, carried unchanged (cut ledger): remeasure it with the bench.
         knob="reviewers.max_review_rounds",
         source_kind="yaml",
         ordering="le",
-        remeasure_on=("model_release",),
-        measure_cmd=_BENCH,
-        note="the disposition mechanism itself is invariant; the TUNE class carries the cap. "
-        "`lane: light` hardcodes a cap of 2 in review.md.j2 — remeasure it with this entry",
-    ),
-    _u("review", "Step 5", "INV", "spec Step 3", note="REVIEW write"),
-    _e(
-        "review",
-        "Step C1",
-        "TUNE",
-        "*",
-        f"{_R}; confirmation pass n=4 (2/2, {_LEDGER_SIDE})",
-        remeasure_on=("model_release",),
-        measure_cmd=_LEDGER,
-        note="`lane: light` skips it after an unchanged approved round 1 — remeasure with it",
-    ),
-    _e(
-        "review",
-        "Step C2",
-        "TUNE",
-        "*",
-        f"{_R}; confirmation pass",
-        remeasure_on=("model_release",),
-        measure_cmd=_LEDGER,
-    ),
-    _e(
-        "review",
-        "Step C3",
-        "TUNE",
-        "*",
-        f"{_R}; confirmation pass",
-        remeasure_on=("model_release",),
-        measure_cmd=_LEDGER,
-    ),
-    _e(
-        "review",
-        "Phase 0",
-        "INV",
-        "**",
-        f"{_R}; mechanical checks, off by default",
-        renders_when="reviewers.mechanical_checks non-empty",
-    ),
-    # ── verify ─────────────────────────────────────────────────────────────
-    _e(
-        "verify",
-        "Check 1",
-        "INV",
-        "**",
-        f"{_R}; drift-verdict existence (mechanical) — 1b LLM coverage deleted by Phase 4",
-    ),
-    _e(
-        "verify",
-        "Check 2",
-        "INV",
-        "**",
-        f"{_R}; harness-diet ADR-003 kept verify as state scaffolding",
-    ),
-    _e("verify", "Check 3", "INV", "**", _R),
-    _e("verify", "Check 4", "INV", "**", _R),
-    _e("verify", "Check 5", "INV", "**", _R, renders_when="loop.enabled"),
-    _e("verify", "Check 6", "INV", "**", f"{_R}; renders at every strictness, blocks at block"),
-    _e(
-        "verify",
-        "Step 0.5",
-        "INV",
-        "**",
-        f"{_R}; stage-delegate cut main-loop turns 136–329 → 38–46",
-        renders_when="delegation.stages contains verify",
     ),
     # ── wrapup ─────────────────────────────────────────────────────────────
     _u("wrapup", "Step 1", "INV", "verify Check 2", note="pre-flight"),
-    _u("wrapup", "Step 2", "INV", "verify Check 2", note="final verification pass"),
-    _u("wrapup", "Step 3", "INV", "review Step 2", note="drift verdict check (read-only)"),
-    _u("wrapup", "Step 3.5", "INV", "spec Step 3.5", note="machine SPEC write-back"),
     _u(
         "wrapup",
         "Step 3.6",
@@ -445,6 +223,10 @@ REGISTRY: tuple[StepEntry, ...] = (
         "**",
         f"{_R}; squash-land is host-native in Claude Code; multi-session coordination is ours",
         note="Production arms only",
+        # Inherited from execute Step 5 (loop-only, gone with /hm:loop): the same worktree knob.
+        knob="worktree.enabled",
+        source_kind="yaml",
+        ordering="bool_off",
     ),
     _u("wrapup", "Step 8", "INV", "plan Step B", note="push is a human gate"),
     _e(

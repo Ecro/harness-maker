@@ -59,35 +59,9 @@ _MACHINE_SPEC = _REPO_ROOT / "specs" / "SPEC-token-efficiency-autopilot-ux-speed
 _AC003_ROWS = load_golden_table(_MACHINE_SPEC, "AC-003")
 
 
-def test_ac_003_the_rendered_health_passes_targets_to_the_smoke_verb() -> None:
-    """The applicability rule must reach production, not just this file (review finding P1-3).
-
-    `smoke_check(targets=None)` means "unknown", which stays applicable — the backward-compatible
-    default. So a rendered `/hm:health` that omits `--targets` leaves the cursor-only false alarm
-    exactly where it was while every arm below passes. Asserted on the TEMPLATE and on the CLI
-    parser together: either half alone is satisfiable without the other.
-    """
-    template = (
-        Path(__file__).parents[2]
-        / "src"
-        / "harness_maker"
-        / "templates"
-        / "commands"
-        / "hm"
-        / "health.md.j2"
-    ).read_text(encoding="utf-8")
-
-    smoke_lines = [ln for ln in template.splitlines() if "autopilot_ledger smoke" in ln]
-    assert smoke_lines, "the rendered health no longer invokes the smoke verb at all"
-    for line in smoke_lines:
-        assert "--targets" in line, f"the smoke invocation omits --targets: {line.strip()!r}"
-        assert "config.targets" in line, (
-            f"--targets is passed a literal rather than the harness's own targets: {line.strip()!r}"
-        )
-
-    assert "--targets" in _smoke_verb_flags(), (
-        "the CLI has no --targets flag, so the rendered invocation would fail to parse"
-    )
+# `test_ac_003_the_rendered_health_passes_targets_to_the_smoke_verb` left with `/hm:health`'s
+# autopilot smoke check in 0.64.0 (autopilot retired, SPEC-hm-overhaul-p1 IRR-005). The verb
+# itself stays a library entry point, still covered below.
 
 
 def _smoke_verb_flags() -> set[str]:

@@ -73,22 +73,6 @@ def _verify_step(body: str) -> str:
     return body[start : body.index(_STEP_END, start)]
 
 
-def test_discovery_covers_all_three_artifact_families() -> None:
-    """Rejects a derivation that silently narrows.
-
-    A count assertion would be config-dependent (this repo renders 7, the default
-    Production profile renders 8). The families are not: an atomic command, the
-    `.claude/stages/` body, and the codex skill must each be represented, and the codex
-    family is the one a claude-only render fixture cannot see.
-
-    A fourth family — "at least one fused workflow" — was asserted here until the fused
-    axis was deleted (PLAN-harness-diet ADR-001). It is dropped rather than relaxed: a
-    `len(...) >= 0` arm would still be present and would assert nothing.
-    """
-    found = _review_bearing_artifacts()
-    assert ".claude/commands/hm/review.md" in found
-    assert ".claude/stages/review.md" in found
-    assert ".agents/skills/hm-review/SKILL.md" in found
 
 
 def test_every_review_bearing_artifact_routes_verification_through_the_skill() -> None:
@@ -122,15 +106,3 @@ def test_the_verify_step_slice_is_non_empty_everywhere() -> None:
         assert len(_verify_step(body)) > 50, f"verify-step slice is degenerate in {path}"
 
 
-def test_the_out_of_scope_wrapup_full_run_survives() -> None:
-    """The ban is scoped to the review verify step, not a blanket ban on `pytest -x`.
-
-    The WRAPUP stage owns its own `uv run pytest -x`, which is deliberately out of
-    scope. Without this assertion a change that stripped every `pytest -x` from the whole
-    render would pass the check above while breaking a different stage.
-
-    Re-pointed from `exec-rev-wrap-ver` (which inlined wrapup) to the wrapup command
-    itself when the fused axis was deleted — PLAN-harness-diet ADR-001.
-    """
-    body = (_render_root() / ".claude/commands/hm/wrapup.md").read_text(encoding="utf-8")
-    assert "uv run pytest -x" in body, "wrapup's own full-suite run was removed"

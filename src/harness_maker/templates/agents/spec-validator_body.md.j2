@@ -12,7 +12,7 @@ were real defects. Two consequences follow, and they are not negotiable:
 - **You run once.** There is no second pass and no re-validation. The loop you replace never
   converged, so another pass buys findings, not release.
 
-Your findings are only worth what a later `/hm:review` confirms. Write them so that comparison
+Your findings are only worth what `/hm:execute`'s review confirms. Write them so that comparison
 is possible: specific, cited, and falsifiable.
 
 {% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
@@ -57,7 +57,7 @@ cannot delegate; everything else about the SPEC is the author's to get wrong che
 - **Phase decomposition, risk registers, rollback points, ADR completeness.** Those belong to
   the PLAN, which `/hm:execute` Step 0 now authors with no human gate. Critiquing them here
   re-creates the interview the absorption removed.
-- Code-level review (defer to `/hm:review` after `/hm:execute`).
+- Code-level review (`/hm:execute` owns it).
 - Security audit (defer to `security-reviewer` post-implementation).
 - Prose quality. Flag wording only when the substance is missing or self-contradictory.
 

@@ -19,7 +19,6 @@ from harness_maker.conditional_router import (
     ALL_LENSES,
     CORE_LENSES,
     DOMAIN_LENSES,
-    lens_dispatch_groups,
     mandatory_lenses,
     routable_lenses,
 )
@@ -107,19 +106,8 @@ def test_the_axis_itself_is_pinned_as_a_literal() -> None:
     }
 
 
-@pytest.mark.parametrize("preset", PRESETS)
-def test_round1_lens_set_matches_preset(bodies: dict[str, str], preset: str) -> None:
-    block = _section(bodies[preset], "### Step 3 — Parallel reviewer invocation", stop="\n### ")
-    assert _dispatched(block) == _expected_dispatch(preset)
 
 
-@pytest.mark.parametrize("preset", PRESETS)
-def test_every_lens_the_router_may_drop_was_actually_dispatched(
-    bodies: dict[str, str], preset: str
-) -> None:
-    """The routing bullet promises subtraction; this pins that there is something to subtract."""
-    block = _section(bodies[preset], "### Step 3 — Parallel reviewer invocation", stop="\n### ")
-    assert set(routable_lenses(preset)) <= _dispatched(block)
 
 
 @pytest.mark.parametrize("preset", PRESETS)
@@ -128,17 +116,6 @@ def test_mandatory_is_a_subset_of_dispatched(preset: str) -> None:
     assert set(mandatory_lenses(preset)) <= _expected_dispatch(preset)
 
 
-@pytest.mark.parametrize("preset", PRESETS)
-def test_the_retired_lenses_are_not_dispatched(bodies: dict[str, str], preset: str) -> None:
-    """`correctness` and `failure` are replaced, not joined.
-
-    An implementer reading "adopt the six categories" could append them to the existing five
-    and produce eleven. Nothing else in this file would notice: every other assertion is a
-    superset check that eleven also satisfies.
-    """
-    block = _section(bodies[preset], "### Step 3 — Parallel reviewer invocation", stop="\n### ")
-    assert "correctness" not in _dispatched(block)
-    assert "failure" not in _dispatched(block)
 
 
 # ── AC-002: presets differ in mandatory-ness, never in availability ───────────
@@ -162,56 +139,10 @@ def test_the_domain_lenses_are_routable_on_side_only() -> None:
 # ── AC-015: the confirmation pass dispatches exactly the round-1 set ──────────
 
 
-@pytest.mark.parametrize("preset", PRESETS)
-def test_confirmation_pass_uses_same_mandatory_set(bodies: dict[str, str], preset: str) -> None:
-    """Set equality between two independently rendered lists.
-
-    Not "the pass dispatches at least the mandatory set" — a pass over a superset re-confirms
-    work round 1 never did, and a pass over a subset confirms a subset while the coverage CLI
-    still demands the whole thing, which is a permanent `blocks_approval: true`.
-    """
-    body = bodies[preset]
-    round1 = _section(body, "### Step 3 — Parallel reviewer invocation", stop="\n### ")
-    confirm = _section(body, "### Step C2 —", stop="\n### ")
-    assert _dispatched(confirm) == _dispatched(round1)
-    assert _dispatched(confirm) == _expected_dispatch(preset)
 
 
-@pytest.mark.parametrize("preset", PRESETS)
-def test_both_sites_write_a_result_file_per_dispatch(bodies: dict[str, str], preset: str) -> None:
-    """One result file per DISPATCH, which is no longer one per lens.
-
-    A merged dispatch produces `core.json` standing for the four lenses it carried; asking for
-    `design.json` beside it would tell the operator to write a file nothing produces, and
-    `lens_coverage` would then require it. The mandatory set is still fully covered — by
-    `lenses_for_result_file`, which maps each stem back to its members.
-    """
-    body = bodies[preset]
-    for section, stop in (
-        ("### Step 3 — Parallel reviewer invocation", "\n### "),
-        ("### Step C2 —", "\n### "),
-    ):
-        block = _section(body, section, stop=stop)
-        covered: set[str] = set()
-        for group in lens_dispatch_groups(preset):
-            assert f"/{group['file']}.json" in block, (
-                f"{section} does not write {group['file']}.json"
-            )
-            covered |= set(group["lenses"])
-        assert set(mandatory_lenses(preset)) <= covered
 
 
-@pytest.mark.parametrize("preset", PRESETS)
-def test_the_coverage_call_is_told_the_preset(bodies: dict[str, str], preset: str) -> None:
-    """Without this the CLI defaults to Production and a Side review is unapprovable."""
-    lines = [
-        ln
-        for ln in bodies[preset].splitlines()
-        if ln.lstrip().startswith("!") and "hm lens_coverage check" in ln
-    ]
-    assert lines, "no runnable coverage call in the rendered command"
-    for line in lines:
-        assert f"--preset {preset}" in line, line
 
 
 # ── AC-003: a missing mandatory lens blocks approval ─────────────────────────
@@ -253,20 +184,6 @@ def test_a_side_review_is_not_blocked_by_an_unrouted_domain_lens(tmp_path: Path)
 # ── AC-017: the two brief clauses survive the axis rewrite ────────────────────
 
 
-@pytest.mark.parametrize("preset", PRESETS)
-def test_briefs_carry_contract_clause_and_test_carve_out(
-    bodies: dict[str, str], preset: str
-) -> None:
-    """Both clauses read off the rendered artifact a consumer sees, not off a template var."""
-    # Drop blockquote markers before flowing: both clauses live inside a `>` block, so their
-    # continuation lines carry a `>` that would otherwise land mid-sentence.
-    stripped = "\n".join(
-        ln.lstrip().removeprefix(">").strip() for ln in bodies[preset].splitlines()
-    )
-    flowed = " ".join(stripped.split())
-    assert "the public contract is fixed and out of scope" in flowed
-    assert "must not edit a test file to resolve a finding whose target is not that test" in flowed
-    assert "a finding whose own target is the test may be fixed" in flowed
 
 
 def test_a_routed_in_domain_lens_is_reported_as_exercised_on_side(tmp_path: Path) -> None:

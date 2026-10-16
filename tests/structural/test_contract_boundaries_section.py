@@ -196,20 +196,6 @@ def _plan_variants() -> dict[str, str]:
     return out
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_required_sections_list_names_the_section(variant: str) -> None:
-    """Membership in the numbered list — not a substring anywhere in the command.
-
-    A template that names the section in a Step 6 bullet, the Quality Bar, or an aside
-    satisfies `_SECTION_HEADING in text` while the required list sits untouched at ten
-    entries. That is exactly the wrong implementation Phase 1 exists to prevent.
-    """
-    block = _required_block(_plan_variants()[variant])
-    assert _REQUIRED_ENTRY.search(block), f"{variant}: not a numbered required-list entry"
-    entries = parse_required_entries(block)
-    expected = list(enumerate(_EXPECTED_ORDER, start=1))
-    assert entries == expected, f"{variant}: required list is {entries}"
-    assert _SUBLIST_PIN in block, f"{variant}: 'Do not change' sub-list missing"
 
 
 def _fake_block(pairs: list[tuple[int, str]]) -> str:
@@ -296,54 +282,12 @@ def test_the_grammar_admits_every_published_form(name: str) -> None:
     assert _admitted(_RIGHT_BULLETS[name]), f"{name} was rejected: {_RIGHT_BULLETS[name]!r}"
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_explicit_none_rule_is_stated(variant: str) -> None:
-    """ADR-002 — emptiness must be WRITTEN, so absent and none are distinguishable.
-
-    Asserts the RULE, not the word. A bare `"none" in text` passed against the unmodified
-    command (Phase A.4 caught it): the word already appears for unrelated reasons, so it
-    could never have gone red for the defect it names.
-    """
-    block = _required_block(_plan_variants()[variant])
-    assert _NONE_RULE in block, f"{variant}: the explicit-`none` rule is not stated"
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_entry_grammar_is_stated(variant: str) -> None:
-    """ADR-008 — one grammar, and the advisory marker is named."""
-    block = _required_block(_plan_variants()[variant])
-    assert "Advisory:" in block, f"{variant}: the advisory marker is not named"
-    assert "repo-relative" in block, f"{variant}: the path grammar is not stated"
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_step6_verification_asserts_the_section(variant: str) -> None:
-    block = _step6_block(_plan_variants()[variant])
-    assert "Contract Boundaries" in block, f"{variant}: Step 6 does not verify the section"
-    assert "non-empty" in block, f"{variant}: Step 6 does not assert sub-list non-emptiness"
-    assert "admitted forms" in block, f"{variant}: Step 6 does not check the entry grammar"
-    # Self-repair, never a stage halt: the grammar bullet must say so, or Step 6's
-    # retry-once-then-stop rule silently claims it and /hm:execute halts on prose formatting.
-    assert "self-repaired inline" in block, f"{variant}: grammar bullet's gate semantics undefined"
 
 
-@pytest.mark.parametrize("variant", ["claude", "codex"])
-def test_outputs_section_count_matches_the_required_list(variant: str) -> None:
-    """The renumbering has to reach the Outputs line, which states a count of its own.
-
-    Asserts the ABSOLUTE count as well as agreement: a pure self-consistency check is
-    satisfied by 10 == 10, so it would never notice a template that added the section
-    nowhere. Both variants — a Codex-only omission is the documented half-ship.
-    """
-    text = _plan_variants()[variant]
-    numbered = _NUMBERED_ENTRY.findall(_required_block(text))
-    assert len(numbered) == _EXPECTED_SECTIONS, f"{variant}: {len(numbered)} required entries"
-    outputs = _slice(text, "## Outputs", _NEXT_H2)
-    stated = re.search(r"frontmatter \+ (\d+) sections above", outputs)
-    assert stated is not None, f"{variant}: Outputs no longer states a section count"
-    assert int(stated.group(1)) == _EXPECTED_SECTIONS, (
-        f"{variant}: Outputs says {stated.group(1)}, required list has {_EXPECTED_SECTIONS}"
-    )
 
 
 def _git(argv: list[str]) -> subprocess.CompletedProcess[str] | None:

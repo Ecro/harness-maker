@@ -38,12 +38,11 @@ from harness_maker.render import (
 SETTINGS_TEMPLATES = ("settings/Side.json.j2", "settings/Production.json.j2")
 
 # ADR-006 Stage 1 — non-blocking (Phase 1).
+# 0.64.0 (SPEC-hm-overhaul-p1 IRR-005) retired telemetry, post_write_reminder and
+# autopilot_autoarm through `_HARNESS_RETIRED_HOOK_INVOCATIONS`.
 STAGE1_MODULES = frozenset(
     {
-        "harness_maker.telemetry",
-        "harness_maker.hooks.post_write_reminder",
         "harness_maker.hooks.sessionid_envfile",
-        "harness_maker.hooks.autopilot_autoarm",
         "harness_maker.hooks.flush_session",
     }
 )
@@ -615,7 +614,7 @@ def test_render_settings_merges_hooks_and_preserves_foreign_keys(tmp_path: Path)
     assert data["enabledPlugins"] == {"harness-maker@local": True}, "Claude-owned key clobbered"
     cmds = _commands(data)
     assert "/usr/local/bin/mine.sh" in cmds, "user hook wiped by re-render"
-    assert any("harness_maker.telemetry" in c for c in cmds), "template hook not merged in"
+    assert any("harness_maker.hooks.flush_session" in c for c in cmds), "template hook not merged in"
     assert isinstance(data["permissions"]["deny"], list), "permissions regressed"
 
 

@@ -32,56 +32,12 @@ def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return out
 
 
-@pytest.mark.parametrize("stage", _STAGES)
-def test_stage_command_has_autopilot_advance_block(rendered_root: Path, stage: str) -> None:
-    body = (rendered_root / "commands" / "hm" / f"{stage}.md").read_text(encoding="utf-8")
-    assert "<!-- @hm:autopilot-advance -->" in body
-    # the deterministic boundary CLI, scoped to THIS stage.
-    assert "hm autopilot_caps boundary" in body
-    assert f"--current {stage}" in body
 
 
-@pytest.mark.parametrize("stage", _GATED_STAGES)
-def test_gated_stages_carry_their_mandatory_gate(rendered_root: Path, stage: str) -> None:
-    body = (rendered_root / "commands" / "hm" / f"{stage}.md").read_text(encoding="utf-8")
-    needles = {
-        # B3 reworded this gate when it became a judgment gate routed to the boundary. The
-        # needle tracks the surviving invariant — an unresolved architecture round is what
-        # the gate is about — not the old sentence.
-        "plan": "unresolved architectural AskUserQuestion round",
-        "review": "CHANGES_REQUESTED",
-        "wrapup": "auto-advance never pushes",
-        "verify": "verification check FAILED",
-    }
-    assert needles[stage] in body
 
 
-def test_picker_present_under_the_promoted_default_level(rendered_root: Path) -> None:
-    # ADR-010 promoted the default to `auto_safe`, so a NEW harness renders the
-    # session-start picker. The render-time gate itself is unchanged — it is still keyed on
-    # the level, and a project pinned back to `gated` still renders no picker
-    # (test_picker_absent_when_level_is_pinned_gated below).
-    body = _with_preamble(rendered_root, "research")
-    assert "<!-- @hm:autopilot-picker -->" in body
 
 
-def test_picker_absent_when_level_is_pinned_gated(tmp_path: Path) -> None:
-    """Negative control for the test above — without it that assertion is vacuous.
-
-    While the default was `gated`, "picker absent" WAS the control: it failed if the block
-    were emitted unconditionally. ADR-010 inverted the default, so the surviving positive
-    assertion would now pass even if the render-time gate were deleted outright. This
-    renders the other side of the gate.
-    """
-    from harness_maker.models import AutonomyConfig
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(
-        update={"autonomy": AutonomyConfig(level="gated", autopilot_persistent=False)}
-    )
-    render(synthesize(p, a), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    body = _with_preamble(tmp_path, "research")
-    assert "<!-- @hm:autopilot-picker -->" not in body
 
 
 def test_runtime_dispatch_is_structural() -> None:

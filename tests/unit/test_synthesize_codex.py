@@ -82,7 +82,9 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     # with the stage. The base-skill count is unchanged — `spec-validator` replaced
     # `plan-validator` one-for-one and agents are not skills.
     # +1 (2026-10-02, SPEC-world-model-name): the world-model router at `.agents/skills/<handle>/`.
-    expected = 13 + 6 + 1 + 1 + 1 + 1
+    # 0.64.0 (SPEC-hm-overhaul-p1): 6 base skills (six retired; second-opinion-gate only with
+    # `second_opinion.models`), 4 stage skills, no loop skills; + help + the world-model router.
+    expected = 6 + 4 + 1 + 1
     assert len(skill_paths) == expected, (
         f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
     )

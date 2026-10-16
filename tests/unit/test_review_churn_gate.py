@@ -158,41 +158,9 @@ def _render_review(*, gate: bool) -> str:
     return stage_text(out, "review")
 
 
-def test_below_threshold_churn_skips_rereview_is_wired_into_the_rendered_stage() -> None:
-    """Arithmetic nothing calls decides nothing (the round-1 P0 of this PLAN, verbatim)."""
-    body = _render_review(gate=True)
-    calls = [ln for ln in body.splitlines() if "hm review_consensus plan " in ln]
-    assert len(calls) == 1, f"expected one plan invocation, got {len(calls)}"
-    assert "--churn-ratio" in calls[0]
-    assert "--threshold" in calls[0]
 
 
-def test_the_gate_off_render_keeps_the_scope_selected_reviewer_set() -> None:
-    """The rollback in `rereview_churn_gate: false` has to actually restore the old text.
-
-    This is the only phase that removes a review that happens today; if the off-render
-    silently kept the gate, the escape hatch documented in `harness.yaml` would be a lie.
-    """
-    body = _render_review(gate=False)
-    assert "re-spawn ONLY reviewers whose scope was touched" in body
-    assert "hm review_consensus plan " not in body
-    assert "dispatch nobody" not in body.lower()
 
 
-def test_the_gate_on_render_states_the_unmeasurable_case_explicitly() -> None:
-    """The absent case is this repo's most-recurring failure class (count:8).
-
-    A null ratio must re-review, not skip. Without the branch the natural reading of
-    "below the threshold" swallows null and the gate skips every round it could not
-    measure — the exact silent no-op the learned correction describes.
-    """
-    body = _render_review(gate=True)
-    assert "null" in body
-    gated = body[body.index("Re-review (gated") :][:2000]
-    assert "as if the gate were off" in gated
 
 
-def test_both_renders_count_every_fix_in_a_skipped_round_as_unreviewed() -> None:
-    """The skip's cost must stay visible in the terminal measure, gate on or off."""
-    for gate in (True, False):
-        assert "`unreviewed_fix_count` = applied fixes" in _render_review(gate=gate)

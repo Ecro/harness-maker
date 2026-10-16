@@ -34,26 +34,26 @@ def test_tier1_explicit_override_beats_preset() -> None:
     )
     specs = _agent_files(
         preset=Preset.PRODUCTION,
-        agent_models={"autoloop-coder": custom},
+        agent_models={"spec-validator": custom},
     )
-    ctx = _spec_for("autoloop-coder", specs)
+    ctx = _spec_for("spec-validator", specs)
     assert ctx["claude_model"] == "haiku"
     assert "cursor_model" not in ctx, "the Cursor target was removed (0.63.0)"
     assert ctx["codex_reasoning_effort"] == "minimal"
 
 
 def test_tier2_preset_production_reasoning_agent() -> None:
-    """Production preset → autoloop-coder context has claude=opus."""
+    """Production preset → spec-validator context has claude=opus."""
     specs = _agent_files(preset=Preset.PRODUCTION)
-    ctx = _spec_for("autoloop-coder", specs)
+    ctx = _spec_for("spec-validator", specs)
     assert ctx["claude_model"] == "opus"
     assert ctx["codex_reasoning_effort"] == "high"
 
 
 def test_tier2_preset_side_downshifts_reasoning_agent() -> None:
-    """Side preset → autoloop-coder context has claude=sonnet (downshifted)."""
+    """Side preset → spec-validator context has claude=sonnet (downshifted)."""
     specs = _agent_files(preset=Preset.SIDE)
-    ctx = _spec_for("autoloop-coder", specs)
+    ctx = _spec_for("spec-validator", specs)
     assert ctx["claude_model"] == "sonnet"
     assert ctx["codex_reasoning_effort"] == "medium"
 

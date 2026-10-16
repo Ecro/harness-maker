@@ -51,7 +51,9 @@ def test_side_file_count_in_range() -> None:
     # Step 4.2's light check (IRR-003).
     # 68 → 71 (2026-10-15, SPEC-hm-light-lane-s3c): `.claude/hm/{stage-preamble,execute-plan,
     # spec-machine-full}.md`, the preamble and the full-lane PLAN and schema text (IRR-004).
-    assert 40 <= len(SIDE_FILES) <= 71
+    # 71 → 31 (0.64.0, SPEC-hm-overhaul-p1): four stages, no `.claude/stages/` or `.claude/hm/`,
+    # no configure/review/verify/loop commands, three base agents, six base skills.
+    assert 28 <= len(SIDE_FILES) <= 31
 
 
 def test_synthesize_side_returns_blueprint() -> None:
@@ -123,7 +125,9 @@ def test_synthesize_fused_workflow_command_count() -> None:
     # 7 → 6 atomic (2026-09-20, SPEC-plan-stage-absorption IRR-001): `/hm:plan` was removed.
     # `AtomicStage` is the single source for which stages render (ADR-007), so the count
     # follows the enum and there is no second place to forget.
-    expected = 6 + 8
+    # 0.64.0 (SPEC-hm-overhaul-p1): 4 atomic + 5 fixed (health/metrics/make/uninstall/help);
+    # configure, review, verify, loop and loop-p5-batch retired, so `loop.enabled` is inert.
+    expected = 4 + 5
     assert len(cmd_paths) == expected
 
 
@@ -136,13 +140,13 @@ def test_synthesize_includes_make_command() -> None:
     assert "commands/hm/make.md" in paths
 
 
-def test_synthesize_includes_configure_command() -> None:
-    """Phase 6: /hm:configure command template must be in the generated file list."""
+def test_synthesize_excludes_retired_configure_command() -> None:
+    """0.64.0 retired /hm:configure (SPEC-hm-overhaul-p1 IRR-002); edit harness.yaml and re-make."""
     p = _profile()
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a)
     paths = {str(f.path) for f in bp.files}
-    assert "commands/hm/configure.md" in paths
+    assert "commands/hm/configure.md" not in paths
 
 
 def test_synthesize_includes_uninstall_command() -> None:
@@ -343,8 +347,8 @@ def test_synthesize_ko_locale_propagates_into_atomic_command_body(tmp_path: Path
     spec_text = (tmp_path / "commands/hm/spec.md").read_text()
     research_text = (tmp_path / "commands/hm/research.md").read_text()
 
-    assert "Live UI** in `ko`" in spec_text, "spec.md still bakes en into stage body"
-    assert "`ko`" in research_text, "research.md still bakes en into stage body"
+    assert "talk to the user in `ko`" in spec_text, "spec.md still bakes en into stage body"
+    assert "talk to the user in `ko`" in research_text, "research.md still bakes en into stage body"
 
     # No bare `en` directive should leak through for ko-locale renders. We
     # whitelist the legend text that lists the mapping (`en→English, ...`).
@@ -424,8 +428,9 @@ def test_atomic_command_fallback_pins_block_strictness() -> None:
     assert resolve_strictness(HarnessConfig()) == "warn"  # sanity: the default would NOT pin
 
     files = _atomic_command_files()  # no config_dump → fallback path
-    body = next(ctx["stage_body"] for (_tpl, dest, ctx) in files if dest.endswith("execute.md"))
-    assert "explicit FAIL signal to `/hm:verify` Check 6" in body
+    # Since 0.64.0 the spec stage is where strictness shows (execute does not branch on it).
+    body = next(ctx["stage_body"] for (_tpl, dest, ctx) in files if dest.endswith("spec.md"))
+    assert "`blocked: true` halts" in body
 
 
 def test_hooks_json_not_a_blueprint_filespec() -> None:

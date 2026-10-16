@@ -5,34 +5,24 @@
 
 ## Workflow overview
 
-harness-maker provides 6 atomic stages.
+harness-maker provides 4 stages; `$hm-research` is optional.
 Invoke a stage by mentioning the skill name (e.g. `$hm-execute task-slug`).
 Use this Codex spelling in next-step and recovery guidance; recommend only available skills.
 
-### Atomic stages
+### Stages
 
 | Skill | Purpose |
 |-------|---------|
-| `$hm-research` | Multi-source fact-gathering; writes RESEARCH doc |
+| `$hm-research` | Optional: facts, prior art, alternatives; writes RESEARCH doc |
 | `$hm-spec` | Acceptance criteria, irreversible decisions; writes SPEC doc |
-| `$hm-execute` | Writes the PLAN (phases, ADRs), then TDD implementation; no commits |
-| `$hm-review` | Deep code review; grades A–F; writes REVIEW doc |
-| `$hm-verify` | Full check suite: tests + lint + type |
-| `$hm-wrapup` | Final tests, drift gate, single commit |
+| `$hm-execute` | PLAN, tests RED, code GREEN, one review; no commits |
+| `$hm-wrapup` | `hm check`, memory, single commit |
 
-### Autoloop
-
-{% if config.loop.enabled -%}
-| Skill | Purpose |
-|-------|---------|
-| `$hm-loop` | Bounded autoloop: interview → iterate the configured atomic stages → wrapup |
-{% else -%}
-`$hm-loop` is off — set `loop.enabled: true` in `.claude/harness.yaml` and run `/hm:make` to enable it.
-{% endif -%}
+Each stage stops when it is done; the next one is the user's call.
 
 ## Configuration
 
-- `harness.yaml` — worktree isolation, loop settings, reviewer list
+- `harness.yaml` — worktree isolation, reviewer list
 - Worktree isolation: {{ 'enabled' if config.worktree is defined and config.worktree.get('enabled') else 'disabled' }}
 - Reviewers: {{ config.reviewers.verbosity | default('standard') }} verbosity
 

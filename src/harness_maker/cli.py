@@ -443,6 +443,11 @@ def make(
     )
     _warn_world_model_handle_taken(target, a)
     _warn_removed_cursor_inputs(pre_yaml_body, targets_override, a, target)
+    # SPEC-hm-overhaul-p1 AC-007 / IRR-006: once per make, read from the file as the user left it.
+    from harness_maker.inert_keys import inert_key_warnings
+
+    for line in inert_key_warnings(pre_yaml_body):
+        typer.echo(f"warn: inert key {line}", err=True)
     # Seed `toolchains` from manifest detection, fill-if-empty (ADR-007). Placed AFTER the
     # override pass so a `--preset` rebuild cannot discard what we just seeded, and so a
     # user-authored value round-tripped from harness.yaml wins — `seed_toolchains` returns the
@@ -1050,10 +1055,12 @@ def _emit_install_summary(
             typer.echo(f"Mechanical checks: {'; '.join(answers.mechanical_checks)}")
 
         typer.echo("\nQuick start:")
-        typer.echo("  /hm:execute <task>       — implement a feature with TDD")
-        typer.echo("  /hm:health               — check the 2-layer harness health")
-        typer.echo("  /hm:configure            — adjust settings later")
-        typer.echo("  /hm:make                 — re-render after plugin update")
+        typer.echo("  /hm:spec <task>          — lock what to build and how to verify it")
+        typer.echo("  /hm:execute <task>       — tests first, then code, then one review")
+        typer.echo("  /hm:health               — check the harness health")
+        typer.echo(
+            "  /hm:make                 — re-render after a plugin update or a harness.yaml edit"
+        )
     except Exception:  # noqa: BLE001 — diagnostic, never fail the make
         pass
 

@@ -1,15 +1,15 @@
 # consensus-arbiter
 
-Aggregates the JSON findings produced by the reviewer set, runs the **surface match → reasoning alignment** consensus filter (matches `/hm:review` Step 4 contract), and tags each surviving finding so the auto-fix loop knows which are eligible for application.
+Aggregates the JSON findings produced by the reviewer set, runs the **surface match → reasoning alignment** consensus filter (matches the review step of `/hm:execute` Step 4 contract), and tags each surviving finding so the auto-fix loop knows which are eligible for application.
 
 {% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## Triggers
 
-- Invoked by `/hm:review` Step 4 when more than one reviewer ran in Step 3.
+- Invoked by the review step of `/hm:execute` Step 4 when more than one reviewer ran in Step 3.
 - Invoked by autoloop iteration boundary when reviewer findings need consolidation before grade computation.
 
-## Responsibilities (matches `/hm:review` Step 4)
+## Responsibilities (matches the review step of `/hm:execute` Step 4)
 
 ### Step 4a — Surface match (candidacy)
 
@@ -66,7 +66,7 @@ compute the exemption set; do not reimplement the logic in prose here. The
 helper takes **one** argument — it reads `REVIEWER_SCOPES` from its own module,
 so there is no `reviewer_scopes` parameter to pass.
 
-> **Reachability note.** `/hm:review` does not invoke this agent — its Step 4 runs
+> **Reachability note.** the review step of `/hm:execute` does not invoke this agent — its Step 4 runs
 > as prose — so the `scope-exempted` tag below exists only on this path and does
 > not appear in the review stage's Step 4d table. Whether this agent gets wired in
 > or retired is an open decision; do not assume either from its presence here.
@@ -86,7 +86,7 @@ shares one severity — apply that agreed severity. There is **no cross-tier
 resolution**: a P0 and a P1 on the same issue are NOT candidates (Hard Rule: No
 tier bridging) — they stay independent. Never synthesize a "middle" severity
 across tiers. Cross-tier same-issue findings that remain `manual-only` /
-`weak-consensus` at P0/P1 are surfaced by `/hm:review`'s `human_review_needed`
+`weak-consensus` at P0/P1 are surfaced by the review step's `human_review_needed`
 flag (ADR-001), not merged here.
 
 ### Step 4d — Tag every finding

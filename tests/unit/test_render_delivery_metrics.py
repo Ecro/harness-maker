@@ -26,31 +26,6 @@ def _file(files: dict[str, str], suffix: str) -> str:
     return next(t for p, t in files.items() if p.endswith(suffix))
 
 
-def test_metrics_command_always_full(tmp_path: Path) -> None:
-    """AC-010 (0.36.0): /hm:metrics always renders the full CFR+churn command —
-    trend-display, raw-counts, baseline-delta, LLM-interpretation (the machine
-    oracle's fixed marker set), two-pass adjudication flow, maturation-lag
-    disclaimer, untrusted-data framing — with no enable gate and no stub."""
-    body = _file(_render(tmp_path), "commands/hm/metrics.md")
-    required_metrics_markers = [
-        "hm delivery_metrics candidates",
-        "hm delivery_metrics adjudicate",
-        "hm delivery_metrics compute",
-        "hm delivery_metrics trend",
-        "failed/total",  # raw counts, never percentage alone (SPEC Outcomes)
-        "baseline delta",
-        "Interpret the trend",  # LLM-interpretation instruction block (AC-010)
-        "improvement suggestions",
-        "maturation",  # churn lag disclaimer (ADR-004 consequence)
-        "Untrusted data",  # REVIEW security P1: prompt-injection framing for commit content
-    ]
-    assert all(marker in body for marker in required_metrics_markers), [
-        m for m in required_metrics_markers if m not in body
-    ]
-    # Two-pass ordering: candidates → adjudicate → compute (ADR-006).
-    assert body.index("delivery_metrics candidates") < body.index("delivery_metrics compute")
-    # No enable/disable stub text survives.
-    assert "Delivery metrics are OFF" not in body
 
 
 def test_health_narrative_always_present(tmp_path: Path) -> None:

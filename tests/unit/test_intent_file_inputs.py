@@ -527,7 +527,8 @@ EXPECTED_CALL_SITES = {key for key, _ in CALL_SITES}
 #: Where the inline scan looks: the whole section, not only the call lines, so prose that
 #: describes arguments (a preview the operator confirms) cannot name an inline form either.
 _SCAN = {
-    "wrapup": re.compile(r"#### 5\.7.*?(?=\n#{2,4} )", re.S),
+    # 0.64.0: wrapup's intent writes are bullets of Step 5 (the 5.7 subsection is gone).
+    "wrapup": re.compile(r"## Step 5 — Memory.*?(?=\n## )", re.S),
     "intent-layer": re.compile(r".*", re.S),
 }
 _SECTION = {

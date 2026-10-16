@@ -231,34 +231,6 @@ def test_ac_002_a_lifetime_window_reports_every_dangling_authorization(tmp_path:
     )
 
 
-def test_ac_001_the_rendered_wrapup_produces_the_rollup_before_staging_it() -> None:
-    """A manifest entry for a file no template writes is AC-014's defect in AC-001's clothes.
-
-    Review finding P1-4: `wrapup.md.j2` staged `work-docs/BASELINE-ledger-rollup.md` as
-    `--optional`, and nothing in any rendered command generated it. On every harness where an
-    operator does not type the CLI by hand the file never exists, `wrapup_land` records
-    `absent-optional`, and ADR-002's "survives a clone" guarantee is unreachable. Ordering matters
-    as much as presence: staging before the producer would stage nothing.
-    """
-    template = (
-        Path(__file__).parents[2]
-        / "src"
-        / "harness_maker"
-        / "templates"
-        / "stages"
-        / "wrapup.md.j2"
-    ).read_text(encoding="utf-8")
-
-    producer = template.find("autopilot_ledger rollup")
-    stager = template.find(autopilot_ledger.ROLLUP_RELPATH)
-
-    assert producer != -1, (
-        "no rendered command produces the roll-up, so the manifest stages a file nothing writes"
-    )
-    assert stager != -1, "the manifest no longer stages the roll-up"
-    assert producer < stager, (
-        "the roll-up is staged before it is produced, so the first wrapup stages nothing"
-    )
 
 
 def test_ac_002_a_dangling_authorization_is_reported(tmp_path: Path) -> None:
@@ -337,38 +309,6 @@ def test_ac_001_the_rollup_reads_the_base_repo_not_the_worktree(
     )
 
 
-def test_the_rollup_path_is_named_in_wrapup_lands_manifest() -> None:
-    """The staging half of AC-001, guarded continuously rather than by a one-time shell check.
-
-    Phase 1's exit criterion checks `git ls-tree` once. Without this test the `--optional` entry
-    could be dropped from the template later and nothing would notice until measurements silently
-    stopped landing on a `worktree.enabled: false` harness — the `worktree-sweep` row records
-    `skipped-not-isolated` when the worktree IS the base, so the manifest entry is the only thing
-    that stages it there.
-    """
-    template = (
-        Path(__file__).parents[2]
-        / "src"
-        / "harness_maker"
-        / "templates"
-        / "stages"
-        / "wrapup.md.j2"
-    )
-    needle = f"--optional {autopilot_ledger.ROLLUP_RELPATH}"
-    invocations = [
-        line
-        for line in template.read_text(encoding="utf-8").splitlines()
-        if "hm wrapup_land --worktree" in line
-    ]
-
-    # UNIVERSAL, not aggregate. `count(needle) == 2` is satisfied by any distribution summing to
-    # two -- including one codex-branch hit plus one prose mention, which leaves the non-codex
-    # branch (the one this repo renders) unstaged. That is the repo's signature two-halves-one-
-    # checked failure. Quantifying over the invocation lines themselves is immune to a third
-    # variant, to a macro extraction, and to prose that merely discusses the manifest.
-    assert invocations, "no `hm wrapup_land --worktree` invocation found — the subject moved"
-    for line in invocations:
-        assert needle in line, f"invocation does not stage the roll-up: {line.strip()[:120]}"
 
 
 def test_rollup_on_an_empty_observability_dir_is_absence_not_health(tmp_path: Path) -> None:

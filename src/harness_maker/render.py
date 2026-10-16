@@ -900,6 +900,11 @@ _HARNESS_RETIRED_HOOK_INVOCATIONS: frozenset[str] = frozenset(
     {
         "<HM>:harness_maker.hooks.autopilot_guard",
         "<HM>:harness_maker.hooks.autopilot_guard --mode stop-hook",
+        # SPEC-hm-overhaul-p1 (0.64.0): the telemetry writer and the two autopilot-era
+        # hooks. Their `python -m` entry points are exit-0 stubs for kept user copies.
+        "<HM>:harness_maker.telemetry",
+        "<HM>:harness_maker.hooks.post_write_reminder",
+        "<HM>:harness_maker.hooks.autopilot_autoarm",
     }
 )
 

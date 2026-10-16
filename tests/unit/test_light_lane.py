@@ -244,40 +244,6 @@ def _lookup(fm: dict[str, Any], path: str) -> Any:
     return node
 
 
-@pytest.mark.parametrize("wt_on", [True, False], ids=["wt-on", "wt-off"])
-@pytest.mark.parametrize("spec_requirement", ["pass", "warn", "n-a"])
-def test_record_satisfies_wrapup_and_verify(wt_on: bool, spec_requirement: str) -> None:
-    """Every field wrapup Step 3 and verify Check 1 read at e7dd6648 is in the record example.
-
-    The fields come from the e7dd6648 readers' own text, not from the new reader: a bare
-    `task_slug` is the PLAN's, which the record must carry both at the top and in the verdict.
-    """
-    text = _light_check_reference(wt_on)
-    record_path_line = next(
-        ln for ln in text.splitlines() if "REVIEW-{slug}-{date}.md" in ln and "Write" in ln
-    )
-    assert RECORD_DIR[wt_on] in record_path_line
-    example = (
-        _record_example(text)
-        .replace("{slug}", SLUG)
-        .replace("{YYYY-MM-DD}", fx.RECORD_DATE)
-        .replace("pass | warn | n-a", spec_requirement)
-        .replace("pass | n-a", "pass")
-    )
-    fm = yaml.safe_load(example.strip().strip("-"))
-    readers = _readers(wt_on)
-    assert len(readers) == 64  # 16 configs per worktree arm x 2 runtimes x 2 readers
-    fields = {f for t in readers for f in READ_FIELD.findall(t)}
-    assert {"drift_verdict", "drift_verdict.task_slug", "task_slug"} <= fields
-    for field in fields:
-        value = _lookup(fm, field)
-        if field.endswith("task_slug"):
-            assert value == SLUG, field
-            assert fm["drift_verdict"]["task_slug"] == SLUG
-    assert isinstance(fm["drift_verdict"], dict)
-    assert fm["review_kind"] == "light-check"
-    assert fm["status"] == "PASSED"
-    assert fnmatch(f"REVIEW-{SLUG}-{fx.RECORD_DATE}.md", "REVIEW-" + SLUG + "-*.md")
 
 
 # ── AC-012 ─────────────────────────────────────────────────────────────────

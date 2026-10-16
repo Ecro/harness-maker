@@ -4,7 +4,7 @@
 > (`observability/dashboard.py:write_dashboard`, plain atomic write — not
 > append-only and not block-merged). Do not add hand-maintained panels here;
 > they are lost on the next health run. The 2-section schema below mirrors
-> exactly what the writer emits so `/hm:verify` Check 3 can read the
+> exactly what the writer emits, so a reader can parse the
 > `## Structural` `score:` line.
 
 ## Structural

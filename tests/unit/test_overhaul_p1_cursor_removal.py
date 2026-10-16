@@ -18,6 +18,7 @@ from harness_maker import hook_host, models, presets, readiness, reconcile, rend
 from harness_maker.io_utils import load_harness_yaml
 from tests._overhaul_p1_ref import (
     HEAD_SRC,
+    PRC_MERGE_SHA,
     REPO_ROOT,
     init_project,
     ref_root,
@@ -32,6 +33,13 @@ _WORKERS = 6
 @pytest.fixture(scope="module")
 def ref_src(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return ref_root(tmp_path_factory.mktemp("overhaul-ref")) / "src"
+
+
+@pytest.fixture(scope="module")
+def prc_src(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The render PR-C shipped. AC-001 is PR-C's relation; PR-S (0.64.0) changes the render on
+    purpose, so the differential is pinned to PR-C's merge commit rather than to HEAD."""
+    return ref_root(tmp_path_factory.mktemp("overhaul-prc"), PRC_MERGE_SHA) / "src"
 
 
 # ── AC-001: differential render ──────────────────────────────────────────────
@@ -160,7 +168,9 @@ _AGENT_MODELS = {
 }
 
 
-def test_ac001_render_equals_reference_without_cursor(tmp_path: Path, ref_src: Path) -> None:
+def test_ac001_render_equals_reference_without_cursor(
+    tmp_path: Path, ref_src: Path, prc_src: Path
+) -> None:
     cells: list[tuple[tuple[str, ...], str, bool, str | None]] = [
         (t, p, w, None) for t, p, w in itertools.product(_TARGETS, _PRESETS, _WORKTREE)
     ]
@@ -184,7 +194,7 @@ def test_ac001_render_equals_reference_without_cursor(tmp_path: Path, ref_src: P
     with ThreadPoolExecutor(_WORKERS) as pool:
         ref_trees = dict(zip(refs, pool.map(lambda c: job(ref_src, "ref", c), refs), strict=True))
         head_trees = dict(
-            zip(cells, pool.map(lambda c: job(HEAD_SRC, "head", c), cells), strict=True)
+            zip(cells, pool.map(lambda c: job(prc_src, "head", c), cells), strict=True)
         )
 
     failures: list[str] = []

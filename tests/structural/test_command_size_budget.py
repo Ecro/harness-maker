@@ -226,440 +226,16 @@ from .conftest import pin_install_ref
 # stage pointers/record links and closeout ordering remain inline. Exact prior
 # frozen vs HEAD vs final measurements are in BASELINE-DELTA for this task.
 _ATOMIC_RATCHET: dict[str, int] = {
-    # 33774 → 34533 (execute-step5-model-mismatch, 2026-08-08). Same bar as ADR-012 and the
-    # entries above: compaction FIRST, then the residue. Raw addition was +954; two passes cut
-    # it to +424 (−55%) — the new gate lost its dual codex/non-codex code fence for an inline
-    # command, the dirty-base paragraph and the crumb note were tightened now that both are
-    # provably loop-only, and the "sequences without wrapup" prose was halved.
-    # The residue is not prose. Step 5 instructed `worktree finalize <WT> stage-only` while the
-    # stage's own Step 0 is the per-task `task-preflight` — both render under the same `wt_on`,
-    # so on every isolated `/hm:execute` the document told the operator to merge into base a
-    # worktree that `task-land` owns, citing a "Step 0 `worktree create`" the rendered file no
-    # longer contains. The finalize is CORRECT under `/hm:loop`, whose `<WT>` is an
-    # `execute-<uuid>`, so a render-time gate cannot separate them: the residue is a runtime
-    # read of `rev-parse --abbrev-ref HEAD` that skips Step 5 on `hm/*` — the discriminator
-    # wrapup Step 7.7 already uses. Compressing it away restores a destructive instruction.
-    # Attributed in work-docs/BASELINE-DELTA-execute-step5-model-mismatch.md.
-    # 34533 → 35322 (multi-lens-review-round, 2026-08-10). +789. Phase A.5 went from one
-    # `test-reviewer` dispatch to three lens-scoped ones in a single message, and gained the
-    # merge algebra those three outputs need — PASS iff all three, union of `blocking_issues`
-    # deduped on `test_file:test_function:category`, worst-quality `per_scenario`, and
-    # `passing_tests` demoted to advisory because it carries bare function names with no
-    # `test_file` and so cannot identify the test a rewrite would freeze.
-    #
-    # The compaction-first bar is met by SUBSTITUTION, not by prose trimming: the shared
-    # reviewer brief is stated once and the three dispatch lines reference it, and the old
-    # per-dispatch ledger bullets collapsed to per-round ones (ADR-007). Raw addition was
-    # ~1.5k; what landed is +789.
-    #
-    # The residue is not compressible without deleting instruction. Three lenses need three
-    # dispatch lines — a single parameterised `Task(` template with a `<lens>` placeholder was
-    # tried first, cost ~500 fewer chars AND zero round-trips, and was REVERTED: the repo's own
-    # fan-out precedent (`research.md.j2`) uses three literal lines, and choosing the cheaper
-    # form because it was cheaper is the exact move that produced two of the four P0s in
-    # `opus5-selfreview-vs-harness-gates`. Attributed in
-    # work-docs/BASELINE-DELTA-multi-lens-review-round.md.
-    #
-    # 35322 → 37048 (+1726, same task, review round 2). Not new feature surface — every
-    # character is a defect fix a 3-voice review found in the round-1 text, and each one closes
-    # a hole that a render test could not see:
-    #   • the round-2 PASS rule was UNSATISFIABLE ("all three PASS" + "re-dispatch only failing
-    #     lenses" + "no verdict carries" — three verdicts cannot exist in round 2), so A.5 either
-    #     never cleared a retry or silently carried a stale verdict;
-    #   • a dead dispatch had no repair path, leaving a FAIL round with nothing to act on;
-    #   • the brief told lenses to report out-of-lens defects into a `suggestions` field the
-    #     schema does not have, so they were discarded and the lens returned PASS — which
-    #     defeated the measured justification for the fan-out itself;
-    #   • the dedupe key lacked `line`, collapsing two distinct bad assertions in one function.
-    # Attributed in the same BASELINE-DELTA document.
-    #
-    # 37048 → 38197 (+1149, same task, review round 3). Again defect repair only, zero new
-    # round-trips. The round-2 FIXES created three of these: the merge trusted a lens's
-    # self-reported PASS while the new brief openly allows a lens to report a defect (so an
-    # inconsistent-but-parseable reply passed the gate) — it now RECOMPUTES from the merged
-    # fields; routing duplicates to `per_scenario.quality=FAIL` made a blocking state with no
-    # repair action, burning the budget on identical rounds — a third repair arm now retargets
-    # or deletes the offending test; and a test AUTHORED for `scenarios_missing[]` was reviewed
-    # only by the coverage lens that asked for it, never by red-correctness or discrimination —
-    # authoring now re-dispatches all three.
-    #
-    # 38197 → 39343 (+1146, same task, review round 4 — the last). Defect repair, zero new
-    # round-trips. Round 3's own fixes produced the biggest one: the re-dispatch rule had grown
-    # to four clauses and clause (c) — "supplied a blocking_issues entry even if it returned
-    # PASS" — was UNREACHABLE, because the agent's PASS requires zero blocking_issues, so such a
-    # lens had already returned FAIL. Meanwhile the hole it was written for (a REWRITE means the
-    # other two lenses never see the changed file) stayed open, since the authoring clause only
-    # fired on authored tests. All four clauses collapsed to one: **repair anything → re-dispatch
-    # all three**, which also removes the standing contradiction with "no verdict carries".
-    # Also: the dedupe key stopped being line-keyed (two lenses anchor one defect on different
-    # lines, so it almost never merged) and now carries a line LIST; `per_scenario` FAIL with an
-    # empty `covered_by` routes to the authoring arm instead of naming a test that does not
-    # exist; and a truncated sentence — "Ask what those newly made reachable." — was completed.
-    #
-    # 39343 → 41222 (+1879, PLAN-ai-review-exit-criteria F1): `Phase A.4 — false-RED screen`,
-    # a numbered phase between A and A.5. Not new instruction so much as RE-ORDERED enforcement:
-    # Phase B has always screened for accidental passes, and always after the three-lens
-    # dispatch was already paid for. Eleven A.5 findings across two tasks were the single
-    # sentence "this test passes before the implementation exists"; each cost a reviewer round
-    # that one pytest run decides.
-    #
-    # The residue is two clauses that cannot be dropped without turning the screen into a worse
-    # rule than the one it replaces. (a) A passing test may be LEGITIMATE — a negative invariant
-    # is vacuously true until the construct it forbids exists — so the screen names both
-    # dispositions; "all tests must fail" would teach authors to delete the invariant. (b) "Do
-    # not infer the counts": the round-5 brief in this very task stated `24 failed, 3 passed`
-    # against a true 25/2 read off a progress string, and sent all three lenses hunting a test
-    # that did not exist. Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
-    # 41459 → 43200 (stuck-dispatch, 2026-08-17). +1741.
-    # **The previous entry's 41222 was STALE by 237 chars** — measured, not inferred: stashing only
-    # this task's template edit and re-running the `flag_on` fixture renders 41459. That drift
-    # predates this change and is NOT attributed to it; folding it in would have reported +1737 for
-    # a +1516 insertion, which is the `attribution-doc-reports-the-wrong-movement` class this repo
-    # has already paid for twice. The band (`measured*1.02`) is wide enough that a stale base passes
-    # silently, so it can only be caught by measuring both endpoints — do that when you re-baseline.
-    #
-    # What the +1516 buys: the `stuck` agent has shipped in every preset since 0.1.0 naming
-    # `/hm:execute` Phase A.5 / Phase D / ADR conflict as its OWN triggers, while no stage template
-    # dispatched it — the blocker path halted with the failure output and the agent written to
-    # explain it never ran.
-    # Compaction FIRST, per the bar the entries above set: the first draft was +1630 of prose, cut
-    # to +1136 by moving the rationale into the delta document. The +605 above that is what two
-    # review rounds added back, and none of it is prose: the four-step ordering that makes
-    # the dispatch unreachable from the GREEN exit (it rendered unconditionally, so a clean run
-    # read an unqualified "dispatch" imperative), the `[stuck] unavailable` degrade — including
-    # its has-not-answered arm, since the Codex join contract forbids reading a missing reply as
-    # a failure, so the other conditions never fire on a hang — the untrusted-DATA clause on the
-    # verbatim stderr the brief interpolates, and the `no Write tool` correction — `stuck` has
-    # `tools: Read, Grep, Glob`, so the original brief ordered a file write that cannot execute and
-    # the stage surfaced a path to a file that was never created.
-    # Attributed in work-docs/BASELINE-DELTA-stuck-dispatch.md.
-    # 43200 → 45169 (self-induced-regression-gate, folded 2026-08-19 at close-out). +1969, of
-    # which 864 is the standing 2% slack and 1105 was charged to that PLAN's declared
-    # `surface_allowance.commands.execute: 2008`. The growth itself landed in 43234d0e (Phase C.0's
-    # pre-repair declaration and the `targeted-test-selection` pointer) and was attributed then;
-    # what was missed is that the commit re-froze `surface_baseline.json` and NOT this dict.
-    # There are two ratchets on different counters — that file measures the rendered command's
-    # chars, this one measures `len(flag_on[name])` — so folding one leaves the other passing
-    # only for as long as the allowance stays in flight. Retiring the allowance without this
-    # entry turns the gate red on landed, reviewed, released work.
-    # Attributed in work-docs/BASELINE-DELTA-self-induced-regression-gate.md.
-    # 45169 → 47718 (ai-work-boundaries, folded 2026-08-19 at close-out). +2549, matching that
-    # PLAN's declared `surface_allowance.commands.execute`. Buys the Step 1 load clause for the
-    # PLAN's `Do not change` list, Phase C.0's citation, and the GREEN-exit comparison — which is
-    # ALSO the sole site defining what a crossing is, after five review rounds found the rule
-    # stated in four places and three of the four now defer to it. Attributed in
-    # work-docs/BASELINE-DELTA-ai-work-boundaries.md.
-    # BOTH ratchets are folded in this same commit. That PLAN's ADR-010 exists because
-    # 43234d0e folded `surface_baseline.json` and not this dict; folding one and not the other
-    # is invisible until the allowance retires, which is exactly when it is hardest to diagnose.
-    # 47718 → 48199 (review-scope-and-oracle, 2026-08-20). +481, and it was NOT tripping — the
-    # render fit under the standing 2% slack. Recorded anyway: leaving it there is exactly how
-    # the `review` entry below accumulated 1298 characters nobody could attribute. Phase D gains
-    # a pointer to `targeted-test-selection` §4.5's three-way classification of a RED run, which
-    # execute had no counterpart to: D.5 asks what a repair newly made REACHABLE, and nothing
-    # asked whether the red light was about something reachable at all. `grep -in 'unreachable'`
-    # over this template returned zero before this. The rule itself is in the skill, which
-    # neither ratchet measures; what is charged here is the pointer and the D.5 relation.
-    # 48199 → 49290 (observed-harness-gaps-salvage, 2026-09-19): +1091 over the recorded figure
-    # (+713 of it this task's, the rest landed-but-unrecorded slack); the warm tier now loads
-    # failure BODIES via `hm memory_retrieve` (is_codex-branched call + the topic-substitution
-    # warning + what the `high-recurrence` fence section is) instead of a one-line skim. The
-    # prose is the salvaged source's, already cut once to fit a zero-slack budget in 2026-08.
-    # Attributed in work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md.
-    # 49290 → 50383 (ai-native-sdlc-vs-intent-world, 2026-09-19): +1093, Phase C's rule for an
-    # irreversible decision the SPEC does not list (five categories, the narrowing questions,
-    # append-then-invalidate, interactive re-approve). Attributed in
-    # work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md §3.1.
-    # 50383 → 59260 (2026-09-20, SPEC-plan-stage-absorption). +8877, and this is the ratchet
-    # that must be folded HERE rather than declared: `/hm:plan` was deleted, so
-    # `surface_baseline.json` had to be re-frozen (a vanished command has no allowance
-    # escape — `assert not missing`), and once it is re-frozen a declared headroom would
-    # double-count. Both ratchets fold in this commit, which is the ADR-010 rule that
-    # exists because 43234d0e folded one and not the other. What the characters buy:
-    # Step 0 (PLAN authorship + required sections + the seven per-phase fields),
-    # Step 0.1 (prefilter / record / preserving frontmatter write), Step 0.2 (loop
-    # per-iter PLAN), Step 0.3 (write verification incl. contract-boundaries grammar).
-    # The shipped AGGREGATE fell 10.9% in the same change — `plan` was 62,703 chars.
-    # Attributed in work-docs/BASELINE-DELTA-plan-stage-absorption.md.
-    # 59260 → 60725 (same task, second fold): Step 0.1 gained `spec_need prefilter` +
-    # `record` (the evidence half of the removed Step 1.7 gate) and Step 0.2 gained the
-    # session-scoped `worktree loop-mode-active` call it had replaced with prose.
-    # 62820 → 63008 (understanding-handoff, 2026-09-26): +188, Step 0's ADR item requires a
-    # `**Decided by:**` provenance line. Attributed in
-    # work-docs/BASELINE-DELTA-understanding-handoff.md.
-    # 63008 → 43710 (2026-10-14, SPEC-hm-light-lane-s2b, stage 2b of HM-LIGHT-LANE): -19298. Phase
-    # A.5's procedure moved verbatim into `.claude/hm/execute-a5.md` and the command keeps the
-    # heading, the light-lane skip, a pointer and the ledger block. Nothing was deleted (the
-    # moved text is byte-identical, pinned by test_render_light_lane_s2b); the floor moves with
-    # the ceiling because the 0.80 floor would otherwise sit above the render. Folded here, not
-    # declared, per the ADR-010 rule above. work-docs/BASELINE-DELTA-hm-light-lane-s2b.md.
-    # 43710 → 37591 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -6731 on the
-    # a7403f2f render (44322): the preamble left for `.claude/hm/stage-preamble.md` (-4228 here) and
-    # Step 0's full PLAN text and Step 0.3's body for `.claude/hm/execute-plan.md`, behind the
-    # approval-status read, the routing sentence and the light PLAN block. The moved text is
-    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
-    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
-    "execute": 37591,
-    # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
-    # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
-    # and the shell-quoting rules for the free-text `--reason`. Attributed in
-    # work-docs/BASELINE-DELTA-validator-pass-cap.md.
-    # 47503 → 48595 (PLAN-plan-interview-comprehension): the shared disclosure partial, at
-    # this repo's own effective `depth: standard`. Compaction FIRST per the bar the entries
-    # around this one set — raw was +1923, a compaction pass cut it to +1547, and the review
-    # round took it to +1092 (−43% from raw). That last −455 is not compaction: the round
-    # found that ADR-008 gated only Step A's heading, so the ORIGINAL round-preamble block
-    # still rendered alongside the partial's and `/hm:plan` shipped two contradicting
-    # preambles at the default depth. Gating it deleted the duplicate. The residue is the
-    # feature: the design brief (which discloses the Step 1 draft the heading itself calls
-    # unshown) plus the round-state delta contract.
-    # A third-party harness at `depth: minimal` pays ZERO — that is AC-003, asserted by
-    # SHA-256 against a pre-change golden, not by character count. Attributed in
-    # work-docs/BASELINE-DELTA-plan-interview-comprehension.md.
-    #
-    # 48595 → 51130 (+2535, Phase 6 / AC-010): Step 4.5, terminal whole-document re-validation.
-    # Zero new round-trips — it re-uses the pass the two-pass cap already allows.
-    #
-    # `plan` removed 2026-09-20 (SPEC-plan-stage-absorption IRR-001) — the command no longer
-    # renders, so a ceiling for it would guard nothing. Its 62,703 chars are the single
-    # largest reason the shipped aggregate FELL 12.2% in this change.
-    # 26673 -> 27248 (+575, 0.52.1). The autopilot picker renders into EVERY stage, so a
-    # four-word correction there costs a little on all of them. It is the fix that
-    # unblocks autopilot on Codex entirely: the block was headed "(Claude Code only)",
-    # so a Codex session read its own rendered skill and stood down — while the CLI it
-    # would have called armed fine the whole time. Arming writes a marker and works in
-    # any runtime; only end-of-stage auto-advance needs the `Skill` tool.
-    # 25770 → 17292 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -4228 on the
-    # a7403f2f render (21520): the preamble (loop check, start banner, autopilot picker, output
-    # language) left for `.claude/hm/stage-preamble.md` behind one pointer. The moved text is
-    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
-    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
-    "research": 17292,
-    # 34760 → 35828 (review round 4): the `CHANGES_REQUESTED` resolution bullet gained an
-    # autopilot carve-out, and the APPROVED+human_review_needed bullet was split so the
-    # interactive and autopilot paths stop saying the same thing. Both were live
-    # contradictions with the enforceable gate — nothing in code can tell a failed grade
-    # from a passing one, so this prose IS ADR-010's guarantee on the review side and
-    # cannot be compressed away. Attributed in
-    # work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
-    #
-    # 35828 → 40700 (+4872, PLAN-ai-review-exit-criteria Phase 4). The largest review-stage
-    # raise in this table. It is one feature, not an accretion: the stage stops exiting on
-    # "no more findings" and starts exiting on a declared failure space having been covered.
-    # The characters are the five-lens dispatch fence, the per-lens result contract, the
-    # coverage CLI call and its verdict keys, the approval condition's second conjunct, the
-    # AC-013 blocker, and the auto-fix re-dispatch rule.
-    #
-    # Compaction ran FIRST, per the bar the entries above set: raw was +5158, a pass cut it to
-    # +4872 (−286) by deleting a Step-1 paragraph that Step 3 restated and tightening three
-    # sentences. That is a small return, and the reason is worth recording — most of this
-    # delta is not prose but STRUCTURE that render tests bind to: five literal `Task(` lines
-    # and five literal `<lens>.json` paths, which cannot collapse to a placeholder without
-    # making the per-lens assertions unrenderable and the concurrency claim a serial loop.
-    # Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
-    #
-    # 40700 → 46525 (+5825, Phase 5): the confirmation pass. This is criterion ⑤ — N clean
-    # passes on a FROZEN diff — and it is the half that makes ④ mean anything: covering the
-    # declared failure space over an artifact that moves under you is coverage of nothing in
-    # particular. The stage's prior exit re-reviewed only touched scopes, so the last round's
-    # fixes always left unreviewed, and fixes introduce defects at close to 1:1.
-    #
-    # The characters are the freeze/read-base calls, the `review_base..<freeze>` span rule, the
-    # per-pass results contract, and a SIX-ARM outcome block. That block is where the bytes are
-    # and it does not compress: the arms are (incomplete coverage) × (clean) × (auto_fix off) ×
-    # (first pass) × (second pass), and this SPEC's own S4a exists because an earlier draft
-    # collapsed two of them and produced a state that matched NO branch — zero-new-severe with
-    # incomplete coverage. Merging arms to save characters is how that hole was made.
-    # Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
-    #
-    # 46525 → 47652 (+1127, round-2 review repairs). Not new feature surface — three defects
-    # the review found, each of which needed the instruction to change:
-    #   • the five freeze/coverage calls ran in the BASE repo (no `cd <WT>`), so the
-    #     confirmation pass froze a tree containing none of the fixes and approved;
-    #   • the coverage check now takes `--round` once per round, because a per-round reading
-    #     made a healthy review permanently unapprovable — and the first repair said "take the
-    #     union yourself", which the gate forbids, so the CLI computes it instead;
-    #   • the frozen refs are released at the terminal state, because `prune_stale`'s sweep
-    #     needs a live task slug and the Side preset never has one.
-    # Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
-    #
-    # 47652 → 60550 (+12898, PLAN-review-loop-empirics Phases 1–7). The largest single ratchet
-    # move in this table, made deliberately and with the pre-change figure recorded here
-    # because risk R11 of that PLAN predicted this line would be the thing that blocked it.
-    # Every character is in ONE command; nothing else in the shipped surface moved.
-    #   • the axis: seven lenses dispatched at round 1 and again by the confirmation pass,
-    #     which must render its OWN brief list — six of the seven share `code-reviewer` and are
-    #     told apart only by the brief line, so a back-reference is not runnable;
-    #   • four executable seams that were prose: `review_consensus finalize`, `plan`, the
-    #     churn pins/measure, and the oscillation scan. Prose has no surface a test can bind
-    #     to, and this PLAN's round-1 P0 was exactly that — arithmetic nothing called;
-    #   • the churn gate's third branch (a null ratio re-reviews as if the gate were off),
-    #     which is a paragraph and is the branch that keeps the gate from silently skipping
-    #     every round it could not measure.
-    # This PLAN spends context to buy back reviewer DISPATCHES and repair ROUNDS. Whether that
-    # trade paid is not yet decidable — the churn rows and round-trip counts exist to answer it
-    # and have no live corpus. Attributed in work-docs/BASELINE-DELTA-review-loop-empirics.md.
-    # 60550 → 63924 (self-induced-regression-gate, folded 2026-08-19 at close-out). +3374, of
-    # which 1211 is the standing 2% slack and 2163 was charged to that PLAN's declared
-    # `surface_allowance.commands.review: 2301` — 138 characters of the declaration went unspent.
-    # Growth: Step 0's run-open block, the id-source sentence and the five `close` instructions
-    # (43234d0e). Same half-done fold as the `execute` entry above; see it for why this dict was
-    # missed. Attributed in work-docs/BASELINE-DELTA-self-induced-regression-gate.md.
-    # 63924 → 65198 (review-loop-ledger-fixes, 2026-08-20). +1274, the permanent home for the
-    # growth that PLAN-review-loop-ledger-fixes carried in `surface_allowance` while it was in
-    # flight. That allowance expires the moment the PLAN's status flips to `complete`
-    # (`surface_allowance._sole_active` documents the handoff), so the fold has to land here or
-    # the next run of this gate reads the growth as unattributed. Attributed in
-    # work-docs/BASELINE-DELTA-review-loop-ledger-fixes.md; the figure is measured, not declared.
-    #
-    # What it bought, in the order it was paid: a `disposition_counts` field so the disposition
-    # gate leaves a machine-readable trace at all (its rejection rate was previously unreadable
-    # from disk); a reachability question before the auto-fix loop calls a failing test a
-    # regression; P2 out of the auto-fix queue. Then two review rounds found a P0 each and the
-    # mechanism was reduced twice — the second reduction deleted a 228-line shared store and paid
-    # +182 prompt characters for the `tee` / `--measured` plumbing that replaced it, and the
-    # repairs for that reduction's own P0 (`--spec` rendered onto `tee` instead of the producer)
-    # added `set -o pipefail` on four template arms, an absolute-path rule, and the `!` auto-exec
-    # marker the telemetry step never had. The last of those also moved round_trips 37 → 38.
-    # 65198 → 67008 (review-scope-and-oracle, 2026-08-20). Two numbers, and they are not the
-    # same number. **This change costs +512** — measured by rendering the fixture with and
-    # without the template edits (66 496 → 67 008). The other **+1298 is drift that was already
-    # there**: the previous fold recorded 65 198 while the render was 66 496, and the standing
-    # 2% slack (ceiling 66 501) hid the gap by five characters. It is the half-done fold the
-    # `execute` entry above describes — the figure was taken before that task's last repair
-    # commit landed. Folding it silently into a "+1810 bought X" claim would attribute another
-    # task's growth to this one, so it is separated here and in the delta doc.
-    #
-    # The first draft of this change cost +900 and the residue is +512, because the oracle-scope
-    # rule MOVED rather than shrank: it lives in `targeted-test-selection` §4.5, which neither
-    # ratchet measures, and this command keeps a pointer plus the two things that are review's
-    # own — revert-either-way, and the per-cause log vocabulary. Two sources of truth for one
-    # rule is what the `consistency` lens is told to flag; the pointer form also gives the same
-    # rule to `/hm:execute` Phase D for one line there.
-    #
-    # What the +512 buys: the three-way classification of a RED verify run reaches this loop at
-    # all. Both rules in this change answer one defect class, found running this harness against
-    # a firmware experiment — three real defects were TRIGGERED inside the changed file but
-    # CAUSED in files the diff never touched, and the reviewers' `Diff scope` hard rule read as
-    # permission to read there but not to report there. Widening reporting alone is a half fix:
-    # once findings point outside the diff, FIXES follow them there, and `targeted-test-selection`
-    # derives targets from the CHANGED files — so a correct fix against a real upstream symbol is
-    # checked by a target that does not contain it and fails to link. Externally observed:
-    # `undefined reference to 'power_sampling_active'` on a function that exists, in a fix that
-    # was right. The reporting half costs nothing here — it lives in the shared `hard_rules`
-    # partial, which this dict does not measure.
-    # Attributed in work-docs/BASELINE-DELTA-review-scope-and-oracle.md.
-    # 67008 -> 70818: PLAN-bench-study-adoption's end-of-task fold, taken from the base repo
-    # at squash commit 15669b4e with `work-docs/BASELINE-DELTA-bench-study-adoption.md` as the
-    # attribution. The growth is the four prescriptions' prose plus the seven repairs its own
-    # live review found. `execute` did not move; this task edited one stage template.
-    # 70818 -> 71143: the probe check went advisory before release (+325, one paragraph).
-    # Blocking on a canary that fails lenses which HAVE read the repository would have made
-    # every consuming Production harness's review permanently unapprovable.
-    # 71143 -> 70153 (PLAN-probe-envelope-contract Phase 3, -990): the canary was retired
-    # outright, taking the +325 above plus the Step-3 carry paragraph and the confirmation
-    # pass's re-derive note. Lowered rather than left as slack: a net-negative change that
-    # keeps its old ceiling hands the next task ~1k of headroom no BASELINE-DELTA row
-    # explains, which is the silent absorption SPEC-workflow-loop-efficiency.md:126 forbids.
-    # RE-DERIVED 2026-09-08 (PLAN-token-efficiency-autopilot-ux-speed ADR-011, AC-013).
-    # The ratchet fixtures were models-OFF, so both ceilings were set for a document without
-    # the second-opinion dispatch recipes — prose that this repo's own harness renders, and
-    # that no band had ever seen. `_render` now passes `_RATCHET_MODELS`; measured through the
-    # same pinned fixture, only these two entries moved outside their bands (the other five
-    # atomic commands do not include the partial and are byte-identical), which is exactly the
-    # carve-out ADR-011 authorises. This is the SINGLE re-derivation that decision permits:
-    # re-deriving again to absorb a later edit is `ratchet-rebaselined-by-its-own-subject`.
-    #   review: 70153 -> 80586 (+10433, models-on)
-    # 82883 → 56211 (2026-10-14, SPEC-hm-light-lane-s2b): -26672. The auto-fix rounds
-    # (`review-autofix.md`) and the confirmation pass (`review-confirmation.md`) moved verbatim;
-    # the command keeps both headings, their start conditions, the light-lane skip rule and a
-    # pointer each. `verify` and `wrapup` do not move here: this fixture delegates neither stage,
-    # and a non-delegated stage keeps its body inline (s2b ADR-006).
-    # 56211 → 52462 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -4228 on the
-    # a7403f2f render (56690): the preamble (loop check, start banner, autopilot picker, output
-    # language) left for `.claude/hm/stage-preamble.md` behind one pointer. The moved text is
-    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
-    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
-    "review": 52462,
-    # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
-    # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
-    # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text
-    # would instruct it to show an artifact it never produces. §2.3's existing round
-    # preamble is SUBSUMED rather than stacked, so the round-state half is close to a swap.
-    # Attributed in work-docs/BASELINE-DELTA-plan-interview-comprehension.md.
-    # 32114 → 34664 (ai-native-sdlc-vs-intent-world, 2026-09-19): `spec` became judgment-gated,
-    # so the shared end-of-stage partial renders its classify-then-boundary branch (the larger
-    # share), plus the approve/exempt stamps, the irreversible-decision rule, the 🔒 section and
-    # the v3 schema note.
-    # Attributed in work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md §3.1.
-    # 34664 → 43957 (2026-09-20, same task). +9293: Step 4.6 — the `spec-validator`
-    # dispatch with its ledger row and the pass-cap / over-cap / one-terminal contracts,
-    # the mandatory-matrix gate, and the cross-model second-opinion main loop, all
-    # relocated from the removed plan stage — plus `interview_rounds` in the frontmatter
-    # contract. Same fold-both-ratchets note as `execute` above.
-    # 43957 → 45248 (same task, second fold): the cross-model second-opinion MAIN LOOP moved
-    # here from the removed plan stage — CLAUDE.md documents that matrix as a Production
-    # guarantee over the judgment-gated stages, which are now `review` and `spec`. Also the
-    # ledger pass-cap / over-cap / one-terminal contracts and the barrier-index integer note.
-    # 46621 → 34867 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -5737 on the
-    # a7403f2f render (40604): the preamble left for `.claude/hm/stage-preamble.md` (-4228 here),
-    # Step 3.5's full schema for `.claude/hm/spec-machine-full.md` behind the minimal one, and Step
-    # 4 describes the quiet `check --all`. The moved text is byte-identical
-    # (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling, as for 2b.
-    # work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
-    "spec": 34867,
-    # 23796 → 24935 (+1139, 2026-08-16, cross-runtime test-execution recipe). One paragraph,
-    # in the stage that owns the whole-suite pass, saying: ask `hm test_runners plan` for THIS
-    # runner rather than pasting a parallel flag. The flag is not portable advice — `cargo`,
-    # `go`, `vitest`, `jest` and `flutter` are ALREADY parallel and a worker flag there caps or
-    # nests instead of accelerating, while `pytest` is the one common runner that is serial by
-    # default. Attributed in work-docs/BASELINE-DELTA-plan-validator-transfer.md.
-    # 25387 → 16266 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -4228 on the
-    # a7403f2f render (20494): the preamble (loop check, start banner, autopilot picker, output
-    # language) left for `.claude/hm/stage-preamble.md` behind one pointer. The moved text is
-    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
-    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
-    "verify": 16266,
-    # 41345 → 42452 (PLAN-workflow-time-token-savings B3/B4): the shared
-    # `stage_end_summary` partial gained the judgment-gate discriminator and
-    # `step_manifest` gained the `ask-pending` picker branch, both of which every stage
-    # command inlines. wrapup is the largest command, so it is the one that crossed its
-    # ceiling first. Attributed in work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
-    # 42452 → 44654 (playbook-alignment, 2026-09-16): the intent layer's wrapup 5.7 (two
-    # answer-gated questions) landed under its own `surface_allowance`, which expired with its
-    # PLAN; the ratchet is re-based to the landed figure so the growth stays attributed
-    # (work-docs/BASELINE-DELTA-playbook-alignment.md §2.1). This task's own +67 (the `--claim`
-    # clause on the observe line) rides on its declared allowance, not on this number.
-    # 44654 → 45646 (intent-layer-ops, 2026-09-18): outcome-measure's +601 (the third
-    # answer-gated block) and this task's +324 (one 5.7 sentence surfacing
-    # `withdrawal.due`) together took the ask@flag_on render past the 2 % band; re-based
-    # to the landed figure. Attributed in work-docs/BASELINE-DELTA-intent-layer-ops.md §3.1.
-    # 45646 → 47413 (observed-harness-gaps-salvage, 2026-09-19): the previous task's +713 had
-    # stayed inside the 2 % band; this task's +1054 main-loop proposal-backlog paragraph at the
-    # head of `Steps 6 → 7.6` (call, JSON contract, warning line, degrade + halt exemption)
-    # took ask@flag_on past it. Re-based to the landed figure, attributed in
-    # work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md.
-    # 47413 → 48388 (mission-context-loop, 2026-09-19): +975, the wrapup 5.1.0 fact-safe
-    # search-before-write (one `hm memory_retrieve` call, the exact-slug Grep check and its
-    # base-path rule). First re-based to 47084 on top of assumption-entry; re-based again at
-    # wrapup onto observed-harness-gaps-salvage, whose Steps 6 → 7.6 paragraph is disjoint, so
-    # the deltas add. Attributed in work-docs/BASELINE-DELTA-mission-context-loop.md §3.1.
-    # 50649 → 52162 (understanding-handoff, 2026-09-26): +1513, the `Steps 6 → 7.6` paragraph
-    # asking for the commit-body `Understanding:` block, and the instruction to print that block
-    # immediately before the closing banner — re-read from the `--message-file`, with a branch
-    # that surfaces the warning when no usable block landed (review moved it out of the `Done`
-    # line, then anchored its source and added the branch). Re-based rather than left to
-    # consume the next task's headroom. Attributed in
-    # work-docs/BASELINE-DELTA-understanding-handoff.md.
-    # 52162 → 52323 (understanding-handoff follow-up, 2026-09-27): +161, the closing print takes
-    # `steps.understanding_block` from the receipt (resume-safe) and handles a receipt without
-    # the key. Attributed in the same document.
-    # 52323 → 45631 (2026-10-15, SPEC-hm-light-lane-s3c, stage 3c of HM-LIGHT-LANE): -4228 on the
-    # a7403f2f render (49859): the preamble (loop check, start banner, autopilot picker, output
-    # language) left for `.claude/hm/stage-preamble.md` behind one pointer. The moved text is
-    # byte-identical (test_render_light_lane_s3c AC-002/AC-011); the floor moves with the ceiling,
-    # as for 2b. work-docs/BASELINE-DELTA-hm-light-lane-s3c.md.
-    "wrapup": 45631,
+    # 0.64.0 (SPEC-hm-overhaul-p1): seven stages collapsed to four and each was rewritten to
+    # its AC-004 budget, so every entry was re-measured here from the ratchet fixture
+    # (`flag_on`: Production, worktree on, `second_opinion.models: [codex]`). The binding
+    # per-stage ceilings are now AC-004's, in `tests/unit/test_overhaul_p1_surface.py`; this
+    # table keeps the ±2%/−20% band around what ships so a later edit still has to say why.
+    # Entry history before the collapse is in git and in work-docs/BASELINE-DELTA-*.md.
+    "execute": 7274,
+    "research": 4554,
+    "spec": 7033,
+    "wrapup": 4407,
 }
 
 
@@ -777,14 +353,6 @@ def flag_on(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     )
 
 
-@pytest.fixture(scope="module")
-def flag_on_loop(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
-    return _render(
-        feature_branch_workflow=True,
-        tmp=tmp_path_factory.mktemp("on-loop"),
-        second_opinion_models=_RATCHET_MODELS,
-        loop=True,
-    )
 
 
 @pytest.fixture(scope="module")
@@ -828,7 +396,7 @@ def test_the_fixtures_actually_rendered_commands(
     # assertion would KeyError-or-pass against a render that produced no stage commands.
     assert set(_ATOMIC_RATCHET) <= set(flag_off), sorted(set(_ATOMIC_RATCHET) - set(flag_off))
     assert set(_ATOMIC_RATCHET) <= set(flag_on), sorted(set(_ATOMIC_RATCHET) - set(flag_on))
-    assert all(len(flag_on[k]) > 10_000 for k in _ATOMIC_RATCHET)
+    assert all(len(flag_on[k]) > 3_000 for k in _ATOMIC_RATCHET)
 
 
 def test_no_rendered_command_bakes_a_machine_specific_absolute_path(
@@ -886,7 +454,7 @@ def test_ac_013_the_ratchet_render_carries_second_opinion(flag_on: dict[str, str
     """
     assert _RATCHET_MODELS, "the ratchet is back to a models-off render; the ceilings do not apply"
 
-    for name in ("review", "spec"):
+    for name in ("execute",):
         assert "second_opinion_invoke" in flag_on[name], (
             f"the ratchet's {name} fixture has no second-opinion dispatch, so its ceiling was "
             "derived against a document this repo's harness does not render"
@@ -907,7 +475,7 @@ def test_ac_013_the_models_delta_is_produced_by_configuration(
 
     assert set(off) == set(flag_on), "the two configurations rendered different command sets"
 
-    for name in ("review", "spec"):
+    for name in ("execute",):
         assert len(off[name]) < len(flag_on[name]), (
             f"{name} did not grow when second-opinion models were enabled, so the flag renders "
             "nothing and the re-derivation had no subject"
@@ -916,11 +484,11 @@ def test_ac_013_the_models_delta_is_produced_by_configuration(
             f"{name} names the invoker with models off — the partial is not byte-zero when disabled"
         )
 
-    unchanged = sorted(set(_ATOMIC_RATCHET) - {"review", "spec"})
+    unchanged = sorted(set(_ATOMIC_RATCHET) - {"execute"})
     moved = [n for n in unchanged if off[n] != flag_on[n]]
     assert moved == [], (
         f"enabling second-opinion models moved {moved}, whose ceilings were NOT re-derived — "
-        "ADR-011's carve-out names only review and plan"
+        "since 0.64.0 only execute's review step carries the second-opinion block"
     )
 
 
@@ -928,16 +496,7 @@ def test_the_atomic_table_covers_every_atomic_command(flag_on: dict[str, str]) -
     """A command missing from the table is a command with no budget at all — the silent
     way this arm narrows. Meta commands are excluded by name, not by omission — and
     since the fused axis went (ADR-001) there is nothing else left to exclude."""
-    rendered_atomic = set(flag_on) - {
-        "configure",
-        "health",
-        "help",
-        "loop",
-        "loop-p5-batch",
-        "make",
-        "metrics",
-        "uninstall",
-    }
+    rendered_atomic = set(flag_on) - {"health", "help", "make", "metrics", "uninstall"}
     assert rendered_atomic == set(_ATOMIC_RATCHET), sorted(rendered_atomic ^ set(_ATOMIC_RATCHET))
 
 
@@ -1024,32 +583,8 @@ def test_the_fingerprint_rejects_a_heading_with_an_empty_body(flag_on: dict[str,
         assert shared_prose_fingerprints(text.replace(sentence, ""), block) == 0, block
 
 
-def test_atomic_renders_keep_their_own_copy(flag_on: dict[str, str]) -> None:
-    """The hoist is fused-only — an atomic command still carries the WHOLE block.
-
-    "Whole" is checked through the tail markers, not just the intro fingerprint. An
-    atomic render that kept the opening sentence and lost the `<WT>` rule and the
-    drift remedy fingerprinted as intact; the mutation receipt's M10 survived on
-    exactly that, and nothing else in this file measures atomic size.
-    """
-    for stage in ("execute", "review", "wrapup", "verify", "spec", "research"):
-        text = flag_on[stage]
-        assert shared_prose_fingerprints(text, "worktree_preflight") == 1, stage
-        # SPEC-hm-light-lane-s2: Gate 0 is loop-only and this render has the loop off; the
-        # loop-on copy is pinned by tests/render/test_render_light_lane_s2.py (AC-002).
-        assert shared_prose_fingerprints(text, "gate0_receipt") == 0, stage
-        assert shared_prose_fingerprints(text, "stage_end_banner") == 1, stage
-        for marker in _PREFLIGHT_TAIL_MARKERS:
-            assert text.count(marker) == 1, f"{stage}: {marker}"
-        assert "- **`skipped`** —" not in text, stage  # a Gate 0 line, so loop-only too
 
 
-def test_loop_on_atomic_renders_keep_one_gate0_copy(flag_on_loop: dict[str, str]) -> None:
-    """The loop-on half of the check above: Gate 0 renders whole, exactly once per stage."""
-    for stage in ("execute", "review", "wrapup", "verify", "spec", "research"):
-        text = flag_on_loop[stage]
-        assert shared_prose_fingerprints(text, "gate0_receipt") == 1, stage
-        assert "- **`skipped`** —" in text, stage
 
 
 # ── AC-007 ─────────────────────────────────────────────────────────────────────

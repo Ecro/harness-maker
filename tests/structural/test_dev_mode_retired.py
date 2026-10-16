@@ -15,7 +15,6 @@ uppercase document prefix, so a bare `dev_mode` or `spec-driven` is still caught
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 
@@ -44,11 +43,6 @@ def snapshot_arms() -> list[Path]:
     return sorted((ROOT / "tests" / "snapshot").glob("*.expected.yaml"))
 
 
-def instruction_baseline_keys() -> list[str]:
-    data = json.loads((ROOT / "tests" / "structural" / "instruction_baseline.json").read_text())
-    return list(data["commands"])
-
-
 def test_ac_005_snapshot_arms_halve() -> None:
     from harness_maker import step_sensitivity as ss
     from harness_maker.models import Preset
@@ -56,9 +50,6 @@ def test_ac_005_snapshot_arms_halve() -> None:
     arms = snapshot_arms()
     assert len(arms) == 4, [a.name for a in arms]
     assert not any(a.name.endswith(("-spec.expected.yaml", "-task.expected.yaml")) for a in arms)
-    assert not any(
-        "@" in k and k.split("@")[1] in {"spec-driven", "task-driven"}
-        for k in instruction_baseline_keys()
-    )
+    # `instruction_baseline.json` left with the instruction-preservation gate in 0.64.0.
     # One render arm per preset: the matrix is a function of `preset` alone.
     assert set(ss.ARMS) == set(Preset)

@@ -54,7 +54,8 @@ def _wrapup_template_path() -> Path:
 # pinning obligation is unchanged — this integration test must replay the REAL production
 # path list, never a paraphrase — so only the shape it reads has moved, from a shell
 # `for p in <paths>` header to the flag list on the same `!` line.
-_WRAPUP_LAND_RE = re.compile(r"^!.*\bhm wrapup_land\b(.*)$", re.MULTILINE)
+#: 0.64.0: the call is an inline code span the model runs through the shared `hm` prefix.
+_WRAPUP_LAND_RE = re.compile(r"`hm wrapup_land\b([^`]*)`")
 _MANIFEST_FLAG_RE = re.compile(r"--(?:required|optional)\s+(\S+)")
 
 
@@ -70,7 +71,7 @@ def _extract_wrapup_git_add_args() -> str:
     match = _WRAPUP_LAND_RE.search(body)
     if not match:
         raise AssertionError(
-            "wrapup.md.j2 has no `!… hm wrapup_land …` staging call — template drift "
+            "wrapup.md.j2 has no `hm wrapup_land …` staging call — template drift "
             "broke integration-test pinning. Update _WRAPUP_LAND_RE or restore the line "
             "shape."
         )
@@ -81,6 +82,9 @@ def _extract_wrapup_git_add_args() -> str:
         .replace("{{ config.work_docs.dir }}", "work-docs/")
         .replace("{{ config.spec.dir }}", "specs/")
         .replace("{slug}", "phase4-integration")
+        .replace("<slug>", "phase4-integration")
+        .replace("<Y>", "specs/SPEC-phase4-integration.machine.yaml")
+        .replace("'", "")
     )
     paths = _MANIFEST_FLAG_RE.findall(flags)
     if not paths:

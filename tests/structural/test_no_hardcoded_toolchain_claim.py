@@ -31,17 +31,14 @@ EXPECTED_ANCHORED = {
     "src/harness_maker/templates/skills/second-opinion-gate/SKILL.md.j2",
 }
 
-# ADR-009's explicit deferral list — the eight surfaces that still hardcode the Python triple
+# ADR-009's explicit deferral list — the surfaces (eight until 0.64.0 retired verify, loop and
+# two skills) that still hardcode the Python triple
 # for their OWN purposes (verify/wrapup/loop gates, permission prefixes, a rubric example).
 # They are out of scope this round and migrate onto `toolchains` later, with no key move
 # because ADR-002 placed the key at the root. This constant is that deferral's single
 # machine-readable home: adding a surface here is a deliberate, reviewable act.
 DEFERRED_SURFACES = {
-    "src/harness_maker/templates/stages/verify.md.j2",
     "src/harness_maker/templates/stages/wrapup.md.j2",
-    "src/harness_maker/templates/commands/hm/loop.md.j2",
-    "src/harness_maker/templates/skills/verify-before-completion/SKILL.md.j2",
-    "src/harness_maker/templates/skills/targeted-test-selection/SKILL.md.j2",
     "src/harness_maker/templates/rubrics/claude_md.yaml.j2",
     "src/harness_maker/templates/settings/Production.json.j2",
     "src/harness_maker/templates/settings/Side.json.j2",

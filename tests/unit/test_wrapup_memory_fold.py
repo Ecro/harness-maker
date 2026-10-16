@@ -193,40 +193,6 @@ def test_tier_pathspec_corresponds_to_memory_md_writers() -> None:
     assert session_rel in _HUMAN_MEMORY_TIER_PATHSPEC
 
 
-def test_tier_pathspec_covers_every_memory_output_wrapup_writes() -> None:
-    """memory_md is not the only writer, and scoping the fold to it lost two files.
-
-    The wrapup STAGE writes `pending-proposals.md` (Step 5.3, a MUST step) and
-    `pending-drift.md` by hand — the LLM does, not `memory_md` — so an allowlist
-    derived from memory_md's targets silently excluded them. They stayed as base
-    working-tree dirt after every `task-land`, and because the create-guard forgives
-    `.claude/memory/`, nothing ever complained: the count>=3 escalation output simply
-    never reached git.
-
-    This derives the expectation from the rendered stage rather than a hand-written
-    list, so a third memory output fails here until the fold covers it.
-    """
-    import re
-
-    from harness_maker import worktree as wt
-
-    templates = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
-    stage = (templates / "stages" / "wrapup.md.j2").read_text(encoding="utf-8")
-    written = {
-        m.group(0)
-        for m in re.finditer(r"\.claude/memory/[A-Za-z0-9._/-]+\.md", stage)
-        # `<...>` placeholders and the session tier are covered by the prefix rule.
-        if not m.group(0).startswith(".claude/memory/session/")
-    }
-    assert {".claude/memory/pending-proposals.md", ".claude/memory/pending-drift.md"} <= written, (
-        f"extraction looks broken — got {sorted(written)}"
-    )
-
-    uncovered = sorted(p for p in written if not wt._is_human_memory_tier_path(p))
-    assert not uncovered, (
-        f"wrapup writes {uncovered} to the base repo but commit-base-memory will not "
-        f"fold them, so they never land in the squash commit"
-    )
 
 
 def _render_wrapup(tmp_path: Path, *, flag_on: bool) -> str:
@@ -247,63 +213,16 @@ def _render_wrapup(tmp_path: Path, *, flag_on: bool) -> str:
     )
 
 
-def test_wrapup_memory_fold_gated_on_feature_branch_flag(tmp_path: Path) -> None:
-    """AC-004: the fold step renders (exact launcher) only when the flag is on."""
-    on = _render_wrapup(tmp_path / "on", flag_on=True)
-    off = _render_wrapup(tmp_path / "off", flag_on=False)
-    # flag-on: the exact full launcher + base arg + expect-head, inside the flag-on Step 7.7
-    assert "uv run --with" in on
-    assert "hm worktree commit-base-memory <BASE> --expect-head <SQUASH_SHA>" in on
-    assert "Fold base memory into the squash commit" in on
-    # flag-off: the fold step (and its command) must be entirely absent
-    assert "commit-base-memory" not in off
 
 
 # ── recurrence-dedup render gate (PLAN-failure-memory-recurrence-dedup) ──────────
 
 
-def test_wrapup_renders_search_before_write_step(tmp_path: Path) -> None:
-    """ADR-001/006: Step 5.2 must render a numbered MUST search step over both tiers."""
-    text = _render_wrapup(tmp_path, flag_on=True)
-    # the search step invokes the retrieval helper (which loads BOTH failures + wiki)
-    assert "hm memory_retrieve" in text
-    assert "search-before-write" in text
-    # the wiki anchor for oscillation is called out explicitly
-    assert "wiki.md" in text
-    assert "failures.md" in text
-    # under-merge bias is stated
-    assert "UNDER-MERGE" in text
 
 
-def test_wrapup_renders_dedup_receipt(tmp_path: Path) -> None:
-    """ADR-004: the discriminating dedup receipt (K proves execution) must render."""
-    text = _render_wrapup(tmp_path, flag_on=True)
-    assert "dedup: searched K existing failures, N considered, M reused" in text
 
 
-def test_wrapup_renders_occurrence_note_recurrence_path(tmp_path: Path) -> None:
-    """ADR-002: the recurrence write path passes --occurrence-note with the exact slug."""
-    text = _render_wrapup(tmp_path, flag_on=True)
-    assert "--occurrence-note" in text
-    # The exact-slug wiring is explicit: the recurrence invocation reuses the existing
-    # slug. Single-quoted since 2026-07-25 — the value is read out of `failures.md`, a
-    # committed file, and reaches an argv position in a rendered `!uv run …` line, so an
-    # unquoted `$(…)` in a heading would execute at bash parse time.
-    assert "--slug '<existing-slug>'" in text
-    assert "--slug <existing-slug>" not in text
 
 
-def test_wrapup_renders_design_oscillation_qualifier(tmp_path: Path) -> None:
-    """ADR-005: design oscillation qualifies and records under a stable family slug."""
-    text = _render_wrapup(tmp_path, flag_on=True)
-    assert "design oscillation" in text
-    assert "stable-family-slug" in text
 
 
-def test_wrapup_renders_escalation_last_mile(tmp_path: Path) -> None:
-    """ADR-007: Step 5.3 is a numbered MUST that writes proposals + emits a receipt."""
-    text = _render_wrapup(tmp_path, flag_on=True)
-    assert "escalation: K entries at count>=3, P proposals written" in text
-    assert "pending-proposals.md" in text
-    # it must read as a MUST, not the old advisory phrasing
-    assert "escalation last mile" in text

@@ -362,7 +362,7 @@ def test_load_config_degrade_returns_config_when_folders_empty(
     assert loaded.enabled is True
     assert loaded.folders == []
     assert any(
-        "second_brain.folders is empty" in rec.message or "/hm:configure" in rec.message
+        "second_brain.folders is empty" in rec.message or "configure-second-brain" in rec.message
         for rec in caplog.records
     )
 
@@ -420,7 +420,7 @@ def test_degraded_stderr_warning_visible(
     captured = capsys.readouterr()
     assert "WARNING" in captured.err
     assert "ACTION" in captured.err
-    assert "/hm:configure" in captured.err
+    assert "configure-second-brain" in captured.err
 
 
 def test_search_score_title_match_ranks_above_body_only(tmp_path: Path) -> None:
@@ -464,17 +464,17 @@ def test_search_notes_degrades_to_empty_with_warning_when_folders_empty(
 
     assert results == []
     assert any(
-        "second_brain.folders is empty" in rec.message or "/hm:configure" in rec.message
+        "second_brain.folders is empty" in rec.message or "configure-second-brain" in rec.message
         for rec in caplog.records
     )
 
 
 def test_write_note_raises_remediation_error_when_folders_empty(tmp_path: Path) -> None:
-    """write_note fails fast with a /hm:configure pointer when folders=[] (ADR-008)."""
+    """write_note fails fast with a configure-second-brain pointer when folders=[] (ADR-008)."""
     root = _harness_root(tmp_path)
     _write_harness_yaml(root, _degraded_config(root))
 
-    with pytest.raises(SecondBrainError, match="/hm:configure"):
+    with pytest.raises(SecondBrainError, match="configure-second-brain"):
         write_note(
             root,
             "anywhere/note.md",
@@ -484,20 +484,20 @@ def test_write_note_raises_remediation_error_when_folders_empty(tmp_path: Path) 
 
 
 def test_append_note_raises_remediation_error_when_folders_empty(tmp_path: Path) -> None:
-    """append_note fails fast with /hm:configure pointer when folders=[] (ADR-008)."""
+    """append_note fails fast with configure-second-brain pointer when folders=[] (ADR-008)."""
     root = _harness_root(tmp_path)
     _write_harness_yaml(root, _degraded_config(root))
 
-    with pytest.raises(SecondBrainError, match="/hm:configure"):
+    with pytest.raises(SecondBrainError, match="configure-second-brain"):
         append_note(root, "anywhere/note.md", "appended text\n")
 
 
 def test_patch_note_raises_remediation_error_when_folders_empty(tmp_path: Path) -> None:
-    """patch_note fails fast with /hm:configure pointer when folders=[] (ADR-008)."""
+    """patch_note fails fast with configure-second-brain pointer when folders=[] (ADR-008)."""
     root = _harness_root(tmp_path)
     _write_harness_yaml(root, _degraded_config(root))
 
-    with pytest.raises(SecondBrainError, match="/hm:configure"):
+    with pytest.raises(SecondBrainError, match="configure-second-brain"):
         patch_note(root, "anywhere/note.md", "old", "new")
 
 

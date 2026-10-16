@@ -140,14 +140,16 @@ def _rendered_hm_commands() -> set[str]:
     NOT `.claude/commands/**`: that is a generated artifact whose contents depend on the
     local harness.yaml (targets, preset), so a test reading it measures this machine.
     """
-    from harness_maker.models import AtomicStage
+    # The stages that render, not `AtomicStage`: the enum keeps `review` / `verify` so an old
+    # `autonomy.pipeline` still parses, but 0.64.0 renders neither (SPEC-hm-overhaul-p1).
+    from harness_maker.synthesize import _ATOMIC_STAGES
 
-    names = {s.value for s in AtomicStage}
+    names = set(_ATOMIC_STAGES)
     templates = _ROOT / "src" / "harness_maker" / "templates" / "commands" / "hm"
     for path in templates.glob("*.md.j2"):
         stem = path.name.removesuffix(".md.j2")
         if stem == "atomic_command":
-            continue  # the generator for the AtomicStage names already added above
+            continue  # the generator for the stage names already added above
         names.add(stem.split(".", 1)[0])  # help.en / help.ko both spell `help`
     return names
 
@@ -185,8 +187,8 @@ def test_the_rendered_command_list_is_non_empty() -> None:
     exists to reject.
     """
     commands = _rendered_hm_commands()
-    assert len(commands) >= 10, commands
-    for expected in ("health", "configure", "execute", "wrapup"):
+    assert len(commands) >= 9, commands  # nine since 0.64.0
+    for expected in ("health", "execute", "wrapup"):  # configure retired in 0.64.0
         assert expected in commands, (expected, sorted(commands))
 
 

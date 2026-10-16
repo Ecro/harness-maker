@@ -191,11 +191,11 @@ def test_rendered_yaml_with_empty_folders_degrades_gracefully(
     assert cfg.enabled is True
     assert cfg.folders == []
     assert any(
-        "second_brain.folders is empty" in rec.message or "/hm:configure" in rec.message
+        "second_brain.folders is empty" in rec.message or "configure-second-brain" in rec.message
         for rec in caplog.records
     )
 
-    with pytest.raises(SecondBrainError, match="/hm:configure"):
+    with pytest.raises(SecondBrainError, match="configure-second-brain"):
         write_note(
             project_root,
             "anywhere/n.md",
@@ -233,12 +233,12 @@ def test_rendered_yaml_rejects_typoed_vault_path(tmp_path: Path) -> None:
 def _wrapup_procedure_files(dotclaude: Path) -> list[Path]:
     """Rendered files carrying the wrapup PROCEDURE body.
 
-    Discovered by content (the stable "Memory append" step header) rather than
-    a fixed path, so the guard covers the atomic stage file AND any fused
-    workflow command embedding it (W3 — the body is NOT in the thin
-    commands/hm/wrapup.md dispatcher).
+    Discovered by content (the stable "Step 5 — Memory" header, 0.64.0) rather than a fixed
+    path, so the guard covers every rendered copy of the wrapup body.
     """
-    return [p for p in dotclaude.rglob("*.md") if "Memory append" in p.read_text(encoding="utf-8")]
+    return [
+        p for p in dotclaude.rglob("*.md") if "## Step 5 — Memory" in p.read_text(encoding="utf-8")
+    ]
 
 
 def test_wrapup_renders_promote_step(tmp_path: Path) -> None:

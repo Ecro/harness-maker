@@ -8,7 +8,6 @@ shipped call form per target — a bare `uv run` line is inert on both and must 
 
 from __future__ import annotations
 
-import json
 import re
 import sys
 import tempfile
@@ -91,29 +90,6 @@ def _block(text: str, open_marker: str) -> str:
     return text[start:end]
 
 
-@pytest.mark.parametrize("target", ["claude", "codex"])
-@pytest.mark.parametrize(
-    ("marker", "cmd"),
-    [
-        ("<!-- @hm:answer-gated:record-batch -->", "hm intent question"),
-        ("<!-- @hm:answer-gated:intent-close -->", "hm intent close"),
-    ],
-    ids=["record-batch", "intent-close"],
-)
-def test_ac_015_wrapup_writes_sit_inside_answer_gated_blocks_with_an_explicit_no_branch(
-    surface: dict[str, dict[str, str]], target: str, marker: str, cmd: str
-) -> None:
-    wrapup = _command(surface, target, "wrapup")
-    block = _block(wrapup, marker)
-    # SPEC-intent-layer-improvements: the record batch asks once (multi-select on Claude, a
-    # numbered list with one reply on Codex) and its "no" branch is marking rows `declined`;
-    # the close question keeps the single-choice ask and a "keep open: write nothing" branch.
-    if "record-batch" in marker:
-        ask = {"claude": "AskUserQuestion", "codex": "numbered list"}[target]
-        order = [cmd, ask, "Run only the selected writes", "`declined`"]
-    else:
-        order = [ASK_TOKEN[target], cmd, "On keep open: write nothing"]
-    assert _in_order(block, order), block
 
 
 # ── AC-019 ───────────────────────────────────────────────────────────────────
@@ -166,41 +142,11 @@ def test_ac_019_the_skill_description_and_body_carry_the_contract() -> None:
     assert _in_order(body, ORDERED_RULE), body
 
 
-def test_ac_019_help_lists_the_skill_and_no_command_was_added(
-    surface: dict[str, dict[str, str]],
-) -> None:
-    assert "intent-layer" in _command(surface, "claude", "help")
-    assert "intent-layer" in _command(surface, "codex", "help")
-    frozen = json.loads(
-        (_REPO / "tests" / "fixtures" / "rendered_command_names.json").read_text(encoding="utf-8")
-    )
-    assert sorted(surface["claude"]) == frozen["claude"]
-    assert sorted(surface["codex"]) == frozen["codex"]
 
 
 # ── AC-007 (SPEC-playbook-alignment): the supersedes branch names --claim ────────────────────
 
 
-@pytest.mark.parametrize("target", ["claude", "codex"])
-def test_ac_007_wrapup_supersedes_carries_claim(
-    surface: dict[str, dict[str, str]], target: str
-) -> None:
-    """`world.observe` refuses `supersedes` without a claim, so a rendered instruction that
-    offers the relation without the flag fails by construction (review finding 5202e61a)."""
-    wrapup = _command(surface, target, "wrapup")
-    block = _block(wrapup, "<!-- @hm:answer-gated:record-batch -->")
-    observe_lines = [
-        ln for ln in block.splitlines() if "hm intent question observe <id> --relation" in ln
-    ]
-    assert len(observe_lines) == 1, block
-    # On the CALL line itself — a `--claim` mentioned in prose beside the command still leaves
-    # the rendered invocation unable to satisfy world.observe's supersedes rule.
-    assert "--claim" in observe_lines[0]
-    assert "supersedes" in observe_lines[0]
-    # 2 at playbook-alignment, 3 after SPEC-outcome-measure S7; SPEC-intent-layer-improvements
-    # folds them into one record batch plus the close question.
-    assert wrapup.count("<!-- @hm:answer-gated:") == 2
-    assert "`declined`" in block
 
 
 # ── AC-004 / AC-005 (SPEC-objective-gap-proposal): the proposer's rules and the plan draft ────
@@ -268,31 +214,6 @@ def test_ac_004_skill_renders_gap_situation_and_candidate_rules(target: Target, 
 # ── AC-007 (SPEC-outcome-measure) — the prose calls the verb ─────────────────
 
 
-@pytest.mark.parametrize("target", ["claude", "codex"])
-def test_ac_007_skill_and_wrapup_call_the_verb(
-    surface: dict[str, dict[str, str]], target: str
-) -> None:
-    """Keep write consent; WORLD-INTENT-CLOSED-LOOP moves measurement before closure.
-
-    SPEC-intent-layer-improvements folds the measure question into the record batch: the
-    measure item is one selectable write, and the close question follows the batch readback.
-    """
-    wrapup = _command(surface, target, "wrapup")
-    assert wrapup.index("@hm:answer-gated:record-batch") < wrapup.index(
-        "@hm:answer-gated:intent-close"
-    )
-    measure_block = _block(wrapup, "<!-- @hm:answer-gated:record-batch -->")
-    assert "measure all" in measure_block
-    record_calls = re.findall(r"hm intent metric measure --all(?! --dry-run)", measure_block)
-    assert len(record_calls) == 1, "exactly one bare record call (never the --dry-run preview)"
-    assert "--dry-run" not in measure_block
-    assert "`declined`" in measure_block
-    assert "hm intent status --json" in measure_block, "the listing source (ADR-006)"
-    assert _in_order(
-        measure_block, ["hm intent metric measure --all", "Run only the selected writes"]
-    ), measure_block
-    assert "one record batch, then close" in wrapup
-    assert "three questions, answer-gated" not in wrapup
 
 
 @pytest.mark.parametrize(
@@ -329,41 +250,5 @@ def _step57(wrapup: str) -> str:
     return wrapup[start:end]
 
 
-@pytest.mark.parametrize("target", ["claude", "codex"])
-def test_ac_005_wrapup_prints_withdrawal_line_when_due(
-    surface: dict[str, dict[str, str]], target: str
-) -> None:
-    """Literals fixed by SPEC S5 before the template edit; sliced to 5.7 so elsewhere fails."""
-    from harness_maker import intent
-
-    wrapup = _command(surface, target, "wrapup")
-    step = _step57(wrapup)
-    assert step.count("[intent] withdrawal criterion met") == 1, step
-    assert "withdrawal.due" in step
-    line_at = step.index("[intent] withdrawal criterion met")
-    # V-10: the sentence reads the gap output the outcome-measure check already obtained.
-    assert line_at > step.index("<!-- @hm:answer-gated:record-batch -->")
-    assert wrapup.count("[intent] withdrawal criterion met") == 1
-    assert "hm intent status" in intent.SKELETON
-    assert "withdrawal.due" in intent.SKELETON
 
 
-@pytest.mark.parametrize("target", ["claude", "codex"])
-def test_ac_007_wrapup_notice_names_the_signal_the_count_runs_from(
-    surface: dict[str, dict[str, str]], target: str
-) -> None:
-    """AC-007 of SPEC-withdrawal-criterion-window — the notice and the payload name one thing.
-
-    The negative half is anchored on a phrase the RETIRED rule evaluated and the replacement
-    does not, so it fails against the template as it shipped before this change. The positive
-    half is the pair of keys the producer now emits: a notice quoting `wrapups_since_fill`
-    would be quoting a key that no longer exists.
-    """
-    step = _step57(_command(surface, target, "wrapup"))
-    assert "quiet_wrapups" in step, step
-    assert "last_signal_at" in step, step
-    assert "no observed objective" not in step, (
-        "the replacement never evaluates how many objectives carry `observed:`; a notice that "
-        "still says so tells the operator the criterion checked something it did not"
-    )
-    assert "wrapups_since_fill" not in step, step

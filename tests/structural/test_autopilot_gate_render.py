@@ -399,8 +399,6 @@ Re-captures (append; never silently overwrite):
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from pathlib import Path
 
@@ -416,9 +414,8 @@ from harness_maker.models import (
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
-from ._instruction_baseline import AXES, _render_atomic
+from ._instruction_baseline import AXES
 from .conftest import pin_install_ref
-from .test_command_size_budget import _render
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GOLDEN = Path(__file__).resolve().parent / "autopilot_gate_golden.json"
@@ -494,66 +491,10 @@ def armed(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     return _render_at_level("auto_safe", tmp_path_factory.mktemp("armed"))
 
 
-def test_ac_005_a_gated_harness_renders_no_boundary_invocation(gated: dict[str, str]) -> None:
-    """The whole point: a gated harness must not carry a call whose only output is `kill_switch`."""
-    carriers = {name: text.count(_BOUNDARY_CALL) for name, text in gated.items()}
-
-    assert sum(carriers.values()) == 0, {k: v for k, v in carriers.items() if v}
 
 
-def test_ac_005_the_gated_delta_is_exactly_the_advance_blocks(
-    gated: dict[str, str], armed: dict[str, str]
-) -> None:
-    """AC-005's MIDDLE conjunct — a zero-boundary count alone does not catch over-swallowing.
-
-    A level gate that also removed a heading, the sibling `gate-blocked` line, or adjacent banner
-    prose would satisfy the count assertion just as well. So the armed render with its advance
-    blocks stripped must equal the gated render, byte for byte, per command.
-    """
-    assert set(gated) == set(armed), "the command set itself moved"
-
-    # Scoped to the commands that CARRY an advance block, derived rather than hand-listed. This
-    # conjunct asks what the ADVANCE gate removed, and a command with no advance block has nothing
-    # for it to remove. The scoping is not a convenience: `autonomy.level` gates a THIRD region
-    # that predates this change and carries no `@hm:` marker — `health.md`'s "Autopilot
-    # auto-advance smoke check" section — so a whole-command comparison would charge this phase for
-    # correct, pre-existing behaviour. Non-carriers are covered by the byte golden on the non-gated
-    # arms, which is where a regression in them would show up.
-    carriers = sorted(name for name, text in armed.items() if _ADVANCE_BLOCK.search(text))
-    assert carriers, "no armed command carries an advance block — this assertion would be vacuous"
-
-    for name in carriers:
-        armed_text = armed[name]
-        # BOTH marked blocks. `autonomy.level` gates two, not one: `step_manifest.md.j2:33` already
-        # gates the PICKER on `level != "gated"`, and `atomic_command.md.j2` includes that partial
-        # into every command. Stripping only the advance block made this test fail a CORRECT
-        # implementation, and the only way to green it would have been deleting the picker's gate —
-        # which ADR-006 and SPEC Open Question 4 forbid. The sibling test below asserts that same
-        # asymmetry, so the file contradicted itself.
-        stripped = _PICKER_BLOCK.sub("", _ADVANCE_BLOCK.sub("", armed_text))
-        # Collapsing 3+ newlines is required, not a loosening: removing a marker pair that occupies
-        # whole lines necessarily leaves a 3-newline run. It does not weaken what the golden
-        # catches — that pins the non-gated arms by un-normalised sha256. The accepted residual is
-        # that blank-line drift in the GATED arm is unpinned, which no AC binds.
-        expected = _normalise(stripped)
-        actual = _normalise(gated[name])
-        assert actual == expected, (
-            f"{name}: the gated render is not the armed render minus its two level-gated blocks — "
-            "the level gate removed or added something else"
-        )
 
 
-def test_ac_005_the_advance_block_is_present_in_the_armed_arm(armed: dict[str, str]) -> None:
-    """Control for the test above: strip-and-compare is vacuous if nothing was there to strip.
-
-    Without this, a render that emitted no advance block in EITHER arm would pass the delta
-    assertion trivially, and the 24.9 kB this AC exists to reclaim would be reported as reclaimed
-    in a harness that never had it.
-    """
-    carriers = [name for name, text in armed.items() if _ADVANCE_BLOCK.search(text)]
-
-    assert carriers, "no armed command carries an advance block — the delta test proves nothing"
-    assert all(_BOUNDARY_CALL in armed[name] for name in carriers)
 
 
 def test_ac_005_the_dead_guard_name_appears_nowhere() -> None:
@@ -587,68 +528,8 @@ def test_ac_005_the_dead_guard_name_appears_nowhere() -> None:
     assert hits == [], f"{_DEAD_GUARD} still referenced in: {sorted(hits)}"
 
 
-def test_ac_005_the_non_gated_arms_are_byte_identical_to_the_pre_change_golden(
-    tmp_path: Path,
-) -> None:
-    """The non-gated arms must not move by one byte — including whitespace.
-
-    The render env is `trim_blocks=False, lstrip_blocks=False`, so restructuring the condition into
-    nested `{% if %}` tags ADDS output newlines, and nothing else in the repo would catch that: the
-    character ratchet's 2% band absorbs a few chars, `instruction_baseline` compares stripped
-    heading and `!`-line SETS, and the aggregate baseline has headroom.
-    `[wiki:convention] jinja-comment-whitespace-moves-renders` is the recorded hazard.
-    """
-    golden = json.loads(_GOLDEN.read_text(encoding="utf-8"))["arms"]
-    live: dict[str, dict[str, str]] = {}
-    for strictness in AXES:
-        live[f"auto_safe@{strictness}"] = {
-            k: hashlib.sha256(v.encode()).hexdigest()
-            for k, v in sorted(_render_atomic(strictness).items())
-        }
-    live["ask@flag_on"] = {
-        k: hashlib.sha256(v.encode()).hexdigest()
-        for k, v in sorted(
-            _render(feature_branch_workflow=True, tmp=tmp_path / "on", loop=True).items()
-        )
-    }
-    live["ask@flag_off"] = {
-        k: hashlib.sha256(v.encode()).hexdigest()
-        for k, v in sorted(
-            _render(feature_branch_workflow=False, tmp=tmp_path / "off", loop=True).items()
-        )
-    }
-
-    assert set(live) == set(golden), "the captured arm set drifted"
-    for arm in sorted(golden):
-        # Per-arm COMMAND sets too, not just the arm names: iterating golden's keys alone would
-        # not see a newly ADDED command file. Impossible from a single-condition edit, which is
-        # why it was recorded as a note rather than a gate — and cheap enough to close anyway.
-        assert set(live[arm]) == set(golden[arm]), (
-            f"{arm}: command set moved — "
-            f"added {sorted(set(live[arm]) - set(golden[arm]))}, "
-            f"removed {sorted(set(golden[arm]) - set(live[arm]))}"
-        )
-        moved = {k for k, sha in golden[arm].items() if live[arm].get(k) != sha}
-        assert not moved, (
-            f"{arm}: rendered bytes moved for {sorted(moved)}. If THIS guard's subject (the "
-            "autopilot gate) moved them, regenerating would freeze whatever the edit produced, "
-            "which is the failure it exists to catch. If a LATER, unrelated task moved them, "
-            "re-capture and append a dated entry to the module docstring naming the task and the "
-            "commands — see the re-capture list there."
-        )
 
 
-def test_ac_005_the_picker_block_is_untouched(gated: dict[str, str], armed: dict[str, str]) -> None:
-    """ADR-006 leaves the picker alone: it is already correctly gated on `level != "gated"`.
-
-    So the gated arm renders no picker and the armed arm does — and the armed picker's bytes are
-    covered by the golden above. Asserting it here is what stops a `{% if %}` restructure of the
-    adjacent block from taking the picker with it.
-    """
-    assert not any(_PICKER_BLOCK.search(text) for text in gated.values())
-
-    armed_pickers = [text for text in armed.values() if _PICKER_BLOCK.search(text)]
-    assert armed_pickers, "the armed arm lost its picker — the restructure reached too far"
 
 
 def test_strictness_is_still_the_only_instruction_baseline_axis() -> None:

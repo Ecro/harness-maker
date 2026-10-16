@@ -196,7 +196,7 @@ Deliberately deferred; this has not been left unreviewed. Full reasoning: [`docs
 
 ## Step sensitivity classes (COMP / HOST / INV / TUNE)
 
-`src/harness_maker/step_sensitivity.py` 가 렌더된 7 stage 의 모든 `Step|Phase|Check` 헤딩에
+`src/harness_maker/step_sensitivity.py` 가 렌더된 4 stage 의 모든 `Step|Phase|Check` 헤딩에
 감도 클래스를 붙인다 (PLAN-workflow-steps-vs-model-capability). **COMP** = 모델 능력 보상 —
 모델이 좋아질수록 줄여도 되는 산문. **HOST** = 호스트 하네스(Claude Code/Codex)가 이제
 네이티브로 하는 것. **INV** = 모델과 무관하게 유지 — 컨텍스트 창을 넘어 살아남는 상태, 결정적
@@ -208,7 +208,7 @@ plan-validator, fan-out) — `remeasure_on`/`measure_cmd` 필드가 재측정 �
   strictness) 렌더의 모든 헤딩이 레지스트리에 있어야 하고(무분류 헤딩 = 테스트 실패), Side 기본값은 knob 을
   가진 어떤 엔트리(HOST 포함)에서도 Production 보다 공격적일 수 없다 (`knob`/`ordering`, 비공허 바닥 ≥3).
   렌더는 레지스트리를 읽지 않는다 — 검사이지 파생이 아니다 (ADR-005).
-- **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 31` 는 기준을 충족하는 근거가
+- **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 20` 는 기준을 충족하는 근거가
   없는 항목 수 — RESEARCH 행 없이 이웃에서 상속했거나 (ADR-009), 조사했지만 찾지 못했다
   (`RESEARCH-source-plan-steps`). TUNE 수치는 전부 **Side-preset only, n=** 표기 —
   stage-agent ledger 에 Production 행이 0 이다. FAIL 율은 가치 증명이 아니다 (plan-validator 는

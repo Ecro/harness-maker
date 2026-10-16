@@ -73,17 +73,6 @@ def rendered_commands() -> dict[str, str]:
     }
 
 
-def test_the_discovery_is_not_empty() -> None:
-    """Positive control — `== 0` over an empty corpus holds in every possible world.
-
-    All three artifact families must be present; the codex one is what a claude-only
-    fixture cannot see, and it is a separate synthesis path (`synthesize._COMMUNICATION_
-    VARIANT` and friends), so a removal that missed it would be invisible without this.
-    """
-    found = rendered_commands()
-    assert ".claude/commands/hm/review.md" in found
-    assert ".claude/stages/review.md" in found
-    assert ".agents/skills/hm-review/SKILL.md" in found
 
 
 def test_the_counter_discriminates_against_the_pre_change_render() -> None:

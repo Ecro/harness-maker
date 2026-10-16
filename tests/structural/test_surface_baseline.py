@@ -107,8 +107,9 @@ def test_the_committed_numbers_are_not_zeros(frozen: dict[str, object]) -> None:
     # 25 -> 23: `/hm:plan` and `@hm-plan` were removed (SPEC-plan-stage-absorption
     # IRR-001), one per target. A floor, not an equality — it guards a degraded render
     # that measured almost nothing, and that property is unchanged. 23 -> 19 on 2026-09-29:
-    # this repo set `loop.enabled: false`, so both loop commands left each target.
-    assert len(entries) >= 19, f"only {len(entries)} commands measured"
+    # this repo set `loop.enabled: false`, so both loop commands left each target. 19 -> 14 in
+    # 0.64.0: configure, review and verify (Claude) and hm-review, hm-verify (Codex) retired.
+    assert len(entries) >= 14, f"only {len(entries)} commands measured"
     for variant, name, entry in entries:
         assert isinstance(entry["chars"], int), (variant, name, entry)
         assert entry["chars"] > 0, (variant, name, entry)
@@ -116,10 +117,12 @@ def test_the_committed_numbers_are_not_zeros(frozen: dict[str, object]) -> None:
         # skills legitimately mandate none. `>= 0` would be vacuous — a counter cannot
         # be negative — so the real floor is the corpus sum below.
         assert isinstance(entry["round_trips"], int), (variant, name, entry)
-    assert sum(e["round_trips"] for _, _, e in entries) >= 100, "the counting rule found nothing"
-    assert surface[CLAUDE_VARIANT]["verify"]["round_trips"] >= 4
-    assert surface[CLAUDE_VARIANT]["verify"]["chars"] > 10_000
-    assert surface[CODEX_VARIANT]["hm-verify"]["round_trips"] >= 4
+    # 0.64.0: the stages carry no `!` lines, so the corpus sum fell from 200+ to 21. The floors
+    # are anchored to `health` (5 `!` lines) and the stage dispatches (2 per execute).
+    assert sum(e["round_trips"] for _, _, e in entries) >= 15, "the counting rule found nothing"
+    assert surface[CLAUDE_VARIANT]["health"]["round_trips"] >= 4
+    assert surface[CLAUDE_VARIANT]["execute"]["chars"] > 5_000
+    assert surface[CODEX_VARIANT]["hm-execute"]["round_trips"] >= 2
     aggregate = frozen["aggregate_chars"]
     assert isinstance(aggregate, dict)
     for variant, cmds in surface.items():
@@ -351,9 +354,9 @@ def test_chars_is_characters_not_bytes(measured: dict[str, dict[str, dict[str, i
         from ._surface_baseline import render_surface
 
         rendered = render_surface()
-    text = rendered[CLAUDE_VARIANT]["verify"]
+    text = rendered[CLAUDE_VARIANT]["execute"]
     assert len(text.encode("utf-8")) > len(text), "fixture is pure ASCII — the arm is vacuous"
-    assert measured[CLAUDE_VARIANT]["verify"]["chars"] == len(text)
+    assert measured[CLAUDE_VARIANT]["execute"]["chars"] == len(text)
 
 
 # ── positive controls ──────────────────────────────────────────────────────────
@@ -368,10 +371,12 @@ def test_the_generator_measured_both_target_variants(
     # 15 -> 14 for the same reason as the floor above. 14 -> 12 on 2026-09-29: this repo set
     # `loop.enabled: false` (SPEC-loop-opt-in follow-up), so `loop` and `loop-p5-batch` stop
     # rendering here. Setting it back to true restores both.
-    assert len(measured[CLAUDE_VARIANT]) >= 12, "Claude render produced too few commands"
+    # 12 -> 9 in 0.64.0: configure, review and verify retired.
+    assert len(measured[CLAUDE_VARIANT]) >= 9, "Claude render produced too few commands"
     # 10 -> 9: `@hm-plan` went with the stage (SPEC-plan-stage-absorption IRR-001).
     # 9 -> 7 on 2026-09-29: `hm-loop` and `hm-loop-p5-batch` left with `loop.enabled: false`.
-    assert len(measured[CODEX_VARIANT]) >= 7, "Codex render produced too few stage skills"
+    # 7 -> 5 in 0.64.0: hm-review and hm-verify retired.
+    assert len(measured[CODEX_VARIANT]) >= 5, "Codex render produced too few stage skills"
 
 
 # ── staleness arms (PLAN follow-up: a template change that never re-froze) ─────

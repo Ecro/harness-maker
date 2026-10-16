@@ -29,7 +29,6 @@ AGENTS.md) are NEVER touched — the renderer only writes there.
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
 import re
@@ -41,7 +40,14 @@ from typing import Any
 
 import yaml
 
-from harness_maker.block_merge import MarkerStyle, ParseError, has_markers, parse_segments
+from harness_maker.block_merge import (
+    MarkerStyle,
+    ParseError,
+    detect_marker_style,
+    has_markers,
+    parse_segments,
+    parse_user_blocks,
+)
 from harness_maker.cursor_retire import (
     CURSOR_DIR,
     kept_warning,
@@ -348,7 +354,15 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
             continue
         existing_hash = fm.get("content_hash")
         recomputed = compute_body_hash(body)
-        if existing_hash == recomputed:
+        if existing_hash == recomputed and _user_blocks_edited(fe.template, existing_path, body):
+            conflicts.append(
+                ConflictItem(
+                    path=fe.path,
+                    decision=ReconcileDecision.MERGE_BLOCK,
+                    reason="hash-match-user-blocks",
+                ),
+            )
+        elif existing_hash == recomputed:
             conflicts.append(
                 ConflictItem(
                     path=fe.path,
@@ -413,6 +427,49 @@ def _decide_hash_comment_branch(
             return ReconcileDecision.KEEP, "hashcomment-malformed-markers"
         return ReconcileDecision.MERGE_BLOCK, "hashcomment-marker-merge"
     return ReconcileDecision.REPLACE, "pure-hashcomment-no-markers"
+
+
+def _template_user_blocks(
+    template_name: str, style: MarkerStyle, _seen: frozenset[str] = frozenset()
+) -> dict[str, str] | None:
+    """The default user blocks a template and its literal includes ship; `None` if unreadable."""
+    if template_name in _seen:
+        return {}
+    try:
+        src = (_TEMPLATE_DIR / template_name).read_text(encoding="utf-8")
+        blocks = parse_user_blocks(src, style) if has_markers(src, style) else {}
+    except (OSError, ParseError):
+        return None
+    for inc in _INCLUDE_RE.findall(src):
+        more = _template_user_blocks(inc, style, _seen | {template_name})
+        if more is None:
+            return None
+        blocks = {**more, **blocks}
+    return blocks
+
+
+def _user_blocks_edited(template_name: str, existing_path: Path, body: bytes) -> bool:
+    """A hash-matching file whose user blocks differ from the template's defaults.
+
+    A block-merged file records the hash of its MERGED body, so the next `make` sees a hash
+    match. REPLACE there drops the user's block on the second upgrade, so such a file
+    block-merges again (SPEC-hm-overhaul-p1 AC-007). An unreadable template or unparsable block
+    counts as edited: merging keeps the user's text, replacing would not.
+    """
+    style = detect_marker_style(existing_path)
+    if style == MarkerStyle.JSON_KEY:
+        return False
+    text = body.decode("utf-8", errors="replace")
+    if not has_markers(text, style) or not _template_has_markers(template_name, style):
+        return False
+    try:
+        mine = parse_user_blocks(text, style)
+    except ParseError:
+        return False  # malformed markers: the hash still matches, so this is our own render
+    defaults = _template_user_blocks(template_name, style)
+    if defaults is None:
+        return True
+    return any(defaults.get(block_id) != content for block_id, content in mine.items())
 
 
 def _decide_user_modified(template_name: str, old_body: bytes) -> tuple[ReconcileDecision, str]:
@@ -682,21 +739,33 @@ def _normalize_expected_path(fe_path: Path) -> str:
     return ".claude/" + path_str
 
 
-def _remove_emptied_skill_dir(deleted: Path) -> None:
-    """Remove a `skills/<name>/` directory the sweep just emptied — for ANY swept skill.
+#: Directories only a 0.62 render created and 0.64.0 no longer renders (SPEC-hm-overhaul-p1
+#: AC-004 lists them as absent). Emptied by the sweep, they go too; a user file keeps them.
+_RETIRED_DIRS = frozenset({".claude/stages", ".claude/hm"})
+
+
+def _remove_emptied_dirs(project_root: Path, rel_key: str) -> None:
+    """Remove the directories the sweep just emptied, up to a swept skill's `skills/<name>/`.
 
     The motivating case is a renamed world-model router leaving `skills/<old>/` behind, but the
-    rule applies to every orphaned `skills/<name>/SKILL.md` (REVIEW a9402944).
+    rule applies to every orphaned skill file, including a Codex skill's nested
+    `agents/openai.yaml` (REVIEW a9402944), and to the retired `_RETIRED_DIRS`.
 
-    Restricted to a direct `skills/<name>/` parent so the sweep never removes a directory a
-    user or another tool may still be filling (SPEC-world-model-name ADR-007).
+    Bounded to those two shapes so the sweep never removes a directory a user or another tool
+    may still be filling (SPEC-world-model-name ADR-007); `rmdir` refuses a non-empty one.
     """
-    parent = deleted.parent
-    if parent.parent.name != "skills":
+    parts = rel_key.split("/")
+    if "skills" in parts[:-2]:
+        floor = parts.index("skills") + 2
+    elif "/".join(parts[:-1]) in _RETIRED_DIRS:
+        floor = len(parts) - 1
+    else:
         return
-    # Not empty (user files remain) or already gone: leave it.
-    with contextlib.suppress(OSError):
-        parent.rmdir()
+    for depth in range(len(parts) - 1, floor - 1, -1):
+        try:
+            (project_root.joinpath(*parts[:depth])).rmdir()
+        except OSError:  # not empty (user files remain) or already gone: leave it and above
+            return
 
 
 def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport:
@@ -750,7 +819,7 @@ def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport
                 report.kept.append((rel_path, "unlink-failed"))
                 continue
             report.deleted.append(rel_path)
-            _remove_emptied_skill_dir(project_root / rel_path)
+            _remove_emptied_dirs(project_root, rel_key)
         else:
             if rel_key.startswith(CURSOR_DIR + "/") and rel_key in manifest:
                 # A file the removed Cursor target rendered and the user then edited

@@ -149,9 +149,9 @@ def test_mv3_jinja_dispatcher_does_not_emit_model_none() -> None:
 
     templates_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
-    template = env.get_template("agents/autoloop-coder.md.j2")
+    template = env.get_template("agents/spec-validator.md.j2")
     rendered = template.render(
-        name="autoloop-coder",
+        name="spec-validator",
         claude_model=None,
         codex_reasoning_effort="medium",
         reviewer_kind="",
@@ -240,7 +240,7 @@ def test_user_override_cursor_only_keeps_its_alias(
     """0.63.0 (SPEC-hm-overhaul-p1 AC-001, PR-C review round 1): a cursor-only override still
     picks the Claude model when it holds a tier alias.
 
-    A user who writes `agent_models: {autoloop-coder: {cursor: sonnet}}` (no `claude:`) leaves
+    A user who writes `agent_models: {spec-validator: {cursor: sonnet}}` (no `claude:`) leaves
     spec.claude None. 0.62 rendered the Claude `model:` from that alias; dropping the fallback
     would move the agent to the template floor, so "T minus cursor" would not render the same.
     The `model:` line must stay valid (MV-3), never the bare `None` / `null`.
@@ -251,22 +251,22 @@ def test_user_override_cursor_only_keeps_its_alias(
 
     config = HarnessConfig(
         preset=Preset.PRODUCTION,
-        agent_models={"autoloop-coder": AgentModelSpec(cursor=cursor)},
+        agent_models={"spec-validator": AgentModelSpec(cursor=cursor)},
     )
-    spec = resolve_agent_spec("autoloop-coder", config)
+    spec = resolve_agent_spec("spec-validator", config)
     assert spec.claude is None  # Tier-1 cursor-only override
     assert spec.cursor == cursor  # parsed and carried unnormalized
 
     ctx = next(
         c
         for tmpl, dst, c in _agent_files(preset=Preset.PRODUCTION, agent_models=config.agent_models)
-        if dst == "agents/autoloop-coder.md"
+        if dst == "agents/spec-validator.md"
     )
     assert ctx["claude_model"] == claude_model
 
     templates_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
-    rendered = env.get_template("agents/autoloop-coder.md.j2").render(
+    rendered = env.get_template("agents/spec-validator.md.j2").render(
         **ctx, communication_variant="full"
     )
     # MV-3: a valid non-empty model: line (not None/null/~/empty).

@@ -25,29 +25,30 @@ from harness_maker.communication_audit import (
 _REPO_TEMPLATES = Path(__file__).resolve().parents[2] / "src/harness_maker/templates"
 
 
-def test_discover_dispatchers_returns_16_agents() -> None:
+def test_discover_dispatchers_returns_12_agents() -> None:
     found = discover_dispatchers(_REPO_TEMPLATES)
     # 16 dispatcher templates (excludes _body / _partials); judgment-reviewer added
-    # in PLAN-judgment-ac-binding, stage-delegate in PLAN-economics-attribution-and-carry.
-    assert len(found) == 16
+    # in PLAN-judgment-ac-binding, stage-delegate in PLAN-economics-attribution-and-carry;
+    # 0.64.0 deleted stuck, security-auditor, executor and autoloop-coder.
+    assert len(found) == 12
     names = {f.stem.removesuffix(".md") for f in found}
     assert "code-reviewer" in names
-    assert "autoloop-coder" in names
+    assert "autoloop-coder" not in names
     assert "trajectory-monitor" in names
     # _body files excluded
     assert not any(f.name.endswith("_body.md.j2") for f in found)
 
 
-def test_discover_pinned_skills_returns_four_llm_judgment() -> None:
+def test_discover_pinned_skills_returns_two_llm_judgment() -> None:
     found = discover_pinned_skills(_REPO_TEMPLATES)
-    # 4 pinned skills (relevance-filter removed in 0.22.3 per ADR-0007)
-    assert len(found) == 4
+    # relevance-filter removed in 0.22.3 (ADR-0007); security-scanner, refdocs-search in 0.64.0
+    assert len(found) == 2
     parents = {f.parent.name for f in found}
     assert parents == set(PINNED_SKILLS)
 
 
 def test_repo_full_scan_returns_zero_items_when_clean() -> None:
-    """Baseline: with all 16 dispatchers + 4 skills correctly declared, audit is empty."""
+    """Baseline: with every dispatcher and pinned skill correctly declared, audit is empty."""
     items = audit_communication(_REPO_TEMPLATES)
     assert items == [], f"Expected clean baseline, got items: {items}"
 

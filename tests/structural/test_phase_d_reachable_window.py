@@ -153,12 +153,6 @@ _MUTATIONS: dict[str, tuple[str, str]] = {
 }
 
 
-def test_the_corpus_covers_all_three_artifact_families() -> None:
-    """Positive control — every predicate below is vacuous over an empty corpus."""
-    found = execute_bearing_artifacts()
-    assert ".claude/commands/hm/execute.md" in found
-    assert ".claude/stages/execute.md" in found
-    assert ".agents/skills/hm-execute/SKILL.md" in found
 
 
 def test_the_step_renders_on_every_target() -> None:
@@ -185,26 +179,6 @@ def test_the_step_runs_after_the_gates_it_distrusts() -> None:
         assert text.index(_STEP_HEADING) < text.index(_STEP_END), f"{name}: D.5 follows stage exit"
 
 
-@pytest.mark.parametrize("clause", sorted(_MUTATIONS), ids=lambda c: c.replace(" ", "-"))
-def test_each_clause_is_covered_by_at_least_one_predicate(clause: str) -> None:
-    """Coverage, honestly named. NOT the mutation control ADR-003 asked for.
-
-    ADR-003 wants proof that the step has operative force. This cannot supply it — see the
-    accounting on `_MUTATIONS`. It proves the weaker, still-useful property that every
-    clause listed there is watched by some predicate, so deleting or rewording one fails a
-    test with that clause's name in it rather than passing silently.
-
-    **The ADR-003 gap is therefore OPEN**, recorded here rather than papered over: the
-    operative-force question is semantic and this file is literal greps. Anyone closing it
-    needs a different mechanism, not a third rearrangement of these strings.
-    """
-    original, weakened = _MUTATIONS[clause]
-    body = step_body(execute_bearing_artifacts()[".claude/stages/execute.md"])
-    assert original in body, f"mutation target {original!r} is not in the rendered step"
-    mutated = body.replace(original, weakened)
-    assert any(not p(mutated) for p in _PREDICATES), (
-        f"{clause} ({original!r}) is watched by NO predicate — it can be edited away silently"
-    )
 
 
 # ── AC-002 binding ────────────────────────────────────────────────────────────

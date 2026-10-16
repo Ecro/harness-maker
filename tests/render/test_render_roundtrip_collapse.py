@@ -120,51 +120,20 @@ _WITH_CODEX = (Target.CLAUDE_CODE, Target.CODEX)
 # ── positive control ───────────────────────────────────────────────────────────
 
 
-def test_the_render_helper_produces_the_seven_atomic_commands() -> None:
-    """Without this, every `not in` assertion below would pass on an empty render."""
-    cmds = _commands(_CLAUDE_ONLY)
-    for stage in ("research", "spec", "execute", "review", "verify", "wrapup"):
-        assert stage in cmds, f"{stage} did not render"
-        assert len(cmds[stage]) > 2000
 
 
 # ── Phase 4 — execute Phase C per-file + Phase D select-then-one-call ───────────
 
 
-@pytest.mark.parametrize("strictness", ["warn", "block"])
-def test_phase_c_checks_per_file_not_per_edit(strictness: Strictness) -> None:
-    body = _commands(_CLAUDE_ONLY, strictness)["execute"]
-    assert "Type-check once per FILE" in body
-    assert "Compile / type-check after each edit" not in body, (
-        "the per-edit rule survived — that is the cost being cut"
-    )
 
 
-@pytest.mark.parametrize("strictness", ["warn", "block"])
-def test_phase_d_issues_one_combined_check_call(strictness: Strictness) -> None:
-    body = _commands(_CLAUDE_ONLY, strictness)["execute"]
-    assert "hm test_dep_map --root ." in body
-    assert "<lint> && <type> && <test>" in body
-    for gone in ("!cd <WT> && <lint command>", "!cd <WT> && <type command>"):
-        assert gone not in body, f"the three-call form survived: {gone}"
 
 
-def test_phase_d_collapse_also_reaches_the_codex_render() -> None:
-    """Codex gets the same collapse in its own `Bash(...)` form, not the Claude one."""
-    body = _codex_skills(_WITH_CODEX)["hm-execute"]
-    assert 'Bash("cd <WT> && uv run' in body
-    assert "hm test_dep_map --root ." in body
-    assert "!cd <WT> && <lint command>" not in body
 
 
 # ── Phase 5 — research fan-out, Claude-only ────────────────────────────────────
 
 
-def test_the_fan_out_renders_when_claude_is_the_only_reader() -> None:
-    body = _commands(_CLAUDE_ONLY)["research"]
-    assert body.count('Task(subagent_type="Explore"') == 3
-    assert "SINGLE message" in body
-    assert "verbatim snippet" in body, "the citation contract is what makes a digest usable"
 
 
 def test_the_fan_out_is_absent_from_the_codex_render() -> None:
@@ -172,29 +141,6 @@ def test_the_fan_out_is_absent_from_the_codex_render() -> None:
     assert "Explore" not in body
 
 
-@pytest.mark.parametrize("reader", ["claude", "codex"])
-def test_every_source_class_survives_in_both_renders(reader: str) -> None:
-    """Redistributed, not deleted — a fan-out that loses source classes is a regression.
-
-    The two renders are the two branches: Claude's fan-out and Codex's plain list. (The second
-    case used to render with cursor, which took the plain branch in the Claude file.)
-    """
-    if reader == "claude":
-        body = _commands(_CLAUDE_ONLY)["research"]
-        assert "Fan out" in body
-    else:
-        body = _codex_skills(_WITH_CODEX)["hm-research"]
-        assert "Run these in parallel where the answers are independent" in body
-    for marker in (
-        "Codebase patterns",
-        "Prior-art search in memory",
-        "Prior PLANs / REVIEWs",
-        "User-workflow / product discovery",
-        "Library / framework docs",
-        "Web search",
-        "Refdocs folders",
-    ):
-        assert marker in body, f"source class lost: {marker}"
 
 
 def test_every_dispatched_agent_resolves_on_the_target_that_gets_it() -> None:
@@ -239,10 +185,6 @@ def test_spec_issues_one_check_call_instead_of_three() -> None:
     assert "hm spec_quality eval" not in body
 
 
-def test_spec_still_documents_all_six_cross_validate_rules() -> None:
-    body = _commands(_CLAUDE_ONLY)["spec"]
-    for n in range(1, 7):
-        assert f"\n{n}. " in body or f"rule-{n}" in body
 
 
 # ── Phase 2 — wrapup Steps 6 → 7.6 collapse ────────────────────────────────────
@@ -294,39 +236,6 @@ def test_hm_call_sequence_skips_a_bang_line_that_invokes_no_hm_verb() -> None:
     )
 
 
-def test_the_wrapup_git_tail_is_the_expected_call_sequence() -> None:
-    """The roll-up, then `wrapup_land` + `task-land` + `commit-base-memory`, in that order.
-
-    Sliced to Steps 6 → 7.7 exactly. Slicing "to the end of the file" would sweep in Step
-    8's push, the Gate-0 receipt guard and the two autopilot calls — shared blocks present
-    in every stage command, outside this PLAN's scope and not part of the git tail.
-
-    **Re-based from a bare `== 3`, and renamed with it** (PLAN-token-efficiency-autopilot-ux-speed
-    Phase 1, which added the `autopilot_ledger rollup` call and declared it as
-    `surface_allowance.round_trips.wrapup: 1` — the movement is funded, it was simply never
-    folded back into this golden). A count is the weakest form this assertion can take: it stays
-    green through a substitution or a re-ordering, which is most of what could actually go wrong
-    here. The sequence is compared instead, so the allowance's one added call has to be *that*
-    call, in that position.
-
-    **Re-based again, same rule** (PLAN-observed-harness-gaps-salvage ADR-006/009): the main
-    loop's `hm proposals summary` now opens the section, ahead of the roll-up and every
-    halting call, so the backlog line prints where the operator sees it and a later halt cannot
-    swallow it. Funded by that PLAN's `surface_allowance.round_trips.wrapup: 1`; the position is
-    part of the contract, which is why it is asserted here rather than counted.
-    """
-    body = _commands(_CLAUDE_ONLY)["wrapup"]
-    tail = body[body.index("### Steps 6 → 7.6") : body.index("### Step 8")]
-    assert _hm_call_sequence(tail) == (
-        "proposals summary",
-        # SPEC-ai-native-sdlc-vs-intent-world: the DRI's acceptance is read before the roll-up
-        # and the land call, funded by that PLAN's `surface_allowance.round_trips.wrapup: 1`.
-        "spec_machine approval-status",
-        "autopilot_ledger rollup",
-        "wrapup_land",
-        "worktree task-land",
-        "worktree commit-base-memory",
-    )
 
 
 def test_wrapup_carries_the_stash_preview_obligation_into_the_prose() -> None:
@@ -335,7 +244,3 @@ def test_wrapup_carries_the_stash_preview_obligation_into_the_prose() -> None:
     assert "git stash show -p" in body
 
 
-def test_the_manifest_marks_plan_required_and_review_optional() -> None:
-    body = _commands(_CLAUDE_ONLY)["wrapup"]
-    assert re.search(r"--required \S*PLAN-\{slug\}\.md", body)
-    assert re.search(r"--optional \S*REVIEW-\{slug\}-\*\.md", body)

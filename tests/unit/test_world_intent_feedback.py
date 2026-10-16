@@ -86,11 +86,8 @@ def test_s5_authoritative_map_and_plan_feedback(roots: dict[str, Path], host: st
 @pytest.mark.parametrize("host", ["codex", "claude"])
 def test_s3_measure_before_intent_closure(roots: dict[str, Path], host: str) -> None:
     p = roots[host] / ("skills/hm-wrapup/SKILL.md" if host == "codex" else "commands/hm/wrapup.md")
-    block = _section(p.read_text(), "#### 5.7 Intent state")
-    assert "Feedback" in block
-    record = block.index("@hm:answer-gated:record-batch")
-    assert (
-        record
-        < block.index("hm intent metric measure --all")
-        < block.index("@hm:answer-gated:intent-close")
-    )
+    # 0.64.0: wrapup Step 5's intent bullet replaced the answer-gated 5.7 block; the order it
+    # pinned — measure, then close — is what survives.
+    text = p.read_text()
+    assert text.index("hm intent question observe") < text.index("hm intent metric")
+    assert text.index("hm intent metric") < text.index("hm intent close")

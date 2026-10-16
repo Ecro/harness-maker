@@ -1,12 +1,8 @@
 """Synthesizer — map preset+answers to deterministic Blueprint with FileEntry list.
 
-Per the new architecture every preset installs the FULL skill + agent inventory.
-The harness.yaml `reviewers.enabled` and `skills.enabled` lists govern default
-activation; users opt into more reviewers per-task via inline command flags.
-
-Only the seven atomic stage commands are emitted — the fused-workflow axis was
-removed (PLAN-harness-diet ADR-001/002); `/hm:loop` and autopilot chain stages
-instead.
+Four stage commands render (SPEC-hm-overhaul-p1 AC-004): research, spec, execute, wrapup. Each is
+one self-contained file. Agents and skills beyond the kept core render only when the config that
+uses them is on (second opinion, delegation, the lens fan-out).
 """
 
 from __future__ import annotations
@@ -19,7 +15,7 @@ from typing import Any
 
 import typer
 
-from harness_maker import template_globals, world_model
+from harness_maker import world_model
 from harness_maker.models import (
     AgentModelSpec,
     AtomicStage,
@@ -35,9 +31,7 @@ from harness_maker.strictness import write_strictness
 
 logger = logging.getLogger(__name__)
 
-#: `review.md.j2` points at this skill's §5 from an UNGUARDED line, so the
-#: auto-fix loop's round-state contract is only reachable if the skill is
-#: enabled — in every harness, `second_opinion.models` empty or not.
+#: The cross-model gate's skill; it renders only when `second_opinion.models` is non-empty.
 ROUND_STATE_SKILL = "second-opinion-gate"
 
 # Each tuple: (template path under templates/, output path under .claude/, context supplement)
@@ -253,56 +247,97 @@ def _compute_install_ref() -> str:
     return _portablize_ref("harness-maker")
 
 
-_ATOMIC_STAGES: list[str] = [s.value for s in AtomicStage]
+#: The stages that render (SPEC-hm-overhaul-p1 AC-004). `AtomicStage` keeps review and verify for
+#: the CLI that still parses them; Phase 2 deletes that.
+_ATOMIC_STAGES: list[str] = ["research", "spec", "execute", "wrapup"]
+assert set(_ATOMIC_STAGES) <= {s.value for s in AtomicStage}
 
-# Every preset installs the full reviewer/skill inventory; activation is data,
-# not file presence.
-_ALL_AGENTS: list[str] = [
-    "autoloop-coder",
-    "code-reviewer",
-    "code-verifier",
-    "concurrency-reviewer",
-    "consensus-arbiter",
-    "executor",
-    "judgment-reviewer",
-    "performance-reviewer",
-    "spec-validator",
-    "security-auditor",
+#: Agents every harness renders (D-1, D-3, and the judgment-AC oracle).
+_BASE_AGENTS: tuple[str, ...] = ("code-reviewer", "judgment-reviewer", "spec-validator")
+#: Rendered only when `second_opinion.models` is non-empty.
+_SECOND_OPINION_AGENTS: tuple[str, ...] = ("code-verifier", "consensus-arbiter")
+#: Rendered only when `delegation.stages` is non-empty.
+_DELEGATION_AGENTS: tuple[str, ...] = ("stage-delegate",)
+#: The lens reviewers (D-9): rendered, for the names in `reviewers.installed`, only when
+#: `reviewers.fanout` is true.
+LENS_REVIEWERS: tuple[str, ...] = (
     "security-reviewer",
-    "stage-delegate",
-    "stuck",
+    "concurrency-reviewer",
     "test-reviewer",
+    "performance-reviewer",
     "ux-reviewer",
-]
+)
+#: No longer rendered on any config (SPEC-hm-overhaul-p1 AC-004 "Not rendered").
+RETIRED_AGENTS: tuple[str, ...] = ("stuck", "security-auditor", "executor", "autoloop-coder")
+#: Every agent template that can still render.
+_ALL_AGENTS: list[str] = sorted(
+    {*_BASE_AGENTS, *_SECOND_OPINION_AGENTS, *_DELEGATION_AGENTS, *LENS_REVIEWERS}
+)
 _ALL_SKILLS: list[str] = [
     "agent-quality-rubric",
     "ai-readiness-rubric",
-    "autoloop-driver",
-    "conditional-router",
     "context-linter",
-    "refdocs-search",
-    "second-opinion-gate",
-    "security-scanner",
-    "targeted-test-selection",
-    "verify-before-completion",
     "worktree-isolator",
     # SPEC-intent-world-model-objective-layer S13: the discoverable surface for `hm world`.
     "intent-layer",
     # SPEC-mission-context-loop S1: the capture path for code-absent project facts. The
-    # always-loaded pointer (CLAUDE.md / AGENTS.md / harness.mdc) names it in every preset.
+    # always-loaded pointer (CLAUDE.md / AGENTS.md) names it in every preset.
     "project-knowledge",
 ]
+#: No longer rendered on any config (SPEC-hm-overhaul-p1 AC-004 "Not rendered").
+RETIRED_SKILLS: tuple[str, ...] = (
+    "security-scanner",
+    "verify-before-completion",
+    "targeted-test-selection",
+    "conditional-router",
+    "autoloop-driver",
+    "refdocs-search",
+)
+#: Stage commands and helper files that stopped rendering (IRR-002).
+RETIRED_COMMANDS: tuple[str, ...] = ("review", "verify", "configure", "loop", "loop-p5-batch")
 
 
-def _stage_files() -> list[FileSpec]:
-    return [
-        (
-            f"stages/{s}.md.j2",
-            f"stages/{s}.md",
-            {"stage": s, "project_name": "", "feature": ""},
-        )
-        for s in _ATOMIC_STAGES
-    ]
+def _section(config_dump: dict[str, object] | None, key: str) -> dict[str, Any]:
+    value = (config_dump or {}).get(key)
+    return value if isinstance(value, dict) else {}
+
+
+def second_opinion_on(config_dump: dict[str, object] | None) -> bool:
+    return bool(_section(config_dump, "second_opinion").get("models"))
+
+
+def delegation_on(config_dump: dict[str, object] | None) -> bool:
+    """Only wrapup can still delegate; a 0.62 `[verify]` alone renders no stage-delegate."""
+    stages = _section(config_dump, "delegation").get("stages")
+    return isinstance(stages, list) and "wrapup" in stages
+
+
+def lens_agents(config_dump: dict[str, object] | None) -> list[str]:
+    """The lens reviewers that render and that execute dispatches (D-9); `[]` with fan-out off."""
+    reviewers = _section(config_dump, "reviewers")
+    if reviewers.get("fanout") is not True:
+        return []
+    installed = reviewers.get("installed")
+    names = set(installed) if isinstance(installed, list) else set()
+    return [n for n in LENS_REVIEWERS if n in names]
+
+
+def rendered_agents(config_dump: dict[str, object] | None) -> list[str]:
+    """The agents a render emits for this config, in a stable order."""
+    names = set(_BASE_AGENTS) | set(lens_agents(config_dump))
+    if second_opinion_on(config_dump):
+        names |= set(_SECOND_OPINION_AGENTS)
+    if delegation_on(config_dump):
+        names |= set(_DELEGATION_AGENTS)
+    return sorted(names)
+
+
+def rendered_skills(config_dump: dict[str, object] | None) -> list[str]:
+    """The fixed-name skills a render emits (the world-model skill renders at its handle)."""
+    names = list(_ALL_SKILLS)
+    if second_opinion_on(config_dump):
+        names.append(ROUND_STATE_SKILL)
+    return names
 
 
 def _atomic_command_files(
@@ -321,17 +356,16 @@ def _atomic_command_files(
 
     env = _make_env()
     if config_dump is None:
-        config_dump = _no_answers_dump()
+        config_dump = _strict_fallback_dump()
     install_ref = _compute_install_ref()
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
         body = tpl.render(
             stage=s,
-            project_name="",
-            feature="",
             config=config_dump,
             harness_maker_src_path=install_ref,
             is_codex=False,
+            lens_agents=lens_agents(config_dump),
         )
         out.append(
             (
@@ -342,7 +376,7 @@ def _atomic_command_files(
                     "stage_body": body,
                     "stage_description": (
                         f"{_STAGE_SUMMARIES.get(s, f'harness-maker {s} stage.')} "
-                        f"{_stage_gate(_world_model_name(config_dump), '$hm-loop')}"
+                        f"{_stage_gate(_world_model_name(config_dump))}"
                     ),
                 },
             ),
@@ -372,26 +406,18 @@ def _atomic_command_files(
 # invokers). Summaries are short so summary + gate stays within the 120-char cap at the default
 # name; the Codex `hm-<stage>` skills reuse them.
 _STAGE_SUMMARIES: dict[str, str] = {
-    "research": "Survey facts, prior art and alternatives into a RESEARCH doc.",
+    "research": "Optional: survey facts, prior art and alternatives into a RESEARCH doc.",
     "spec": "Lock what and why: acceptance criteria into a SPEC doc.",
-    "execute": "Implement a PLAN's phases TDD-first. Stages, never commits.",
-    "review": "Multi-reviewer consensus review with a grade gate and auto-fix.",
-    "verify": "Pre-completion stop sign: regression, structure, security.",
-    "wrapup": "Close the work: final checks, memory capture, the single commit.",
+    "execute": "Tests first, then code, then one review. Never commits.",
+    "wrapup": "Close the work: gate, memory, one commit.",
 }
 
 
-def _stage_gate(world_model_name: str, loop: str) -> str:
-    return f"Only when typed, or via {world_model_name}, autopilot or {loop}."
+def _stage_gate(world_model_name: str) -> str:
+    return f"Only when typed, or via {world_model_name}."
 
 
 _COMMAND_DESCRIPTIONS: dict[str, str] = {
-    "commands/hm/loop.md": (
-        "Run a bounded autoloop over a master PLAN, iterating stages until convergence."
-    ),
-    "commands/hm/loop-p5-batch.md": (
-        "Bulk-author SPECs for a large PLAN's Phase 5 in prompt-driven batches."
-    ),
     "commands/hm/health.md": (
         "Two-layer harness audit — structural integrity plus personalization drift."
     ),
@@ -399,9 +425,6 @@ _COMMAND_DESCRIPTIONS: dict[str, str] = {
         "Delivery-metrics trend — change-failure rate and post-merge churn, with interpretation."
     ),
     "commands/hm/make.md": "Re-render this project's harness after a plugin update.",
-    "commands/hm/configure.md": (
-        "Change one harness dimension without re-running the full interview."
-    ),
     "commands/hm/uninstall.md": "Remove harness-maker's generated files from this project.",
     "commands/hm/help.md": "List the /hm: commands and what each one is for.",
 }
@@ -413,11 +436,8 @@ _COMMAND_DESCRIPTIONS: dict[str, str] = {
 #: the Skill tool.
 _TYPED_ONLY_COMMANDS: frozenset[str] = frozenset(
     {
-        "commands/hm/loop.md",
-        "commands/hm/loop-p5-batch.md",
         "commands/hm/metrics.md",
         "commands/hm/make.md",
-        "commands/hm/configure.md",
         "commands/hm/uninstall.md",
         "commands/hm/help.md",
     }
@@ -428,7 +448,7 @@ def _command_frontmatter(out_path: str, world_model_name: str) -> dict[str, Any]
     """ADR-016 description for a rendered command; empty for every other file kind."""
     stage = out_path.removeprefix("commands/hm/").removesuffix(".md")
     if out_path.startswith("commands/hm/") and stage in _STAGE_SUMMARIES:
-        gate = _stage_gate(world_model_name, "/hm:loop")
+        gate = _stage_gate(world_model_name)
         return {"description": f"{_STAGE_SUMMARIES[stage]} {gate}"}
     if out_path in _TYPED_ONLY_SKILL_PATHS:
         return {"disable-model-invocation": True}
@@ -456,10 +476,7 @@ _REVIEWER_KIND: dict[str, str] = {
 # render._extract_source_communication_variant. The Codex render path
 # bypasses dispatcher source — they need the variant explicitly in context.
 _COMMUNICATION_VARIANT: dict[str, str] = {
-    "autoloop-coder": "full",
-    "executor": "full",
     "stage-delegate": "full",
-    "stuck": "full",
     # trajectory-monitor is intentionally absent from _ALL_AGENTS (no body
     # file, JSON-output agent); Codex render path does not need a variant
     # entry for it. If it is ever added to _ALL_AGENTS, also add the matching
@@ -471,7 +488,6 @@ _COMMUNICATION_VARIANT: dict[str, str] = {
     "judgment-reviewer": "reframe",
     "performance-reviewer": "reframe",
     "spec-validator": "reframe",
-    "security-auditor": "reframe",
     "security-reviewer": "reframe",
     "test-reviewer": "reframe",
     "ux-reviewer": "reframe",
@@ -482,6 +498,7 @@ def _agent_files(
     preset: Preset = Preset.SIDE,
     agent_models: dict[str, AgentModelSpec] | None = None,
     default_model: str = "opus",
+    names: list[str] | None = None,
 ) -> list[FileSpec]:
     """Agent .md.j2 contexts include per-agent model values resolved through
     the 3-tier presets.resolve_agent_spec chain (ADR-005). Templates render
@@ -506,7 +523,7 @@ def _agent_files(
         default_model=default_model,
     )
     out: list[FileSpec] = []
-    for n in _ALL_AGENTS:
+    for n in names if names is not None else _ALL_AGENTS:
         spec = resolve_agent_spec(n, config)
         claude_model = spec.claude or (spec.cursor if spec.cursor in tier_aliases else None)
         out.append(
@@ -539,19 +556,15 @@ def _agent_files(
 # single-line string literals (with line-length suppression for long
 # descriptions) close that re-introduction surface.
 _CODEX_AGENT_META: dict[str, str] = {
-    "autoloop-coder": "Implementation agent for autoloop iterations — bounded scope, write-tool-only, no open-ended exploration; worktree-bounded writes",  # noqa: E501
     "code-reviewer": "Reviews code changes for correctness, readability, maintainability, and basic security/performance hygiene",  # noqa: E501
     "code-verifier": "Reduce-only verifier. Mode B (cross-model PIDA) is the only live caller and the default: accepted/rejected/duplicate/unresolved for second-opinion findings against injected oracle output. Mode A (the Pass 1.5 KEEP/DROP/DEMOTE reduction) is retained but no longer dispatched — its call site was removed. MUST NOT introduce new findings.",  # noqa: E501
     "concurrency-reviewer": "Reviews changes for race conditions, deadlocks, ISR safety, and async correctness",  # noqa: E501
     "consensus-arbiter": "Aggregates findings from multiple reviewer agents via surface match + reasoning alignment + severity resolution; tags every finding consensus-passed | weak-consensus | manual-only",  # noqa: E501
-    "executor": "Workflow executor with worktree-bounded write permissions — only writes to .worktrees/, never to repo root",  # noqa: E501
     "judgment-reviewer": "Independently evaluates a judgment AC's subject against its rubric and returns a per-criterion verdict with cited locators (PLAN-judgment-ac-binding ADR-006). Read-only.",  # noqa: E501
     "performance-reviewer": "Reviews changes for hot-path regressions, allocation hotspots, and algorithmic inefficiency",  # noqa: E501
     "spec-validator": "Critiques a SPEC and its machine.yaml for missing or contradictory ACs, circular oracles, and irreversible decisions the ACs imply but do not list. Single pass, advisory — never blocks approval. Read-only.",  # noqa: E501
-    "security-auditor": "Deep 5-gate security audit (secrets, permissions, hook injection, dependency CVEs, prompt injection) — read-only, returns structured findings JSON",  # noqa: E501
     "security-reviewer": "Reviews changes for secrets exposure, injection, auth flaws, and unsafe permission grants",  # noqa: E501
     "stage-delegate": "Runs a whole pipeline stage body (wrapup or verify) from a validated brief and returns a machine receipt, cutting main-loop context carry",  # noqa: E501
-    "stuck": "Escalation analyst — invoked when /hm:execute, /hm:review, or /hm:spec blocks. Performs root-cause analysis, proposes 2-3 unblock paths, and returns a structured escalation note. Read-only.",  # noqa: E501
     "test-reviewer": "Phase A.5 gate for /hm:execute. Critiques RED-stage tests for SPEC alignment, banned-pattern violations, and assertion quality before Phase B (RED gate) runs. Read-only.",  # noqa: E501
     "ux-reviewer": "Reviews UI changes for accessibility, consistency, and interaction quality",
 }
@@ -561,6 +574,7 @@ def _codex_agent_files(
     preset: Preset = Preset.SIDE,
     agent_models: dict[str, AgentModelSpec] | None = None,
     default_model: str = "opus",
+    names: list[str] | None = None,
 ) -> list[FileSpec]:
     """Codex agent TOML files — one per agent using codex/agent.toml.j2.
 
@@ -579,7 +593,7 @@ def _codex_agent_files(
         default_model=default_model,
     )
     out: list[FileSpec] = []
-    for n in _ALL_AGENTS:
+    for n in names if names is not None else _ALL_AGENTS:
         spec = resolve_agent_spec(n, config)
         out.append(
             (
@@ -605,14 +619,14 @@ def _codex_agent_files(
     return out
 
 
-def _skill_files() -> list[FileSpec]:
+def _skill_files(config_dump: dict[str, object] | None = None) -> list[FileSpec]:
     return [
         (
             f"skills/{n}/SKILL.md.j2",
             f"skills/{n}/SKILL.md",
             {"name": n},
         )
-        for n in _ALL_SKILLS
+        for n in rendered_skills(config_dump)
     ] + [
         (
             "skills/intent-layer/references/workflow-feedback.md.j2",
@@ -620,38 +634,6 @@ def _skill_files() -> list[FileSpec]:
             {},
         )
     ]
-
-
-# SPEC-hm-light-lane-s2b IRR-001: the stage text that moved out of the Claude commands. The names
-# are read by the commands and by `stage-delegate`, so renaming one needs a retire step.
-_STAGE_REFERENCE_FILES: tuple[str, ...] = (
-    "wrapup-steps",
-    "verify-checks",
-    "review-autofix",
-    "review-confirmation",
-    "execute-a5",
-    "execute-light-check",
-    # SPEC-hm-light-lane-s3c IRR-004: read by every Claude stage command and by `/hm:health`,
-    # by execute off the trusted light lane, and by spec on `lane: full`.
-    "stage-preamble",
-    "execute-plan",
-    "spec-machine-full",
-)
-
-
-def _reference_files(config_dump: dict[str, object] | None) -> list[FileSpec]:
-    """On-demand reference files under ``.claude/hm/`` (SPEC-hm-light-lane-s2 / -s2b IRR-001).
-
-    The auto-advance procedure renders only where the stage stubs that point at it do: a
-    ``gated`` harness carries neither. The six stage-body files always render, because the
-    review and execute paths that read them exist in every harness, and a delegated stage that
-    meets a missing file stops (s2b ADR-002); an unused one is harmless. No config (the
-    module-level skeletons) is the full inventory.
-    """
-    out: list[FileSpec] = [(f"hm/{n}.md.j2", f"hm/{n}.md", {}) for n in _STAGE_REFERENCE_FILES]
-    if template_globals.autopilot_enabled(config_dump):
-        out.insert(0, ("hm/autopilot-advance.md.j2", "hm/autopilot-advance.md", {}))
-    return out
 
 
 def _world_model_handle(config_dump: dict[str, object] | None) -> str:
@@ -756,37 +738,6 @@ def _strict_fallback_dump() -> dict[str, Any]:
     return HarnessConfig(spec=holder["spec"]).model_dump(mode="json")
 
 
-def _no_answers_dump() -> dict[str, Any]:
-    """The dump a no-answers render uses: the strict fallback with the loop ON.
-
-    ``_loop_enabled(None)`` renders the loop commands, so the stage bodies on the same path must
-    keep their Gate 0 receipt (SPEC-hm-light-lane-s2 AC-011); the fallback's fresh-install
-    ``False`` alone would drop it beside a rendered driver.
-    """
-    dump = _strict_fallback_dump()
-    loop = dump.get("loop")
-    return {**dump, "loop": {**(loop if isinstance(loop, dict) else {}), "enabled": True}}
-
-
-def _loop_enabled(config_dump: dict[str, Any] | None) -> bool:
-    """Whether the /hm:loop family renders (SPEC-loop-opt-in, ADR-003 of its PLAN).
-
-    ``None`` is the legacy no-answers path (``SIDE_FILES`` and direct test calls), which
-    has always meant the full inventory. It is checked BEFORE the strict fallback dump is
-    substituted, because that dump carries the fresh-install ``False``.
-    """
-    if config_dump is None:
-        return True
-    return template_globals.loop_enabled(config_dump)
-
-
-def _loop_command_files() -> list[FileSpec]:
-    return [
-        ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
-        ("commands/hm/loop-p5-batch.md.j2", "commands/hm/loop-p5-batch.md", {}),
-    ]
-
-
 def _base_files(
     preset: Preset,
     locale: str = "en",
@@ -816,24 +767,18 @@ def _base_files(
         (_localized("memory/failures", locale), "memory/failures.md", {}),
         (_localized("memory/wiki", locale), "memory/wiki.md", {}),
         ("memory/session-readme.md.j2", "memory/session/README.md", {}),
-        # Reference files first: a render cut short must not leave a command whose pointer
-        # names a file that was never written (/hm:review round 1, finding C1).
-        *_reference_files(config_dump),
-        *_stage_files(),
         *_atomic_command_files(config_dump=config_dump),
-        *(_loop_command_files() if _loop_enabled(config_dump) else []),
         ("commands/hm/health.md.j2", "commands/hm/health.md", {}),
         # PLAN-cfr-churn-metrics (0.36.0): /hm:metrics is a manual, read-only
         # command with no on/off flag — always rendered as the full CFR+churn
         # command. `delivery_metrics` config holds only per-project tuning knobs.
         ("commands/hm/metrics.md.j2", "commands/hm/metrics.md", {}),
         ("commands/hm/make.md.j2", "commands/hm/make.md", {}),
-        ("commands/hm/configure.md.j2", "commands/hm/configure.md", {}),
         ("commands/hm/uninstall.md.j2", "commands/hm/uninstall.md", {}),
         (_localized("commands/hm/help", locale), "commands/hm/help.md", {}),
-        *_skill_files(),
+        *_skill_files(config_dump),
         *_world_model_skill_files(config_dump),
-        *_agent_files(preset, agent_models, default_model),
+        *_agent_files(preset, agent_models, default_model, rendered_agents(config_dump)),
         *_rubric_files(),
         # `.claude/hooks/hooks.json` is NOT rendered (ADR-005 of
         # PLAN-permission-deny-and-hooks-wiring). Claude Code reads project hooks ONLY
@@ -873,36 +818,11 @@ def _codex_target_files(
     """
     from harness_maker.render import _make_env  # local import: avoid cycle
 
-    loop_on = _loop_enabled(config_dump)
     if config_dump is None:
-        # Keep the listing prose consistent with the full inventory this path renders.
-        config_dump = _no_answers_dump()
+        config_dump = _strict_fallback_dump()
     env = _make_env()
     install_ref = _compute_install_ref()
-    loop_specs: list[FileSpec] = []
-    if loop_on:
-        loop_body = env.get_template("commands/hm/loop.md.j2").render(
-            harness_maker_src_path=install_ref,
-            is_codex=True,
-            config=config_dump,
-        )
-        p5_batch_body = env.get_template("commands/hm/loop-p5-batch.md.j2").render(
-            harness_maker_src_path=install_ref,
-            is_codex=True,
-            config=config_dump,
-        )
-        loop_specs = [
-            (
-                "codex/loop_skill.md.j2",
-                ".agents/skills/hm-loop/SKILL.md",
-                {"loop_body": loop_body},
-            ),
-            (
-                "codex/loop_p5_batch_skill.md.j2",
-                ".agents/skills/hm-loop-p5-batch/SKILL.md",
-                {"p5_batch_body": p5_batch_body},
-            ),
-        ]
+    agents = rendered_agents(config_dump)
     help_locale_raw = str(config_dump.get("locale", "en")) if config_dump else "en"
     help_body = env.get_template(_localized("commands/hm/help", help_locale_raw)).render(
         harness_maker_src_path=install_ref,
@@ -913,7 +833,7 @@ def _codex_target_files(
         (
             "codex/config.toml.j2",
             ".codex/config.toml",
-            {"agents": _CODEX_AGENT_META},
+            {"agents": {n: _CODEX_AGENT_META[n] for n in agents}},
         ),
         (
             "codex/AGENTS.md.j2",
@@ -925,11 +845,10 @@ def _codex_target_files(
             ".codex/hooks.json",
             {},
         ),
-        *_codex_agent_files(preset, agent_models, default_model),
-        *_codex_skill_files(),
+        *_codex_agent_files(preset, agent_models, default_model, agents),
+        *_codex_skill_files(config_dump),
         *_world_model_skill_files(config_dump, prefix=".agents/"),
         *_codex_stage_skills(config_dump=config_dump),
-        *loop_specs,
         (
             "codex/help_skill.md.j2",
             ".agents/skills/hm-help/SKILL.md",
@@ -938,15 +857,12 @@ def _codex_target_files(
     ]
 
 
-def _codex_skill_files() -> list[FileSpec]:
-    """Existing 9 skills dual-rendered to .agents/skills/ for Codex.
-
-    ADR-0007 (0.22.3) removed research-crawler + relevance-filter; base count 11 → 9.
-    """
+def _codex_skill_files(config_dump: dict[str, object] | None = None) -> list[FileSpec]:
+    """The rendered skills, dual-rendered to .agents/skills/ for Codex."""
     return (
         [
             (f"skills/{n}/SKILL.md.j2", f".agents/skills/{n}/SKILL.md", {"name": n})
-            for n in _ALL_SKILLS
+            for n in rendered_skills(config_dump)
         ]
         + [
             (
@@ -975,7 +891,6 @@ _TYPED_ONLY_SKILLS: tuple[str, ...] = (
     "project-knowledge",
     "agent-quality-rubric",
     "ai-readiness-rubric",
-    "autoloop-driver",
     "context-linter",
     "worktree-isolator",
 )
@@ -1014,11 +929,11 @@ def _is_codex_output(out_path: str) -> bool:
 
 
 def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list[FileSpec]:
-    """Seven stage-trigger SKILL.md files with embedded procedure bodies (is_codex=True)."""
+    """The four stage skills, each the stage command's body (is_codex=True)."""
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     if config_dump is None:
-        config_dump = _no_answers_dump()
+        config_dump = _strict_fallback_dump()
     env = _make_env()
     install_ref = _compute_install_ref()
     out: list[FileSpec] = []
@@ -1026,11 +941,10 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
         tpl = env.get_template(f"stages/{s}.md.j2")
         body = tpl.render(
             stage=s,
-            project_name="",
-            feature="",
             config=config_dump,
             harness_maker_src_path=install_ref,
             is_codex=True,
+            lens_agents=lens_agents(config_dump),
         )
         out.append(
             (
@@ -1041,7 +955,7 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
                     "stage_body": body,
                     "stage_description": (
                         f"{_STAGE_SUMMARIES.get(s, f'harness-maker {s} stage.')} "
-                        f"{_stage_gate(_world_model_name(config_dump), '$hm-loop')}"
+                        f"{_stage_gate(_world_model_name(config_dump))}"
                     ),
                 },
             )
@@ -1112,6 +1026,7 @@ def synthesize(
             "rereview_churn_gate": answers.rereview_churn_gate,
             "rereview_churn_ratio": answers.rereview_churn_ratio,
             "mechanical_checks": list(answers.mechanical_checks),
+            "fanout": answers.reviewers_fanout,
         },
         project={"domains": list(answers.domains)},
         spec={"dir": "specs/"},
@@ -1181,22 +1096,7 @@ def synthesize(
 
     # Skills inventory + enabled list aren't part of HarnessConfig today, but
     # templates need them; expose via per-file context.
-    # PLAN-review-round-inflation ADR-005. Both presets force-enable this skill
-    # (`interview.py`), but `skills.enabled` is user-editable and the pointer at
-    # its §5 renders unguarded — so a harness that trimmed it would ship a
-    # pointer aimed at a document it never loads, and the loop's termination
-    # contract would be reachable only by chance. Auto-add and say so; never
-    # abort (CLAUDE.md checkpoint #1 — a raise here turns `--update` into a total
-    # render failure for that user with no migration path).
     enabled_skills = list(answers.skills.get("enabled", []))
-    if ROUND_STATE_SKILL not in enabled_skills:
-        enabled_skills.append(ROUND_STATE_SKILL)
-        logger.warning(
-            "%s was not in skills.enabled; re-adding it. review.md.j2 points at its §5 "
-            "(the auto-fix loop's round-state contract) from a line that renders in every "
-            "harness, so disabling the skill leaves that pointer dangling.",
-            ROUND_STATE_SKILL,
-        )
     skills_dump = {
         "installed": answers.skills.get("installed", []),
         "enabled": enabled_skills,

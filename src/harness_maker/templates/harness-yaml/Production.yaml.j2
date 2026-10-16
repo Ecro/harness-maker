@@ -77,6 +77,9 @@ reviewers:
   auto_fix: {{ config.reviewers.auto_fix | lower }}
   grade_threshold: {{ config.reviewers.grade_threshold }}
   max_review_rounds: {{ config.reviewers.max_review_rounds }}
+  # Lens reviewer fan-out (opt-in): true renders and dispatches the lens reviewers named in
+  # `installed` beside code-reviewer; false runs code-reviewer alone.
+  fanout: {{ 'true' if config.reviewers.get('fanout') else 'false' }}
   # Repair-round re-review gate: below this fraction of a touched file's LOC the
   # round skips its re-review and records the measured ratio as the reason.
   # Set the gate false to restore the pre-gate behaviour in one line.
@@ -143,10 +146,10 @@ economics:
 delegation:
   stages: {{ (config.delegation.stages if config.delegation else []) | tojson }}
 loop:
-  # /hm:loop + /hm:loop-p5-batch. false = not rendered; set true and run /hm:make to enable.
+  # Retired in 0.64.0: the loop commands no longer render, so this key is inert.
   enabled: {{ (config.loop.enabled if config.loop else false) | tojson }}
 world_model:
-  # The name you call this project's world model by, and its /<handle> skill. Change with /hm:configure.
+  # The name you call this project's world model by, and its /<handle> skill. Edit it here, then run /hm:make.
   name: "{{ config.world_model.name | replace('\\', '\\\\') | replace('"', '\\"') }}"
   handle: "{{ config.world_model.handle }}"
 autonomy:
@@ -155,7 +158,7 @@ autonomy:
   step_cap: {{ (config.autonomy.step_cap if config.autonomy else 20) | tojson }}
   time_cap_min: {{ (config.autonomy.time_cap_min if config.autonomy else 300) | tojson }}
   extra_deny: {{ (config.autonomy.extra_deny if config.autonomy else []) | tojson }}
-  autopilot_persistent: {{ (config.autonomy.autopilot_persistent if config.autonomy else true) | tojson }}
+  autopilot_persistent: {{ (config.autonomy.autopilot_persistent if config.autonomy else false) | tojson }}
 instrumentation:
   # harness-maker's own development telemetry. false = this project stops emitting
   # stage_agent_ledger rows AND leaves the cross-project denominator.

@@ -1,0 +1,28 @@
+{#- Shared render-time macros for the four stage commands (SPEC-hm-overhaul-p1 AC-004).
+    Imported `with context`, so `config`, `is_codex` and `harness_maker_src_path` are the
+    caller's. Everything here is inlined at render time: a stage file reads nothing at run time. -#}
+
+{%- macro cli() -%}
+**CLI.** Run every `hm …` below as `uv run --with {{ harness_maker_src_path }} hm …`{% if is_codex %} through the Bash tool{% endif %}, typing the prefix in full.
+{%- endmacro -%}
+
+{%- macro wt_on() -%}{{ config.worktree.get('enabled') }}{%- endmacro -%}
+
+{%- macro preflight(stage) -%}
+{%- if config.worktree.get('enabled') %}
+
+## Task worktree
+
+Run `hm worktree task-preflight <slug> "$(pwd)" --stage hm:{{ stage }} --claude-session-id "$HM_SESSION_ID"`. Its stdout is the task worktree `.worktrees/<slug>/` on branch `hm/<slug>`, shared by every stage of this task: treat that exact path as `<WT>` for every Read, Write and Edit, and `cd <WT>` before each shell command. A `[preflight] … other active session(s)` warning is informational. On `[preflight] … behind …`, rebase onto the base tip with `hm worktree task-refresh <slug> "$(pwd)"` (it refuses a dirty tree and aborts on conflict, leaving the branch untouched).
+{%- endif %}
+{%- endmacro -%}
+
+{%- macro ask() -%}{% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}{%- endmacro -%}
+
+{%- macro dispatch(agent, brief) -%}
+{%- if is_codex -%}
+`spawn_agent(agent_type="{{ agent }}", message=…)` ({{ brief }}; wait for its reply)
+{%- else -%}
+`Task(subagent_type="{{ agent }}", …)` ({{ brief }})
+{%- endif -%}
+{%- endmacro -%}

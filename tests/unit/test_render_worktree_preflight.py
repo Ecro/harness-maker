@@ -16,7 +16,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from harness_maker import synthesize as _synth
 from harness_maker.models import Blueprint, InterviewAnswers, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 
@@ -52,25 +51,11 @@ def _stage(files: dict[str, str], name: str) -> str:
 # ── flag-ON: preflight present in every wired stage ──────────────────────────
 
 
-def test_preflight_present_in_all_stages_when_flag_on(tmp_path: Path) -> None:
-    files = _render(tmp_path, flag_on=True)
-    for stage in WIRED_STAGES:
-        body = _stage(files, stage)
-        assert "Task worktree preflight" in body, stage
-        assert "worktree task-preflight <slug>" in body, stage
-        assert "worktree task-refresh <slug>" in body, stage
-        assert "<WT>" in body, stage
 
 
 # ── flag-OFF: preflight absent; legacy paths intact ──────────────────────────
 
 
-def test_preflight_absent_in_all_stages_when_flag_off(tmp_path: Path) -> None:
-    files = _render(tmp_path, flag_on=False)
-    for stage in WIRED_STAGES:
-        body = _stage(files, stage)
-        assert "Task worktree preflight" not in body, stage
-        assert "task-preflight" not in body, stage
 
 
 def test_flag_off_render_succeeds_on_absent_key(tmp_path: Path) -> None:
@@ -89,57 +74,12 @@ def test_flag_off_render_succeeds_on_absent_key(tmp_path: Path) -> None:
 # the `(unknown-stage)` sentinel, which is the absent case ADR-003 defines.
 
 
-def test_every_wired_stage_passes_its_own_stage_name_after_the_base_positional(
-    tmp_path: Path,
-) -> None:
-    """Rejects three wrong implementations: a template that inherits the partial but
-    forgets `--stage`; one that hard-codes a single name for all seven (copy-paste);
-    and — the one a bare `--stage hm:X` grep would MISS — a flag placed BEFORE the
-    base positional. The shipped parser treats every non-`--` arg as positional, so
-    `task-preflight <slug> --stage hm:plan "$(pwd)"` makes `base_dir = Path("hm:plan")`.
-    Pinning the full invocation is what couples the rendered string to a correct parse.
-    """
-    files = _render(tmp_path, flag_on=True)
-    for stage in WIRED_STAGES:
-        body = _stage(files, stage)
-        assert f'task-preflight <slug> "$(pwd)" --stage hm:{stage}' in body, stage
 
 
-def test_flag_off_gives_zero_stage_coverage(tmp_path: Path) -> None:
-    """Non-Goal 2, re-corrected by PLAN-worktree-side-defaults ADR-005.
-
-    History worth keeping: an early version asserted "emits nothing" for all seven
-    stages and was WRONG, because flag-off `execute` still rendered
-    `worktree create execute`, which emits an `hm:execute` span. The correction added
-    the "…but execute keeps a real emitter" clause.
-
-    ADR-005 makes the original claim true for the first time: OFF now means no stage
-    creates a worktree, so there is no emitter left. The clause is removed, not because
-    the earlier correction was wrong, but because the behavior it described is gone.
-    """
-    files = _render(tmp_path, flag_on=False)
-    for stage in WIRED_STAGES:
-        assert "--stage hm:" not in _stage(files, stage), stage
-    assert "worktree create execute" not in _stage(files, "execute")
 
 
-def test_execute_dualpath_flag_on_uses_preflight(tmp_path: Path) -> None:
-    files = _render(tmp_path, flag_on=True)
-    body = _stage(files, "execute")
-    assert "worktree task-preflight <slug>" in body
-    # the legacy ephemeral-isolation command is replaced when the flag is on
-    assert "worktree create execute" not in body
 
 
-def test_execute_flag_off_has_no_isolation_path_at_all(tmp_path: Path) -> None:
-    """ADR-005 replaced the dual path with a single gate: OFF renders neither the
-    legacy `Step 0 — Worktree isolation` block nor the preflight."""
-    files = _render(tmp_path, flag_on=False)
-    body = _stage(files, "execute")
-    assert "Step 0 — Worktree isolation" not in body
-    assert "worktree create execute" not in body
-    assert "task-preflight" not in body
-    assert "Step 5 — Worktree finalize" not in body
 
 
 # ── flag-ON determinism: full golden block (validator W2) ─────────────────────
@@ -166,16 +106,6 @@ _GOLDEN_PREFLIGHT = """### Task worktree preflight (feature-branch workflow)
   `task-refresh` rebases `hm/<slug>` onto the base tip (base HEAD, not a hardcoded `main`), preserving commits; a conflict aborts and leaves the branch untouched — resolve manually, then retry. Refuse to refresh a dirty worktree: commit or discard first."""
 
 
-def test_preflight_block_matches_golden(tmp_path: Path) -> None:
-    files = _render(tmp_path, flag_on=True)
-    body = _stage(files, "wrapup")
-    start = body.index("### Task worktree preflight")
-    end = body.index("### Step 1 — Pre-flight")
-    block = body[start:end].rstrip("\n")
-    # normalize the machine-specific install ref to keep the golden path-independent
-    src = _synth._compute_install_ref()
-    block = block.replace(src, "<SRC>")
-    assert block == _GOLDEN_PREFLIGHT
 
 
 # ── fused workflows inherit the preflight (master Phase 5 AC) ──────────────────
@@ -195,49 +125,12 @@ def test_fused_workflows_omit_preflight_when_flag_off(tmp_path: Path) -> None:
 # ── flag-ON: wrapup squash-lands the task branch (ADR-003 wiring; Phase 4 gap) ─
 
 
-def test_wrapup_lands_task_branch_when_flag_on(tmp_path: Path) -> None:
-    # ADR-003: wrapup is the land owner. Flag-on wrapup must wire the actual Step 7.7
-    # land invocation (the Phase-4 wiring gap Codex found) — pin the exact command +
-    # the heading so an incidental `task-*` mention can't satisfy this.
-    body = _stage(_render(tmp_path, flag_on=True), "wrapup")
-    assert "Squash-land the task branch" in body, (
-        "flag-on wrapup must render the Step 7.7 land step"
-    )
-    assert "worktree task-land <SLUG> <BASE>" in body, "flag-on wrapup must invoke task-land"
 
 
-def test_wrapup_no_land_when_flag_off(tmp_path: Path) -> None:
-    # Flag-off must render the legacy wrapup with NO land step (the Step 7.7 block is
-    # fully inside the flag gate). Byte-neutrality of the gate is asserted separately;
-    # here we pin that neither the heading nor the invocation leaks into flag-off.
-    body = _stage(_render(tmp_path, flag_on=False), "wrapup")
-    assert "task-land" not in body, "flag-off wrapup must not reference task-land"
-    assert "Squash-land the task branch" not in body, "flag-off must omit the Step 7.7 heading"
 
 
 # ── flag-ON: Step 6/7 commit inside <WT> so the curated commit lands on the branch ─
 
 
-def test_wrapup_commit_runs_inside_worktree_when_flag_on(tmp_path: Path) -> None:
-    # REVIEW-2026-06-21 P3-3: staging + commit must target <WT> (the hm/<slug> task
-    # worktree), else they execute in the base repo against an empty index → the commit
-    # is a no-op and the curated message never reaches the branch Step 7.7 squash-lands
-    # (which also defeats P2-3's message reuse).
-    #
-    # PLAN-workflow-step-audit Phase 2 changed the MECHANISM, not the property: the
-    # `cd <WT> &&` shell prefix became an explicit `--worktree <WT>` argument, and the
-    # composite refuses a `--worktree` that is not a worktree of `--base`. That is a
-    # stronger binding than the prefix — a prefix could be dropped and the call would
-    # still run, just in the wrong place.
-    body = _stage(_render(tmp_path, flag_on=True), "wrapup")
-    assert "hm wrapup_land --worktree <WT> --base <BASE>" in body, (
-        "flag-on staging + commit must bind <WT> explicitly"
-    )
 
 
-def test_wrapup_commit_runs_in_base_when_flag_off(tmp_path: Path) -> None:
-    # Flag-off has no task worktree, so the composite still takes both roots but there is
-    # no Step 7.7 to land onto — asserted by `test_wrapup_no_land_when_flag_off`.
-    body = _stage(_render(tmp_path, flag_on=False), "wrapup")
-    assert "hm wrapup_land --worktree" in body
-    assert "cd <WT> && git commit" not in body, "flag-off must not inject <WT> into the commit"

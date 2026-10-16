@@ -97,14 +97,16 @@ def test_reconcile_hash_mismatch_both_have_markers_returns_merge_block(tmp_path:
     """User edited a marker-bearing file whose template still has markers
     → MERGE_BLOCK so user blocks survive the upgrade.
     """
-    target = tmp_path / "review.md"
-    # OLD body has a user block — simulates a previously-rendered review.md.
-    body = "# Stage: review\n<!-- @hm:user:notes -->\nmy custom step\n<!-- @hm:/user:notes -->\n"
+    target = tmp_path / "wrapup.md"
+    # OLD body has a user block — simulates a previously-rendered wrapup.md.
+    body = "# Stage: wrapup\n<!-- @hm:user:notes -->\nmy custom step\n<!-- @hm:/user:notes -->\n"
     fm = (
         "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
     )
     target.write_text(fm + body, encoding="utf-8")
-    bp = Blueprint(files=[FileEntry(path=Path("review.md"), template="stages/review.md.j2")])
+    bp = Blueprint(
+        files=[FileEntry(path=Path("wrapup.md"), template="commands/hm/atomic_command.md.j2")]
+    )
     conflicts = reconcile(tmp_path, bp)
     assert conflicts[0].decision == ReconcileDecision.MERGE_BLOCK
     assert conflicts[0].reason == "hash-mismatch-mergeable"
@@ -115,13 +117,15 @@ def test_reconcile_malformed_markers_falls_back_to_keep(tmp_path: Path) -> None:
     MERGE_BLOCK. Reason: silent loss of user edits is unacceptable; surface
     the diagnostic so the user can fix their markup.
     """
-    target = tmp_path / "review.md"
-    body = "# Stage: review\n<!-- @hm:user:notes -->\nuser content but close tag is missing\n"
+    target = tmp_path / "wrapup.md"
+    body = "# Stage: wrapup\n<!-- @hm:user:notes -->\nuser content but close tag is missing\n"
     fm = (
         "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
     )
     target.write_text(fm + body, encoding="utf-8")
-    bp = Blueprint(files=[FileEntry(path=Path("review.md"), template="stages/review.md.j2")])
+    bp = Blueprint(
+        files=[FileEntry(path=Path("wrapup.md"), template="commands/hm/atomic_command.md.j2")]
+    )
     conflicts = reconcile(tmp_path, bp)
     assert conflicts[0].decision == ReconcileDecision.KEEP
     assert conflicts[0].reason == "hash-mismatch-malformed-markers"
@@ -645,7 +649,7 @@ def _edited_agent_body(marker: str = "extensions") -> bytes:
 
 @pytest.mark.parametrize(
     "name",
-    ["code-reviewer", "concurrency-reviewer", "performance-reviewer", "executor"],
+    ["code-reviewer", "concurrency-reviewer", "performance-reviewer", "security-reviewer"],
 )
 def test_split_agent_template_merges_rather_than_freezing(name: str) -> None:
     """Regression: 13 of 15 agents froze permanently on the user's first edit.
@@ -916,3 +920,35 @@ def test_tracked_cursor_deletions_are_reported(tmp_path: Path) -> None:
     no_repo = tmp_path.parent / f"{tmp_path.name}-no-repo"
     no_repo.mkdir()
     assert tracked_cursor_deletions(no_repo) == []
+
+
+def _hashed(target: Path, body: str) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    h = compute_body_hash(body.encode("utf-8"))
+    target.write_text(f"---\ncontent_hash: {h}\n---\n{body}", encoding="utf-8")
+
+
+def test_reconcile_hash_match_with_edited_user_block_merges(tmp_path: Path) -> None:
+    """A block-merged file records the hash of its merged body, so the NEXT make sees a hash
+    match. Treating that as pristine REPLACEd it and dropped the user's block on the second
+    upgrade (SPEC-hm-overhaul-p1 AC-007, found by test_dogfood_sandbox). A hash match whose user
+    block differs from the template's default must block-merge again."""
+    template = "commands/hm/atomic_command.md.j2"
+    default = (
+        "<!-- @hm:user:extensions -->\n<!-- Your additions; kept on upgrade. -->\n"
+        "<!-- @hm:/user:extensions -->\n"
+    )
+    assert default in (_TEMPLATE_DIR / template).read_text(encoding="utf-8")
+    bp = Blueprint(files=[FileEntry(path=Path("commands/hm/spec.md"), template=template)])
+    _hashed(
+        tmp_path / "commands/hm/spec.md",
+        "# spec\n\n" + default.replace("-->\n<!-- @hm:/", "-->\nmine\n<!-- @hm:/"),
+    )
+    edited = reconcile(tmp_path, bp)[0]
+    assert (edited.decision, edited.reason) == (
+        ReconcileDecision.MERGE_BLOCK,
+        "hash-match-user-blocks",
+    )
+    _hashed(tmp_path / "commands/hm/spec.md", "# spec\n\n" + default)
+    pristine = reconcile(tmp_path, bp)[0]
+    assert (pristine.decision, pristine.reason) == (ReconcileDecision.REPLACE, "hash-match-ours")

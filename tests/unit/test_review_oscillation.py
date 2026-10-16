@@ -226,37 +226,3 @@ def test_a_round_that_only_fixes_forward_reports_no_oscillation(tmp_path: Path) 
     assert not (tmp_path / ".claude" / "observability" / "review-oscillation-s.jsonl").exists()
 
 
-def test_the_rendered_stage_scans_for_oscillation_and_keeps_it_off_the_grade() -> None:
-    """Wiring plus the one property that makes it safe to ship.
-
-    A detector that could move the grade would block approval on a SPEC gap, so the
-    render must state that it does not — and must actually be invoked, which the round-1
-    P0 of this PLAN showed is a separate fact from the arithmetic being correct.
-    """
-    import tempfile
-
-    from harness_maker.interview import interview
-    from harness_maker.models import ProjectProfile, Target
-    from harness_maker.render import DEFAULT_FREEZE_TIME, render
-    from harness_maker.synthesize import synthesize
-
-    profile = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    answers = interview(profile, autoloop_mode=True)
-    answers.worktree["enabled"] = True
-    answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
-    out = Path(tempfile.mkdtemp()) / ".claude"
-    render(synthesize(profile, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
-
-    bodies = {
-        "claude": (out / "commands" / "hm" / "review.md").read_text(encoding="utf-8"),
-        "codex": (out / ".." / ".agents" / "skills" / "hm-review" / "SKILL.md")
-        .resolve()
-        .read_text(encoding="utf-8"),
-    }
-    for variant, body in bodies.items():
-        calls = [ln for ln in body.splitlines() if "hm review_churn oscillation " in ln]
-        assert len(calls) == 1, f"{variant}: expected one oscillation scan, got {len(calls)}"
-        assert "--rounds" in calls[0]
-        assert "cd <WT> &&" in calls[0], f"{variant}: scan runs against the base repo"
-        assert "never moves the grade" in body, f"{variant}: the grade exclusion is not stated"
-        assert "manual-only" in body

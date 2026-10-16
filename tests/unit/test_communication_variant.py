@@ -45,7 +45,7 @@ def _render_dispatcher(name: str) -> str:
 
 
 def test_variant_full_renders_full_partial() -> None:
-    rendered = _render_dispatcher("autoloop-coder")
+    rendered = _render_dispatcher("stage-delegate")
     assert '- Be direct. No flattery, no preamble, no "Great question!"' in rendered
     assert "<!-- @hm:communication_variant: full -->" in rendered
     assert "## Input Processing" not in rendered
