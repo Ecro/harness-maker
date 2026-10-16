@@ -8,12 +8,12 @@ version: 0.64.0
 status: planning
 summary: "Overhaul phase 1 PR-S: four stages, one hm check gate, retired hooks, brownfield sweep"
 surface_allowance:
-  chars: 960
-  reason: "Review round 1 (ADR-044..ADR-047): execute gains the one-RED-then-phases order, the irreversible-decision stop, the test-edit rule in the fix loop and the background-gate rule (+912 claude, +822 codex); wrapup gains the background-gate rule, answer-gated intent writes and the closing Understanding print, net of compression (+48 claude, +8 codex). Both stages stay inside their AC-004 budgets. No new round trips."
+  chars: 992
+  reason: "Review round 1 (ADR-044..ADR-047): execute gains the one-RED-then-phases order, the irreversible-decision stop, the test-edit rule in the fix loop and the background-gate rule (+912 claude, +822 codex); wrapup gains the background-gate rule, answer-gated intent writes and the closing Understanding print, net of compression (+80 claude, +40 codex; the intent writes keep one call per line, which `test_intent_file_inputs` reads, and the memory bullet keeps the wording `test_render_project_knowledge` pins). Both stages stay inside their AC-004 budgets. No new round trips."
   delta_doc: BASELINE-DELTA-hm-overhaul-p1-s.md
   commands:
     execute: 653
-    wrapup: 41
+    wrapup: 73
 ---
 
 # PLAN: overhaul phase 1, PR-S (stage collapse)

@@ -803,8 +803,9 @@ def test_intent_skill_and_wrapup_call_the_intent_verbs(tmp_path: Path, codex: bo
     root = _render_rules(tmp_path, codex=codex)
     wrapup = _rule_stage(root, "wrapup", codex=codex)
     intents = wrapup[wrapup.index("hm intent status --json") :]
-    assert "`hm intent metric record|measure`" in intents
-    assert "--text-file/--claim-file <f>" in intents
+    assert "`hm intent metric record|measure …`" in intents
+    assert "`hm intent question observe <id> … --text-file <f> [--claim-file <f>]`" in intents
+    assert "`hm intent question add <id> … --claim-file <f> [--text-file <f>]`" in intents
     assert "`hm intent close <id> --observed <met|missed|no_data> --note-file <f>`" in intents
     skill_dir = root / (".agents/skills" if codex else ".claude/skills") / "intent-layer"
     skill = _flat_rule(skill_dir / "SKILL.md")

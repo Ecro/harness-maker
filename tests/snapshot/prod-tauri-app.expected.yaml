@@ -40,7 +40,7 @@ files:
   body_sha256: 86a9b22c2d05bb4c25d11d38a50fb331dda627fe91c0348f95acee03f3be15a1
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 22ed65a46a4f8ebf5186b470df58ee7dd90e6f79fa122ec1bc42e93471619234
+  body_sha256: a5dce09f7c728e37fafedd9c2a0dee1f051301e583c88ee10d6a3d8216bc2561
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
   body_sha256: f295e822ef5766a50608e4ab2d990d9e97ed9f9b79c10116a476895d51c962eb

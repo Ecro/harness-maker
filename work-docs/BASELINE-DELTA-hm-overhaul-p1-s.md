@@ -60,15 +60,15 @@ growth is held as this PLAN's `surface_allowance` until the DRI re-freezes from 
 | variant | command | frozen (chars, round trips) | now | cause |
 |---|---|---|---|---|
 | claude | `execute` | 7 485, 2 | 8 397, 2 | Phase A writes every AC test and RED runs once (ADR-044); the irreversible-decision stop and the test-edit rule (ADR-046); the background-gate rule (ADR-045) |
-| claude | `wrapup` | 5 827, 2 | 5 875, 2 | the background-gate rule, answer-gated intent writes, the closing Understanding print; the rest compressed to stay at 3 497 of the 3 500 AC-004 budget |
+| claude | `wrapup` | 5 827, 2 | 5 907, 2 | the background-gate rule, answer-gated intent writes (one call per line), the closing Understanding print; the rest compressed to stay within the 3 500 AC-004 budget |
 | codex | `hm-execute` | 7 541, 2 | 8 363, 2 | same text; Codex gets the no-JSON rule without a background call |
-| codex | `hm-wrapup` | 5 921, 2 | 5 929, 2 | same |
+| codex | `hm-wrapup` | 5 921, 2 | 5 961, 2 | same |
 
 | key | frozen | now | Δ |
 |---|---|---|---|
-| `aggregate_chars`.claude | 45 487 | 46 447 | +960 (the allowance's `chars`) |
-| `aggregate_chars`.codex | 27 381 | 28 211 | +830 |
+| `aggregate_chars`.claude | 45 487 | 46 479 | +992 (the allowance's `chars`) |
+| `aggregate_chars`.codex | 27 381 | 28 243 | +862 |
 
-The per-command allowance (`execute: 653`, `wrapup: 41`) is the measured overshoot of the
-atomic ceilings in `test_command_size_budget.py` (8 072 vs 7 419 and 4 536 vs 4 495 on the
+The per-command allowance (`execute: 653`, `wrapup: 73`) is the measured overshoot of the
+atomic ceilings in `test_command_size_budget.py` (8 072 vs 7 419 and 4 568 vs 4 495 on the
 opt-in arm).

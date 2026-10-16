@@ -20,33 +20,37 @@ Run `hm wrapup_brief --root . --slug '<slug>'`. When it is `ok` and you can disp
 
 ## Step 3.6 — Judgment
 
-`<Y>` = `specs/SPEC-<slug>.machine.yaml`. Run `hm spec_machine find-unbound --yaml <Y>`; per AC `hm spec_machine find-unjudged --yaml <Y>` lists, dispatch {{ hm.dispatch("judgment-reviewer", "rubric, subject paths") }}, then `hm spec_machine mark-judged --yaml <Y> --ac AC-NNN --verdict <pass|fail> --evidence-file <file>`.{% if strictness_of(config) == 'warn' %} `hm spec_machine waiver-check --yaml <Y> --strictness warn` (warn-only).{% endif %}
+`<Y>` = `specs/SPEC-<slug>.machine.yaml`. Run `hm spec_machine find-unbound --yaml <Y>`; per AC `hm spec_machine find-unjudged --yaml <Y>` lists, dispatch {{ hm.dispatch("judgment-reviewer", "rubric, paths") }}, then `hm spec_machine mark-judged --yaml <Y> --ac AC-NNN --verdict <pass|fail> --evidence-file <file>`.{% if strictness_of(config) == 'warn' %} `hm spec_machine waiver-check --yaml <Y>`.{% endif %}
 
 ## Step 4 — PLAN
 
-Set the PLAN's `status: complete`; tick every `- [ ]`.
+PLAN: `status: complete`, all `- [ ]` ticked.
 
 ## Step 5 — Memory
 
 Search first: `hm memory_retrieve --topic "<what changed>"`. Bodies: `mktemp` files (Write tool); never edit memory files.
-- `hm memory_md upsert-wiki --slug '<slug>' --category '<cat>' --body-file <tmp>`: reuse a found slug unless `[wiki:fact]`; a new one matches no `## [wiki:` heading (Grep{% if _wt %}, in `<BASE>`: the `<WT>` copy is stale{% endif %}).
-- `hm memory_md upsert-failure` (same flags): a same-root-cause recurrence reuses its slug with `--occurrence-note '<line>'`.
-- A `count >= 3` failure gets a proposal in `.claude/memory/pending-proposals.md`; print `escalation: K at count>=3, P proposals`.
+- `hm memory_md upsert-wiki --slug '<slug>' --category '<cat>' --body-file <tmp>`; reuse a found slug unless it is a `[wiki:fact]`; a new one must match no `## [wiki:` heading (Grep tool{% if _wt %}, in `<BASE>`: the `<WT>` copy is stale{% endif %}).
+- `hm memory_md upsert-failure` (same flags): a same-root-cause recurrence reuses its slug, `--occurrence-note '<line>'`.
+- A `count >= 3` failure: a proposal in `.claude/memory/pending-proposals.md`; print `escalation: K at count>=3, P proposals`.
 {%- if config.wrapup_docs %}
 - Update {{ config.wrapup_docs | map('tojson') | join(', ') | replace('"', '`') }} for this change.
 {%- endif %}
 {%- if config.second_brain.get('enabled') %}
 - **Second Brain.** Promote only what is durable across projects (a failure, decision, preference or project note): `hm second_brain promote --type <type> --source-slug '<slug>' --title '<title>' --body-file <path>`. Promoting nothing is a valid result. End with one line, `promotion evaluated: <N> candidates, <M> promoted`, where N counts this step's promotable entries and is not 0 when you wrote one.
 {%- endif %}
-- An intent in use (`hm intent status --json`): ask the DRI once ({{ hm.ask() }}, multi-select) which to run; run only the selected writes; no answer runs none: `hm intent question observe|add <id> … --text-file/--claim-file <f>`, `hm intent metric record|measure`, `hm intent close <id> --observed <met|missed|no_data> --note-file <f>`.
+- An intent in use (`hm intent status --json`): ask the DRI once ({{ hm.ask() }}, multi-select); run only the selected writes; no answer runs none:
+  - `hm intent question observe <id> … --text-file <f> [--claim-file <f>]`
+  - `hm intent question add <id> … --claim-file <f> [--text-file <f>]`
+  - `hm intent metric record|measure …`
+  - `hm intent close <id> --observed <met|missed|no_data> --note-file <f>`
 
 ## Steps 6 → 7.6 — Commit
 
-Message file: `<type>(<scope>): <subject>`, why, the RED summary and an `Understanding:` block, ≤5 bullets (`<assumption>: <before> -> <after>`, `unknown: …`, `agent-decided: ADR-…`). `hm proposals summary`: 5+ open warns once (triage: `hm proposals list --open`).
+Message file: `<type>(<scope>): <subject>`, why, RED summary, an `Understanding:` block, ≤5 bullets (`<assumption>: <before> -> <after>`, `unknown: …`, `agent-decided: ADR-…`). `hm proposals summary`: 5+ open warns once (triage: `hm proposals list --open`).
 
-`hm spec_machine approval-status --slug <slug>{% if _wt %} --root <BASE> --checkout <WT>{% endif %}`. On `land: hold`, show each `irreversible` decision; one closed question: approve runs `hm spec_machine approve --yaml {{ '<WT>/' if _wt else '' }}<Y>`, keep stops; silence is never approval.
+`hm spec_machine approval-status --slug <slug>{% if _wt %} --root <BASE> --checkout <WT>{% endif %}`. On `land: hold`, show each `irreversible` decision; ask once: approve runs `hm spec_machine approve --yaml {{ '<WT>/' if _wt else '' }}<Y>`, keep stops; silence is never approval.
 
-`hm wrapup_land --worktree {{ _W }} --base {{ _B }} --slug <slug> --message-file <file> --required work-docs/PLAN-<slug>.md --optional .claude/memory/ --optional 'work-docs/REVIEW-<slug>-*.md' --optional work-docs/RESEARCH-<slug>.md --optional specs/SPEC-<slug>.md --optional <Y>`. Its `index_after` must hold your code. On `legacy_ref_scan: abort`, show `git stash show -p <ref>` before any stash advice. Ask only on `[finalize] stash-pop conflict` or `untracked-file collision`; else report verbatim and halt.
+`hm wrapup_land --worktree {{ _W }} --base {{ _B }} --slug <slug> --message-file <file> --required work-docs/PLAN-<slug>.md --optional .claude/memory/ --optional 'work-docs/REVIEW-<slug>-*.md' --optional work-docs/RESEARCH-<slug>.md --optional specs/SPEC-<slug>.md --optional <Y>`. `index_after` must hold the code. On `legacy_ref_scan: abort`, show `git stash show -p <ref>` before stash advice. Ask only on `[finalize] stash-pop conflict` or `untracked-file collision`; else report verbatim, halt.
 {%- if _wt %}
 
 ## Step 7.7 — Squash-land
