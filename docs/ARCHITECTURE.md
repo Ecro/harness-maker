@@ -23,7 +23,7 @@ Measurements precede closure; existing consent applies only to the same scope.
 
 Codex executes the next local stage skill after the shared boundary authorizes
 it. Auto-answered judgments are recorded before a terminal halt, and missing
-skills produce a handoff. Claude retains Skill dispatch; Cursor keeps handoff.
+skills produce a handoff. Claude retains Skill dispatch.
 No new scheduler, Goal engine, storage schema or approval bypass is introduced.
 
 Real-use validation has a separate activation and three first-start-ordered task
@@ -127,7 +127,7 @@ the final replacement.
                           ▼
             ┌──────────────────────────────────────────────────────┐
             │  ADD-only apply to <project>/.claude/                │
-            │  (+ .cursor/, .codex/, .agents/, AGENTS.md when targeted) │
+            │  (+ .codex/, .agents/, AGENTS.md when targeted)      │
             └────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼
@@ -224,7 +224,7 @@ Every mechanism below maps to a module under `src/harness_maker/` and at least o
 The four-stage core. Each stage has a single responsibility and a typed handoff.
 
 - **Profiler** (`profile.py`) inspects the project root for signals: `pyproject.toml`, `package.json`, `Cargo.toml`, `*.overlay`, `.github/workflows/`, presence of `.claude/`, presence of standalone `TECH_SPEC.md`, vault membership. Emits `ProjectProfile`.
-- **Interviewer** (`interview.py`) recommends a preset based on the profile, then runs an interactive interview across 10+ override dimensions: workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching. Also captures `targets` (Claude Code / Cursor) and `recommended_model`. Locale-first; English is the default (`DEFAULT_LOCALE = "en"`) with Korean built-in and unknown locales silently falling back to English, via `i18n.py`. Emits `HarnessConfig`.
+- **Interviewer** (`interview.py`) recommends a preset based on the profile, then runs an interactive interview across 10+ override dimensions: workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching. Also captures `targets` (Claude Code / Codex) and `recommended_model`. Locale-first; English is the default (`DEFAULT_LOCALE = "en"`) with Korean built-in and unknown locales silently falling back to English, via `i18n.py`. Emits `HarnessConfig`.
 - **Synthesizer** (`synthesize.py`) is **purely deterministic** — given a `HarnessConfig`, it produces the same `Blueprint` (a list of `FileEntry`) every time. No LLM call here; this guarantees reproducibility and snapshot testability.
 - **Renderer** (`render.py`) walks the `Blueprint`, loads each Jinja2 template, injects context, prepends provenance frontmatter (M13), and writes the result.
 - **Second Brain** (`second_brain.py`) treats an Obsidian vault as a typed Markdown graph for stage-aware memory. First-install onboarding is read-first; deeper write-capable setup is configured later. Read/write access is constrained by configured folder allowlists, and writable folders require `second_brain.project_id` in the folder path so several projects can share one vault without writing into the same namespace.
@@ -424,47 +424,40 @@ Three loops depend on this:
 - **`reconcile`** (invoked by `/harness-maker:make`) compares hashes to detect user edits and refuses to silently overwrite.
 - **`phase_<N>_invariants`** check in `.claude-verify.sh` walks every generated file and asserts the first line is `---` — the invariant that makes the other two loops sound.
 
-### M14 — Multi-Target Rendering (Claude Code, Cursor, Codex)
+### M14 — Multi-Target Rendering (Claude Code, Codex)
 
-harness-maker renders the same workflow model for Claude Code, Cursor IDE, and OpenAI Codex CLI. The `targets` field in `HarnessConfig` (values: `claude-code`, `cursor`, `codex`, or any combination) drives which files the Renderer emits.
+harness-maker renders the same workflow model for Claude Code and OpenAI Codex CLI. The `targets` field in `HarnessConfig` (values: `claude-code`, `codex`, or both) drives which files the Renderer emits. The Cursor target was removed in 0.63.0 (SPEC-hm-overhaul-p1): a harness.yaml that still lists `cursor` drops it at parse, and a kept 0.62 `.cursor/` file is deleted only when it is byte-for-byte what 0.62 shipped (`cursor_retire`).
 
-**Single-source Claude/Cursor assets** (`targets: [claude-code, cursor]` both get these — Cursor reads them natively):
+**Claude Code assets**:
 - `.claude/agents/<name>.md`
 - `.claude/skills/<name>/SKILL.md`
-- `.claude/commands/hm/<name>.md` (verified empirically against kairos 0.5.7 in 0.6.2 — see `tests/cursor-compat/results-2026-05-08.md`; the previously-reserved `_is_cursor_command` dispatch in `render.py` is now annotated as dead code)
+- `.claude/commands/hm/<name>.md`
 
 **Per-IDE hooks** — each IDE reads its own location, and they are NOT interchangeable:
 - `.claude/settings.json` → its `hooks` key. **This is the only place Claude Code reads project
   hooks from.** PascalCase event keys (`PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) +
   nested `{matcher, hooks:[{type, command}]}`. Harness-owned but deep-merged, so a user's own
   hooks survive a re-render.
-- `.cursor/hooks.json` — Cursor-native schema: lowercase camelCase event keys (`preToolUse`,
-  `stop`, `preCompact`) + flat `{matcher, command}` shape + `version: 1`.
 - `.codex/hooks.json` — Codex's own file and schema.
 
 > **Corrected 2026-07-17; the correction is the interesting part.** This section used to name
 > `.claude/hooks/hooks.json` as "the Claude Code schema", and **that was false** — Claude Code
 > loads project hooks only from settings files, and `hooks/hooks.json` is a *plugin-bundle*
 > path. Every hook harness-maker rendered there was dead in Claude Code for as long as the
-> claim stood; Cursor and Codex were unaffected because they really do read their own files.
+> claim stood.
 >
-> The claim came from the 2026-05-08 kairos forensic cited below, which asked only *"does
-> Cursor read `.cursor/hooks.json`?"* (yes, proven) and never tested the Claude half. **The
-> untested half of a verified experiment became an assertion**, and it survived two years of
-> readers because the verified half made the whole paragraph feel measured. Refuted by a
-> controlled experiment; `.claude/hooks/hooks.json` is no longer rendered at all (ADR-005 of
+> The claim came from a 2026-05-08 forensic that asked only *"does Cursor read
+> `.cursor/hooks.json`?"* (yes, proven) and never tested the Claude half. **The untested half
+> of a verified experiment became an assertion**, and it survived because the verified half
+> made the whole paragraph feel measured. Refuted by a controlled experiment;
+> `.claude/hooks/hooks.json` is no longer rendered at all (ADR-005 of
 > PLAN-permission-deny-and-hooks-wiring), and a pristine leftover copy is retired by
 > `cli._retire_stale_hooks_json` — user-merged content is never deleted.
 
-**The Cursor/Codex divergence is still by design.** The 0.6.2 forensic on the kairos repo
-(private, harness-maker 0.5.7) traced 4 entries in `metrics.jsonl` — all with `event: "stop"`
-(lowercase) and Cursor-only `status` / `loop_count` payload fields per `telemetry.py:11` — to the
-lowercase template, proving Cursor reads its dedicated file with its own schema. Do not try to
-collapse the per-IDE files: Cursor silently stops firing hooks.
-
-**Cursor-only assets** (emitted only when `cursor` ∈ targets):
-- `.cursor/rules/harness.mdc` — always-on workflow rules rendered via `_render_cursor_mdc()`, which limits frontmatter to keys Cursor accepts (`description`, `globs`, `alwaysApply`). Our `content_hash` metadata is omitted from the frontmatter to avoid strict-reject. The `.mdc` line budget is a Cursor authoring guideline (≤500 lines; split recommended past ~200 per CLAUDE.md), **not** enforced by `context_lint.py` — its per-preset `THRESHOLDS` table covers only `CLAUDE.md`/`AGENTS.md`/`agent`/`skill`/`workflow`. Current rendered output is ~133 lines.
-- `.cursor/mcp.json` — pure JSON (no frontmatter), rendered via `_render_pure_text()`. Populated from `harness.yaml.mcp_servers` propagated through `HarnessConfig.mcp_servers` and the Jinja context (0.6.2 P5). Empty default `{"mcpServers": {}}` is valid; users add servers manually to their yaml. The `interview.answers_from_harness_yaml` reverse mapper preserves user-edited `mcp_servers` across re-renders, with type validation (`command: str` non-empty, `args: list[str]` optional, `env: dict[str, str]` optional) and a warning log when entries are dropped.
+**A kept 0.62 `.cursor/hooks.json` still runs in Cursor**, and Cursor also imports
+`.claude/settings.json` hooks. `hook_host.is_claude_copy_in_cursor` lets the Claude copy stand
+down only for a hook whose own module the kept file runs from a live `--with` path; otherwise
+the Claude copy runs and says so on stderr.
 
 **Codex invocation boundary:** `template_globals.stage_invocation` normalizes
 owned Markdown prose to `$hm-*` before `render.py` hashes it and merges user blocks.
@@ -482,11 +475,9 @@ also reference emitted skills; a valid spelling alone does not establish availab
 
 Codex TOML files intentionally carry no provenance frontmatter because TOML parsers reject markdown preambles. The Reconciler treats `.codex/*.toml` as replaceable generated config, while `AGENTS.md` is block-merge aware.
 
-**Plugin manifests**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, and `.codex-plugin/plugin.json` describe the same package for each runtime. All three manifests must be bumped in sync with `pyproject.toml` and `src/harness_maker/__init__.py` on every version release.
+**Plugin manifests**: `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` describe the same package for each runtime. Both manifests must be bumped in sync with `pyproject.toml` and `src/harness_maker/__init__.py` on every version release.
 
 **Recommended model**: `HarnessConfig.recommended_model` defaults to `opus` and propagates to agent frontmatter. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
-
-**Minimum supported Cursor**: 2.4 (2026-01-22 — first to bundle subagents, skills, Claude Code hooks compatibility). **Recommended**: 3.2+ (2026-04-24 — agent-first redesign, native `/worktree` and `/best-of-n`). The native worktree commands coexist safely with `/hm:execute` because cleanup is prefix-matched (`phase-*`, `autoloop-*`, `execute-*` reserved for harness-maker).
 
 ### M15 — Detection Depth (Track A)
 
@@ -494,7 +485,7 @@ Codex TOML files intentionally carry no provenance frontmatter because TOML pars
 
 Caching: results are stored at `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime invalidation + a 24h ceiling, both governed by `detection_cache.CACHED_MANIFESTS`. The cache makes back-to-back `/hm:configure` runs cheap and keeps `/hm:health`'s personalization layer from re-walking the source tree.
 
-Installed-CLI detection is deliberately **outside** this cache. `harness-maker detect-tools --json` (0.49.0) resolves `codex` / `agy` / `cursor` on `PATH` on every call and is not a `ProjectProfile` field: installing a CLI touches no project manifest, so manifest-mtime invalidation would never fire and a cached answer could report a tool installed minutes ago as absent. `installed` means the binary resolves; authentication is never probed.
+Installed-CLI detection is deliberately **outside** this cache. `harness-maker detect-tools --json` (0.49.0) resolves `codex` / `agy` on `PATH` on every call and is not a `ProjectProfile` field: installing a CLI touches no project manifest, so manifest-mtime invalidation would never fire and a cached answer could report a tool installed minutes ago as absent. `installed` means the binary resolves; authentication is never probed.
 
 **Key files**: `src/harness_maker/profile.py`, `src/harness_maker/detection_cache.py`.
 
@@ -506,7 +497,7 @@ Installed-CLI detection is deliberately **outside** this cache. `harness-maker d
 - **MEDIUM** → explicit `AskUserQuestion` so the user explicitly accepts or overrides.
 - **LOW** → no surface (we don't show low-confidence guesses).
 
-Tri-IDE payload equivalence is asserted (validator N1: the same `Recommendation` flows through Claude Code, Cursor, and Codex). Backward-compat regression test guards 0.11.x users from silent default changes (validator W3).
+Cross-IDE payload equivalence is asserted (validator N1: the same `Recommendation` flows through Claude Code and Codex). Backward-compat regression test guards 0.11.x users from silent default changes (validator W3).
 
 **Key files**: `src/harness_maker/recommendation.py`, `src/harness_maker/interview.py`, `src/harness_maker/models.py` (`Confidence`, `Recommendation`, `RecommendationEvidence`, `AdaptiveConfig`).
 
@@ -600,7 +591,7 @@ Telemetry (M18) is default-on for both presets per ADR-005: the audit is only us
 - **How to extend:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - **What's verified:** [`.claude-verify.sh`](../.claude-verify.sh) — every mechanism above has at least one phase check
 - **Reference patterns:** [`docs/reference/autoloop-pattern.md`](reference/autoloop-pattern.md), [`docs/reference/block-merge-spec.md`](reference/block-merge-spec.md) (covers the `@hm:harness:*` inverted marker family used by M17)
-- **Target details:** [`../README.md#targets`](../README.md) — Cursor and Codex asset layout, KEEP rule trade-off, recommended model, manual checklist
+- **Target details:** [`../README.md#targets`](../README.md) — Codex asset layout, KEEP rule trade-off, recommended model
 - **0.12.0 ADRs (in `work-docs/PLAN-personalization-depth-2026-05.md`):**
   - ADR-005 — default-on telemetry + no-network positive obligation
   - ADR-009 — `@hm:harness:*` inverted markers (foreign config re-render)

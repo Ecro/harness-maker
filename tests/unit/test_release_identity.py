@@ -28,7 +28,6 @@ _SPEC = _ROOT / "specs/SPEC-docs-release-sync.machine.yaml"
 _REMOTE_ROWS = load_golden_table(_SPEC, "AC-008")
 _VERSION_PATHS = (
     ".claude-plugin/plugin.json",
-    ".cursor-plugin/plugin.json",
     ".codex-plugin/plugin.json",
     "pyproject.toml",
     "src/harness_maker/__init__.py",
@@ -44,7 +43,7 @@ _PYPI_URL = "https://pypi.org/pypi/harness-maker/1.2.3/json"
 
 
 def _release_tree(tmp_path: Path, version: str = "1.2.3") -> Path:
-    for relative in _VERSION_PATHS[:3]:
+    for relative in _VERSION_PATHS[:2]:
         path = tmp_path / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"version": version}), encoding="utf-8")

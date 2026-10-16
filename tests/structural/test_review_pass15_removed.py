@@ -54,7 +54,7 @@ def _render_root() -> Path:
     """Production across all three targets — the cursor/codex surfaces render too."""
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
-    answers.targets = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+    answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
     answers.second_opinion = SecondOpinionConfig(models=["codex", "antigravity"])
     bp = synthesize(profile, answers, preset=Preset.PRODUCTION)
     root = Path(mkdtemp(prefix="hm-pass15-"))

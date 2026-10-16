@@ -60,9 +60,6 @@
 | project-knowledge | skill, typed only (직접 입력할 때만{% if is_codex %}, `$project-knowledge`{% endif %}) — 코드에 없는 프로젝트 사실 기록·정정, auto-memory 가 아니라 공유 wiki. 그 외엔 {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) 에게 |
 | {{ (config.world_model or {}).get('name', 'Maker') }} | world model 정면 입구 — {% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}: 브리핑, 작업 시작·재개, 사실 기록, 목표 |
 
-{% if not is_codex and "cursor" in config.targets -%}
-> **Cursor:** `/hm:*` 명령이 동일하게 동작. Subagent · skill 은 `.claude/` 에서 공유.
-{% endif -%}
 {% if "codex" in config.targets -%}
 > **Codex CLI:** `$hm-*` 형식으로 호출 (예: `$hm-help`, `$hm-execute`). Skill 은 `.agents/skills/` 경로.
 {% endif -%}

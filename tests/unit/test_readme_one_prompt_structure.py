@@ -34,7 +34,6 @@ def _section_between_markers(block: str, ide: str) -> str:
     """Return substring scoped to the given IDE branch inside the prompt body."""
     markers = {
         "claude": r"IF Claude Code:",
-        "cursor": r"IF Cursor",
         "codex": r"IF Codex CLI:",
     }
     pat = markers[ide]
@@ -42,7 +41,7 @@ def _section_between_markers(block: str, ide: str) -> str:
     if m is None:
         pytest.fail(f"branch marker {pat!r} missing inside one-prompt body")
     rest = block[m.end() :]
-    end = re.search(r"\n\s*IF (Claude Code|Cursor|Codex CLI|you can't)", rest)
+    end = re.search(r"\n\s*IF (Claude Code|Codex CLI|you can't)", rest)
     return rest[: end.start()] if end else rest
 
 
@@ -88,18 +87,6 @@ def test_claude_code_branch_uses_bash_install(readme: Path) -> None:
     )
 
 
-def test_cursor_branch_uses_bash_git_clone(readme: Path) -> None:
-    sub = _section_between_markers(_extract_one_prompt_block(readme), "cursor")
-    bash_lines = [ln for ln in sub.splitlines() if re.match(r"^\s*Bash:", ln)]
-    assert len(bash_lines) >= 1, (
-        f"{readme.name}: Cursor branch expects ≥1 'Bash:' line; found {len(bash_lines)}"
-    )
-    assert "git clone" in " ".join(bash_lines), (
-        f"{readme.name}: Cursor branch missing 'git clone' Bash line. "
-        f"Got:\n" + "\n".join(bash_lines)
-    )
-
-
 def test_codex_branch_uses_native_install_and_bundled_bootstrap(readme: Path) -> None:
     """AC-001 supersedes the old unavailable-marketplace constraint.
 
@@ -124,7 +111,7 @@ def test_per_ide_step_budget_table_present(readme: Path) -> None:
     assert heading is not None
     fence_open = text.find("```", heading.end())
     pre_fence_section = text[heading.end() : fence_open]
-    for ide in ("Claude Code", "Cursor", "Codex"):
+    for ide in ("Claude Code", "Codex"):
         assert ide in pre_fence_section, (
             f"{readme.name}: per-IDE step budget section before prompt is missing '{ide}'"
         )

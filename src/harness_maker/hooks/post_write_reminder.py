@@ -110,7 +110,7 @@ def _match_rules(file_path: str, rules: list[tuple[str, str]]) -> list[str]:
 def main() -> int:
     """Hook entry. Emits reminders on stdout; never blocks the tool call."""
     payload = _read_tool_input()
-    if is_claude_copy_in_cursor(payload):
+    if is_claude_copy_in_cursor(payload, "harness_maker.hooks.post_write_reminder"):
         return 0
     file_path = _extract_written_path(payload)
     if not file_path:

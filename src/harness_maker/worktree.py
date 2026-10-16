@@ -5946,8 +5946,8 @@ def _cli_span_end(args: list[str]) -> int:
     whatever span preceded it — possibly from a different session entirely.
 
     Claude-Code-only by construction: hooks live in `.claude/settings.json`. Cursor
-    imports that file too (third-party hooks, on by default), so the Cursor-run copy
-    stands down via `hook_host` once `.cursor/hooks.json` carries the host marker. On
+    imports that file too (third-party hooks, on by default); the Cursor-run copy stands
+    down via `hook_host` only when a kept `.cursor/hooks.json` runs this module itself. On
     Cursor/Codex spans close by next-start or cap (ADR-003), which is why those targets
     should expect a higher `capped_turns`.
     """
@@ -5960,7 +5960,7 @@ def _cli_span_end(args: list[str]) -> int:
         raw = ""
     from .hook_host import is_claude_copy_in_cursor
 
-    if is_claude_copy_in_cursor(raw):
+    if is_claude_copy_in_cursor(raw, "harness_maker.worktree"):
         return 0
     try:
         from .stage_spans import emit_event, ledger_path, read_events

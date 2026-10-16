@@ -7,6 +7,9 @@ mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verifica
 last_mutation_run: null
 paths_to_mutate:
 - src/harness_maker/presets.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
 ac:
 - id: AC-001
   title: Preset-aware per-agent model defaults + 3-tier render resolution
@@ -15,5 +18,26 @@ ac:
   - tests/unit/test_presets.py::test_cursor_model_ids_canonical_aliases_present
   - tests/unit/test_presets.py::test_cursor_model_ids_values_look_like_concrete_ids
   - tests/unit/test_presets.py::test_normalize_cursor_alias_pass_through_when_concrete
+  - tests/unit/test_presets.py::test_resolve_agent_spec_tier1_explicit_override_beats_preset
+  - tests/unit/test_presets.py::test_resolve_agent_spec_tier2_preset_production_reasoning_agent
+  - tests/unit/test_presets.py::test_resolve_agent_spec_tier2_preset_side_downshifts
+  - tests/unit/test_presets.py::test_resolve_agent_spec_tier3_user_authored_agent_no_keyerror
   executable_predicate: '# placeholder — refine in /hm:spec presets'
+  golden_table: []
+  rubric_id: null
+  note: ''
   pending_test: false
+  oracle_source: legacy-unspecified
+  oracle_evidence: null
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

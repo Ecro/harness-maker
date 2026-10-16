@@ -432,7 +432,7 @@ def main() -> None:
     args = parser.parse_args()
 
     stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
-    if is_claude_copy_in_cursor(stdin_text):
+    if is_claude_copy_in_cursor(stdin_text, "harness_maker.hooks.loop_gate"):
         sys.exit(0)
 
     if args.mode == "stop-hook":

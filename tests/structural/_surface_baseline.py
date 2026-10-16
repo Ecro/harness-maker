@@ -43,6 +43,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from harness_maker import render as _render_mod
 from harness_maker import synthesize as _synthesize_mod
 from harness_maker.interview import answers_from_harness_yaml
 from harness_maker.io_utils import atomic_write
@@ -76,6 +77,11 @@ _SCHEMA_VERSION = 1
 # and a baseline frozen in a worktree would be wrong in CI and in base.
 _MAIN_CHECKOUT_DEFAULT = "/home/noel/harness-maker"
 _PORTABLE_REF = "$HOME/harness-maker"
+# The release stamp (`harness_maker_version:` frontmatter, the AGENTS.md `version=`) is pinned
+# for the same reason: it measures WHICH release rendered, not what the render says. The
+# byte-goldens under tests/fixtures/light_lane_* were captured at 0.62.0; without the pin,
+# every version bump would move all of them although no instruction changed.
+_PINNED_RENDER_VERSION = "0.62.0"
 
 _BANG_LINE = re.compile(r"^\s*!", re.M)
 
@@ -86,15 +92,18 @@ def pinned_install_ref() -> Iterator[None]:
 
     original_root = _synthesize_mod._HARNESS_MAKER_PKG_ROOT
     original_compute = _synthesize_mod._compute_install_ref
+    original_version = vars(_render_mod)["__version__"]
     _synthesize_mod._HARNESS_MAKER_PKG_ROOT = os.environ.get(
         "HM_MAIN_CHECKOUT_PATH", _MAIN_CHECKOUT_DEFAULT
     )
     _synthesize_mod._compute_install_ref = lambda: _PORTABLE_REF
+    vars(_render_mod)["__version__"] = _PINNED_RENDER_VERSION
     try:
         yield
     finally:
         _synthesize_mod._HARNESS_MAKER_PKG_ROOT = original_root
         _synthesize_mod._compute_install_ref = original_compute
+        vars(_render_mod)["__version__"] = original_version
 
 
 REFS_VARIANT = "refs"

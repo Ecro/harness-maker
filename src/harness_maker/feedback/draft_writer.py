@@ -59,7 +59,7 @@ class FeedbackDraft(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     harness_maker_version: str
-    ide: Literal["claude-code", "cursor", "codex"]
+    ide: Literal["claude-code", "codex"]
     os: str
     stage: str
     task_slug: str

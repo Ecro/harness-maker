@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-10-16
+
 ### Added
 
 - **Plain-vs-hm eval with published results (SPEC-hm-eval).** `scripts/bench_light_lane.py` now records,
@@ -177,6 +179,24 @@
 
 ### Removed
 
+- **The Cursor target (SPEC-hm-overhaul-p1 PR-C).** `targets` accepts `claude-code` and `codex`;
+  `templates/cursor/`, `.cursor-plugin/plugin.json` and the flat hooks schema are gone, and version sync
+  is four files. A `cursor` entry in `harness.yaml` or `--targets` is dropped with one
+  `cursor target removed` warning per `make` (an emptied list becomes `[claude-code]`), and
+  `agent_models.<agent>.cursor` still loads with a warning; with no `claude:`, a tier alias in it
+  still picks the Claude model as 0.62 did. `make` deletes a 0.62 `.cursor/` file only when it is
+  unedited and not reached through a symlink: `.cursor/hooks.json` must match the render manifest
+  **and** every entry must be one 0.62 shipped, key for key, so an appended command, a re-scoped
+  matcher or a changed timeout keeps it. Every kept file prints a KEPT warning on each run; a
+  `.cursor/hooks.json` the manifest never recorded gets the generic orphan line instead. An emptied
+  `.cursor/` is removed, and a note says to `git add -u .cursor` when the deletions are tracked. The
+  Cursor model-id advisory leaves readiness, whose model-routing signals are reweighted 50/50.
+- **`hook_host` decides per hook.** The Claude copy of a hook stands down in Cursor only when a kept
+  `.cursor/hooks.json` parses, holds a marked command that runs that same module, and the command's
+  `--with` target exists. Before, the marker text anywhere in the file stood every hook down, spec_gate
+  included where the Cursor file never ran it. Any other case runs the Claude copy, and prints one
+  `[hook-host] Cursor copy of <gate> is stale or missing` line when a `.cursor/hooks.json` exists
+  (none, the normal state after retirement, runs silently).
 - **Intent trial machinery.** `hm intent trial`, `hm intent reconcile` and `hm intent record-decision`
   are gone, along with the frozen `intent_trial.py` module and its `worktree.py` hooks.
 - `hm intent new --from-proposal` no longer appends an `objective_proposed` ledger row. The event

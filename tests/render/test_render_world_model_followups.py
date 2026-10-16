@@ -262,7 +262,7 @@ def test_ac013_pointer_cap_full_tokens(row: Any, tmp_path: Path) -> None:
         "--locale",
         row.input["locale"],
         "--targets",
-        "claude-code,cursor,codex",
+        "claude-code,codex",
         "--world-model-name",
         name,
         "--world-model-handle",
@@ -271,7 +271,6 @@ def test_ac013_pointer_cap_full_tokens(row: Any, tmp_path: Path) -> None:
     for rel, token in (
         ("CLAUDE.md", f"/{handle}"),
         ("AGENTS.md", f"${handle}"),
-        (".cursor/rules/harness.mdc", f"/{handle}"),
     ):
         section = _pointer((repo / rel).read_text(encoding="utf-8"))
         # The golden row's 200 is the approved SPEC-world-model-followups AC-013 value; the

@@ -181,7 +181,7 @@ def _build_map_system_prompt() -> str:
         "  - preset: 'Side' or 'Production'\n"
         "  - strictness: 'block' or 'warn' (SPEC gate strictness)\n"
         "  - locale: language tag like 'en' or 'ko'\n"
-        "  - targets: list of 'claude-code'|'cursor'|'codex'\n"
+        "  - targets: list of 'claude-code'|'codex'\n"
         "  - default_model: free-text model id\n"
         "  - reviewers: list of reviewer names mentioned in the file\n"
         "  - domains: list of project domain keywords (e.g. 'flutter', 'zephyr')\n\n"
@@ -447,10 +447,7 @@ def _render_template(template_name: str, ctx: dict[str, Any]) -> str:
 # Anthropic API directly and reject the bare `opus`/`sonnet`/`haiku` aliases the
 # agent-launch surfaces (Claude Code) resolve natively); for the doc-style
 # templates (cursor_rules / claude_md / copilot / agents_md) the value is inert
-# prose. This map is intentionally SEPARATE from presets.CURSOR_MODEL_IDS: that
-# map holds Cursor's reversed-format ids (`claude-4-7-opus`) which are NOT valid
-# Anthropic API ids — a different namespace. Already-concrete `default_model`
-# values pass through unchanged.
+# prose. Already-concrete `default_model` values pass through unchanged.
 _FOREIGN_MODEL_IDS: dict[str, str] = {
     "opus": "claude-opus-4-8",
     "sonnet": "claude-sonnet-4-6",

@@ -3,12 +3,9 @@
 Every assertion here is scoped to the ONE rendered artifact a given consumer reads.
 That scoping is the point, twice over:
 
-* `.cursor/commands/` is dead code (`render.py:585-597` — no template feeds it), so
-  **Cursor reads the Claude render**. A fan-out gated on `"claude-code" in targets`
-  would therefore ship Cursor a `Task(subagent_type="Explore")` it cannot resolve — the
-  CLAUDE.md checklist-#2 failure class where the file on disk is right and only the
-  executed content differs. The gate is `cursor not in targets`, and the test that
-  matters is the one that renders WITH cursor and asserts the dispatch is absent.
+* The research fan-out (`Task(subagent_type="Explore")`) is Claude-only: the Codex
+  render must not carry it. (Until 0.63.0 Cursor read the Claude render too, and the
+  fan-out was gated off whenever `cursor` was a target; the Cursor target is gone.)
 * Phase D and Phase C sit outside every `dev_mode` gate, so both arms are rendered and
   compared: a collapse that reached one arm only is the defect the per-arm instruction
   baseline exists to catch.
@@ -74,7 +71,7 @@ def _hm_call_sequence(block: str) -> tuple[str, ...]:
 
 @cache
 def _commands(targets: tuple[Target, ...], strictness: Strictness = "warn") -> dict[str, str]:
-    """The `.claude/commands/hm/*.md` bodies — what Claude Code AND Cursor both read."""
+    """The `.claude/commands/hm/*.md` bodies — what Claude Code reads."""
     with tempfile.TemporaryDirectory() as td:
         out = Path(td) / ".claude"
         out.mkdir()
@@ -117,7 +114,6 @@ def _codex_skills(targets: tuple[Target, ...]) -> dict[str, str]:
 
 
 _CLAUDE_ONLY = (Target.CLAUDE_CODE,)
-_WITH_CURSOR = (Target.CLAUDE_CODE, Target.CURSOR)
 _WITH_CODEX = (Target.CLAUDE_CODE, Target.CODEX)
 
 
@@ -171,22 +167,24 @@ def test_the_fan_out_renders_when_claude_is_the_only_reader() -> None:
     assert "verbatim snippet" in body, "the citation contract is what makes a digest usable"
 
 
-def test_the_fan_out_is_absent_when_cursor_shares_the_claude_render() -> None:
-    """The load-bearing case: Cursor reads THIS file and cannot resolve `Explore`."""
-    body = _commands(_WITH_CURSOR)["research"]
-    assert "Explore" not in body
-    assert "Run these in parallel where the answers are independent" in body
-
-
 def test_the_fan_out_is_absent_from_the_codex_render() -> None:
     body = _codex_skills(_WITH_CODEX)["hm-research"]
     assert "Explore" not in body
 
 
-@pytest.mark.parametrize("targets", [_CLAUDE_ONLY, _WITH_CURSOR])
-def test_every_source_class_survives_in_both_renders(targets: tuple[Target, ...]) -> None:
-    """Redistributed, not deleted — a fan-out that loses source classes is a regression."""
-    body = _commands(targets)["research"]
+@pytest.mark.parametrize("reader", ["claude", "codex"])
+def test_every_source_class_survives_in_both_renders(reader: str) -> None:
+    """Redistributed, not deleted — a fan-out that loses source classes is a regression.
+
+    The two renders are the two branches: Claude's fan-out and Codex's plain list. (The second
+    case used to render with cursor, which took the plain branch in the Claude file.)
+    """
+    if reader == "claude":
+        body = _commands(_CLAUDE_ONLY)["research"]
+        assert "Fan out" in body
+    else:
+        body = _codex_skills(_WITH_CODEX)["hm-research"]
+        assert "Run these in parallel where the answers are independent" in body
     for marker in (
         "Codebase patterns",
         "Prior-art search in memory",

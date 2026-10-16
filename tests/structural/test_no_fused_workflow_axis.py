@@ -144,9 +144,9 @@ def _fresh_render(preset: Preset, targets: list[Target], tmp: Path) -> dict[str,
 def renders(tmp_path_factory: pytest.TempPathFactory) -> dict[str, dict[str, str]]:
     """Both presets × the target combinations that carry commands (PLAN Phase 1 exit)."""
     combos = {
-        "prod-all": (Preset.PRODUCTION, [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]),
+        "prod-all": (Preset.PRODUCTION, [Target.CLAUDE_CODE, Target.CODEX]),
         "prod-claude": (Preset.PRODUCTION, [Target.CLAUDE_CODE]),
-        "side-all": (Preset.SIDE, [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]),
+        "side-all": (Preset.SIDE, [Target.CLAUDE_CODE, Target.CODEX]),
         "side-claude": (Preset.SIDE, [Target.CLAUDE_CODE]),
     }
     return {

@@ -176,7 +176,7 @@ def main() -> int:
         return 0  # malformed input: never block on confusion
     if not isinstance(payload, dict):
         return 0
-    if is_claude_copy_in_cursor(payload):
+    if is_claude_copy_in_cursor(payload, "harness_maker.gates.spec_gate"):
         return 0
     tool_name = str(payload.get("tool_name") or "")
     raw_input = payload.get("tool_input")

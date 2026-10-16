@@ -55,16 +55,17 @@ class ModelTier(str, Enum):  # noqa: UP042
 class Target(str, Enum):  # noqa: UP042
     """IDE target — which IDE(s) the rendered harness must work in.
 
-    Drives whether ``.cursor/rules/harness.mdc``, ``.cursor/hooks.json``,
-    ``.cursor/mcp.json`` are rendered alongside the shared ``.claude/`` assets
-    (Cursor reads ``.claude/commands/hm/`` natively — no ``.cursor/commands/``). preset 과
-    직교; 인터뷰에서 명시 multi-select 강제. 옛 yaml fallback 은
-    ``HarnessConfig._targets_schema_gap_fallback`` validator 가 처리.
+    ``codex`` adds ``.codex/``, ``.agents/`` and ``AGENTS.md`` beside the shared ``.claude/``.
+    preset 과 직교; 인터뷰에서 명시 multi-select 강제. The ``cursor`` target was removed in
+    0.63.0 (SPEC-hm-overhaul-p1 IRR-001): readers drop the value, and ``make`` warns once.
     """
 
     CLAUDE_CODE = "claude-code"
-    CURSOR = "cursor"
     CODEX = "codex"
+
+
+#: The removed IDE target. A 0.62 harness.yaml or a `--targets` flag may still name it.
+REMOVED_CURSOR_TARGET = "cursor"
 
 
 class AtomicStage(str, Enum):  # noqa: UP042
@@ -732,11 +733,12 @@ _MODEL_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_.:-]+$")
 
 
 class AgentModelSpec(BaseModel):
-    """Per-agent override carrying optional Claude / Cursor / Codex values.
+    """Per-agent override carrying optional Claude / Codex values.
 
-    ADR-003 R5: ``cursor`` accepts either an alias key (``opus``/``sonnet``/
-    ``haiku``) or a concrete model ID (``claude-4-7-opus``). Alias-form is
-    normalized to concrete ID at render boundary by ``presets.resolve_agent_spec``.
+    ``cursor`` names no Cursor model since the Cursor target was removed (0.63.0): it stays a
+    parseable field so a 0.62 harness.yaml still loads under ``extra="forbid"`` (IRR-006), and
+    ``make`` warns once per agent that sets it. With no ``claude``, a tier alias in it still
+    picks the Claude model, as 0.62 rendered it (``synthesize._agent_files``).
 
     Security: ``claude``/``cursor`` values flow into Jinja2-rendered YAML
     frontmatter (``model: {{ claude_model }}``); a field_validator enforces a
@@ -1254,7 +1256,7 @@ class HarnessConfig(BaseModel):
     work_docs: dict[str, Any] = Field(default_factory=lambda: {"dir": "work-docs/"})
     ref_folders: list[RefFolder] = Field(default_factory=list)
     second_brain: SecondBrainConfig = Field(default_factory=SecondBrainConfig)
-    # MCP servers — propagated to .cursor/mcp.json (and future .claude/.mcp.json).
+    # MCP servers — propagated to .codex/config.toml.
     # Shape: {"server-name": {"command": "...", "args": [...], "env": {...}}}.
     # Users add manually to harness.yaml; preserved across re-render via
     # answers_from_harness_yaml. No interview question yet.
@@ -1365,7 +1367,7 @@ class InterviewAnswers(BaseModel):
 
     locale: str = "en"
     # IDE target multi-select (preset 과 직교). 빈 list 거부 (min_length=1).
-    # 인터뷰 default 는 [claude-code]; cursor 는 명시 multi-select.
+    # 인터뷰 default 는 [claude-code]; codex 는 명시 multi-select.
     targets: list[Target] = Field(
         default_factory=lambda: [Target.CLAUDE_CODE],
         min_length=1,
@@ -1462,7 +1464,7 @@ class InterviewAnswers(BaseModel):
     # User adds to harness.yaml manually (no interview question). Empty list = feature off.
     mechanical_checks: list[str] = Field(default_factory=list)
     # MCP servers — user adds to harness.yaml manually (no interview question
-    # yet). Propagated to .cursor/mcp.json on re-render via answers_from_harness_yaml.
+    # yet). Propagated to .codex/config.toml on re-render via answers_from_harness_yaml.
     mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
     models: dict[str, Any] = Field(default_factory=dict)
     autoloop: dict[str, Any] = Field(default_factory=dict)

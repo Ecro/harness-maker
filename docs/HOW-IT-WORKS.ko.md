@@ -3,7 +3,7 @@
 # harness-maker 동작 원리 완전 가이드
 
 > **대상 독자**: harness-maker 를 처음 접하는 개발자, 또는 내부 동작을 깊이 이해하고 싶은 사용자.
-> **Version**: 0.62.0
+> **Version**: 0.63.0
 >
 > 코드 세부 구현이 아닌 **절차·흐름·책임** 중심 설명.
 
@@ -26,7 +26,7 @@
 > <!-- hm-doc-contract:mechanisms:end -->
 >
 > <!-- hm-doc-contract:version-files:start -->
-> **릴리스 버전 파일:** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
+> **릴리스 버전 파일:** `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
 > <!-- hm-doc-contract:version-files:end -->
 
 ---
@@ -2575,4 +2575,4 @@ PLAN 이행 여부는 체크박스 체크만으로는 판정할 수 없다. PLAN
 
 ---
 
-*이 문서는 harness-maker 0.62.0 기준. 생성: `/hm:execute how-it-works-docs`*
+*이 문서는 harness-maker 0.63.0 기준. 생성: `/hm:execute how-it-works-docs`*

@@ -1,7 +1,7 @@
 """Phase 1 W-11 (R5): lint — no raw Claude concrete-ID strings in templates.
 
-ADR-003 R5: the alias → concrete-ID mapping lives in CURSOR_MODEL_IDS only.
-Templates render concrete IDs via {{ cursor_model }} context variable.
+Agent-launch surfaces render the version-agnostic alias (`opus`/`sonnet`/`haiku`);
+a pinned concrete id in a template would stop launching once that model is retired.
 
 Scope per R5 W-11: assignment-only patterns. Prose mentions like
 "this agent uses claude-3-5-sonnet for X" are intentionally NOT matched.

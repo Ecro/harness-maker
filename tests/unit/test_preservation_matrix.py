@@ -98,31 +98,6 @@ def test_m6a_claude_hooks_json_merges(tmp_path: Path) -> None:
     )
 
 
-# ─── M6b: Cursor hooks.json — RED in Phase 0, GREEN after Phase 1+3 ──────────
-def test_m6b_cursor_hooks_json_merges(tmp_path: Path) -> None:
-    target = tmp_path.parent / ".cursor"
-    target.mkdir(exist_ok=True)
-    (target / "hooks.json").write_text('{"version": 1, "hooks": {}}\n', encoding="utf-8")
-    # reconcile is called with existing_dir = .claude/; .cursor/ paths render
-    # via resolve_output_path to sibling tree. The reconcile loop iterates
-    # blueprint files and only checks files at existing_dir; .cursor/hooks.json
-    # uses an explicit literal-match in reconcile.py:136 regardless of where
-    # the file lives. Setup mirrors the resolve_output_path behavior.
-    bp = _bp_one(".cursor/hooks.json")
-    # Place the file where resolve_output_path expects it (sibling to .claude/).
-    cursor_dir = tmp_path / ".cursor"
-    cursor_dir.mkdir(exist_ok=True)
-    (cursor_dir / "hooks.json").write_text(
-        '{"version": 1, "hooks": {"preToolUse": []}}\n', encoding="utf-8"
-    )
-    conflicts = reconcile(tmp_path, bp)
-    decision = conflicts[0].decision
-    assert decision is not None
-    assert decision.value == "merge_json", (
-        f"Expected MERGE_JSON for .cursor/hooks.json (Phase 1+3 contract), got {decision.value}"
-    )
-
-
 # ─── M6c: Codex hooks.json — RED in Phase 0 (latent KEEP-fallback) ───────────
 def test_m6c_codex_hooks_json_merges(tmp_path: Path) -> None:
     """Phase 1 fixes the literal-match bug; Phase 3 makes it MERGE_JSON.

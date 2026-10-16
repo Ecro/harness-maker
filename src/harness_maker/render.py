@@ -34,7 +34,7 @@ import sys
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -541,7 +541,6 @@ def _shallow_merge_existing_json(
         merged["hooks"] = _merge_hooks_json(
             {"hooks": existing_hooks},
             {"hooks": new_hooks},
-            schema="nested",
         )["hooks"]
     for key in _SETTINGS_KEYS_OWNED_BY_HARNESS:
         if key not in new_data:
@@ -560,51 +559,16 @@ def _is_hooks_json(fe: FileEntry) -> bool:
 def resolve_output_path(target_dir: Path, fe_path: Path) -> Path:
     """Resolve where a FileEntry should be written/read.
 
-    `target_dir` 는 보통 `<project>/.claude` (CLI dispatch). `.cursor/`,
-    `.codex/`, `.agents/`, `AGENTS.md` 는 `.claude/` 의 sibling 이라
-    `target_dir.parent` 기준으로 resolve.
+    `target_dir` 는 보통 `<project>/.claude` (CLI dispatch). `.codex/`, `.agents/`,
+    `AGENTS.md` 는 `.claude/` 의 sibling 이라 `target_dir.parent` 기준으로 resolve.
 
     그 외 자산은 기존대로 ``target_dir / fe_path``. reconcile.py 도 동일
     helper 사용 — 같은 path 에 read/write/backup 이 일관.
     """
     path_str = str(fe_path)
-    if (
-        path_str.startswith(".cursor/")
-        or path_str.startswith(".codex/")
-        or path_str.startswith(".agents/")
-        or path_str == "AGENTS.md"
-    ):
+    if path_str.startswith(_SIBLING_TREE_PREFIXES) or path_str == "AGENTS.md":
         return target_dir.parent / fe_path
     return target_dir / fe_path
-
-
-def _is_cursor_mdc(fe: FileEntry) -> bool:
-    """Cursor rules — ``.cursor/rules/*.mdc``. Plain markdown + Cursor frontmatter
-    (``description``, ``globs``, ``alwaysApply``). 우리 ``content_hash`` 등 메타는
-    Phase 1 A1.frontmatter 검증 결과 따라 추후 sidecar 분리 가능 — 현재는 jinja
-    template 이 frontmatter 자체를 만들어내므로 ``_render_pure_text`` 로 처리.
-    """
-    return str(fe.path).startswith(".cursor/rules/") and fe.path.suffix == ".mdc"
-
-
-def _is_cursor_command(fe: FileEntry) -> bool:
-    """Cursor slash commands — ``.cursor/commands/*.md``.
-
-    **Currently dead code** — no template feeds ``.cursor/commands/`` because
-    Cursor 2.4+ reads ``.claude/commands/hm/*.md`` natively (verified
-    empirically via kairos 0.5.7 forensic on 2026-05-08; see
-    ``tests/cursor-compat/results-2026-05-08.md``). Kept as a reserved
-    dispatch in case a future Cursor release regresses the single-source
-    contract — adding a ``templates/cursor/commands/`` directory would be
-    sufficient to reactivate it. Until that happens, the dispatch evaluates
-    to False on every FileEntry produced by synthesize.
-    """
-    return str(fe.path).startswith(".cursor/commands/") and fe.path.suffix == ".md"
-
-
-def _is_cursor_mcp_json(fe: FileEntry) -> bool:
-    """Cursor MCP config — ``.cursor/mcp.json`` (pure JSON, no frontmatter)."""
-    return str(fe.path) == ".cursor/mcp.json"
 
 
 def _is_schemas_json(fe: FileEntry) -> bool:
@@ -782,15 +746,11 @@ def _render_pure_text(
 
     - ``.sh`` wrappers under ``.claude/lib/`` — bash interprets ``---`` as
       a command
-    - ``.cursor/rules/*.mdc`` — Cursor frontmatter parser may strict-reject
-      our ``content_hash`` / ``generated_by`` keys (Phase 1 A1.frontmatter
-      검증 결과에 따라 sidecar 메타 분리 가능)
-    - ``.cursor/commands/*.md`` — Cursor slash commands are plain markdown
+    - Codex's ``.agents/skills/<n>/agents/openai.yaml``
 
     Provenance is sacrificed because these files are small, reproducible
     from the template, and re-rendered every time the user runs
-    ``/harness-maker:make``. Reconcile of ``.cursor/`` 자산은 Phase 2.4 에서
-    별도 정책 (sidecar 또는 항상 REPLACE).
+    ``/harness-maker:make``.
     """
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
@@ -825,18 +785,17 @@ def _render_pure_json(
 
     Used for files whose external consumer expects pure JSON:
 
-    - ``.claude/hooks/hooks.json`` — jq-parseable, Claude Code spec
-    - ``.cursor/mcp.json`` — Cursor MCP config
+    - ``.codex/hooks.json`` on a fresh render
+    - ``.claude/schemas/*.json``
 
     Provenance is intentionally omitted; both are small, reproducible from the
     template, and re-rendered every time. Frontmatter invariant gate explicitly
     excludes them.
     """
-    # A FRESH render (no existing file to merge) routes .cursor/hooks.json and
-    # .codex/hooks.json here — NOT through _render_hooks_json_merged — so the
-    # ADR-005 leak-check guard must fire here too, else 2 of 3 IDE hook surfaces
-    # bypass it on the common path. No-op for non-hook pure JSON (.cursor/mcp.json,
-    # schemas) — those contexts carry no `harness_maker_src_path`.
+    # A FRESH render (no existing file to merge) routes .codex/hooks.json here —
+    # NOT through _render_hooks_json_merged — so the ADR-005 leak-check guard must
+    # fire here too, else a hook surface bypasses it on the common path. No-op for
+    # non-hook pure JSON (schemas) — those contexts carry no `harness_maker_src_path`.
     _assert_portable_install_ref(fe.context.get("harness_maker_src_path"))
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
@@ -926,11 +885,10 @@ def _normalize_hm_managed_command(cmd: str) -> str:
 #
 # APPEND-ONLY. Membership is bounded by ONE test-enforced invariant:
 #   - ABSENT from every current NESTED hook template (settings.json AND
-#     `.codex/hooks.json` — both routed through `_merge_hooks_json(schema="nested")`,
+#     `.codex/hooks.json` — both routed through `_merge_hooks_json`,
 #     so `_strip_shipped_commands` applies this set to ALL of them, not just settings)
 #     (`test_retired_invocations_absent_from_current_templates`) — never retire
-#     something a template still ships. (Cursor's `.cursor/hooks.json` is flat-schema
-#     and the strip skips flat entirely, so it is out of scope.)
+#     something a template still ships.
 #
 # ⚠️ Unlike `_HARNESS_SHIPPED_DENY_LITERALS`, there is NO second "provably enforces
 # nothing" invariant here: these are LIVE hooks. Deletion safety rests ENTIRELY on the
@@ -954,16 +912,11 @@ _IDENT_CMD_SEP = "\x1f"
 
 def _entry_identity(
     entry: Any,  # noqa: ANN401 — JSON entries are heterogeneous
-    *,
-    schema: Literal["nested", "flat"],
 ) -> tuple[str, str, str] | None:
     """Compute a hooks.json entry's identity tuple for dedup; None on malformed.
 
-    Returns:
-      - nested (Claude/Codex): ``(matcher_or_empty, <every normalized command in
-        the group, joined by _IDENT_CMD_SEP>, hooks[0]['type'])``
-      - flat (Cursor): ``(matcher_or_empty, normalized_command, "")`` — third slot
-        always empty so both schemas share a single tuple type for set ops.
+    Returns ``(matcher_or_empty, <every normalized command in the group, joined by
+    _IDENT_CMD_SEP>, hooks[0]['type'])`` — the nested Claude/Codex schema, the only one.
 
     **Why all commands, not just ``hooks[0]``** (ADR-008 of
     PLAN-permission-deny-and-hooks-wiring): a matcher group holds N commands —
@@ -979,8 +932,8 @@ def _entry_identity(
     bumps (the original bug: each /plugin update accumulated stale entries).
     User-authored commands round-trip unchanged.
 
-    "Malformed" includes: not a dict, non-string fields, missing required field
-    (`hooks` for nested with non-empty list of dicts; `command` for flat).
+    "Malformed" includes: not a dict, non-string fields, a missing or empty `hooks`
+    list of dicts.
     Malformed entries are dropped from both shipped and user sets — backup is
     the recovery path per ADR-001.
     """
@@ -989,28 +942,22 @@ def _entry_identity(
     matcher_val = entry.get("matcher", "")
     if not isinstance(matcher_val, str):
         return None
-    if schema == "nested":
-        hooks_list = entry.get("hooks")
-        if not isinstance(hooks_list, list) or not hooks_list:
-            return None
-        norm_cmds: list[str] = []
-        for h in hooks_list:
-            if not isinstance(h, dict):
-                return None
-            cmd_val = h.get("command")
-            if not isinstance(cmd_val, str):
-                return None
-            norm_cmds.append(_normalize_hm_managed_command(cmd_val))
-        first = hooks_list[0]
-        type_val = first.get("type", "command")
-        if not isinstance(type_val, str):
-            return None
-        return (matcher_val, _IDENT_CMD_SEP.join(norm_cmds), type_val)
-    # flat (Cursor)
-    flat_cmd = entry.get("command")
-    if not isinstance(flat_cmd, str):
+    hooks_list = entry.get("hooks")
+    if not isinstance(hooks_list, list) or not hooks_list:
         return None
-    return (matcher_val, _normalize_hm_managed_command(flat_cmd), "")
+    norm_cmds: list[str] = []
+    for h in hooks_list:
+        if not isinstance(h, dict):
+            return None
+        cmd_val = h.get("command")
+        if not isinstance(cmd_val, str):
+            return None
+        norm_cmds.append(_normalize_hm_managed_command(cmd_val))
+    first = hooks_list[0]
+    type_val = first.get("type", "command")
+    if not isinstance(type_val, str):
+        return None
+    return (matcher_val, _IDENT_CMD_SEP.join(norm_cmds), type_val)
 
 
 def _is_mixed_group(hooks_list: list[Any]) -> bool:
@@ -1042,13 +989,10 @@ def _harness_commands_in(entry: Any) -> set[str]:  # noqa: ANN401 — heterogene
     return out
 
 
-def _entry_commands(entry: Any, *, schema: Literal["nested", "flat"]) -> list[str]:  # noqa: ANN401
-    """Every command string an entry carries, in order — both schemas."""
+def _entry_commands(entry: Any) -> list[str]:  # noqa: ANN401
+    """Every command string an entry carries, in order."""
     if not isinstance(entry, dict):
         return []
-    if schema == "flat":
-        cmd = entry.get("command")
-        return [cmd] if isinstance(cmd, str) else []
     hooks_list = entry.get("hooks")
     if not isinstance(hooks_list, list):
         return []
@@ -1057,22 +1001,6 @@ def _entry_commands(entry: Any, *, schema: Literal["nested", "flat"]) -> list[st
         for h in hooks_list
         if isinstance(h, dict) and isinstance(h.get("command"), str)
     ]
-
-
-def _harness_commands_of(entry: Any, *, schema: Literal["nested", "flat"]) -> set[str]:  # noqa: ANN401
-    """Normalized harness commands an entry carries — schema-agnostic.
-
-    A flat (Cursor) entry holds its single command at the entry level, so
-    `_harness_commands_in`, which reads `hooks[]`, finds nothing there. Routing both
-    schemas through one reader is what let ADR-011 and ADR-014 extend to Cursor.
-    """
-    if schema == "nested":
-        return _harness_commands_in(entry)
-    return {
-        norm
-        for cmd in _entry_commands(entry, schema=schema)
-        if (norm := _normalize_hm_managed_command(cmd)) != cmd
-    }
 
 
 #: The `--with <value>` token of a `uv run` invocation, quoted or bare. ADR-014 swaps
@@ -1105,7 +1033,7 @@ def _splice_install_ref(cmd: str, ref_token: str) -> str:
 
     ADR-014. Replacing the WHOLE command with the template's text — what ADR-007 did
     first — discards two things the user meant: a prefix before `python -m` (an env
-    assignment, a PATH shim; every Cursor command has one) and any trailing arguments.
+    assignment, a PATH shim) and any trailing arguments.
     Only the ref is stale, so only the ref is replaced.
     """
     if _WITH_REF_RE.search(cmd) is None:
@@ -1116,24 +1044,12 @@ def _splice_install_ref(cmd: str, ref_token: str) -> str:
 def _drop_commands_from_entry(
     entry: Any,  # noqa: ANN401 — heterogeneous JSON
     drop: set[str],
-    *,
-    schema: Literal["nested", "flat"] = "nested",
 ) -> Any | None:  # noqa: ANN401
     """Command-level removal (ADR-004), preserving siblings, order and metadata.
 
     Entry-level removal would take co-located commands the user never scoped —
     `permission_gate` and `worktree_gate` share `spec_gate`'s group.
-
-    ADR-015: a flat (Cursor) entry holds ONE command at the entry level, so command-level
-    and entry-level removal coincide there. ADR-009 had withdrawn flat suppression because
-    the only choice available was delete-or-not; ADR-011 added a third action (subtract),
-    which is what makes it safe to re-enter this path.
     """
-    if schema == "flat":
-        cmd = entry.get("command") if isinstance(entry, dict) else None
-        if isinstance(cmd, str) and _command_module(cmd) in drop:
-            return None
-        return entry
     hooks_list = entry.get("hooks") if isinstance(entry, dict) else None
     if not isinstance(hooks_list, list):
         return entry
@@ -1193,8 +1109,6 @@ def _residual_matcher(template_matcher: str, user_matchers: set[str]) -> str | N
 def _residual_entries(
     entry: Any,  # noqa: ANN401
     residual: list[tuple[str, str]],
-    *,
-    schema: Literal["nested", "flat"] = "nested",
 ) -> list[Any]:
     """Re-emit each residual command as its own entry under the narrowed matcher.
 
@@ -1203,13 +1117,6 @@ def _residual_entries(
     """
     if not residual:
         return []
-    if schema == "flat":
-        # One command per entry, so the residual is the same entry under a new matcher.
-        cmd = entry.get("command") if isinstance(entry, dict) else None
-        if not isinstance(cmd, str):
-            return []
-        module = _command_module(cmd)
-        return [{**entry, "matcher": rest} for c, rest in residual if c == module]
     hooks_list = entry.get("hooks") if isinstance(entry, dict) else None
     if not isinstance(hooks_list, list):
         return []
@@ -1230,7 +1137,6 @@ def _warn_live_double_fires(
     new_entries: list[Any],
     per_entry_drop: list[set[str]],
     user_scoped: dict[str, set[str]],
-    schema: Literal["nested", "flat"] = "nested",
 ) -> None:
     """Warn per (command, template matcher, user matcher) that can BOTH fire.
 
@@ -1243,7 +1149,7 @@ def _warn_live_double_fires(
     for e, drop in zip(new_entries, per_entry_drop, strict=True):
         tm = e.get("matcher", "") if isinstance(e, dict) else ""
         tm = tm if isinstance(tm, str) else ""
-        modules = {m for c in _entry_commands(e, schema=schema) if (m := _command_module(c))}
+        modules = {m for c in _entry_commands(e) if (m := _command_module(c))}
         for cmd in sorted(modules - drop):
             for um in sorted(user_scoped.get(cmd, set())):
                 t_terms, u_terms = _matcher_terms(tm), _matcher_terms(um)
@@ -1267,7 +1173,6 @@ def _strip_shipped_commands(
     entry: Any,  # noqa: ANN401 — JSON entries are heterogeneous
     shipped_cmds: set[str],
     *,
-    schema: Literal["nested", "flat"],
     shipped_refs: dict[str, str] | None = None,
 ) -> Any | None:  # noqa: ANN401
     """Drop commands the template already ships (or has RETIRED) from a preserved entry.
@@ -1278,18 +1183,8 @@ def _strip_shipped_commands(
     ``_HARNESS_RETIRED_HOOK_INVOCATIONS``, so a user's own command is never removed
     here. Retired invocations (ADR-001 of PLAN-hook-inventory-efficiency-audit) are
     dropped even though the current template no longer ships them — that is how a
-    hook removed from the template gets removed from an existing user's disk. A flat
-    (Cursor) entry is never STRIPPED — the retired hooks were only ever in
-    `.claude/settings.json` (nested) — but ADR-015 does refresh its install ref, because
-    a preserved flat entry carrying a pruned plugin-cache path is a dead blocking gate
-    on exactly the same terms as the nested one.
+    hook removed from the template gets removed from an existing user's disk.
     """
-    if schema == "flat":
-        cmd = entry.get("command") if isinstance(entry, dict) else None
-        if not (isinstance(cmd, str) and shipped_refs):
-            return entry
-        fresh = _refresh_ref(cmd, shipped_refs)
-        return entry if fresh == cmd else {**entry, "command": fresh}
     hooks_list = entry.get("hooks")
     if not isinstance(hooks_list, list):
         return entry
@@ -1358,10 +1253,9 @@ def _merge_hooks_json(
     existing: dict[str, Any],
     new_data: dict[str, Any],
     *,
-    schema: Literal["nested", "flat"],
     allowed_top_level: frozenset[str] | None = None,
 ) -> dict[str, Any]:
-    """Schema-aware in-place 3-way merge of hooks.json (ADR-003/006).
+    """In-place 3-way merge of a nested-schema hooks file (ADR-003/006).
 
     Per-event union: template entries (in template order) + user entries whose
     identity tuple is NOT in the template set (preserving original disk order
@@ -1370,7 +1264,7 @@ def _merge_hooks_json(
     Events present in existing but not in new_data (user-added events for
     custom hook surfaces) are preserved verbatim.
 
-    Top-level non-``hooks`` keys (e.g., Cursor's ``"version": 1``) follow
+    Top-level non-``hooks`` keys (e.g., Codex's ``"description"``) follow
     template-wins-on-conflict, existing-survives-when-absent — same shape as
     ``_shallow_merge_existing_json``. ``allowed_top_level`` overrides that for a
     consumer whose parser rejects unknown keys (Codex): keys outside the set are
@@ -1414,13 +1308,13 @@ def _merge_hooks_json(
 
         shipped_identities: set[tuple[str, str, str]] = set()
         for e in new_entries:
-            ident = _entry_identity(e, schema=schema)
+            ident = _entry_identity(e)
             if ident is not None:
                 shipped_identities.add(ident)
 
         shipped_cmds: set[str] = set()
         for e in new_entries:
-            ident = _entry_identity(e, schema=schema)
+            ident = _entry_identity(e)
             if ident is not None:
                 shipped_cmds.update(ident[1].split(_IDENT_CMD_SEP))
 
@@ -1438,7 +1332,7 @@ def _merge_hooks_json(
                 continue
             matcher = e.get("matcher", "")
             matcher = matcher if isinstance(matcher, str) else ""
-            for raw in _entry_commands(e, schema=schema):
+            for raw in _entry_commands(e):
                 norm = _normalize_hm_managed_command(raw)
                 if norm == raw:  # not ours
                     continue
@@ -1453,7 +1347,7 @@ def _merge_hooks_json(
 
         user_entries: list[Any] = []
         for e in existing_entries:
-            ident = _entry_identity(e, schema=schema)
+            ident = _entry_identity(e)
             if ident is None or ident in shipped_identities:
                 continue
             # NOTE — there is deliberately NO "retire" branch here (REVIEW round 1).
@@ -1476,9 +1370,7 @@ def _merge_hooks_json(
             # 2026-05-28 spoton triplication). Reachable in practice because Claude
             # Code's `/hooks` UI appends into an existing matcher group. So keep the
             # user's commands and drop only the ones the template already ships.
-            trimmed = _strip_shipped_commands(
-                e, shipped_cmds, schema=schema, shipped_refs=shipped_refs
-            )
+            trimmed = _strip_shipped_commands(e, shipped_cmds, shipped_refs=shipped_refs)
             if trimmed is not None:
                 user_entries.append(trimmed)
 
@@ -1487,14 +1379,8 @@ def _merge_hooks_json(
         # fire twice and the user's narrower matcher would buy nothing — the defect
         # would survive its own fix. Command-level, so siblings keep shipping.
         #
-        # ADR-008 amends WHICH template entry gives the command up. ADR-009 had removed the
-        # flat arm — a flat entry holds one command, so there is no mixed-group evidence and
-        # the only signal left was the matcher difference ADR-003 rejected. **ADR-015
-        # restores it**, because ADR-011 supplied a third action: subtract. Withdrawal was
-        # the right call when the choice was delete-or-not; it is not once the residual can
-        # be shipped. Cursor's duplicate was never harmless either — the preserved entry
-        # keeps a pruned `--with` (a dead blocking gate) and `telemetry` on `postToolUse *`
-        # appends a row per call, so the duplicate doubles the ledger's denominator.
+        # ADR-008 amends WHICH template entry gives the command up; ADR-011 adds a third
+        # action beside keep and drop: subtract the user's share and ship the residual.
         emitted_template: list[Any] = list(new_entries)
         if new_entries or user_entries:
             # ADR-016. Keyed on the MODULE, not the normalized identity. The reported
@@ -1506,13 +1392,13 @@ def _merge_hooks_json(
             # bought nothing. That is the sentence this PLAN was opened with.
             #
             # Safe because no single event ships one module twice with different arguments
-            # (verified across both settings templates × both strictness values and cursor's), so
+            # (verified across both settings templates × both strictness values), so
             # module and identity coincide on the template side today.
             user_scoped: dict[str, set[str]] = {}
             for e in user_entries:
                 m = e.get("matcher", "") if isinstance(e, dict) else ""
                 m = m if isinstance(m, str) else ""
-                for cmd in _entry_commands(e, schema=schema):
+                for cmd in _entry_commands(e):
                     module = _command_module(cmd)
                     if module and module in shipped_modules:
                         user_scoped.setdefault(module, set()).add(m)
@@ -1534,7 +1420,7 @@ def _merge_hooks_json(
                         continue  # branch 3 — several template homes; see the warning below
                     # ADR-011. The user's matcher differs and the command has ONE template
                     # home. Branch 2 used to drop it outright, which is the matcher-difference
-                    # inference ADR-003 rejected and ADR-009 withdrew on the flat path: a user
+                    # inference ADR-003 rejected: a user
                     # whose /hooks group carries a PREVIOUS release's matcher would pin the
                     # gate to it forever, so widening `Write|Edit` to `Write|Edit|MultiEdit`
                     # left MultiEdit permanently ungated with no diagnostic. Instead, subtract
@@ -1557,16 +1443,15 @@ def _merge_hooks_json(
                 new_entries=new_entries,
                 per_entry_drop=per_entry_drop,
                 user_scoped=user_scoped,
-                schema=schema,
             )
 
             if any(per_entry_drop):
                 rebuilt: list[Any] = []
                 for e, d, res in zip(new_entries, per_entry_drop, per_entry_residual, strict=True):
-                    trimmed = _drop_commands_from_entry(e, d, schema=schema) if d else e
+                    trimmed = _drop_commands_from_entry(e, d) if d else e
                     if trimmed is not None:
                         rebuilt.append(trimmed)
-                    rebuilt.extend(_residual_entries(e, res, schema=schema))
+                    rebuilt.extend(_residual_entries(e, res))
                 emitted_template = rebuilt
 
         merged_hooks[event] = emitted_template + user_entries
@@ -1588,9 +1473,7 @@ def _render_hooks_json_merged(
 ) -> Path:
     """Render hooks.json with in-place 3-way merge (ADR-003/006).
 
-    Schema dispatch by path:
-      - ``.cursor/hooks.json`` → flat (lowercase camelCase, command at entry level)
-      - everything else (``hooks/hooks.json``, ``.codex/hooks.json``) → nested
+    Every hook file left (``.codex/hooks.json``) is nested-schema.
 
     Malformed existing JSON → fall back to template overwrite with warning on
     stderr. Backup (``.backup-<ts>/``) is the recovery path per ADR-001.
@@ -1612,7 +1495,6 @@ def _render_hooks_json_merged(
         raise ValueError(msg)
 
     out = resolve_output_path(target_dir, fe.path)
-    schema: Literal["nested", "flat"] = "flat" if str(fe.path) == ".cursor/hooks.json" else "nested"
     allowed_top_level = (
         _CODEX_HOOKS_ALLOWED_TOP_LEVEL if str(fe.path) == ".codex/hooks.json" else None
     )
@@ -1640,7 +1522,6 @@ def _render_hooks_json_merged(
                 merged_data = _merge_hooks_json(
                     existing_data,
                     new_data,
-                    schema=schema,
                     allowed_top_level=allowed_top_level,
                 )
             else:
@@ -1934,16 +1815,16 @@ def _strip_agents_md_metadata(text: str) -> str:
     return text
 
 
-_SIBLING_TREE_PREFIXES = (".cursor/", ".codex/", ".agents/")
+_SIBLING_TREE_PREFIXES = (".codex/", ".agents/")
 
 
 def _manifest_key_for(fe_path: Path) -> str:
     """Project-root-relative key for the manifest, derived from ``fe.path``.
 
     Matches the orphan-sweep's disk walk (``_iter_disk_files`` returns keys
-    like ``.claude/commands/hm/x.md`` or ``.cursor/rules/x.mdc``). The
-    ``synthesize.py`` convention is to store sibling-tree files (``.cursor/
-    ``, ``.codex/``, ``.agents/``) and ``AGENTS.md`` WITH their prefix and
+    like ``.claude/commands/hm/x.md`` or ``.codex/config.toml``). The
+    ``synthesize.py`` convention is to store sibling-tree files (``.codex/``,
+    ``.agents/``) and ``AGENTS.md`` WITH their prefix and
     ``.claude/``-bound files WITHOUT it; this helper restores the missing
     ``.claude/`` so writer and reader agree on a single key shape.
 
@@ -1972,7 +1853,7 @@ def _append_render_manifest(
     orphan-sweep's disk walk so a key written here is queryable as-is on
     the next reconcile — covers both ``.claude/``-bound files
     (``commands/hm/x.md`` → ``.claude/commands/hm/x.md``) and sibling
-    locations (``.cursor/``, ``.codex/``, ``.agents/``, ``AGENTS.md``).
+    locations (``.codex/``, ``.agents/``, ``AGENTS.md``).
 
     POSIX guarantees that a single ``write()`` <= PIPE_BUF (4096 bytes) is
     atomic. Each record we emit is well below that limit (path + 64-char
@@ -2106,7 +1987,7 @@ def _warn_context_lint(written: list[Path], target_dir: Path, preset: Preset) ->
     Side preset, and that opt-out is honoured by the caller below.
     """
     for path in written:
-        # TWO roots, because `resolve_output_path` has two: `.cursor/`, `.codex/`, `.agents/` and
+        # TWO roots, because `resolve_output_path` has two: `.codex/`, `.agents/` and
         # `AGENTS.md` land at `target_dir.parent`. A single `relative_to(target_dir)` with a
         # `continue` dropped all of them — 22 assets on a codex render, including `AGENTS.md`,
         # whose threshold rows exist in `context_lint.THRESHOLDS` and were therefore unreachable
@@ -2148,8 +2029,7 @@ def render(
     ``merge_json_paths`` — when non-empty, hooks.json files at those (relative)
     paths receive schema-aware in-place 3-way merge per ADR-003/006: shipped
     entries from the freshly rendered template + user entries from disk whose
-    identity tuple is not in the template set. ``.cursor/mcp.json`` is NOT a
-    hook file and is excluded from this dispatch (retains pure-render path).
+    identity tuple is not in the template set.
 
     ``merge_reports`` — optional out-dict. When provided, each successfully
     merged path is recorded with its ``MergeReport`` so the CLI can display
@@ -2169,9 +2049,8 @@ def render(
         compact_render_manifest(target_dir)
     for fe in blueprint.files:
         if _is_hooks_json(fe) or _is_codex_hooks_json(fe):
-            # Hook files (Claude/Cursor/Codex): in-place merge when existing
-            # file is on disk (reconcile decided MERGE_JSON); template-render
-            # otherwise. .cursor/mcp.json is NOT a hook file (Phase 1+3 W2 fix).
+            # Hook files: in-place merge when the existing file is on disk
+            # (reconcile decided MERGE_JSON); template-render otherwise.
             if fe.path in json_merge_paths:
                 out = _render_hooks_json_merged(
                     fe,
@@ -2188,17 +2067,6 @@ def render(
                     dry_run=dry_run,
                     freeze_time=freeze_time,
                 )
-        elif _is_cursor_mcp_json(fe):
-            # .cursor/mcp.json is MCP server config, NOT a hook file. Retains
-            # the existing pure-render path unchanged by Phase 1+3. Out of scope
-            # for PLAN-onboarding-backup-friction.
-            out = _render_pure_json(
-                fe,
-                env,
-                target_dir,
-                dry_run=dry_run,
-                freeze_time=freeze_time,
-            )
         elif _is_schemas_json(fe):
             # .claude/schemas/*.json — pure JSON Schema for external consumers
             # (codex exec --output-schema, jsonschema-aware tooling). No YAML
@@ -2248,7 +2116,7 @@ def render(
                 dry_run=dry_run,
                 freeze_time=freeze_time,
             )
-        elif _is_pure_text(fe) or _is_cursor_mdc(fe) or _is_cursor_command(fe):
+        elif _is_pure_text(fe):
             out = _render_pure_text(
                 fe,
                 env,

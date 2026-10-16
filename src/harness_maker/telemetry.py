@@ -169,7 +169,7 @@ def main() -> int:
                 data = parsed
         except (json.JSONDecodeError, ValueError):
             data = {}
-    if is_claude_copy_in_cursor(data):
+    if is_claude_copy_in_cursor(data, "harness_maker.telemetry"):
         return 0
     raw_workspace = data.get("workspace")
     workspace: dict[str, Any] = raw_workspace if isinstance(raw_workspace, dict) else {}

@@ -3,7 +3,6 @@
 Covers:
 - MV-1 / MV-2: Pydantic model_copy validator bypass in interview.answers_from_harness_yaml
 - MV-3: Jinja2 `is defined` returning True for None → `model: None` render
-- C-1 / R-7: cursor_model context key consumed by templates (concrete-ID render for Cursor)
 - CP-1 / R-1: trajectory-monitor removed from preset maps (dormant agent dead data)
 - CP-2: _ALL_AGENTS ⊆ _COMMUNICATION_VARIANT symmetry enforced by structural test
 
@@ -16,11 +15,12 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import AgentModelSpec, HarnessConfig, Preset
-from harness_maker.presets import CURSOR_MODEL_IDS, PRESET_AGENT_MODELS, resolve_agent_spec
+from harness_maker.presets import PRESET_AGENT_MODELS, resolve_agent_spec
 from harness_maker.synthesize import _ALL_AGENTS, _COMMUNICATION_VARIANT
 
 # Authoritative source for the post-fix fallback value — referenced
@@ -153,7 +153,6 @@ def test_mv3_jinja_dispatcher_does_not_emit_model_none() -> None:
     rendered = template.render(
         name="autoloop-coder",
         claude_model=None,
-        cursor_model=None,
         codex_reasoning_effort="medium",
         reviewer_kind="",
         communication_variant="full",
@@ -169,46 +168,6 @@ def test_mv3_jinja_dispatcher_does_not_emit_model_none() -> None:
     assert model != "None", (
         f"`model:` is literal 'None' string (Jinja `is defined` None-bug). "
         f"Rendered head:\n{rendered[:400]}"
-    )
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# C-1 / R-7 — cursor_model concrete-ID rendered when available (ADR-003 R5)
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def test_c1_agent_model_renders_claude_alias_not_cursor_concrete() -> None:
-    """SUPERSEDES C-1 / R-7 (PLAN-agent-model-version-agnostic ADR-001).
-
-    The original C-1/R-7 made the dispatcher template prefer `cursor_model`
-    (the concrete Cursor id) for the `model:` line, valid while Claude Code
-    ignored the field (#43869). With #43869 fixed the field is load-bearing,
-    so a pinned concrete id fails to launch in a newer-model session. The
-    template MUST now render the Claude ALIAS (`claude_model`) and never the
-    concrete cursor id — single-source `.claude/agents/*.md` carries the alias
-    for both IDEs.
-    """
-    from jinja2 import Environment, FileSystemLoader
-
-    templates_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
-    env = Environment(loader=FileSystemLoader(str(templates_dir)))
-    template = env.get_template("agents/autoloop-coder.md.j2")
-    cursor_concrete = CURSOR_MODEL_IDS["opus"]
-    rendered = template.render(
-        name="autoloop-coder",
-        claude_model="opus",
-        cursor_model=cursor_concrete,
-        codex_reasoning_effort="high",
-        reviewer_kind="",
-        communication_variant="full",
-    )
-    # The alias reaches the model: line ...
-    assert "model: opus" in rendered, (
-        f"claude_model alias not rendered on model: line; head:\n{rendered[:300]}"
-    )
-    # ... and the concrete cursor id never does (the bug ADR-001 fixes).
-    assert f"model: {cursor_concrete}" not in rendered, (
-        f"concrete cursor id leaked into the Claude-launch model: line; head:\n{rendered[:300]}"
     )
 
 
@@ -265,15 +224,26 @@ def test_cp2_all_agents_subset_of_communication_variant() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_user_override_cursor_only_renders_alias() -> None:
-    """SUPERSEDES the C-1 tail (ADR-001 + synthesize intent-preservation).
+@pytest.mark.parametrize(
+    ("cursor", "claude_model", "model_line"),
+    [
+        # A tier alias carries over, exactly as db19f023's `_alias_by_cursor_id` derived it.
+        ("sonnet", "sonnet", "model: sonnet"),
+        ("haiku", "haiku", "model: haiku"),
+        # Anything else never named a Claude model: the template floor renders.
+        ("some-concrete-id", None, "model: opus"),
+    ],
+)
+def test_user_override_cursor_only_keeps_its_alias(
+    cursor: str, claude_model: str | None, model_line: str
+) -> None:
+    """0.63.0 (SPEC-hm-overhaul-p1 AC-001, PR-C review round 1): a cursor-only override still
+    picks the Claude model when it holds a tier alias.
 
-    A user who writes `agent_models: {autoloop-coder: {cursor: opus}}` (no
-    `claude:`) leaves spec.claude None. ADR-001 renders the Claude alias, so
-    `_agent_files` derives the alias back from the normalized cursor id —
-    otherwise the override would silently fall through to the `sonnet` default.
-    The rendered `model:` line must therefore be `opus` (intent preserved),
-    never the bare `None` / `null` (MV-3) and never the concrete cursor id.
+    A user who writes `agent_models: {autoloop-coder: {cursor: sonnet}}` (no `claude:`) leaves
+    spec.claude None. 0.62 rendered the Claude `model:` from that alias; dropping the fallback
+    would move the agent to the template floor, so "T minus cursor" would not render the same.
+    The `model:` line must stay valid (MV-3), never the bare `None` / `null`.
     """
     from jinja2 import Environment, FileSystemLoader
 
@@ -281,19 +251,18 @@ def test_user_override_cursor_only_renders_alias() -> None:
 
     config = HarnessConfig(
         preset=Preset.PRODUCTION,
-        agent_models={"autoloop-coder": AgentModelSpec(cursor="opus")},
+        agent_models={"autoloop-coder": AgentModelSpec(cursor=cursor)},
     )
     spec = resolve_agent_spec("autoloop-coder", config)
     assert spec.claude is None  # Tier-1 cursor-only override
-    assert spec.cursor == CURSOR_MODEL_IDS["opus"]  # normalized to concrete
+    assert spec.cursor == cursor  # parsed and carried unnormalized
 
     ctx = next(
         c
         for tmpl, dst, c in _agent_files(preset=Preset.PRODUCTION, agent_models=config.agent_models)
         if dst == "agents/autoloop-coder.md"
     )
-    # Intent preserved: the derived Claude alias, not the dropped `sonnet`.
-    assert ctx["claude_model"] == "opus"
+    assert ctx["claude_model"] == claude_model
 
     templates_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
@@ -304,9 +273,7 @@ def test_user_override_cursor_only_renders_alias() -> None:
     assert _VALID_MODEL_LINE.search(rendered) is not None, (
         f"invalid model: line rendered; head:\n{rendered[:300]}"
     )
-    # ADR-001: the alias reaches the line; the concrete cursor id never does.
-    assert "model: opus" in rendered
-    assert f"model: {spec.cursor}" not in rendered
+    assert f"\n{model_line}\n" in rendered
 
 
 # Phase A.5 / B reference: pytest -k phase5_test_model_routing

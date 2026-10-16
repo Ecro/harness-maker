@@ -5,13 +5,6 @@ ADR-005 (PLAN-model-routing-multi-ide):
     Tier 2 — PRESET_AGENT_MODELS[preset][name] (preset default for shipped agents)
     Tier 3 — _spec_from_default_model(config.default_model) (catch-all for
               user-authored agents; never KeyErrors — validator C-2 fix).
-
-ADR-003 R5: cursor alias normalization happens here at the render boundary.
-Users write aliases (``cursor: opus``) in harness.yaml; this module normalizes
-to concrete IDs via CURSOR_MODEL_IDS. Concrete IDs hand-authored in harness.yaml
-pass through unchanged. ADR-010 sub-check (b) inspects PRE-resolution values
-directly from ``config.agent_models[name].cursor`` (not from
-``resolve_agent_spec(...).cursor``).
 """
 
 from __future__ import annotations
@@ -25,19 +18,6 @@ if TYPE_CHECKING:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Canonical alias → concrete-ID table (ADR-003 R5 + W-4)
-# ──────────────────────────────────────────────────────────────────────────────
-# Single source of truth for Cursor concrete IDs. Templates MUST NOT embed raw
-# concrete IDs (enforced by tests/unit/test_no_raw_cursor_model_ids_in_templates.py).
-# A future Claude release = update this dict in one place, re-render snapshots.
-CURSOR_MODEL_IDS: dict[str, str] = {
-    "opus": "claude-4-7-opus",
-    "sonnet": "claude-4-6-sonnet",
-    "haiku": "claude-4-5-haiku",
-}
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # Preset default maps (ADR-005)
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -46,11 +26,7 @@ _Effort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
 
 
 def _spec(claude_alias: str, effort: _Effort) -> AgentModelSpec:
-    """Convenience: build a uniform spec where Claude alias === Cursor alias.
-
-    Cursor alias gets normalized to concrete ID at the render boundary via
-    `_normalize_cursor_alias`, so writing the alias here keeps the preset map
-    portable across Claude releases (single update in CURSOR_MODEL_IDS).
+    """Convenience: build a spec from a Claude alias and a Codex reasoning effort.
 
     Typed `effort: _Effort` (not str) so mypy catches a typo in any of the 28
     preset entries — without this, only the runtime Pydantic validator would
@@ -58,7 +34,6 @@ def _spec(claude_alias: str, effort: _Effort) -> AgentModelSpec:
     """
     return AgentModelSpec(
         claude=claude_alias,
-        cursor=claude_alias,
         codex=CodexAgentSpec(reasoning_effort=effort),
     )
 
@@ -137,7 +112,7 @@ PRESET_AGENT_MODELS: dict[Preset, dict[str, AgentModelSpec]] = {
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 3-tier resolution + cursor alias normalization (ADR-003 R5 + ADR-005)
+# 3-tier resolution (ADR-005)
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -165,23 +140,12 @@ def _spec_from_default_model(default_model: str) -> AgentModelSpec:
         alias = "sonnet"
     return AgentModelSpec(
         claude=alias,
-        cursor=alias,
         codex=CodexAgentSpec(reasoning_effort="medium"),
     )
 
 
-def _normalize_cursor_alias(spec: AgentModelSpec) -> AgentModelSpec:
-    """ADR-003 R5: alias-form cursor values are normalized to concrete IDs at
-    render boundary. Concrete IDs (not in CURSOR_MODEL_IDS keys) pass through
-    unchanged.
-    """
-    if spec.cursor and spec.cursor in CURSOR_MODEL_IDS:
-        return spec.model_copy(update={"cursor": CURSOR_MODEL_IDS[spec.cursor]})
-    return spec
-
-
 def resolve_agent_spec(name: str, config: HarnessConfig) -> AgentModelSpec:
-    """3-tier resolution + cursor alias normalization for a given agent name.
+    """3-tier resolution for a given agent name.
 
     Render-time entry point — every agent template renders via this function.
     """
@@ -193,4 +157,4 @@ def resolve_agent_spec(name: str, config: HarnessConfig) -> AgentModelSpec:
     # Tier 3: default_model-derived (catches user-authored custom agents)
     if spec is None:
         spec = _spec_from_default_model(config.default_model)
-    return _normalize_cursor_alias(spec)
+    return spec

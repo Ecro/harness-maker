@@ -7,6 +7,9 @@ mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verifica
 last_mutation_run: null
 paths_to_mutate:
 - src/harness_maker/gates/spec_gate.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
 ac:
 - id: AC-001
   title: spec_gate hook — refuse test writes that lack a SPEC reference
@@ -15,5 +18,24 @@ ac:
   - tests/unit/test_render.py::test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven
   - tests/unit/test_render.py::test_render_cursor_hooks_json_omits_spec_gate_when_task_driven
   - tests/unit/test_spec_gate.py::test_derive_test_slug
+  - tests/unit/test_render.py::test_render_settings_hooks_gate_spec_gate_on_strictness
+  - tests/unit/test_render.py::test_render_codex_hooks_gate_spec_gate_on_strictness
   executable_predicate: '# placeholder — refine in /hm:spec spec-gate'
+  golden_table: []
+  rubric_id: null
+  note: ''
   pending_test: false
+  oracle_source: legacy-unspecified
+  oracle_evidence: null
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

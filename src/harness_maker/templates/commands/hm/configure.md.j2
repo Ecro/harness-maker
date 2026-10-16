@@ -6,7 +6,7 @@
 ## Procedure
 
 You (Claude) act as the orchestrator. Read `.claude/harness.yaml` to
-show current settings, then drive targeted changes via the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code).
+show current settings, then drive targeted changes via the structured question tool (`AskUserQuestion`).
 Use the configured locale for the live conversation. Every selected setting
 must show a concise decision receipt before dispatch: current value, new value,
 benefit, trade-off, re-render impact, and preservation note.
@@ -28,7 +28,7 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 
 ### 2. Ask what to change
 
-Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code): "What would you like to change?" This is a
+Use `AskUserQuestion`: "What would you like to change?" This is a
 multi-select flow; the user can update several settings in one pass.
 
 Options (multi-select):
@@ -39,7 +39,7 @@ Options (multi-select):
 - **Grade threshold** — A / B / C. Trade-off: stricter thresholds catch more
   issues and can require more re-review.
 - **SPEC strictness** — `block` stops on a failed SPEC check; `warn` reports it and continues.
-- **IDE targets** — claude-code, cursor, codex, or combinations. Trade-off:
+- **IDE targets** — claude-code, codex, or combinations. Trade-off:
   extra targets render extra roots and dropping a target does not delete old
   target-specific files.
 - **Worktree isolation** — `worktree.enabled`. ON: every `/hm:` stage runs in a per-task
@@ -110,7 +110,7 @@ new value alternatives, and a short explanation:
 - **Benefit** — what improves when this setting changes.
 - **Trade-off** — what cost the user pays, including review time where relevant.
 - **Re-render impact** — which generated roots may change (`.claude/`,
-  `.cursor/`, `.codex/`, `.agents/skills/`, `AGENTS.md`).
+  `.codex/`, `.agents/skills/`, `AGENTS.md`).
 - **Preservation note** — unspecified fields are preserved from
   `.claude/harness.yaml`; user blocks marked `@hm:user:*` remain protected by
   reconcile.
@@ -221,8 +221,7 @@ For each detected foreign config:
      foreign-map "$(pwd)" --path "<foreign-path>"
    ```
 
-2. Show the resulting mapping table per axis. Use `AskQuestion` (Cursor) /
-   `AskUserQuestion` (Claude Code) with options **accept / reject / edit**
+2. Show the resulting mapping table per axis. Use `AskUserQuestion` with options **accept / reject / edit**
    for each axis. Reject silently if the user has no opinion; edit lets the
    user override the value.
 

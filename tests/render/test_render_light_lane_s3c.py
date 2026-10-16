@@ -16,6 +16,7 @@ import hashlib
 import json
 import re
 from functools import cache
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -387,6 +388,33 @@ BOUNDARY: dict[str, str] = json.loads(
 assert set(FULL["configs"]) == set(FULL_KEYS)
 
 
+# 2026-10-16, SPEC-hm-overhaul-p1 PR-C: the Cursor target is gone, so the `"cursor" not in
+# config.targets` half of research Phase 1's fan-out condition went with it. The full-lane arms
+# render this repo's `.claude/harness.yaml`, whose `targets` still lists cursor (dropped at parse),
+# so the Claude research command now takes the Explore fan-out branch where a7403f2f took the
+# plain "Run these in parallel" branch. Swapping exactly that branch back gives a7403f2f's bytes.
+_RESEARCH_TEMPLATE = (
+    Path(__file__).resolve().parents[2] / "src/harness_maker/templates/stages/research.md.j2"
+).read_text(encoding="utf-8")
+_FANOUT_OPEN, _FANOUT_ELSE, _FANOUT_END = "{% if not is_codex %}", "{% else %}", "{% endif %}"
+_FANOUT_START = _RESEARCH_TEMPLATE.index(_FANOUT_OPEN) + len(_FANOUT_OPEN)
+_FANOUT_MID = _RESEARCH_TEMPLATE.index(_FANOUT_ELSE, _FANOUT_START)
+FANOUT_BRANCH = _RESEARCH_TEMPLATE[_FANOUT_START:_FANOUT_MID]
+PLAIN_BRANCH = _RESEARCH_TEMPLATE[
+    _FANOUT_MID + len(_FANOUT_ELSE) : _RESEARCH_TEMPLATE.index(_FANOUT_END, _FANOUT_MID)
+]
+#: PR-C's research growth, measured 2026-10-16 (surface baseline 16 677 -> 17 292 chars). Fixed
+#: here, not derived, so a later edit to either branch moves the bound only by a deliberate edit.
+FANOUT_DELTA = 615
+assert len(FANOUT_BRANCH) - len(PLAIN_BRANCH) == FANOUT_DELTA, "the fan-out branch changed size"
+
+
+def without_cursor_fanout(text: str) -> str:
+    """`text` with PR-C's research fan-out branch swapped back for the plain one, exactly once."""
+    assert text.count(FANOUT_BRANCH) == 1
+    return text.replace(FANOUT_BRANCH, PLAIN_BRANCH)
+
+
 @cache
 def _full_render(key: str) -> dict[str, str | None]:
     return fx.render_files(fx.full_answers(key))
@@ -411,6 +439,8 @@ def _normalise(key: str, rel: str) -> str | None:
         # 2026-10-15, SPEC-hm-light-lane-s3d: the light check's Check 2 passes `--spec-slug` and
         # its record line names the gate source. Undoing exactly those bytes gives a7403f2f's.
         text = s3d.without_s3d(text, record=True)
+    if rel == "commands/hm/research.md":
+        text = without_cursor_fanout(text)
     return fx.mask_content_hash(text)
 
 
@@ -447,7 +477,8 @@ SURFACE: dict[str, Any] = json.loads(
 )
 #: The SPEC's per-cut bounds (Surface table), applied to a7403f2f's own numbers.
 CUTS: dict[tuple[str, str], int] = {
-    ("claude", "research"): -3712,
+    # + FANOUT_DELTA: PR-C's fan-out branch (see `without_cursor_fanout`), not a stage-3c cut.
+    ("claude", "research"): -3712 + FANOUT_DELTA,
     ("claude", "spec"): -3712 + 300 - 1000,
     # C amended to -2150 (SPEC amendment 2026-10-15, review round 1): the light read-back
     # keeps the full Step 0 / 0.3 guards, and Step 0.3 carries the read rule.

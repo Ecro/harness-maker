@@ -48,14 +48,12 @@ harness-maker/
 │   └── hooks/                # telemetry hooks
 ├── commands/make.md          # /harness-maker:make plugin entry
 ├── .claude-plugin/plugin.json  # Claude Code marketplace manifest
-├── .cursor-plugin/plugin.json  # Cursor Marketplace manifest
 ├── tests/
 │   ├── unit/                 # per-module pytest
 │   │   └── test_no_network.py # ADR-005 positive obligation (no outbound socket during audit / telemetry)
 │   ├── fixtures/             # 4 reference projects (side-python-cli, side-tauri-app, prod-tauri-app, prod-firmware)
 │   ├── snapshot/             # golden Blueprint YAMLs + regenerate.py
-│   ├── e2e/                  # dogfood + plugin entry
-│   └── cursor-compat/        # M14: manual checklist + results grid for Cursor IDE verification
+│   └── e2e/                  # dogfood + plugin entry
 ├── docs/                     # this folder
 ├── TECH_SPEC.md              # source of truth for design decisions
 └── .claude-verify.sh         # autoloop-callable phase exit-criteria checker
@@ -110,17 +108,6 @@ Same pattern as skills, with two differences:
    - If a template needs a real per-agent command restriction, that requires a PreToolUse hook keyed on agent identity, or a sandbox — frontmatter cannot express it.
    - If you're instead adding a rule to the **main-session** `settings.json` deny list (a separate, real, session-wide mechanism, opt-in via `harness.yaml.permissions.deny_dangerous`), the rule shape must be **matchable**: no bare `Write(<path>)` / `NotebookEdit(<path>)` / `Glob(<path>)` (the file-permission check only consults `Edit`/`Read`), and no `Bash(... | ...)` / `Bash(... && ...)` / etc. (Bash rules are matched per-subcommand after splitting on `&& || ; | &`, so a rule spanning a separator never fires — silently). `permission_syntax.is_matchable_rule` is the oracle; `test_permission_syntax.py` fails the build on a regression. See `templates/agents/code-reviewer.md.j2` and `templates/agents/executor.md.j2` for the current `tools:`-only pattern.
 3. Update the "Agents (9) presence" loop in `.claude-verify.sh`'s `final_acceptance`.
-
-## Adding Cursor target support to a new template
-
-If your new skill, agent, or command needs a Cursor-specific variant:
-
-1. **Check if single-source is enough.** For most templates, Cursor 2.4+ reads `.claude/agents/` and `.claude/skills/` natively — no extra file needed.
-2. **Only add a Cursor-specific file if the content must differ** (e.g., a rules file at `.cursor/rules/`).
-3. **Use `_render_cursor_mdc()` dispatch in `render.py`** when the output is a `.mdc` file. This limits frontmatter to `description`, `globs`, and `alwaysApply` — Cursor rejects unknown keys. Do **not** include `content_hash` in the frontmatter; use a sidecar `.hm-meta.yaml` if hash-tracking is needed.
-4. **Use `_render_pure_text()` dispatch** for `.json` files like `.cursor/mcp.json` — no frontmatter allowed.
-5. **Gate the render** with `if cursor in config.targets` in `synthesize.py`.
-6. **Add a manual checklist row** in `tests/cursor-compat/MANUAL_CHECKLIST.md` for the new asset.
 
 ## Adding a New Preset
 
@@ -216,7 +203,7 @@ Before opening a PR:
 - [ ] If you added a skill/agent/preset: enumerated in `.claude-verify.sh final_acceptance`
 - [ ] If you added a template: starts with `---` frontmatter (provenance invariant)
 - [ ] `TECH_SPEC.md` updated if the change touches a Section 3 mechanism (M1-M14) or Section 5 acceptance criteria
-- [ ] If bumping the version: all **5 files** updated in the same commit: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
+- [ ] If bumping the version: all **4 files** updated in the same commit: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
 - [ ] Commit message follows `<type>(phase<N>): <description>` (e.g. `feat(phase4): add anti-rot adaptive threshold`)
 
 ## Reporting Issues

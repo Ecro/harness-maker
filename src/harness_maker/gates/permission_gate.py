@@ -160,7 +160,7 @@ def main() -> int:
         return 0
     if not isinstance(payload, dict):
         return 0
-    if is_claude_copy_in_cursor(payload):
+    if is_claude_copy_in_cursor(payload, "harness_maker.gates.permission_gate"):
         return 0
     hook_event = str(payload.get("hook_event_name") or "")
     if hook_event and hook_event not in _KNOWN_HOOK_EVENTS:

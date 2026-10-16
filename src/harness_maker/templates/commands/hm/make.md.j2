@@ -52,7 +52,7 @@ uv run --with "$HM" hm cli make "$(pwd)" --update --dry-run
 
 Surface the NEW / REPLACE / KEEP / MERGE counts (KEEP = your edits preserved,
 MERGE = block-merged into your edits), then ask with the structured question tool
-(`AskUserQuestion` in Claude Code, `AskQuestion` in Cursor) — **Proceed** /
+(`AskUserQuestion`) — **Proceed** /
 **Cancel**. On Cancel, stop here. If `.claude/` does not exist yet (fresh install),
 skip this step and apply directly.
 
@@ -89,7 +89,7 @@ Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
     unrelated pre-staged work OUT of the harness commit; churn + `.backup-*` are
     already gitignored, so the commit is clean):
     ```bash
-    roots=""; for r in .claude .cursor .codex .agents AGENTS.md; do [ -e "$r" ] && roots="$roots $r"; done; git add $roots && git commit -m "chore: add harness-maker harness" -- $roots
+    roots=""; for r in .claude .codex .agents AGENTS.md; do [ -e "$r" ] && roots="$roots $r"; done; git add $roots && git commit -m "chore: add harness-maker harness" -- $roots
     ```
   - **Gitignore them** — the roots are added to `.gitignore` and kept local. On
     this choice run (fails loudly if the write does not take effect):
@@ -110,7 +110,7 @@ Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
 ### `--reinterview`
 
 Routes to the full interactive setup. Run `/harness-maker:make` instead —
-it asks locale first, then drives the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) for preset, targets, and
+it asks locale first, then drives the structured question tool (`AskUserQuestion`) for preset, targets, and
 dispatches with the collected flags.
 
 Tell the user:

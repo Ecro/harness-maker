@@ -47,7 +47,6 @@ _EXPECTED_CORE_DOCS = (
 )
 _EXPECTED_VERSION_FILES = (
     ".claude-plugin/plugin.json",
-    ".cursor-plugin/plugin.json",
     ".codex-plugin/plugin.json",
     "pyproject.toml",
     "src/harness_maker/__init__.py",
@@ -230,8 +229,8 @@ def test_ac_002_contract_and_mutation_inventories_are_nonempty() -> None:
         ),
         (
             "docs/CONTRIBUTING.md",
-            "all **5 files** updated",
             "all **4 files** updated",
+            "all **5 files** updated",
             "version-files",
         ),
         (

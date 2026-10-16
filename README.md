@@ -7,14 +7,13 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-orange)](https://code.claude.com)
-[![Cursor 2.4+ (3.2+ rec)](https://img.shields.io/badge/Cursor-2.4%2B_(3.2%2B_rec)-black)](https://cursor.com)
 [![Built with uv](https://img.shields.io/badge/built_with-uv-261230.svg)](https://docs.astral.sh/uv/)
 
 **English** · [한국어](https://github.com/Ecro/harness-maker/blob/main/README.ko.md)
 
 > **A different harness for every project — built from yours, never generic.**
 
-> **Version**: 0.62.0
+> **Version**: 0.63.0
 >
 > Current release contract (validated from source):
 >
@@ -37,7 +36,7 @@
 > <!-- hm-doc-contract:mechanisms:end -->
 >
 > <!-- hm-doc-contract:version-files:start -->
-> **Release version files:** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
+> **Release version files:** `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
 > <!-- hm-doc-contract:version-files:end -->
 
 > Other harnesses give everyone the same starting point. harness-maker reads YOUR repo and builds YOUR harness.
@@ -76,12 +75,12 @@ Design notes and field reports live on [EdgeLog][edgelog], the maintainer's embe
 
 ## Try in 30 seconds
 
-Paste this into Claude Code, Cursor, or Codex CLI. **A profiler reads 12+ stack signals + a 10-dimension interview synthesizes a harness specific to YOUR project** — not a generic template. It auto-detects your IDE, installs harness-maker via Bash (no slash-command typing), runs the interview, and prints a personalization-tier report.
+Paste this into Claude Code or Codex CLI. **A profiler reads 12+ stack signals + a 10-dimension interview synthesizes a harness specific to YOUR project** — not a generic template. It auto-detects your IDE, installs harness-maker via Bash (no slash-command typing), runs the interview, and prints a personalization-tier report.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
 
-You are an AI agent running inside Claude Code, Cursor, or Codex CLI.
+You are an AI agent running inside Claude Code or Codex CLI.
 Detect which one (silently — don't ask me), install harness-maker via
 Bash (NOT slash commands typed by me), then invoke harness-maker:make and
 hm:health via the Skill tool. Conduct the conversation in the language of
@@ -91,8 +90,6 @@ Install path per IDE:
   Claude Code:  Bash  claude plugin marketplace add Ecro/harness-maker
                 Bash  claude plugin install harness-maker@harness-maker
                 Then tell me: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
-  Cursor:       Bash  git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
-                Then tell me: "Reload the Cursor window (Ctrl+Shift+P → Reload Window)."
   Codex CLI:    Bash  codex plugin marketplace add Ecro/harness-maker
                 Bash  codex plugin add harness-maker@harness-maker
                 Load the bundled hm-make skill; it resolves the installed
@@ -121,7 +118,7 @@ Most AI coding setups start from a generic template and drift from day one — s
 | 🛡️ | **Trusted** | With `worktree.enabled: true` (the Production default) every `/hm:` stage for a task runs in one **persistent** worktree — `.worktrees/<slug>/` on branch `hm/<slug>`, **shared** by plan/execute/review and squash-landed by `/hm:wrapup` — and the TDD loop runs there. With `worktree.enabled: false` (the Side default) **no worktree** is created and every stage runs in the current tree. `/hm:review` doesn't just report — it applies consensus-passed fixes and re-reviews until grade ≥ A. Mechanical checks (lint/tests) gate the LLM reviewer before any token is spent. |
 | 🧭 | **Human-owned** | AI takes as much of the *how* as it can; you keep the *why*, the *what* and the trade-offs. `/hm:spec` locks intent, scope and `irreversible_decisions` with you before any code, autopilot stops at stages that need a human decision, and intent records change only with your consent. **Not shipped yet:** a wrapup summary of how the system's assumptions changed, so you can explain a change without reading the diff. |
 | 🌱 | **Self-evolving** | Hand-edit any agent, skill, CLAUDE.md — block-merge markers preserve your edits across `--update`. Memory accumulates project-specific patterns; recurring failures auto-propose new guardrails. |
-| 🎛️ | **Multi-IDE** | Claude Code + Cursor + Codex. One `harness.yaml`, three target-native renders. Existing Cursor rules / Aider config / Copilot instructions get absorbed on first run — no manual port. |
+| 🎛️ | **Multi-IDE** | Claude Code + Codex. One `harness.yaml`, two target-native renders. Existing Cursor rules / Aider config / Copilot instructions get absorbed on first run — no manual port. |
 
 ---
 
@@ -158,9 +155,9 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | Dimension | Choices | What it changes |
 |---|---|---|
 | **Preset** | `Side` · `Production` | Reviewer count (1 vs 5), workflow stage count, security gate depth, verify-required flag |
-| **Targets** | `claude-code` · `cursor` · `codex` (multi-select) | Which IDE-native asset trees are rendered |
+| **Targets** | `claude-code` · `codex` (multi-select) | Which IDE-native asset trees are rendered |
 | **Locale** | `en` · `ko` · any tag | Interview text + user-facing error messages |
-| **World model name** | Default `Maker` (`/maker`) · any name | Names the one skill you start work from — `/<handle>` (Claude Code, Cursor), `$<handle>` (Codex), or by name. It is the only entrance to `intent-layer` / `project-knowledge`, which run otherwise only when typed. Asked right after locale; stored as `world_model.name` / `world_model.handle` in `harness.yaml` (absent → `Maker` / `maker`). See [Maker](#maker--the-world-models-front-door) |
+| **World model name** | Default `Maker` (`/maker`) · any name | Names the one skill you start work from — `/<handle>` (Claude Code), `$<handle>` (Codex), or by name. It is the only entrance to `intent-layer` / `project-knowledge`, which run otherwise only when typed. Asked right after locale; stored as `world_model.name` / `world_model.handle` in `harness.yaml` (absent → `Maker` / `maker`). See [Maker](#maker--the-world-models-front-door) |
 | **Reviewers / skills** | Preset defaults + overrides | Which reviewers are active + agent model tiers (the full agent/skill set always installs) |
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
@@ -174,11 +171,10 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 
 ### 3. RENDER — *How does this become a working harness?*
 
-One source tree, three IDE-native renders, all from a single `harness.yaml`:
+One source tree, two IDE-native renders, all from a single `harness.yaml`:
 
 ```
 .claude/                 ← single source: agents, skills, commands/hm/, hooks, memory, observability
-├── .cursor/             ← + Cursor-native rules, hooks, mcp.json     (if cursor target)
 ├── .codex/              ← + Codex-native config.toml, agent TOMLs    (if codex target)
 ├── AGENTS.md            ← + Codex root instructions                  (if codex target)
 └── .agents/skills/      ← + Codex skill paths                        (if codex target)
@@ -193,7 +189,7 @@ Layered on top of the base render:
 
 > **Result:** Every IDE you use sees the same agents, the same skills, the same workflows — natively. Zero manual porting.
 
-Codex invokes generated stage skills with `$hm-research topic`, `$hm-spec task-slug`, and `$hm-execute task-slug`. Claude Code and Cursor use `/hm:research`, `/hm:spec`, and `/hm:execute`. Research hands off to spec; execute writes the PLAN before implementation. The separate plan stage has been removed. Regenerate an existing project harness after updating the plugin to refresh its guidance.
+Codex invokes generated stage skills with `$hm-research topic`, `$hm-spec task-slug`, and `$hm-execute task-slug`. Claude Code uses `/hm:research`, `/hm:spec`, and `/hm:execute`. Research hands off to spec; execute writes the PLAN before implementation. The separate plan stage has been removed. Regenerate an existing project harness after updating the plugin to refresh its guidance.
 
 **What running it feels like — guided to the end.** When `.claude/` already exists, `/hm:make` shows a dry-run **preview** (NEW / REPLACE / KEEP / MERGE — KEEP = your edits preserved) and asks before overwriting; a fresh install applies directly. There's **no git worktree** — a backup + reconcile cover the overwrite concern, so non-git projects work too. After applying, the command **narrates** what changed in your language (a clean first install stays quiet; real P0/P1 findings go loud). Then the **last mile**: it detects your git state and asks — *neutrally, no nudge* — whether to **commit** the harness (so teammates who clone get it) or **gitignore** it (keep it local). Churn and `.backup-*` are always gitignored, so a commit stays clean, and the decision is **inferred from git state** so re-renders never re-nag. Full flow: [**docs/HOW-IT-WORKS.md → Render pipeline**](docs/HOW-IT-WORKS.md#render-pipeline).
 
@@ -249,7 +245,7 @@ For the mechanics behind each step — full procedures, decision paths, internal
 
 ### Universal Bootstrap Prompt
 
-> **Paste into your AI agent — it detects whether you're in Claude Code, Cursor,
+> **Paste into your AI agent — it detects whether you're in Claude Code
 > or Codex, runs the matching plugin install via Bash (no slash-command typing
 > by you), and bootstraps the harness end-to-end.** One paste, every supported IDE.
 
@@ -258,17 +254,16 @@ For the mechanics behind each step — full procedures, decision paths, internal
 | IDE | Paste | Typed slash | GUI / restart action | Total user actions |
 |---|---|---|---|---|
 | **Claude Code** | 1 | 1 (`/reload-plugins`) | 1 short message (e.g. `go`) to re-trigger Claude | **3** |
-| **Cursor** | 1 | 0 | 1 (`Ctrl+Shift+P → Reload Window`) | **2-3** |
 | **Codex CLI** | 1 | 0 | 0–1 (new thread if plugin skills need discovery) | **2** |
 
 > **Codex CLI install path.** Native installation exposes bundled `hm-make` and `hm-update` skills. These run the matching Python engine through `uv`; no Claude Code cache is required. Plugin installation alone does not generate the project harness.
 
-> **First-use Bash approval.** Claude Code / Cursor / Codex CLI will request Bash permission for the install commands shown below. Approve **only** the exact commands in the prompt (`codex plugin marketplace add Ecro/harness-maker`, `codex plugin add harness-maker@harness-maker`, `claude plugin install harness-maker@harness-maker`, `git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker`, or `uv tool install harness-maker`). Do **NOT** grant blanket `Bash(*)` — if the AI requests a different command, stop and inspect. The Cursor clone fetches the current `main` branch of a public repo; future `git pull` updates are not integrity-verified — pin a release tag manually if this matters for your threat model.
+> **First-use Bash approval.** Claude Code / Codex CLI will request Bash permission for the install commands shown below. Approve **only** the exact commands in the prompt (`codex plugin marketplace add Ecro/harness-maker`, `codex plugin add harness-maker@harness-maker`, `claude plugin install harness-maker@harness-maker`, or `uv tool install harness-maker`). Do **NOT** grant blanket `Bash(*)` — if the AI requests a different command, stop and inspect.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
 
-You are an AI agent running inside one of: Claude Code, Cursor, or Codex CLI.
+You are an AI agent running inside one of: Claude Code or Codex CLI.
 Detect which one (silently — do NOT ask me), run the matching plugin install
 via Bash (NOT slash commands typed by me), then invoke harness-maker:make
 and hm:health via the Skill tool.
@@ -276,8 +271,6 @@ and hm:health via the Skill tool.
 Step 1 — Detect the host IDE (silent):
   - Claude Code  → $CLAUDE_CODE is set, or ~/.claude/ exists, or you have
                    the Bash tool with access to the `claude` CLI
-  - Cursor       → $CURSOR_SESSION is set, or ~/.cursor/ exists, or you have
-                   Cursor's plugin manager available
   - Codex CLI    → $CODEX_SESSION is set, or ~/.codex/ exists, or the
                    `codex` command is on PATH
 
@@ -288,10 +281,6 @@ harness-maker:make skill is already available):
     Bash: claude plugin marketplace add Ecro/harness-maker
     Bash: claude plugin install harness-maker@harness-maker
     Then tell me verbatim: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
-
-  IF Cursor:
-    Bash: git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
-    Then tell me verbatim: "Reload the Cursor window now (Ctrl+Shift+P → Reload Window)."
 
   IF Codex CLI:
     Bash: codex plugin marketplace add Ecro/harness-maker
@@ -345,21 +334,6 @@ The engine must be published at the plugin's release version. Development cacheb
 
 For Claude second opinions, enable `second_opinion.models: [claude]` in `.claude/harness.yaml`. Optional `second_opinion.claude` keys are `model` (default: CLI selection) and `timeout` (positive seconds, default 300). The authenticated `claude` CLI must support `--safe-mode`; the invoker sends supplied context on stdin with tools disabled. Unsupported/authentication failures are recorded skips; malformed results are failures, never clean votes.
 
-#### Cursor (Team marketplace import OR local symlink)
-
-Cursor's public plugin marketplace is curated ([cursor.com/marketplace/publish](https://cursor.com/marketplace/publish), submit-and-review). Direct GitHub install is still on the roadmap as of Cursor 2.5+. Two working paths today:
-
-**A. Team marketplace (Team / Enterprise plans):**
-Dashboard → Settings → Plugins → Team Marketplaces → Import → paste `https://github.com/Ecro/harness-maker` → push to team members.
-
-**B. Local dev install (community pattern):**
-
-```bash
-git clone https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
-```
-
-Reload Cursor (Ctrl+Shift+P → "Reload Window") to pick up the new plugin.
-
 #### PyPI (no IDE plugin — CI, headless, scripts)
 
 For environments where no IDE plugin path applies (CI scripts, headless servers, automation, or strong preference for a Python CLI tool):
@@ -376,7 +350,7 @@ Then:
 ```bash
 cd your-project
 harness-maker profile . --json
-harness-maker make . --preset Production --locale en --targets claude-code,cursor
+harness-maker make . --preset Production --locale en --targets claude-code,codex
 ```
 
 This path is fine for one-off renders but skips the in-IDE slash-command surface — `/hm:health`, `/hm:spec`, `/hm:execute`, etc. only appear after the IDE plugin loads them.
@@ -396,7 +370,7 @@ harness-maker make . --promote NAME    # move an ad-hoc artifact into the harnes
 
 ## Maker — the world model's front door
 
-The world model is what the harness keeps between sessions: **intents** (goals, metrics, open questions), **project facts** the code does not show, and **task state** (which task is at which stage). Maker is the one skill you start from. The interview names it right after locale; the default is `Maker`, invoked as `/maker` (Claude Code, Cursor), `$maker` (Codex), or by addressing it by name.
+The world model is what the harness keeps between sessions: **intents** (goals, metrics, open questions), **project facts** the code does not show, and **task state** (which task is at which stage). Maker is the one skill you start from. The interview names it right after locale; the default is `Maker`, invoked as `/maker` (Claude Code), `$maker` (Codex), or by addressing it by name.
 
 | You say | Route |
 |---|---|
@@ -406,7 +380,7 @@ The world model is what the harness keeps between sessions: **intents** (goals, 
 | a goal, metric, assumption or intent; a project fact | **Goals and facts** — recorded through the intent or knowledge procedure |
 | "what next?" | **Briefing** plus 2–4 options; starts no stage |
 
-**The only entrance.** `intent-layer` and `project-knowledge` are not model-invocable. Typing `/intent-layer` or `/project-knowledge` (`$…` on Codex) still runs them; otherwise Maker reads their procedure before any write, and their ask-before-write rule is unchanged. An always-loaded `## World model` pointer in `CLAUDE.md` / `AGENTS.md` / `.cursor/rules/harness.mdc` sends goal, metric, fact and status requests to Maker even when you don't name it, and even mid-stage. Ordinary build and fix requests are not rerouted. `/hm:` stages still run when typed, or via Maker, autopilot or `/hm:loop`.
+**The only entrance.** `intent-layer` and `project-knowledge` are not model-invocable. Typing `/intent-layer` or `/project-knowledge` (`$…` on Codex) still runs them; otherwise Maker reads their procedure before any write, and their ask-before-write rule is unchanged. An always-loaded `## World model` pointer in `CLAUDE.md` / `AGENTS.md` sends goal, metric, fact and status requests to Maker even when you don't name it, and even mid-stage. Ordinary build and fix requests are not rerouted. `/hm:` stages still run when typed, or via Maker, autopilot or `/hm:loop`.
 
 **Scope follows the ask.** "research X" ends at research, "spec X" at spec, "build X" / "fix X" runs the full pipeline; an unclear ask starts at research. With autopilot armed, Maker runs `hm autopilot narrow --until <end>` on every ask, so "research X" stops after research and the armed pipeline is restored at that boundary. Maker never arms autopilot.
 
@@ -430,7 +404,6 @@ Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`). Claude Co
 |---|---|
 | **Python 3.12+** and **[`uv`](https://docs.astral.sh/uv/)** | Required wherever Claude Code runs against your project — even if your project's primary language is Rust, Node, or Go. Hooks invoke `uv run python -m harness_maker.gates.*`; without `uv` they are silent no-ops. |
 | **Claude Code CLI** (plugin + hook support) | Optional for plugin mode (`claude --plugin-dir /path/to/harness-maker`). Not required — the `harness-maker` CLI can generate harnesses independently. |
-| **Cursor IDE 2.4+** (3.2+ recommended) | Optional. Reads `.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/*.md` natively (verified empirically in 0.6.2, re-confirmed 0.7.1 — see `tests/cursor-compat/results-2026-05-08.md`). Hooks render to a separate `.cursor/hooks.json` with Cursor-native schema; both files are emitted when `targets` includes `cursor`. Cursor 3.0+ adds native `/worktree` and `/best-of-n` which coexist safely with harness-maker's prefix-matched cleanup. |
 | **OpenAI Codex CLI** | Optional. When `targets` includes `codex`, harness-maker renders Codex-native `.codex/` config, `AGENTS.md`, and `.agents/skills/` assets from the same workflow definitions. |
 | **Git** | Required for worktree isolation (every `/hm:execute` and `/hm:loop` run). |
 
@@ -463,13 +436,13 @@ Grouped by what they do for your project, not by component.
 - **2-pass redaction (+47pp precision).** Pass 1 strips PR metadata so findings can't anchor on author/title. Pass 2 restores full context — reviewers must validate or drop each Pass 1 finding. Ablation-measured precision gain on anchoring-prone diffs.
 - **7 security gates.** `secrets` · `permissions` (settings.json over-grant) · `hook-injection` (AST scan for `rm -rf`, `curl|sh`, `eval`) · `CVEs` (OSV.dev) · `hallucination` (AST scan for non-existent imports) · `prod-name guard` · `prompt-injection`. Findings stay local in `.claude/observability/security/`.
 - **Privilege separation.** Reviewer agents deny `Write` / `Edit` / interpreter `Bash` calls. Executor agents allow only `.worktrees/**` writes + paired Edit/Write denies on system paths. Defense-in-depth survives prompt injection, agent compromise, and tool_input poisoning.
-- **Worktree isolation per task.** With `worktree.enabled: true`, one **persistent** worktree per task — `.worktrees/<slug>/` on `hm/<slug>`, **shared** by every `/hm:` stage and squash-landed once by `/hm:wrapup`, so two concurrent sessions cannot commit into each other's work. With `worktree.enabled: false` **no worktree** is created. Failed runs preserve evidence; cleanup is prefix-matched (Cursor's own worktrees never touched). Create also prunes stale harness-owned markers/worktrees first, and stale finalize-stash refs do not count as live queue pressure.
+- **Worktree isolation per task.** With `worktree.enabled: true`, one **persistent** worktree per task — `.worktrees/<slug>/` on `hm/<slug>`, **shared** by every `/hm:` stage and squash-landed once by `/hm:wrapup`, so two concurrent sessions cannot commit into each other's work. With `worktree.enabled: false` **no worktree** is created. Failed runs preserve evidence; cleanup is prefix-matched (other tools' worktrees never touched). Create also prunes stale harness-owned markers/worktrees first, and stale finalize-stash refs do not count as live queue pressure.
 
 ### 🌱 Self-evolving — *grows with your project*
 
 - **Block-merge preservation.** Hand-tune any agent, skill, CLAUDE.md section. Survives `--update` because content hashes per file plus `@hm:user:*` markers separate your edits from template-owned regions. `@hm:harness:*` inverted markers do the opposite for foreign config absorption.
 - **Accumulating memory.** `wiki.md` (patterns) · `failures.md` (recurring mistakes deduplicated by slug) are written automatically by each `/hm:wrapup` and surfaced by later stages. `session/<date>.md` holds compaction checkpoints only — written by the `flush_session` hook for interrupted-session resume.
-- **Code-absent project facts.** The `project-knowledge` skill captures things no diff reveals — external-system behavior, ops quirks, corrected assumptions — as a `[wiki:fact]` entry, distinct from the dev-only wiki categories above. It reuses only a `[wiki:fact]` slug (never overwrites a dev pattern/gotcha) and never records an inferred fact. It is typed-only: reach it through Maker ("remember that …") or by typing `/project-knowledge`. A ≤300-char pointer in `CLAUDE.md`/`AGENTS.md`/`.cursor/rules/harness.mdc` names the Maker invocation and the procedure file, so a project fact lands in the shared wiki, not host auto-memory.
+- **Code-absent project facts.** The `project-knowledge` skill captures things no diff reveals — external-system behavior, ops quirks, corrected assumptions — as a `[wiki:fact]` entry, distinct from the dev-only wiki categories above. It reuses only a `[wiki:fact]` slug (never overwrites a dev pattern/gotcha) and never records an inferred fact. It is typed-only: reach it through Maker ("remember that …") or by typing `/project-knowledge`. A ≤300-char pointer in `CLAUDE.md`/`AGENTS.md` names the Maker invocation and the procedure file, so a project fact lands in the shared wiki, not host auto-memory.
 - **Self-improving failure proposals.** When a `[fail:*]` slug recurs 3× across sessions, wrapup writes a proposal to `pending-proposals.md` — a new skill, rule, or hook that would have prevented the recurrence. You review and decide whether to ingest.
 - **ADR system as binding execute constraints.** The SPEC's `irreversible_decisions` and the ADRs `/hm:execute` Step 0 records while authoring the PLAN are hard constraints on the implementation. Conflicts surface as blockers, never silently proceed. Future sessions don't re-litigate settled decisions.
 - **Refdocs search.** Register architecture docs, API specs, design docs in `harness.yaml`. `refdocs-search` skill gives lossless full-text search — no chunking, no RAG index.
@@ -478,7 +451,7 @@ Grouped by what they do for your project, not by component.
 
 ### 🎛️ Multi-IDE — *one source, every IDE*
 
-- **Three targets from one harness.** Claude Code + Cursor (2.4+, 3.0+ recommended) + Codex CLI. Single `.claude/` source tree; Cursor reads it natively plus its own `.cursor/` for hooks and rules; Codex reads `.codex/`, `AGENTS.md`, and `.agents/skills/`. All rendered from one `harness.yaml`.
+- **Two targets from one harness.** Claude Code + Codex CLI. Single `.claude/` source tree; Codex reads `.codex/`, `AGENTS.md`, and `.agents/skills/`. All rendered from one `harness.yaml`.
 - **Foreign AI config migration.** Detects 6 known foreign configs (`.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`, `.aider.conf.yml`, `.github/copilot-instructions.md`). LLM-translates them into harness.yaml axes. `@hm:harness:*` inverted markers keep them synced across re-renders.
 - **Sibling repos.** Frontend + backend + library bind into one harness session via relative paths in harness.yaml. Cross-machine portable (relative paths survive `git clone`).
 
@@ -487,7 +460,7 @@ Grouped by what they do for your project, not by component.
 - **Deep interview before every implementation.** `/hm:spec` runs a 6-category interview (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification) scored for completeness. The decisions that cannot be cheaply undone are locked in that same interview as `irreversible_decisions`; the *how* — phases, ordering, risk — is authored by `/hm:execute` Step 0 with no human gate.
 - **Autoloop with adaptive interview + 4-gate convergence.** `/hm:loop` runs time-and-iteration-bounded loops. `autoloop-driver` reads the goal, asks only what's missing, locks intensity + exit checklist, then requires mechanical checks + LLM judgment + regression comparison + 2-iter convergence streak before accepting completion.
 - **3-tier context loading + compaction recovery.** Hot tier (today's session) · Warm tier (wiki/failures entries matched to the stage topic — lexical hits first, up to 3 high-recurrence failures only in slots left over, one 8 KB cap for the whole block) · Cold tier (git log / PLANs on demand). `PreCompact` hook flushes session before context compaction; next turn detects the marker and resumes from the last in-progress phase.
-- **Cross-process memory safety.** `.claude/memory/` writers serialise via re-entrant POSIX flock. Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤PIPE_BUF) so concurrent Claude Code + Cursor sessions cannot interleave JSONL lines.
+- **Cross-process memory safety.** `.claude/memory/` writers serialise via re-entrant POSIX flock. Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤PIPE_BUF) so concurrent Claude Code + Codex sessions cannot interleave JSONL lines.
 - **Intent layer — purpose, metrics and accountable work.** `.claude/intent.yaml` holds purpose, metrics, open questions and optional owner/dri/team roles; `intent/<ID>.md` records each intent across one or more SPECs. `hm intent status` combines gaps, revisits and withdrawal; writes remain answer-gated. Reached through Maker or by typing `/intent-layer`. Owners warnings are advisory, and `hm intent migrate` preserves legacy approvals and history. `hm world` remains a deprecated alias for one release.
 
 ### 🔧 Advanced features — *background mechanisms, tunable but not in the way*
@@ -515,7 +488,7 @@ flowchart TD
     F -- No --> G["Write .claude/ directly"]
     F -- Yes --> H["Reconcile\n(hash-based keep/replace/both)"]
     H --> G
-    G --> I["Extra targets?\nRender .cursor/ and/or .codex/ assets"]
+    G --> I["Extra targets?\nRender .codex/ assets"]
     I --> J["User runs /hm:* commands"]
     J --> K["Weekly /hm:health (Step 2)\n4-source anti-rot crawl\n→ manual confirm"]
 ```
@@ -550,7 +523,7 @@ There is no fused-workflow command. Two mechanisms chain the atomic stages: <!--
 | Mechanism | What it does |
 |---|---|
 | `/hm:loop` | Bounded autoloop. `--per-iter-stages execute,review` (default) sets the per-iteration sequence; `wrapup` is rejected there because loop-close owns it. **Opt-in** via `harness.yaml`'s `loop.enabled` — a fresh install renders without it; an existing harness keeps it unless the key is set. |
-| Autopilot | Auto-advances the configured `autonomy.pipeline` past two-way-door boundaries, always stopping at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge. Claude Code and Codex; Cursor retains manual handoff. |
+| Autopilot | Auto-advances the configured `autonomy.pipeline` past two-way-door boundaries, always stopping at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge. Claude Code and Codex. |
 
 ### Utility commands
 
@@ -611,8 +584,7 @@ required, and stops at the ones where it is.
 - **Arming works in every runtime; auto-advance supports Claude Code and Codex.**
   Claude dispatches through its Skill tool. Codex reads and executes the next local
   stage skill in the same conversation only after the shared boundary returns
-  `proceed: true`. Missing skills produce an explicit handoff; Cursor retains
-  manual stage starts. Approval, review, verification and cap gates still apply.
+  `proceed: true`. Missing skills produce an explicit handoff. Approval, review, verification and cap gates still apply.
   Sessions without a usable session ID share the degraded marker.
 - **Feedback follows ordinary work.** Entry/resume, material observations and
   closeout load the intent feedback procedure. Existing authorization is reused
@@ -631,7 +603,7 @@ Other harnesses give everyone the same starting point. harness-maker reads YOUR 
 |---|---|
 | **Project-tailored synthesis** | Profiler reads 12+ stack/framework/CI signals before any prompt. A 10-dimension interview locks the rest. A `Side` experiment and a `Production` service get *structurally different* harnesses (reviewer counts, workflow stages, security gates) — not the same set of files with different flags. |
 | **Edit-preserving upgrades** | Hand-edit any agent, skill, or CLAUDE.md. Block-merge markers (`@hm:user:*`) carry your edits across `--update`. No "your customisations will be overwritten" warning at the top of every file. |
-| **Multi-IDE single source** | One `harness.yaml` renders Claude Code, Cursor, and Codex CLI native assets. Foreign configs (`.cursor/rules/`, `AGENTS.md`, `.aider.conf.yml`, `.continue/`, `.github/copilot-instructions.md`) are absorbed on first run — no manual port. |
+| **Multi-IDE single source** | One `harness.yaml` renders Claude Code and Codex CLI native assets. Foreign configs (`.cursor/rules/`, `AGENTS.md`, `.aider.conf.yml`, `.continue/`, `.github/copilot-instructions.md`) are absorbed on first run — no manual port. |
 | **Privilege-separated reviewers** | Reviewer agents (`code`, `security`, `performance`, `concurrency`, `UX`) have read-only permissions — no `Write`, no `Edit`, no shell interpreters. The stage orchestrator applies fixes, preserving the boundary. Mechanical checks (lint/tests) gate the LLM reviewer before any token is spent. |
 
 harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static template gives you a starting point. harness-maker gives you a starting point that knows who it was created for, and can be updated without losing your changes.
@@ -683,7 +655,6 @@ spec:
   strictness: block          # block | warn — absent = preset default (Production block, Side warn)
 targets:                     # which runtimes to drive
   - claude-code
-  - cursor
   - codex
 recommended_model: opus
 
@@ -812,36 +783,13 @@ that produced the original bug.
 
 ## Targets
 
-`targets` is a multi-select. Choose `claude-code`, `cursor`, `codex`, or any combination. Claude Code is the default; Cursor and Codex add runtime-specific assets while preserving the same preset, workflows, skills, reviewers, and safety model.
+`targets` is a multi-select. Choose `claude-code`, `codex`, or both. Claude Code is the default; Codex adds runtime-specific assets while preserving the same preset, workflows, skills, reviewers, and safety model.
 
-### Cursor target
-
-Run `/harness-maker:make` and pick `targets: [cursor]` or `[claude-code, cursor]` at the interview. The renderer adds:
-
-- `.cursor/rules/harness.mdc` — always-on workflow rules with Cursor-legal frontmatter (`description` / `globs: []` / `alwaysApply: true`)
-- `.cursor/hooks.json` — Cursor-native hooks schema (lowercase camelCase keys, `version: 1`, flat `{matcher, command}`). **Deliberately different from where Claude Code reads hooks**, which is the `hooks` key inside `.claude/settings.json` (PascalCase, nested `{hooks:[…], matcher}`) — *not* `.claude/hooks/hooks.json`, which is a plugin-bundle path this project no longer renders. Each IDE reads only its own file; don't try to collapse them — Cursor will silently stop firing hooks. See `tests/cursor-compat/results-2026-05-08.md` for the kairos 0.5.7 forensic that proved the Cursor half empirically, and `docs/ARCHITECTURE.md` for why the Claude half of that same forensic was an untested assumption for two years.
-- `.cursor/mcp.json` — Cursor MCP server config. Populated from `harness.yaml.mcp_servers` (0.6.2+); defaults to `{"mcpServers": {}}` when no servers are configured. Inner shape (`command`, `args`, `env`) is type-validated on parse with a warning log when entries are dropped.
-
-`.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/` are single-source — Cursor 2.4+ reads them natively (forensic-verified). Hooks are the only asset that requires per-IDE rendering because the schemas diverge by design.
+**The Cursor target was removed in 0.63.0.** A `cursor` entry in `targets` (or `--targets`) is dropped with one warning per `make` run. Unedited `.cursor/` files from an earlier render are deleted; files you edited are kept and reported, and no longer maintained.
 
 ### Recommended model
 
-`harness.yaml.recommended_model` defaults to `opus` and propagates to agent frontmatter. Cursor users may override model selection in their IDE. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
-
-### Verification
-
-Per-release Cursor compatibility is tracked in `tests/cursor-compat/`:
-
-- `MANUAL_CHECKLIST.md` — A1–A4 (agent dispatch, hook fire, skill auto-discovery, slash command + Q&A loop) covering both IDEs
-- `RESULTS.md` — PASS/FAIL/PARTIAL grid you fill while running the checklist
-- `results-2026-05-08.md` — kairos 0.5.7 forensic that resolved Q-A (hooks discovery) and Q-B (commands discovery) without an IDE-driven manual run; future Cursor verifications append a new dated `results-*.md`
-- `fixture/` — minimal `.claude/` for opening directly in either IDE
-
-Automated CI guards the dual-schema invariants regardless of manual fixture runs:
-
-- `test_cursor_hooks_uses_lowercase_native_schema` — fails if `.cursor/hooks.json` accidentally adopts Claude PascalCase
-- `test_no_cursor_commands_rendered` — fails if a future change starts emitting `.cursor/commands/hm-*.md` mirrors (Cursor reads `.claude/commands/` natively)
-- `test_render_agents_have_structured_permissions_frontmatter` — fails if any agent template loses its `permissions.allow/deny` block (Cursor 2.5+ subagent permission inheritance gap)
+`harness.yaml.recommended_model` defaults to `opus` and propagates to agent frontmatter. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
 
 ### Codex target
 
@@ -872,8 +820,6 @@ rm .claude/harness.yaml
 # (previous .claude/ is auto-backed up to .backup-<ISO>/)
 ```
 
-`.cursor/rules/*.mdc` follow the same KEEP behavior. A future phase introduces a sidecar `.hm-meta.yaml` so harness-maker can hash-track Cursor assets without polluting Cursor frontmatter.
-
 **`@hm:harness:*` inverted markers (0.12.0)** — for foreign-AI-config files we generate post-import (`.cursor/rules/*.mdc`, `AGENTS.md`, `CLAUDE.md`, etc.), content INSIDE `@hm:harness:<id>` markers is harness-owned (replaced on every render); content OUTSIDE is user-owned (byte-for-byte preserved). The block-merge parser dispatches per file extension: HTML comments for `.md`/`.mdc`, `# @hm:harness:` for `.yml`/`.yaml`, top-level `_hm_harness` JSON key for `.json`. 0.11.x files (frontmatter `generated_by: harness-maker` + zero `@hm:harness:*` markers) are treated as wholly harness-owned on first encounter post-upgrade and re-rendered into the new marker family (ADR-009 amendment).
 
 ---
@@ -902,7 +848,6 @@ Run `/hm:health` to regenerate the dashboard on demand.
 Marketplace manifests are present for each runtime:
 
 - `.claude-plugin/plugin.json` — Claude Code plugin spec
-- `.cursor-plugin/plugin.json` — Cursor Marketplace spec
 - `.codex-plugin/plugin.json` — Codex plugin spec
 
 Listings are **pending**. Until then, install locally:
@@ -911,12 +856,10 @@ Listings are **pending**. Until then, install locally:
 # Any IDE — CLI install (recommended)
 uv tool install harness-maker          # from PyPI (when published)
 uv tool install /path/to/harness-maker # pre-PyPI, from clone
-harness-maker make . --targets claude-code,cursor,codex
+harness-maker make . --targets claude-code,codex
 
 # Claude Code — plugin mode (optional, enables /harness-maker:make command)
 claude --plugin-dir /path/to/harness-maker
-
-# Cursor — open the repo folder directly in Cursor as a workspace plugin
 
 # Codex — render Codex-native assets in your project harness
 harness-maker make . --targets codex
@@ -932,7 +875,7 @@ harness-maker is on `0.x` and stays there until enough projects depend on it tha
 
 - **Slash command names**: `/hm:make`, `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/harness-maker:make`.
 - **`harness.yaml` top-level keys**: `targets`, `preset`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
-- **Plugin manifest schemas**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — fields covered by each marketplace's published spec.
+- **Plugin manifest schemas**: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — fields covered by each marketplace's published spec.
 - **Local-only telemetry guarantee** — see [`PRIVACY.md`](PRIVACY.md). A documented-vs-actual mismatch is treated as a P0 bug.
 
 **Everything else may break in any 0.x.minor.** Internal Python APIs, file formats under `.claude/observability/`, template contents, ADR numbering, reviewer prompt phrasing, interview wording. Pin a specific release (`uvx --from harness-maker==0.17.0 ...`) if reproducibility matters before 1.0.
@@ -956,10 +899,10 @@ No. Every generated file carries a `content_hash` in its provenance frontmatter.
 `Side` is lean: 1 reviewer (code), verify-before-completion optional, worktree isolation off. `Production` is thorough: 5 reviewers, verify required, worktree isolation on, security on high-finding = block. Isolation is a single `worktree.enabled` boolean either preset can override (`--worktree` / `--no-worktree`, or `/hm:configure`). Both share the same anti-rot and caching defaults.
 
 **Q: Does anti-rot ever auto-apply?**
-Never. Every anti-rot item surfaces via a structured question (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) in `/hm:health`'s anti-rot layer. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.
+Never. Every anti-rot item surfaces via a structured question (`AskUserQuestion` in Claude Code) in `/hm:health`'s anti-rot layer. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.
 
-**Q: Can I use only Claude Code? Only Cursor? Only Codex?**
-Yes. `targets` is a multi-select at the interview. Claude Code uses `.claude/`; Cursor reuses most `.claude/` assets and adds `.cursor/`; Codex adds `AGENTS.md`, `.codex/`, and `.agents/skills/`.
+**Q: Can I use only Claude Code? Only Codex?**
+Yes. `targets` is a multi-select at the interview. Claude Code uses `.claude/`; Codex adds `AGENTS.md`, `.codex/`, and `.agents/skills/`.
 
 **Q: Do my prompts or telemetry leave my machine?**
 No. `metrics.jsonl`, dashboard, and security findings are written to `.claude/observability/` locally. Anti-rot crawls *read* public sources (Anthropic blog, arxiv, GitHub, OSV.dev) but never uploads anything.
@@ -993,12 +936,6 @@ harness-maker 0.12.0 introduces three tracks of personalization depth:
   harness on every render*. The `@hm:harness:*` block markers protect
   user customizations outside the marked regions.
 
-  **Cursor power-user constraint (ADR-003)** — single-source means
-  harness re-generates `.cursor/rules/` on every render. If you prefer
-  Cursor-only ownership of those rules, the only opt-out today is to
-  drop the `cursor` target from `harness.yaml.targets`. A dedicated
-  opt-out flag is TODO for a future PLAN.
-
 - **Adaptive (Track B start)** —
   `harness.yaml.adaptive.disable_telemetry: false` (opt-out per
   ADR-005) enables override telemetry. The personalization-audit layer
@@ -1021,9 +958,8 @@ All adaptive features run **100% locally** — no network calls
 - Track D (Foreign AI Config Migration): 6 config types, single-source re-render, `@hm:harness:*` markers, 0.11.x migration
 - Track B-start (Adaptive): override telemetry, the personalization-audit rubric, SessionStart drift surface
 
-**Next (0.13.0 — Track B completion + Cursor opt-out):**
+**Next (0.13.0 — Track B completion):**
 - Track B-extra: B2 permission-frequency capture + B3 reviewer-signal aggregation
-- `harness.yaml.cursor.opt_out_render` flag for Cursor power-users (ADR-003 documented constraint)
 - `github/spec-kit` external e2e fixture vendoring (currently pytest.skip with TODO)
 
 **Future (0.14.0+ — Track C strategic expansion, ranked by user value):**
@@ -1038,8 +974,7 @@ All adaptive features run **100% locally** — no network calls
 
 **Standing items:**
 - PyPI publish — remove the editable-from-clone requirement.
-- Claude Code + Cursor + Codex Marketplace listings — submit all plugin manifests.
-- `.hm-meta.yaml` sidecar for Cursor assets — enable hash-tracking of `.cursor/rules/*.mdc` without polluting Cursor frontmatter.
+- Claude Code + Codex Marketplace listings — submit all plugin manifests.
 - User-configurable anti-rot repo list — `harness.yaml.anti_rot.github_repos` to track additional Claude Code ecosystem repos beyond the default.
 - Demo screencast — record a first-install + `/hm:loop` session.
 - `Enterprise` preset — stricter security gates, `block` SPEC strictness that cannot be overridden.
@@ -1061,7 +996,7 @@ bash .claude-verify.sh all          # phase-by-phase exit criteria + final accep
 
 ## Contributing
 
-See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for adding skills/agents/presets, test patterns, and the PR checklist (including the 5-file version bump invariant).
+See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for adding skills/agents/presets, test patterns, and the PR checklist (including the 4-file version bump invariant).
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the 19 mechanisms (M1-M19) behind the system.
 

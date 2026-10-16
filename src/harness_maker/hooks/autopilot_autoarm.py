@@ -166,7 +166,7 @@ def main() -> int:
     """SessionStart entrypoint — always exit 0 (a hook must never block session start)."""
     try:
         payload = _payload_from_stdin()
-        if is_claude_copy_in_cursor(payload):
+        if is_claude_copy_in_cursor(payload, "harness_maker.hooks.autopilot_autoarm"):
             return 0
         arm_if_persistent(_project_root(payload), claude_session_id=_session_id(payload))
     except Exception:

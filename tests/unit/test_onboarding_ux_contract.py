@@ -30,7 +30,6 @@ def test_make_command_explains_receipt_safety_boundaries() -> None:
     text = _read("commands/make.md")
     required = [
         ".claude/",
-        ".cursor/",
         ".codex/",
         ".agents/skills/",
         "AGENTS.md",

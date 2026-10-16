@@ -14,8 +14,7 @@ verifies that:
 
 1. The PyPI install path (``uv tool install harness-maker``) actually
    produces a working ``harness-maker`` binary. BLOCKING.
-2. The Cursor git-clone install path lands the plugin manifest where
-   Cursor expects to find it. BLOCKING.
+2. (Removed in 0.63.0 with the Cursor target: the Cursor git-clone path.)
 3. Every ``Bash:`` install command in README.md / README.ko.md is in
    the explicit allowlist defined in ``_install_helpers.py``. BLOCKING.
    (Catches README drift: a new install command appearing without an
@@ -53,7 +52,6 @@ from tests.integration._install_helpers import (
     build_local_wheel,
     extract_bash_install_commands,
     install_via_uv_tool,
-    simulate_cursor_install,
 )
 
 INSTALL_CMD_GATE = pytest.mark.skipif(
@@ -128,32 +126,6 @@ def test_pypi_install_works(tmp_path: Path) -> None:
         f"`{binary} --help` did not advertise the `make` subcommand as a "
         f"command-list entry. cleaned stdout: {clean_stdout!r}\n"
         f"raw stderr: {result.stderr!r}"
-    )
-
-
-@INSTALL_CMD_GATE
-def test_cursor_git_clone_path_structure(tmp_path: Path) -> None:
-    """`git clone ~/.cursor/plugins/local/harness-maker` lands the
-    `.cursor-plugin/plugin.json` manifest Cursor needs.
-
-    Failure mode this catches: someone deletes or relocates
-    ``.cursor-plugin/plugin.json`` (or its parent directory) without
-    updating the README's Cursor branch. Without the manifest, Cursor
-    cannot register the plugin after reload.
-    """
-    repo = _repo_root()
-    install_path = simulate_cursor_install(repo, tmp_path / "harness-maker")
-    manifest = install_path / ".cursor-plugin" / "plugin.json"
-    assert manifest.is_file(), (
-        f"Cursor manifest missing at {manifest}. "
-        f"Contents of {install_path}: {list(install_path.iterdir())}"
-    )
-    # Verify the manifest parses + has the required name field.
-    import json
-
-    parsed = json.loads(manifest.read_text(encoding="utf-8"))
-    assert parsed.get("name") == "harness-maker", (
-        f"Cursor manifest at {manifest} has wrong name: {parsed.get('name')!r}"
     )
 
 

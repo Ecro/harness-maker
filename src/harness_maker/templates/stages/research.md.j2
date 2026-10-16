@@ -138,7 +138,7 @@ lenses under `## 🔍 Refinement Decisions` as "Discovery lens: ..."; if the
 section would otherwise be omitted, include only this short note.
 
 ### Phase 1 — Multi-source gathering
-{% if not is_codex and "cursor" not in config.targets %}
+{% if not is_codex %}
 
 **Fan out — all three in a SINGLE message, then read only the digests.** Their raw
 `grep`/`Read` output never enters this conversation; that is the saving.

@@ -59,9 +59,8 @@ def test_model_tier_members() -> None:
 
 def test_target_members() -> None:
     assert Target.CLAUDE_CODE.value == "claude-code"
-    assert Target.CURSOR.value == "cursor"
     assert Target.CODEX.value == "codex"
-    assert {m.value for m in Target} == {"claude-code", "cursor", "codex"}
+    assert {m.value for m in Target} == {"claude-code", "codex"}
 
 
 def test_atomic_stage_members() -> None:
@@ -133,13 +132,8 @@ def test_harness_config_targets_default() -> None:
 
 
 def test_harness_config_targets_multi_select() -> None:
-    cfg = HarnessConfig(targets=[Target.CLAUDE_CODE, Target.CURSOR])
-    assert cfg.targets == [Target.CLAUDE_CODE, Target.CURSOR]
-
-
-def test_harness_config_targets_cursor_only() -> None:
-    cfg = HarnessConfig(targets=[Target.CURSOR])
-    assert cfg.targets == [Target.CURSOR]
+    cfg = HarnessConfig(targets=[Target.CLAUDE_CODE, Target.CODEX])
+    assert cfg.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 def test_harness_config_targets_empty_raises() -> None:
@@ -153,14 +147,20 @@ def test_harness_config_targets_invalid_value_raises() -> None:
         HarnessConfig.model_validate({"targets": ["not-a-real-target"]})
 
 
+def test_harness_config_rejects_the_removed_cursor_target() -> None:
+    """0.63.0: the model has no `cursor` member; parsers drop it before validation."""
+    with pytest.raises(ValidationError):
+        HarnessConfig.model_validate({"targets": ["cursor"]})
+
+
 def test_harness_config_targets_codex() -> None:
     cfg = HarnessConfig(targets=[Target.CODEX])
     assert cfg.targets == [Target.CODEX]
 
 
-def test_harness_config_targets_all_three() -> None:
-    cfg = HarnessConfig(targets=[Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX])
-    assert cfg.targets == [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+def test_harness_config_targets_both() -> None:
+    cfg = HarnessConfig(targets=[Target.CLAUDE_CODE, Target.CODEX])
+    assert cfg.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 def test_interview_answers_targets_codex() -> None:
@@ -362,8 +362,8 @@ def test_interview_answers_defaults() -> None:
 
 
 def test_interview_answers_targets_multi_select() -> None:
-    ans = InterviewAnswers(targets=[Target.CLAUDE_CODE, Target.CURSOR])
-    assert ans.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+    ans = InterviewAnswers(targets=[Target.CLAUDE_CODE, Target.CODEX])
+    assert ans.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 def test_interview_answers_targets_empty_raises() -> None:

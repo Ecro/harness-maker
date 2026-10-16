@@ -5,14 +5,12 @@
     superseding SPEC-world-model-followups AC-013's 200): it now carries the routing of unnamed
     goal/metric/fact/status asks (mid-stage too, build/fix excluded), decision capture and the
     aside protocol (PLAN ADR-006/008), every turn — so the name appears at most twice and each arm
-    is terse. Codex invokes skills as `$<handle>`. Cursor's slash listing of project skills is
-    unverified; its arm shares the Claude Code form beside the spoken (bold) name, so
-    `world_model_cursor` (set by harness.mdc.j2) only keeps it English. Cursor and Codex arms stay English. -#}
+    is terse. Codex invokes skills as `$<handle>`; the Codex arm stays English. -#}
 {#- Callers that render with a partial config (tests, direct AGENTS.md renders) get the default. -#}
 {%- set wm = config.world_model if (config is defined and config.world_model is defined and config.world_model) else {"name": "Maker", "handle": "maker"} -%}
 ## World model
 
-{% if (config.locale | default('en')) == 'ko' and not (is_codex is defined and is_codex) and not (world_model_cursor is defined and world_model_cursor) -%}
+{% if (config.locale | default('en')) == 'ko' and not (is_codex is defined and is_codex) -%}
 **{{ wm.name }}** (`/{{ wm.handle }}`): 목표·지표·사실·현황 요청은 이름을 부르지 않아도, 단계 중에도 여기로 (만들기·고치기 제외). 진행 중 작업의 결정은 답하기 전 가장 하위 산출물에 쓴다. 곁답은 `{{ wm.name }} —`로 시작, 6줄 이내, 새 작업은 `## Queued asks` 에 쌓고 ↩ 단계·스텝으로 끝낸다.
 {%- else -%}
 **{{ wm.name }}** ({% if is_codex is defined and is_codex %}`${{ wm.handle }}`{% else %}`/{{ wm.handle }}`{% endif %}): goal, metric, fact, status asks, named or not, mid-stage too; not build/fix. Live-task decisions → its PLAN/SPEC/RESEARCH before replying. Mid-stage asides start `{{ wm.name }} —`, ≤ 6 lines; new work → `## Queued asks`; end ↩ stage·step.

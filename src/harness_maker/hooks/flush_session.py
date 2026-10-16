@@ -72,7 +72,7 @@ def run(cwd: Path | None = None) -> int:
         cwd = Path.cwd()
 
     payload = _read_stdin()
-    if is_claude_copy_in_cursor(payload):
+    if is_claude_copy_in_cursor(payload, "harness_maker.hooks.flush_session"):
         return 0
     trigger = str(payload.get("trigger", "unknown"))
     ts = _utcnow().strftime("%Y%m%dT%H%M%SZ")

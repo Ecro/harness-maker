@@ -267,6 +267,22 @@ _REMOVED_COMMANDS = {
     ".claude/stages/plan.md",
 }
 
+#: SPEC-hm-overhaul-p1 PR-C (2026-10-16): the Cursor target was removed, so these Cursor clauses
+#: left the question-tool lines. Only the clause is stripped from the baseline line before the
+#: compare; the rest of the line must still render, so a dispatch lost in the same edit fails.
+_CURSOR_CLAUSES = (
+    ("`AskUserQuestion` in Claude Code, `AskQuestion` in Cursor", "`AskUserQuestion`"),
+    ("`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code", "`AskUserQuestion`"),
+    ("`AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code)", "`AskUserQuestion`"),
+)
+
+
+def _without_cursor_clause(line: str) -> str:
+    for clause, kept in _CURSOR_CLAUSES:
+        line = line.replace(clause, kept)
+    return line
+
+
 _COLLAPSED_MULTILINE = {
     # SPEC-hm-light-lane-s2 (2026-10-14): the auto-advance block became a per-stage stub and its
     # shared procedure moved to `.claude/hm/autopilot-advance.md` (IRR-001). The stub keeps the
@@ -399,7 +415,11 @@ def test_rendered_claude_arm_still_matches_the_frozen_baseline(preset: Preset) -
         body = "\n".join([body, *(files.get(p, "") for p in pointed)])
         current = {_norm(line) for line in body.splitlines()}
         for line in lines:
-            if _norm(line) in current or line.strip() in _COLLAPSED_MULTILINE:
+            if (
+                _norm(line) in current
+                or _norm(_without_cursor_clause(line)) in current
+                or line.strip() in _COLLAPSED_MULTILINE
+            ):
                 continue
             unaccounted.append(f"{path}: {line.strip()[:100]}")
     assert not unaccounted, (

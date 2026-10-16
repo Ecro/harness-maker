@@ -52,7 +52,7 @@ files:
   body_sha256: 0cd2a9b5d4c1aa58ffc2518e3255c15dec09f1bcaeb68842943f3000b275877d
 - path: commands/hm/configure.md
   template: commands/hm/configure.md.j2
-  body_sha256: 21018297793864154d0b065fdd700302d101d6576fc503c3c65138255e901fc8
+  body_sha256: 2ff04e04865ef4efec52fb16bd7c0e26f4f3361bb858a9292bc88fe15896b2ee
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: f872a18d85a417aca20f333bc0ed4ba683be4e3f2c34357895af8436788f641d
@@ -64,7 +64,7 @@ files:
   body_sha256: 607113fb0d4b49d1bdee4c84d98e36f552fb7d78d584c70af78679f817322fed
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
-  body_sha256: 8cb01c899f55914258b01e856b75f0a36d0008f7c032c212af4faa174e6409d1
+  body_sha256: 9db136d83b269aa6c0a430c14b4f70de2bf5c1081db67ce275c7e1d1cef0daaf
 - path: commands/hm/metrics.md
   template: commands/hm/metrics.md.j2
   body_sha256: b6749fc52ac4b05518c0198200d63ab859a9d92eefa7edf202dcd425b7df9703

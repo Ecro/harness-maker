@@ -93,11 +93,10 @@ _MAX_HANDLE = "h" * HANDLE_MAX
 # name, handle, locale, CLI args. "ko" deliberately uses a non-default name so a template that
 # hard-codes "Maker" / "maker" fails there.
 _CONFIGS: dict[str, tuple[str, str, str, tuple[str, ...]]] = {
-    "en": ("Maker", "maker", "en", ("--targets", "claude-code,cursor,codex")),
-    "ko": ("비비", "bibi", "ko", ("--targets", "claude-code,cursor,codex")),
-    "en_max": (_MAX_NAME, _MAX_HANDLE, "en", ("--targets", "claude-code,cursor,codex")),
-    "ko_max": (_MAX_NAME, _MAX_HANDLE, "ko", ("--targets", "claude-code,cursor,codex")),
-    "cursor": ("Bibi", "bibi", "en", ("--targets", "cursor")),
+    "en": ("Maker", "maker", "en", ("--targets", "claude-code,codex")),
+    "ko": ("비비", "bibi", "ko", ("--targets", "claude-code,codex")),
+    "en_max": (_MAX_NAME, _MAX_HANDLE, "en", ("--targets", "claude-code,codex")),
+    "ko_max": (_MAX_NAME, _MAX_HANDLE, "ko", ("--targets", "claude-code,codex")),
 }
 
 
@@ -180,12 +179,12 @@ def _invocation(runtime: str, handle: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# AC-001 — intent-layer / project-knowledge are not model-invocable (Claude Code, Cursor)
+# AC-001 — intent-layer / project-knowledge are not model-invocable (Claude Code)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("skill", _KNOWLEDGE_SKILLS)
-@pytest.mark.parametrize("config", ["en", "cursor"], ids=["claude-code", "cursor"])
+@pytest.mark.parametrize("config", ["en"], ids=["claude-code"])
 def test_ac001_skills_not_model_invocable(
     config: str, skill: str, repo: Callable[[str], Path]
 ) -> None:
@@ -279,7 +278,6 @@ def test_ac003_stage_descriptions_gated(
 _PK_POINTERS = [
     ("en", "CLAUDE.md", "claude-code", ".claude/skills"),
     ("ko", "CLAUDE.md", "claude-code", ".claude/skills"),
-    ("en", ".cursor/rules/harness.mdc", "cursor", ".claude/skills"),
     ("en", "AGENTS.md", "codex", ".agents/skills"),
 ]
 
@@ -287,7 +285,7 @@ _PK_POINTERS = [
 @pytest.mark.parametrize(
     ("config", "rel", "runtime", "skills_dir"),
     _PK_POINTERS,
-    ids=["claude-en", "claude-ko", "cursor", "codex"],
+    ids=["claude-en", "claude-ko", "codex"],
 )
 def test_ac004_pointers_route_to_maker(
     config: str, rel: str, runtime: str, skills_dir: str, repo: Callable[[str], Path]
@@ -324,11 +322,10 @@ def test_ac004_help_rows_typed_only(
 _MAKER_ARMS = [
     ("en", "claude-code"),
     ("ko", "claude-code"),
-    ("cursor", "cursor"),
     ("en", "codex"),
     ("ko", "codex"),
 ]
-_MAKER_IDS = ["claude-code-en", "claude-code-ko", "cursor", "codex-en", "codex-ko"]
+_MAKER_IDS = ["claude-code-en", "claude-code-ko", "codex-en", "codex-ko"]
 
 
 def _maker(repo: Callable[[str], Path], config: str, runtime: str) -> str:
@@ -537,19 +534,16 @@ def test_ac010_injected_command_fail_soft(
 _POINTERS = [
     ("en", "CLAUDE.md", "claude-code", "en"),
     ("ko", "CLAUDE.md", "claude-code", "ko"),
-    ("en", ".cursor/rules/harness.mdc", "cursor", "en"),
-    ("ko", ".cursor/rules/harness.mdc", "cursor", "any"),
     ("en", "AGENTS.md", "codex", "en"),
     ("ko", "AGENTS.md", "codex", "any"),
 ]
-_POINTER_IDS = ["claude-en", "claude-ko", "cursor-en", "cursor-ko", "codex-en", "codex-ko"]
+_POINTER_IDS = ["claude-en", "claude-ko", "codex-en", "codex-ko"]
 _MAX_POINTERS = [
     ("en_max", "CLAUDE.md", "claude-code", "en"),
     ("ko_max", "CLAUDE.md", "claude-code", "ko"),
-    ("en_max", ".cursor/rules/harness.mdc", "cursor", "en"),
     ("en_max", "AGENTS.md", "codex", "en"),
 ]
-_MAX_IDS = ["claude-en-max", "claude-ko-max", "cursor-max", "codex-max"]
+_MAX_IDS = ["claude-en-max", "claude-ko-max", "codex-max"]
 
 # ADR-006/008 routing content. Each group accepts its en or ko wording; one member must appear.
 _ROUTING_GROUPS: dict[str, tuple[str, ...]] = {
@@ -600,8 +594,7 @@ def test_ac016_decision_capture_instructed(
     section = _pointer(repo(config), rel)
     assert any(lit in section for lit in _decision_literals(locale)), section
     maker_runtime = "codex" if runtime == "codex" else "claude-code"
-    maker_config = "cursor" if runtime == "cursor" and config == "en" else config
-    maker = _maker(repo, maker_config, maker_runtime)
+    maker = _maker(repo, config, maker_runtime)
     assert _DECISION_RULE in maker
     resume = _section(maker, "## Resume")
     assert _RESUME_LATEST in resume, resume
@@ -619,9 +612,8 @@ def test_ac017_mid_stage_aside(
     opener = _POINTER_OPENER_BY_LOCALE.get(locale, "asides start `{name} —`").format(name=name)
     assert opener in section, (opener, section)
     maker_runtime = "codex" if runtime == "codex" else "claude-code"
-    maker_config = "cursor" if runtime == "cursor" and config == "en" else config
-    maker = _maker(repo, maker_config, maker_runtime)
-    maker_name = _CONFIGS[maker_config][0]
+    maker = _maker(repo, config, maker_runtime)
+    maker_name = _CONFIGS[config][0]
     # The aside clause itself, not the pre-existing Voice line, must carry the opener.
     assert _MAKER_OPENER.format(name=maker_name) in maker
     missing = [c for c in _MAKER_ASIDE if c not in maker]

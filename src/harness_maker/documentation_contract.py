@@ -27,7 +27,6 @@ CORE_DOCS: Final[tuple[str, ...]] = (
 )
 VERSION_FILES: Final[tuple[str, ...]] = (
     ".claude-plugin/plugin.json",
-    ".cursor-plugin/plugin.json",
     ".codex-plugin/plugin.json",
     "pyproject.toml",
     "src/harness_maker/__init__.py",
@@ -80,7 +79,7 @@ class ContractError:
 
 
 def _version_values(root: Path) -> dict[str, str]:
-    manifests = VERSION_FILES[:3]
+    manifests = VERSION_FILES[:2]
     values = {
         path: str(json.loads((root / path).read_text(encoding="utf-8"))["version"])
         for path in manifests

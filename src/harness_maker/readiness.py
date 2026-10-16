@@ -1805,22 +1805,19 @@ def _dim_observability_setup(project_dir: Path) -> DimensionScore:
 
 
 def _dim_model_routing(project_dir: Path) -> DimensionScore:
-    """ADR-010 (PLAN-model-routing-multi-ide): 3 advisory sub-checks per IDE target.
+    """ADR-010 (PLAN-model-routing-multi-ide): advisory sub-checks per IDE target.
 
     All checks are advisory (score-only, not failure-grade):
     (a) Claude target + any agent_models.<*>.claude set → relies on Anthropic
         issue #43869 which is currently silently broken — subagents inherit
         parent model regardless. Render frontmatter anyway for forward-compat.
-    (b) Cursor target + any agent_models.<*>.cursor value matching a known
-        alias key (PRE-resolution) → user opted into alias-form; renderer
-        normalizes via CURSOR_MODEL_IDS, but the raw value in harness.yaml
-        may surprise future readers and pre-3.3 Cursor versions need
-        concrete IDs.
-    (c) Codex target + agents with reasoning_effort=None → the dominant cost
+    (b) Codex target + agents with reasoning_effort=None → the dominant cost
         lever isn't pinned; defaults will apply.
+
+    The weights are 50/50: the Cursor advisory left with the Cursor target (0.63.0), and the
+    dimension must still reach 100.
     """
     from harness_maker.io_utils import load_harness_yaml
-    from harness_maker.presets import CURSOR_MODEL_IDS
 
     signals: list[Signal] = []
     harness_yaml = project_dir / ".claude" / "harness.yaml"
@@ -1865,7 +1862,7 @@ def _dim_model_routing(project_dir: Path) -> DimensionScore:
             _signal(
                 "claude_subagent_routing_43869",
                 claude_ok,
-                33,
+                50,
                 "no per-agent claude overrides"
                 if claude_ok
                 else (
@@ -1888,51 +1885,13 @@ def _dim_model_routing(project_dir: Path) -> DimensionScore:
             _signal(
                 "claude_subagent_routing_43869",
                 True,
-                33,
+                50,
                 "claude-code not in targets — check N/A",
                 None,
             )
         )
 
-    # (b) Cursor — alias vs concrete-ID advisory (inspects PRE-resolution raw values)
-    has_cursor = "cursor" in targets_set
-    cursor_alias_overrides = [
-        name
-        for name, spec in raw_agent_models.items()
-        if isinstance(spec, dict)
-        and isinstance(spec.get("cursor"), str)
-        and spec["cursor"] in CURSOR_MODEL_IDS
-    ]
-    if has_cursor:
-        cursor_ok = not cursor_alias_overrides
-        signals.append(
-            _signal(
-                "cursor_alias_vs_concrete_id",
-                cursor_ok,
-                33,
-                "no alias-form cursor values in agent_models"
-                if cursor_ok
-                else (
-                    f"{len(cursor_alias_overrides)} agent(s) wrote alias-form "
-                    f"`cursor:` (renderer normalizes via CURSOR_MODEL_IDS; "
-                    f"works on Cursor 3.3+; on 2.4-3.2 the renderer emits "
-                    f"concrete IDs so this is informational only)."
-                ),
-                None,
-            )
-        )
-    else:
-        signals.append(
-            _signal(
-                "cursor_alias_vs_concrete_id",
-                True,
-                33,
-                "cursor not in targets — check N/A",
-                None,
-            )
-        )
-
-    # (c) Codex — reasoning_effort coverage
+    # (b) Codex — reasoning_effort coverage
     has_codex = "codex" in targets_set
     codex_missing_effort = [
         name
@@ -1952,11 +1911,11 @@ def _dim_model_routing(project_dir: Path) -> DimensionScore:
             _signal(
                 "codex_reasoning_effort_coverage",
                 codex_ok,
-                34,
+                50,
                 "all per-agent codex overrides set reasoning_effort, or no overrides"
                 if codex_ok
                 else (
-                    f"{len(codex_missing_effort)} agent(s) override claude/cursor "
+                    f"{len(codex_missing_effort)} agent(s) override claude "
                     f"but not codex.reasoning_effort — Codex default profile applies. "
                     f"See `codex -p cheap` / `codex -p deep` (installed by "
                     f"`harness-maker make` into ~/.codex/config.toml) "
@@ -1970,7 +1929,7 @@ def _dim_model_routing(project_dir: Path) -> DimensionScore:
             _signal(
                 "codex_reasoning_effort_coverage",
                 True,
-                34,
+                50,
                 "codex not in targets — check N/A",
                 None,
             )

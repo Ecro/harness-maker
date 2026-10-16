@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import ast
+import re
 import subprocess
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -787,3 +790,106 @@ def test_mark_tested_resolves_class_nested_nodeid(tmp_path: Path) -> None:
     errors = mark_tested(yp, md, {"AC-001": ["tests/test_cls.py::TestC::test_member"]})
     assert errors == [], errors  # exact class nodeid resolves
     assert load(yp).ac[0].pending_test is False
+
+
+# ── Every bound test id resolves (SPEC-hm-overhaul-p1 PR-C review round 1) ────
+#
+# PR-C deleted Cursor tests that three other SPECs still listed as `test_ids`; nothing noticed,
+# because `mark-tested` only checks the ids it is adding. This resolves every bound id in every
+# SPEC statically (file, then class, then function, by AST) — the nodes `pytest --collect-only`
+# would find, without paying for a full collection inside the suite.
+
+_REPO = Path(__file__).resolve().parents[2]
+#: Ids already dead when this guard landed (2026-10-16), grouped by why. Shrink-only.
+_KNOWN_DEAD_FILE = Path(__file__).with_name("spec_test_ids_known_dead.txt")
+
+
+def _ids_known_dead() -> dict[str, frozenset[str]]:
+    groups: dict[str, set[str]] = {}
+    current = ""
+    for raw in _KNOWN_DEAD_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1]
+            groups[current] = set()
+        else:
+            groups[current].add(line)
+    return {k: frozenset(v) for k, v in groups.items()}
+
+
+def _ids_bound() -> dict[str, list[str]]:
+    """Live, already-tested bindings: superseded and still-pending ACs owe nothing yet."""
+    found: dict[str, list[str]] = {}
+    for path in sorted((_REPO / "specs").glob("SPEC-*.machine.yaml")):
+        doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        for ac in doc.get("ac") or []:
+            if ac.get("superseded_by") or ac.get("pending_test"):
+                continue
+            for test_id in ac.get("test_ids") or []:
+                found.setdefault(str(test_id), []).append(f"{path.name}:{ac.get('id')}")
+    return found
+
+
+@cache
+def _ids_names(path: Path) -> frozenset[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.ClassDef):
+            names.add(node.name)
+            for item in node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    names.add(f"{node.name}::{item.name}")
+    return frozenset(names)
+
+
+def _ids_resolves(test_id: str) -> bool:
+    file, _, rest = test_id.partition("::")
+    path = _REPO / file
+    if not path.is_file():
+        return False
+    if not rest:
+        return True
+    return re.sub(r"\[.*\]$", "", rest) in _ids_names(path)
+
+
+def _ids_dead() -> dict[str, list[str]]:
+    return {t: owners for t, owners in _ids_bound().items() if not _ids_resolves(t)}
+
+
+def _ids_known() -> frozenset[str]:
+    return frozenset().union(*_ids_known_dead().values())
+
+
+def test_bound_ids_guard_sees_real_bindings() -> None:
+    bound = _ids_bound()
+    assert len(bound) > 500, len(bound)
+    rebound = "tests/unit/test_render.py::test_render_settings_hooks_gate_spec_gate_on_strictness"
+    assert rebound in bound
+    assert _ids_resolves(rebound)
+    # Negative control: a deleted test, a missing file, and a method named without its class.
+    assert not _ids_resolves("tests/unit/test_render.py::test_no_such_test")
+    assert not _ids_resolves("tests/unit/no_such_file.py::test_x")
+    assert not _ids_resolves("tests/unit/hooks/test_loop_gate.py::test_found_in_cwd")
+    assert _ids_resolves("tests/unit/hooks/test_loop_gate.py::TestFindMarker::test_found_in_cwd")
+    assert set(_ids_known_dead()) == {"pr-c-cursor", "pre-existing"}
+
+
+def test_every_bound_test_id_resolves() -> None:
+    new = {t: o for t, o in _ids_dead().items() if t not in _ids_known()}
+    assert not new, (
+        "SPEC test_ids name tests that do not exist (bind the replacement with `hm spec_machine "
+        "mark-tested`, or `retire` the AC):\n"
+        + "\n".join(f"  {t}  <- {', '.join(o)}" for t, o in sorted(new.items()))
+    )
+
+
+def test_known_dead_test_ids_are_still_dead() -> None:
+    revived = sorted(_ids_known() - set(_ids_dead()))
+    assert not revived, (
+        f"these resolve (or are unbound) now; drop them from {_KNOWN_DEAD_FILE.name}: {revived}"
+    )

@@ -161,19 +161,19 @@ def test_interview_ref_folders_multiple_with_glob_override(
 def test_interview_targets_multi_select_input(monkeypatch: pytest.MonkeyPatch) -> None:
     """Comma-separated input parses into list[Target]; whitespace tolerated."""
     inputs: Iterator[str] = iter(
-        ["", "", "claude-code, cursor", "", "", "", "", "", "", "", "", ""],
+        ["", "", "claude-code, codex", "", "", "", "", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
-    assert result.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+    assert result.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
-def test_interview_targets_cursor_only_input(monkeypatch: pytest.MonkeyPatch) -> None:
-    """User can pick Cursor as the sole target."""
+def test_interview_targets_removed_cursor_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    """0.63.0: `cursor` alone is dropped and the answer falls back to [claude-code]."""
     inputs: Iterator[str] = iter(["", "", "cursor", "", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
-    assert result.targets == [Target.CURSOR]
+    assert result.targets == [Target.CLAUDE_CODE]
 
 
 def test_interview_targets_unknown_value_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -194,14 +194,14 @@ def test_interview_targets_codex_input(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.targets == [Target.CODEX]
 
 
-def test_interview_targets_all_three(monkeypatch: pytest.MonkeyPatch) -> None:
-    """All three targets in comma-separated input."""
+def test_interview_targets_drops_removed_cursor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 0.62-style three-target answer keeps the two live targets."""
     inputs: Iterator[str] = iter(
         ["", "", "claude-code, cursor, codex", "", "", "", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
-    assert result.targets == [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+    assert result.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 def test_parse_targets_codex(tmp_path: pathlib.Path) -> None:
@@ -213,15 +213,15 @@ def test_parse_targets_codex(tmp_path: pathlib.Path) -> None:
     assert result.targets == [Target.CODEX]
 
 
-def test_parse_targets_all_three(tmp_path: pathlib.Path) -> None:
-    """answers_from_harness_yaml round-trips all three targets."""
+def test_parse_targets_drops_removed_cursor(tmp_path: pathlib.Path) -> None:
+    """answers_from_harness_yaml drops a 0.62 `cursor` entry and keeps the rest."""
     harness_yaml = tmp_path / "harness.yaml"
     harness_yaml.write_text(
         "locale: en\npreset: Side\ntargets:\n  - claude-code\n  - cursor\n  - codex\n"
     )
     result = answers_from_harness_yaml(harness_yaml)
     assert result is not None
-    assert result.targets == [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+    assert result.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 def test_interview_autoloop_skips_ref_folders() -> None:

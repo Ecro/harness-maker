@@ -3,15 +3,15 @@
 End-to-end on-disk verification that the Phase 1+3 (hooks.json schema-aware
 3-way merge) and Phase 2 (TOML/sh marker-aware MERGE_BLOCK) and Phase 4
 (`.backup-*/` auto-gitignore) work survive a realistic brownfield re-render
-across the three target file trees (claude-code, cursor, codex).
+across the target file trees (claude-code, codex).
 
 Per CLAUDE.md §테스트 정책 + checkpoint 8 of §"무언가를 고치거나 개선하기 전에":
 - This module is the **automated half** of Phase 7. It exercises render →
   reconcile → manifest → sweep_orphans chains directly with realistic
   synthesize() blueprints.
-- The **manual half** — verifying that Cursor IDE / Codex CLI actually FIRE
-  the merged hooks at runtime — lives in `tests/cursor-compat/MANUAL_CHECKLIST.md`
-  and is user-only (no IDE driver automation per CLAUDE.md ckpt 8).
+- The **manual half** — verifying that Codex CLI actually FIRES
+  the merged hooks at runtime — is user-only (no IDE driver automation per
+  CLAUDE.md ckpt 8).
 
 Gated by ``INTEGRATION=1`` to avoid loading on every unit test run.
 """
@@ -122,37 +122,6 @@ def test_e2e_claude_hooks_json_user_entry_survives(tmp_path: Path) -> None:
     assert "my-custom-audit-logger" in commands
     # Shipped telemetry entry still there (template-wins on overlap)
     assert any("telemetry" in c for c in commands)
-
-
-@INTEGRATION_GATE
-def test_e2e_cursor_hooks_json_user_entry_survives(tmp_path: Path) -> None:
-    """Cursor flat lowercase: user-added preToolUse entry survives.
-
-    Cursor schema differs (flat {matcher, command} vs Claude nested) — ADR-006
-    schema dispatch must route this to flat identity (matcher_or_empty, command).
-    """
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    _render_initial(target_dir, [Target.CLAUDE_CODE, Target.CURSOR])
-
-    cursor_hooks = project_root / ".cursor" / "hooks.json"
-    assert cursor_hooks.is_file()
-
-    initial = json.loads(cursor_hooks.read_text(encoding="utf-8"))
-    initial["hooks"].setdefault("preToolUse", []).append(
-        {"matcher": "Read", "command": "my-cursor-custom-pretool"},
-    )
-    cursor_hooks.write_text(json.dumps(initial, indent=2) + "\n", encoding="utf-8")
-
-    _render_brownfield(project_root, target_dir, [Target.CLAUDE_CODE, Target.CURSOR])
-
-    after = json.loads(cursor_hooks.read_text(encoding="utf-8"))
-    pretool_commands = [e["command"] for e in after["hooks"]["preToolUse"]]
-    assert "my-cursor-custom-pretool" in pretool_commands
-    # Shipped permission-gate entry still present
-    assert any("permission_gate" in c for c in pretool_commands)
 
 
 @INTEGRATION_GATE

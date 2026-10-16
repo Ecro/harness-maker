@@ -7,14 +7,13 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-orange)](https://code.claude.com)
-[![Cursor 2.4+ (3.2+ rec)](https://img.shields.io/badge/Cursor-2.4%2B_(3.2%2B_rec)-black)](https://cursor.com)
 [![Built with uv](https://img.shields.io/badge/built_with-uv-261230.svg)](https://docs.astral.sh/uv/)
 
 [English](https://github.com/Ecro/harness-maker/blob/main/README.md) · **한국어**
 
 > **프로젝트마다 다른 하네스 — 당신 프로젝트로부터 빚어지고, 절대 generic 하지 않습니다.**
 
-> **Version**: 0.62.0
+> **Version**: 0.63.0
 >
 > 현재 릴리스 계약(소스에서 자동 검증):
 >
@@ -37,7 +36,7 @@
 > <!-- hm-doc-contract:mechanisms:end -->
 >
 > <!-- hm-doc-contract:version-files:start -->
-> **릴리스 버전 파일:** `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
+> **릴리스 버전 파일:** `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
 > <!-- hm-doc-contract:version-files:end -->
 
 **프로젝트별 개인화** · 등급 게이트 · 자가 진화 · 멀티 IDE
@@ -58,12 +57,12 @@
 
 ## 30초 만에 시도하기
 
-Claude Code · Cursor · Codex CLI 중 하나의 AI 에이전트에 아래 프롬프트를 붙여넣으세요. **프로파일러가 12개 이상의 스택 신호를 읽고 10차원 인터뷰가 당신 프로젝트 전용 하네스를 합성합니다** — generic 템플릿이 아닙니다. IDE를 자동 감지하고, harness-maker 를 Bash로 설치한 뒤, 인터뷰를 진행하고 personalization tier 리포트까지 출력합니다.
+Claude Code · Codex CLI 중 하나의 AI 에이전트에 아래 프롬프트를 붙여넣으세요. **프로파일러가 12개 이상의 스택 신호를 읽고 10차원 인터뷰가 당신 프로젝트 전용 하네스를 합성합니다** — generic 템플릿이 아닙니다. IDE를 자동 감지하고, harness-maker 를 Bash로 설치한 뒤, 인터뷰를 진행하고 personalization tier 리포트까지 출력합니다.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
 
-You are an AI agent running inside Claude Code, Cursor, or Codex CLI.
+You are an AI agent running inside Claude Code or Codex CLI.
 Detect which one (silently — don't ask me), install harness-maker via
 Bash (NOT slash commands typed by me), then invoke harness-maker:make and
 hm:health via the Skill tool. Conduct the conversation in the language of
@@ -73,8 +72,6 @@ Install path per IDE:
   Claude Code:  Bash  claude plugin marketplace add Ecro/harness-maker
                 Bash  claude plugin install harness-maker@harness-maker
                 Then tell me: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
-  Cursor:       Bash  git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
-                Then tell me: "Reload the Cursor window (Ctrl+Shift+P → Reload Window)."
   Codex CLI:    Bash  codex plugin marketplace add Ecro/harness-maker
                 Bash  codex plugin add harness-maker@harness-maker
                 Load the bundled hm-make skill; it resolves the installed
@@ -102,7 +99,7 @@ action items).
 | 🧭 | **사람이 소유 (Human-owned)** | *어떻게*는 AI 가 최대한 가져가고, *왜*·*무엇을*·트레이드오프는 당신이 소유. `/hm:spec` 이 코드 이전에 의도·범위·`irreversible_decisions` 를 당신과 함께 lock 하고, autopilot 은 사람의 결정이 필요한 stage 에서 멈추며, intent 기록은 당신의 동의로만 바뀜. **아직 출하 전:** 시스템의 가정이 어떻게 바뀌었는지 wrapup 이 요약해, diff 를 읽지 않고도 변경을 설명할 수 있게 하는 기능. |
 | 🌱 | **자기진화 (Self-evolving)** | agent, skill, CLAUDE.md 어디든 손편집 — block-merge 마커가 `--update` 너머에서도 보존. 메모리가 프로젝트 고유 패턴을 축적; 반복되는 실패는 새 가드레일을 자동 제안. |
 | 🌀 | **무방부패 (Anti-rot)** | 4개 소스 주간 크롤 (Anthropic, GitHub releases, arXiv, OSV CVE). 사용자 accept/reject 이력으로 적응형 relevance filter. 항상 수동 확인 — silent auto-apply 경로는 존재하지 않음. |
-| 🎛️ | **다중 IDE (Multi-IDE)** | Claude Code + Cursor + Codex. 한 개의 `harness.yaml`, 세 개의 target-native 렌더. 기존 Cursor rules / Aider 설정 / Copilot instructions는 첫 실행에서 흡수 — 수동 포팅 0. |
+| 🎛️ | **다중 IDE (Multi-IDE)** | Claude Code + Codex. 한 개의 `harness.yaml`, 두 개의 target-native 렌더. 기존 Cursor rules / Aider 설정 / Copilot instructions는 첫 실행에서 흡수 — 수동 포팅 0. |
 
 ---
 
@@ -139,9 +136,9 @@ action items).
 | 차원 | 선택지 | 영향 |
 |---|---|---|
 | **Preset** | `Side` · `Production` | Reviewer 개수 (1 vs 5), 워크플로 stage 수, 보안 게이트 깊이, verify-required 플래그 |
-| **Targets** | `claude-code` · `cursor` · `codex` (다중 선택) | 어떤 IDE-native 자산 트리가 렌더되나 |
+| **Targets** | `claude-code` · `codex` (다중 선택) | 어떤 IDE-native 자산 트리가 렌더되나 |
 | **Locale** | `en` · `ko` · 임의 태그 | 인터뷰 텍스트 + 사용자 대면 에러 메시지 |
-| **World model 이름** | 기본 `Maker` (`/maker`) · 임의 이름 | 작업을 시작하는 단 하나의 skill 이름 — `/<handle>` (Claude Code, Cursor), `$<handle>` (Codex), 또는 이름으로 부르기. `intent-layer` / `project-knowledge` 로 가는 유일한 입구이며, 두 skill 은 그 외엔 직접 입력할 때만 실행된다. locale 직후에 묻고 `harness.yaml` 의 `world_model.name` / `world_model.handle` 에 저장 (없으면 `Maker` / `maker`). [Maker](#maker--world-model-입구) 참조 |
+| **World model 이름** | 기본 `Maker` (`/maker`) · 임의 이름 | 작업을 시작하는 단 하나의 skill 이름 — `/<handle>` (Claude Code), `$<handle>` (Codex), 또는 이름으로 부르기. `intent-layer` / `project-knowledge` 로 가는 유일한 입구이며, 두 skill 은 그 외엔 직접 입력할 때만 실행된다. locale 직후에 묻고 `harness.yaml` 의 `world_model.name` / `world_model.handle` 에 저장 (없으면 `Maker` / `maker`). [Maker](#maker--world-model-입구) 참조 |
 | **Reviewers / skills** | Preset default + 오버라이드 | 어떤 reviewer가 활성화되고 agent model tier가 어떻게 되나 (agent·skill 전량은 항상 설치) |
 | **Ref folders** | 경로 + glob 쌍 | `refdocs-search` skill로 검색 가능한 외부 문서 |
 | **Sibling repos** | 상대 경로 | 같은 하네스 세션을 공유할 인접 repo |
@@ -158,7 +155,6 @@ action items).
 
 ```
 .claude/                 ← 단일 source: agents, skills, commands/hm/, hooks, memory, observability
-├── .cursor/             ← + Cursor-native rules, hooks, mcp.json    (cursor target일 때)
 ├── .codex/              ← + Codex-native config.toml, agent TOML들   (codex target일 때)
 ├── AGENTS.md            ← + Codex root instructions                  (codex target일 때)
 └── .agents/skills/      ← + Codex skill 경로                          (codex target일 때)
@@ -173,7 +169,7 @@ action items).
 
 > **결과:** 사용하는 모든 IDE가 같은 agent, 같은 skill, 같은 워크플로를 native로 봄. 수동 포팅 0.
 
-Codex에서는 생성된 단계 스킬을 `$hm-research 주제`, `$hm-spec task-slug`, `$hm-execute task-slug`로 호출합니다. Claude Code와 Cursor에서는 `/hm:research`, `/hm:spec`, `/hm:execute`를 사용합니다. research 다음은 spec이며, execute가 구현 전에 PLAN을 작성합니다. 별도의 plan 단계는 제거되었습니다. 기존 프로젝트 안내를 갱신하려면 플러그인 업데이트 후 하네스를 재생성하세요.
+Codex에서는 생성된 단계 스킬을 `$hm-research 주제`, `$hm-spec task-slug`, `$hm-execute task-slug`로 호출합니다. Claude Code에서는 `/hm:research`, `/hm:spec`, `/hm:execute`를 사용합니다. research 다음은 spec이며, execute가 구현 전에 PLAN을 작성합니다. 별도의 plan 단계는 제거되었습니다. 기존 프로젝트 안내를 갱신하려면 플러그인 업데이트 후 하네스를 재생성하세요.
 
 **실행 경험 — 끝까지 가이드.** `.claude/`가 이미 있으면 `/hm:make`는 dry-run **미리보기**(NEW / REPLACE / KEEP / MERGE — KEEP = 내 편집 보존)를 보여주고 덮어쓰기 전에 확인을 받습니다; 신규 설치는 바로 적용. **git worktree 안 씀** — backup + reconcile이 덮어쓰기 우려를 커버하므로 비-git 프로젝트도 작동. 적용 후 무엇이 바뀌었는지 사용자 언어로 **설명**(깨끗한 첫 설치는 조용히, 실제 P0/P1이 있으면 loud). 그리고 **마지막 한 걸음**: git 상태를 감지해 — *중립적으로, 권유 없이* — 하네스를 **commit**(clone하는 팀원이 받도록)할지 **gitignore**(로컬 전용)할지 묻습니다. churn과 `.backup-*`은 항상 gitignore되어 commit이 깨끗하고, 결정은 **git 상태에서 추론**되므로 재렌더가 다시 묻지 않습니다. 전체 흐름: [**docs/HOW-IT-WORKS.ko.md → 렌더 파이프라인**](docs/HOW-IT-WORKS.ko.md#렌더-파이프라인).
 
@@ -205,7 +201,7 @@ Codex에서는 생성된 단계 스킬을 `$hm-research 주제`, `$hm-spec task-
 
 ### Universal Bootstrap Prompt
 
-> **AI 에이전트에 paste 하세요 — 현재 IDE (Claude Code / Cursor / Codex)를 감지해서
+> **AI 에이전트에 paste 하세요 — 현재 IDE (Claude Code / Codex)를 감지해서
 > 해당 IDE의 plugin install 을 Bash로 실행하고 (사용자가 슬래시 명령을 칠 필요 없음)
 > 하네스까지 부트스트랩합니다.** 한 번의 paste, 모든 지원 IDE 대응.
 
@@ -214,17 +210,16 @@ Codex에서는 생성된 단계 스킬을 `$hm-research 주제`, `$hm-spec task-
 | IDE | Paste | 타이핑할 슬래시 | GUI / restart 액션 | 총 액션 |
 |---|---|---|---|---|
 | **Claude Code** | 1 | 1 (`/reload-plugins`) | 짧은 메시지 1개 (예: `go`) — Claude re-trigger 용 | **3** |
-| **Cursor** | 1 | 0 | 1 (`Ctrl+Shift+P → Reload Window`) | **2-3** |
 | **Codex CLI** | 1 | 0 | 0–1 (새 스킬 검색에 새 대화가 필요한 경우) | **2** |
 
 > **Codex CLI 설치 경로.** 네이티브 설치로 `hm-make`와 `hm-update` 스킬을 사용할 수 있습니다. 스킬이 `uv`로 플러그인 릴리스에 맞는 Python 엔진을 실행하므로 Claude Code 캐시가 필요하지 않습니다. 프로젝트 생성은 설치 후 `hm-make`에서 수행합니다.
 
-> **첫 사용 시 Bash 승인 가이드.** Claude Code / Cursor / Codex CLI 가 아래 prompt 의 install 명령에 대해 Bash 권한을 요청. prompt 에 명시된 **정확한 명령만** 승인 (`claude plugin install harness-maker@harness-maker`, `git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker`, 또는 `uv tool install harness-maker`). **`Bash(*)` 전체 허용은 거부** — AI 가 다른 명령을 요청하면 중지하고 검토. Cursor clone 은 public repo 의 현재 `main` 브랜치를 받고 이후 `git pull` 업데이트는 무결성 검증되지 않음 — threat model 에 따라 release tag 수동 pin 권장.
+> **첫 사용 시 Bash 승인 가이드.** Claude Code / Codex CLI 가 아래 prompt 의 install 명령에 대해 Bash 권한을 요청. prompt 에 명시된 **정확한 명령만** 승인 (`claude plugin install harness-maker@harness-maker`, 또는 `uv tool install harness-maker`). **`Bash(*)` 전체 허용은 거부** — AI 가 다른 명령을 요청하면 중지하고 검토.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
 
-You are an AI agent running inside one of: Claude Code, Cursor, or Codex CLI.
+You are an AI agent running inside one of: Claude Code or Codex CLI.
 Detect which one (silently — do NOT ask me), run the matching plugin install
 via Bash (NOT slash commands typed by me), then invoke harness-maker:make
 and hm:health via the Skill tool.
@@ -232,8 +227,6 @@ and hm:health via the Skill tool.
 Step 1 — Detect the host IDE (silent):
   - Claude Code  → $CLAUDE_CODE is set, or ~/.claude/ exists, or you have
                    the Bash tool with access to the `claude` CLI
-  - Cursor       → $CURSOR_SESSION is set, or ~/.cursor/ exists, or you have
-                   Cursor's plugin manager available
   - Codex CLI    → $CODEX_SESSION is set, or ~/.codex/ exists, or the
                    `codex` command is on PATH
 
@@ -244,10 +237,6 @@ harness-maker:make skill is already available):
     Bash: claude plugin marketplace add Ecro/harness-maker
     Bash: claude plugin install harness-maker@harness-maker
     Then tell me verbatim: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
-
-  IF Cursor:
-    Bash: git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
-    Then tell me verbatim: "Reload the Cursor window now (Ctrl+Shift+P → Reload Window)."
 
   IF Codex CLI:
     Bash: codex plugin marketplace add Ecro/harness-maker
@@ -301,21 +290,6 @@ codex plugin add harness-maker@harness-maker
 
 Claude second opinion은 `.claude/harness.yaml`의 `second_opinion.models: [claude]`로 켭니다. `second_opinion.claude.model`은 기본적으로 CLI 선택을 따르고, `timeout`은 양수 초 단위이며 기본 300입니다. 인증된 `claude` CLI가 `--safe-mode`를 지원해야 합니다. 지정한 문맥만 stdin으로 전달하고 도구는 비활성화합니다. 인증·지원 기능 문제는 skip으로 기록하고, 잘못된 응답은 실패로 처리합니다.
 
-#### Cursor (Team marketplace 임포트 또는 local symlink)
-
-Cursor의 공식 plugin marketplace는 큐레이션 방식 ([cursor.com/marketplace/publish](https://cursor.com/marketplace/publish), submit-and-review)이고 GitHub 직접 install은 Cursor 2.5+ 로드맵상 미지원. 현재 동작하는 두 경로:
-
-**A. Team marketplace (Team / Enterprise plan):**
-Dashboard → Settings → Plugins → Team Marketplaces → Import → `https://github.com/Ecro/harness-maker` 붙여넣기 → 팀원에게 푸시.
-
-**B. Local 개발 install (커뮤니티 패턴):**
-
-```bash
-git clone https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
-```
-
-Cursor 재시작 (Ctrl+Shift+P → "Reload Window")으로 plugin 인식.
-
 #### PyPI (IDE plugin 미사용 — CI / headless / 스크립트)
 
 IDE plugin 경로가 맞지 않을 때 (CI 스크립트, headless 서버, 자동화, 또는 Python CLI 도구 선호):
@@ -332,7 +306,7 @@ uv tool install harness-maker
 ```bash
 cd your-project
 harness-maker profile . --json
-harness-maker make . --preset Production --locale ko --targets claude-code,cursor
+harness-maker make . --preset Production --locale ko --targets claude-code,codex
 ```
 
 일회성 렌더는 가능하지만, IDE 내 슬래시 명령 (`/hm:health`, `/hm:spec`, `/hm:execute` 등)은 IDE plugin이 로드해야 나타납니다.
@@ -352,7 +326,7 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 
 ## Maker — world model 입구
 
-World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent** (목표·지표·열린 질문), 코드에 드러나지 않는 **프로젝트 사실**, 그리고 **작업 상태** (어떤 작업이 어느 단계에 있는지). Maker 는 작업을 시작하는 단 하나의 skill 이다. 인터뷰가 locale 직후에 이름을 정하고, 기본값은 `Maker` — `/maker` (Claude Code, Cursor), `$maker` (Codex), 또는 이름으로 불러서 호출한다.
+World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent** (목표·지표·열린 질문), 코드에 드러나지 않는 **프로젝트 사실**, 그리고 **작업 상태** (어떤 작업이 어느 단계에 있는지). Maker 는 작업을 시작하는 단 하나의 skill 이다. 인터뷰가 locale 직후에 이름을 정하고, 기본값은 `Maker` — `/maker` (Claude Code), `$maker` (Codex), 또는 이름으로 불러서 호출한다.
 
 | 이렇게 말하면 | 경로 |
 |---|---|
@@ -362,7 +336,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 | 목표·지표·가정·intent; 프로젝트 사실 | **Goals and facts** — intent 또는 knowledge 절차로 기록 |
 | "뭐 하지?", "what next?" | **Briefing** + 선택지 2–4개; 어떤 단계도 시작하지 않음 |
 
-**유일한 입구.** `intent-layer` 와 `project-knowledge` 는 모델이 스스로 호출하지 않는다. `/intent-layer` 나 `/project-knowledge` (Codex 는 `$…`) 를 직접 입력하면 여전히 실행되고, 그 외에는 Maker 가 쓰기 전에 해당 절차를 읽는다. 쓰기 전에 묻는 규칙은 그대로다. `CLAUDE.md` / `AGENTS.md` / `.cursor/rules/harness.mdc` 에 항상 로드되는 `## World model` 포인터가 목표·지표·사실·현황 요청을 이름을 부르지 않아도, 단계 진행 중에도 Maker 로 보낸다. 일반적인 만들기·고치기 요청은 경로가 바뀌지 않는다. `/hm:` 단계는 여전히 직접 입력하거나 Maker, autopilot, `/hm:loop` 를 통해 실행된다.
+**유일한 입구.** `intent-layer` 와 `project-knowledge` 는 모델이 스스로 호출하지 않는다. `/intent-layer` 나 `/project-knowledge` (Codex 는 `$…`) 를 직접 입력하면 여전히 실행되고, 그 외에는 Maker 가 쓰기 전에 해당 절차를 읽는다. 쓰기 전에 묻는 규칙은 그대로다. `CLAUDE.md` / `AGENTS.md` 에 항상 로드되는 `## World model` 포인터가 목표·지표·사실·현황 요청을 이름을 부르지 않아도, 단계 진행 중에도 Maker 로 보낸다. 일반적인 만들기·고치기 요청은 경로가 바뀌지 않는다. `/hm:` 단계는 여전히 직접 입력하거나 Maker, autopilot, `/hm:loop` 를 통해 실행된다.
 
 **범위는 요청을 따른다.** "X 리서치해줘" 는 research 에서, "X 스펙 잡자" 는 spec 에서 끝나고, "만들어줘" / "고쳐줘" 는 전체 파이프라인을 돈다. 불분명한 요청은 research 에서 시작한다. autopilot 이 켜져 있으면 Maker 는 매 요청마다 `hm autopilot narrow --until <end>` 를 실행한다 — "X 리서치해줘" 는 research 후 멈추고, 그 경계에서 원래 armed 파이프라인이 복원된다. Maker 는 autopilot 을 켜지 않는다.
 
@@ -405,7 +379,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 - **2-pass redaction (+47pp 정밀도).** Pass 1이 PR 메타데이터를 제거하여 finding이 author/title에 anchor되지 못하게. Pass 2가 전체 컨텍스트 복원 — reviewer가 각 Pass 1 finding을 validate 또는 drop. Anchoring 취약 diff에 대한 ablation 측정된 정밀도 증가.
 - **7개 보안 게이트.** `secrets` · `permissions` (settings.json over-grant) · `hook-injection` (`rm -rf`, `curl|sh`, `eval`에 대한 AST 스캔) · `CVEs` (OSV.dev) · `hallucination` (존재하지 않는 import에 대한 AST 스캔) · `prod-name guard` · `prompt-injection`. Finding은 `.claude/observability/security/`에 로컬로만.
 - **Privilege separation.** Reviewer agent는 `Write` / `Edit` / interpreter `Bash` 호출 deny. Executor agent는 `.worktrees/**` 쓰기만 allow + 시스템 경로에 대한 Edit/Write 페어 deny. Defense-in-depth가 prompt injection, agent compromise, tool_input poisoning을 모두 견딤.
-- **Per-run worktree 격리.** 모든 execute가 fresh `git worktree`에서 실행. 실패한 run은 증거 보존; 성공한 run은 prefix-match로 auto-cleanup (Cursor 자체 worktree는 절대 건드리지 않음).
+- **Per-run worktree 격리.** 모든 execute가 fresh `git worktree`에서 실행. 실패한 run은 증거 보존; 성공한 run은 prefix-match로 auto-cleanup (다른 도구의 worktree는 절대 건드리지 않음).
 
 ### 🌱 자기진화 — *프로젝트와 함께 성장한다*
 
@@ -427,7 +401,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 
 ### 🎛️ 다중 IDE — *하나의 source, 모든 IDE*
 
-- **하나의 하네스, 세 개의 target.** Claude Code + Cursor (2.4+, 3.0+ 권장) + Codex CLI. 단일 `.claude/` source tree; Cursor가 native로 읽고 자신의 `.cursor/`로 hook과 rule 받음; Codex는 `.codex/`, `AGENTS.md`, `.agents/skills/`. 모두 하나의 `harness.yaml`에서 렌더.
+- **하나의 하네스, 두 개의 target.** Claude Code + Codex CLI. 단일 `.claude/` source tree; Codex는 `.codex/`, `AGENTS.md`, `.agents/skills/`. 모두 하나의 `harness.yaml`에서 렌더.
 - **외부 AI 설정 마이그레이션.** 6개의 알려진 외부 설정 감지 (`.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`, `.aider.conf.yml`, `.github/copilot-instructions.md`). LLM이 harness.yaml 축으로 번역. `@hm:harness:*` inverted 마커가 재렌더 너머에서도 동기화 유지.
 - **Sibling repos.** Frontend + backend + library가 harness.yaml의 상대 경로로 한 세션에 바인딩. 머신 간 portable (상대 경로가 `git clone`을 견딤).
 
@@ -437,7 +411,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 - **구현 전 깊은 인터뷰.** `/hm:spec`이 6-카테고리 인터뷰 (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification)를 완전성 점수화하여 실행. 되돌리기 어려운 결정은 같은 인터뷰의 `irreversible_decisions` 로 잠기고, phase·순서·위험 같은 *how* 는 `/hm:execute` Step 0 이 사람 게이트 없이 직접 씁니다.
 - **적응형 인터뷰 + 4-게이트 수렴 autoloop.** `/hm:loop`이 time-and-iteration-bounded 루프 실행. `autoloop-driver`가 goal을 읽고 누락된 것만 질문, loop intensity + exit checklist lock, 그 후 mechanical check + LLM judgment + regression 비교 + 2-iter convergence streak가 완료 수락 전 모두 필요.
 - **3-tier 컨텍스트 로딩 + compaction 복구.** Hot tier (오늘 session) · Warm tier (stage 주제에 맞는 wiki/failures 항목 — lexical 매치 우선, 남는 슬롯에만 고재발 failure 최대 3개, 블록 전체에 8 KB 상한 하나) · Cold tier (git log / PLAN on demand). `PreCompact` hook이 context compaction 전에 session flush; 다음 turn이 마커를 감지하고 마지막 in-progress phase에서 resume.
-- **Cross-process 메모리 안전성.** `.claude/memory/` 쓰기는 re-entrant POSIX flock으로 serialize. Telemetry hook이 `O_APPEND`에 raw `os.write()`로 원자적 append (single-syscall, ≤PIPE_BUF) — concurrent Claude Code + Cursor 세션이 JSONL 라인을 interleave 불가.
+- **Cross-process 메모리 안전성.** `.claude/memory/` 쓰기는 re-entrant POSIX flock으로 serialize. Telemetry hook이 `O_APPEND`에 raw `os.write()`로 원자적 append (single-syscall, ≤PIPE_BUF) — concurrent Claude Code + Codex 세션이 JSONL 라인을 interleave 불가.
 
 각 기능의 완전한 메커니즘 — 모든 절차, 결정 경로, 내부 invariant — 는 [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md) 참조.
 
@@ -451,7 +425,7 @@ harness-maker는 `0.x` 단계이며 1.0 약속이 정직해질 만큼의 의존 
 
 - **슬래시 명령 이름**: `/hm:make`, `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/harness-maker:make`.
 - **`harness.yaml` 최상위 키**: `targets`, `preset`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
-- **Plugin manifest 스키마**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — 각 marketplace 공식 spec에 포함된 필드들.
+- **Plugin manifest 스키마**: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — 각 marketplace 공식 spec에 포함된 필드들.
 - **로컬 전용 telemetry 보장** — [`PRIVACY.md`](PRIVACY.md) 참조. 문서-vs-실제 불일치는 P0 버그로 취급합니다.
 
 **그 외 모든 것은 어떤 0.x.minor 에서든 바뀔 수 있습니다.** 내부 Python API, `.claude/observability/` 파일 포맷, 템플릿 내용, ADR 번호 부여, reviewer 프롬프트 표현, 인터뷰 문구. 1.0 전 reproducibility가 중요하다면 특정 릴리스로 핀 (`uvx --from harness-maker==0.17.0 ...`) 사용을 권장합니다.

@@ -69,7 +69,7 @@ _ADVISORY_DISCLAIMER = re.compile(
 def _render_root() -> Path:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
-    answers.targets = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+    answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
     # The ledger axis defaults OFF for a fresh install; the round-scoping assertions below
     # are about the emit guidance, so pin it ON or they would be vacuous.
     answers.instrumentation = InstrumentationConfig(stage_agent_ledger=True)

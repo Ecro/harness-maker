@@ -10,7 +10,7 @@ You (Claude) act as the orchestrator. Follow these steps:
 ### 0. CI / test mode detection
 
 If the prompt text contains `--ci`, extract inline params and skip all
-`AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) calls. Parse `preset=`, `locale=`,
+`AskUserQuestion` calls. Parse `preset=`, `locale=`,
 `targets=` and the optional `strictness=` (`block` / `warn`) from the prompt; use defaults
 `Side` / `en` / `claude-code` for any that are absent. Export the parsed value as
 `$STRICTNESS` (empty when absent) — every dispatch below passes
@@ -25,7 +25,7 @@ depending on whether `.claude/harness.yaml` exists).
 
 Example invocation:
 ```
-/harness-maker:make --ci preset=Side locale=en targets=claude-code,cursor,codex
+/harness-maker:make --ci preset=Side locale=en targets=claude-code,codex
 /harness-maker:make --ci preset=Side locale=ko world_model_name=비비 world_model_handle=bibi
 ```
 
@@ -36,7 +36,7 @@ wants a full interactive reconfigure. **Do not pass `--reinterview` through
 to the CLI** — the CLI's interactive interview reads from stdin, which
 falls back to autoloop defaults in the slash-command context (no TTY).
 Instead, skip the menu in section 3 and jump straight to the **Full
-reconfigure** branch in section 5, which drives `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) here in
+reconfigure** branch in section 5, which drives `AskUserQuestion` here in
 the slash command and dispatches with collected `--preset / --locale /
 --targets` flags.
 
@@ -50,7 +50,7 @@ summaries must use the selected locale. Persisted generated documents may still
 follow their own template rules; this section controls the live setup
 conversation.
 
-Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
+Use `AskUserQuestion`:
 
 - **English (`en`)** — default; best-supported public-plugin baseline.
 - **Korean (`ko`)** — use Korean for the rest of this onboarding flow.
@@ -67,7 +67,7 @@ entry point they talk to while developing (briefing, start or resume work, remem
 fact, goals and metrics). Default is **Maker**. Skip this when `.claude/harness.yaml` already
 exists: a re-render keeps the existing name (renaming is a `/hm:configure` dimension).
 
-Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code), in `$LOCALE`:
+Use `AskUserQuestion`, in `$LOCALE`:
 
 - **Maker** — default.
 - **Other** — free-text name (single line, at most 40 characters, any language).
@@ -103,29 +103,21 @@ if [ -n "$plugin_dir" ]; then
     RESOLVE_MODE="claude-code"
     echo "RESOLVE_MODE=claude-code  PLUGIN_DIR=$plugin_dir"
 else
-    # Step B — Cursor local plugin directory
-    cursor_local="$HOME/.cursor/plugins/local/harness-maker"
-    if [ -d "$cursor_local" ] && [ -f "$cursor_local/pyproject.toml" ]; then
-        plugin_dir="$cursor_local"
-        RESOLVE_MODE="cursor"
-        echo "RESOLVE_MODE=cursor  PLUGIN_DIR=$plugin_dir"
+    # Step B — CLI fallback (console_scripts or uv tool)
+    cli_path=$(command -v harness-maker 2>/dev/null || true)
+    if [ -n "$cli_path" ]; then
+        RESOLVE_MODE="CLI_FALLBACK"
+        echo "RESOLVE_MODE=CLI_FALLBACK  CLI_PATH=$cli_path"
     else
-        # Step C — CLI fallback (console_scripts or uv tool)
-        cli_path=$(command -v harness-maker 2>/dev/null || true)
-        if [ -n "$cli_path" ]; then
-            RESOLVE_MODE="CLI_FALLBACK"
-            echo "RESOLVE_MODE=CLI_FALLBACK  CLI_PATH=$cli_path"
-        else
-            echo "ERROR: harness-maker not found. Install with: uv tool install harness-maker  OR  pip install harness-maker"
-            exit 1
-        fi
+        echo "ERROR: harness-maker not found. Install with: uv tool install harness-maker  OR  pip install harness-maker"
+        exit 1
     fi
 fi
 
 [ -f "$(pwd)/.claude/harness.yaml" ] && echo "STATE=re-render" || echo "STATE=fresh-install"
 ```
 
-The variable `$RESOLVE_MODE` (`claude-code`, `cursor`, or `CLI_FALLBACK`)
+The variable `$RESOLVE_MODE` (`claude-code` or `CLI_FALLBACK`)
 determines the dispatch shape in section 5.
 
 ### 3. If `STATE=re-render` — show current settings + ask intent
@@ -135,20 +127,18 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface to the user:
 - harness_maker_version (so they see how stale)
 - count of enabled reviewers/skills
 
-Then use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) with these options. **Order matters** — list
+Then use `AskUserQuestion` with these options. **Order matters** — list
 "Switch runtime targets" prominently right after Update, since it's the
 most common reason existing 0.4.x/0.5.0 users return to this command:
 
 - **Update** — re-render with the same settings; pick up new template
   improvements. (recommended after a `/plugin update`. Does **not** ask
   about extra runtimes — pick "Switch runtime targets" if you want to opt into
-  Cursor or Codex on a previously claude-code-only install.) Explain that the
+  Codex on a previously claude-code-only install.) Explain that the
   CLI backs up the current generated harness state under `.backup-<timestamp>`
   before rendering when existing files are present.
-- **Switch runtime targets** — pick `claude-code`, `cursor`, `codex`, or any combination.
-  Adding `cursor` renders `.cursor/rules/harness.mdc` + `.cursor/mcp.json`
-  alongside the shared `.claude/` assets so the harness drives Cursor
-  IDE 2.4+ natively. Adding `codex` renders `AGENTS.md`, `.codex/`, and
+- **Switch runtime targets** — pick `claude-code`, `codex`, or both.
+  Adding `codex` renders `AGENTS.md`, `.codex/`, and
   `.agents/skills/` assets. Dropping a target does not delete previously
   rendered target-specific files; it leaves them in place so user edits are not
   destroyed. Remove them manually or with uninstall if you want a clean slate.
@@ -181,7 +171,7 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
 #### 4.1 Run profile scan
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli profile "$(pwd)" --json
 # CLI_FALLBACK:
 !harness-maker profile "$(pwd)" --json
@@ -195,14 +185,14 @@ installing a CLI touches no project manifest — a cached answer would report a 
 five minutes ago as absent.
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli detect-tools --json
 # CLI_FALLBACK:
 !harness-maker detect-tools --json
 ```
 
 Output shape: `{"codex": {"installed": bool}, "antigravity": {"installed": bool},
-"cursor": {"installed": bool}}`. Store as `$DETECTED`. `installed` means **the binary is on
+"claude": {"installed": bool}}`. Store as `$DETECTED`. `installed` means **the binary is on
 PATH — it does not mean the user is authenticated** (`codex login` / an authenticated `agy`);
 never phrase it as "ready". If the command is missing or its output does not parse, treat
 every tool as absent and continue — detection is an enhancement, never a gate.
@@ -222,7 +212,7 @@ Based on the profile, derive:
 #### 4.3 Structured question: Smart defaults confirm screen
 
 Show a summary of the detected profile and smart defaults in `$LOCALE`.
-Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
+Use `AskUserQuestion`:
 
 > **Project profile detected:**
 > - Stack: {stack}
@@ -264,7 +254,7 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 > | `toolchains` | {seeded from your manifests: python / node / rust, or empty when none is recognised} — which file types each check command understands. The cross-model review oracle runs a toolchain's checks **only** on the file types it declares, and runs nothing at all on the rest, so a project it cannot recognise gets an honestly-empty oracle rather than another language's tools. Only filled when the key is absent or empty; anything you write is kept. | hand-edit `.claude/harness.yaml` |
 >
 > **Safety receipt preview:**
-> - Generated roots may include `.claude/`, `.cursor/`, `.codex/`,
+> - Generated roots may include `.claude/`, `.codex/`,
 >   `.agents/skills/`, and `AGENTS.md`, depending on selected targets.
 > - Existing generated state is backed up under `.backup-<timestamp>` before
 >   re-render when applicable. `.backup-*/` is auto-added to your `.gitignore`
@@ -288,8 +278,7 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 
 - **Nothing detected** (`codex` and `antigravity` both absent) → ask nothing. Jump straight
   to Section 4.6 (Preview) with smart defaults.
-- **`codex` and/or `antigravity` detected** → ask **exactly one** question with `AskQuestion`
-  (Cursor) / `AskUserQuestion` (Claude Code), then jump to Section 4.6:
+- **`codex` and/or `antigravity` detected** → ask **exactly one** question with `AskUserQuestion`, then jump to Section 4.6:
 
   > A cross-model second opinion is available — {name the detected CLIs}. Enabled models cast
   > a real consensus vote in `/hm:review` and are reconciled in `/hm:spec`.
@@ -310,15 +299,14 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
   `--second-opinion-models` in Section 4.6's dispatch. Leave the flag off when the user
   declines.
 
-  This is the **only** question the fast path may ask (one, capped). A detected `cursor` is
-  reported in the §4.3 summary and never asked about — `targets` is changed under "Adjust a
-  few things".
+  This is the **only** question the fast path may ask (one, capped). `targets` is changed under
+  "Adjust a few things".
 
-**"Adjust a few things"** → Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) to ask which dimension(s)
+**"Adjust a few things"** → Use `AskUserQuestion` to ask which dimension(s)
 to change (multi-select: preset, locale, strictness, targets, grade_threshold,
 mechanical_checks, wrapup_docs, ref_folders, sibling_repos, second_brain, second_opinion,
 autonomy). For each selected
-dimension, show an `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) with the current smart default,
+dimension, show an `AskUserQuestion` with the current smart default,
 alternatives, and a one-line trade-off. Then jump to Section 4.6.
 
 `second_opinion` and `autonomy` belong on that list because this is the **only** in-`make`
@@ -327,42 +315,42 @@ the harness. They map to `--second-opinion-models` and `--autonomy-level`.
 
 **"Full setup"** → Ask all dimensions in order:
 
-1. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **locale confirmation** — keep `$LOCALE` or change it.
+1. `AskUserQuestion`: **locale confirmation** — keep `$LOCALE` or change it.
    This must remain first if the user enters Full setup directly.
-2. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **preset** — `Side` or `Production` (show smart default
+2. `AskUserQuestion`: **preset** — `Side` or `Production` (show smart default
    and trade-off: Side is lighter; Production increases review coverage and strictness)
-3. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **targets** — `claude-code`, `cursor`, `codex`, or any combination (multi-select)
-4. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **review focus** — "What's your primary work on this project?"
+3. `AskUserQuestion`: **targets** — `claude-code`, `codex`, or both (multi-select)
+4. `AskUserQuestion`: **review focus** — "What's your primary work on this project?"
    Options: `feature` (code + UX review), `bugfix` (code + test review),
    `security` (code + security + auditor), `performance` (code + perf review),
    `refactoring` (code + concurrency review). Maps to `--focus` flag.
-5. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **mechanical_checks** — "Pre-review shell commands to
+5. `AskUserQuestion`: **mechanical_checks** — "Pre-review shell commands to
    run before LLM reviewers." Show detected_checks as suggestion. User can
    accept, edit, or clear. Semicolon-separated. Maps to `--mechanical-checks`.
-6. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **grade_threshold** — `A` (strict, zero P0/P1), `B`
+6. `AskUserQuestion`: **grade_threshold** — `A` (strict, zero P0/P1), `B`
    (moderate, up to 2 P1), or `C` (relaxed). Maps to `--grade-threshold`.
-7. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **domains + model** — comma-separated domain packs
+7. `AskUserQuestion`: **domains + model** — comma-separated domain packs
    (python, react, tauri, ...) and preferred Claude model (opus/sonnet/haiku).
    Maps to `--domains` and `--recommended-model`.
-8. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **wrapup documents** — "Additional documents that
+8. `AskUserQuestion`: **wrapup documents** — "Additional documents that
    `/hm:wrapup` should update after each work unit (e.g. CHANGELOG.md,
    TODO.md, docs/decisions/index.md)." Semicolon-separated paths relative
    to project root, or "none". Maps to `--wrapup-docs`.
-9. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **ref_folders** — "Reference documentation folders
+9. `AskUserQuestion`: **ref_folders** — "Reference documentation folders
    that the `refdocs-search` skill will index for skill-driven search."
    Show detected sibling dirs (`../docs`, `../specs`, etc.) from `ls ..`
    as suggestions. Format: `::` separates multiple entries, `;` separates
    path from glob within an entry (e.g. `../docs::../specs;**/*.pdf`).
    Default glob: `**/*.{md,txt,pdf}`. DOCX unsupported. "none" to skip.
    Maps to `--ref-folders`.
-10. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **sibling_repos** — "Other repositories that form
+10. `AskUserQuestion`: **sibling_repos** — "Other repositories that form
    one logical project with this one (e.g. backend + frontend monorepo
    split). Entering them lets research and review agents cross-reference
    related code."
    Suggest sibling dirs visible via `ls ..` that look like git repos.
    Semicolon-separated relative paths (e.g. `../backend;../mobile`).
    "none" to skip. Maps to `--sibling-repos`.
-11. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Second Brain** — "Connect an Obsidian vault for
+11. `AskUserQuestion`: **Second Brain** — "Connect an Obsidian vault for
    stage-aware memory? This first setup is read-first: stages read typed notes
    (decision, preference, failure, reference, project) instead of loading the
    whole vault or configuring writable folders now."
@@ -371,14 +359,14 @@ the harness. They map to `--second-opinion-models` and `--autonomy-level`.
    Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
    Tell the user that `/hm:configure` can continue with deeper Second Brain
    setup after install, including write-capable allowlisted folders.
-12. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Cross-model second opinion** —
+12. `AskUserQuestion`: **Cross-model second opinion** —
    "Enable a second-opinion model (Codex and/or Antigravity) to cast a real k-of-N consensus
    vote in /hm:review and reconcile in /hm:spec? A missing/unauthenticated/rate-limited CLI
    degrades gracefully (warn + skip)." Multi-select: `codex`, `antigravity`, or none.
    Prereqs: `codex login` (codex), an authenticated `agy` (antigravity). Before dispatch,
    `shutil.which` each selected model's CLI (`codex` / `agy`) and warn (non-blocking) if
    absent. Maps to `--second-opinion-models` (comma-separated; empty disables).
-13. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — "Auto-advance
+13. `AskUserQuestion`: **Autopilot** — "Auto-advance
    the stage pipeline this session (stages advance past two-way-door boundaries but always
    stop at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge)?" Options:
    `gated` (off) / `ask` (**the default a fresh install renders** — the session picker decides,
@@ -396,7 +384,7 @@ Before dispatch, show a preview:
 > - {reviewer_count} reviewers active
 > - {skill_count} skills enabled
 > - Mechanical checks: {checks or "(none)"}
-> - Target roots: `.claude/` always; `.cursor/`, `.codex/`, `.agents/skills/`,
+> - Target roots: `.claude/` always; `.codex/`, `.agents/skills/`,
 >   and `AGENTS.md` when those targets are selected.
 > - Backup: existing generated state is copied to `.backup-<timestamp>` before
 >   re-render when applicable.
@@ -422,7 +410,7 @@ Jump to Section 5 → Fresh install branch, passing all collected flags.
 Branch on the chosen intent. Use `$plugin_dir` and `$RESOLVE_MODE` from section 2.
 
 **Dispatch shape by RESOLVE_MODE:**
-- `claude-code` or `cursor`: `uv run --directory "$plugin_dir" python -m harness_maker.cli <args>`
+- `claude-code`: `uv run --directory "$plugin_dir" python -m harness_maker.cli <args>`
 - `CLI_FALLBACK`: `harness-maker <args>` (direct CLI — console_scripts entry point)
 
 #### Update (re-render same settings)
@@ -431,15 +419,15 @@ Branch on the chosen intent. Use `$plugin_dir` and `$RESOLVE_MODE` from section 
 existing files — this is why make does NOT use a worktree: backup + reconcile +
 a read-only preview cover the overwrite concern). Run `--dry-run`, surface the
 NEW / REPLACE / KEEP / MERGE counts (KEEP = your edits preserved), then confirm
-with `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) — Proceed / Cancel.
+with `AskUserQuestion` — Proceed / Cancel.
 On a fresh install (no existing `.claude/`), skip the preview and apply directly.
 **Run these with the Bash tool when you reach them — the apply must fire only AFTER
 the Proceed confirm, so they are NOT `!`-autorun lines:**
 
 ```bash
-# Preview (claude-code / cursor):
+# Preview (claude-code):
 uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --dry-run ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
-# Apply — only after the user confirms Proceed (claude-code / cursor):
+# Apply — only after the user confirms Proceed (claude-code):
 uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
 harness-maker make "$(pwd)" --dry-run ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
@@ -453,7 +441,7 @@ run the **git disposition** step (section 6.5).
 #### Switch preset
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --preset Production ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" --preset Production ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
@@ -466,7 +454,7 @@ enables broader review and stricter gates; Side is lighter.
 #### Switch locale
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --locale ko \
   ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
@@ -477,7 +465,7 @@ enables broader review and stricter gates; Side is lighter.
 #### Switch SPEC strictness
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --strictness block ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" --strictness block ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
@@ -486,23 +474,21 @@ enables broader review and stricter gates; Side is lighter.
 #### Switch runtime targets
 
 ```bash
-# claude-code / cursor:
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --targets claude-code,cursor,codex ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
+# claude-code:
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --targets claude-code,codex ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)" --targets claude-code,cursor,codex ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
+!harness-maker make "$(pwd)" --targets claude-code,codex ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
-(or `--targets cursor` for Cursor-only, `--targets codex` for Codex-only,
-`--targets claude-code` to drop back to Claude-Code-only.) Adding `cursor`
-renders `.cursor/rules/harness.mdc` + `.cursor/mcp.json`; adding `codex`
-renders `AGENTS.md`, `.codex/`, and `.agents/skills/`. Dropping a target
+(or `--targets codex` for Codex-only, `--targets claude-code` to drop back
+to Claude-Code-only.) Adding `codex` renders `AGENTS.md`, `.codex/`, and `.agents/skills/`. Dropping a target
 does **not** delete previously rendered target-specific files — remove them
 manually if you want a clean slate.
 
 #### Add / remove a component
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add reviewer:security ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --remove skill:research-crawler ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add-domain tauri ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
@@ -519,11 +505,11 @@ packs ship: `python` (others get a user-side stub).
 
 #### Manage ref_folders
 
-Ask the user for the new ref_folders value with `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) (current
+Ask the user for the new ref_folders value with `AskUserQuestion` (current
 value shown from harness.yaml), then dispatch:
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --ref-folders "$REF_FOLDERS" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
@@ -535,11 +521,11 @@ an entry (e.g. `../docs::../specs;**/*.pdf`). Pass the empty string to clear.
 
 #### Manage sibling_repos
 
-Ask the user for the new sibling_repos value with `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) (current
+Ask the user for the new sibling_repos value with `AskUserQuestion` (current
 value shown from harness.yaml), then dispatch:
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --sibling-repos "$SIBLING_REPOS" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
@@ -551,47 +537,47 @@ Pass the empty string to clear.
 
 #### Full reconfigure
 
-Drive the interview here in the slash command via `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) —
+Drive the interview here in the slash command via `AskUserQuestion` —
 **do not** pass `--reinterview` to the CLI (its stdin-based interview
 falls back to autoloop defaults in slash context). Ask each dimension
 in turn, then dispatch with all collected flags:
 
-1. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **locale confirmation** — keep `$LOCALE` from section 1
+1. `AskUserQuestion`: **locale confirmation** — keep `$LOCALE` from section 1
    or change it before asking any other setup question.
-2. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **preset** — `Side` (1 reviewer, lean) or
+2. `AskUserQuestion`: **preset** — `Side` (1 reviewer, lean) or
    `Production` (5 reviewers, verify-required).
-3. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **targets** — `claude-code`, `cursor`, `codex`, or any combination
-   (multi-select; `claude-code,cursor,codex` for all three).
-4. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **review focus** — `feature` | `bugfix` | `security` |
+3. `AskUserQuestion`: **targets** — `claude-code`, `codex`, or both
+   (multi-select; `claude-code,codex` for both).
+4. `AskUserQuestion`: **review focus** — `feature` | `bugfix` | `security` |
    `performance` | `refactoring`. Maps to `--focus`.
-5. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **mechanical_checks** — semicolon-separated commands.
+5. `AskUserQuestion`: **mechanical_checks** — semicolon-separated commands.
    Show detected_checks from `profile --json` as suggestion. Maps to
    `--mechanical-checks`.
-6. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **grade_threshold** — `A` | `B` | `C`. Maps to
+6. `AskUserQuestion`: **grade_threshold** — `A` | `B` | `C`. Maps to
    `--grade-threshold`.
-7. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **domains + model** — comma-separated domain packs
+7. `AskUserQuestion`: **domains + model** — comma-separated domain packs
    and preferred Claude model. Maps to `--domains` and `--recommended-model`.
-8. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **wrapup documents** — semicolon-separated paths to
+8. `AskUserQuestion`: **wrapup documents** — semicolon-separated paths to
    docs that `/hm:wrapup` should update (e.g. `CHANGELOG.md;TODO.md`), or
    "none". Maps to `--wrapup-docs`.
-9. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **ref_folders** — reference doc folders for the
+9. `AskUserQuestion`: **ref_folders** — reference doc folders for the
    `refdocs-search` skill. Show sibling git repos visible via `ls ..` as
    suggestions. `::` separates entries, `;` separates path from glob within
    an entry (e.g. `../docs::../specs;**/*.pdf`). "none" to skip.
    Maps to `--ref-folders`.
-10. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **sibling_repos** — other repos forming one logical
+10. `AskUserQuestion`: **sibling_repos** — other repos forming one logical
    project (e.g. `../backend;../mobile`). Show sibling git dirs as
    suggestions. Semicolon-separated relative paths, or "none".
    Maps to `--sibling-repos`.
-11. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Second Brain** — "Connect an Obsidian vault for
+11. `AskUserQuestion`: **Second Brain** — "Connect an Obsidian vault for
    stage-aware memory?" Ask for vault path (absolute or `~`-relative), or
    "none" to skip. If given: ask project_id (kebab-case, e.g. `my-app`).
    Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
-12. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Cross-model second opinion** —
+12. `AskUserQuestion`: **Cross-model second opinion** —
    multi-select `codex`, `antigravity`, or none. Graceful warn+skip on a missing/
    unauthenticated/rate-limited CLI. `shutil.which` each selected CLI (`codex` / `agy`) and
    warn (non-blocking) if absent. Maps to `--second-opinion-models` (comma-separated).
-13. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — `gated` (off) /
+13. `AskUserQuestion`: **Autopilot** — `gated` (off) /
    `ask` (default) / `auto_safe` / `auto_full`; if enabled, ask whether to persist across
    sessions. Maps to
    `--autonomy-level` and `--autonomy-persistent` / `--no-autonomy-persistent`.
@@ -599,7 +585,7 @@ in turn, then dispatch with all collected flags:
 Then dispatch with the collected values:
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --targets "$TARGETS" \
   ${STRICTNESS:+--strictness "$STRICTNESS"} \
@@ -649,14 +635,14 @@ Read `.claude/harness.yaml` for current `second_brain` settings (enabled, vault_
 project_id). Show them, explain this is the advanced path after read-first
 setup, then ask:
 
-1. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): vault path — current value shown; enter new path, empty to keep,
+1. `AskUserQuestion`: vault path — current value shown; enter new path, empty to keep,
    or "none" to disable.
-2. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): project_id — current value shown; enter new value or blank to keep.
+2. `AskUserQuestion`: project_id — current value shown; enter new value or blank to keep.
 3. Explain that write-capable folders are constrained by allowlist,
    Markdown/frontmatter validation, and `project_id` namespace rules.
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
@@ -670,7 +656,7 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
 #### Fresh install
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --targets "$TARGETS" \
   ${STRICTNESS:+--strictness "$STRICTNESS"} \
@@ -696,8 +682,8 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
 
 Substitute the values collected in section 4. Omit flags the user didn't set
 or left at smart defaults (the CLI applies preset defaults for unset flags).
-`$TARGETS` is the comma-joined multi-select — e.g. `claude-code`,
-`claude-code,cursor`, or `claude-code,cursor,codex`.
+`$TARGETS` is the comma-joined multi-select — e.g. `claude-code`
+or `claude-code,codex`.
 
 ### 6. Report + Quick start
 
@@ -725,7 +711,7 @@ Then show a **quick-start** guide:
 > - `/hm:configure` — change any setting later, including ones this install did not ask about
 > - `/hm:make` — re-render after a plugin update
 
-If something's unclear, prompt the user with `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) rather than
+If something's unclear, prompt the user with `AskUserQuestion` rather than
 guessing.
 
 ### 6.5 Git disposition — the last mile (after any install / update)
@@ -739,7 +725,7 @@ gitignore actions must fire only AFTER the user has explicitly chosen.** First r
 the state (dispatch shape per `$RESOLVE_MODE`):
 
 ```bash
-# claude-code / cursor:
+# claude-code:
 uv run --directory "$plugin_dir" python -m harness_maker.cli git-status "$(pwd)"
 # CLI_FALLBACK:
 harness-maker git-status "$(pwd)"
@@ -751,20 +737,19 @@ Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
 - **`is_git: false`** — not a git repository. Tell the user the harness files are
   not under version control; if they want to track them, they can run `git init`
   and re-run `/harness-maker:make`. Run no git commands. Done.
-- **`decision_needed: true`** — ask with `AskQuestion` (Cursor) / `AskUserQuestion`
-  (Claude Code), in the user's locale, the two options **as equals**:
+- **`decision_needed: true`** — ask with `AskUserQuestion`, in the user's locale, the two options **as equals**:
   - **Commit them** — the harness roots are added to git and committed, so anyone
     who clones the repo gets the harness (churn + `.backup-*` are already
     gitignored, so the commit is clean). On this choice run (scopes both the add
     AND the commit to only the existing roots — the `-- $roots` pathspec keeps any
     unrelated pre-staged work OUT of the harness commit):
     ```bash
-    roots=""; for r in .claude .cursor .codex .agents AGENTS.md; do [ -e "$r" ] && roots="$roots $r"; done; git add $roots && git commit -m "chore: add harness-maker harness" -- $roots
+    roots=""; for r in .claude .codex .agents AGENTS.md; do [ -e "$r" ] && roots="$roots $r"; done; git add $roots && git commit -m "chore: add harness-maker harness" -- $roots
     ```
   - **Gitignore them** — the roots are added to `.gitignore` and kept local
     (fails loudly if the write does not take effect):
     ```bash
-    # claude-code / cursor:
+    # claude-code:
     uv run --directory "$plugin_dir" python -m harness_maker.cli git-ignore-roots "$(pwd)"
     # CLI_FALLBACK:
     harness-maker git-ignore-roots "$(pwd)"
@@ -784,12 +769,12 @@ Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
 
 - The CLI's `--autoloop` skips its interview using preset defaults — only
   use this for fresh installs where you've already collected answers via
-  `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code).
+  `AskUserQuestion`.
 - **Never pass `--reinterview` from the slash command.** It only works on
   a real TTY; in slash context it silently falls back to `--autoloop`
   defaults. If the user types `--reinterview` in their prompt, route them
   to the **Full reconfigure** branch (section 0.5) which drives
-  `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) here. `--reinterview` from a real terminal still
+  `AskUserQuestion` here. `--reinterview` from a real terminal still
   works for users who want the full interactive interview that re-asks
   every dimension (workflows, reviewer enablement, anti-rot, etc.) —
   the slash-command Full reconfigure covers preset / locale /

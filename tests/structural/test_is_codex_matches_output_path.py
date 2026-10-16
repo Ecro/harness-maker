@@ -33,7 +33,7 @@ def entries() -> list[tuple[str, bool]]:
     """(out_path, is_codex) for a harness targeting every runtime at once."""
     profile = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     answers = interview(profile, autoloop_mode=True)
-    answers.targets = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+    answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
     return [
         (str(fe.path), bool(fe.context.get("is_codex")))
         for fe in synthesize(profile, answers).files

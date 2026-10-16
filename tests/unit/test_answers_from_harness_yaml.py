@@ -308,11 +308,19 @@ def test_targets_present_in_yaml_parsed(tmp_path: Path) -> None:
         "preset: Side\nlocale: en\ndev_mode: task-driven\n"
         "default_workflow: exec-rev-wrap\n"
         "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n"
-        "targets:\n  - claude-code\n  - cursor\n",
+        "targets:\n  - claude-code\n  - codex\n",
     )
     answers = answers_from_harness_yaml(target)
     assert answers is not None
-    assert answers.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+    assert answers.targets == [Target.CLAUDE_CODE, Target.CODEX]
+
+
+def test_targets_removed_cursor_only_falls_back_to_claude_code(tmp_path: Path) -> None:
+    """0.63.0: a cursor-only 0.62 harness re-renders as [claude-code]; `make` warns."""
+    target = _write_yaml(tmp_path, "preset: Side\nlocale: en\ntargets:\n  - cursor\n")
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.targets == [Target.CLAUDE_CODE]
 
 
 def test_targets_missing_falls_back_with_warning(
@@ -379,20 +387,14 @@ def test_phase1_fixture_yaml_falls_back_with_warning(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """B11 — Phase 1 manual checklist fixture
-    (`tests/cursor-compat/fixture/.claude/harness.yaml`) 이 옛 yaml format
+    (`tests/fixtures/harness_yaml_pre_targets.yaml`, moved out of the retired
+    `tests/cursor-compat/` in 0.63.0) 이 옛 yaml format
     (targets 키 부재) 임을 검증 + answers_from_harness_yaml 이 [claude-code]
     fallback + 경고 로그 emit. PLAN-cursor-target-impl.md §2.6 의 B11 자동화
     acceptance 를 직접 만족시키는 test (Phase 1 fixture 를 production code 가
     실제로 처리할 수 있는지 회귀 방지).
     """
-    fixture = (
-        Path(__file__).resolve().parents[2]
-        / "tests"
-        / "cursor-compat"
-        / "fixture"
-        / ".claude"
-        / "harness.yaml"
-    )
+    fixture = Path(__file__).resolve().parents[2] / "tests/fixtures/harness_yaml_pre_targets.yaml"
     assert fixture.exists(), "Phase 1 fixture missing — broken test setup"
 
     with caplog.at_level(logging.WARNING, logger="harness_maker.interview"):
@@ -417,7 +419,7 @@ def test_round_trip_targets_via_render_and_reverse(tmp_path: Path) -> None:
 
     p = profile(tmp_path)
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+        update={"targets": [Target.CLAUDE_CODE, Target.CODEX]},
     )
     bp = synthesize(p, a)
     target = tmp_path / ".claude"
@@ -425,26 +427,7 @@ def test_round_trip_targets_via_render_and_reverse(tmp_path: Path) -> None:
 
     reused = answers_from_harness_yaml(target / "harness.yaml")
     assert reused is not None
-    assert reused.targets == [Target.CLAUDE_CODE, Target.CURSOR]
-
-
-def test_round_trip_cursor_only_targets(tmp_path: Path) -> None:
-    """Cursor-only target 의 round-trip 도 보존."""
-    from harness_maker.interview import interview
-    from harness_maker.models import Target
-    from harness_maker.profile import profile
-    from harness_maker.render import render
-    from harness_maker.synthesize import synthesize
-
-    p = profile(tmp_path)
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-    bp = synthesize(p, a)
-    target = tmp_path / ".claude"
-    render(bp, target, dry_run=False)
-
-    reused = answers_from_harness_yaml(target / "harness.yaml")
-    assert reused is not None
-    assert reused.targets == [Target.CURSOR]
+    assert reused.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 # ──────────────────────────────────────────────────────────────────────────────

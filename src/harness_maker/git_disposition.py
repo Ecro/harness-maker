@@ -49,8 +49,6 @@ def resolve_target_roots(targets: Iterable[str]) -> list[str]:
     """Generated-content roots for the selected IDE targets (``.claude/`` always present)."""
     tset = {str(t) for t in targets}
     roots = [".claude/"]
-    if "cursor" in tset:
-        roots.append(".cursor/")
     if "codex" in tset:
         roots.extend([".codex/", ".agents/", "AGENTS.md"])
     return roots
@@ -89,6 +87,19 @@ def _is_git_worktree(project_root: Path) -> bool:
     except (subprocess.SubprocessError, OSError):
         return False
     return r.returncode == 0 and r.stdout.strip() == "true"
+
+
+def tracked_cursor_deletions(project_root: Path) -> list[str]:
+    """Tracked `.cursor/` files the retirement deleted from the work tree but git still has.
+
+    The commit step scopes `git add` to the live roots, and `.cursor` is no longer one, so
+    these deletions would otherwise sit unstaged forever.
+    """
+    try:
+        r = _git(project_root, "ls-files", "--deleted", "--", ".cursor")
+    except (subprocess.SubprocessError, OSError):
+        return []
+    return r.stdout.split() if r.returncode == 0 else []
 
 
 def _is_churn(path: str) -> bool:

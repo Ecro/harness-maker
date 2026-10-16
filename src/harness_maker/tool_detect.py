@@ -10,7 +10,6 @@ _BINARIES: dict[str, str] = {
     "codex": "codex",
     "claude": "claude",
     "antigravity": "agy",
-    "cursor": "cursor",
 }
 
 # `installed` means the binary resolves on PATH. It does NOT mean `codex login` has been

@@ -170,7 +170,7 @@ def _step6_block(text: str) -> str:
 def _render_root() -> Path:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
-    answers.targets = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+    answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
     bp = synthesize(profile, answers, preset=Preset.PRODUCTION)
     root = Path(mkdtemp(prefix="hm-boundaries-"))
     render(bp, root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)

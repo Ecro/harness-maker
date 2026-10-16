@@ -538,7 +538,7 @@ def _fixture_matrix() -> Iterator[Any]:
 def test_reference_files_render_with_generated_frontmatter(preset: Preset, level: str) -> None:
     answers = _build_answers(
         locale="en",
-        targets=[Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX],
+        targets=[Target.CLAUDE_CODE, Target.CODEX],
         preset=preset,
         autonomy=models.AutonomyConfig(level=level),  # type: ignore[arg-type]
     )
