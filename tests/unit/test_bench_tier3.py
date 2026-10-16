@@ -14,10 +14,12 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import textwrap
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -694,3 +696,185 @@ def test_tier3_judge_lines_are_labelled_uncalibrated(bench: ModuleType) -> None:
     value3 = next(x for x in by_tier[3]["value"]["lines"] if x["metric"] == "judge_overall")
     assert value3["label"].endswith(" (uncalibrated)")
     assert dataclasses.is_dataclass(bench.Session)
+
+
+# --- tier-3 publish (DRI, 2026-10-16): the pilot outcome and the hm diagnostic ----------------
+# The SPEC's non-goal "publish refuses an incomplete tier" stays true for the scorecard: tier 3
+# is published beside it from its own rows dir, and tiers 1-2 keep every byte they had.
+
+_GOLDEN = Path(__file__).resolve().parent / "fixtures" / "hm_eval"
+_WITHDRAWN = "The per-task code-quality claim is withdrawn"
+_PILOT_SOLVED = {"t13": 3, "t14": 3, "t15": 3, "t16": 3, "t17": 3, "t18": 2, "t19": 3,
+                 "t20": 0, "t21": 3}  # fmt: skip
+
+
+def _pilot(solved: dict[str, int]) -> list[dict[str, Any]]:
+    return [{**_row(t, "plain", r, solved=r <= n, cost=0.1), "harness_sha": "pilot"}
+            for t, n in solved.items() for r in (1, 2, 3)]  # fmt: skip
+
+
+def _diagnostic() -> list[dict[str, Any]]:
+    rows = [{**_row("t20", "hm", r, solved=r == 2, cost=2.0), "harness_sha": "diag"}
+            for r in (1, 2, 3)]  # fmt: skip
+    rows += [
+        {**_row("t21", "hm", r, solved=True, cost=1.0), "harness_sha": "diag"} for r in (1, 2, 3)
+    ]
+    rows += [
+        {**_row("t20", "plain-careful", r, solved=False), "harness_sha": "diag"} for r in (1, 2, 3)
+    ]
+    sessions = [{"status": "ok", "cost_usd": 1.0, "turns": 2, "wall_s": 15.0}] * 2
+    return [{**r, "sessions": sessions, "stopped_at": None} for r in rows]
+
+
+def _write_rows(directory: Path, rows: list[dict[str, Any]]) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
+def _tier3_repo(tmp_path: Path, pilot: list[dict[str, Any]],
+                diagnostic: list[dict[str, Any]] | None) -> tuple[Path, Path]:  # fmt: skip
+    out = tmp_path / "out"
+    _write_rows(out, [json.loads(x) for x in (_GOLDEN / "rows.jsonl").read_text().splitlines()])
+    repo = tmp_path / "repo"
+    (repo / "docs" / "evals").mkdir(parents=True)
+    (repo / "README.md").write_text((_GOLDEN / "README.before.md").read_text())
+    tier3 = repo / "docs" / "evals" / "tier3"
+    _write_rows(tier3 / "pilot", pilot)
+    if diagnostic is not None:
+        _write_rows(tier3 / "diagnostic", diagnostic)
+    (tier3 / "notes.md").write_text("- A fairness note written by hand.\n")
+    return out, repo
+
+
+def _publish3(bench: ModuleType, out: Path, repo: Path) -> int:
+    argv = ["publish", "--out", str(out), "--docs", str(repo / "docs" / "evals")]
+    return int(bench.main([*argv, "--readme", str(repo / "README.md")]))
+
+
+def test_tier3_publishes_the_pilot_rule_and_withdraws_the_claim(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    out, repo = _tier3_repo(tmp_path, _pilot(_PILOT_SOLVED), _diagnostic())
+    assert _publish3(bench, out, repo) == 0
+    rows = bench.publish_rows(out)
+    results = (repo / "docs" / "evals" / "RESULTS.md").read_text()
+    readme = (repo / "README.md").read_text()
+    # tiers 1-2 keep every byte: the old file is a prefix, the old block sits unchanged inside
+    assert results.startswith(bench.render_results_md(rows))
+    section = results[len(bench.render_results_md(rows)) :]
+    old_block = bench.render_readme_block(rows)
+    start, end = readme.index("<!-- hm:eval:start -->"), readme.index("<!-- hm:eval:end -->")
+    assert readme[start:end].startswith(f"<!-- hm:eval:start -->\n{old_block}")
+    before = (_GOLDEN / "README.before.md").read_text()
+    assert readme[:start] == before[: before.index("<!-- hm:eval:start -->")]
+    assert readme[end:] == before[before.index("<!-- hm:eval:end -->") :]
+
+    pilot_lines = [x for x in section.splitlines() if re.match(r"\| t\d+ \| \d/\d \|", x)]
+    pilot = {cells[0]: cells for cells in ([c.strip() for c in x.strip("|").split("|")]
+                                           for x in pilot_lines)}  # fmt: skip
+    assert list(pilot) == _TASK_IDS
+    assert pilot["t20"][-1] == "keep"
+    assert pilot["t21"][-1] == "guard"
+    assert pilot["t18"][1] == "2/3"
+    assert all(pilot[t][-1] == "drop" for t in _TASK_IDS[:7])
+    assert "T = 1 (t20)" in section
+    assert "inconclusive" in section
+    assert "Plain solved 23 of 27 pilot runs" in section
+    assert f"{_WITHDRAWN} under the pre-registered rule" in section
+    assert "diagnostic, not a verdict" in section
+    assert "| t20 | hm | 1/3 |" in section
+    assert "| t21 | hm | 3/3 |" in section
+    assert "| t20 | plain-careful | 0/3 |" in section
+    assert "- A fairness note written by hand." in section
+    assert "`1f8767cb8b8c`" not in section  # the rows' own hash is shown, not the checkout's
+    assert "`t3`" in section
+    assert "`m`" not in section  # no model name in the tier-3 section
+    tier3_md = readme[readme.index(old_block) + len(old_block) : end]
+    assert _WITHDRAWN.lower() in tier3_md.lower()
+    assert "not a verdict" in tier3_md
+    assert "t20 1/3" in tier3_md
+    assert 1 <= tier3_md.count(". ") + tier3_md.count(".\n") <= 3  # one or two sentences
+
+    first = _tree_bytes(repo)
+    assert _publish3(bench, out, repo) == 0
+    assert _tree_bytes(repo) == first
+
+
+def _tree_bytes(root: Path) -> dict[str, bytes]:
+    return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob("*"))
+            if p.is_file()}  # fmt: skip
+
+
+def test_four_kept_tasks_make_tier3_measurable_and_keep_the_claim_open(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    solved = {**_PILOT_SOLVED, "t13": 0, "t14": 1, "t15": 1}
+    out, repo = _tier3_repo(tmp_path, _pilot(solved), None)
+    assert _publish3(bench, out, repo) == 0
+    results = (repo / "docs" / "evals" / "RESULTS.md").read_text()
+    assert "T = 4 (t13, t14, t15, t20)" in results
+    assert _WITHDRAWN not in results
+    assert "inconclusive" not in results
+    assert "the pre-registered full run decides" in results
+    assert "### hm diagnostic" not in results
+
+
+def _without(rows: list[dict[str, Any]], task: str, rep: int) -> list[dict[str, Any]]:
+    return [r for r in rows if (r["task"], r["rep"]) != (task, rep)]
+
+
+def _extra(task: str, arm: str, tier: int = 3) -> list[dict[str, Any]]:
+    return [{**_row(task, arm, 1, solved=True, tier=tier), "harness_sha": "pilot"}]
+
+
+_Rows = list[dict[str, Any]]
+_TIER3_REFUSALS: dict[str, Callable[[], tuple[_Rows, _Rows | None]]] = {
+    "mixed_tier3_hash": lambda: (
+        _pilot(_PILOT_SOLVED),
+        [{**r, "tier3_hash": "other"} for r in _diagnostic()],
+    ),
+    "hm_in_the_pilot": lambda: (_pilot(_PILOT_SOLVED) + _extra("t20", "hm"), None),
+    "short_pilot": lambda: (_without(_pilot(_PILOT_SOLVED), "t13", 3), None),
+    "tier_two_row": lambda: (_pilot(_PILOT_SOLVED) + _extra("t6", "plain", tier=2), None),
+    "mixed_harness_in_one_dir": lambda: (
+        _pilot(_PILOT_SOLVED),
+        [{**r, "harness_sha": f"d{i}"} for i, r in enumerate(_diagnostic())],
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(_TIER3_REFUSALS))
+def test_tier3_publish_refuses_rows_it_cannot_report_honestly(
+    bench: ModuleType, tmp_path: Path, capsys: pytest.CaptureFixture[str], case: str
+) -> None:
+    pilot, diagnostic = _TIER3_REFUSALS[case]()
+    out, repo = _tier3_repo(tmp_path, pilot, diagnostic)
+    before = _tree_bytes(repo)
+    assert _publish3(bench, out, repo) == 2
+    assert "refusing to publish" in capsys.readouterr().err
+    assert _tree_bytes(repo) == before
+
+
+def test_without_tier3_rows_publish_writes_what_it_wrote_before(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    out, repo = _tier3_repo(tmp_path, [], None)
+    shutil.rmtree(repo / "docs" / "evals" / "tier3")
+    assert _publish3(bench, out, repo) == 0
+    rows = bench.publish_rows(out)
+    assert (repo / "docs" / "evals" / "RESULTS.md").read_text() == bench.render_results_md(rows)
+    assert (repo / "README.md").read_text() == (_GOLDEN / "README.after.md").read_text()
+
+
+def test_the_committed_tier3_rows_publish_the_committed_section(bench: ModuleType) -> None:
+    """The committed RESULTS.md is the tier 1-2 render plus the section from docs/evals/tier3."""
+    docs = _ROOT / "docs" / "evals"
+    rows = bench.publish_rows(docs)
+    tier3 = bench.tier3_inputs(docs / "tier3")
+    assert tier3 is not None
+    committed = (docs / "RESULTS.md").read_text()
+    assert committed == bench.render_results_md(rows, tier3)
+    assert committed.startswith(bench.render_results_md(rows))
+    readme = (_ROOT / "README.md").read_text()
+    assert bench.splice_readme(readme, bench.render_readme_block(rows, tier3)) == readme
+    assert _WITHDRAWN in committed

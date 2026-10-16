@@ -2702,7 +2702,7 @@ _PRE_EVAL_NOTE = (
 )
 
 
-def render_readme_block(rows: list[dict[str, Any]]) -> str:
+def render_readme_block(rows: list[dict[str, Any]], tier3: dict[str, Any] | None = None) -> str:
     lines = [
         f"**Measured: plain prompt vs `/hm:`** at harness `{rows[0]['harness_sha']}`, same model "
         "and budget; n is the number of runs behind each figure. Leads follow the fixed bands in "
@@ -2713,7 +2713,8 @@ def render_readme_block(rows: list[dict[str, Any]]) -> str:
     ]
     if _pre_eval(rows):
         lines += [f"_{_PRE_EVAL_NOTE}_"]
-    return "\n".join(lines).rstrip("\n") + "\n"
+    block = "\n".join(lines).rstrip("\n") + "\n"
+    return block if tier3 is None else f"{block}\n{render_tier3_readme(tier3)}"
 
 
 def _setup_table(rows: list[dict[str, Any]], card: dict[str, Any]) -> list[str]:
@@ -2746,9 +2747,9 @@ def _setup_table(rows: list[dict[str, Any]], card: dict[str, Any]) -> list[str]:
     ]  # fmt: skip
 
 
-def render_results_md(rows: list[dict[str, Any]]) -> str:
-    """The scorecard as Markdown, what the extra cost buys first; no clock, path or host, so
-    the git history of this file is the eval's trend."""
+def render_results_md(rows: list[dict[str, Any]], tier3: dict[str, Any] | None = None) -> str:
+    """The scorecard as Markdown, what the extra cost buys first, then any tier-3 section; no
+    clock, path or host, so the git history of this file is the eval's trend."""
     card, summary = scorecard(rows), summarize(rows)
     lines = [
         "# hm eval results", "",
@@ -2781,15 +2782,221 @@ def render_results_md(rows: list[dict[str, Any]]) -> str:
                           "", f"Run flags: {flags_text(tier)}."]  # fmt: skip
             lines.append("")
     lines += [f"## {METRIC_HEADER}", "", "```text", render_report(summary), "```"]
+    if tier3 is not None:
+        lines += ["", *render_tier3_md(tier3)]
     return "\n".join(lines) + "\n"
 
 
-def publish(out: Path, docs: Path, readme: Path) -> None:
+# --- tier-3 publish (DRI, 2026-10-16) ---------------------------------------------------------
+# Tier 3 is published beside the scorecard, never in it: the pilot is plain-only and the hm runs
+# are a diagnostic, so neither forms a balanced plain-vs-hm cell. Its rows live in their own dir
+# (`<docs>/tier3/pilot/` and `diagnostic/`), and without that dir publish writes what it wrote
+# before, byte for byte.
+
+TIER3_MIN_KEPT = 4  # SPEC-hm-eval-tier3 pre-registration (4): fewer surviving tasks is inconclusive
+TIER3_PILOT, TIER3_DIAGNOSTIC, TIER3_NOTES = "pilot", "diagnostic", "notes.md"
+TIER3_WITHDRAWN = (
+    "The per-task code-quality claim is withdrawn under the pre-registered rule: an "
+    'inconclusive tier 3 counts as "plain cannot be made to fail fairly", so this eval makes '
+    "no claim that `/hm:` writes better code than a plain prompt on any task."
+)
+
+
+def _tier3_rows(directory: Path, what: str) -> list[dict[str, Any]]:
+    rows = [r for r in read_rows(directory) if r.get("status") not in UNUSABLE]
+    try:
+        ensure_consistent(rows)
+    except MixedResultsError as exc:
+        raise PublishError(f"tier-3 {what} rows: {exc}") from exc
+    if any(tier_of(r) != 3 for r in rows):
+        raise PublishError(f"tier-3 {what} rows in {directory / RESULTS} hold a non-tier-3 row")
+    return sorted(rows, key=lambda r: ((len(str(r["task"])), str(r["task"])),
+                                       ALL_ARMS.index(str(r["arm"])), r["rep"]))  # fmt: skip
+
+
+def tier3_inputs(root: Path) -> dict[str, Any] | None:
+    """The pilot rows, the diagnostic rows and the hand-written notes under `root`, or None
+    when there is no pilot; PublishError when they cannot be reported honestly."""
+    if not (root / TIER3_PILOT / RESULTS).exists():
+        return None
+    pilot = _tier3_rows(root / TIER3_PILOT, TIER3_PILOT)
+    diagnostic = _tier3_rows(root / TIER3_DIAGNOSTIC, TIER3_DIAGNOSTIC)
+    if not pilot:
+        raise PublishError(f"no usable tier-3 pilot rows in {root / TIER3_PILOT / RESULTS}")
+    if any(r["arm"] != "plain" for r in pilot):
+        raise PublishError("the tier-3 pilot is plain-only; it holds another arm's row")
+    hashes = sorted({str(r.get("tier3_hash")) for r in pilot + diagnostic})
+    if len(hashes) > 1:
+        raise PublishError(f"the tier-3 pilot and diagnostic mix tier3_hash values {hashes}")
+    guards = {t.id for t in load_tier3_tasks() if t.guard}
+    tasks: list[dict[str, Any]] = []
+    for task in sorted({str(r["task"]) for r in pilot}, key=lambda t: (len(t), t)):
+        mine = [r for r in pilot if r["task"] == task]
+        solved = sum(1 for r in mine if outcome_of(r) == "solved")
+        label = pilot_label(task, solved, len(mine), guards)
+        if label.startswith("n/a"):
+            raise PublishError(f"the tier-3 pilot has {len(mine)} run(s) of {task}; the drop "
+                               f"rule needs {PILOT_RUNS}")  # fmt: skip
+        tasks.append({"task": task, "rows": mine, "solved": solved, "label": label})
+    notes = root / TIER3_NOTES
+    return {
+        "pilot": pilot, "diagnostic": diagnostic, "tasks": tasks, "tier3_hash": hashes[0],
+        "kept": [t["task"] for t in tasks if t["label"] == "keep"],
+        "guards": [t["task"] for t in tasks if t["label"] == "guard"],
+        "notes": notes.read_text(encoding="utf-8").strip("\n") if notes.exists() else "",
+    }  # fmt: skip
+
+
+def _tier3_solved(rows: list[dict[str, Any]]) -> int:
+    return sum(1 for r in rows if outcome_of(r) == "solved")
+
+
+def _tier3_cases(rows: list[dict[str, Any]]) -> str:
+    graded = [r for r in rows if isinstance(r.get("hidden"), dict)]
+    passed = sum(_cases_passed(r) for r in graded)
+    return f"{passed}/{sum(int(r['hidden'].get('tests', 0)) for r in graded)}"
+
+
+def _tier3_money(rows: list[dict[str, Any]]) -> str:
+    cell = _cell(rows)
+    return "n/a" if cell["mean_cost"] is None else f"${cell['mean_cost']:.3f}"
+
+
+def _tier3_wall(rows: list[dict[str, Any]]) -> str:
+    return format_duration(_cell(rows)["mean_wall_s"] or 0.0, len(rows)).split(" (")[0]
+
+
+def _tier3_verdict(t3: dict[str, Any]) -> str:
+    kept = t3["kept"]
+    named = f" ({', '.join(kept)})" if kept else ""
+    if len(kept) < TIER3_MIN_KEPT:
+        return (f"**Outcome: T = {len(kept)}{named}, below the {TIER3_MIN_KEPT} surviving tasks "
+                "the rule needs, so tier 3 is inconclusive.**")  # fmt: skip
+    return (f"**Outcome: T = {len(kept)}{named}; the pre-registered full run decides, and this "
+            "section makes no claim.**")  # fmt: skip
+
+
+def _setup_cell(rows: list[dict[str, Any]], field: str) -> str:
+    return ", ".join(f"`{v}`" for v in sorted({str(r.get(field)) for r in rows})) or "n/a"
+
+
+def render_tier3_md(t3: dict[str, Any]) -> list[str]:
+    """The tier-3 section of RESULTS.md: the plain pilot per task, the drop rule and its
+    outcome, the hm diagnostic labelled as one, then the hand-written notes. No model name,
+    clock, path or host."""
+    pilot, diag = t3["pilot"], t3["diagnostic"]
+    runs = len(pilot)
+    guards = ", ".join(t3["guards"]) or "none"
+    sets = [("pilot", pilot), *([("diagnostic", diag)] if diag else [])]
+
+    def dates(rows: list[dict[str, Any]]) -> str:
+        days = sorted(str(r["started_at"])[:10] for r in rows if r.get("started_at"))
+        return f"{days[0]} to {days[-1]}" if days else "n/a"
+
+    lines = [
+        "## Tier 3", "",
+        "Tasks whose prompt does not hold the answer: it sits in a file of the repo or in an "
+        f"earlier session. {guards} is the guard. These rows sit outside the scorecard above.", "",
+        "| Setup | " + " | ".join(name for name, _ in sets) + " |",
+        "|---|" + "---|" * len(sets),
+        f"| tier3_hash | `{t3['tier3_hash']}` |" + " |" * (len(sets) - 1),
+        "| harness_sha | " + " | ".join(_setup_cell(r, "harness_sha") for _, r in sets) + " |",
+        "| runner_hash | " + " | ".join(_setup_cell(r, "runner_hash") for _, r in sets) + " |",
+        "| arms | " + " | ".join(", ".join(a for a in ALL_ARMS if any(x["arm"] == a for x in r))
+                                 for _, r in sets) + " |",
+        "| runs started | " + " | ".join(dates(r) for _, r in sets) + " |",
+        "", "### Plain pilot", "",
+        f"Pre-registered drop rule: a task drops when plain solves 2 or more of {PILOT_RUNS} runs; "
+        f"the guard is exempt. Tier 3 needs at least {TIER3_MIN_KEPT} surviving tasks (T).", "",
+        "| Task | plain solved | hidden cases | $/run | wall/run | Pilot |",
+        "|---|---|---|---|---|---|",
+    ]  # fmt: skip
+    for task in t3["tasks"]:
+        rows = task["rows"]
+        lines.append(f"| {task['task']} | {task['solved']}/{len(rows)} | {_tier3_cases(rows)} | "
+                     f"{_tier3_money(rows)} | {_tier3_wall(rows)} | {task['label']} |")  # fmt: skip
+    lines += ["", f"Plain solved {_tier3_solved(pilot)} of {runs} pilot runs. {_tier3_verdict(t3)}"]
+    if len(t3["kept"]) < TIER3_MIN_KEPT:
+        lines += ["", f"**{TIER3_WITHDRAWN}**"]
+    if diag:
+        tasks = sorted({str(r["task"]) for r in diag}, key=lambda t: (len(t), t))
+        lines += [
+            "", f"### hm diagnostic on {', '.join(tasks)} (diagnostic, not a verdict)", "",
+            "Asked by the DRI to see whether `/hm:` carries state across fresh headless "
+            "sessions. It is not the pre-registered full run, too small to decide anything, and "
+            "it changes no outcome above.", "",
+            "| Task | Arm | Solved | hidden cases | $/run | wall/run |",
+            "|---|---|---|---|---|---|",
+        ]  # fmt: skip
+        for task in tasks:
+            for arm in ALL_ARMS:
+                mine = [r for r in diag if r["task"] == task and r["arm"] == arm]
+                if mine:
+                    lines.append(f"| {task} | {arm} | {_tier3_solved(mine)}/{len(mine)} | "
+                                 f"{_tier3_cases(mine)} | {_tier3_money(mine)} | "
+                                 f"{_tier3_wall(mine)} |")  # fmt: skip
+        lines += ["", "| Run | Solved | hidden cases | Sessions (status, $, wall) | $ | wall |",
+                  "|---|---|---|---|---|---|"]  # fmt: skip
+        for r in diag:
+            sessions = (
+                "; ".join(
+                    f"{s.get('status')}, {_tier3_money([s])}, {_tier3_wall([s])}"
+                    for s in r.get("sessions") or []
+                )
+                or "n/a"
+            )
+            lines.append(f"| {r['task']} {r['arm']} {r['rep']} | "
+                         f"{'yes' if outcome_of(r) == 'solved' else outcome_of(r) or 'no'} | "
+                         f"{_tier3_cases([r])} | {sessions} | {_tier3_money([r])} | "
+                         f"{_tier3_wall([r])} |")  # fmt: skip
+    if t3["notes"]:
+        lines += ["", "### Notes", "", t3["notes"]]
+    return lines
+
+
+def render_tier3_readme(t3: dict[str, Any]) -> str:
+    """One or two sentences for the README block, kept whichever arm they favour."""
+    pilot, kept = t3["pilot"], t3["kept"]
+    tasks_word = "task" if len(kept) == 1 else "tasks"
+    first = (f"**Tier 3** (the answer is in the repo or an earlier session, not the prompt): plain "
+             f"solved {_tier3_solved(pilot)} of {len(pilot)} pilot runs, so {len(kept)} "
+             f"{tasks_word} survived the pre-registered drop rule")  # fmt: skip
+    if len(kept) < TIER3_MIN_KEPT:
+        first += (f" where {TIER3_MIN_KEPT} are needed; tier 3 is inconclusive and the per-task "
+                  "code-quality claim is withdrawn.")  # fmt: skip
+    else:
+        first += "; the pre-registered full run decides."
+    hm = [r for r in t3["diagnostic"] if r["arm"] == "hm"]
+    if not hm:
+        return first + "\n"
+    tasks = sorted({str(r["task"]) for r in hm}, key=lambda t: (len(t), t))
+
+    def arm_text(arm: str, rows: list[dict[str, Any]], named: bool) -> str:
+        cells = []
+        for t in tasks:
+            mine = [r for r in rows if r["task"] == t]
+            cells.append(f"{t + ' ' if named else ''}{_tier3_solved(mine)}/{len(mine)}")
+        return f"{arm} {' and '.join(cells)} at {_tier3_money(rows)}/run"
+
+    parts = [
+        arm_text("hm solved", hm, True),
+        arm_text("plain (pilot)", [r for r in pilot if r["task"] in tasks], False),
+    ]
+    parts += [arm_text(arm, mine, False) for arm in CONTROL_ARMS
+              if (mine := [r for r in t3["diagnostic"] if r["arm"] == arm])]  # fmt: skip
+    second = (f" A diagnostic on {' and '.join(tasks)}, not a verdict: {'; '.join(parts)} "
+              "([details](docs/evals/RESULTS.md#tier-3)).")  # fmt: skip
+    return first + second + "\n"
+
+
+def publish(out: Path, docs: Path, readme: Path, tier3: Path | None = None) -> None:
     """Render RESULTS.md and the README block, then write both atomically, the README first: a
-    refusal writes nothing, and a failure after the README is completed by re-running publish."""
+    refusal writes nothing, and a failure after the README is completed by re-running publish.
+    Tier 3 comes from `tier3` (default `<docs>/tier3`) when it holds pilot rows."""
     rows = publish_rows(out)
-    results = render_results_md(rows)
-    text = splice_readme(readme.read_bytes().decode("utf-8"), render_readme_block(rows))
+    extra = tier3_inputs(docs / TIER3 if tier3 is None else tier3)
+    results = render_results_md(rows, extra)
+    text = splice_readme(readme.read_bytes().decode("utf-8"), render_readme_block(rows, extra))
     atomic_write(readme, text)
     atomic_write(docs / RESULTS_MD, results)
 
@@ -3148,7 +3355,7 @@ def _cmd_report(args: argparse.Namespace) -> int:
 def _cmd_publish(args: argparse.Namespace) -> int:
     docs, readme = Path(args.docs), Path(args.readme)
     try:
-        publish(Path(args.out), docs, readme)
+        publish(Path(args.out), docs, readme, Path(args.tier3) if args.tier3 else None)
     except (MixedResultsError, PublishError, OSError, UnicodeDecodeError) as exc:
         print(f"refusing to publish: {exc}", file=sys.stderr)
         return 2
@@ -3262,6 +3469,10 @@ def _parser() -> argparse.ArgumentParser:
     pub.add_argument("--out", required=True, help="results dir")
     pub.add_argument("--docs", default=str(REPO_ROOT / "docs" / "evals"))
     pub.add_argument("--readme", default=str(REPO_ROOT / "README.md"))
+    pub.add_argument(
+        "--tier3", default=None,
+        help="tier-3 rows dir with pilot/, diagnostic/ and notes.md (default: <docs>/tier3)",
+    )  # fmt: skip
     sub.add_parser("check", help="prove each task's hidden tests discriminate (offline)")
     return parser
 
