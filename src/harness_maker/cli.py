@@ -1647,7 +1647,16 @@ def _apply_dimension_overrides(
                 # `--preset` switch. `update` restores it only when the flag carried it.
                 comprehension_depth=effective_depth,
             )
-            result = rebuilt.model_copy(update=update)
+            # `reviewers` and `reviewers_fanout` likewise: both presets ship the same reviewer
+            # lists, and a reset would turn a user's fan-out off and name no lens, so the
+            # orphan sweep would delete the lens agents (SPEC-hm-overhaul-p1 D-9).
+            result = rebuilt.model_copy(
+                update={
+                    "reviewers": {k: list(v) for k, v in answers.reviewers.items()},
+                    "reviewers_fanout": answers.reviewers_fanout,
+                    **update,
+                }
+            )
             if focus_override:
                 additional = _focus_to_additional_reviewers(focus_override, new_preset)
                 if additional:

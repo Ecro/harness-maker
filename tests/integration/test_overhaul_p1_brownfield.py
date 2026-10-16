@@ -90,8 +90,10 @@ def _harness_paths(listing: dict[str, bytes]) -> set[str]:
     }
 
 
-def _upgrade(project: Path, home: Path) -> subprocess.CompletedProcess[str]:
-    r = run_make(project, ["--update"], src=HEAD_SRC, home=home)
+def _upgrade(
+    project: Path, home: Path, extra: tuple[str, ...] = ()
+) -> subprocess.CompletedProcess[str]:
+    r = run_make(project, ["--update", *extra], src=HEAD_SRC, home=home)
     assert r.returncode == 0, (project.name, r.stdout[-2000:], r.stderr[-2000:])
     return r
 
@@ -360,41 +362,97 @@ def _getdeep(data: dict[str, Any], dotted: str) -> object:
 #: (label, edits, the inert key one warning must name, a key no warning may name). A 0.62 file
 #: already names lens reviewers in `installed` and sets `autopilot_persistent: true`, so the
 #: unedited tree's own warnings are the baseline the "gives none" rows compare against.
-_KEY_ROWS: list[tuple[str, dict[str, object], str | None, str | None]] = [
-    ("loop", {"loop.enabled": True}, "loop.enabled", None),
-    ("deleg-review", {"delegation.stages": ["review", "execute"]}, "delegation.stages", None),
-    ("deleg-verify", {"delegation.stages": ["verify"]}, "delegation.stages", None),
-    ("rounds", {"reviewers.max_review_rounds": 4}, None, "max_review_rounds"),
+#: Each row's 5th field is extra `make` flags. A `forbid` of "" means no inert warning at all.
+_Row = tuple[str, dict[str, object], str | None, str | None, tuple[str, ...]]
+_LENS_FANOUT = {"reviewers.fanout": True, "reviewers.installed": ["code-reviewer", *LENSES]}
+_RETIRED_AGENT_MODEL_ROWS: list[_Row] = [
+    (
+        f"agent-model-{n}",
+        {f"agent_models.{n}": {"claude": "tier-small"}},
+        f"agent_models.{n}",
+        None,
+        (),
+    )
+    for n in ("stuck", "security-auditor", "executor", "autoloop-coder")
+]
+_KEY_ROWS: list[_Row] = [
+    ("loop", {"loop.enabled": True}, "loop.enabled", None, ()),
+    ("deleg-review", {"delegation.stages": ["review", "execute"]}, "delegation.stages", None, ()),
+    ("deleg-verify", {"delegation.stages": ["verify"]}, "delegation.stages", None, ()),
+    ("rounds", {"reviewers.max_review_rounds": 4}, None, "max_review_rounds", ()),
+    # The 0.62 file names every lens in `installed`, so each lens row first narrows it to
+    # code-reviewer; otherwise the row would pass on the unedited file's own warning.
     (
         "lens-no-fanout",
-        {"reviewers.enabled": ["code-reviewer", "security-reviewer"]},
+        {
+            "reviewers.installed": ["code-reviewer"],
+            "reviewers.enabled": ["code-reviewer", "security-reviewer"],
+        },
         "reviewers.installed/enabled",
         None,
+        (),
     ),
     (
-        "fanout",
-        {"reviewers.fanout": True, "reviewers.installed": ["code-reviewer", *LENSES]},
+        "lens-none",
+        {"reviewers.installed": ["code-reviewer"], "reviewers.enabled": ["code-reviewer"]},
         None,
-        "reviewers.",
+        "reviewers.installed/enabled",
+        (),
     ),
+    ("fanout", _LENS_FANOUT, None, "reviewers.", ()),
+    # A `--preset` switch rebuilds the answers from an allowlist; the fan-out must survive it.
+    ("fanout-preset", _LENS_FANOUT, None, "reviewers.", ("--preset", "Production")),
     (
         "fanout-empty",
         {"reviewers.fanout": True, "reviewers.installed": ["code-reviewer"]},
         "reviewers.fanout",
         None,
+        (),
     ),
-    ("skill", {"skills.enabled": ["context-linter", "conditional-router"]}, "skills.enabled", None),
+    (
+        "skill",
+        {"skills.enabled": ["context-linter", "conditional-router"]},
+        "skills.enabled",
+        None,
+        (),
+    ),
     (
         "agent-model",
         {"agent_models.test-reviewer": {"claude": "tier-small"}},
         "agent_models.test-reviewer",
         None,
+        (),
     ),
+    *_RETIRED_AGENT_MODEL_ROWS,
     (
         "autopilot",
         {"autonomy.autopilot_persistent": True},
         "autonomy.autopilot_persistent",
         None,
+        (),
+    ),
+    (
+        "autopilot-off",
+        {"autonomy.autopilot_persistent": False},
+        None,
+        "autonomy.autopilot_persistent",
+        (),
+    ),
+    (
+        "none",
+        {
+            "loop.enabled": False,
+            "delegation.stages": [],
+            "reviewers.installed": ["code-reviewer"],
+            "reviewers.enabled": ["code-reviewer"],
+            "skills.enabled": ["context-linter"],
+            "agent_models": {},
+            "instrumentation.stage_agent_ledger": False,
+            "autonomy.autopilot_persistent": False,
+        },
+        None,
+        "",
+        (),
     ),
 ]
 
@@ -442,18 +500,18 @@ def test_ac007_user_blocks_and_hooks_survive(pristine: dict[str, Path], tmp_path
     base_tree = _copy(source, tmp_path / "k-baseline")
     baseline = set(_inert_warnings(_upgrade(base_tree, tmp_path / "kh-baseline")))
 
-    def one(row: tuple[str, dict[str, object], str | None, str | None]) -> list[str]:
-        label, edits, key, forbid = row
+    def one(row: _Row) -> list[str]:
+        label, edits, key, forbid, flags = row
         t = _copy(source, tmp_path / f"k-{label}")
         yaml_path = t / ".claude" / "harness.yaml"
         _edit_yaml(yaml_path, edits)
         out: list[str] = []
         for run in (1, 2):  # the warning repeats per `make`; the value survives both re-renders
-            warnings = _inert_warnings(_upgrade(t, tmp_path / f"kh-{label}"))
+            warnings = _inert_warnings(_upgrade(t, tmp_path / f"kh-{label}", flags))
             if key is not None and len([w for w in warnings if f" {key}:" in w]) != 1:
                 out.append(f"{label} run {run}: expected one warning naming {key}, got {warnings}")
             if forbid is not None:
-                extra = [w for w in warnings if forbid in w or w not in baseline]
+                extra = [w for w in warnings if forbid in w or (forbid and w not in baseline)]
                 if extra:
                     out.append(f"{label} run {run}: unexpected {extra}")
             after = _load_yaml(yaml_path)
@@ -465,10 +523,10 @@ def test_ac007_user_blocks_and_hooks_survive(pristine: dict[str, Path], tmp_path
             execute = (t / ".claude" / "commands" / "hm" / "execute.md").read_text(encoding="utf-8")
             if label == "rounds" and "(4) rounds" not in execute:
                 out.append("reviewers.max_review_rounds is no longer read by execute.md")
-            if label == "fanout":
+            if label in ("fanout", "fanout-preset"):
                 agents = {p.stem for p in (t / ".claude" / "agents").glob("*.md")}
                 if not set(LENSES) <= agents:
-                    out.append(f"fanout run {run}: lens agents missing, have {sorted(agents)}")
+                    out.append(f"{label} run {run}: lens agents missing, have {sorted(agents)}")
         return out
 
     with ThreadPoolExecutor(_WORKERS) as pool:
