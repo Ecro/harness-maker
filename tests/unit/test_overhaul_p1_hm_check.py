@@ -879,7 +879,8 @@ def test_ac005_failing_mutation_gates(tmp_path: Path, monkeypatch: pytest.Monkey
     assert out["sections"]["mutation"]["ok"] is False
     assert "40%" in out["sections"]["mutation"]["tail"]
     code, out = run_check(p)
-    assert code == 0 and "mutation" not in out["sections"], out
+    assert code == 0, out
+    assert "mutation" not in out["sections"], out
 
 
 def test_ac005_harness_reports_and_never_gates(
@@ -889,7 +890,8 @@ def test_ac005_harness_reports_and_never_gates(
     code, out = run_check(p, "--harness")
     body = out["sections"]["harness"]
     assert code == 0, out
-    assert body["gating"] is False and body["ok"] is True
+    assert body["gating"] is False
+    assert body["ok"] is True
     assert isinstance(body["score"], (int, float))
     assert isinstance(body["signals_failed"], list)
 
