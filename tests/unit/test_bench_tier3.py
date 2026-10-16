@@ -553,7 +553,8 @@ def test_tier3_rows_record_their_hash_and_never_mix(
 
 
 def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType) -> None:
-    """Values recorded by the runner at origin/main db19f023, before tier 3 existed."""
+    """Values recorded by the runner at origin/main 687a46c3, before tier 3 existed (the report
+    and scorecard pins moved there when #30 added wall time to the headline)."""
     assert bench.bench_hash() == "569e17ef29ab"
     assert bench.tier2_hash() == "1cf707c57e12"
     tools = {"ruff": "r", "mypy": "m"}
@@ -568,9 +569,9 @@ def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType) -> None:
     )
     rows = bench.read_rows(_ROOT / "docs" / "evals")
     report = hashlib.sha256(bench.report_text(rows).encode()).hexdigest()[:16]
-    assert report == "387310765063ba47"
+    assert report == "a082ce5d4abd734b"
     card = json.dumps(bench.scorecard(rows), sort_keys=True)
-    assert hashlib.sha256(card.encode()).hexdigest()[:16] == "5aab714072eb7600"
+    assert hashlib.sha256(card.encode()).hexdigest()[:16] == "4a9d0dc59df6770c"
 
 
 _TIER_TWO_ROW_KEYS = {
