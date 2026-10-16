@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import os
 import re
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -29,9 +28,6 @@ EXPECTED_README_INSTALL_COMMANDS: frozenset[str] = frozenset(
         # Claude Code marketplace install (canonical path)
         "claude plugin marketplace add Ecro/harness-maker",
         "claude plugin install harness-maker@harness-maker",
-        # Cursor local-clone install (community pattern)
-        "git clone --depth 1 https://github.com/Ecro/harness-maker.git "
-        "~/.cursor/plugins/local/harness-maker",
         "codex plugin marketplace add Ecro/harness-maker",
         "codex plugin add harness-maker@harness-maker",
         # Codex CLI PyPI fallback (when `claude` CLI is not present)
@@ -122,47 +118,6 @@ def install_via_uv_tool(wheel: Path, tool_dir: Path) -> Path:
             f"contents of {bin_dir}: {list(bin_dir.iterdir())}"
         )
     return binary
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# Cursor local-clone install simulation
-# ──────────────────────────────────────────────────────────────────────────
-
-
-def simulate_cursor_install(repo_root: Path, target_dir: Path) -> Path:
-    """Simulate the README's ``git clone ~/.cursor/plugins/local/harness-maker``
-    by copying the repo into ``target_dir``. Returns the install path.
-
-    Why ``copytree`` instead of a real ``git clone``: the network path is
-    out of scope for a unit-like integration test; what we care about
-    structurally is that the resulting directory contains
-    ``.cursor-plugin/plugin.json``, the manifest Cursor needs to register
-    the plugin. ``copytree`` exactly reproduces the on-disk state
-    ``git clone --depth 1`` would leave, minus the ``.git`` dir.
-    """
-    if target_dir.exists():
-        shutil.rmtree(target_dir)
-    # `symlinks=True` is REQUIRED security hardening (REVIEW security P1-3,
-    # 2026-05-23): with the default `symlinks=False`, copytree follows each
-    # symlink and copies the TARGET file. A PR adding e.g. a symlink at
-    # `src/harness_maker/secrets -> /etc/shadow` would cause this helper to
-    # read arbitrary host files during the test. With `symlinks=True`, the
-    # symlinks are preserved AS symlinks — Cursor users typically wouldn't
-    # have any in this tree, but the safety property must hold defensively.
-    shutil.copytree(
-        src=repo_root,
-        dst=target_dir,
-        symlinks=True,
-        ignore=shutil.ignore_patterns(
-            ".git",
-            ".worktrees",
-            ".venv",
-            "__pycache__",
-            "*.pyc",
-            ".pytest_cache",
-        ),
-    )
-    return target_dir
 
 
 # ──────────────────────────────────────────────────────────────────────────

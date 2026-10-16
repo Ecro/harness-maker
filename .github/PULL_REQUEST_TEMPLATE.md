@@ -21,7 +21,7 @@ See ADR-011 in work-docs/PLAN-oss-readiness-audit.md for the rationale.
 - [ ] Ran `uv run mypy --strict src` locally — clean.
 - [ ] Ran `uv run pytest -x --tb=short` locally — green.
 - [ ] CHANGELOG.md entry added (skip if change is internal-only / not user-visible).
-- [ ] If this is a version bump: all **five** version files moved in lockstep (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`). See CLAUDE.md "버전업 정책".
+- [ ] If this is a version bump: all **four** version files moved in lockstep (`.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`). See CLAUDE.md "버전업 정책".
 - [ ] Linked issue or short rationale below.
 
 Linked issue / rationale:

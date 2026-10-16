@@ -1,7 +1,7 @@
 {
   "name": "harness-maker",
-  "version": "0.62.0",
-  "description": "Per-project AI coding harness for Claude Code, Cursor, and Codex. Bundled hm-make and hm-update skills connect native Codex plugins to a matching Python engine and project generation.",
+  "version": "0.63.0",
+  "description": "Per-project AI coding harness for Claude Code and Codex. Bundled hm-make and hm-update skills connect native Codex plugins to a matching Python engine and project generation.",
   "author": {
     "name": "noel"
   },
@@ -11,7 +11,6 @@
   "keywords": [
     "codex",
     "claude-code",
-    "cursor",
     "harness",
     "autoloop",
     "anti-rot",
@@ -26,7 +25,7 @@
   "interface": {
     "displayName": "Harness Maker",
     "shortDescription": "Project harness setup and updates for Codex",
-    "longDescription": "Per-project AI coding harness for Claude Code, Cursor, and Codex. Bundled hm-make and hm-update skills connect native Codex plugins to a matching Python engine and project generation.",
+    "longDescription": "Per-project AI coding harness for Claude Code and Codex. Bundled hm-make and hm-update skills connect native Codex plugins to a matching Python engine and project generation.",
     "developerName": "noel",
     "category": "Developer Tools",
     "defaultPrompt": "Set up or update this project with harness-maker.",

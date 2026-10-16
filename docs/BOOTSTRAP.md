@@ -1,6 +1,6 @@
 # Bootstrapping harness-maker in a fresh project
 
-Canonical onboarding reference for **Claude Code**, **Cursor**, and **Codex CLI**.
+Canonical onboarding reference for **Claude Code** and **Codex CLI**.
 Paste the IDE-matching snippet into your agent's onboarding meta-prompt instead
 of re-implementing a plugin-cache resolver — that path is a known footgun (see
 [Anti-pattern](#anti-pattern-do-not-do-this) below).
@@ -26,26 +26,6 @@ claude plugin install harness-maker@harness-maker
 Then in Claude Code, run `/reload-plugins` once. After that, the plugin's CLI
 is available as `harness-maker` (and `python -m harness_maker.cli`) within
 `uv run --with` invocations resolved through the install path.
-
-### Cursor
-
-```bash
-git clone --depth 1 https://github.com/Ecro/harness-maker.git \
-    ~/.cursor/plugins/local/harness-maker
-```
-
-Then reload the Cursor window (`Ctrl+Shift+P` → **Reload Window**) so it picks
-up the plugin's skills, agents, and commands.
-
-> **Note for Cursor users:** the git-clone install does NOT write to
-> `~/.claude/plugins/installed_plugins.json` (which is Claude Code's plugin
-> registry). Therefore `harness-maker locate` (Step 2) will return exit 3 in
-> this setup. For Cursor-only environments, use the cloned path directly:
-> ```bash
-> HM_DIR="$HOME/.cursor/plugins/local/harness-maker"
-> ```
-> Then skip to Step 4. If you also use Claude Code from the same machine, the
-> Claude Code install will satisfy `locate` for both IDEs.
 
 ### Codex CLI
 
@@ -129,10 +109,10 @@ harness-maker locate --plain --require-version 0.20 || exit $?
 
 ### Exit codes (stable contract)
 
-| Code | Meaning | Recovery (Claude Code / Cursor / Codex) |
+| Code | Meaning | Recovery (Claude Code / Codex) |
 |------|---------|------------------------------------------|
 | 0 | Found and (if requested) version OK | proceed |
-| 2 | Version mismatch — installed is older than `--require-version X.Y` | Claude Code: `claude plugin update harness-maker` · Cursor (git clone): `git -C ~/.cursor/plugins/local/harness-maker pull` · Codex: `codex plugin update harness-maker` |
+| 2 | Version mismatch — installed is older than `--require-version X.Y` | Claude Code: `claude plugin update harness-maker` · Codex: `codex plugin update harness-maker` |
 | 3 | No installed plugin entry found for cwd | Install per Step 1 above for your IDE, or install user-scope: `claude plugin install harness-maker@harness-maker` |
 
 Use `exit 2` and `exit 3` in your shell branches when handling the failure
@@ -158,7 +138,7 @@ creates a `.claude/`.
 Once Steps 1–3 succeed, hand control to harness-maker's own slash command:
 
 ```text
-/harness-maker:make    # in Claude Code or Cursor
+/harness-maker:make    # in Claude Code
 ```
 
 or, from a shell:

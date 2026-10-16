@@ -48,7 +48,6 @@ harness-maker/
 │   └── hooks/                # telemetry hooks
 ├── commands/make.md          # /harness-maker:make plugin entry
 ├── .claude-plugin/plugin.json  # Claude Code marketplace manifest
-├── .cursor-plugin/plugin.json  # Cursor Marketplace manifest
 ├── tests/
 │   ├── unit/                 # per-module pytest
 │   │   └── test_no_network.py # ADR-005 positive obligation (no outbound socket during audit / telemetry)
@@ -216,7 +215,7 @@ Before opening a PR:
 - [ ] If you added a skill/agent/preset: enumerated in `.claude-verify.sh final_acceptance`
 - [ ] If you added a template: starts with `---` frontmatter (provenance invariant)
 - [ ] `TECH_SPEC.md` updated if the change touches a Section 3 mechanism (M1-M14) or Section 5 acceptance criteria
-- [ ] If bumping the version: all **5 files** updated in the same commit: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
+- [ ] If bumping the version: all **4 files** updated in the same commit: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
 - [ ] Commit message follows `<type>(phase<N>): <description>` (e.g. `feat(phase4): add anti-rot adaptive threshold`)
 
 ## Reporting Issues

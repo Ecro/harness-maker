@@ -222,8 +222,6 @@ harness-maker/
 ├── .claude-progress.json                # autoloop runtime state (gitignored)
 ├── .claude-plugin/
 │   └── plugin.json                      # Claude Code official manifest
-├── .cursor-plugin/
-│   └── plugin.json                      # Cursor marketplace manifest
 ├── .codex-plugin/
 │   └── plugin.json                      # Codex plugin manifest
 ├── .claude/                             # harness-maker dogfoods itself (Phase 9)
@@ -679,7 +677,7 @@ class ConflictItem(BaseModel):
 - All generated assets carry a frontmatter header (generated_by, harness_maker_version, content_hash, source_template, generated_at, provenance)
 - `/hm:refresh` compares hashes → detects user modifications → blocks silent overwrite
 - Brownfield reconcile uses frontmatter to distinguish ours from theirs
-- Version numbers must be updated in **5 files simultaneously**: `.claude-plugin/plugin.json` · `.cursor-plugin/plugin.json` · `.codex-plugin/plugin.json` · `pyproject.toml` · `src/harness_maker/__init__.py`. Missing any one causes a runtime or marketplace manifest to report the previous version. ADR-108: when rendering drift diffs, XML fence delimiters are defanged (both open and close tags) to prevent the diff content from being interpreted as live tool calls.
+- Version numbers must be updated in **4 files simultaneously**: `.claude-plugin/plugin.json` · `.codex-plugin/plugin.json` · `pyproject.toml` · `src/harness_maker/__init__.py`. Missing any one causes a runtime or marketplace manifest to report the previous version. ADR-108: when rendering drift diffs, XML fence delimiters are defanged (both open and close tags) to prevent the diff content from being interpreted as live tool calls.
 
 **(M14) Multi-target rendering — Claude Code, Cursor, Codex**
 - `HarnessConfig.targets: list[Target]` — user makes an explicit selection during the interview (auto-detection is prohibited)
@@ -692,7 +690,7 @@ class ConflictItem(BaseModel):
   - `.codex/config.toml` and `.codex/agents/*.toml` — pure TOML config and agent registrations
   - `.codex/hooks.json` — Codex hook schema, including `PermissionRequest` handling
   - `.agents/skills/*/SKILL.md` — existing skills plus generated stage, workflow, and loop trigger skills
-- Plugin manifests: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — version synchronization is mandatory
+- Plugin manifests: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — version synchronization is mandatory
 - `recommended_model: claude-opus-4-7` — propagated to agent frontmatter. User override permitted. Prompts themselves are not neutralized for model (`<thinking>` and other Claude-specific expressions are preserved). ADR-107: tool_input fields passed through telemetry hooks are filtered against a whitelist; any field matching a secret pattern (API keys, tokens, passwords) is redacted before writing to `metrics.jsonl`.
 
 ### Preset Default Comparison

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-10-16
+
 ### Added
 
 - **Plain-vs-hm eval with published results (SPEC-hm-eval).** `scripts/bench_light_lane.py` now records,
@@ -177,6 +179,16 @@
 
 ### Removed
 
+- **The Cursor target (SPEC-hm-overhaul-p1 PR-C).** `targets` accepts `claude-code` and `codex`;
+  `templates/cursor/`, `.cursor-plugin/plugin.json` and the flat hooks schema are gone, and version sync
+  is four files. A `cursor` entry in `harness.yaml` or `--targets` is dropped with one
+  `cursor target removed` warning per `make` (an emptied list becomes `[claude-code]`), and
+  `agent_models.<agent>.cursor` still loads but is ignored with a warning. `make` deletes a 0.62
+  `.cursor/` file only when it is unedited: `.cursor/hooks.json` must match the render manifest **and**
+  hold only harness-managed entries, so a merged user hook keeps it. Every kept file prints a KEPT
+  warning on each run, and an emptied `.cursor/` is removed. The Cursor model-id advisory leaves
+  readiness, whose model-routing signals are reweighted 50/50. `hook_host` stays, so the Claude copy of a
+  hook still stands down while a kept `.cursor/hooks.json` runs.
 - **Intent trial machinery.** `hm intent trial`, `hm intent reconcile` and `hm intent record-decision`
   are gone, along with the frozen `intent_trial.py` module and its `worktree.py` hooks.
 - `hm intent new --from-proposal` no longer appends an `objective_proposed` ledger row. The event

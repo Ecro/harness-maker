@@ -74,7 +74,7 @@ def _normalize_version(value: str) -> str:
 
 def _source_versions(root: Path) -> dict[str, str]:
     versions: dict[str, str] = {}
-    for relative in VERSION_FILES[:3]:
+    for relative in VERSION_FILES[:2]:
         payload = json.loads((root / relative).read_text(encoding="utf-8"))
         versions[relative] = str(payload["version"])
     pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))

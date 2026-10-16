@@ -67,12 +67,11 @@ Run from `main` after the version-bump commit is merged.
 ```bash
 VERSION="$(uv run python -c 'from harness_maker import __version__; print(__version__)')"
 
-# 5-file version sync — every file must match
+# 4-file version sync — every file must match
 grep -H 'version\|__version__' \
     pyproject.toml \
     src/harness_maker/__init__.py \
     .claude-plugin/plugin.json \
-    .cursor-plugin/plugin.json \
     .codex-plugin/plugin.json
 
 # Local tag/source/docs identity — no network access
@@ -155,7 +154,7 @@ PyPI does not support replacing a file for the same version. When a defective ve
 1. **Yank** the release on PyPI (Project → Manage → Releases → click version → "Yank release").
    Confirm at `https://pypi.org/project/harness-maker/`; the version is hidden from
    `pip install harness-maker` resolution but stays in the index history.
-2. **Fix forward**: bump the patch version (e.g. `0.14.0 → 0.14.1`) per the 5-file version sync
+2. **Fix forward**: bump the patch version (e.g. `0.14.0 → 0.14.1`) per the 4-file version sync
    policy in CLAUDE.md §버전업 정책.
 3. **Re-run** Phases 1 and 2 with the new version.
 4. Document the yank reason in `CHANGELOG.md` under the yanked version line.

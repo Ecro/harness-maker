@@ -53,11 +53,6 @@ def test_doc_has_claude_code_section(doc_text: str) -> None:
     assert "claude plugin install" in doc_text
 
 
-def test_doc_has_cursor_section(doc_text: str) -> None:
-    """Cursor-specific install + bootstrap snippet present."""
-    assert "Cursor" in doc_text
-
-
 def test_doc_has_codex_section(doc_text: str) -> None:
     """Codex CLI install + bootstrap snippet present."""
     assert "Codex" in doc_text

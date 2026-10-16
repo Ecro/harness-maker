@@ -482,7 +482,7 @@ also reference emitted skills; a valid spelling alone does not establish availab
 
 Codex TOML files intentionally carry no provenance frontmatter because TOML parsers reject markdown preambles. The Reconciler treats `.codex/*.toml` as replaceable generated config, while `AGENTS.md` is block-merge aware.
 
-**Plugin manifests**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, and `.codex-plugin/plugin.json` describe the same package for each runtime. All three manifests must be bumped in sync with `pyproject.toml` and `src/harness_maker/__init__.py` on every version release.
+**Plugin manifests**: `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` describe the same package for each runtime. Both manifests must be bumped in sync with `pyproject.toml` and `src/harness_maker/__init__.py` on every version release.
 
 **Recommended model**: `HarnessConfig.recommended_model` defaults to `opus` and propagates to agent frontmatter. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
 
