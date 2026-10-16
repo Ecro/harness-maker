@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: hm-eval-tier3
-status: draft
+status: approved
 created: 2026-10-15
 tags: [harness-maker, spec, eval, hidden-tests, multi-session, fairness]
 test_framework: pytest

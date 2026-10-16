@@ -395,7 +395,8 @@ ac:
       diagnostic: hm on t20 and t21, plain-careful on t20
     expected:
       results_md: tiers 1-2 render unchanged as a prefix, then T = 1 (t20), inconclusive,
-        the per-task claim withdrawn, the hm rows under a diagnostic-not-a-verdict heading
+        the per-task claim withdrawn, the hm rows under a diagnostic-not-a-verdict
+        heading
       readme: the old block unchanged, then one to three tier-3 sentences
     edge: false
     note: the DRI's card of 2026-10-16 (publish + hm diagnostic)
@@ -406,8 +407,8 @@ ac:
     edge: true
     note: tiers 1-2 keep every byte
   - input:
-      pilot_or_diagnostic: mixed tier3_hash; an hm row in the pilot; a task with 2 pilot
-        runs; a tier-2 row; mixed harness_sha in one dir; every t16 row runner_error;
+      pilot_or_diagnostic: mixed tier3_hash; an hm row in the pilot; a task with 2
+        pilot runs; a tier-2 row; mixed harness_sha in one dir; every t16 row runner_error;
         no t21 row; an unknown arm; a row without rep
     expected:
       publish: exit 2, refusing to publish on stderr, no file written
@@ -417,15 +418,15 @@ ac:
   - input:
       cost: one diagnostic row without a price
     expected:
-      cost_note: every $ is the CLI cost, which excludes subagent spend; 1 of 36 runs has
-        no price and is left out of the $ means
+      cost_note: every $ is the CLI cost, which excludes subagent spend; 1 of 36 runs
+        has no price and is left out of the $ means
     edge: true
     note: with every row priced the unpriced clause is absent
   - input:
       rows: the committed docs/evals/tier3 rows
     expected:
-      tier3_hash: scripts/bench/tier3-signoff.json tier3_hash == tier3_hash() == the rows'
-        tier3_hash
+      tier3_hash: scripts/bench/tier3-signoff.json tier3_hash == tier3_hash() == the
+        rows' tier3_hash
     edge: false
     note: the signed bytes are the published bytes
   rubric_id: null
@@ -434,9 +435,9 @@ ac:
   oracle_source: golden
   oracle_evidence: The keep/drop/guard labels and T are worked by hand from the pre-registered
     drop rule (DESIGN §5); the expected hash is the DRI's own scripts/bench/tier3-signoff.json;
-    the cost caveat restates docs/evals/tier3/notes.md (transcript-priced about $22.2 against
-    $18.1 by the CLI for the diagnostic rows); the no-tier3 golden is the committed
-    tests/unit/fixtures/hm_eval/README.after.md.
+    the cost caveat restates docs/evals/tier3/notes.md (transcript-priced about $22.2
+    against $18.1 by the CLI for the diagnostic rows); the no-tier3 golden is the
+    committed tests/unit/fixtures/hm_eval/README.after.md.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -452,9 +453,9 @@ ac:
 irreversible_decisions: []
 approval:
   kind: human
-  content_hash: b0eb5183e3550deca434aeb4692ac53a4d07d104881cc2323712bc3793b8e144
+  content_hash: 6b648676d4e48fd52d40068a42ba11be51f0da7995ff50c58147d7a7fd3ac7c7
   approved_by: Ecro
-  approved_at: '2026-10-16T05:34:48Z'
+  approved_at: '2026-10-16T09:29:06Z'
   field_hashes:
     schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
     spec_slug: d6600a56500d4c37c60c9dceadfa0d6fd8af5dc2e9a9b7150cf277c5a6bb0a5b
@@ -471,5 +472,6 @@ approval:
     AC-007: d373b8f1d511cfd6dd81a08866255ade2e3782f73a8b2849c82412544364d56f
     AC-008: 77c7a136a8b5a95a3273ef24d5938e59b8c8e4582786df5b180ca1224132260a
     AC-009: 7c0c73c4fe6883cb6706505785b0392a32e43a72680f46d3f51d4249f07410ca
-    ac_order: 164396d6c2494dc69325356de9d2f12b5629b3c0c73cb6ef656e4acf0aad5ff4
+    AC-010: 7a5c289c1166489e10dd7bb9687e9cc2537e0a4dd230375802a238f674aed197
+    ac_order: 9197b2c918245ab06ace42d9ff4679ea85b92fa0c38b4938b0bc74e8d2d86aab
   lane: full
