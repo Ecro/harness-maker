@@ -2810,6 +2810,13 @@ def _tier3_rows(directory: Path, what: str) -> list[dict[str, Any]]:
         raise PublishError(f"tier-3 {what} rows: {exc}") from exc
     if any(tier_of(r) != 3 for r in rows):
         raise PublishError(f"tier-3 {what} rows in {directory / RESULTS} hold a non-tier-3 row")
+    for r in rows:  # checked before the sort, which would raise on either
+        if not isinstance(r.get("task"), str) or r.get("arm") not in ALL_ARMS:
+            raise PublishError(f"a tier-3 {what} row has task {r.get('task')!r} and arm "
+                               f"{r.get('arm')!r}; arms are {list(ALL_ARMS)}")  # fmt: skip
+        if not isinstance(r.get("rep"), int) or isinstance(r.get("rep"), bool):
+            raise PublishError(f"the tier-3 {what} row {r['task']} {r['arm']} has rep "
+                               f"{r.get('rep')!r}, not a run number")  # fmt: skip
     return sorted(rows, key=lambda r: ((len(str(r["task"])), str(r["task"])),
                                        ALL_ARMS.index(str(r["arm"])), r["rep"]))  # fmt: skip
 
@@ -2828,9 +2835,16 @@ def tier3_inputs(root: Path) -> dict[str, Any] | None:
     hashes = sorted({str(r.get("tier3_hash")) for r in pilot + diagnostic})
     if len(hashes) > 1:
         raise PublishError(f"the tier-3 pilot and diagnostic mix tier3_hash values {hashes}")
-    guards = {t.id for t in load_tier3_tasks() if t.guard}
+    bench_tasks = load_tier3_tasks()
+    guards = {t.id for t in bench_tasks if t.guard}
+    # A task whose rows were all dropped as unusable would leave T's denominator silently.
+    expected, seen = {t.id for t in bench_tasks}, {str(r["task"]) for r in pilot}
+    if seen != expected:
+        missing, extra = sorted(expected - seen), sorted(seen - expected)
+        raise PublishError(f"the tier-3 pilot must cover every tier-3 task; missing {missing}, "
+                           f"unknown {extra}")  # fmt: skip
     tasks: list[dict[str, Any]] = []
-    for task in sorted({str(r["task"]) for r in pilot}, key=lambda t: (len(t), t)):
+    for task in sorted(seen, key=lambda t: (len(t), t)):
         mine = [r for r in pilot if r["task"] == task]
         solved = sum(1 for r in mine if outcome_of(r) == "solved")
         label = pilot_label(task, solved, len(mine), guards)
@@ -2860,6 +2874,20 @@ def _tier3_cases(rows: list[dict[str, Any]]) -> str:
 def _tier3_money(rows: list[dict[str, Any]]) -> str:
     cell = _cell(rows)
     return "n/a" if cell["mean_cost"] is None else f"${cell['mean_cost']:.3f}"
+
+
+def _tier3_cost_note(t3: dict[str, Any]) -> str:
+    """Every tier-3 $ is the CLI total, which leaves out subagent spend (docs/evals/tier3/
+    notes.md), and an unpriced row is left out of a mean: say both rather than imply more."""
+    rows = t3["pilot"] + t3["diagnostic"]
+    unpriced = _cell(rows)["cost_unknown"]
+    note = "Each $ is the CLI cost per run, which excludes subagent spend"
+    if any(r["arm"] == "hm" for r in rows):
+        note += ", so an hm $ understates what the run spent"
+    if unpriced:
+        has, be = ("has", "is") if unpriced == 1 else ("have", "are")
+        note += f"; {unpriced} of {len(rows)} runs {has} no price and {be} left out of the $ means"
+    return note + "."
 
 
 def _tier3_wall(rows: list[dict[str, Any]]) -> str:
@@ -2905,6 +2933,7 @@ def render_tier3_md(t3: dict[str, Any]) -> list[str]:
         "| arms | " + " | ".join(", ".join(a for a in ALL_ARMS if any(x["arm"] == a for x in r))
                                  for _, r in sets) + " |",
         "| runs started | " + " | ".join(dates(r) for _, r in sets) + " |",
+        "", _tier3_cost_note(t3),
         "", "### Plain pilot", "",
         f"Pre-registered drop rule: a task drops when plain solves 2 or more of {PILOT_RUNS} runs; "
         f"the guard is exempt. Tier 3 needs at least {TIER3_MIN_KEPT} surviving tasks (T).", "",
@@ -2986,7 +3015,7 @@ def render_tier3_readme(t3: dict[str, Any]) -> str:
               if (mine := [r for r in t3["diagnostic"] if r["arm"] == arm])]  # fmt: skip
     second = (f" A diagnostic on {' and '.join(tasks)}, not a verdict: {'; '.join(parts)} "
               "([details](docs/evals/RESULTS.md#tier-3)).")  # fmt: skip
-    return first + second + "\n"
+    return f"{first}{second} {_tier3_cost_note(t3)}\n"
 
 
 def publish(out: Path, docs: Path, readme: Path, tier3: Path | None = None) -> None:

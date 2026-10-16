@@ -840,6 +840,23 @@ _TIER3_REFUSALS: dict[str, Callable[[], tuple[_Rows, _Rows | None]]] = {
         _pilot(_PILOT_SOLVED),
         [{**r, "harness_sha": f"d{i}"} for i, r in enumerate(_diagnostic())],
     ),
+    # a task whose every row is dropped as unusable must not vanish from T's denominator
+    "task_whose_rows_were_all_dropped": lambda: (
+        [
+            {**r, "status": "runner_error"} if r["task"] == "t16" else r
+            for r in _pilot(_PILOT_SOLVED)
+        ],
+        None,
+    ),  # fmt: skip
+    "missing_guard": lambda: ([r for r in _pilot(_PILOT_SOLVED) if r["task"] != "t21"], None),
+    "unknown_arm": lambda: (
+        _pilot(_PILOT_SOLVED),
+        [*_diagnostic(), {**_diagnostic()[0], "arm": "bogus"}],
+    ),
+    "missing_rep": lambda: (
+        _pilot(_PILOT_SOLVED),
+        [{k: v for k, v in r.items() if k != "rep"} for r in _diagnostic()],
+    ),
 }
 
 
@@ -864,6 +881,44 @@ def test_without_tier3_rows_publish_writes_what_it_wrote_before(
     rows = bench.publish_rows(out)
     assert (repo / "docs" / "evals" / "RESULTS.md").read_text() == bench.render_results_md(rows)
     assert (repo / "README.md").read_text() == (_GOLDEN / "README.after.md").read_text()
+
+
+def test_the_committed_tier3_rows_carry_the_signed_tier3_hash(bench: ModuleType) -> None:
+    """The DRI's sign-off, the checkout's tier-3 fixtures and the published rows name one hash."""
+    signoff = json.loads((_ROOT / "scripts" / "bench" / "tier3-signoff.json").read_text())
+    tier3 = bench.tier3_inputs(_ROOT / "docs" / "evals" / "tier3")
+    assert tier3 is not None
+    assert signoff["tier3_hash"] == bench.tier3_hash() == tier3["tier3_hash"]
+
+
+def test_tier3_costs_say_they_are_cli_totals_without_subagent_spend(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    diagnostic = _diagnostic()
+    diagnostic[0] = {**diagnostic[0], "cost_usd": None}
+    out, repo = _tier3_repo(tmp_path, _pilot(_PILOT_SOLVED), diagnostic)
+    assert _publish3(bench, out, repo) == 0
+    rows = bench.publish_rows(out)
+    section = (repo / "docs" / "evals" / "RESULTS.md").read_text()[
+        len(bench.render_results_md(rows)) :
+    ]
+    readme = (repo / "README.md").read_text()
+    tier3_md = readme[readme.index("**Tier 3**") : readme.index("<!-- hm:eval:end -->")]
+    for text in (section, tier3_md):
+        assert "CLI" in text
+        assert "excludes subagent spend" in text
+        assert "1 of 36 runs has no price" in text  # counted, not averaged away
+    assert 1 <= tier3_md.count(". ") + tier3_md.count(".\n") <= 3
+
+
+def test_tier3_costs_omit_the_unpriced_note_when_every_row_is_priced(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    out, repo = _tier3_repo(tmp_path, _pilot(_PILOT_SOLVED), _diagnostic())
+    assert _publish3(bench, out, repo) == 0
+    results = (repo / "docs" / "evals" / "RESULTS.md").read_text()
+    assert "excludes subagent spend" in results
+    assert "no price" not in results
 
 
 def test_the_committed_tier3_rows_publish_the_committed_section(bench: ModuleType) -> None:

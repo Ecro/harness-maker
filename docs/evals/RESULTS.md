@@ -157,6 +157,8 @@ Tasks whose prompt does not hold the answer: it sits in a file of the repo or in
 | arms | plain | hm, plain-careful, plain-continue |
 | runs started | 2026-10-15 to 2026-10-15 | 2026-10-16 to 2026-10-16 |
 
+Each $ is the CLI cost per run, which excludes subagent spend, so an hm $ understates what the run spent.
+
 ### Plain pilot
 
 Pre-registered drop rule: a task drops when plain solves 2 or more of 3 runs; the guard is exempt. Tier 3 needs at least 4 surviving tasks (T).
