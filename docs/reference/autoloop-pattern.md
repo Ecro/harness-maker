@@ -1,9 +1,11 @@
 # Autoloop Pattern Reference
 
 > Extracted and condensed from the vault `/autoloop` command (`/mnt/c/Users/euncheol.ro/Documents/obsidian-vault/.claude/commands/autoloop.md`).
-> Reference for implementing `/hm:loop` (user-harness autoloop) in Phase 6. Cross-filesystem dependency removed; self-contained reference.
+> Reference for implementing `hm:loop` (user-harness autoloop) in Phase 6. Cross-filesystem dependency removed; self-contained reference.
+>
+> **0.64.0:** the user-harness `hm:loop` command was retired (SPEC-hm-overhaul-p1), and so was the `hm:review` stage it chained. Its mentions below are written without the leading slash because they are no longer commands. The autonomous decision protocol (DD#8) still governs this repo's own autoloop builds.
 
-*Last reviewed against code: 2026-05-08 (0.7.1). `/hm:loop` supports `feature` and `improve` modes and uses a per-loop single worktree (0.5.5+); squash-merged at convergence (0.7.1+). Wrapup runs once at loop close, not per iteration.*
+*Last reviewed against code: 2026-05-08 (0.7.1). `hm:loop` supports `feature` and `improve` modes and uses a per-loop single worktree (0.5.5+); squash-merged at convergence (0.7.1+). Wrapup runs once at loop close, not per iteration.*
 
 ## Per-Phase 5-Stage Pipeline
 
@@ -95,7 +97,7 @@ When ambiguous, log the decision and proceed (do not block on user input).
 | Phase blocked (max retries) | HALT autoloop, record blocker | Yes |
 | Final verification fails | Report only, do not HALT | Yes |
 
-*0.7.1: `/hm:review` defaults to consensus filter (surface match + reasoning alignment) with grade gate A/B/C and auto-fix loop bounded by `max_review_rounds`.*
+*0.7.1: `hm:review` defaults to consensus filter (surface match + reasoning alignment) with grade gate A/B/C and auto-fix loop bounded by `max_review_rounds`.*
 
 ## State File Schema (`.claude-progress.json`)
 
@@ -157,7 +159,7 @@ When ambiguous, log the decision and proceed (do not block on user input).
 | Final verify fails | Report, do not HALT |
 | Agent malformed JSON | Proceed with N-1 agents |
 
-## What `/hm:loop` Adopts
+## What `hm:loop` Adopts
 
 - **5-stage pipeline** (research → plan-validate → execute → review → wrapup)
 - **Document sharding** — atomic per-stage prompt fragments + per-workflow fused prompts
@@ -167,10 +169,10 @@ When ambiguous, log the decision and proceed (do not block on user input).
 - **Autonomous decision protocol** — all decisions autonomous except `--dry-run`; every decision logged
   (0.7.1 ADR-108: drift_monitor wraps LLM judge input in XML fences with both open and close tag defanging)
 
-## Differences Specific to `/hm:loop`
+## Differences Specific to `hm:loop`
 
-- The vault autoloop runs inside the vault and targets that repo. `/hm:loop` runs inside the user's project and targets that same repo.
-- The vault autoloop is TECH_SPEC.md-driven. `/hm:loop` is natural-language-goal-driven + workflow-driven.
-- The vault autoloop is phase-based. `/hm:loop` is feature-based (parse_goal → feature_list).
-- Permission separation enforced: `/hm:loop` workers are executor agents (write-in-worktree only).
+- The vault autoloop runs inside the vault and targets that repo. `hm:loop` runs inside the user's project and targets that same repo.
+- The vault autoloop is TECH_SPEC.md-driven. `hm:loop` is natural-language-goal-driven + workflow-driven.
+- The vault autoloop is phase-based. `hm:loop` is feature-based (parse_goal → feature_list).
+- Permission separation enforced: `hm:loop` workers are executor agents (write-in-worktree only).
 - Security gate integrated: verify-before-completion runs immediately before each iter wrapup (zero high-severity security findings required).

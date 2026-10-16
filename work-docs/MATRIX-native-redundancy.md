@@ -10,6 +10,8 @@ summary: "Which harness surfaces are now redundant with native Claude Code capab
 
 # Native-capability redundancy matrix
 
+> **0.64.0 (SPEC-hm-overhaul-p1):** the rows for the 15 subjects that release retired (`hm:review`, `hm:verify`, `hm:configure`, `hm:loop`, `hm:loop-p5-batch`; the `stuck`, `security-auditor`, `executor` and `autoloop-coder` agents; the `security-scanner`, `verify-before-completion`, `targeted-test-selection`, `conditional-router`, `autoloop-driver` and `refdocs-search` skills) were removed, so the table keeps covering exactly the shipped surface. Their verdicts are in git history.
+
 The user's question that opened this scope: *"is a command like `/hm:loop` still needed?
 the model's own harness already provides things like goal."* Generalised — **which of our 41
 shipped surfaces exist only because the host could not do it when they were written?**
@@ -69,14 +71,9 @@ review of the branch or a PR — explicitly *not* launchable by me), a per-proje
 | `hm:research` | `none` — `WebSearch`/`WebFetch` are retrieval primitives; the staged RESEARCH document, `mtime_warn_days` cache contract and downstream `research_doc:` binding are ours | loss | loss | **keep** |
 | `hm:spec` | `none` — no native acceptance-criteria elicitation; the oracle axis (`oracle_source`/`oracle_evidence`) has no host equivalent | loss | loss | **keep** |
 | `hm:execute` | `none` — native has no TDD phase machine, no RED gate, no PLAN-phase exit criteria | loss | loss | **keep** |
-| `hm:review` | ⚠️ **partial** — `/code-review ultra` ✅ exists and is a multi-agent branch/PR review. It is **user-triggered and billed, and cannot be launched by the model**, so it cannot serve an automated loop | loss | loss | **keep** (see note) |
-| `hm:verify` | `none` observed | loss | loss | **keep** |
 | `hm:wrapup` | `none` — no native commit/memory/promotion pipeline | loss | loss | **keep** |
-| `hm:loop` | ⚠️ **substantial** — native `/loop` ✅ exists with both interval and dynamic pacing (`ScheduleWakeup`), and `Workflow` ✅ provides deterministic multi-agent orchestration with phases, `pipeline()`, budget control and resume | loss | loss | **merge** — the user's original question; see §Merge candidates |
-| `hm:loop-p5-batch` | ⚠️ `Workflow`'s `pipeline()` ✅ is the same fan-out-over-items shape, with a real concurrency cap and resume | loss | loss | **merge** |
 | `hm:health` | `none` — readiness signals are harness-specific by construction | loss | loss | **keep** |
 | `hm:metrics` | `none` — reads our own ledgers | loss | loss | **keep** |
-| `hm:configure` | `none` — edits `harness.yaml` | loss | loss | **keep** |
 | `hm:help` | `none` — host `/help` lists host commands, not ours | parity | parity | **keep** |
 | `hm:make` | `none` — the renderer itself | loss | loss | **keep** |
 | `hm:uninstall` | `none` | loss | loss | **keep** |
@@ -99,15 +96,11 @@ it is the substrate. The question for each row is whether the *role definition* 
 | `performance-reviewer` | `none` | loss | loss | **keep** |
 | `concurrency-reviewer` | `none` | loss | loss | **keep** |
 | `ux-reviewer` | `none` | loss | loss | **keep** |
-| `security-auditor` | `none` | loss | loss | **keep** |
 | `judgment-reviewer` | `none` | loss | loss | **keep** |
 | `test-reviewer` | `none` | loss | loss | **keep** — but its *barrier* is what P3's ledger is measuring; retirement would be an evidence decision, not a redundancy one |
 | `code-verifier` | `none` | loss | loss | **keep** — mode A's dispatch was removed in P1; mode B (cross-model PIDA) has no native analogue |
 | `consensus-arbiter` | ⚠️ `Workflow`'s adversarial-verify / judge-panel patterns ✅ are documented in the host tool description and cover the same shape | loss | loss | **merge** |
 | `spec-validator` | `none` observed | loss | loss | **keep** — relocated from `plan-validator` (SPEC-plan-stage-absorption ADR-004); single-pass and never-blocking, and its discrimination is still the thing P3 is gathering evidence on |
-| `stuck` | `none` | loss | loss | **keep** |
-| `executor` | ⚠️ overlaps the generic native `general-purpose` / `claude` agent types ✅ | loss | loss | **merge** |
-| `autoloop-coder` | ⚠️ same overlap as `executor`, plus `Workflow`'s own subagent default | loss | loss | **merge** |
 | `stage-delegate` | `none` — exists to cut main-loop context carry, which no native agent targets | loss | loss | **keep** |
 
 ## Skills (12)
@@ -116,17 +109,11 @@ it is the substrate. The question for each row is whether the *role definition* 
 |---|---|---|---|---|
 | `agent-quality-rubric` | `none` | loss | loss | **keep** |
 | `ai-readiness-rubric` | `none` | loss | loss | **keep** |
-| `security-scanner` | `none` | loss | loss | **keep** |
-| `refdocs-search` | `none` — `WebSearch` ✅ does not read configured local `ref_folders` | loss | loss | **keep** |
 | `context-linter` | `none` | loss | loss | **keep** |
-| `conditional-router` | `none` | loss | loss | **keep** |
-| `targeted-test-selection` | `none` | loss | loss | **keep** |
-| `verify-before-completion` | `none` | loss | loss | **keep** |
 | `second-opinion-gate` | `none` — cross-vendor CLI invocation is ours | loss | loss | **keep** |
 | `intent-layer` | `none` — Auto Memory ✅ stores preferences, not intent / assumptions / objective approvals; no vendor ships epistemic state | loss | loss (mention-only, `@intent-layer`) | **keep** |
 | `project-knowledge` | ⚠️ partial — Auto Memory ✅ saves "remember X" as project context, but machine-local: not in git, not read by Cursor/Codex, not in `memory_retrieve` (SPEC-mission-context-loop) | loss | loss (AGENTS.md pointer names the skill file) | **keep** — withdrawal pre-registered: 0 `[wiki:fact]` entries in 28 days after release → remove |
 | `maker` | `none` — the router skill is named by the user (`world_model.handle`, default `maker`); Claude Code skills ✅ give `/name` invocation, but no vendor ships a named front door that routes to this harness's stages, intents and project knowledge (SPEC-world-model-name) | loss | loss (AGENTS.md pointer names `$handle`) | **keep** |
-| `autoloop-driver` | ⚠️ **substantial** — `Workflow` ✅ is a deterministic driver with phases, fan-out, budget and resume; `/loop` ✅ covers self-paced iteration | loss | loss | **merge** |
 | `worktree-isolator` | ⚠️ `EnterWorktree` / `ExitWorktree` ✅ exist natively | loss | loss | **merge** — but see the warning below |
 
 ---
@@ -216,6 +203,7 @@ inherited with no RESEARCH row, or researched and none found (30 of 85). TUNE ev
 | execute | Phase D | INV | unsourced |
 | execute | Phase D.5 | COMP | * |
 | execute | Step 4 | INV | unsourced |
+| execute | Step 6 | INV | unsourced |
 | execute | Step 4.2 | INV | * |
 | execute | Check 2 | INV | ** |
 | execute | Check 4 | INV | ** |

@@ -130,7 +130,71 @@ Each phase ends at a commit with the local gate green for what it touched.
   ok, `tree_changed` empty, exit 1. Negative controls use t1-hm-1 (`timeparse/format.py`): the
   harness-file control commits the line on top of the harness commit, so it stays untouched.
 
-(Phase 4 ADRs are added when that phase starts.)
+Phase 4 (each is the simplest option where the SPEC is silent):
+
+- **ADR-019: commands keep the `/hm:` prefix; Codex stage skills stay `hm-<stage>`.** Only the
+  set shrinks (research, spec, execute, wrapup + utilities).
+- **ADR-020: the two rubric skills stay** (`agent-quality-rubric`, `ai-readiness-rubric`): kept
+  readers point at them, so `communication_audit.PINNED_SKILLS` is those two.
+- **ADR-021: second opinion is one compact step in execute's review**, rendered only with
+  `second_opinion.models`; its agents and skill render under the same condition.
+- **ADR-022: skills are minimal.** Six retired skill directories and four retired agent templates
+  are deleted from `templates/`, not left unrendered; `RETIRED_*` in `synthesize` names them for
+  the sweep and the inert-key warnings.
+- **ADR-023: `waiver-check` is warn-only and renders only at strictness `warn`.**
+- **ADR-024: `AtomicStage` and the six-stage `AutonomyConfig().pipeline` default are kept.**
+  Both are inert library surface used by autopilot and its tests; changing the default broke ~20
+  of them. The documentation contract reads the rendered `synthesize._ATOMIC_STAGES` instead.
+- **ADR-025: inventories are re-derived, not edited.** Doc contract blocks, the provides table and
+  the redundancy matrix list what renders today; 15 retired matrix rows are removed.
+- **ADR-026: AC-004 budgets are measured at the pinned install ref** (`$HOME/harness-maker`), so a
+  checkout path's length is in no number.
+- **ADR-027: delegation renders for `wrapup` only;** other listed stages are skipped with the
+  `delegation.stages` inert warning.
+- **ADR-028: the TUNE knobs keep their registry rows;** `reviewers.max_review_rounds` still sets
+  the review cap (default 3); reclassifying registry entries is left to the SPEC's non-goal.
+- **ADR-029: `reviewers.installed` round-trips unchanged;** lenses render only with
+  `reviewers.fanout: true` plus installed lenses (D-9).
+- **ADR-030: user-block markers are literal in the stage wrappers** (`atomic_command.md.j2`,
+  `codex/stage_skill.md.j2`), so an edited stage block-merges on upgrade instead of freezing; the
+  Codex agent TOMLs have no markers and keep their pre-existing KEEP behaviour.
+- **ADR-031: the instruction-preservation gate is deleted with the bodies it pinned;** its
+  subject (`.claude/stages/`) no longer renders.
+- **ADR-032: presets are pruned to rendered names;** `focus=security` maps to
+  `security-reviewer` (a lens, opt-in) instead of the retired `security-auditor`.
+- **ADR-033: `make.md` documents `instrumentation.stage_agent_ledger` as inert** with one warning
+  per `make`; the key and value are kept (IRR-006).
+- **ADR-034: wrapup keeps the receipt reconcile and the promotion line in compressed form;**
+  `<slug>` is the PLAN's `task_slug`.
+- **ADR-035: tests whose subject is gone are deleted; their bound ids go to the known-dead
+  `[pr-s-stage-collapse]` section** (92 ids, each resolving at `a3c2a5a8` and dead at HEAD).
+  Several pinned behaviour that survives in compressed form (Understanding block, ADR "Decided
+  by", receipt reconcile, intent file flags); rebinding them is a follow-up.
+- **ADR-036: `modular_edit` passes the install ref** (`harness_maker_src_path`) so kept skills
+  render through it.
+- **ADR-037: AC-001 is pinned to the PR-C merge commit via `git archive`**
+  (`tests/fixtures/overhaul_p1/prc_merge_sha`), not a `git worktree add`, matching ADR-001.
+- **ADR-038: HOW-IT-WORKS gets a 0.64.0 banner and corrected inventories, not a rewrite.**
+- **ADR-039: the sweep removes the directories it empties** — a swept skill's `skills/<name>/`
+  including Codex's nested `agents/`, and the retired `.claude/stages/` and `.claude/hm/`. The
+  AC-007 test found both left behind empty. `rmdir` refuses a non-empty directory, so a user file
+  keeps its directory.
+- **ADR-040: AC-007's "byte-identical" covers user records.** Under `specs/`, `work-docs/`,
+  `.claude/memory/` and `.claude/observability/`, a file whose `content_hash` still matches its
+  body is harness state and may re-render; memory seeds (no hash) may only change their
+  `harness_maker_version` stamp; `orphans-*.jsonl` may only be appended to. Everything else must
+  not move.
+- **ADR-041: the surface baseline is re-frozen in the branch,** with `render_sha` = the merge-base
+  `a3c2a5a8` (`BASELINE-DELTA-hm-overhaul-p1-s.md`). A shrink cannot be held as an allowance.
+- **ADR-042: AC-010 stays `pending_test: true`.** Its test is committed and fails until the DRI's
+  re-run rows exist; `mark-tested` waits for that.
+- **ADR-043: a hash-matching file whose user blocks differ from the template's defaults
+  block-merges.** A block-merged file records the hash of its merged body, so the next `make`
+  read it as pristine and replaced it, dropping the user's block on the second upgrade. This was
+  already true at `a3c2a5a8` (reproduced on an agent file) and surfaced as an alternating
+  `test_dogfood_sandbox` failure. `reconcile._user_blocks_edited` compares the file's user
+  blocks with the template's (and its literal includes'); an unreadable template counts as
+  edited. Unedited files still REPLACE, so the render summary's merge count does not grow.
 
 ## Risks
 
@@ -140,8 +204,8 @@ Each phase ends at a commit with the local gate green for what it touched.
   this branch, which costs real model runs; the DRI runs it. Until then its test fails by design
   (the SPEC: "fails, never skips").
 - **Surface ratchet.** The stage collapse removes commands, which the frozen baseline's shape
-  check rejects. Held as this PLAN's allowance with a BASELINE-DELTA doc, folded from main after
-  merge, as PR-C did.
+  check rejects. A shrink cannot be an allowance, so the baseline is re-frozen in the branch
+  (ADR-041); the DRI re-freezes from main after the squash.
 
 ## AC→test map
 
@@ -162,7 +226,7 @@ Each phase ends at a commit with the local gate green for what it touched.
 - [x] Phase 1 — `hm check`
 - [x] Phase 2 — telemetry readers
 - [x] Phase 3 — eval-3 replay
-- [ ] Phase 4 — stage collapse
+- [x] Phase 4 — stage collapse
 - [ ] Phase 5 — ship
 
 ## Evidence
@@ -214,3 +278,17 @@ negative controls, fixture-set pin); every rebuilt harness commit matched the ma
 Phase 1 full-suite gate (run while Phase 2 edits landed): besides the five allowed failures it
 found `test_autonomy_level_literals` (check.py restated `ask`/`auto_full`) and
 `test_test_dep_map_config_class` (the two new suites unlisted); both fixed here.
+
+### Phase 4 (AC-003, AC-004, AC-007, AC-009; AC-008 re-checked)
+
+RED, 2026-10-16: the AC-007 brownfield suite run with the PR-C merge source (`24d12cc5`) fails all
+four tests: no inert-key warnings, `post_write_reminder`/`autopilot_autoarm` still wired, the
+lens/fanout values not round-tripped, `max_review_rounds` unread. At HEAD before ADR-039/043 it
+also failed: `.claude/stages`, `.claude/hm` and `.agents/skills/autoloop-driver/agents` left
+empty, and the reconcile unit test returned `REPLACE`/`hash-match-ours` for an edited block.
+
+GREEN: brownfield 4 passed (8 db19f023 cells + 36 eval-3 trees; one mutation per retired path);
+AC-004 surface and AC-009 kept suites pass; AC-008 passes. `mark-tested --ac AC-007`: OK;
+`approval-status` still `approved`. Full suite: only the five allowed failures plus
+`test_ac010_scorecard_meets_bar` (by design, ADR-042).
+

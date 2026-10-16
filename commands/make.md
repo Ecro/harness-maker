@@ -65,7 +65,8 @@ user explicitly changes it.
 Right after locale, ask what the user wants to call this project's **world model** — the one
 entry point they talk to while developing (briefing, start or resume work, remember a project
 fact, goals and metrics). Default is **Maker**. Skip this when `.claude/harness.yaml` already
-exists: a re-render keeps the existing name (renaming is a `/hm:configure` dimension).
+exists: a re-render keeps the existing name (rename it in `.claude/harness.yaml`, then re-run
+`/harness-maker:make`).
 
 Use `AskUserQuestion`, in `$LOCALE`:
 
@@ -150,15 +151,15 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
 - **Add a component** — install one extra reviewer / skill / domain pack.
 - **Remove a component** — uninstall one reviewer / skill.
 - **Manage ref_folders** — add, remove, or clear reference document folders
-  that the `refdocs-search` skill indexes. Ask the user for new folder paths.
+  that `/hm:research` searches with Grep. Ask the user for new folder paths.
 - **Manage sibling_repos** — add, remove, or clear sibling repo relative paths
   that provide cross-repo context during research and review.
 - **Manage Second Brain** — enable, disable, or update the Obsidian vault
   connection. Ask for `vault_path` and `project_id`; dispatches with
   `--second-brain-vault-path` (pass empty string to disable). Explain that
   first setup is read-first: stages search configured project memory rather
-  than writing arbitrary vault files; deeper writable-folder setup continues in
-  `/hm:configure`.
+  than writing arbitrary vault files; write-capable folders are set later under
+  `second_brain` in `.claude/harness.yaml`.
 - **Full reconfigure** — drive a fresh interview here in the slash command
   (locale → preset → targets → ref_folders → sibling_repos →
   second_brain) and dispatch with all flags. No TTY required — works in
@@ -239,18 +240,18 @@ Use `AskUserQuestion`:
 >
 > | Axis | Value here | Change it later with |
 > |---|---|---|
-> | `targets` | {targets} | Adjust / `/hm:configure` |
-> | `spec.strictness` | {block for Production, warn for Side} — from the preset | Adjust / `/hm:configure` |
-> | `worktree.enabled` | {true for Production, false for Side} — decides whether every `/hm:` stage runs in `.worktrees/<slug>/` on branch `hm/<slug>` | `/hm:configure` |
-> | `second_opinion.models` | {[] unless the question below is answered} | Adjust / `/hm:configure` |
-> | `autonomy.level` / persistence | **`ask` / persistent `true`** — the level is decided per session: at the first stage of each session the picker offers `auto_safe` (advance the two-way doors), `auto_full` (also answer the plan interview and an APPROVED review's `human_review_needed`), or gated. A CHANGES_REQUESTED review and the wrapup land stop at **every** level. | Adjust / `/hm:configure` |
-> | `ref_folders` | (none) | Adjust / `/hm:configure` |
-> | `sibling_repos` | (none) | Adjust / `/hm:configure` |
-> | `second_brain` | disabled | Adjust / `/hm:configure` |
-> | `wrapup_docs` | (none) | Adjust / `/hm:configure` |
-> | `instrumentation.stage_agent_ledger` | `false` on a fresh install (an existing harness that predates the key keeps it ON) — records one LOCAL row per plan-validator / test-reviewer dispatch and keeps each review round's finding payload, so harness-maker can tell whether its own gates earn their latency. Nothing is transmitted. Turning it off also removes this project from that cross-project measurement. | Full setup / hand-edit `.claude/harness.yaml` |
-> | `loop.enabled` | `false` on a fresh install (an existing harness keeps its value, and one that predates the key keeps it ON) — `/hm:loop` and `/hm:loop-p5-batch` are not rendered; stages chain via autopilot | hand-edit `.claude/harness.yaml`, then `/hm:make` |
-> | `permissions.deny_dangerous` | `false` — the destructive-command deny baseline is NOT applied | hand-edit `.claude/harness.yaml` (`/hm:configure` has no permissions dimension) |
+> | `targets` | {targets} | Adjust / hand-edit `.claude/harness.yaml` |
+> | `spec.strictness` | {block for Production, warn for Side} — from the preset | Adjust / hand-edit `.claude/harness.yaml` |
+> | `worktree.enabled` | {true for Production, false for Side} — decides whether every `/hm:` stage runs in `.worktrees/<slug>/` on branch `hm/<slug>` | hand-edit `.claude/harness.yaml` |
+> | `second_opinion.models` | {[] unless the question below is answered} | Adjust / hand-edit `.claude/harness.yaml` |
+> | `autonomy.level` / persistence | **`ask` / persistent `false`** — autopilot is retired (0.64.0), so no stage advances on its own. The level is read only by `/hm:execute`: at `auto_full` it runs a SPEC with no recorded approval; at any other level it stops and asks. | Adjust / hand-edit `.claude/harness.yaml` |
+> | `ref_folders` | (none) | Adjust / hand-edit `.claude/harness.yaml` |
+> | `sibling_repos` | (none) | Adjust / hand-edit `.claude/harness.yaml` |
+> | `second_brain` | disabled | Adjust / hand-edit `.claude/harness.yaml` |
+> | `wrapup_docs` | (none) | Adjust / hand-edit `.claude/harness.yaml` |
+> | `instrumentation.stage_agent_ledger` | inert since 0.64.0 — the stages emit no ledger rows, and a `true` gives one warning per `make` | — |
+> | `loop.enabled` | inert since 0.64.0 — the loop commands no longer render, and a `true` gives one warning per `make`; stages chain by hand | — |
+> | `permissions.deny_dangerous` | `false` — the destructive-command deny baseline is NOT applied | hand-edit `.claude/harness.yaml` |
 > | `toolchains` | {seeded from your manifests: python / node / rust, or empty when none is recognised} — which file types each check command understands. The cross-model review oracle runs a toolchain's checks **only** on the file types it declares, and runs nothing at all on the rest, so a project it cannot recognise gets an honestly-empty oracle rather than another language's tools. Only filled when the key is absent or empty; anything you write is kept. | hand-edit `.claude/harness.yaml` |
 >
 > **Safety receipt preview:**
@@ -281,19 +282,19 @@ Use `AskUserQuestion`:
 - **`codex` and/or `antigravity` detected** → ask **exactly one** question with `AskUserQuestion`, then jump to Section 4.6:
 
   > A cross-model second opinion is available — {name the detected CLIs}. Enabled models cast
-  > a real consensus vote in `/hm:review` and are reconciled in `/hm:spec`.
+  > a real consensus vote in `/hm:execute`'s review step.
   >
   > **This sends the diff under review to that third-party CLI.** It is the only part of this
   > harness that transmits project content off your machine — everything else is local-only.
   >
-  > Cost: one CLI call per enabled model, on every review and every plan validation under the
-  > Production preset; under Side, only when the change is high-diff. Not one call total.
+  > Cost: one CLI call per enabled model on every `/hm:execute` review. Not one call total.
   >
   > A missing, unauthenticated, or rate-limited CLI degrades to a warning and a skip, never a
   > failure. (Detected = the binary is on PATH; whether `codex login` / `agy` auth is current
   > has not been checked.)
   >
-  > Options: enable the detected model(s) / enable none — decide later in `/hm:configure`.
+  > Options: enable the detected model(s) / enable none — decide later under
+  > `second_opinion.models` in `.claude/harness.yaml`.
 
   Set `$SECOND_OPINION_MODELS` to the comma-joined selection and pass it as
   `--second-opinion-models` in Section 4.6's dispatch. Leave the flag off when the user
@@ -337,7 +338,7 @@ the harness. They map to `--second-opinion-models` and `--autonomy-level`.
    TODO.md, docs/decisions/index.md)." Semicolon-separated paths relative
    to project root, or "none". Maps to `--wrapup-docs`.
 9. `AskUserQuestion`: **ref_folders** — "Reference documentation folders
-   that the `refdocs-search` skill will index for skill-driven search."
+   that `/hm:research` will search with Grep."
    Show detected sibling dirs (`../docs`, `../specs`, etc.) from `ls ..`
    as suggestions. Format: `::` separates multiple entries, `;` separates
    path from glob within an entry (e.g. `../docs::../specs;**/*.pdf`).
@@ -357,23 +358,19 @@ the harness. They map to `--second-opinion-models` and `--autonomy-level`.
    Ask: vault path (absolute or `~`-relative), or "none" to skip.
    If given: ask project_id (kebab-case, e.g. `my-app`; blank to omit).
    Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
-   Tell the user that `/hm:configure` can continue with deeper Second Brain
-   setup after install, including write-capable allowlisted folders.
+   Tell the user that write-capable allowlisted folders are set later under
+   `second_brain` in `.claude/harness.yaml`.
 12. `AskUserQuestion`: **Cross-model second opinion** —
    "Enable a second-opinion model (Codex and/or Antigravity) to cast a real k-of-N consensus
-   vote in /hm:review and reconcile in /hm:spec? A missing/unauthenticated/rate-limited CLI
+   vote in /hm:execute's review? A missing/unauthenticated/rate-limited CLI
    degrades gracefully (warn + skip)." Multi-select: `codex`, `antigravity`, or none.
    Prereqs: `codex login` (codex), an authenticated `agy` (antigravity). Before dispatch,
    `shutil.which` each selected model's CLI (`codex` / `agy`) and warn (non-blocking) if
    absent. Maps to `--second-opinion-models` (comma-separated; empty disables).
-13. `AskUserQuestion`: **Autopilot** — "Auto-advance
-   the stage pipeline this session (stages advance past two-way-door boundaries but always
-   stop at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge)?" Options:
-   `gated` (off) / `ask` (**the default a fresh install renders** — the session picker decides,
-   which is why arming is a per-session question rather than a config value) / `auto_safe` /
-   `auto_full`; ask whether to persist across sessions (`autopilot_persistent` defaults to
-   **`true`**). Maps to `--autonomy-level` and `--autonomy-persistent` /
-   `--no-autonomy-persistent`.
+13. `AskUserQuestion`: **Autonomy level** — autopilot is retired, so this only decides whether
+   `/hm:execute` runs a SPEC with no recorded approval: `ask`
+   (**the default a fresh install renders** — it stops and asks the DRI) or `auto_full` (it proceeds). Maps to
+   `--autonomy-level`.
 
 #### 4.5 Preview structured question
 
@@ -490,16 +487,16 @@ manually if you want a clean slate.
 ```bash
 # claude-code:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add reviewer:security ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --remove skill:research-crawler ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --remove skill:context-linter ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add-domain tauri ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" --add reviewer:security ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
-!harness-maker make "$(pwd)" --remove skill:research-crawler ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
+!harness-maker make "$(pwd)" --remove skill:context-linter ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 !harness-maker make "$(pwd)" --add-domain tauri ${WM_NAME:+--world-model-name "$WM_NAME"} ${WM_HANDLE:+--world-model-handle "$WM_HANDLE"}
 ```
 
-Available reviewers: `code`, `security`, `performance`, `concurrency`, `ux`,
-`security-auditor`, `consensus-arbiter`, `executor`, `autoloop-coder`.
+Available reviewers: `code`, and the lens reviewers `security`, `performance`, `concurrency`,
+`ux`, `test`, which render only with `reviewers.fanout: true` in `.claude/harness.yaml`.
 Available skills: see `.claude/harness.yaml` `skills.installed`. Domain
 packs ship: `python` (others get a user-side stub).
 
@@ -560,8 +557,8 @@ in turn, then dispatch with all collected flags:
 8. `AskUserQuestion`: **wrapup documents** — semicolon-separated paths to
    docs that `/hm:wrapup` should update (e.g. `CHANGELOG.md;TODO.md`), or
    "none". Maps to `--wrapup-docs`.
-9. `AskUserQuestion`: **ref_folders** — reference doc folders for the
-   `refdocs-search` skill. Show sibling git repos visible via `ls ..` as
+9. `AskUserQuestion`: **ref_folders** — reference doc folders that
+   `/hm:research` searches. Show sibling git repos visible via `ls ..` as
    suggestions. `::` separates entries, `;` separates path from glob within
    an entry (e.g. `../docs::../specs;**/*.pdf`). "none" to skip.
    Maps to `--ref-folders`.
@@ -577,10 +574,8 @@ in turn, then dispatch with all collected flags:
    multi-select `codex`, `antigravity`, or none. Graceful warn+skip on a missing/
    unauthenticated/rate-limited CLI. `shutil.which` each selected CLI (`codex` / `agy`) and
    warn (non-blocking) if absent. Maps to `--second-opinion-models` (comma-separated).
-13. `AskUserQuestion`: **Autopilot** — `gated` (off) /
-   `ask` (default) / `auto_safe` / `auto_full`; if enabled, ask whether to persist across
-   sessions. Maps to
-   `--autonomy-level` and `--autonomy-persistent` / `--no-autonomy-persistent`.
+13. `AskUserQuestion`: **Autonomy level** — `ask` (default; `/hm:execute` stops on a SPEC with
+   no recorded approval) / `auto_full` (it proceeds). Maps to `--autonomy-level`.
 
 Then dispatch with the collected values:
 
@@ -610,8 +605,7 @@ Then dispatch with the collected values:
 Omit `--second-brain-vault-path` when the user chose "none"; omit
 `--second-brain-project-id` when the user left it blank. Omit
 `--second-opinion-models` / `--autonomy-level` when the user left them at default.
-Add `--autonomy-persistent` (or `--no-autonomy-persistent`) only when the user made an
-explicit choice. Omit all other flags for dimensions the user skipped or left at default.
+Omit all other flags for dimensions the user skipped or left at default.
 
 Existing settings outside these dimensions (workflow naming, anti-rot
 config, etc.) are reused from `.claude/harness.yaml`. For a deeper reset
@@ -693,8 +687,7 @@ After dispatch, summarize what changed:
 - Backup directory path for recovery
 - What target roots are now active and which previously rendered target files
   were intentionally left in place
-- For Second Brain: whether it is disabled, read-first, or ready for deeper
-  `/hm:configure` setup
+- For Second Brain: whether it is disabled or read-first
 
 Then show a **quick-start** guide:
 
@@ -708,7 +701,9 @@ Then show a **quick-start** guide:
 >
 > **2. Then try:**
 > - `/hm:execute <task>` — implement something with TDD
-> - `/hm:configure` — change any setting later, including ones this install did not ask about
+> - `/hm:spec <task>` — the acceptance criteria to build against
+> - edit `.claude/harness.yaml`, then `/hm:make` — change any setting later, including ones this
+>   install did not ask about
 > - `/hm:make` — re-render after a plugin update
 
 If something's unclear, prompt the user with `AskUserQuestion` rather than

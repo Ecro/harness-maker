@@ -151,7 +151,7 @@ is_pre_0_12_0_render =
 
 **Test guard**: `test_apply_0_11_x_migration` in `tests/unit/test_foreign_config.py` verifies (a) the first render rewrites and (b) the second render is byte-identical to the first.
 
-If a user wants to preserve 0.11.x edits across this upgrade, they must back the file up before the first 0.12.0 render. The `/hm:configure` exit prompt warns about this on the upgrade path.
+If a user wants to preserve 0.11.x edits across this upgrade, they must back the file up before the first 0.12.0 render. The former `hm:configure` exit prompt (retired in 0.64.0) warned about this on the upgrade path.
 
 ## Frontmatter extension (v1.5+)
 

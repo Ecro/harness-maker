@@ -3,6 +3,8 @@
 Every byte of a rendered `/hm:` stage command is re-read on each later model call of the session
 (HM-LIGHT-LANE: stage bodies are 60.5% of main-context carry). Rationale that changes nothing the
 model does at run time lives here instead. Each entry names the stage and step it used to sit in.
+The `review` and `verify` stages were retired in 0.64.0 (SPEC-hm-overhaul-p1); their entries are
+kept as the record of why those steps existed.
 
 ## `execute` Phase A.5 — why one test-reviewer dispatch
 
@@ -17,7 +19,7 @@ Measured across two tasks: eleven Phase A.5 findings were the single sentence "t
 
 ## `review` Step 3 — why result files carry the run id
 
-> Why: the results directory is keyed by slug and round, so re-running `/hm:review` on the same
+> Why: the results directory is keyed by slug and round, so re-running `hm:review` on the same
 > slug lands in the **same** directory. Without the run id, a previous invocation's files
 > vouch for every lens in an invocation where only one returned — `blocks_approval: false`,
 > four dead lenses reported as exercised. Measured. The round keying separates a pass from a

@@ -37,7 +37,7 @@ harness-maker/
 │   │   └── personalization.yaml # locked v0 rubric (L1/L2/L3 formulas + tier boundaries)
 │   └── i18n.py               # locale-first messaging
 ├── templates/                # Jinja2 templates (the harness's payload)
-│   ├── commands/hm/          # /hm:<stage> + /hm:loop / ai-readiness / refresh
+│   ├── commands/hm/          # /hm:<stage> + health / help / make / metrics / uninstall
 │   ├── skills/<name>/SKILL.md.j2
 │   ├── agents/<name>.md.j2
 │   ├── stages/<stage>.md.j2  # per-stage fragments composed into /hm: commands
