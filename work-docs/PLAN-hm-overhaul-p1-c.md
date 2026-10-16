@@ -5,7 +5,7 @@ spec: specs/SPEC-hm-overhaul-p1.md
 spec_hash: bd01dacb
 scope: PR-C (AC-001, AC-002, AC-008; IRR-001; the Cursor rows of IRR-006)
 version: 0.63.0
-status: planning
+status: complete
 surface_allowance:
   chars: 340
   round_trips:
