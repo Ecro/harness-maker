@@ -1968,7 +1968,9 @@ def _run_dri(
             if spend is None or spend >= opts.max_budget_usd:
                 stop, capped, kind = "budget", spend is not None, None
     fields = dri_fields(kinds, ran)
-    finished = kinds[-1] == DRI_ORDER[-1] and fields["dri_turns"][-1]["status"] == "ok"
+    finished = (
+        stop is None and kinds[-1] == DRI_ORDER[-1] and fields["dri_turns"][-1]["status"] == "ok"
+    )
     dri = {
         **fields, "dri_slug": slug, "dri_stop": stop, "capped": capped,
         "stopped_at": None if finished else len(ran),

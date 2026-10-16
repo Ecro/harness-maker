@@ -287,6 +287,7 @@ def _golden_slug(
     [
         ({"SPEC-a.md": 1, "SPEC-b.md": 2}, [], "b"),
         ({"SPEC-a.md": 5, "SPEC-b.md": 5}, [], "b"),
+        ({"SPEC-z.md": 1, "SPEC-a.md": 2}, [], "a"),
         ({"SPEC-old.md": 9, "SPEC-new.md": 1}, ["SPEC-old.md"], "new"),
     ],
 )
@@ -472,6 +473,13 @@ def test_a_lost_session_id_stops_the_run(bench: ModuleType, tmp_path: Path) -> N
     assert (none["dri_stop"], _kinds(none), none["stopped_at"]) == ("session_lost", ["spec"], 1)
     assert len(argvs) == 1
 
+    (tmp_path / "last").mkdir()
+    steps = [{"spec": "x"}, {}, {}, {"session": "new"}]
+    last, _ = _run(bench, tmp_path / "last", steps)
+    assert (last["dri_stop"], last["stopped_at"]) == ("session_lost", 4), (
+        "a lost session on the wrapup turn is still an early stop"
+    )
+
 
 # --- AC-006: graded once on the final tree, every turn's output kept and leak-checked ---------
 
@@ -483,7 +491,8 @@ def test_the_run_is_graded_once_after_its_last_turn(
     original = bench.grade
 
     def counting(work: Path, tests_dir: Path, *args: Any, **kwargs: Any) -> Any:
-        if tests_dir.name == "hidden":
+        # `hidden_ids` (cached) also grades a scratch tree on first use; count only this run's.
+        if tests_dir.name == "hidden" and work.is_relative_to(tmp_path):
             graded.append(work)
         return original(work, tests_dir, *args, **kwargs)
 
