@@ -17,8 +17,7 @@ ac:
   title: rendered wrapup Step 6 instructs the Understanding block
   type: mechanical
   test_ids:
-  - tests/unit/test_render_understanding_handoff.py::test_ac_001_step6_instructs_the_understanding_block
-  - tests/unit/test_render_understanding_handoff.py::test_ac_001_block_instruction_is_not_in_the_delegated_span
+  - tests/unit/test_overhaul_p1_kept.py::test_the_understanding_block_and_adr_provenance_render
   executable_predicate: all(understanding_instruction_in_step6(render_wrapup(preset,
     wt)) for preset, wt in ARMS)
   golden_table: []
@@ -382,7 +381,7 @@ ac:
   title: rendered wrapup closing output repeats the block
   type: mechanical
   test_ids:
-  - tests/unit/test_render_understanding_handoff.py::test_ac_005_closing_output_repeats_the_block
+  - tests/unit/test_overhaul_p1_kept.py::test_wrapup_prints_the_understanding_block_and_gates_intent_writes
   executable_predicate: all(closing_output_repeats_block(render_wrapup(preset, wt))
     for preset, wt in ARMS)
   golden_table: []
@@ -409,7 +408,7 @@ ac:
   title: rendered execute ADR section requires Decided by
   type: mechanical
   test_ids:
-  - tests/unit/test_render_understanding_handoff.py::test_ac_006_execute_adr_section_requires_decided_by
+  - tests/unit/test_overhaul_p1_kept.py::test_the_understanding_block_and_adr_provenance_render
   executable_predicate: all(adr_requires_decided_by(render_execute(preset, wt)) for
     preset, wt in ARMS)
   golden_table: []
@@ -435,7 +434,7 @@ ac:
   title: rendered wrapup reports agent-decided and unmarked ADRs
   type: mechanical
   test_ids:
-  - tests/unit/test_render_understanding_handoff.py::test_ac_007_step6_reports_agent_decided_and_unmarked
+  - tests/unit/test_overhaul_p1_kept.py::test_the_understanding_block_and_adr_provenance_render
   executable_predicate: all(step6_reports_agent_and_unmarked(render_wrapup(preset,
     wt)) for preset, wt in ARMS)
   golden_table: []

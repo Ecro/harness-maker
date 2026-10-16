@@ -436,9 +436,7 @@ ac:
   title: stage renders carry the acceptance flow
   type: mechanical
   test_ids:
-  - tests/render/test_spec_acceptance_render.py::test_ac_007_stage_renders_carry_the_acceptance_flow
-  - tests/render/test_spec_acceptance_render.py::test_ac_007_wrapup_checks_approval_before_it_lands
-  - tests/render/test_spec_acceptance_render.py::test_ac_007_spec_no_longer_ends_on_clear_alone
+  - tests/unit/test_overhaul_p1_kept.py::test_spec_and_wrapup_carry_the_acceptance_flow
   executable_predicate: all(marker in rendered[stage] for stage, marker in REQUIRED_MARKERS)
   golden_table: []
   rubric_id: null

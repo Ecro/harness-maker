@@ -66,8 +66,7 @@ ac:
     title: "wrapup warns from the main loop when open proposals reach five"
     type: mechanical
     test_ids:
-      - tests/unit/test_render_wrapup_backlog_warning.py::test_wrapup_renders_backlog_warning_threshold
-      - tests/unit/test_render_wrapup_backlog_warning.py::test_wrapup_backlog_check_runs_in_the_main_loop
+      - tests/unit/test_overhaul_p1_kept.py::test_wrapup_warns_on_the_proposal_backlog
     executable_predicate: "proposals_call_offset(render_stage(WRAPUP)) > step_heading_offset(render_stage(WRAPUP), '### Steps 6 ')"
     golden_table: []
     rubric_id: null

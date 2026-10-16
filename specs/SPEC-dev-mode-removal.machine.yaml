@@ -228,8 +228,7 @@ ac:
   title: warn renders the SPEC machinery and blocks nothing; block renders the hook
   type: parametric
   test_ids:
-  - tests/unit/test_render_strictness_surface.py::test_ac_006_warn_renders_the_checks_and_blocks_nothing
-  - tests/unit/test_render_strictness_surface.py::test_ac_006_block_renders_the_spec_gate_hook
+  - tests/unit/test_overhaul_p1_kept.py::test_ac009_spec_gate_keyed_on_strictness
   executable_predicate: null
   golden_table:
   - input:

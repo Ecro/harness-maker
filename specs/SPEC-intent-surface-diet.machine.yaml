@@ -43,7 +43,7 @@ ac:
   title: Spec renders only the intent link step
   type: mechanical
   test_ids:
-  - tests/unit/test_intent_surface_diet.py::test_ac002_spec_link_only
+  - tests/unit/test_overhaul_p1_kept.py::test_spec_links_an_intent_and_writes_none
   - tests/unit/test_intent_surface_diet.py::test_ac002_control
   executable_predicate: '''Step 4.9'' not in rendered_stage(''spec'') and ''Draft
     an intent for this task?'' not in rendered_stage(''spec'') and ''revisits['' not
@@ -72,11 +72,7 @@ ac:
   title: Wrapup 5.7 keeps its verbs, guards and target-specific consent
   type: mechanical
   test_ids:
-  - tests/unit/test_intent_surface_diet.py::test_ac003_wrapup_57_guards_and_consent
-  - tests/unit/test_intent_surface_diet.py::test_ac003_control
-  - tests/unit/test_intent_surface_diet.py::test_ac003_consent_controls
-  - tests/unit/test_intent_surface_diet.py::test_ac003_gates_hold_on_the_pre_change_render
-  - tests/unit/test_intent_surface_diet.py::test_ac003_gate_controls
+  - tests/unit/test_overhaul_p1_kept.py::test_wrapup_prints_the_understanding_block_and_gates_intent_writes
   executable_predicate: all(intent_verbs(s57(t)) >= GOLDEN_57_VERBS and all(g in s57(t)
     for g in GOLDEN_57_GUARDS) and consent_token(t) in s57(t) and 'pending' in s57(t)
     and '## Feedback' in s57(t) for t in TARGETS)
@@ -105,7 +101,7 @@ ac:
   title: Understanding and decided_by instructions are byte-identical
   type: mechanical
   test_ids:
-  - tests/unit/test_intent_surface_diet.py::test_ac004_understanding_byte_identical
+  - tests/unit/test_overhaul_p1_kept.py::test_the_understanding_block_and_adr_provenance_render
   - tests/unit/test_intent_surface_diet.py::test_ac004_control
   executable_predicate: understanding_extracts(rendered_all()) == GOLDEN_UNDERSTANDING_EXTRACTS
     and len(GOLDEN_UNDERSTANDING_EXTRACTS) == EXPECTED_EXTRACT_COUNT and all(GOLDEN_UNDERSTANDING_EXTRACTS)

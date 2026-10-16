@@ -10,14 +10,17 @@ drops and moves of the SPEC's AC-009 table.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
 
 from harness_maker.models import (
     DelegationConfig,
@@ -530,13 +533,16 @@ def _render_rules(
     codex: bool = False,
     worktree: bool = False,
     delegation: list[str] | None = None,
+    preset: Preset = Preset.SIDE,
+    **extra: Any,
 ) -> Path:
     targets = [Target.CLAUDE_CODE, Target.CODEX] if codex else [Target.CLAUDE_CODE]
     answers = InterviewAnswers(
-        preset=Preset.SIDE,
+        preset=preset,
         targets=targets,
         delegation=DelegationConfig(stages=delegation or []),
         worktree={"enabled": worktree},
+        **extra,
     )
     render(synthesize(ProjectProfile(), answers), tmp_path / ".claude", freeze_time=FREEZE)
     return tmp_path
@@ -655,3 +661,268 @@ def test_wrapup_prints_the_understanding_block_and_gates_intent_writes(
 def test_execute_names_wt_only_with_the_worktree(tmp_path: Path, codex: bool, wt: bool) -> None:
     text = _rule_stage(_render_rules(tmp_path, codex=codex, worktree=wt), "execute", codex=codex)
     assert ("<WT>" in text) is wt
+
+
+# ── legacy-SPEC behaviour the collapse kept (review finding P1-j) ───────────
+# PR-S deleted the tests that asserted these with their subject's old prose; the behaviour
+# survived in the collapsed text. Each test below is what the legacy SPEC's AC is now bound to.
+
+
+def _fm(path: Path) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8")
+    assert text.startswith("---\n"), path
+    loaded = yaml.safe_load(text.split("---\n", 2)[1])
+    assert isinstance(loaded, dict)
+    return loaded
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_typed_only_commands_and_skills(tmp_path: Path, codex: bool) -> None:
+    """SPEC-hm-light-lane AC-008: hidden surfaces never self-trigger, and only those."""
+    from harness_maker.synthesize import _TYPED_ONLY_COMMANDS, _TYPED_ONLY_SKILLS
+
+    root = _render_rules(tmp_path, codex=codex)
+    assert {"metrics", "make", "uninstall", "help"} == {
+        p.removeprefix("commands/hm/").removesuffix(".md") for p in _TYPED_ONLY_COMMANDS
+    }
+    commands = root / ".claude" / "commands" / "hm"
+    for md in sorted(commands.glob("*.md")):
+        fm = _fm(md)
+        assert fm.get("description"), md.name
+        typed = f"commands/hm/{md.name}" in _TYPED_ONLY_COMMANDS
+        assert (fm.get("disable-model-invocation") is True) is typed, md.name
+    skills = root / ".claude" / "skills"
+    for skill in sorted(skills.glob("*/SKILL.md")):
+        typed = skill.parent.name in _TYPED_ONLY_SKILLS
+        assert (_fm(skill).get("disable-model-invocation") is True) is typed, skill
+    assert (skills / "maker" / "SKILL.md").is_file(), "the front door stays model-invocable"
+    policies = {p.parent.parent.name for p in (root / ".agents" / "skills").glob("*/agents/*.yaml")}
+    assert policies == (set(_TYPED_ONLY_SKILLS) if codex else set())
+
+
+def test_second_opinion_skill_stamps_caused_by_once(tmp_path: Path) -> None:
+    """SPEC-top-issues-2026-09 AC-015: arm (b) fires on a `fix-r` stamp only."""
+    from harness_maker.models import SecondOpinionConfig
+
+    root = _render_rules(tmp_path, second_opinion=SecondOpinionConfig(models=["codex"]))
+    skill = (root / ".claude" / "skills" / "second-opinion-gate" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "caused_by=#" not in skill
+    arm_b = skill[skill.index("**Two-arm batch trigger.**") :].split("\n\n")[0]
+    b_sentence = re.search(r"\(b\)[^.]*\.", arm_b)
+    assert b_sentence, arm_b
+    assert "`none`" not in b_sentence.group(0), arm_b
+    assert re.search(r"\(b\)[^.]*`caused_by`[^.]*`fix-r", arm_b), arm_b
+    assert re.search(r"`none`[^.]*`unknown`[^.]*never fire", arm_b), arm_b
+    assert "non-null" not in arm_b
+    grammar = skill[skill.index("**`caused_by` grammar.**") :].split("\n\n")[0]
+    assert "caused_by=fix-r" in grammar
+    assert "caused_by=none" in grammar
+    assert "stamped **once**, by `hm review_churn attribute`" in skill
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_spec_and_wrapup_carry_the_acceptance_flow(tmp_path: Path, codex: bool) -> None:
+    """SPEC-ai-native-sdlc-vs-intent-world AC-007: approval is asked, stamped and checked."""
+    root = _render_rules(tmp_path, codex=codex)
+    spec = _rule_stage(root, "spec", codex=codex)
+    for marker in (
+        "Approve this SPEC and end interview",
+        "silence never counts",
+        "spec_machine approve --yaml",
+        "--exempt",
+        "schema_version: 3",
+        "irreversible_decisions:",
+    ):
+        assert marker in spec, marker
+    assert "SPEC is sufficiently clear — end interview" not in spec
+    assert "No mandatory gate — spec may auto-advance" not in spec
+    wrapup = _rule_stage(root, "wrapup", codex=codex)
+    assert wrapup.index("spec_machine approval-status") < wrapup.index("hm wrapup_land")
+    assert "spec_machine approve --yaml" in wrapup
+    assert "silence is never approval" in wrapup
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_test_reviewer_rule_is_per_observable(tmp_path: Path, codex: bool) -> None:
+    """SPEC-a5-duplicate-coverage-block AC-001/AC-003, on the fan-out's test-reviewer."""
+    root = _render_rules(
+        tmp_path,
+        codex=codex,
+        reviewers={"installed": ["code-reviewer", "test-reviewer"], "enabled": []},
+        reviewers_fanout=True,
+    )
+    agent = (
+        root / ".codex" / "agents" / "test-reviewer.toml"
+        if codex
+        else root / ".claude" / "agents" / "test-reviewer.md"
+    )
+    body = agent.read_text(encoding="utf-8")
+    assert body.count("for the same observable") == 1
+    assert "at least one dedicated test function" in body
+    assert "exactly one dedicated test function" not in body
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_spec_links_an_intent_and_writes_none(tmp_path: Path, codex: bool) -> None:
+    """SPEC-intent-surface-diet AC-002: the spec stage only links; intent writes are wrapup's."""
+    spec = _rule_stage(_render_rules(tmp_path, codex=codex), "spec", codex=codex)
+    status = spec.index("hm intent status --json")
+    assert "With no `active` or `proposed` intent, print `[intent] none`" in spec[status:]
+    assert "`intent: <id>`" in spec[status:]
+    for write in ("hm intent question", "hm intent metric", "hm intent close"):
+        assert write not in spec, write
+
+
+@pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
+def test_the_understanding_block_and_adr_provenance_render(
+    tmp_path: Path, codex: bool, wt: bool
+) -> None:
+    """SPEC-understanding-handoff AC-001/006/007, SPEC-intent-surface-diet AC-004.
+
+    The commit carries the block, the delegated span (Steps 1-5) does not author it, and
+    every ADR says who decided it, so `agent-decided` can be reported.
+    """
+    root = _render_rules(tmp_path, codex=codex, worktree=wt, delegation=["wrapup"])
+    wrapup = _rule_stage(root, "wrapup", codex=codex)
+    commit = wrapup[wrapup.index("## Steps 6 → 7.6") :]
+    assert "`Understanding:` block, ≤5 bullets" in commit
+    for anchor in ("<before> -> <after>", "`unknown: …`", "`agent-decided: ADR-…`"):
+        assert anchor in commit, anchor
+    assert "Understanding:" not in wrapup[: wrapup.index("## Steps 6 → 7.6")]
+    assert "Steps 1–5 of `.claude/commands/hm/wrapup.md`" in wrapup
+    execute = _rule_stage(root, "execute", codex=codex)
+    assert "**Decided by:** <user (source) | agent>" in execute
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_intent_skill_and_wrapup_call_the_intent_verbs(tmp_path: Path, codex: bool) -> None:
+    """SPEC-outcome-measure AC-007, SPEC-playbook-alignment AC-007,
+    SPEC-wrapup-intent-hardening AC-002: the verbs, `supersedes`' claim, and closed formats."""
+    root = _render_rules(tmp_path, codex=codex)
+    wrapup = _rule_stage(root, "wrapup", codex=codex)
+    intents = wrapup[wrapup.index("hm intent status --json") :]
+    assert "`hm intent metric record|measure`" in intents
+    assert "--text-file/--claim-file <f>" in intents
+    assert "`hm intent close <id> --observed <met|missed|no_data> --note-file <f>`" in intents
+    skill_dir = root / (".agents/skills" if codex else ".claude/skills") / "intent-layer"
+    skill = _flat_rule(skill_dir / "SKILL.md")
+    assert "hm intent metric measure --all" in skill
+    observe = re.search(
+        r"hm intent question observe <id> --relation <[^>]*supersedes[^>]*>.*?\n",
+        (skill_dir / "SKILL.md").read_text(encoding="utf-8"),
+    )
+    assert observe, skill
+    assert "--claim-file" in observe.group(0)
+    assert "`supersedes` needs `--claim-file`" in skill
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_help_lists_the_intent_layer_skill(tmp_path: Path, codex: bool) -> None:
+    """SPEC-intent-world-model-objective-layer AC-019: a skill, listed in help, no command."""
+    root = _render_rules(tmp_path, codex=codex)
+    assert "| intent-layer | skill, typed only" in _rule_stage(root, "help", codex=codex)
+    assert not (root / ".claude" / "commands" / "hm" / "intent-layer.md").exists()
+    assert not (root / ".claude" / "commands" / "hm" / "intent.md").exists()
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_spec_renders_the_open_ended_cap_from_config(tmp_path: Path, codex: bool) -> None:
+    """SPEC-workflow-steps-vs-model-capability AC-004: the cap survives, valued from config."""
+    from harness_maker.models import interview_deep_gate_defaults
+
+    cap = interview_deep_gate_defaults()["open_ended_cap_by_locale"]
+    spec = _rule_stage(_render_rules(tmp_path, codex=codex), "spec", codex=codex)
+    assert f"At most {cap.get('en', cap['default'])} open-ended follow-up(s) per turn" in spec
+    assert "inequality" not in spec.lower()
+
+
+@pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
+def test_wrapup_warns_on_the_proposal_backlog(tmp_path: Path, codex: bool, wt: bool) -> None:
+    """SPEC-observed-harness-gaps-salvage AC-003: once, in the main loop, past the delegate."""
+    wrapup = _rule_stage(
+        _render_rules(tmp_path, codex=codex, worktree=wt, delegation=["wrapup"]),
+        "wrapup",
+        codex=codex,
+    )
+    assert wrapup.count("`hm proposals summary`") == 1
+    at = wrapup.index("`hm proposals summary`")
+    assert wrapup.index("## Steps 6 → 7.6") < at < wrapup.index("hm wrapup_land")
+    assert "5+ open warns once (triage: `hm proposals list --open`)" in wrapup
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_second_opinion_renders_only_with_a_model(tmp_path: Path, codex: bool) -> None:
+    """SPEC-token-efficiency-autopilot-ux-speed AC-006: no invoker ships with no model on."""
+    from harness_maker.models import SecondOpinionConfig
+
+    on = _render_rules(
+        tmp_path / "on", codex=codex, second_opinion=SecondOpinionConfig(models=["codex"])
+    )
+    off = _render_rules(tmp_path / "off", codex=codex)
+    assert "hm second_opinion_invoke --model" in _rule_stage(on, "execute", codex=codex)
+    for stage in STAGES:
+        assert "second_opinion_invoke" not in _rule_stage(off, stage, codex=codex), stage
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_wrapup_folds_base_memory_only_with_the_worktree(tmp_path: Path, codex: bool) -> None:
+    """SPEC-wrapup-memory-base-seam AC-004."""
+    on = _rule_stage(
+        _render_rules(tmp_path / "on", codex=codex, worktree=True), "wrapup", codex=codex
+    )
+    off = _rule_stage(_render_rules(tmp_path / "off", codex=codex), "wrapup", codex=codex)
+    assert "uv run --with" in on
+    land = on.index("hm worktree task-land <slug> <BASE>")
+    assert land < on.index("hm worktree commit-base-memory <BASE> --expect-head <SHA>")
+    assert "commit-base-memory" not in off
+
+
+def _make(repo: Path, *args: str) -> None:
+    from typer.testing import CliRunner
+
+    from harness_maker.cli import app
+
+    before = Path.cwd()
+    os.chdir(repo)
+    try:
+        res = CliRunner().invoke(app, ["make", str(repo), "--autoloop", *args])
+    finally:
+        os.chdir(before)
+    assert res.exit_code == 0, res.output
+
+
+_LOOP_CASES = {
+    # case: (how the existing harness.yaml is edited, re-render flags, expected loop.enabled)
+    "absent-key-update": ("absent", ("--update",), True),
+    "absent-key-reinterview": ("absent", ("--reinterview",), True),
+    "undecodable-update": ("undecodable", ("--update",), True),
+    "explicit-false-reinterview": ("false", ("--reinterview",), False),
+    "preset-switch-true": ("true", ("--update", "--preset", "Production"), True),
+    "preset-switch-false": ("false", ("--update", "--preset", "Production"), False),
+}
+
+
+@pytest.mark.parametrize("case", list(_LOOP_CASES))
+def test_existing_loop_setting_survives_every_rerender(tmp_path: Path, case: str) -> None:
+    """SPEC-loop-opt-in AC-005/AC-010: the commands are gone; the stored choice is not reset."""
+    from harness_maker.io_utils import load_harness_yaml
+
+    edit, flags, expected = _LOOP_CASES[case]
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    _make(repo)
+    hy = repo / ".claude" / "harness.yaml"
+    if edit == "undecodable":
+        hy.write_bytes(b"preset: Side\nlocale: \xff\xfe\n")
+    else:
+        data = load_harness_yaml(hy)
+        if edit == "absent":
+            data.pop("loop", None)
+            data["schema_version"] = 5
+        else:
+            data["loop"] = {"enabled": edit == "true"}
+        hy.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    _make(repo, *flags)
+    assert load_harness_yaml(hy)["loop"]["enabled"] is expected

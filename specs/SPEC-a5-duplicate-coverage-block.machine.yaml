@@ -17,7 +17,7 @@ ac:
   title: reviewer Hard Rule states the trigger per observable
   type: mechanical
   test_ids:
-  - tests/structural/test_duplicate_trigger_observable_parity.py::test_ac_001_reviewer_hard_rule_is_observable_qualified
+  - tests/unit/test_overhaul_p1_kept.py::test_test_reviewer_rule_is_per_observable
   executable_predicate: bare_scenario_cardinality_triggers(render_all_targets()['test-reviewer'])
     == 0
   golden_table: []
@@ -85,7 +85,7 @@ ac:
   title: rubric section 1 keeps "at least one dedicated test function"
   type: mechanical
   test_ids:
-  - tests/structural/test_duplicate_trigger_observable_parity.py::test_ac_003_rubric_keeps_at_least_one_dedicated_test
+  - tests/unit/test_overhaul_p1_kept.py::test_test_reviewer_rule_is_per_observable
   executable_predicate: '''at least one dedicated test function'' in render_all_targets()[''test-reviewer'']'
   golden_table: []
   rubric_id: null

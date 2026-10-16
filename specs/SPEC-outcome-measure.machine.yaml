@@ -197,7 +197,7 @@ ac:
   title: skill and wrapup call the verb
   type: mechanical
   test_ids:
-  - tests/unit/test_render_intent_layer.py::test_ac_007_skill_and_wrapup_call_the_verb
+  - tests/unit/test_overhaul_p1_kept.py::test_intent_skill_and_wrapup_call_the_intent_verbs
   executable_predicate: '''hm world outcome measure --all --dry-run'' in measure_first_step
     and ''The rule for every write'' in measure_first_step and wrapup.index(''@hm:answer-gated:outcome-measure'')
     > wrapup.index(''@hm:answer-gated:objective-close'') and ''Measure outcomes now?''

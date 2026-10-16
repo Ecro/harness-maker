@@ -807,7 +807,7 @@ ac:
   test_ids:
   - tests/unit/test_render_intent_layer.py::test_ac_019_the_skill_renders_for_every_target
   - tests/unit/test_render_intent_layer.py::test_ac_019_the_skill_description_and_body_carry_the_contract
-  - tests/unit/test_render_intent_layer.py::test_ac_019_help_lists_the_skill_and_no_command_was_added
+  - tests/unit/test_overhaul_p1_kept.py::test_help_lists_the_intent_layer_skill
   executable_predicate: all(skill_exists(target, '.claude/skills/intent-layer/SKILL.md')
     for target in TARGETS) and skill_exists('codex', '.agents/skills/intent-layer/SKILL.md')
     and len(skill_frontmatter('intent-layer')['description']) <= 200 and all(phrase

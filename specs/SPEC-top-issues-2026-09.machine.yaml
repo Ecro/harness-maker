@@ -518,7 +518,7 @@ ac:
   title: review loop and gate skill read caused_by from the stamp
   type: mechanical
   test_ids:
-  - tests/render/test_render_review_attribution.py::test_caused_by_single_owner
+  - tests/unit/test_overhaul_p1_kept.py::test_second_opinion_skill_stamps_caused_by_once
   executable_predicate: '''determine each one'' not in autofix_step1 and ''caused_by=#''
     not in skill and ''fix-r'' in skill_arm_b'
   golden_table: []

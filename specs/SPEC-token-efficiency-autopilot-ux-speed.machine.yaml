@@ -183,7 +183,7 @@ ac:
   test_ids:
     - tests/unit/test_second_opinion_backgrounding.py::test_ac_006_the_review_render_backgrounds_the_invoker
     - tests/unit/test_second_opinion_backgrounding.py::test_ac_006_the_plan_render_refuses_to_background
-    - tests/unit/test_second_opinion_backgrounding.py::test_ac_006_the_wiring_sits_inside_the_models_gate
+    - tests/unit/test_overhaul_p1_kept.py::test_second_opinion_renders_only_with_a_model
     - tests/unit/test_second_opinion_backgrounding.py::test_ac_006_a_live_review_overlaps_the_fan_out
   executable_predicate: second_opinion_span(live_review).start_ts < pass1_fanout_span(live_review).end_ts
   golden_table: []

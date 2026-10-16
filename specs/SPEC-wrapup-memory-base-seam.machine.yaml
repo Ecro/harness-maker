@@ -100,7 +100,7 @@ ac:
   title: memory fold step is gated on the feature-branch flag
   type: mechanical
   test_ids:
-  - tests/unit/test_wrapup_memory_fold.py::test_wrapup_memory_fold_gated_on_feature_branch_flag
+  - tests/unit/test_overhaul_p1_kept.py::test_wrapup_folds_base_memory_only_with_the_worktree
   executable_predicate: fold_marker_in_render(flag_on=True) and not fold_marker_in_render(flag_on=False)
   golden_table: []
   rubric_id: null
