@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
 import subprocess
 import sys
+import time
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -31,7 +34,7 @@ def _no_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(security_scanner, "_build_pi_client", lambda: None)
 
 
-def _project(tmp_path: Path, *, metrics: bool) -> Path:
+def _project(tmp_path: Path, *, metrics: bool, name: str | None = None) -> Path:
     root = tmp_path / "proj"
     obs = root / ".claude" / "observability"
     obs.mkdir(parents=True)
@@ -45,7 +48,8 @@ def _project(tmp_path: Path, *, metrics: bool) -> Path:
                 ("Delete", {"path": "notes.txt"}),
             )
         ]
-        (obs / "metrics-2026-10-01.jsonl").write_text(
+        # Dated today by default: a stale file is no telemetry source (ADR-013, P1-d).
+        (obs / (name or f"metrics-{date.today().isoformat()}.jsonl")).write_text(
             "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8"
         )
     return root
@@ -168,3 +172,29 @@ def test_ac011_reader_list_matches_grep() -> None:
         if any(_READER.search(ln) for ln in code_lines):
             readers.add(path.relative_to(SRC).with_suffix("").as_posix())
     assert readers == {"security_scanner", "readiness", "feedback/telemetry_grep", "telemetry"}
+
+
+@pytest.mark.parametrize("kind", ["stale-dated", "stale-legacy"])
+def test_ac011_a_stale_file_is_no_telemetry_source(kind: str, tmp_path: Path) -> None:
+    """ADR-013's case: a `metrics-*.jsonl` left from before 0.64.0 is history, not a source.
+
+    On an upgraded install the writer is gone but its last files remain, so presence alone would
+    keep every reader on "scanned" forever and AC-011's "no telemetry source" would never fire.
+    """
+    stale = date.today() - timedelta(days=30)
+    name = f"metrics-{stale.isoformat()}.jsonl" if kind == "stale-dated" else "metrics.jsonl"
+    root = _project(tmp_path, metrics=True, name=name)
+    obs = root / ".claude" / "observability"
+    if kind == "stale-legacy":
+        old = time.time() - 30 * 86400
+        os.utime(obs / name, (old, old))
+    assert security_scanner.gate_status(root)["prod_name_guard"] == NO_SOURCE
+    assert telemetry_grep.last_stop_with_trace(obs) == NO_SOURCE
+
+    # The same file, fresh, is a source again.
+    if kind == "stale-dated":
+        (obs / name).rename(obs / f"metrics-{date.today().isoformat()}.jsonl")
+    else:
+        os.utime(obs / name, None)
+    assert security_scanner.gate_status(root)["prod_name_guard"] == "scanned"
+    assert telemetry_grep.last_stop_with_trace(obs) != NO_SOURCE
