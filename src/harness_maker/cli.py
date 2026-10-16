@@ -442,7 +442,7 @@ def make(
         world_model_handle_override=world_model_handle_override,
     )
     _warn_world_model_handle_taken(target, a)
-    _warn_removed_cursor_inputs(pre_yaml_body, targets_override, a)
+    _warn_removed_cursor_inputs(pre_yaml_body, targets_override, a, target)
     # Seed `toolchains` from manifest detection, fill-if-empty (ADR-007). Placed AFTER the
     # override pass so a `--preset` rebuild cannot discard what we just seeded, and so a
     # user-authored value round-tripped from harness.yaml wins — `seed_toolchains` returns the
@@ -1879,7 +1879,10 @@ def _retire_stale_hooks_json(project_root: Path, blueprint: Blueprint) -> None:
 
 
 def _warn_removed_cursor_inputs(
-    disk_yaml: dict[str, Any], targets_flag: str | None, answers: InterviewAnswers
+    disk_yaml: dict[str, Any],
+    targets_flag: str | None,
+    answers: InterviewAnswers,
+    project_root: Path,
 ) -> None:
     """One warning per `make` run for each removed-Cursor input (SPEC-hm-overhaul-p1 AC-002).
 
@@ -1889,7 +1892,13 @@ def _warn_removed_cursor_inputs(
     from harness_maker import cursor_retire
 
     if cursor_retire.target_requested(disk_yaml, targets_flag):
-        typer.echo(cursor_retire.removed_warning([t.value for t in answers.targets]), err=True)
+        had_mcp = (project_root / cursor_retire.CURSOR_MCP_JSON).is_file()
+        typer.echo(
+            cursor_retire.removed_warning(
+                [t.value for t in answers.targets], had_cursor_mcp=had_mcp
+            ),
+            err=True,
+        )
     for line in cursor_retire.agent_model_warnings(disk_yaml):
         typer.echo(line, err=True)
 
@@ -1913,6 +1922,14 @@ def _retire_cursor_leftovers(project_root: Path, sweep_report: OrphanSweepReport
         line is not None and "RETIRED" in line
     ):
         cursor_retire.remove_empty_dirs(project_root)
+    from harness_maker.git_disposition import tracked_cursor_deletions
+
+    if tracked_cursor_deletions(project_root):
+        typer.echo(
+            "NOTE: retired .cursor/ files are still tracked by git; "
+            "stage the deletions with `git add -u .cursor`.",
+            err=True,
+        )
 
 
 def _world_model_from_flags(

@@ -42,7 +42,12 @@ from typing import Any
 import yaml
 
 from harness_maker.block_merge import MarkerStyle, ParseError, has_markers, parse_segments
-from harness_maker.cursor_retire import CURSOR_DIR, kept_warning
+from harness_maker.cursor_retire import (
+    CURSOR_DIR,
+    kept_warning,
+    safe_to_delete,
+    symlink_kept_warning,
+)
 from harness_maker.io_utils import atomic_append
 from harness_maker.locate import compare_version
 from harness_maker.models import Blueprint, ConflictItem, ReconcileDecision
@@ -726,6 +731,14 @@ def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport
             rel_path,
             manifest,
         )
+        if (
+            classification == "ours-clean"
+            and rel_key.startswith(CURSOR_DIR + "/")
+            and not safe_to_delete(project_root, rel_key)
+        ):
+            print(symlink_kept_warning(rel_key), file=sys.stdout)
+            report.kept.append((rel_path, "symlink"))
+            continue
         if classification == "ours-clean":
             try:
                 (project_root / rel_path).unlink()

@@ -89,6 +89,19 @@ def _is_git_worktree(project_root: Path) -> bool:
     return r.returncode == 0 and r.stdout.strip() == "true"
 
 
+def tracked_cursor_deletions(project_root: Path) -> list[str]:
+    """Tracked `.cursor/` files the retirement deleted from the work tree but git still has.
+
+    The commit step scopes `git add` to the live roots, and `.cursor` is no longer one, so
+    these deletions would otherwise sit unstaged forever.
+    """
+    try:
+        r = _git(project_root, "ls-files", "--deleted", "--", ".cursor")
+    except (subprocess.SubprocessError, OSError):
+        return []
+    return r.stdout.split() if r.returncode == 0 else []
+
+
 def _is_churn(path: str) -> bool:
     """True iff ``path`` is a harness-churn artifact (already individually gitignored)."""
     for pat in _HARNESS_GITIGNORE_PATTERNS:

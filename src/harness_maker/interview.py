@@ -330,6 +330,11 @@ def _ask_targets() -> list[Target]:
         s = token.strip()
         if not s:
             continue
+        if s == REMOVED_CURSOR_TARGET:
+            logger.warning(
+                "cursor target removed — harness-maker no longer renders .cursor/ (0.63.0); skipped"
+            )
+            continue
         try:
             out.append(Target(s))
         except ValueError:
