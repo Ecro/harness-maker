@@ -127,6 +127,11 @@ mode = cfg.get("mode", "normal")
 if cfg.get("marker"):
     Path(cfg["marker"]).write_text("called")
 prompt = argv[argv.index("-p") + 1]
+if "--resume" in argv:  # a later scripted hm turn (SPEC-hm-eval-scripted-dri): no change
+    result = {"type": "result", "subtype": "success", "is_error": False, "num_turns": 0,
+              "session_id": argv[argv.index("--resume") + 1], "total_cost_usd": 0.4}
+    print(json.dumps(result))  # the session's running total stays turn one's
+    sys.exit(0)
 arm = "hm" if prompt.startswith("/hm:spec ") else "plain"
 text = prompt.removeprefix("/hm:spec ").strip()
 tasks = Path(cfg["tasks_dir"])
@@ -159,6 +164,9 @@ if mode == "stall":  # the 2026-10-14 hm stall shape: process files only, no cod
 else:
     overlay = cfg.get("overlay", {}).get(arm)
     shutil.copytree(overlay or task / "reference", cwd, dirs_exist_ok=True)
+    if arm == "hm":  # the SPEC the scripted turns after this one name by its slug
+        (cwd / "specs").mkdir(exist_ok=True)
+        (cwd / "specs" / f"SPEC-{task.name}.md").write_text("# SPEC\n")
 session = str(uuid.uuid4())
 scale = 4 if arm == "hm" else 1
 if mode != "lose_cost":
@@ -299,6 +307,8 @@ def test_hidden_tests_discriminate(bench: ModuleType, task_id: str, tmp_path: Pa
 
 
 def test_arms_differ_only_by_harness_and_prefix(bench_run: dict[str, Any]) -> None:
+    """Turn one of the hm cell against the plain call; the later scripted turns are fixed strings
+    (SPEC-hm-eval-scripted-dri, which amends S15), pinned in test_bench_scripted_dri.py."""
     logs: Path = bench_run["logs"]
     plain = json.loads((logs / "plain-t1.json").read_text())
     hm = json.loads((logs / "hm-t1.json").read_text())

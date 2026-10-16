@@ -63,6 +63,26 @@ TARGET_EPS = 1e-9  # float noise in a mean of means must not flip an inclusive `
 SUSPECT_GAP = 0.2  # CLI and transcript ratios further apart than this are not trusted
 ARMS = ("plain", "hm")
 HM_PREFIX = "/hm:spec "
+# The bench plays the DRI for the hm arm of a one-session task (SPEC-hm-eval-scripted-dri): one
+# resumed session gets the spec stage, a fixed approval, then execute and wrapup on the slug of
+# the SPEC the run wrote. Nothing else is sent, and nothing is composed from the agent's text.
+APPROVE_TURN = (
+    "I approve this SPEC as written. For each open question, take the option you recommend and"
+    " record it in the SPEC. Stamp the approval, then stop."
+)
+REPLY_TURN = (
+    "I have nothing to add. For each open question, take the option you recommend, then write"
+    " the SPEC."
+)
+EXECUTE_PREFIX = "/hm:execute "
+WRAPUP_PREFIX = "/hm:wrapup "
+DRI_ORDER = ("spec", "approve", "execute", "wrapup")
+DRI_SPEC_KINDS = ("spec", "reply", "approve")  # turns after which the slug is looked up
+DRI_MAX_REPLIES = 1  # a second miss is the harness stalling, not the script
+RESUME_FLAG = "--resume"
+SPEC_PATTERN = r"SPEC-([a-z0-9][a-z0-9-]*)\.md"  # keeps the slug a plain token in a prompt
+DRI_TIERS = (1, 2)
+DRI_ROW_FIELDS = ("dri_turns", "dri_slug", "dri_stop", "stopped_at", "cli_cost_shape")
 DEFAULT_MODEL = "claude-sonnet-5-5"  # the baseline's model (RESEARCH-hm-light-lane)
 DEFAULT_MAX_TURNS = 400
 DEFAULT_TIMEOUT_S = 1800
@@ -478,6 +498,18 @@ def runner_hash(
     never mix them."""
     config = {
         "hm_prefix": HM_PREFIX,
+        "dri": {
+            "approve": APPROVE_TURN,
+            "reply": REPLY_TURN,
+            "order": list(DRI_ORDER),
+            "spec_kinds": list(DRI_SPEC_KINDS),
+            "execute_prefix": EXECUTE_PREFIX,
+            "wrapup_prefix": WRAPUP_PREFIX,
+            "max_replies": DRI_MAX_REPLIES,
+            "resume": RESUME_FLAG,
+            "spec_pattern": SPEC_PATTERN,
+            "tiers": list(DRI_TIERS),
+        },
         "agent": agent_argv("<claude>", "<prompt>", model, max_turns, max_budget_usd),
         "harness": harness_argv(Path("<work>"))[1:],
         "timeout_s": timeout_s,
@@ -1738,6 +1770,8 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
         row["tier3_hash"] = opts.tier3_hash
     if STOP.is_set():
         return {**row, "status": "interrupted"}
+    if arm == "hm" and task.tier in DRI_TIERS and not task.sessions:
+        return _run_dri(row, task, opts, run_dir, work)
     ran: list[tuple[str, str, int | None, float]] = []
     clobbered: list[str] = []
     for index in range(len(task.session_prompts)):
@@ -1756,11 +1790,7 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
         if STOP.is_set():
             return {**row, "status": "interrupted"}
         if len(task.sessions) > 1:  # each session's own output, beside the last one's
-            for stream in ("stdout", "stderr"):
-                with contextlib.suppress(OSError):
-                    shutil.copyfile(
-                        run_dir / f"agent.{stream}", run_dir / f"agent-{index + 1}.{stream}"
-                    )
+            _keep_output(run_dir, index + 1)
         if _status(code, parse_cli_result(stdout)) != "ok":
             break
     try:
@@ -1769,6 +1799,186 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
         return {
             **row, "status": "runner_error", "error": f"{type(exc).__name__}: {failure_text(exc)}",
             "exit_code": ran[-1][2], **_salvage(work, ran, opts),
+        }  # fmt: skip
+
+
+def _keep_output(run_dir: Path, position: int) -> None:
+    """A copy of the call's agent.stdout/agent.stderr as agent-<position>.*, so every call's
+    output survives the next call's overwrite."""
+    for stream in ("stdout", "stderr"):
+        with contextlib.suppress(OSError):
+            shutil.copyfile(run_dir / f"agent.{stream}", run_dir / f"agent-{position}.{stream}")
+
+
+def spec_slug(work: Path, template: Path | None) -> str | None:
+    """The slug of the newest `specs/SPEC-<slug>.md` this run created, or None.
+
+    A file whose path is also in the arm's template is not the run's own. Only the file name is
+    read, never its text, and the name pattern keeps the slug a plain token.
+    """
+    found: list[tuple[int, str, str]] = []
+    try:
+        entries = list((work / "specs").iterdir())
+    except OSError:
+        return None
+    for path in entries:
+        match = re.fullmatch(SPEC_PATTERN, path.name)
+        if match is None or path.is_symlink() or not path.is_file():
+            continue
+        if template is not None and os.path.lexists(template / "specs" / path.name):
+            continue
+        with contextlib.suppress(OSError):
+            found.append((path.stat().st_mtime_ns, path.name, match.group(1)))
+    return max(found)[2] if found else None
+
+
+def dri_prompt(kind: str, task: Task, slug: str | None) -> str:
+    """The fixed prompt of a scripted turn: the task only on the first, the slug only after a
+    SPEC was found."""
+    if kind == "spec":
+        return prompt_for(task, "hm")
+    if kind == "reply":
+        return REPLY_TURN
+    if kind == "approve":
+        return APPROVE_TURN
+    if slug is None:
+        raise ValueError(f"a {kind} turn needs the SPEC's slug")
+    return (EXECUTE_PREFIX if kind == "execute" else WRAPUP_PREFIX) + slug
+
+
+def resume_argv(first: list[str], prompt: str, session: str) -> list[str]:
+    """Turn one's argv with only the prompt replaced, resuming turn one's session."""
+    argv = list(first)
+    argv[argv.index("-p") + 1] = prompt
+    return [*argv, RESUME_FLAG, session]
+
+
+def _dri_totals(ran: list[tuple[str, str, int | None, float]]) -> list[float | None]:
+    return [_cli_cost(parse_cli_result(stdout)) for stdout, *_rest in ran]
+
+
+def _falls(totals: list[float | None]) -> bool:
+    return any(
+        a is not None and b is not None and b < a for a, b in zip(totals, totals[1:], strict=False)
+    )
+
+
+def dri_spend(totals: list[float | None]) -> float | None:
+    """The run's spend so far: the last running total, or the sum of the totals when one fell
+    (the larger reading, so the cap is never under-counted); None when any is unknown."""
+    if not totals or any(t is None for t in totals):
+        return None
+    known = [t for t in totals if t is not None]
+    return math.fsum(known) if _falls(totals) else known[-1]
+
+
+def dri_cli_cost(totals: list[float | None]) -> float | None:
+    """The session's CLI cost read as a running total: the last one. A missing or falling total
+    disproves the reading, and the row falls back to the transcript price."""
+    if not totals or any(t is None for t in totals) or _falls(totals):
+        return None
+    return totals[-1]
+
+
+def dri_fields(kinds: list[str], ran: list[tuple[str, str, int | None, float]]) -> dict[str, Any]:
+    """The summed cost, turns and wall of a scripted session, and each turn's own record."""
+    totals = _dri_totals(ran)
+    turns_seen: list[dict[str, Any]] = []
+    previous: float | None = 0.0
+    for kind, total, (stdout, _stderr, code, wall) in zip(kinds, totals, ran, strict=True):
+        result = parse_cli_result(stdout)
+        own = None
+        if total is not None and previous is not None and total >= previous:
+            own = round(total - previous, 6)
+        previous = total
+        turns_seen.append({
+            "kind": kind, "status": _status(code, result), "cost_usd": own,
+            "cli_total_usd": total, "turns": result.get("num_turns") if result else None,
+            "subtype": result.get("subtype") if result else None, "wall_s": round(wall, 1),
+        })  # fmt: skip
+    counts = [t["turns"] for t in turns_seen]
+    return {
+        "cli_cost_usd": dri_cli_cost(totals),
+        "cli_cost_shape": "not_cumulative" if _falls(totals) else None,
+        "num_turns": sum(counts) if all(isinstance(n, int) for n in counts) else None,
+        "wall_s": round(math.fsum(w for *_rest, w in ran), 1),
+        "dri_turns": turns_seen,
+    }
+
+
+def _dri_next(kind: str, slug: str | None, replies: int) -> tuple[str | None, str | None]:
+    """(next turn, stop reason): up to DRI_MAX_REPLIES replies while no SPEC follows turn one,
+    no_spec when a spec-stage turn still left none, otherwise the next turn of DRI_ORDER (None
+    after the last). A reply goes on where turn one would have."""
+    if kind in (DRI_ORDER[0], "reply") and slug is None and replies < DRI_MAX_REPLIES:
+        return "reply", None
+    if kind in DRI_SPEC_KINDS and slug is None:
+        return None, "no_spec"
+    position = DRI_ORDER.index(DRI_ORDER[0] if kind == "reply" else kind) + 1
+    return (DRI_ORDER[position] if position < len(DRI_ORDER) else None), None
+
+
+def _run_dri(
+    row: dict[str, Any], task: Task, opts: Options, run_dir: Path, work: Path
+) -> dict[str, Any]:
+    """The hm cell of a one-session task as the DRI drives it: the fixed turns of DRI_ORDER in
+    one resumed session, stopping early on a failed turn, a missing SPEC, the run budget or a
+    lost session, then one row graded once on the final tree."""
+    template = opts.templates.get(template_key(task, "hm"))
+    first = session_argv(task, "hm", 0, opts)
+    ran: list[tuple[str, str, int | None, float]] = []
+    kinds: list[str] = []
+    session: str | None = None
+    slug: str | None = None
+    stop: str | None = None
+    capped = False
+    replies = 0
+    kind: str | None = DRI_ORDER[0]
+    while kind is not None:
+        try:
+            prompt = dri_prompt(kind, task, slug)
+            argv = first if session is None else resume_argv(first, prompt, session)
+            start = time.monotonic()
+            stdout, stderr, code = _invoke(argv, work, opts.timeout_s, opts.pass_env)
+        except (OSError, shutil.Error, subprocess.SubprocessError, ValueError) as exc:
+            if not ran:
+                return {**row, "status": "setup_error", "error": failure_text(exc)}
+            return {**row, "status": "runner_error", "error": failure_text(exc),
+                    **_salvage(work, ran, opts, cumulative=True)}  # fmt: skip
+        ran.append((stdout, stderr, code, time.monotonic() - start))
+        kinds.append(kind)
+        _keep_output(run_dir, len(ran))
+        if STOP.is_set():
+            return {**row, "status": "interrupted"}
+        result = parse_cli_result(stdout)
+        if _status(code, result) != "ok" or result is None:
+            break
+        reported = result.get("session_id")
+        if not isinstance(reported, str) or not reported or session not in (None, reported):
+            stop = "session_lost"
+            break
+        session = reported
+        if kind == "reply":
+            replies += 1
+        if kind in DRI_SPEC_KINDS:
+            slug = spec_slug(work, template)
+        kind, stop = _dri_next(kind, slug, replies)
+        if kind is not None:
+            spend = dri_spend(_dri_totals(ran))
+            if spend is None or spend >= opts.max_budget_usd:
+                stop, capped, kind = "budget", spend is not None, None
+    fields = dri_fields(kinds, ran)
+    finished = kinds[-1] == DRI_ORDER[-1] and fields["dri_turns"][-1]["status"] == "ok"
+    dri = {
+        **fields, "dri_slug": slug, "dri_stop": stop, "capped": capped,
+        "stopped_at": None if finished else len(ran),
+    }  # fmt: skip
+    try:
+        return _record(row, task, opts, work, ran, [], dri=dri)
+    except Exception as exc:  # noqa: BLE001 - the agent already ran and spent; keep what we know
+        return {
+            **row, "status": "runner_error", "error": f"{type(exc).__name__}: {failure_text(exc)}",
+            "exit_code": ran[-1][2], **_salvage(work, ran, opts, cumulative=True),
         }  # fmt: skip
 
 
@@ -1811,12 +2021,14 @@ def _cli_total(ran: list[tuple[str, str, int | None, float]]) -> float | None:
 
 
 def _salvage(
-    work: Path, ran: list[tuple[str, str, int | None, float]], opts: Options
-) -> dict[str, Any]:
-    """Whatever cost evidence survives a failure after the agent ran, so its spend still counts."""
+    work: Path, ran: list[tuple[str, str, int | None, float]], opts: Options,
+    *, cumulative: bool = False,
+) -> dict[str, Any]:  # fmt: skip
+    """Whatever cost evidence survives a failure after the agent ran, so its spend still counts;
+    `cumulative` reads the calls' totals as one resumed session's running total."""
     found: dict[str, Any] = {}
     with contextlib.suppress(Exception):
-        found["cli_cost_usd"] = _cli_total(ran)
+        found["cli_cost_usd"] = dri_cli_cost(_dri_totals(ran)) if cumulative else _cli_total(ran)
     with contextlib.suppress(Exception):
         found["transcript_cost_usd"] = round(transcript_cost(work, opts.transcript_root).usd, 6)
     return found
@@ -1836,15 +2048,18 @@ def _sessions_record(ran: list[tuple[str, str, int | None, float]]) -> list[dict
 def _record(
     row: dict[str, Any], task: Task, opts: Options, work: Path,
     ran: list[tuple[str, str, int | None, float]], clobbered: list[str],
+    dri: dict[str, Any] | None = None,
 ) -> dict[str, Any]:  # fmt: skip
     """One row for the cell: a session's status, cost, turns and wall are summed over the
     sessions that ran, the first non-ok status is the row's, and the work dir is graded once,
-    against the start tree plus the teammate overlays that were applied."""
+    against the start tree plus the teammate overlays that were applied. `dri` (a scripted hm
+    session, see _run_dri) replaces the CLI cost, turns and wall with its running-total reading
+    and adds its own fields."""
     stdout, _stderr, code, _wall = ran[-1]
     result = parse_cli_result(stdout)
     sessions = _sessions_record(ran)
     status = next((s["status"] for s in sessions if s["status"] != "ok"), "ok")
-    cli_cost = _cli_total(ran)
+    cli_cost = _cli_total(ran) if dri is None else dri["cli_cost_usd"]
     wall = math.fsum(w for *_rest, w in ran)
     turns = [s["turns"] for s in sessions]
     num_turns = sum(turns) if all(isinstance(t, int) for t in turns) else None
@@ -1860,7 +2075,7 @@ def _record(
             work, task.hidden_dir, scratch / "g", expected=hidden_ids(task, opts.fixture)
         )
         start = scratch / "start"
-        start_tree(start, task, opts.fixture, overlays=len(ran) - 1)
+        start_tree(start, task, opts.fixture, overlays=len(ran) - 1 if dri is None else 0)
         outcome = outcome_for(start, work, graded.passed)
         quality = quality_for(
             start, work, opts.fixture / "tests", scratch / "q", stalled=outcome == "stalled"
@@ -1896,6 +2111,11 @@ def _record(
         stopped = len(ran) if status != "ok" else None
         recorded |= {"sessions": [{k: v for k, v in s.items() if k != "subtype"} for s in sessions],
                      "stopped_at": stopped, "overlay_clobbered": clobbered}  # fmt: skip
+    if dri is not None:
+        recorded |= {"num_turns": dri["num_turns"], "wall_s": dri["wall_s"]}
+        recorded |= {name: dri[name] for name in DRI_ROW_FIELDS}
+        if dri["capped"]:
+            recorded["subtype"] = BUDGET_SUBTYPE
     return recorded
 
 
