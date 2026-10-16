@@ -13,7 +13,7 @@
 
 > **A different harness for every project — built from yours, never generic.**
 
-> **Version**: 0.63.0
+> **Version**: 0.64.0
 >
 > Current release contract (validated from source):
 >

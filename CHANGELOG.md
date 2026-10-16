@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+## [0.64.0] - 2026-10-16
+
+Overhaul phase 1, PR-S (SPEC-hm-overhaul-p1): seven stages become four.
+
+### Added
+
+- **`hm check --slug <slug>`, one exit code for every deterministic gate.** Sections approval,
+  gates, ac, review, security and cve (plus `--mutation` and `--harness`); exits 0 proceed, 1 fix
+  and rerun, 3 or a second 4 report and stop, 5 ask the DRI. `--red` runs approval and the RED check
+  only. `execute` and `wrapup` read it instead of running each gate themselves.
+- **`reviewers.fanout`.** The lens reviewers (security, concurrency, test, performance, ux) render
+  and run only with `reviewers.fanout: true` and the lens named in `reviewers.installed`; otherwise
+  the one `code-reviewer` runs.
+- **Inert-key warnings.** `make` prints one `warn: inert key …` line per harness.yaml key that no
+  longer steers anything (`loop.enabled`, retired `delegation.stages`, lenses without fanout,
+  retired `skills.enabled` names, `agent_models` for retired or un-fanned agents,
+  `autonomy.autopilot_persistent`, `instrumentation.stage_agent_ledger`). Values are kept and the
+  file still parses (IRR-006).
+
+### Changed
+
+- **Four self-contained stages: `/hm:research` → `/hm:spec` → `/hm:execute` → `/hm:wrapup`.**
+  Each command carries its whole body; nothing under `.claude/stages/` or `.claude/hm/` is read at
+  run time. Review runs inside execute; verification is `hm check` in wrapup. On this repo's config
+  the Claude command surface fell from 240 699 to 45 487 chars and the Codex skills from 295 518 to
+  27 381 (`work-docs/BASELINE-DELTA-hm-overhaul-p1-s.md`).
+- **Telemetry readers say `no telemetry source`** instead of reporting clean when no
+  `metrics-*.jsonl` exists; a security reader never reports clean on absent data.
+- **Upgrade sweep.** `make --update` deletes pristine retired files and the directories it empties
+  (`.claude/stages/`, `.claude/hm/`, a swept skill's directory); an edited retired file is kept
+  byte-identical with one `orphan-sweep KEPT` line. User blocks and user hooks survive.
+
+### Removed
+
+- Commands `/hm:review`, `/hm:verify`, `/hm:configure`, `/hm:loop`, `/hm:loop-p5-batch` and the
+  Codex skills `hm-review`, `hm-verify`. Edit `.claude/harness.yaml` by hand and rerun `make`; use
+  the host's `/loop` for loops.
+- Agents `stuck`, `security-auditor`, `executor`, `autoloop-coder`.
+- Skills `security-scanner`, `verify-before-completion`, `targeted-test-selection`,
+  `conditional-router`, `autoloop-driver`, `refdocs-search`.
+- Hooks `telemetry`, `post_write_reminder` and `autopilot_autoarm` are no longer wired; their
+  `python -m` entry points are stubs that exit 0, so a 0.62 settings file does not error.
+- The rendered `.claude/stages/` and `.claude/hm/` directories, and the stage-agent ledger rows.
+
 ## [0.63.0] - 2026-10-16
 
 ### Added
