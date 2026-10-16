@@ -250,7 +250,14 @@ def test_ac006_section_verdicts_match_golden(run: str, cache: Path, tmp_path: Pa
         # Precondition: the regenerated harness commit is the run's original one.
         assert harness_digest(tree) == _manifest()
         expected = _expected(run)
-        assert project(hm_check(tree, expected["slug"], tmp_path / "home")) == expected["verdicts"]
+        result = hm_check(tree, expected["slug"], tmp_path / "home")
+        assert project(result) == expected["verdicts"]
+        if "reason" not in expected["verdicts"]["ac"]:
+            # SPEC Open Question 6: every hm run left its ACs unbound. `ac` must fail for that
+            # recorded reason, not for one this implementation invents.
+            failed = result["sections"]["ac"]["failed"]
+            assert failed, result["sections"]["ac"]
+            assert set(failed.values()) == {"pending_test is true"}, failed
     finally:
         shutil.rmtree(tree, ignore_errors=True)
 

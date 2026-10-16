@@ -352,7 +352,7 @@ def _outcome(ac_id: str, outcome: str) -> Callable[[Any], bool]:
     return has
 
 
-EXIT_ROWS = (
+EXIT_ROWS: tuple[Row, ...] = (
     Row("all-green", _noop, _ok),
     Row("failing-gate", _failing_gate, _exit(1, "gates", ok=False)),
     Row("pending-test", _pending, _exit(1, "ac", failed=_names("AC-001"))),
@@ -432,6 +432,128 @@ EXIT_ROWS = (
     Row("gate-and-approval", _gate_and_approval, _exit(1)),
     Row(
         "mutation-no-mutmut", _mutation_paths, _exit(0, "mutation", ok=True), flags=("--mutation",)
+    ),
+)
+
+
+# ── the review, approval and precedence rows (review P1-f) ─────────────────────
+
+_REVIEW_HEAD = (
+    "| id | severity | file:line | finding | disposition | authority |\n|---|---|---|---|---|---|\n"
+)
+
+
+def _review(body: str, name: str = f"REVIEW-{SLUG}-2026-10-16.md") -> Setup:
+    def setup(p: Project) -> None:
+        _write(p.root, f"work-docs/{name}", f"# review\n\n## Findings\n\n{body}\n## Notes\n")
+
+    return setup
+
+
+def _drop_spec(p: Project) -> None:
+    for path in (p.root / "specs").iterdir():
+        path.unlink()
+
+
+def _unparsable_spec(p: Project) -> None:
+    p.spec_yaml().write_text("schema_version: [3\n", encoding="utf-8")
+
+
+def _no_irreversible(p: Project) -> None:
+    p.stamp, p.level = None, "auto_full"
+    p.top = {"irreversible_decisions": None}
+
+
+def _degraded_unstamped(p: Project) -> None:
+    _no_ci_no_venv(p)
+    p.stamp = None
+
+
+def _writes_unstamped(p: Project) -> None:
+    _gate_writes(p)
+    p.stamp = None
+
+
+def _deps_without_lock(p: Project) -> None:
+    text = (
+        (p.root / "pyproject.toml")
+        .read_text()
+        .replace("dependencies = []", 'dependencies = ["alpha>=1"]')
+    )
+    _write(p.root, "pyproject.toml", text)
+
+
+def _id_outside_root(p: Project) -> None:
+    _write(p.root.parent, "outside/test_far.py", "def test_far():\n    assert True\n")
+    p.acs = [_ac(test_ids=["../outside/test_far.py::test_far"])]
+
+
+EXIT_ROWS += (
+    Row(
+        "review-no-disposition-column",
+        _review("| id | finding |\n|---|---|\n| F1 | a defect |\n"),
+        _exit(1, "review", ok=False, reason="findings table has no disposition column"),
+    ),
+    Row(
+        "review-unresolved",
+        _review(_REVIEW_HEAD + "| F1 | P1 | pkg/core.py:1 | a defect | unresolved | |\n"),
+        _exit(1, "review", ok=False, open=["F1"]),
+    ),
+    Row(
+        "review-rejected-without-authority",
+        _review(_REVIEW_HEAD + "| F1 | P2 | pkg/core.py:1 | a nit | rejected | |\n"),
+        _exit(
+            1,
+            "review",
+            ok=False,
+            without_disposition=["F1 (rejected without an authority)"],
+        ),
+    ),
+    Row(
+        "review-rejected-with-authority",
+        _review(_REVIEW_HEAD + "| F1 | P2 | pkg/core.py:1 | a nit | rejected | DRI 2026-10-16 |\n"),
+        _exit(0, "review", ok=True, findings=1),
+    ),
+    Row("review-none", _review("none\n"), _exit(0, "review", ok=True, findings=0)),
+    Row("review-no-doc", _noop, _exit(0, "review", ok=True, gating=False)),
+    Row(
+        "review-other-slug-ignored",
+        _review("| id | finding |\n|---|---|\n| F1 | x |\n", f"REVIEW-{SLUG}-extra-2026-10-16.md"),
+        _exit(0, "review", ok=True, gating=False),
+    ),
+    Row(
+        "approval-pending-auto-safe",
+        _unstamped("auto_safe"),
+        _exit(5, "approval", ok=False, state="missing"),
+    ),
+    Row(
+        "approval-malformed",
+        _no_irreversible,
+        _exit(5, "approval", ok=False, state="malformed"),
+    ),
+    Row(
+        "approval-malformed-yaml",
+        _noop,
+        _exit(5, "approval", ok=False, state="malformed"),
+        after=_unparsable_spec,
+    ),
+    Row(
+        "approval-no-spec",
+        _noop,
+        _exit(5, "approval", ok=False, state="no_spec"),
+        after=_drop_spec,
+    ),
+    Row("precedence-3-over-5", _degraded_unstamped, _exit(3, "approval", ok=False)),
+    Row("precedence-4-over-5", _writes_unstamped, _exit(4, "approval", ok=False)),
+    Row(
+        "cve-no-lock",
+        _deps_without_lock,
+        _exit(0, "cve", ok=True, status="unavailable", warning=lambda w: "uv.lock" in str(w)),
+    ),
+    Row(
+        "ac-id-outside-root",
+        _id_outside_root,
+        _exit(1, "ac", failed=_outcome("AC-001", "not collected")),
     ),
 )
 
@@ -707,3 +829,108 @@ def test_ac005_gate_env_has_no_bytecode(tmp_path: Path) -> None:
     assert not list(p.root.rglob("__pycache__"))
     assert not (p.root / ".pytest_cache").exists()
     assert check.gate_env()["PYTHONDONTWRITEBYTECODE"] == "1"
+
+
+# ── precedence, opt-ins and gate plumbing (review P1-f, P2) ────────────────────
+
+
+def test_ac005_precedence_4_over_3_over_5(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Degraded, unstamped, and the tree changed under the run: 4 wins."""
+    p = make_project(tmp_path)
+    _degraded_unstamped(p)
+    finish(p)
+    real = check.snapshot
+    calls: list[int] = []
+
+    def moved(root: Path) -> dict[str, str]:
+        calls.append(1)
+        snap = real(root)
+        return {**snap, "data.txt": "moved"} if len(calls) > 1 else snap
+
+    monkeypatch.setattr(check, "snapshot", moved)
+    code, out = run_check(p)
+    assert code == 4, out
+    assert out["tree_changed"] == ["data.txt"]
+    assert out["sections"]["gates"]["degraded"] is True
+    assert out["sections"]["approval"]["ok"] is False
+
+
+def test_ac005_failing_mutation_gates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    p = make_project(tmp_path)
+    _mutation_paths(p)
+    finish(p)
+    real = check._run
+
+    def run(argv: list[str], root: Path, env: dict[str, str]) -> tuple[int, str]:
+        if "harness_maker.spec_mutation" in argv:
+            return 1, "mutation score 40% < threshold 80%"
+        return real(argv, root, env)
+
+    monkeypatch.setattr(check, "_run", run)
+    code, out = run_check(p, "--mutation")
+    assert code == 1, out
+    assert out["sections"]["mutation"]["ok"] is False
+    assert "40%" in out["sections"]["mutation"]["tail"]
+    code, out = run_check(p)
+    assert code == 0 and "mutation" not in out["sections"], out
+
+
+def test_ac005_harness_reports_and_never_gates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    p = finish(make_project(tmp_path))
+    code, out = run_check(p, "--harness")
+    body = out["sections"]["harness"]
+    assert code == 0, out
+    assert body["gating"] is False and body["ok"] is True
+    assert isinstance(body["score"], (int, float))
+    assert isinstance(body["signals_failed"], list)
+
+    import harness_maker.ai_readiness as ai_readiness
+
+    def broken(*_a: object, **_kw: object) -> dict[str, object]:
+        raise RuntimeError("structural layer exploded")
+
+    monkeypatch.setattr(ai_readiness, "run_structural", broken)
+    code, out = run_check(p, "--harness")
+    body = out["sections"]["harness"]
+    assert code == 0, out
+    assert body == {
+        "ok": False,
+        "gating": False,
+        "reason": "RuntimeError: structural layer exploded",
+    }
+
+
+def test_ac005_gate_timeout_is_a_failed_row(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A gate that outlives `GATE_TIMEOUT_S` fails its row; the run still prints its JSON."""
+    p = make_project(tmp_path)
+    _write(p.root, "tests/test_slow.py", "import time\n\n\ndef test_slow():\n    time.sleep(60)\n")
+    finish(p)
+    monkeypatch.setattr(check, "GATE_TIMEOUT_S", 3)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        code = check.main(["--slug", SLUG, "--root", str(p.root), "--offline"])
+    doc = json.loads(buf.getvalue())
+    assert code == doc["exit"] == 1
+    rows = doc["sections"]["gates"]["results"]
+    assert any(r["exit"] != 0 and "timed out" in r["tail"] for r in rows), rows
+
+
+def test_ac005_test_files_follow_an_end_of_options_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A test file named like an option must reach pytest as a path, never as a flag."""
+    p = finish(make_project(tmp_path))
+    seen: list[list[str]] = []
+
+    def run(argv: list[str], root: Path, env: dict[str, str]) -> tuple[int, str]:
+        seen.append(argv)
+        return 0, ""
+
+    monkeypatch.setattr(check, "_run", run)
+    check.run_tests(p.root, ["pytest"], ["tests/test_mul.py::test_mul"])
+    argv = seen[0]
+    assert argv[argv.index("--") + 1 :] == ["tests/test_mul.py"]

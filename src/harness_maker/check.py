@@ -55,6 +55,8 @@ CODE_SUFFIXES: frozenset[str] = frozenset(
 )
 HOOK_FILES: tuple[str, ...] = (".claude/settings.json", ".codex/hooks.json", ".cursor/hooks.json")
 GATE_TIMEOUT_S = 3600
+#: The exit a gate row records when it outlived `GATE_TIMEOUT_S` (as coreutils `timeout`).
+EXIT_TIMEOUT = 124
 _GATE_TAIL = 30
 _GIT_ENV = {"GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0"}
 
@@ -130,11 +132,15 @@ def _run(argv: list[str], root: Path, env: dict[str, str]) -> tuple[int, str]:
         return 127, f"{type(exc).__name__}: {exc}"
     try:
         out, _ = proc.communicate(timeout=GATE_TIMEOUT_S)
-    except BaseException:
+    except BaseException as exc:
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(proc.pid, signal.SIGKILL)
+        partial = ""
         with contextlib.suppress(Exception):
-            proc.communicate(timeout=5)
+            partial, _ = proc.communicate(timeout=5)
+        if isinstance(exc, subprocess.TimeoutExpired):
+            # A failed row, not a traceback: the caller still prints its one JSON line.
+            return EXIT_TIMEOUT, f"{partial or ''}\ntimed out after {GATE_TIMEOUT_S}s"
         raise
     return proc.returncode, out or ""
 
@@ -417,11 +423,23 @@ def _exception_line(text: str) -> str:
     return lines[-1] if lines else ""
 
 
+def _inside(root: Path, rel: str) -> bool:
+    """A listed test file must be a relative path that resolves under the project root."""
+    if not rel or Path(rel).is_absolute():
+        return False
+    return (root / rel).resolve().is_relative_to(root.resolve())
+
+
 def run_tests(root: Path, runner: list[str], test_ids: list[str]) -> dict[str, Outcome]:
     """One pytest run over the files of `test_ids`; outcomes read from its junit XML."""
     outcomes: dict[str, Outcome] = {}
     runnable: list[str] = []
     for tid in test_ids:
+        if not _inside(root, tid.partition("::")[0]):
+            outcomes[tid] = Outcome(
+                "not collected", "the node id resolves outside the project root"
+            )
+            continue
         present = _statically_present(root, tid)
         if present is False:
             outcomes[tid] = Outcome("not collected", "the node id names no test")
@@ -443,6 +461,7 @@ def run_tests(root: Path, runner: list[str], test_ids: list[str]) -> dict[str, O
             "--tb=short",
             "--continue-on-collection-errors",
             f"--junitxml={junit}",
+            "--",
             *files,
         ]
         pythonpath = os.pathsep.join(p for p in (tmp, os.environ.get("PYTHONPATH", "")) if p)
@@ -647,6 +666,14 @@ def load_spec(root: Path, slug: str) -> SpecView | None:
         return None
 
 
+def _no_spec(approval_state: str) -> Section:
+    """No readable SPEC is approval's `no_spec`/`malformed` (exit 5), not a failed test."""
+    body = {"ok": False, "reason": "no readable machine SPEC"}
+    if approval_state in ("no_spec", "malformed"):
+        return Section({**body, "see": "approval"}, EXIT_APPROVAL)
+    return Section(body, EXIT_FAILED)
+
+
 def ac_section(
     root: Path,
     spec: SpecView | None,
@@ -657,7 +684,7 @@ def ac_section(
     from harness_maker.spec_machine import find_unjudged
 
     if spec is None:
-        return Section({"ok": False, "reason": "no readable machine SPEC"}, EXIT_FAILED)
+        return _no_spec(approval_state)
     if not spec.model.ac:
         code_change = sorted(p for p in changed if is_code_or_test(p))
         if approval_state == "exempt" and not code_change:
@@ -736,10 +763,14 @@ def ac_section(
 
 
 def red_section(
-    root: Path, spec: SpecView | None, runner: list[str] | None, green_ok: set[str]
+    root: Path,
+    spec: SpecView | None,
+    runner: list[str] | None,
+    green_ok: set[str],
+    approval_state: str = "",
 ) -> Section:
     if spec is None:
-        return Section({"ok": False, "reason": "no readable machine SPEC"}, EXIT_FAILED)
+        return _no_spec(approval_state)
     testable = spec.testable()
     if not testable:
         return Section({"ok": False, "degraded": True, "reason": "no testable AC"}, EXIT_DEGRADED)
@@ -803,7 +834,11 @@ def _cells(line: str) -> list[str]:
 
 def review_section(root: Path, slug: str, config: dict[str, Any]) -> Section:
     work_docs = _dig(config, "work_docs", "dir") or "work-docs/"
-    docs = sorted((root / str(work_docs)).glob(f"REVIEW-{slug}-*.md"))
+    # Anchored: `REVIEW-auth-*.md` would also match another task's `REVIEW-auth-refresh-…`.
+    name = re.compile(rf"REVIEW-{re.escape(slug)}-\d{{4}}-\d{{2}}-\d{{2}}\.md")
+    docs = sorted(
+        p for p in (root / str(work_docs)).glob(f"REVIEW-{slug}-*.md") if name.fullmatch(p.name)
+    )
     if not docs:
         return Section({"ok": True, "gating": False, "reason": "no REVIEW record"})
     doc = docs[-1]
@@ -829,6 +864,7 @@ def review_section(root: Path, slug: str, config: dict[str, Any]) -> Section:
     d_col = header.index("disposition")
     a_col = header.index("authority") if "authority" in header else None
     missing: list[str] = []
+    open_: list[str] = []
     count = 0
     for row in rows[1:]:
         cells = _cells(row)
@@ -839,13 +875,15 @@ def review_section(root: Path, slug: str, config: dict[str, Any]) -> Section:
         label = cells[0] or f"row {count}"
         if disposition not in _DISPOSITIONS:
             missing.append(label)
+        elif disposition == "unresolved":
+            open_.append(label)
         elif disposition == "rejected" and (
             a_col is None or a_col >= len(cells) or not cells[a_col] or cells[a_col] == "-"
         ):
             missing.append(f"{label} (rejected without an authority)")
-    ok = not missing
+    ok = not missing and not open_
     return Section(
-        {"ok": ok, "doc": rel, "findings": count, "without_disposition": missing},
+        {"ok": ok, "doc": rel, "findings": count, "without_disposition": missing, "open": open_},
         EXIT_OK if ok else EXIT_FAILED,
     )
 
@@ -962,6 +1000,17 @@ def cve_section(root: Path, *, offline: bool, query: QueryFn | None = None) -> S
     specs, touched = dependency_specs(root)
     if not specs:
         return Section({"ok": True, "status": "no dependencies"})
+    if not (root / "uv.lock").is_file():
+        # Unpinned names have no version to look up, so an empty answer would read clean.
+        return Section(
+            {
+                "ok": True,
+                "status": "unavailable",
+                "warning": "no uv.lock, so dependency versions are unknown and no CVE lookup "
+                "was made; this is not a clean result",
+                "added": sorted(n for n, _ in touched),
+            }
+        )
     try:
         items = (query or _cve_query)(specs)
     except Exception as exc:  # noqa: BLE001 — any lookup failure is `unavailable`, never clean
@@ -989,9 +1038,9 @@ def cve_section(root: Path, *, offline: bool, query: QueryFn | None = None) -> S
 # ── opt-ins ────────────────────────────────────────────────────────────────────
 
 
-def mutation_section(root: Path, spec: SpecView | None) -> Section:
+def mutation_section(root: Path, spec: SpecView | None, approval_state: str = "") -> Section:
     if spec is None:
-        return Section({"ok": False, "reason": "no readable machine SPEC"}, EXIT_FAILED)
+        return _no_spec(approval_state)
     tier = str(getattr(spec.model, "verification_tier", 2))
     argv = [
         sys.executable,
@@ -1055,19 +1104,20 @@ def run(opts: Options, *, cve_query: QueryFn | None = None) -> dict[str, Any]:
     commands, _reason, _source = gate_commands(root, config)
     runner = pytest_runner(root, commands)
     skipped = Section({"ok": True, "skipped": "--red"})
+    state = str(approval.body["state"])
     if opts.red:
         sections["gates"] = skipped
-        sections["ac"] = red_section(root, spec, runner, opts.green_ok)
+        sections["ac"] = red_section(root, spec, runner, opts.green_ok, state)
         for name in ("review", "security", "cve"):
             sections[name] = skipped
     else:
         sections["gates"] = gates_section(root, config)
-        sections["ac"] = ac_section(root, spec, str(approval.body["state"]), changed, runner)
+        sections["ac"] = ac_section(root, spec, state, changed, runner)
         sections["review"] = review_section(root, opts.slug, config)
         sections["security"] = security_section(root, changed)
         sections["cve"] = cve_section(root, offline=opts.offline, query=cve_query)
         if opts.mutation:
-            sections["mutation"] = mutation_section(root, spec)
+            sections["mutation"] = mutation_section(root, spec, state)
         if opts.harness:
             sections["harness"] = harness_section(root)
     tree_changed = tree_delta(before, snapshot(root))
