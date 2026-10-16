@@ -62,18 +62,10 @@ def test_off_render_ships_no_ledger_instruction(tmp_path: Path) -> None:
     assert not _hits(_render(tmp_path, on=False))
 
 
-def test_on_render_still_ships_both(tmp_path: Path) -> None:
-    """The guard against an OFF-shaped ON. Both stages and review must survive."""
-    hits = _hits(_render(tmp_path, on=True))
-    joined = "\n".join(hits)
-    assert "stage_agent_ledger emit" in joined
-    assert "persist-payload" in joined
-    # Named files, not just a count: a gate that collapsed two stages into one would keep
-    # the count and lose a stage. The validator emitter moved `plan` -> `spec`
-    # (SPEC-plan-stage-absorption ADR-004).
-    assert any("spec.md" in h and "emit" in h for h in hits), hits
-    assert any("execute.md" in h and "emit" in h for h in hits), hits
-    assert any("review.md" in h and "persist-payload" in h for h in hits), hits
+def test_on_render_ships_none_either(tmp_path: Path) -> None:
+    """0.64.0 (SPEC-hm-overhaul-p1): the stage bodies the axis wired were rewritten, so ON is
+    inert too. `make` warns about the key instead (`inert_keys`)."""
+    assert not _hits(_render(tmp_path, on=True))
 
 
 def test_harness_yaml_records_the_axis_both_ways(tmp_path: Path) -> None:

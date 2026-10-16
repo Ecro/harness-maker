@@ -34,7 +34,6 @@ from harness_maker import interview as iv
 from harness_maker.models import (
     DelegationConfig,
     InterviewAnswers,
-    LoopConfig,
     Preset,
     ProjectProfile,
     Target,
@@ -47,30 +46,10 @@ _SRC = _ROOT / "src" / "harness_maker"
 
 #: Rendered agents that no rendered command or skill names, each with the reason its absence is a
 #: decision. A new entry here is a claim a human typed; a new *undeclared* one fails the test.
-_UNWIRED_DECLARED: dict[str, str] = {
-    "consensus-arbiter": (
-        "Rendered but never dispatched. `/hm:review` Step 4 reconciles findings inline — the "
-        "surface-match + reasoning-alignment filter is prose over the merged finding list, and "
-        "`conditional_router.scope_aware_consensus` supplies the k-of-N threshold. The agent is a "
-        "heavier alternative that pays off only on `--with-reviewers` fan-outs beyond the four "
-        "lenses a preset dispatches, and wiring it would change the review flow. Declared as a "
-        "deliberate hold, not a gap: docs/HOW-IT-WORKS.md §11.8 describes the METHOD, which is "
-        "implemented, rather than the agent, which is not."
-    ),
-    "security-auditor": (
-        "Rendered but never dispatched — found by this test's discovery arm, unnamed by the SPEC. "
-        "The 5-gate audit it performs is `/hm:review`'s `security` lens plus the `security-"
-        "reviewer` agent on the normal path; the auditor is the deep, Bash-carrying variant kept "
-        "for an explicit opt-in that no rendered command currently offers. Declared so the next "
-        "reader sees a decision instead of an oversight."
-    ),
-    "stage-delegate": (
-        "Absent from a DEFAULT render only. `verify.md.j2` gates Step 0.5 on "
-        "`'verify' in config.delegation.stages`, so this is opt-in configuration rather than dead "
-        "surface — proved by `test_ac_014_verify_delegation_is_config_gated`, which renders both "
-        "arms and watches the handoff appear."
-    ),
-}
+#: Empty since 0.64.0: `security-auditor` was deleted, and `consensus-arbiter` and
+#: `stage-delegate` render only with the opt-in that dispatches them (`second_opinion.models`,
+#: `delegation.stages`), so a default render carries no agent it does not name.
+_UNWIRED_DECLARED: dict[str, str] = {}
 
 
 @pytest.fixture(scope="module")
@@ -90,10 +69,6 @@ def rendered(tmp_path_factory: pytest.TempPathFactory) -> Path:
                     "installed": list(iv._ALL_REVIEWERS),
                     "enabled": list(iv._PROD_ENABLED_REVIEWERS),
                 },
-                # `autoloop-coder` is named only by loop.md; render with the loop
-                # on so this full-inventory wiring check still exercises it
-                # (SPEC-loop-opt-in AC-006 default-off does not apply here).
-                loop=LoopConfig(enabled=True),
             ),
         ),
         out,
@@ -345,20 +320,14 @@ def test_ac_014_the_linter_emits_on_an_over_threshold_asset(
     )
 
 
-def test_ac_014_verify_delegation_is_config_gated(tmp_path: Path) -> None:
-    """Wired-or-gated for a template branch: render BOTH arms and watch the handoff move.
+def test_ac_014_wrapup_delegation_is_config_gated(tmp_path: Path) -> None:
+    """Wired-or-gated for a template branch: render the arms and watch the handoff move.
 
-    Asserting only that the template contains an `{% if %}` would pass on a condition that can
-    never be true. The differential is the evidence: with `delegation.stages` carrying `verify` the
-    rendered command names `stage-delegate`; without it, it does not.
+    0.64.0: wrapup is the only stage that can delegate. The `verify` arm keeps the cross-stage
+    collision ADR-011 rejected in view: a retired stage's key must not switch wrapup's handoff on.
     """
-    # Three arms, not two. The third is a SHIPPED defect class, not a hypothetical: `models.py`
-    # records that ADR-011 rejected `wrapup.delegate` because an earlier phase used one key to gate
-    # a different stage — "a key named for one stage silently controlling another". With only
-    # `["verify"]` and `[]`, a regression from `'verify' in config.delegation.stages` to a bare
-    # `{% if config.delegation.stages %}` passes every assertion (A.5 round 1, ADVISORY-1).
     renders: dict[str, str] = {}
-    for label, stages in (("verify", ["verify"]), ("off", []), ("wrapup", ["wrapup"])):
+    for label, stages in (("wrapup", ["wrapup"]), ("off", []), ("verify", ["verify"])):
         out = tmp_path / label
         render(
             synthesize(
@@ -372,23 +341,15 @@ def test_ac_014_verify_delegation_is_config_gated(tmp_path: Path) -> None:
             out,
             freeze_time=DEFAULT_FREEZE_TIME,
         )
-        renders[label] = (out / "commands" / "hm" / "verify.md").read_text(encoding="utf-8")
+        renders[label] = (out / "commands" / "hm" / "wrapup.md").read_text(encoding="utf-8")
 
-    assert "stage-delegate" not in renders["wrapup"], (
-        "`delegation.stages: [wrapup]` renders verify's handoff — the gate keys on the presence of "
-        "the list rather than on this stage's name, which is the cross-stage collision ADR-011 "
-        "rejected once already"
-    )
-
-    assert "stage-delegate" in renders["verify"], (
-        "delegation.stages includes `verify` and the rendered command still does not name "
-        "`stage-delegate` — the gate's true branch is unreachable, so the absence is not a "
-        "configuration choice"
-    )
-    assert "stage-delegate" not in renders["off"], (
-        "the handoff renders with delegation off, so it is not gated at all"
+    assert "stage-delegate" in renders["wrapup"], "delegation on, and wrapup names no delegate"
+    assert "stage-delegate" not in renders["off"], "the handoff renders with delegation off"
+    assert "stage-delegate" not in renders["verify"], (
+        "`delegation.stages: [verify]` renders wrapup's handoff — the gate keys on the list, "
+        "not on this stage's name"
     )
     assert re.search(
-        r"\{%\s*if\s+config\.delegation\b",
-        (_SRC / "templates" / "stages" / "verify.md.j2").read_text(encoding="utf-8"),
-    ), "the gate moved out of verify.md.j2 — update this test's anchor"
+        r"'wrapup' in \(\(config\.get\('delegation'\)",
+        (_SRC / "templates" / "stages" / "wrapup.md.j2").read_text(encoding="utf-8"),
+    ), "the gate moved out of wrapup.md.j2 — update this test's anchor"

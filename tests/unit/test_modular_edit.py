@@ -65,12 +65,12 @@ def test_add_unsupported_kind_raises(tmp_path: Path) -> None:
 
 def test_add_skill_creates_file(tmp_path: Path) -> None:
     target_dotclaude = _build_side_fixture(tmp_path)
-    rendered = add("skill:conditional-router", target_dotclaude)
+    rendered = add("skill:trajectory-monitor", target_dotclaude)
     assert rendered.exists()
     assert rendered.name == "SKILL.md"
 
 
-@pytest.mark.parametrize("name", ["autoloop-driver", "context-linter"])
+@pytest.mark.parametrize("name", ["worktree-isolator", "context-linter"])
 def test_add_typed_only_skill_keeps_the_flag(tmp_path: Path, name: str) -> None:
     """SPEC-hm-light-lane-s2 moved the flag out of the templates; `add` must still set it."""
     target_dotclaude = _build_side_fixture(tmp_path)
@@ -81,7 +81,7 @@ def test_add_typed_only_skill_keeps_the_flag(tmp_path: Path, name: str) -> None:
 
 def test_add_ordinary_skill_stays_invocable(tmp_path: Path) -> None:
     target_dotclaude = _build_side_fixture(tmp_path)
-    text = add("skill:conditional-router", target_dotclaude).read_text(encoding="utf-8")
+    text = add("skill:trajectory-monitor", target_dotclaude).read_text(encoding="utf-8")
     assert "disable-model-invocation" not in text
 
 

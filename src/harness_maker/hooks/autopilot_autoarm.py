@@ -18,6 +18,7 @@ SessionStart is worse than a degraded fallback.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -174,5 +175,16 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":  # pragma: no cover — exercised via main() in tests
-    sys.exit(main())
+def _retired_entry() -> int:
+    """The hook is retired (0.64.0, SPEC-hm-overhaul-p1); a kept settings file may still call it.
+
+    Drain stdin so the host never sees a broken pipe, print nothing, exit 0. `main()` stays as a
+    library function for in-process callers and tests.
+    """
+    with contextlib.suppress(OSError, ValueError):
+        sys.stdin.read()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_retired_entry())

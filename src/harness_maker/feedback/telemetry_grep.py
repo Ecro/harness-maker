@@ -12,7 +12,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from harness_maker._metrics_io import _candidate_files, iter_recent_entries
+from harness_maker._metrics_io import (
+    NO_TELEMETRY_SOURCE,
+    _candidate_files,
+    has_telemetry_source,
+    iter_recent_entries,
+)
 
 TELEMETRY_GREP_MAX_BYTES = 2048
 _TRUNC_MARKER = "...<truncated>"
@@ -31,12 +36,14 @@ def last_stop_with_trace(metrics_dir: Path) -> str:
 
     Walks today's ``metrics-YYYY-MM-DD.jsonl`` (and one fallback day) newest-first
     via ``_metrics_io.iter_recent_entries``. Returns the empty string when no
-    stop event exists (clean session). The returned string is capped at
+    stop event exists (clean session), and ``no telemetry source`` when there is no metrics
+    file at all — the `telemetry` hook is retired, so that is not a clean session
+    (SPEC-hm-overhaul-p1 AC-011). The returned string is capped at
     ``TELEMETRY_GREP_MAX_BYTES`` bytes — callers feeding this into an LLM
     context window can rely on that bound.
     """
-    if not metrics_dir.is_dir():
-        return ""
+    if not has_telemetry_source(metrics_dir):
+        return NO_TELEMETRY_SOURCE
     stop_event: dict[str, Any] | None = None
     for entry in iter_recent_entries(metrics_dir, days=1, event="stop"):
         stop_event = entry

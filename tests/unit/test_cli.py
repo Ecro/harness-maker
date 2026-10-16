@@ -321,7 +321,7 @@ def test_mechanical_checks_flag(tmp_path: Path) -> None:
 
 
 def test_focus_flag_adds_reviewers(tmp_path: Path) -> None:
-    """--focus=security adds security-reviewer + security-auditor to Side preset."""
+    """--focus=security adds security-reviewer to Side preset (security-auditor retired)."""
     _write_harness_yaml(tmp_path)
     answers = _minimal_answers()
     captured_bp: dict[str, Any] = {}
@@ -350,7 +350,7 @@ def test_focus_flag_adds_reviewers(tmp_path: Path) -> None:
     assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
     enabled = captured_bp["reviewers_enabled"]
     assert "security-reviewer" in enabled
-    assert "security-auditor" in enabled
+    assert "security-auditor" not in enabled
 
 
 def test_preset_plus_extended_flags(tmp_path: Path) -> None:
@@ -653,7 +653,9 @@ def test_security_scan_command_reports_findings(tmp_path: Path) -> None:
         fix="Remove the instruction override.",
     )
 
-    with patch("harness_maker.security_scanner.scan_all", return_value=[finding]) as scan:
+    with patch(
+        "harness_maker.security_scanner.scan_all_with_status", return_value=([finding], {})
+    ) as scan:
         result = runner.invoke(app, ["security-scan", str(tmp_path)])
 
     assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
@@ -681,7 +683,7 @@ def test_security_scan_blocks_high_when_policy_blocks(tmp_path: Path) -> None:
         fix="Rotate and remove.",
     )
 
-    with patch("harness_maker.security_scanner.scan_all", return_value=[finding]):
+    with patch("harness_maker.security_scanner.scan_all_with_status", return_value=([finding], {})):
         result = runner.invoke(app, ["security-scan", str(tmp_path)])
 
     assert result.exit_code == 1, f"expected blocking exit:\n{result.output}"
@@ -717,7 +719,7 @@ def test_make_update_clear_and_remove_real_tmp_project(tmp_path: Path) -> None:
     assert (claude / "harness.yaml").is_file()
     assert (claude / ".harness-manifest.json").is_file()
     assert (claude / "commands" / "hm" / "make.md").is_file()
-    assert (claude / "commands" / "hm" / "configure.md").is_file()
+    assert not (claude / "commands" / "hm" / "configure.md").exists()  # retired in 0.64.0
     assert (claude / "commands" / "hm" / "uninstall.md").is_file()
 
     update = runner.invoke(

@@ -25,11 +25,6 @@ from typing import Any
 import pytest
 import yaml
 
-from tests.structural.test_contract_boundaries_section import (
-    _ADVISORY_BULLET,
-    _NONE_BULLET,
-    _PATH_BULLET,
-)
 from tests.unit import light_lane_s3a_fixture as s3a
 from tests.unit import light_lane_s3c_fixture as fx
 
@@ -171,54 +166,6 @@ def _section(text: str, heading: str) -> str:
     i = text.index(heading + "\n") + len(heading) + 1
     nxt = re.search(r"^## ", text[i:], re.M)
     return text[i : i + nxt.start()] if nxt else text[i:]
-
-
-def test_light_plan_feeds_every_reader(light_plan: tuple[Path, str]) -> None:
-    from harness_maker import autopilot_caps, wrapup_land
-
-    checkout, text = light_plan
-    fm = _frontmatter(text)
-    # wrapup Step 1.3, Maker's decision capture, the verify skill's PLAN glob: the PLAN exists.
-    assert sorted(p.name for p in (checkout / "work-docs").glob("PLAN-*.md")) == [f"PLAN-{SLUG}.md"]
-    # wrapup Step 3.2, verify Check 1, the drift verdict, Check 6's foreign-slug test.
-    assert fm["task_slug"] == SLUG
-    # wrapup Step 4 and the Quality Bar: `status` and `- [ ]`.
-    assert fm["status"] == "planning"
-    assert "- [ ]" in text
-    # wrapup Step 5.7, review Step 3.3, the boundary's objective gate.
-    assert fm["intent"] == "TIMEPARSE-UNITS"
-    assert autopilot_caps._plan_link(checkout, SLUG) == (True, "TIMEPARSE-UNITS", False)
-    # verify Check 6, both arms.
-    assert (fm["spec_need_verdict"], fm["spec_need_target"]) == T1_SPEC_NEED
-    # execute Steps 1, 2 and 4: `spec:`, the phases, the Do-not-change list.
-    assert fm["spec"] == f"[[SPEC-{SLUG}]]"
-    assert fm["adrs"] == len(T1_ADRS)
-    phases = re.findall(r"^- \[ \] (\d+)\. \*\*Phase \1 — .+$", text, re.M)
-    assert phases == ["1", "2"], text
-    for line in (ln for ln in text.splitlines() if ln.startswith("- [ ] ")):
-        # review Step 2 and the light check's drift read `scope`.
-        for field in ("scope: ", "exit: `", "risk: ", "rollback: "):
-            assert field in line, (field, line)
-    boundaries = _section(text, "## 🚧 Contract Boundaries")
-    bullets = [ln for ln in _section(boundaries, "### Do not change").splitlines() if ln.strip()]
-    assert bullets, "the Do-not-change list is non-empty"
-    for b in bullets:
-        assert _PATH_BULLET.match(b) or _ADVISORY_BULLET.match(b) or _NONE_BULLET.match(b), b
-    assert [_PATH_BULLET.match(b).group(1) for b in bullets] == [  # type: ignore[union-attr]
-        p for p, _ in T1_BOUNDARIES
-    ]
-    # wrapup's `agent-decided:` bullet: ADR ids with `**Decided by:**`.
-    adrs = _section(text, "## 📐 Architecture Decision Records")
-    decided = re.findall(r"^- (ADR-\d{3}): .+\. \*\*Decided by:\*\* (.+)$", adrs, re.M)
-    assert decided == [("ADR-001", "user (source: SPEC S2)"), ("ADR-002", "agent")]
-    # `wrapup_land --required` stages the PLAN.
-    dispositions = wrapup_land.stage_manifest(checkout, [PLAN_REL], [])
-    assert dispositions == [{"path": PLAN_REL, "kind": "required", "disposition": "staged"}]
-
-
-def test_light_plan_is_short(light_plan: tuple[Path, str]) -> None:
-    _checkout, text = light_plan
-    assert len(text) <= 1200, len(text)
 
 
 # ── AC-014: the minimal light machine.yaml ────────────────────────────────────

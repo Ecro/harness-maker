@@ -124,7 +124,7 @@ _MUTATIONS = [
 
 def test_ac_001_living_docs_match_source_contracts(tmp_path: Path) -> None:
     source = default_source_contract(_ROOT)
-    assert source.pipeline == ("research", "spec", "execute", "review", "verify", "wrapup")
+    assert source.pipeline == ("research", "spec", "execute", "wrapup")  # 0.64.0
     assert source.agents
     assert source.skills
     assert source.mechanisms == tuple(f"M{i}" for i in range(1, 20))
@@ -156,7 +156,7 @@ def test_ac_002_doc_contract_rejects_representative_mutations(
     elif mutation == "retired-stage":
         text += "\nThe live `plan` stage writes the plan.\n"
     elif mutation == "pipeline-order":
-        text = text.replace("`review` → `verify` → `wrapup`", "`review` → `wrapup` → `verify`")
+        text = text.replace("`execute` → `wrapup`", "`wrapup` → `execute`")
     elif mutation == "validator-name":
         text += "\nThe current `plan-validator` checks the plan.\n"
     elif mutation == "missing-agent":
@@ -223,8 +223,8 @@ def test_ac_002_contract_and_mutation_inventories_are_nonempty() -> None:
     [
         (
             "README.md",
-            "`/hm:review` → `/hm:verify` → `/hm:wrapup`",
-            "`/hm:review` → `/hm:wrapup` → `/hm:verify`",
+            "`/hm:spec` → `/hm:execute` → `/hm:wrapup`",
+            "`/hm:spec` → `/hm:wrapup` → `/hm:execute`",
             "pipeline",
         ),
         (
@@ -455,6 +455,7 @@ def test_ac_006_each_locale_must_match_the_complete_source_inventory(
 
 
 def test_ac_007_preset_fallbacks_use_the_canonical_six_stage_pipeline() -> None:
+    """Name kept for its SPEC-docs-release-sync binding; the fallback is the inert 0.63 default."""
     source = default_source_contract(_ROOT)
     fallbacks = discover_preset_fallbacks(_ROOT)
     assert tuple(sorted(fallbacks)) == _EXPECTED_PRESET_FILES

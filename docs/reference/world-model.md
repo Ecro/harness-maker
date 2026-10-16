@@ -49,9 +49,9 @@ different contexts. Now:
 - Maker reaches them by **Reading their SKILL.md before any write**; the consent rules inside
   are unchanged. Read-only goal and status questions are answered from the briefing — a
   procedure is read only to change something (AC-005).
-- `/hm:` stage descriptions end with `Only when typed, or via <Name>, autopilot or /hm:loop.`
-  (Codex: `$hm-loop`). This is **advisory** gating: Maker handoff, autopilot advance and
-  `/hm:loop` all invoke stages model-side, so a hard flag would break them (AC-003).
+- `/hm:` stage descriptions end with `Only when typed, or via <Name>.` This is **advisory**
+  gating: a Maker handoff invokes stages model-side, so a hard flag would break it (AC-003).
+  Autopilot and `hm:loop` were retired in 0.64.0.
 - The always-loaded `## World model` pointer (CLAUDE.md / AGENTS.md /
   `.cursor/rules/harness.mdc`, ≤ 400 chars per variant at NAME_MAX/HANDLE_MAX) routes goal,
   metric, fact and status asks to Maker even unnamed or mid-stage; ordinary build/fix asks do

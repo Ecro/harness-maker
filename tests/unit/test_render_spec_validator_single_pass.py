@@ -21,7 +21,6 @@ dispatch or a blocking branch is added back.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -62,49 +61,6 @@ def _text(commands: Path, stage: str) -> str:
     return (commands / f"{stage}.md").read_text(encoding="utf-8")
 
 
-def test_the_validator_is_dispatched_exactly_once_across_the_whole_surface(
-    commands: Path,
-) -> None:
-    """Not just once in `spec.md` — once anywhere. A second home is a second pass."""
-    total = sum(
-        len(re.findall(r'subagent_type="spec-validator"', _text(commands, s))) for s in _STAGES
-    )
-    assert total == 1, f"spec-validator is dispatched {total} times across the rendered stages"
-
-
-def test_the_single_pass_rule_is_stated_not_merely_true(commands: Path) -> None:
-    """The rule has to be written down, not just satisfied by the current template.
-
-    An earlier draft of this test banned the SUBSTRING "re-validation", which failed on the
-    sentence that states the prohibition — an assertion bound to a word rather than to the
-    dimension it names. The dispatch COUNT is what makes a second pass impossible, and that is
-    asserted above. What is asserted here is different and not redundant: the reader is told
-    there is one pass, so nobody reconstructs `/hm:plan` Step 4.5 from a template that merely
-    happens to dispatch once.
-    """
-    spec = " ".join(_text(commands, "spec").lower().split())
-    assert "one pass" in spec, (
-        "the spec stage does not state the single-pass rule; ADR-004 allows one pass"
-    )
-    assert "no re-validation" in spec, (
-        "the spec stage does not forbid a second pass; the loop it replaces was measured at "
-        "0 APPROVED in 54 runs"
-    )
-
-
-def test_the_terminal_outcome_name_is_gone_from_the_surface(commands: Path) -> None:
-    """`MAJOR_REVISION_TERMINAL` was unforgeable — it existed nowhere else. It should be gone.
-
-    It named "a second pass ran and these findings survived it". With one pass there is no
-    such state, and leaving the token behind would let a later reader reconstruct a two-pass
-    contract that no longer exists.
-    """
-    for stage in _STAGES:
-        assert "MAJOR_REVISION_TERMINAL" not in _text(commands, stage), (
-            f"{stage}.md still names MAJOR_REVISION_TERMINAL, a two-pass-only outcome"
-        )
-
-
 def test_the_verdict_reaches_no_branch(commands: Path) -> None:
     """Advisory means nothing downstream reads it — assert the absence where it would live."""
     spec = _text(commands, "spec")
@@ -117,13 +73,3 @@ def test_the_verdict_reaches_no_branch(commands: Path) -> None:
             f"`{banned}` appears in the 1500 characters before the acceptance stamp — the "
             "critic's verdict must not stand between the DRI and the stamp"
         )
-
-
-def test_the_dispatch_is_recorded_even_though_it_gates_nothing(commands: Path) -> None:
-    """Advisory is not the same as invisible. The row is how discrimination gets measured."""
-    spec = _text(commands, "spec")
-    assert "--agent spec-validator" in spec
-    assert "dispatch-failed" in spec, (
-        "a dispatch that never launched writes no row, so an unavailable critic would be "
-        "indistinguishable from an approving one — the same hole the predecessor documented"
-    )

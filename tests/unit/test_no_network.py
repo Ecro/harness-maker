@@ -86,7 +86,7 @@ def test_telemetry_grep_no_network(
     obs = tmp_path / ".claude" / "observability"
     obs.mkdir(parents=True)
     # Empty dir — exercise both readers; should not open any socket.
-    assert last_stop_with_trace(obs) == ""
+    assert last_stop_with_trace(obs) == "no telemetry source"
     out = gather_recent_signals(obs)
     assert out  # non-empty JSON bundle
 

@@ -37,7 +37,6 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.conditional_router import lens_dispatch, lens_dispatch_groups
 from harness_maker.models import (
     InterviewAnswers,
     Preset,
@@ -61,12 +60,11 @@ _CLAUDE_ONLY = ("Task(", "Task tool", "AskUserQuestion", "Skill(")
 #: Lines allowed to name a Claude-only tool in Codex output, with the reason. Substring match
 #: against the stripped line. Keep this SHORT and keep the reason honest — an allowlist that
 #: grows without argument is how a gate stops meaning anything.
-_ALLOWLIST: dict[str, str] = {
-    "`AskUserQuestion` in Claude Code, `request_user_input` in Codex": (
-        "Documentation that names BOTH tools on purpose, so a reader knows the mapping. "
-        "Rewriting it to name only one would delete the very information it carries."
-    ),
-}
+#: Empty since 0.64.0: the one entry was a line of the retired stage preamble.
+_ALLOWLIST: dict[str, str] = {}
+
+#: A sample entry for the allowlist mechanics test, which must not depend on a live entry.
+_SAMPLE_ALLOWED = "`AskUserQuestion` in Claude Code, `request_user_input` in Codex"
 
 #: Two enabled reviewers, because `review.md.j2`'s Pass-1 section is gated on
 #: `reviewers.enabled | length > 1` and the default answers enable ZERO. That block told Codex
@@ -261,9 +259,12 @@ def test_the_gate_refuses_an_empty_surface() -> None:
     assert not bodies, "a claude-code-only render produced Codex output — the axis moved"
 
 
-def test_the_allowlist_does_not_exempt_a_real_call_sharing_its_line() -> None:
+def test_the_allowlist_does_not_exempt_a_real_call_sharing_its_line(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The allowlist forgives a documented sentence, not everything typed beside it."""
-    allowed = next(iter(_ALLOWLIST))
+    allowed = _SAMPLE_ALLOWED
+    monkeypatch.setitem(_ALLOWLIST, allowed, "sample")
     clean = _violations({"x.md": f"prose {allowed} more prose"})
     assert not clean
     smuggled = _violations({"x.md": f'prose {allowed} and Task(subagent_type="x")'})
@@ -274,25 +275,11 @@ def test_the_allowlist_does_not_exempt_a_real_call_sharing_its_line() -> None:
 def test_the_codex_arm_actually_renders_its_dispatches(preset: Preset) -> None:
     """POSITIVE control. Every other assertion here is negative, so a macro that emitted
     NOTHING on the Codex arm would pass the whole module cleanly — "no Claude tool" is also
-    true of an empty file. This pins the count the reported symptom is about: the DISPATCHES
-    across the two blocks in `review.md.j2` — round 1 and the confirmation re-dispatch.
-
-    **The unit is the group, not the lens.** The four core lenses share one `code-reviewer` call,
-    so seven lenses leave as four dispatches on both presets. A dispatch count alone would not
-    notice a group that quietly dropped a member — which is the same blind spot this test exists
-    to close, one level down — so the lens SET carried by the groups is asserted beside it.
+    true of an empty file. 0.64.0: the review dispatch is `/hm:execute` Step 6 (one
+    `code-reviewer`), and `hm-spec` dispatches `spec-validator`.
     """
     bodies = _codex_bodies(preset, [Target.CLAUDE_CODE, Target.CODEX], "block")
-    review = bodies[".agents/skills/hm-review/SKILL.md"]
-    groups = lens_dispatch_groups(preset.value)
-    expected = 2 * len(groups)
-    actual = review.count('spawn_agent(agent_type="')
-    assert actual == expected, (
-        f"hm-review renders {actual} Codex dispatches, expected {expected} "
-        f"({len(groups)} groups x 2 blocks). A shrinking fan-out is "
-        "invisible to every other assertion in this file."
-    )
-    carried = {lens for g in groups for lens in g["lenses"]}
-    assert carried == {d["lens"] for d in lens_dispatch(preset.value)}, (
-        "the groups dropped a lens; the dispatch count alone cannot see that"
-    )
+    execute = bodies[".agents/skills/hm-execute/SKILL.md"]
+    spec = bodies[".agents/skills/hm-spec/SKILL.md"]
+    assert 'spawn_agent(agent_type="code-reviewer"' in execute
+    assert 'spawn_agent(agent_type="spec-validator"' in spec

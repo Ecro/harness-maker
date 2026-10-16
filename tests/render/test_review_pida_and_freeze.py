@@ -20,7 +20,6 @@ has fired three times in this repo on assertions that pinned wording a correct r
 
 from __future__ import annotations
 
-import re
 from functools import cache
 from pathlib import Path
 from tempfile import mkdtemp
@@ -83,23 +82,6 @@ def gate_skill() -> str:
 # --------------------------------------------------------------------------------------
 # ADR-001 / ADR-003 — the PIDA gate and its oracle exist, guarded
 # --------------------------------------------------------------------------------------
-
-
-def test_pida_gate_renders_and_is_guarded() -> None:
-    assert "Step 3.6" in review_on()
-    assert "Step 3.6" not in review_off()
-
-
-def test_stage_points_at_the_gate_skill_from_both_halves_of_the_split() -> None:
-    """The pointer is load-bearing: without it the skill is never loaded and every rule in it is
-    dead prose. There are TWO pointers and they are deliberately scoped differently — the gate
-    pointer (§2–§4) is guarded because with no models there is nothing to gate, while the
-    round-state pointer (§5) is unguarded because that contract governs Claude findings too. So
-    the skill name appears in BOTH renders and only the gate step disappears."""
-    assert "second-opinion-gate" in review_on()
-    assert "second-opinion-gate" in review_off(), "the unguarded §5 pointer went missing"
-    assert "follow §2–§4" in review_on()
-    assert "follow §2–§4" not in review_off()
 
 
 def test_the_agent_that_emits_the_value_uses_the_ledger_vocabulary() -> None:
@@ -203,59 +185,14 @@ def test_verifier_carries_both_modes_and_no_stale_three_step_rubric() -> None:
     assert "three reasoning steps" not in body
 
 
-def test_finding_schema_marks_id_as_harness_assigned() -> None:
-    """Reviewers must NOT invent ids — an LLM-generated one differs per run, which defeats
-    the stability the id exists for."""
-    assert "assigned by the harness" in _agent("code-reviewer")
-
-
 # --------------------------------------------------------------------------------------
 # ADR-010 — the guarded/unguarded split
 # --------------------------------------------------------------------------------------
 
 
-def test_unguarded_id_stamping_reaches_a_harness_with_second_opinion_off() -> None:
-    """Step 3.4 is model-independent: the corroboration-drop it prevents is pure Claude
-    reviewer non-determinism, so guarding it would scope the fix to the wrong population."""
-    assert "Step 3.4" in review_on()
-    assert "Step 3.4" in review_off()
-
-
-def test_the_guard_predicates_discriminate() -> None:
-    """Non-vacuity: the two renders must actually differ, or every guarded/unguarded
-    assertion above would be comparing a document to itself."""
-    assert review_on() != review_off()
-    assert len(review_off()) < len(review_on())
-
-
-def test_unresolved_carve_out_is_stated_where_the_scan_lives() -> None:
-    """ADR-004's exclusion is the only exception to a purely tag-based scan. Stated, not
-    emergent — an unwritten exception is how a reader concludes the scan still covers it."""
-    assert "provenance carve-out" in review_on()
-    assert "provenance carve-out" not in review_off()
-
-
 # --------------------------------------------------------------------------------------
 # ADR-002 — freeze, lifecycle, monotonic progress, voter state
 # --------------------------------------------------------------------------------------
-
-
-def test_no_reinvoke_clause_lives_in_the_skill_that_owns_it() -> None:
-    """The silence this closes — the Auto-Fix Loop never said what happens to cross-model
-    voters — is the direct cause of the reported non-termination.
-
-    Retargeted by PLAN-review-round-inflation ADR-005: the stage carried a second copy of
-    this §5 rule, so the contract had two owners and prose compaction could fork them. The
-    stage's copy is deleted; §5 is the only one. The `not in review_off()` arm is dropped
-    with it — §5 is loaded unconditionally now, so the rule reaches a `models: []` harness
-    by design rather than being scoped away from it.
-    """
-    assert "Do not re-invoke the models" in gate_skill()
-    assert "Do NOT re-invoke the second-opinion models" not in review_on()
-
-
-def test_once_per_invocation_statement_is_present() -> None:
-    assert "EXACTLY ONCE per `/hm:review` invocation" in review_on()
 
 
 def test_resolution_requires_verification() -> None:
@@ -286,33 +223,9 @@ def test_merge_by_id_retains_an_unreported_finding() -> None:
     assert "retained" in body
 
 
-def test_round_state_contract_is_reachable_from_every_harness() -> None:
-    """The contract governs Claude findings too, so its pointer must be UNGUARDED — guarding it
-    would scope the corroboration fix to second-opinion harnesses only, which is exactly the
-    mechanical-gate-beats-prose failure this split was made to avoid."""
-    for body in (review_on(), review_off()):
-        assert "Round-state contract" in body
-        # The POINTER must be unguarded in both configs — that is this test's subject.
-        assert "Load `second-opinion-gate` §5" in body
-    # The RULE itself now lives in exactly one place (ADR-005). Asserting it against the
-    # stage would re-create the duplicate contract this split removed.
-    assert "not replaced wholesale" in gate_skill()
-
-
-def test_exit_reason_distinguishes_no_progress_from_cap_exhausted() -> None:
-    for body in (review_on(), review_off()):
-        assert "Exit reason:" in body
-        assert "cap-exhausted" in body
-
-
 # --------------------------------------------------------------------------------------
 # ADR-007 / ADR-009 — the frozen set and the disposition write
 # --------------------------------------------------------------------------------------
-
-
-def test_frozen_set_section_is_guarded_in_the_stage() -> None:
-    assert "frozen @ round 1" in review_on()
-    assert "frozen @ round 1" not in review_off()
 
 
 def test_frozen_set_schema_carries_the_join_key_and_the_stale_reason() -> None:
@@ -346,143 +259,4 @@ def test_disposition_write_failure_is_observable() -> None:
     assert "disposition rows NOT recorded" in gate_skill()
 
 
-def test_the_gate_skill_is_installed_in_every_harness() -> None:
-    """A pointer to an uninstalled skill is a dangling reference. Installation is
-    unconditional (activation is data, not file presence), so the file must render even
-    though `second_opinion.models` gates the pointer."""
-    assert (_render_root(()) / "skills" / "second-opinion-gate" / "SKILL.md").exists()
-
-
 # ── PLAN-review-round-inflation — measure A + measure C executed surface ─────
-
-
-def test_the_stage_does_not_restate_the_rules_it_points_at() -> None:
-    """ADR-005's negative half. The positive load-line test above cannot see a
-    restatement sitting next to the pointer — that is exactly how the stage ended
-    up with two copies of §5's rules, and how a compaction pass then inverted one
-    of them. Both deleted blocks are named so a re-introduction fails here.
-    """
-    for body in (review_on(), review_off()):
-        # The `:509-514` round-state restatement.
-        assert "`pending` votes;" not in body
-        assert "back-transitions forbidden" not in body
-        # The `:539-545` do-not-re-invoke restatement.
-        assert "Do NOT re-invoke the second-opinion models" not in body
-        assert "fresh stochastic voter every round" not in body
-
-
-def test_the_batch_trigger_is_reachable_and_ordered_before_fix_selection() -> None:
-    """ADR-012. Arm (b) reads `caused_by`; computing that at record-append time
-    would put it AFTER fix selection, so a lone regression finding would take the
-    fast path — reproducing the chain measure A exists to stop. The order is the
-    fix, so the order is what this asserts.
-    """
-    # Whitespace-normalised: the phrases below wrap across lines in the rendered
-    # skill, and pinning them raw is the `[fail:test]
-    # test-pins-retired-implementation-name` shape this module's docstring warns
-    # about — it has fired three times here.
-    skill = " ".join(gate_skill().split())
-    order = [
-        "Merge the previous round's re-review output by `id`",
-        # top-issues-2026-09: read, not determined — `hm review_churn attribute` owns the value.
-        "read the stamped `caused_by`",
-        "group and evaluate the trigger",
-        "select fixes",
-        "apply",
-        "verify build",
-        "selective re-review",
-        "append the iteration record",
-    ]
-    positions = []
-    for step in order:
-        idx = skill.find(step)
-        assert idx != -1, f"round-order step missing from §5: {step!r}"
-        positions.append(idx)
-    assert positions == sorted(positions), (
-        f"§5's round order is out of sequence: {list(zip(order, positions, strict=True))}"
-    )
-
-    # The lone-finding reference case: arm (b) must fire on ONE attributed finding,
-    # so the trigger cannot be expressed as a count alone.
-    # Pin the arms to their SUBJECTS, not to loose tokens: "either … ≥2 … new this
-    # round" is satisfiable by unrelated prose (codex + code-reviewer, round 1).
-    # Scope to the trigger paragraph. `(a)`/`(b)` occur elsewhere in the skill, so
-    # searching the whole document finds the wrong pair — a document-wide anchor is
-    # how the first cut of this assertion sliced an empty string and still had an
-    # opinion about it.
-    para_start = skill.find("Two-arm batch trigger")
-    assert para_start != -1, "the trigger paragraph is gone from §5"
-    para = skill[para_start : para_start + 600]
-    arm_a_at, arm_b_at = para.find("(a)"), para.find("(b)")
-    assert 0 <= arm_a_at < arm_b_at, "the trigger does not read as two ordered, labelled arms"
-    arm_a, arm_b = para[arm_a_at:arm_b_at], para[arm_b_at:]
-    assert "≥2" in arm_a, "arm (a) lost its count threshold"
-    assert "subsystem" in arm_a, "arm (a) no longer groups by shared subsystem / state model"
-    assert "caused_by" in arm_b, "arm (b) no longer reads the attribution field"
-    assert "new this round" in arm_b, "arm (b) lost its new-findings-only domain"
-
-    # The stage enforces the same order by NUMBERING, not by a sentence saying so:
-    # attribute (1) → group/trigger (2) → select (3). A prose clause was what the
-    # first cut asserted, and prose is what drifted from the numbered list in the
-    # first place (code-reviewer + codex, review round 1).
-    # The ordinal's SHAPE is pinned and its VALUE is not. `"1. **Merge and attribute.**"`
-    # broke on a correct renumber ([fail:test] test-pins-retired-implementation-name,
-    # count:4); a bare `.find("**Merge and attribute.**")` then dropped the one thing this
-    # test is about — that the order is carried by the NUMBERED list rather than by prose.
-    # `^\d+\. ` keeps that and survives renumbering.
-    def _step(body: str, title: str) -> int:
-        m = re.search(rf"^\d+\. {re.escape(title)}", body, re.M)
-        return m.start() if m else -1
-
-    for body in (review_on(), review_off()):
-        attribute_at = _step(body, "**Merge and attribute.**")
-        group_at = _step(body, "**Group.**")
-        select_at = _step(body, "**Select fixable findings**")
-        assert -1 not in (attribute_at, group_at, select_at), (
-            "the Auto-Fix Loop's steps are no longer a NUMBERED list where the contract "
-            "says: merge-and-attribute / group / select-fixable"
-        )
-        assert attribute_at < group_at < select_at, (
-            "attribution/trigger no longer precede fix selection — arm (b) is unreachable"
-        )
-
-
-def test_caused_by_uses_the_pinned_status_cell_grammar() -> None:
-    """`caused_by` shares a cell with a different enum. Without one literal
-    grammar, rounds encode it differently, arm (b) misses attributions, and the
-    two counters disagree with the rows they are derived from — with no test able
-    to see it, because an unspecified grammar has nothing to compare against.
-    """
-    # The GRAMMAR is a rule, so §5 owns it (ADR-005); the stage carries exemplar
-    # rows so a reader at the point of use sees the encoding without opening it.
-    skill = gate_skill()
-    # top-issues-2026-09: the literal copies the stamp — `fix-r<N>`, not a fix number `#N`.
-    for literal in ("· caused_by=fix-r1", "· caused_by=none", "· caused_by=unknown"):
-        assert literal in skill, f"{literal} missing from §5's grammar"
-    for body in (review_on(), review_off()):
-        assert "· caused_by=" in body, "the iteration record shows no attribution encoding"
-
-
-def test_the_four_measure_c_fields_reach_the_emitted_record() -> None:
-    """The roster line is what the runtime model copies when building
-    `<record_json>`. Python accepting the fields is not enough — if the roster
-    does not name them, nothing is ever sent and measure C ships inert, which is
-    this project's recorded absent-case failure mode.
-    """
-    for body in (review_on(), review_off()):
-        roster_start = body.find("`{ts, slug, round,")
-        assert roster_start != -1, "telemetry field roster missing from the render"
-        roster_end = body.find("`.", roster_start)
-        # Without this, a missing terminator makes `roster` the rest of the document
-        # and every field assertion below passes on unrelated prose (code-reviewer).
-        assert roster_end != -1, "telemetry roster has no terminator — slice would run away"
-        roster = body[roster_start:roster_end]
-        for field in (
-            "terminal",
-            "unreviewed_fix_count",
-            "regression_attributed_n",
-            "attribution_unknown_n",
-        ):
-            assert field in roster, f"{field} missing from the emitted field roster"
-        # Stale literal that contradicted the field count it introduced.
-        assert "14-field schema" not in body

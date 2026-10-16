@@ -15,6 +15,7 @@ authored text would create a stored-prompt-injection vector. The static
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 
@@ -123,5 +124,16 @@ def main() -> int:
     return 0
 
 
+def _retired_entry() -> int:
+    """The hook is retired (0.64.0, SPEC-hm-overhaul-p1); a kept settings file may still call it.
+
+    Drain stdin so the host never sees a broken pipe, print nothing, exit 0. `main()` stays as a
+    library function for in-process callers and tests.
+    """
+    with contextlib.suppress(OSError, ValueError):
+        sys.stdin.read()
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(_retired_entry())

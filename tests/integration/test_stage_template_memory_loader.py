@@ -74,16 +74,6 @@ def test_session_hot_tier_dropped_in_research(stage_source: dict[str, str]) -> N
     )
 
 
-def test_session_hot_tier_dropped_in_review() -> None:
-    """`plan` carried this with `review` until SPEC-plan-stage-absorption removed the stage;
-    `review` is the surviving decision-journal consumer (ADR-001)."""
-    for stage in ("review",):
-        body = (_TEMPLATES_DIR / f"{stage}.md.j2").read_text(encoding="utf-8")
-        assert ".claude/memory/session" not in body, (
-            f"{stage} stage must NOT read the session tier (ADR-001)"
-        )
-
-
 def test_execute_keeps_checkpoint_and_ignores_legacy() -> None:
     """execute is the checkpoint consumer → keeps the read but scopes it to
     checkpoint:compaction and ignores legacy [decision:*] blocks (ADR-001, C3)."""
@@ -95,22 +85,15 @@ def test_execute_keeps_checkpoint_and_ignores_legacy() -> None:
     )
 
 
-def test_all_three_templates_use_is_codex_branch_for_invocation(
+def test_all_three_templates_use_the_shared_cli_prefix(
     stage_source: dict[str, str],
 ) -> None:
-    """All three templates must wrap the helper invocation in the is_codex branch
-    so Codex gets `Bash("...")` form and Claude Code/Cursor get `!...` form
-    (matches existing hm second_brain pattern)."""
+    """0.64.0: a stage names `hm …` once and states the install-ref prefix once through
+    `_hm.md.j2`'s `cli()` macro, for both hosts; no `!` line or `Bash("…")` wrapper is
+    rendered per call any more."""
     for stage in ("research", "execute", "spec"):
         body = stage_source[stage]
-        # Find the memory_retrieve invocation context. The block should sit
-        # inside a `{% if is_codex %}` ... `{% endif %}` region.
-        # Heuristic: find the substring and check that an `is_codex` token
-        # appears within 200 chars before it.
         idx = body.find("hm memory_retrieve")
         assert idx >= 0, f"{stage}: no memory_retrieve invocation"
-        window = body[max(0, idx - 400) : idx]
-        assert "is_codex" in window, (
-            f"{stage}: memory_retrieve invocation not guarded by is_codex branch; "
-            f"window:\n{window!r}"
-        )
+        assert "hm.cli()" in body[:idx], f"{stage}: no shared CLI prefix before memory_retrieve"
+        assert "!uv run" not in body, f"{stage}: a `!` line survived"

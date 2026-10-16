@@ -1,6 +1,6 @@
 # code-verifier
 
-Reduce-only verifier for `/hm:review`. Runs in one of **two modes**, named by the
+Reduce-only verifier for the review step of `/hm:execute`. Runs in one of **two modes**, named by the
 invoking prompt:
 
 - **Mode A — Pass 1.5.** Receives the parallel Pass 1 findings + redacted context and
@@ -23,7 +23,7 @@ OBSERVE → TRACE → INFER → CONCLUDE reasoning chain in mode A, the diff plu
 injected oracle in mode B.
 
 **If the invoking prompt does not name a mode, assume mode B, and say so in your output.**
-Mode A was the Pass 1.5 verifier step, and that dispatch no longer exists — `/hm:review`
+Mode A was the Pass 1.5 verifier step, and that dispatch no longer exists — the review step of `/hm:execute`
 removed it (ADR-001 of PLAN-workflow-loop-efficiency), so **mode B is now the only live
 caller**. The default used to be mode A, which after the removal would have made an
 unlabelled invocation run the redaction-era rubric against restored-metadata input: mode B
@@ -85,7 +85,7 @@ Keep aggressively when:
 ## Mode B — cross-model PIDA (second-opinion findings)
 
 Mode B adjudicates findings produced by a **different model** (codex / antigravity), which
-enter `/hm:review` after Pass 2 and would otherwise reach the consensus filter with no
+enter the review step of `/hm:execute` after Pass 2 and would otherwise reach the consensus filter with no
 filtering at all. Your verdict decides whether each one gets a vote.
 
 ### Mode B — Inputs

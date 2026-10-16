@@ -151,64 +151,6 @@ def _hook_commands(settings_text: str) -> list[str]:
     ]
 
 
-@pytest.mark.parametrize("preset", list(Preset), ids=lambda p: p.value)
-def test_ac_006_warn_renders_the_checks_and_blocks_nothing(preset: Preset, tmp_path: Path) -> None:
-    new = _render(preset, "warn", tmp_path)
-
-    assert "### Check 6" in new["verify"]
-    assert "SPEC-need fields" in new["execute"]
-    assert "--spec specs/SPEC-{slug}.machine.yaml" in new["review"]
-
-    for stage in STAGES:
-        ref = _stops(_ref(preset, "task-driven", stage))
-        # 2026-10-15, SPEC-hm-light-lane-s3a ADR-004: execute's Step 4.2 light check renders
-        # verify's own Check 2/4/6 partials, so their stop lines arrive in execute verbatim from
-        # the relaxed harness's verify. They end the light check (no record; review runs next),
-        # never the stage, and they are excused only while the relaxed verify's Checks 2, 4 and 6
-        # carried them — the three included partials, not the rest of verify (review item N).
-        if stage == "execute":
-            ref |= _stops(_verify_checks(_ref(preset, "task-driven", "verify"), ("2", "4", "6")))
-        extra = _stops(new[stage]) - ref
-        extra -= {n for n, o in _REWORDED_STOPS.items() if o in ref}
-        assert not extra, (
-            f"{stage} at warn stops on what the relaxed harness never did: {sorted(extra)}"
-        )
-
-    assert not any("spec_gate" in c for c in _hook_commands(new["settings"]))
-
-
-@pytest.mark.parametrize("preset", list(Preset), ids=lambda p: p.value)
-def test_ac_006_block_renders_the_spec_gate_hook(preset: Preset, tmp_path: Path) -> None:
-    new = _render(preset, "block", tmp_path)
-
-    for stage in STAGES:
-        now = _stops(new[stage])
-        lost = _stops(_ref(preset, "spec-driven", stage)) - now
-        lost -= {o for n, o in _REWORDED_STOPS.items() if n in now}
-        assert not lost, (
-            f"{stage} at block lost stop conditions the strict harness had: {sorted(lost)}"
-        )
-
-    assert any("spec_gate" in c for c in _hook_commands(new["settings"]))
-
-
-@pytest.mark.parametrize("preset", list(Preset), ids=lambda p: p.value)
-def test_the_autopilot_block_stops_do_not_vary_with_strictness(
-    preset: Preset, tmp_path: Path
-) -> None:
-    """`_stops` cuts the auto-advance block from the reference comparison; this keeps that cut
-    from hiding a strictness-dependent stop inside the block."""
-    warn = _render(preset, "warn", tmp_path / "warn")
-    block = _render(preset, "block", tmp_path / "block")
-    for stage in STAGES:
-        w = "".join(_AUTOPILOT_BLOCK.findall(warn[stage]))
-        b = "".join(_AUTOPILOT_BLOCK.findall(block[stage]))
-        assert w, f"{stage}: no auto-advance block rendered"
-        assert [ln for ln in w.splitlines() if STOP.search(ln)] == [
-            ln for ln in b.splitlines() if STOP.search(ln)
-        ], f"{stage}: the auto-advance block stops differ between warn and block"
-
-
 def _gate_active(tmp_path: Path, body: str) -> bool:
     """True when the hook reaches its SPEC lookup instead of standing aside.
 

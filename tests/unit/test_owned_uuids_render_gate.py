@@ -16,7 +16,7 @@ import pytest
 
 from harness_maker import wrapup_land
 from harness_maker.interview import interview
-from harness_maker.models import LoopConfig, ProjectProfile
+from harness_maker.models import ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -31,10 +31,7 @@ def rendered(tmp_path_factory: pytest.TempPathFactory) -> Path:
     # deferred a stash. Under `worktree.enabled: false` there is no worktree, no
     # deferred stash, and correctly no crumb (PLAN-worktree-side-defaults ADR-005) —
     # rendering the recommended preset would silently test the wrong configuration.
-    # Loop on too: the finalize that writes the crumb is the loop's (SPEC-hm-light-lane-s2).
-    answers = interview(p, autoloop_mode=True).model_copy(
-        update={"worktree": {"enabled": True}, "loop": LoopConfig(enabled=True)}
-    )
+    answers = interview(p, autoloop_mode=True).model_copy(update={"worktree": {"enabled": True}})
     render(synthesize(p, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
     return out
 
@@ -43,7 +40,9 @@ def _cmd(rendered: Path, name: str) -> str:
     return (rendered / "commands" / "hm" / name).read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("name", ["execute.md", "wrapup.md"])
+#: execute.md left with the loop's finalize in 0.64.0 (SPEC-hm-overhaul-p1): no stage writes the
+#: crumb now, and wrapup_land reads an absent crumb as an empty set.
+@pytest.mark.parametrize("name", ["wrapup.md"])
 def test_owned_session_uuids_sources_crumb_not_owned_uuids(rendered: Path, name: str) -> None:
     text = _cmd(rendered, name)
     owned_lines = _OWNED_LINE.findall(text)
@@ -81,14 +80,6 @@ def test_wrapup_land_derives_the_ownership_set_from_the_crumb_not_all_markers() 
     assert "_owned_crumb_read(base, args.slug)" in src
     assert "_owned_session_uuids" not in src, (
         "wrapup_land must not source the all-markers ownership set (ADR-005 guard)"
-    )
-
-
-def test_execute_writes_owned_crumb_at_finalize(rendered: Path) -> None:
-    """The producer side: execute records the owned uuid into the slug crumb so a
-    standalone/recovered wrapup can read it (ADR-001)."""
-    assert "owned-crumb-add" in _cmd(rendered, "execute.md"), (
-        "execute.md must record the owned uuid via owned-crumb-add after finalize"
     )
 
 

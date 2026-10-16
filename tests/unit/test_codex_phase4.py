@@ -130,7 +130,10 @@ def test_codex_agents_md_names_the_stage_chaining_entry_point() -> None:
     env = _make_env()
     tpl = env.get_template("codex/AGENTS.md.j2")
     rendered = tpl.render(config=_BASE_CONFIG, preset="Production")
-    assert "$hm-loop" in rendered, "AGENTS.md no longer names the stage-chaining entry point"
+    # 0.64.0 retired `$hm-loop`; the stages chain by hand, in the order the table lists.
+    for stage in ("$hm-spec", "$hm-wrapup"):
+        assert stage in rendered, f"AGENTS.md no longer names {stage}"
+    assert "$hm-loop" not in rendered, "AGENTS.md still advertises the retired loop"
     for gone in ("$hm-exec-rev", "Fused workflows"):
         assert gone not in rendered, f"AGENTS.md still advertises the deleted axis: {gone}"
 
@@ -246,7 +249,10 @@ def test_codex_config_toml_agents_section_renders_string_descriptions() -> None:
     assert isinstance(agents, dict), (
         f"config.toml context['agents'] must be a dict, got {type(agents).__name__}"
     )
-    assert set(agents.keys()) == set(_CODEX_AGENT_META.keys()), (
+    from harness_maker.synthesize import rendered_agents
+
+    assert set(agents) <= set(_CODEX_AGENT_META)
+    assert set(agents.keys()) == set(rendered_agents(None)), (
         "config.toml agents keys diverge from _CODEX_AGENT_META — synthesizer "
         "wiring drifted from the source-of-truth mapping"
     )

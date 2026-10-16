@@ -215,7 +215,8 @@ def _tree(root: Path) -> set[str]:
 
 def test_settings_hooks_cover_the_modules_we_expect() -> None:
     modules = {c[0] for c in SETTINGS_HOOKS}
-    assert "harness_maker.telemetry" in modules
+    assert "harness_maker.telemetry" not in modules  # retired in 0.64.0 (IRR-005)
+    assert "harness_maker.hooks.flush_session" in modules
     assert "harness_maker.hooks.loop_gate" in modules
     assert "harness_maker.worktree" in modules
 
@@ -231,11 +232,14 @@ def test_every_settings_hook_is_silent_as_the_cursor_duplicate(
     assert _tree(root) == before
 
 
-def test_telemetry_control_writes_as_the_cursor_copy(tmp_path: Path) -> None:
-    """Same payload, same project — only the host marker differs, and now a row lands."""
+def test_flush_session_control_writes_as_the_cursor_copy(tmp_path: Path) -> None:
+    """Same payload, same project — only the host marker differs, and now a row lands.
+
+    The control was `telemetry` until its `python -m` entry became an exit-0 stub (0.64.0).
+    """
     root = _marked_project(tmp_path, modules=SETTINGS_MODULES)
     before = _tree(root)
-    _run(["harness_maker.telemetry"], root, _cursor_payload(root), HM_HOOK_HOST="cursor")
+    _run(["harness_maker.hooks.flush_session"], root, _cursor_payload(root), HM_HOOK_HOST="cursor")
     assert _tree(root) != before
 
 

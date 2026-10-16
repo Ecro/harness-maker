@@ -169,7 +169,7 @@ ac:
     note: ''
   rubric_id: null
   note: PR-S. The ledger is the SPEC.md 'Cut ledger' table; the test parses it.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The classes come from `git show db19f023:src/harness_maker/step_sensitivity.py`
     (the repo's own pre-change classification, graded against RESEARCH-workflow-steps-vs-model-capability);
@@ -203,6 +203,25 @@ ac:
       code-reviewer
     edge: false
     note: flip Q1 -> this row gains a review on/off axis
+  - input:
+      case: D-9 reviewers.fanout false (default), installed naming every lens reviewer
+    expected: no .claude/agents/ or .codex/agents/ file for security-reviewer, concurrency-reviewer,
+      test-reviewer, performance-reviewer or ux-reviewer; execute.md names no lens
+      agent
+    edge: false
+    note: DRI card 2026-10-16; installed lists every lens by default, so it cannot
+      be the switch
+  - input:
+      case: D-9 reviewers.fanout true, installed naming security-reviewer and ux-reviewer,
+        targets [claude-code, codex]
+    expected: .claude/agents/{security-reviewer,ux-reviewer}.md and .codex/agents/{security-reviewer,ux-reviewer}.toml
+      with their config.toml [agents.*] entries, and no other lens agent; execute.md
+      names exactly those two lens agents and dispatches them in parallel alongside
+      code-reviewer, merges and de-duplicates their findings into the same fix loop
+      capped by reviewers.max_review_rounds; execute.md <= its base budget + 1500
+    edge: true
+    note: the opt-in block is outside the base budget, like second opinion, delegation
+      and Second Brain
   - input:
       case: D-2 codex in targets
     expected: .agents/skills/hm-{research,spec,execute,wrapup,help}/SKILL.md, .codex/agents/<agent>.toml
@@ -251,8 +270,8 @@ ac:
   - input:
       case: any render
     expected: absent .claude/stages/, .claude/hm/, commands review/verify/configure/loop/loop-p5-batch,
-      agents test-reviewer/stuck/security-auditor/executor/autoloop-coder and the
-      5 lens reviewers, skills security-scanner/verify-before-completion/targeted-test-selection/conditional-router/
+      agents stuck/security-auditor/executor/autoloop-coder, the 5 lens reviewers
+      unless reviewers.fanout is true, skills security-scanner/verify-before-completion/targeted-test-selection/conditional-router/
       autoloop-driver/refdocs-search, .cursor/
     edge: false
     note: ''
@@ -280,7 +299,8 @@ ac:
   - input:
       case: execute.md content
     expected: contains checkpoint:compaction and .claude-progress.json; reviewers.max_review_rounds;
-      --no-tdd only inside its retirement notice; second_brain search only when second_brain.enabled
+      --no-tdd only inside its retirement notice; second_brain search only when second_brain.enabled;
+      the lens fan-out dispatch only when reviewers.fanout
     edge: false
     note: Session Context Loading is INV and kept
   - input:
@@ -297,12 +317,13 @@ ac:
     note: self-contained
   rubric_id: null
   note: PR-S
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The file lists come from the DRI-approved draft sections 1 and
-    6 as amended by the 2026-10-15 corrections; the budgets are the DRI's 6k/7k/3k
-    targets adjusted by the scratchpad-draft estimates stated in Open Questions 5,
-    fixed here before any template is written.
+    6 as amended by the 2026-10-15 corrections and the DRI card of 2026-10-16 (D-9,
+    lens fan-out opt-in); the budgets are the DRI's 6k/7k/3k targets adjusted by the
+    scratchpad-draft estimates stated in Open Questions 5, fixed here before any template
+    is written.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -527,7 +548,7 @@ ac:
     note: unchanged from db19f023 spec_mutation gate
   rubric_id: null
   note: PR-S
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The exit meanings, the pytest-outcome rule, the skip-path rule
     and the red_by_import rule are fixed in this SPEC before implementation and are
@@ -604,7 +625,7 @@ ac:
     the harness commit is regenerated from db19f023, which needs full git history
     (CI fetch-depth 0). Precondition, pinned by the test, is that the rebuilt tree's
     harness files equal the original's harness commit modulo provenance.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The verdicts were recorded on 2026-10-15 from the eval-3 artifacts
     (results.jsonl, approval-status on each tree, a scoped-scan and pyproject-gate
@@ -636,7 +657,7 @@ ac:
   note: 'PR-S. Fixtures: db19f023 renders for [claude-code] and [claude-code,codex]
     x {Side, Production} x worktree {off,on}, and copies of the 36 eval-3 hm trees
     (pristine 0.62 claude-code, verified by git status on 2026-10-15).'
-  pending_test: true
+  pending_test: false
   oracle_source: property
   oracle_evidence: Expected sets are AC-004's golden list and the db19f023 render
     listing, both fixed before implementation; the edit-preservation relation holds
@@ -648,8 +669,10 @@ ac:
     stage, a user hook added to a harness matcher group, a user hook group of its
     own}, or one harness.yaml key from the AC-007 table: loop.enabled true; delegation.stages
     [review, execute]; delegation.stages [verify]; reviewers.max_review_rounds 2;
-    reviewers.enabled naming a lens reviewer; skills.enabled naming conditional-router;
-    agent_models.test-reviewer set; autonomy.autopilot_persistent true'
+    reviewers.enabled naming a lens reviewer with reviewers.fanout absent; reviewers.fanout
+    true with installed naming lens reviewers; reviewers.fanout true with no lens
+    in installed; skills.enabled naming conditional-router; agent_models.test-reviewer
+    set with reviewers.fanout absent; autonomy.autopilot_persistent true'
   transformation: hm make <tree> --update at HEAD
   expected_relation: 'pristine tree: files after == AC-004 set and every removed file
     was in the db19f023 listing; mutated retired file kept byte-identical with one
@@ -657,7 +680,8 @@ ac:
     retired invocations absent; specs/, work-docs/, .claude/memory/, .claude/observability/
     byte-identical; each inert harness.yaml key gives exactly one warning naming it
     and keeps its value, reviewers.max_review_rounds gives none and is still read
-    by execute.md; the file still parses under extra=forbid'
+    by execute.md; reviewers.fanout true with lenses installed gives none, renders
+    those lens agents and survives the re-render; the file still parses under extra=forbid'
   preconditions:
   - HOME pinned; freeze_time
   observable_output: per tree, the violating paths, empty
@@ -732,7 +756,7 @@ ac:
     wrapup_land}. Each drop or move is a row of the SPEC AC-009 table tied to a ledger
     row; additions are hm check. second_brain rows are checked with second_brain.enabled
     true.'
-  pending_test: true
+  pending_test: false
   oracle_source: differential
   oracle_evidence: Reference modules are loaded from `git show db19f023:` into a temp
     package and reference stage renders come from a db19f023 checkout; the relation
@@ -766,20 +790,28 @@ ac:
   type: mechanical
   test_ids:
   - tests/integration/test_overhaul_p1_ship_bar.py::test_ac010_scorecard_meets_bar
-  executable_predicate: t1_cost_ratio <= 8 and hm_hidden_pass_rate >= plain_hidden_pass_rate
+  executable_predicate: round(t1_judged_cost_ratio, 3) < 26.418 and hm_hidden_pass_rate
+    >= plain_hidden_pass_rate
   golden_table: []
   rubric_id: null
   note: PR-S. Measured by scripts/bench_light_lane.py on tiers 1-2, 3 runs per cell.
     The test reads the committed docs/evals/results.jsonl and uses the rows whose
     harness_sha is reachable from HEAD and not from db19f023 (git merge-base --is-ancestor);
     with no such rows it fails, never skips, so the published scorecard is the ship
-    gate for PR-S wrapup. A ratio <= 5 meets the intent metric; over 8x, trace with
-    `economics stages` before cutting further. D-8 (no lanes) is invisible to this
-    headless eval; interactive cost is watched in use.
+    gate for PR-S wrapup. 26.418 is the eval-3 tier-1 judged ratio, the last published
+    before this phase; the verdict, runs-per-cell, capped and leak checks are unchanged.
+    Measured at harness a2fe560a4018 on 2026-10-16 as 12.97x (CLI 11.49x), tier 2
+    13.60x, both arms 36/36. The original <= 8 bar was missed and the 4.5x prediction
+    in PREDICTION-p1.md was wrong; 8x is the phase-2 target. A ratio <= 5 meets the
+    intent metric; over 8x, trace with `economics stages` before cutting further.
+    D-8 (no lanes) is invisible to this headless eval; interactive cost is watched
+    in use.
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The thresholds are the DRI's 2026-10-15 ship bar and the pass-rate
-    counter-signal from the draft section 4, fixed before the re-run.
+  oracle_evidence: The pass-rate counter-signal is from the draft section 4, fixed
+    before the re-run. The ratio threshold was amended after the re-run by the DRI's
+    card of 2026-10-16 ("기준 고치고 출시"), replacing the 2026-10-15 bar of <= 8 that the
+    measured 12.97x missed.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -835,7 +867,7 @@ ac:
     note: a new reader must join this table
   rubric_id: null
   note: PR-S. Found by grep of db19f023 for _metrics_io and metrics- on 2026-10-15.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The reader list is a grep of db19f023 made before implementation;
     the rule that a security reader must not read absent data as clean is the spec-validator's
@@ -897,10 +929,12 @@ irreversible_decisions:
   source: spec
 - id: IRR-006
   decision: harness.yaml keeps every key; keys whose consumer is retired (loop.enabled,
-    delegation.stages naming review or verify, retired lens reviewers and skills,
-    agent_models of retired agents, autonomy.autopilot_persistent) stay parseable,
-    keep their value and become inert with one warning each per make run; the only
-    rewrite is dropping cursor from targets; no lane field remains
+    delegation.stages naming review or verify, retired skills, agent_models of retired
+    agents, autonomy.autopilot_persistent, and lens reviewers while reviewers.fanout
+    is false) stay parseable, keep their value and become inert with one warning each
+    per make run; the only rewrite is dropping cursor from targets; no lane field
+    remains. reviewers.fanout is a new additive key (default false); a file without
+    it parses and behaves as with false, so it adds no irreversible decision
   category: schema/file format/storage layout
   rationale: A user's config silently changes meaning; ignoring keeps every 0.62 file
     loadable under extra=forbid where a rewrite would discard values the user chose;
@@ -908,25 +942,25 @@ irreversible_decisions:
   source: spec
 approval:
   kind: human
-  content_hash: bd01dacbccab0b79821bbfda20c8897a26c07e3c3d0aa53e17d5c7010e3b390b
+  content_hash: 7c8c437b72de3a69de84c622614def623e3944722c0ba42c2c6f8e699effb334
   approved_by: Ecro
-  approved_at: '2026-10-16T04:30:12Z'
+  approved_at: '2026-10-16T23:26:51Z'
   field_hashes:
     schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
     spec_slug: 85ab553117319db92c38915c816d1009855e530644a3d969781c75e63280b581
     verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
     mutation_threshold_rationale: cd934b63d1089c97d3b93967cce536e6a1f32e551b01e580b519d597e98f562b
-    irreversible_decisions: cf03d7fcfa45855e7ee611ac681574b4c2610f82510930a06b0e8e0efd2779fd
+    irreversible_decisions: 388d11188a93a4f2660b48b7c5bda6cb3ede4c6745630f5d4b9191bb924d9a0e
     AC-001: ac5ae08698c470e0c8e12b036b32536059e0be3b8a576ab886d6acb9a193fcdb
     AC-002: 6d3caa5bdd110e41b480ee115c4aa354cc6b41296f6946bcae95727f353cf840
     AC-003: 4f4714c9e25b4e1bbf76f881f046fb2e521e437eac8d79d2de5290976590470e
-    AC-004: ccee70828984253232f0592686bc36b76a885737a655e9175b7efbb2747186fb
+    AC-004: e3cacefc91a3725d1420227969007b08cbb68d651eca7f70d60a2474dbf12741
     AC-005: 4357acab2cdda3931617daf6497cbf54926751886a36284f87f481facc4b7642
     AC-006: a10139afa0badb33107df90280af1e3a92ae36bfefc2063ce949b3ddcbb4bad8
-    AC-007: cc2fb296f61f0a80c5f26a90f9915ac5d92e9ca6bef033a373fa8bf5da4cbe5a
+    AC-007: 7bd6ccbb2dfdbe05b2a6683813d5ef7d9efe34a78ec8cfa39a498b8b3546b6d3
     AC-008: 64216fdac18122458bb9567acd2f343c80b0001389013d11177606a699348fab
     AC-009: 3d82bf6dcf5777a4c79e6110ebbf67a74ca0f33c9047cf75dcaaa21288212692
-    AC-010: ba6144c63efa449256ba6315de00b23d63a08cb3594e1e128279b153619064a1
+    AC-010: 99200ddf15139533ba920d039a34dc96d74011c40e93db08b2b9be01c6d16a94
     AC-011: f2b0c6f3b7971a60cb42b3b6aa5debf15b68fddc8f3b4c7d02213f2cd9c68366
     ac_order: 507fc837fd64ae8964fbe1ec5bd2043668206ddae62a90d715516324c2b27cdf
   lane: full

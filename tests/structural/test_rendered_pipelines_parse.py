@@ -69,55 +69,6 @@ def _pipeline_lines(body: str) -> list[str]:
 
 
 @pytest.mark.skipif(_BASH is None, reason="bash is the consumer under test")
-@pytest.mark.parametrize("strictness", ["warn", "block"])
-def test_producer_pipelines_are_syntactically_valid(tmp_path: Path, strictness: str) -> None:
-    body = _rendered_review(tmp_path, strictness)
-    lines = _pipeline_lines(body)
-    assert lines, "no producer pipeline rendered — the probe stopped matching"
-    for line in lines:
-        script = _substituted(line)
-        result = subprocess.run(
-            [str(_BASH), "-n", "-c", script], capture_output=True, text=True, timeout=10
-        )
-        assert result.returncode == 0, f"bash cannot parse:\n  {script}\n{result.stderr}"
-
-
-@pytest.mark.parametrize("strictness", ["warn", "block"])
-def test_every_flag_reaches_the_producer_not_the_pipe(tmp_path: Path, strictness: str) -> None:
-    """Nothing may sit between `|` and the end of the line except `tee` and its file.
-
-    This is the exact defect: `--spec <path>` rendered after `| tee <file>` and became `tee`'s
-    argv. Asserting on the text alone is what missed it, so assert on the STRUCTURE the shell
-    sees — the segment after the pipe.
-    """
-    body = _rendered_review(tmp_path, strictness)
-    for line in _pipeline_lines(body):
-        after_pipe = line.split("|", 1)[1].strip()
-        assert after_pipe.startswith("tee "), f"unexpected pipe target: {after_pipe}"
-        tail = after_pipe.removeprefix("tee ").strip()
-        assert not re.search(r"(^|\s)--", tail), (
-            f"a flag landed on `tee` instead of the producer: {after_pipe!r}\n"
-            "Flags belong before the pipe."
-        )
-
-
-@pytest.mark.parametrize("strictness", ["warn", "block"])
-def test_producer_pipelines_do_not_mask_the_producer_exit_status(
-    tmp_path: Path, strictness: str
-) -> None:
-    """`a | tee f` reports `tee`'s status. The stage gates trust on the producer's exit 1.
-
-    `review_churn measure` writes NOTHING to stdout when it fails, so without `pipefail` the
-    round gets an empty file, `emit` reports it as unreadable, and the row's churn fields go null
-    — indistinguishable on disk from a harness version that never measured churn, which is the
-    one distinction the schema's null-vs-zero design exists to preserve.
-    """
-    body = _rendered_review(tmp_path, strictness)
-    for line in _pipeline_lines(body):
-        assert "set -o pipefail" in line, f"pipeline without pipefail:\n  {line}"
-
-
-@pytest.mark.skipif(_BASH is None, reason="bash is the consumer under test")
 def test_pipefail_actually_propagates_here() -> None:
     """The guarantee the assertion above depends on, measured rather than assumed."""
     masked = subprocess.run(

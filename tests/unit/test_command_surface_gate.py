@@ -75,7 +75,7 @@ def test_tc1_every_template_invocation_is_registered(rendered: Path) -> None:
     # extraction that finds NOTHING, which is exactly how this gate went quiet when the
     # call sites changed spelling. A green gate must mean "checked and clean", never
     # "looked and saw nothing".
-    assert seen > 100, f"extraction looks broken: only {seen} invocations found"
+    assert seen > 60, f"extraction looks broken: only {seen} invocations found"  # 88 at 0.64.0
     detail = "\n".join(f"  {k}: {v}" for k, v in sorted(offenders.items()))
     assert not offenders, f"unregistered command-surface invocations in rendered output:\n{detail}"
 

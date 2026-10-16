@@ -181,7 +181,7 @@ The diagram above covers the original render pipeline. Three flows added in 0.12
 
 1. **Detection cache flow (M15)**: `profile.profile()` calls `detection_cache.load_or_run()`, which checks cache freshness against manifest-mtime with a 24h ceiling (per `detection_cache.CACHED_MANIFESTS`). On cache miss, the full detection runs and `detection_cache.write()` persists the result to `~/.cache/harness-maker/profile-<repo-hash>.json`. The cached `ProjectProfile` is what feeds the Interviewer + M16 recommendation registry.
 2. **Foreign config import flow (M17)**: `foreign_config.detect()` scans the project root for 6 known foreign-AI-tool configs (cursor rules, claude.md, agents.md, continue, aider, copilot). `foreign_config.llm_map()` calls Anthropic with a sha256-keyed 24h cache and proposes a mapping to harness.yaml axes. The slash command UI in `interview.py` confirms with the user before `foreign_config.apply()` returns a `ChangeSet`. The caller writes via `atomic_write`. Re-renders use `@hm:harness:*` inverted block markers so user content outside the harness-managed region is preserved byte-for-byte (see `docs/reference/block-merge-spec.md`).
-3. **Adaptive telemetry flow (M18 + M19)**: `harness_yaml_override` events are captured at two sites — (a) `/hm:configure` exit (primary; computes pre/post yaml diff via `telemetry.compute_yaml_diff()` so uncommitted edits are caught), and (b) the SessionStart drift hook (secondary; git diff since the last recorded `ts`). Both call `telemetry.emit_override()`, which deduplicates on `(ts, axis_path, after)` and appends to `.claude/observability/adaptive/overrides.jsonl`. `/hm:health`'s personalization layer reads that file plus the current harness.yaml plus the ProjectProfile cache and runs `personalization_audit.run_audit()`, which returns a composite-score `PersonalizationPlan` with ranked `PersonalizationActionItem` list (per ADR-011 rubric).
+3. **Adaptive telemetry flow (M18 + M19)**: `harness_yaml_override` events are captured at two sites — (a) `harness-maker make --update` exit (primary; computes pre/post yaml diff via `telemetry.compute_yaml_diff()` so uncommitted edits are caught), and (b) the SessionStart drift hook (secondary; git diff since the last recorded `ts`). Both call `telemetry.emit_override()`, which deduplicates on `(ts, axis_path, after)` and appends to `.claude/observability/adaptive/overrides.jsonl`. `/hm:health`'s personalization layer reads that file plus the current harness.yaml plus the ProjectProfile cache and runs `personalization_audit.run_audit()`, which returns a composite-score `PersonalizationPlan` with ranked `PersonalizationActionItem` list (per ADR-011 rubric).
 
 ### Worktree artifact janitor
 
@@ -242,26 +242,17 @@ When `.claude/` already exists, the Renderer doesn't write blindly. The `Reconci
 5. Backs up the entire `.claude/` to `.backup-<date>/` before applying anything.
 6. Apply is **ADD-only** — no in-place mutation, no deletes from disk (deletes happen via the backup-and-rewrite pattern).
 
-### M3 — Stage Engine (six atomic stages)
+### M3 — Stage Engine (four stages)
 
-There are exactly **6 atomic stages**: `research`, `spec`, `execute`, `review`, `verify`, `wrapup`. Each is a Jinja2 fragment under `templates/stages/<stage>.md.j2` and is **always** exposed as `/hm:<stage>`. The PLAN document remains, but `/hm:execute` now authors it; there is no separate `plan` stage.
+There are exactly **4 stages**: `research` (optional), `spec`, `execute`, `wrapup` (0.64.0, SPEC-hm-overhaul-p1). Each is a Jinja2 fragment under `templates/stages/<stage>.md.j2` and is **always** exposed as `/hm:<stage>`. The PLAN document remains, but `/hm:execute` now authors it; there is no separate `plan` stage. Review is `/hm:execute`'s Step 6, and the deterministic gates the former `hm:verify` ran are one command, `hm check`, which both `/hm:execute` and `/hm:wrapup` call.
 
 The `research` fragment includes a discovery-lens calibration step so broad trend or roadmap prompts inspect user workflows and adjacent artifacts before narrowing into academic, benchmark, or implementation-only sources.
 
 **Fused workflows were retired in 0.47.0** (`PLAN-harness-diet` ADR-001/002). Until then, user-named stage sequences under `harness.yaml.workflows` were concatenated by `workflow_fuse.py` into a single `/hm:<workflow>` command; that module, the `workflows` / `default_workflow` keys and the five rendered fused commands are all gone. They were 58.6% of the shipped Claude command surface with zero recorded invocations. <!-- @hm:axis-removed -->
 
-Stages are chained instead by `/hm:loop --per-iter-stages execute,review` or by autopilot's `autonomy.pipeline`. `io_utils.load_harness_yaml` strips the two retired keys at LOAD time (one advisory per project), so an old config keeps working without a re-render.
+Nothing chains the stages any more: each one ends by naming the next, and running it is the user's call. The `hm:loop` / `hm:loop-p5-batch` drivers and autopilot auto-advance were retired in 0.64.0 (in eval 2, 36 of 80 auto-advances were gate-blocked). `io_utils.load_harness_yaml` strips the two retired fused-workflow keys at LOAD time (one advisory per project), so an old config keeps working without a re-render. `loop.enabled` is read and ignored. <!-- @hm:axis-removed -->
 
-`/hm:loop` and `/hm:loop-p5-batch` are themselves gated by `harness.yaml`'s `loop.enabled`
-(PLAN-loop-opt-in). Resolution is fresh-vs-existing rather than a single class default: no
-`harness.yaml` on disk → `False` (a fresh install renders without the loop commands, listing
-mentions, and skills); an existing file with the key absent or `{}` → `True` (re-rendering an
-old project never silently drops files it already has); a malformed value fails the render
-rather than being coerced. The CLI (`interview.parse_loop`) is the single resolution point,
-and the `--preset` rebuild path forwards the resolved value explicitly rather than relying on
-a field allowlist to carry it.
-
-Every rendered Step/Phase/Check heading across the six stages is classified in
+Every rendered Step/Phase/Check heading across the stages is classified in
 `step_sensitivity.py` along two independent axes of "should this shrink": **COMP**
 (capability-compensation — shrinks as the underlying model improves), **HOST** (host-absorbed —
 shrinks as the vendor harness natively absorbs the behavior), **INV** (invariant regardless of
@@ -295,55 +286,23 @@ The detector (`relevance.detect_version_drift`) compares `harness.yaml.harness_m
 
 All telemetry stays local — `metrics-YYYY-MM-DD.jsonl` is never transmitted. 0.7.1 (ADR-107) added a `tool_input` whitelist for the persisted entries: only `path`, `file_path`, `command`, `target`, `database`, `url`, `query` survive; values are scanned for known-secret prefixes (`sk-`, `ghp_`, `AKIA`, `Bearer …`) and redacted *before* a 256-char cap to ensure a partial-token tail cannot survive truncation. The cwd resolution chain is env-var-first (`CLAUDE_PROJECT_DIR` → `CURSOR_PROJECT_DIR` → typed `workspace.current_dir` → `os.getcwd()`); the bare stdin `cwd` field is intentionally NOT consulted, since prior to 0.7.1 a poisoned PostToolUse payload could redirect metrics writes via that field (ADR-102).
 
-### M6 — Conditional Router
+### M6 — Reviewers
 
-When `/hm:review` runs, it doesn't blindly call every reviewer. The `conditional_router.py` module inspects the changed-file paths and routes:
+`/hm:execute`'s review step always dispatches `code-reviewer` with the SPEC, the PLAN, the diff and the tests. The lens reviewers (security, performance, concurrency, UX) render and run only when `reviewers.fanout` is on and the lens is listed in `reviewers.installed`; their findings are merged as a union, not a vote. The path-based `conditional_router` skill was retired in 0.64.0.
 
-- `auth/` or `.env` → security reviewer
-- `worker/`, `thread/`, `isr/` → concurrency reviewer
-- `*.tsx`, `ui/` → UX reviewer
-- perf-critical paths (configurable per project) → performance reviewer
-- everything → code reviewer (always)
+### M7 — Autoloop Driver (retired)
 
-Override: set `harness.yaml.reviewers.routing: always-all` to call every reviewer on every diff.
+The `hm:loop` driver was retired in 0.64.0. `autoloop_driver.py` stays as a library; nothing renders a command that calls it.
 
-### M7 — Autoloop Driver
+### M8 — `hm check`
 
-`/hm:loop "<goal>" [--mode feature|improve] [--time 8h] [--max-iter 30] [--per-iter-workflow X] [--dry-run]` runs an unbounded-token, time-and-iteration-bounded loop. The command prompt drives runtime orchestration; `autoloop_driver.py` supplies typed schema and dev-time tests.
-
-Two modes:
-
-- **feature** (default) — driven by a goal or `--spec` file; coverage-driven adaptive interview extracts features; iterates until all features pass or caps fire.
-- **improve** — driven by a quality target or `--target` path; reviews first, fixes only when the current state does not already meet the exit checklist.
-
-Each iteration:
-
-1. Allocates a per-loop worktree at loop start (M9); reuses it for all iterations (0.5.5+).
-2. Runs the chosen per-iteration stage list (default: `execute,review`). Wrapup runs once at loop close, not per iteration.
-3. Runs the 4-gate convergence check: mechanical commands, per-criterion LLM judgment, regression comparison, and a persisted two-iteration streak.
-4. Calls `/hm:verify` (M8) before completion.
-5. Cleans up on success; preserves on failure.
-
-Safety: every 5 iterations the driver pings the user; time, iteration, repeated-failure, repeated-feature, and ambiguity safety rails stop the loop before it spins indefinitely.
-
-### M8 — Verify-Before-Completion Gate
-
-`verify.py` is invoked automatically before `/hm:wrapup` finishes (and before each autoloop iteration completes). The checklist:
-
-- PLAN/SPEC requirements satisfied
-- Regression gate passes
-- Health hasn't dropped more than 5 points
-- Anti-rot has zero pending high-severity proposals
-- Security has zero high-severity findings
-- Worktree merges cleanly back to base
-
-Required in the `Production` preset; optional in `Side`.
+`hm check --slug <slug>` replaces the former `hm:verify` stage and the `verify-before-completion` skill: one exit code over every deterministic gate (tests, lint, `reviewers.mechanical_checks`, the SPEC machine checks). 0 pass, 1 a gate failed, 3 degraded, 4 the tree changed during the run (rerun once), 5 approval needs the DRI.
 
 ### M9 — Worktree Isolation
 
 `worktree.py` integrates `git worktree`. Isolation is a single boolean, `harness.yaml`'s `worktree.enabled` (0.48.0 — `scope`, `branch_prefix` and `feature_branch_workflow` were retired by `PLAN-worktree-side-defaults`): ON means **every** `/hm:` stage runs inside the persistent per-task worktree `.worktrees/<slug>/` on branch `hm/<slug>`, which `/hm:wrapup` squash-lands; OFF means no stage creates a worktree and all work happens on the current branch. There is no per-stage scope — the axis proved to be one decision, and the three keys that appeared to subdivide it had no runtime effect. Isolation is a **convention, not a sandbox**: the executor agent is instructed to write only inside that worktree (prompt-level guidance), but its `tools:` list grants unrestricted `Write`/`Edit`/`Bash`, so nothing actually stops it from writing elsewhere. See M12.
 
-`/hm:loop` allocates **one shared worktree per loop run** (not per iteration), reducing branch churn (0.5.5+). `sibling_repos` in `harness.yaml` lets the same isolation session create matching worktrees for related repositories, so cross-repo changes can be reviewed and merged as one logical unit. Cleanup uses prefix-match (`phase-*`, `autoloop-*`, `execute-*`) so harness-maker never removes worktrees created by Cursor or other tools in the same `.worktrees/` directory.
+`sibling_repos` in `harness.yaml` lets the same isolation session create matching worktrees for related repositories, so cross-repo changes can be reviewed and merged as one logical unit. Cleanup uses prefix-match (`phase-*`, `autoloop-*`, `execute-*`) so harness-maker never removes worktrees created by Cursor or other tools in the same `.worktrees/` directory.
 
 Successful runs cleanup the worktree after merging back. Failed runs preserve the worktree as evidence.
 
@@ -483,7 +442,7 @@ Codex TOML files intentionally carry no provenance frontmatter because TOML pars
 
 `harness_maker.profile.profile()` detects 12+ language stacks via `STACK_MANIFESTS` + `STACK_GLOB_MANIFESTS`. It parses python / node / rust dependency files for known frameworks. The detector also picks up `package_manager` (`uv` / `poetry` / `pip` / `pipenv` / `npm` / `pnpm` / `yarn` / `bun` / `cargo`) and `ci_provider` (`github-actions` / `gitlab-ci` / `circleci` / `jenkins` / `travis`). The result populates `ProjectProfile` and feeds the M16 recommendation registry.
 
-Caching: results are stored at `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime invalidation + a 24h ceiling, both governed by `detection_cache.CACHED_MANIFESTS`. The cache makes back-to-back `/hm:configure` runs cheap and keeps `/hm:health`'s personalization layer from re-walking the source tree.
+Caching: results are stored at `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime invalidation + a 24h ceiling, both governed by `detection_cache.CACHED_MANIFESTS`. The cache makes back-to-back `harness-maker make` runs cheap and keeps `/hm:health`'s personalization layer from re-walking the source tree.
 
 Installed-CLI detection is deliberately **outside** this cache. `harness-maker detect-tools --json` (0.49.0) resolves `codex` / `agy` on `PATH` on every call and is not a `ProjectProfile` field: installing a CLI touches no project manifest, so manifest-mtime invalidation would never fire and a cached answer could report a tool installed minutes ago as absent. `installed` means the binary resolves; authentication is never probed.
 
@@ -518,8 +477,8 @@ Cross-IDE payload equivalence is asserted (validator N1: the same `Recommendatio
 
 `harness_yaml_override` events are captured at two sites:
 
-- **Primary** — `/hm:configure` exit: pre/post yaml diff. Catches uncommitted edits the user just made.
-- **Secondary** — SessionStart hook: git diff since the last recorded `ts`. Catches changes made outside `/hm:configure` (e.g., direct yaml edits between sessions).
+- **Primary** — `harness-maker make --update` exit: pre/post yaml diff. Catches uncommitted edits the user just made.
+- **Secondary** — SessionStart hook: git diff since the last recorded `ts`. Catches changes made outside a re-render (e.g., direct yaml edits between sessions).
 
 Dedup key `(ts, axis_path, after)` prevents the two sites from double-recording the same change. The schema is versioned (`schema_version: 1` mandatory per validator C3); the Phase 10 reader skips unknown versions so new schema additions remain forward-compatible.
 

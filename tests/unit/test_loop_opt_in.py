@@ -7,11 +7,9 @@ instead of the whole module failing collection.
 
 from __future__ import annotations
 
-import json
 import os
 import posixpath
 import subprocess
-import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -28,7 +26,6 @@ from harness_maker.cli import app
 from harness_maker.interview import answers_from_harness_yaml, interview
 from harness_maker.io_utils import load_harness_yaml
 from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
-from harness_maker.profile import profile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -367,16 +364,6 @@ def _tree(repo: Path) -> dict[str, bytes]:
 # ---------------------------------------------------------------------------
 
 
-def test_ac001_disabled_renders_no_claude_loop_commands() -> None:
-    assert not (LOOP_CLAUDE & normalized_paths(loop_enabled=False))
-    assert normalized_paths(loop_enabled=True) >= LOOP_CLAUDE
-
-
-def test_ac002_disabled_renders_no_codex_loop_skills() -> None:
-    assert not (LOOP_CODEX & normalized_paths(loop_enabled=False, targets=["codex"]))
-    assert normalized_paths(loop_enabled=True, targets=["codex"]) >= LOOP_CODEX
-
-
 # ---------------------------------------------------------------------------
 # AC-003 — enabled render == pre-change snapshot (reference read from git)
 # ---------------------------------------------------------------------------
@@ -390,73 +377,6 @@ def _isolate_home(
 ) -> None:
     fake_home = tmp_path_factory.mktemp("hm-home")
     monkeypatch.setattr(Path, "home", lambda: fake_home)
-
-
-@pytest.mark.usefixtures("_isolate_home")
-@pytest.mark.parametrize("fixture", _SNAPSHOT_FIXTURES)
-def test_ac003_enabled_matches_pre_change_snapshots(fixture: str, tmp_path: Path) -> None:
-    sys.path.insert(0, str(_REPO / "tests" / "snapshot"))
-    from regenerate import is_excluded, load_exclusions
-
-    snapshot = f"tests/snapshot/{fixture}.expected.yaml"
-    reference = yaml.safe_load(_git_show(_BASE_COMMIT, snapshot))
-    base = {r["path"]: r["body_sha256"] for r in reference["files"]}
-    at_opt_in = {
-        r["path"]: r["body_sha256"]
-        for r in yaml.safe_load(_git_show(_OPT_IN_COMMIT, snapshot))["files"]
-    }
-    now_rows = {
-        r["path"]: r
-        for r in yaml.safe_load((_REPO / snapshot).read_text(encoding="utf-8"))["files"]
-    }
-    now = {path: r["body_sha256"] for path, r in now_rows.items()}
-    moved = {path for path in at_opt_in.keys() | now.keys() if at_opt_in.get(path) != now.get(path)}
-    # Paths whose render depends on loop.enabled are the ones the opt-in commit itself changed.
-    loop_sensitive = {
-        path for path in base.keys() | at_opt_in.keys() if base.get(path) != at_opt_in.get(path)
-    }
-    # A moved loop-insensitive path renders the same with the loop on or off, so its loop-ON
-    # expectation is today's loop-OFF snapshot. A moved loop-SENSITIVE path has no committed
-    # loop-ON expectation at all: fail here so it is handled deliberately, never dropped silently.
-    unhandled = (moved & loop_sensitive) - _LOOP_ON_RECAPTURES.keys() - _LOOP_SENSITIVE_HASH_EXEMPT
-    assert not unhandled, sorted(unhandled)
-    p = profile(_REPO / "tests" / "fixtures" / fixture)
-    a = interview(p, autoloop_mode=True).model_copy(
-        update={"loop": models.LoopConfig(enabled=True)}
-    )
-    bp = synthesize(p, a)
-    render(bp, tmp_path, dry_run=False, freeze_time=DEFAULT_FREEZE_TIME)
-    exclusions = load_exclusions()
-    actual = sorted(
-        (
-            {"path": str(f.path), "template": f.template, "body_sha256": f.body_sha256}
-            for f in bp.files
-            if not is_excluded(str(f.path), exclusions)
-        ),
-        key=lambda x: x["path"] or "",
-    )
-    expected = sorted(
-        (
-            now_rows[r["path"]] if r["path"] in moved else r
-            for r in reference["files"]
-            if not (r["path"] in moved and r["path"] not in now_rows)
-        ),
-        key=lambda x: x["path"] or "",
-    )
-    expected += [now_rows[path] for path in sorted(moved - base.keys()) if path in now_rows]
-    expected = [
-        {**r, "body_sha256": _LOOP_ON_RECAPTURES[r["path"]][fixture]}
-        if r["path"] in _LOOP_ON_RECAPTURES
-        else r
-        for r in expected
-    ]
-    expected.sort(key=lambda x: x["path"] or "")
-
-    def strip(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [r for r in rows if r["path"] != "harness.yaml"]
-
-    assert [r["path"] for r in actual] == [r["path"] for r in expected]
-    assert strip(actual) == strip(expected)
 
 
 # ---------------------------------------------------------------------------
@@ -477,46 +397,9 @@ def _enable_hint_count(text: str) -> int:
     )
 
 
-@pytest.mark.parametrize("preset", [Preset.SIDE, Preset.PRODUCTION])
-@pytest.mark.parametrize("locale", ["en", "ko"])
-def test_ac004_disabled_leaves_no_loop_advertisement(
-    tmp_path: Path, preset: Preset, locale: str
-) -> None:
-    _render_tree(
-        tmp_path,
-        _answers(loop_enabled=False, targets=ALL_TARGETS, preset=preset, locale=locale),
-    )
-    for rel in LISTING_SURFACES:
-        path = tmp_path / rel
-        assert path.is_file(), f"{rel} was not rendered"
-        text = path.read_text(encoding="utf-8")
-        offenders = [
-            line
-            for line in text.splitlines()
-            if ("hm:loop" in line or "hm-loop" in line) and "loop.enabled" not in line
-        ]
-        assert offenders == [], f"{rel} still advertises the loop: {offenders}"
-        assert _enable_hint_count(text) == 1, f"{rel} must carry exactly one enable hint"
-
-
 # ---------------------------------------------------------------------------
 # AC-005 — an existing harness.yaml without the key keeps the loop
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("variant", ["no_version", "v5", "v6_no_key", "empty_loop_block"])
-def test_ac005_existing_absent_key_keeps_loop(tmp_path: Path, variant: str) -> None:
-    data = _legacy_yaml_variants()[variant]
-    src = tmp_path / "harness.yaml"
-    src.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
-    answers = answers_from_harness_yaml(src)
-    assert answers is not None
-    assert answers.loop.enabled is True
-
-    out = tmp_path / "out"
-    bp = _render_tree(out, answers)
-    assert _read_yaml(out)["loop"]["enabled"] is True
-    assert {_norm(f.path) for f in bp.files} >= LOOP_CLAUDE
 
 
 # ---------------------------------------------------------------------------
@@ -546,44 +429,6 @@ def test_ac006_no_harness_yaml_writes_loop_off(tmp_path: Path, preset_flag: str)
 # ---------------------------------------------------------------------------
 
 
-def test_ac007_disable_sweeps_pristine_keeps_edited(tmp_path: Path) -> None:
-    repo = _bootstrap(tmp_path, "--targets", "claude-code,codex")
-    data = _read_yaml(repo)
-    data["loop"] = {"enabled": True}
-    _write_yaml(repo, data)
-    res = _cli(repo, "--update")
-    assert res.exit_code == 0, res.output
-
-    pristine = [".claude/commands/hm/loop.md", ".agents/skills/hm-loop/SKILL.md"]
-    edited = [".claude/commands/hm/loop-p5-batch.md", ".agents/skills/hm-loop-p5-batch/SKILL.md"]
-    for rel in pristine + edited:
-        assert (repo / rel).is_file(), f"precondition: {rel} rendered while enabled"
-    before: dict[str, bytes] = {}
-    for rel in edited:
-        path = repo / rel
-        path.write_text(path.read_text(encoding="utf-8") + "\nuser note\n", encoding="utf-8")
-        before[rel] = path.read_bytes()
-
-    data = _read_yaml(repo)
-    data["loop"] = {"enabled": False}
-    _write_yaml(repo, data)
-    res = _cli(repo, "--update")
-    assert res.exit_code == 0, res.output
-
-    assert not any((repo / rel).exists() for rel in pristine)
-    assert all((repo / rel).read_bytes() == before[rel] for rel in edited)
-    assert "orphan(s) kept" in res.output
-    kept_rows = [
-        json.loads(line)
-        for log in (repo / ".claude" / "observability").glob("orphans-*.jsonl")
-        for line in log.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    kept = {row["path"]: row["classification"] for row in kept_rows}
-    for rel in edited:
-        assert kept.get(rel) == "ours-modified", f"{rel} keep warning missing: {kept}"
-
-
 # ---------------------------------------------------------------------------
 # AC-008 — an explicit value survives re-render (property)
 # ---------------------------------------------------------------------------
@@ -610,82 +455,9 @@ def test_ac008_explicit_value_round_trips(enabled: bool, preset: Preset) -> None
 # ---------------------------------------------------------------------------
 
 
-def test_ac009_disable_removes_only_loop_files(tmp_path: Path) -> None:
-    enabled = _rendered_body_hashes(tmp_path / "on", loop_enabled=True, targets=ALL_TARGETS)
-    disabled = _rendered_body_hashes(tmp_path / "off", loop_enabled=False, targets=ALL_TARGETS)
-    assert set(enabled) - set(disabled) == LOOP_CLAUDE | LOOP_CODEX
-    assert not (set(disabled) - set(enabled))
-    changed = {p for p in disabled if disabled[p] != enabled[p]}
-    assert changed <= ALLOWED_BODY_DIFFS, f"unexpected body changes: {changed - ALLOWED_BODY_DIFFS}"
-    # The s2b widening is exact: both reference files really do move, and nothing else was added.
-    assert ALLOWED_BODY_DIFFS - PREVIOUS_ALLOWED == _S2B_LOOP_REFS
-    assert changed >= _S2B_LOOP_REFS, "an allowance for a file that no longer moves is dead"
-    for p in disabled:
-        if p in ALLOWED_BODY_DIFFS:
-            continue
-        if p.startswith(
-            (".claude/agents/", ".claude/skills/", ".agents/skills/", ".codex/")
-        ) or p in {".claude/settings.json"}:
-            assert disabled[p] == enabled[p], f"{p} changed"
-
-
 # ---------------------------------------------------------------------------
 # AC-010 — an existing harness.yaml keeps the loop on every re-render path
 # ---------------------------------------------------------------------------
-
-
-def test_ac010_preset_switch_keeps_existing_loop(tmp_path: Path) -> None:
-    """Review finding f5610f47309c7a63: the `--preset` rebuild takes a field allowlist."""
-    for preset_from, preset_to in (("Side", "Production"), ("Production", "Side")):
-        for enabled in (True, False):
-            repo = _bootstrap(tmp_path / f"{preset_from}-{enabled}", "--preset", preset_from)
-            data = _read_yaml(repo)
-            data["loop"] = {"enabled": enabled}
-            _write_yaml(repo, data)
-            res = _cli(repo, "--update", "--preset", preset_to)
-            assert res.exit_code == 0, res.output
-            assert _read_yaml(repo)["preset"] == preset_to
-            assert _read_yaml(repo)["loop"]["enabled"] is enabled
-            assert (repo / ".claude/commands/hm/loop.md").is_file() is enabled
-
-
-def test_ac010_existing_yaml_keeps_loop_on_every_path(tmp_path: Path) -> None:
-    loop_md = Path(".claude/commands/hm/loop.md")
-
-    repo = _bootstrap(tmp_path / "reinterview")
-    data = _read_yaml(repo)
-    data.pop("loop", None)
-    data["schema_version"] = 5
-    _write_yaml(repo, data)
-    res = _cli(repo, "--reinterview")
-    assert res.exit_code == 0, res.output
-    assert _read_yaml(repo)["loop"]["enabled"] is True
-    assert (repo / loop_md).is_file()
-
-    repo = _bootstrap(tmp_path / "fallback")
-    data = _read_yaml(repo)
-    data.pop("loop", None)
-    data["preset"] = "NotAPreset"  # answers_from_harness_yaml returns None → interview()
-    _write_yaml(repo, data)
-    res = _cli(repo, "--update")
-    assert res.exit_code == 0, res.output
-    assert _read_yaml(repo)["loop"]["enabled"] is True
-    assert (repo / loop_md).is_file()
-
-    repo = _bootstrap(tmp_path / "undecodable")
-    (repo / ".claude" / "harness.yaml").write_bytes(b"preset: Side\nlocale: \xff\xfe\n")
-    res = _cli(repo, "--update")
-    assert res.exit_code == 0, res.output
-    assert _read_yaml(repo)["loop"]["enabled"] is True
-    assert (repo / loop_md).is_file()
-
-    repo = _bootstrap(tmp_path / "explicit-false")
-    data = _read_yaml(repo)
-    data["loop"] = {"enabled": False}
-    _write_yaml(repo, data)
-    res = _cli(repo, "--reinterview")
-    assert res.exit_code == 0, res.output
-    assert _read_yaml(repo)["loop"]["enabled"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -728,31 +500,3 @@ def test_ac011_malformed_loop_value_fails_render(tmp_path: Path, bad: object) ->
 # SPEC-hm-light-lane-s2 (concurrency review P1): a loop-off render drops execute Step 5,
 # Gate 0 and verify Check 5, so turning the loop off under live loop residue is refused.
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "residue",
-    [".claude/.hm-loop-abc123", ".worktrees/execute-0f1e2d3c"],
-    ids=["loop-marker", "execute-worktree"],
-)
-def test_turning_the_loop_off_is_refused_while_a_loop_is_live(tmp_path: Path, residue: str) -> None:
-    repo = _bootstrap(tmp_path)
-    data = _read_yaml(repo)
-    data["loop"] = {"enabled": True}
-    _write_yaml(repo, data)
-    assert _cli(repo, "--update").exit_code == 0
-    assert (repo / ".claude/commands/hm/loop.md").is_file()
-    path = repo / residue
-    if residue.startswith(".worktrees/"):
-        path.mkdir(parents=True)
-    else:
-        path.write_text("claude_session_id: x\n", encoding="utf-8")
-    data["loop"] = {"enabled": False}
-    _write_yaml(repo, data)
-    res = _cli(repo, "--update")
-    assert res.exit_code == 1, res.output
-    assert "refusing to turn the loop off" in res.output
-    assert (repo / ".claude/commands/hm/loop.md").is_file()
-    path.rmdir() if path.is_dir() else path.unlink()
-    assert _cli(repo, "--update").exit_code == 0
-    assert not (repo / ".claude/commands/hm/loop.md").is_file()

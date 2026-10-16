@@ -32,11 +32,12 @@ _MARKDOWN_EXTS = {".md", ".markdown"}
 _TYPE_TAG_PREFIX = "hm/type/"
 _SECOND_BRAIN_TAG = "hm/second-brain"
 _EMPTY_FOLDERS_REMEDIATION = (
-    "second_brain.folders is empty — run /hm:configure to add at least one folder"
+    "second_brain.folders is empty — run `harness-maker configure-second-brain --add-folder "
+    "<path>` to add at least one folder"
 )
 _EMPTY_FOLDERS_ACTION = (
     "ACTION: add at least one folder to second_brain.folders in .claude/harness.yaml, "
-    "or run /hm:configure"
+    "or run `harness-maker configure-second-brain --add-folder <path>`"
 )
 
 _RECOMMENDED_FIELDS: dict[str, tuple[str, ...]] = {

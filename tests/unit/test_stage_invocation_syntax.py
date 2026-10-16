@@ -50,7 +50,8 @@ def _rendered(preset: Preset, locale: str = "en", loop: bool = True) -> dict[str
 
 
 def _next_lines(body: str) -> list[str]:
-    return [line.strip() for line in body.splitlines() if "**Next:**" in line]
+    """The lines that hand off to the next stage (since 0.64.0 "… is the user's call")."""
+    return [line.strip() for line in body.splitlines() if "is the user's call" in line]
 
 
 def test_rewrites_only_for_codex() -> None:
@@ -85,7 +86,7 @@ def test_rendered_codex_banner_uses_mention_form() -> None:
         for line in _next_lines(body):
             seen += 1
             assert "/hm:" not in line, f"{path}: Codex banner names an uncallable slash command"
-    assert seen, "no Next: banner found in any Codex stage skill"
+    assert seen, "no hand-off line found in any Codex stage skill"
 
 
 def test_rendered_claude_banner_keeps_slash_form() -> None:
@@ -102,9 +103,9 @@ def test_rendered_claude_banner_keeps_slash_form() -> None:
 def test_codex_guidance_uses_dollar_mentions(preset: Preset, locale: str) -> None:
     files = _rendered(preset, locale)
     research = files[".agents/skills/hm-research/SKILL.md"]
-    assert "Invoke via `$hm-research <topic>" in research
-    assert "Y → run `$hm-spec {slug}`" in research
-    assert "**Next:** `$hm-spec {slug}`" in research
+    assert "`$hm-research <topic> [--deep]" in research
+    assert "`$hm-spec` reads its output" in research
+    assert "`$hm-execute <slug>` is the user's call" in files[".agents/skills/hm-spec/SKILL.md"]
     assert "`$hm-execute task-slug`" in files["AGENTS.md"]
     for path, body in files.items():
         if path == "AGENTS.md" or path.startswith(".agents/skills/"):
@@ -113,11 +114,6 @@ def test_codex_guidance_uses_dollar_mentions(preset: Preset, locale: str) -> Non
     assert "`$hm-research`" in help_body
     assert "`$intent-layer`" in help_body
     assert "`$project-knowledge`" in help_body
-    for skill in ("hm-verify", "hm-wrapup", "verify-before-completion"):
-        recovery = files[f".agents/skills/{skill}/SKILL.md"]
-        assert "— run $hm-review first" in recovery
-    common = files[".agents/skills/targeted-test-selection/SKILL.md"]
-    assert "Followed by $hm-review" in common
 
 
 def test_preserves_executable_and_non_codex_content() -> None:
@@ -137,49 +133,38 @@ def test_preserves_executable_and_non_codex_content() -> None:
     text = "Run `/hm:spec x`, `@hm-execute x`, then `/hm:review x`."
     assert stage_invocation(text, False) == text
     files = _rendered(Preset.SIDE)
-    assert "Y → run `/hm:spec {slug}`" in files[".claude/commands/hm/research.md"]
+    assert "`/hm:execute <slug>` is the user's call" in files[".claude/commands/hm/spec.md"]
 
 
-@pytest.mark.parametrize("loop", [True, False], ids=["loop-on", "loop-off"])
 @pytest.mark.parametrize("preset", [Preset.SIDE, Preset.PRODUCTION])
 @pytest.mark.parametrize("locale", ["en", "ko", "ja"])
-def test_recommendations_resolve_to_skills(preset: Preset, locale: str, loop: bool) -> None:
-    files = _rendered(preset, locale, loop)
+def test_recommendations_resolve_to_skills(preset: Preset, locale: str) -> None:
+    # `loop.enabled: true` is inert since 0.64.0: the loop skills never render.
+    files = _rendered(preset, locale, True)
     names = {p.split("/")[2] for p in files if p.startswith(".agents/skills/")}
     core = {
         "hm-research",
         "hm-spec",
         "hm-execute",
-        "hm-review",
-        "hm-verify",
         "hm-wrapup",
         "hm-help",
     }
     assert core <= names
-    assert ("hm-loop" in names) is loop
+    assert "hm-loop" not in names
+    assert not {"hm-review", "hm-verify"} & names
     assert "hm-plan" not in names
     for path, body in files.items():
         if path.startswith(".agents/skills/hm-"):
             for line in _next_lines(body):
                 for name in re.findall(r"(?:\$hm-|@hm-|/hm:)([a-z][a-z-]+)", line):
                     assert f"hm-{name}" in names, (path, line)
-    # The loop-off enable hint names `$hm-loop` on purpose (SPEC-loop-opt-in AC-004): only
-    # that one token is exempt, so every other reference on the hint line (its re-render
-    # command) is still checked. The re-render skill ships in the plugin bundle
-    # (`skills/`), not in the project render, so it resolves against both sets.
-    help_lines = files[".agents/skills/hm-help/SKILL.md"].splitlines()
-    help_body = "\n".join(
-        re.sub(r"`(?:\$hm-|@hm-|/hm:)loop`", "", line) if "loop.enabled" in line else line
-        for line in help_lines
-    )
+    help_body = files[".agents/skills/hm-help/SKILL.md"]
     advertised = {
         f"hm-{name}" for name in re.findall(r"`(?:\$hm-|@hm-|/hm:)([a-z][a-z-]+)`", help_body)
     }
     plugin_skills = {p.name for p in (Path(__file__).resolve().parents[2] / "skills").iterdir()}
-    assert core | ({"hm-loop"} if loop else set()) <= advertised
+    assert core <= advertised
     assert advertised <= names | plugin_skills
-    if not loop:
-        assert any("loop.enabled" in line for line in help_lines), "enable hint missing"
 
 
 def test_update_repairs_guidance(tmp_path: Path) -> None:
@@ -189,9 +174,9 @@ def test_update_repairs_guidance(tmp_path: Path) -> None:
     rel = Path(".agents/skills/hm-research/SKILL.md")
     path = tmp_path / rel
     old = path.read_text().replace("$hm-", "@hm-")
-    old = old.replace("Y → run `@hm-spec {slug}`", "Y → run `/hm:spec {slug}`")
-    assert "Invoke via `@hm-research <topic>" in old
-    assert "Y → run `/hm:spec {slug}`" in old
+    old = old.replace("`@hm-spec` reads", "`/hm:spec` reads")
+    assert "`@hm-research <topic> [--deep]" in old
+    assert "`/hm:spec` reads" in old
     marker = "<!-- @hm:user:extensions -->"
     agents_path = tmp_path / "AGENTS.md"
     extension = "\nKeep my literal /hm:spec and @hm-spec.\n"
@@ -205,8 +190,8 @@ def test_update_repairs_guidance(tmp_path: Path) -> None:
         merge_reports={},
     )
     result = path.read_text()
-    assert "Invoke via `$hm-research <topic>" in result
-    assert "Y → run `$hm-spec {slug}`" in result
+    assert "`$hm-research <topic> [--deep]" in result
+    assert "`$hm-spec` reads" in result
     agents_result = agents_path.read_text()
     assert extension in agents_result
     render(

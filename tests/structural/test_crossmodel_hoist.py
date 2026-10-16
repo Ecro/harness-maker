@@ -21,8 +21,6 @@ from pathlib import Path
 from tempfile import mkdtemp
 from typing import Literal
 
-import pytest
-
 from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile, SecondOpinionConfig, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -92,14 +90,6 @@ def pass2_offset(text: str) -> int:
     return off
 
 
-def test_the_corpus_covers_all_three_artifact_families() -> None:
-    """Positive control — every offset comparison below is vacuous over an empty corpus."""
-    found = render_all_targets()
-    assert ".claude/commands/hm/review.md" in found
-    assert ".claude/stages/review.md" in found
-    assert ".agents/skills/hm-review/SKILL.md" in found
-
-
 def test_ac_009_crossmodel_launches_with_pass1() -> None:
     """AC-009's executable predicate, verbatim."""
     assert all(crossmodel_launch_offset(t) < pass2_offset(t) for t in render_all_targets().values())
@@ -126,24 +116,3 @@ def test_pida_still_follows_the_voters() -> None:
         pida = _offset(_PIDA, text)
         assert pida is not None, f"{name}: Step 3.6 (PIDA) is missing"
         assert crossmodel_launch_offset(text) < pida, f"{name}: PIDA is not after the voters"
-
-
-def test_the_hoist_is_gated_on_second_opinion_being_enabled() -> None:
-    """Anti-tautology + correctness: a harness with no models must not carry the block.
-
-    It would instruct the model to go run a step whose own preset gate then skips it —
-    the dangling-pointer shape this repo has shipped before with `second-opinion-gate`.
-    """
-    off = _render_second_opinion_off()
-    assert off, "the second-opinion-off render produced no review-bearing artifact"
-    for name, text in off.items():
-        assert _offset(_HOIST, text) is None, f"{name}: hoist rendered with no models enabled"
-
-
-@pytest.mark.parametrize("family", [".claude/commands/hm/review.md", ".claude/stages/review.md"])
-def test_the_hoist_names_step_3_5_as_its_destination(family: str) -> None:
-    """A "launch them now" instruction with no destination is not actionable."""
-    text = render_all_targets()[family]
-    hoist = _offset(_HOIST, text)
-    assert hoist is not None
-    assert "Step 3.5" in text[hoist : hoist + 1200]

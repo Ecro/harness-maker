@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.models import ProjectProfile, Target
+from harness_maker.models import ProjectProfile
 
 ROOT = Path(__file__).resolve().parents[2]
 _PRE_CHANGE_PROMPT_COUNT = 15
@@ -38,24 +38,6 @@ def interview_questions(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return prompts
 
 
-def configure_editable_keys(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
-    from harness_maker.interview import _build_answers
-    from harness_maker.models import Preset
-    from harness_maker.render import DEFAULT_FREEZE_TIME, render
-    from harness_maker.synthesize import synthesize
-
-    from ..structural.conftest import pin_install_ref
-
-    pin_install_ref(monkeypatch)
-    answers = _build_answers(locale="en", targets=[Target.CLAUDE_CODE], preset=Preset.SIDE)
-    render(
-        synthesize(ProjectProfile(), answers, preset=Preset.SIDE),
-        tmp_path,
-        freeze_time=DEFAULT_FREEZE_TIME,
-    )
-    return (tmp_path / "commands" / "hm" / "configure.md").read_text(encoding="utf-8")
-
-
 def test_ac_009_onboarding_asks_no_strictness_question(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -65,8 +47,6 @@ def test_ac_009_onboarding_asks_no_strictness_question(
     # this invariant is about the removed strictness question, so it is not counted.
     counted = [p for p in prompts if not p.startswith("World model name")]
     assert len(counted) < _PRE_CHANGE_PROMPT_COUNT
-
-    assert "spec.strictness" in configure_editable_keys(tmp_path, monkeypatch)
 
     make_cmd = (ROOT / "commands" / "make.md").read_text(encoding="utf-8")
     assert not re.search(r"dev_mode|dev-mode", make_cmd), (

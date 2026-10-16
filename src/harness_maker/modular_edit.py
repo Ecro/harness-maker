@@ -20,7 +20,7 @@ from jinja2 import TemplateNotFound
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import FileEntry
 from harness_maker.render import _make_env, _render_text_file
-from harness_maker.synthesize import _TYPED_ONLY_SKILL_PATHS
+from harness_maker.synthesize import _TYPED_ONLY_SKILL_PATHS, _compute_install_ref
 from harness_maker.verify import verify
 
 ALLOWED_KINDS: set[str] = {"reviewer", "skill"}
@@ -129,6 +129,9 @@ def _render_single_component(
             # omission raises `UndefinedError` under StrictUndefined instead of silently
             # rendering the Claude arm — the guarantee ADR-003 is built on.
             "is_codex": False,
+            # Most kept skills call `hm` through the install ref (0.64.0 deleted the last two
+            # that did not), so this path supplies it the way `synthesize` does.
+            "harness_maker_src_path": _compute_install_ref(),
         },
         # The typed-only skill flag lives in `synthesize._TYPED_ONLY_SKILL_PATHS`, not in the
         # templates (SPEC-hm-light-lane-s2 AC-009), so this path must read the same list.

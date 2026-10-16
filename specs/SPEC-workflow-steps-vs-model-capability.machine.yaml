@@ -99,7 +99,7 @@ ac:
   title: five-term ceremony absent, open-ended cap retained
   type: mechanical
   test_ids:
-  - tests/unit/test_render_inequality_gate_removed.py::test_five_term_ceremony_absent_cap_retained
+  - tests/unit/test_overhaul_p1_kept.py::test_spec_renders_the_open_ended_cap_from_config
   executable_predicate: '''5-Term Inequality Gate'' not in rendered and ''open-ended''
     in rendered'
   golden_table: []

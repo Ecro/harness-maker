@@ -59,26 +59,6 @@ def _after(text: str, *needles: str) -> bool:
     return True
 
 
-@pytest.mark.parametrize("target", ["claude", "codex"])
-def test_ac_010_wrapup_offers_add_and_lists_stale_first(
-    surface: dict[str, dict[str, str]], target: str
-) -> None:
-    block = _assumption_block(surface, target)
-    # SPEC-intent-layer-improvements: the record batch replaced the per-question ask. Stale
-    # questions still lead the list; "new" is no longer an option (new questions arrive as
-    # pending rows), and selecting an item that shows its exact arguments is the confirmation,
-    # so the old second question and the two-id cap are retired with it.
-    for literal in (STALE_LABEL, GAP_SOURCE, "`stale_evidence`"):
-        assert literal in block, literal
-    ask = {"claude": "AskUserQuestion", "codex": "numbered list"}[target]
-    assert _after(block, "`stale_evidence`", ADD_CMD, ask, "`declined`"), block
-    calls = [ln for ln in block.splitlines() if ln.strip().startswith(MANDATED[target])]
-    assert sum(ADD_CMD in ln for ln in calls) == 1, calls
-    observe = [ln for ln in calls if "hm intent question observe" in ln]
-    assert len(observe) == 1, calls
-    assert OBSERVE_LOCATOR in observe[0], calls
-
-
 def _render(target: Target) -> dict[str, str]:
     blueprint = synthesize(
         ProjectProfile(), InterviewAnswers(preset=Preset.PRODUCTION, targets=[target])

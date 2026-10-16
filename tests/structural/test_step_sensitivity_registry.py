@@ -37,7 +37,7 @@ from .conftest import pin_install_ref
 from .test_command_size_budget import headings
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-STAGES = ("research", "spec", "execute", "review", "verify", "wrapup")
+STAGES = ("research", "spec", "execute", "wrapup")
 
 
 def _answers(preset: Preset) -> InterviewAnswers:
@@ -127,17 +127,17 @@ def test_orphan_entries_flags_a_dead_entry_and_exempts_renders_when(
         renders_when="delegation.stages non-empty",
     )
     assert ss.orphan_entries(ordinals_by_stage, (gated,)) == []
-    live = ss.StepEntry(stage="verify", ordinal="Check 2", cls="INV", grade="*", source="x")
+    live = ss.StepEntry(stage="execute", ordinal="Step 6", cls="INV", grade="*", source="x")
     assert ss.orphan_entries(ordinals_by_stage, (live,)) == []
 
 
 def test_registry_validates() -> None:
     ss.validate(ss.REGISTRY)
-    bad_tune = ss.StepEntry(stage="review", ordinal="Step 99", cls="TUNE", grade="*", source="x")
+    bad_tune = ss.StepEntry(stage="execute", ordinal="Step 99", cls="TUNE", grade="*", source="x")
     with pytest.raises(ValueError, match="TUNE"):
         ss.validate((bad_tune,))
     unprefixed = ss.StepEntry(
-        stage="review",
+        stage="execute",
         ordinal="Step 98",
         cls="TUNE",
         grade="*",
@@ -148,7 +148,7 @@ def test_registry_validates() -> None:
     with pytest.raises(ValueError, match="repo"):
         ss.validate((unprefixed,))
     knob_without_ordering = ss.StepEntry(
-        stage="review",
+        stage="execute",
         ordinal="Step 97",
         cls="INV",
         grade="*",

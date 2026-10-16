@@ -54,26 +54,3 @@ def test_no_rendered_command_passes_level_ask(rendered: Path) -> None:
         if "--level ask" in text:
             offenders.append(str(f.relative_to(rendered)))
     assert not offenders, offenders
-
-
-def test_the_picker_offers_the_three_operational_levels(rendered: Path) -> None:
-    # The picker lives in `.claude/hm/stage-preamble.md`, which the stage command points at
-    # (SPEC-hm-light-lane-s3c ADR-001).
-    spec = (rendered / ".claude" / "commands" / "hm" / "spec.md").read_text(encoding="utf-8")
-    assert "Read `.claude/hm/stage-preamble.md`" in spec
-    text = (rendered / ".claude" / "hm" / "stage-preamble.md").read_text(encoding="utf-8")
-    assert "ask-pending" in text, "the picker must branch on ask-pending explicitly"
-    assert "auto_safe" in text
-    assert "auto_full" in text
-    assert "<the level the user picked>" in text, (
-        "the arm command must carry the PICKED level; a hard-coded one would make the "
-        "picker's answer decorative"
-    )
-
-
-def test_health_skips_its_smoke_under_ask(rendered: Path) -> None:
-    text = (rendered / ".claude" / "commands" / "hm" / "health.md").read_text(encoding="utf-8")
-    assert "autopilot_ledger smoke" not in text, (
-        "the smoke probe takes a concrete --level; under `ask` there is none to give"
-    )
-    assert "resolved per session" in text, "the skip must be stated, not silent"

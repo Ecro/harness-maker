@@ -142,10 +142,12 @@ def test_ac_007_config_render_roundtrip_preserves_claude(tmp_path: Path) -> None
     assert restored is not None
     assert restored.second_opinion.models == ["claude", "codex"]
     assert restored.second_opinion.model_dump()["claude"] == {"model": "sonnet", "timeout": 45.0}
-    review = (tmp_path / ".agents/skills/hm-review/SKILL.md").read_text()
-    assert "hm second_opinion_invoke --model claude" in review
+    # 0.64.0: the review is `/hm:execute` Step 6; one generic call per listed model, and
+    # `second_opinion_invoke` owns each CLI's flags (`--safe-mode` for claude).
+    review = (tmp_path / ".agents/skills/hm-execute/SKILL.md").read_text()
+    assert "**Second opinion** (claude, codex)" in review
+    assert "hm second_opinion_invoke --model <model>" in review
     assert "--stage review" in review
-    assert "--safe-mode" in review
     assert "--dangerously-skip-permissions" not in review
 
 

@@ -101,9 +101,9 @@ def test_resolve_agent_spec_tier2_preset_production_reasoning_agent() -> None:
 
 
 def test_resolve_agent_spec_tier2_preset_side_downshifts() -> None:
-    """Tier 2: Side preset → autoloop-coder gets sonnet (downshifted from opus)."""
+    """Tier 2: Side preset → spec-validator gets sonnet (downshifted from opus)."""
     config = HarnessConfig(preset=Preset.SIDE)
-    spec = resolve_agent_spec("autoloop-coder", config)
+    spec = resolve_agent_spec("spec-validator", config)
     assert spec.claude == "sonnet"
 
 

@@ -26,6 +26,7 @@ See ``OverrideRecord`` / ``emit_override`` / ``load_overrides`` /
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -447,5 +448,16 @@ def now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _retired_entry() -> int:
+    """The PostToolUse hook is retired (0.64.0, IRR-005); a kept settings file may still call it.
+
+    Drain stdin so the host never sees a broken pipe, write nothing, exit 0. `main()` stays as a
+    library function for in-process callers and tests.
+    """
+    with contextlib.suppress(OSError, ValueError):
+        sys.stdin.read()
+    return 0
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(_retired_entry())

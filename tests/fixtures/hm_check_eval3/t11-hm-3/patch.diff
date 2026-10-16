@@ -1,0 +1,416 @@
+diff --git a/specs/SPEC-report-all-invalid.machine.yaml b/specs/SPEC-report-all-invalid.machine.yaml
+new file mode 100644
+index 0000000..841ff93
+--- /dev/null
++++ b/specs/SPEC-report-all-invalid.machine.yaml
+@@ -0,0 +1,162 @@
++schema_version: 3
++spec_slug: report-all-invalid
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/cli.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: Several invalid arguments are all reported
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      argv:
++      - 1h
++      - nope
++      - 2x
++      - 30s
++    expected:
++      code: 2
++      stdout: ''
++      stderr: 'error: invalid duration: ''nope''
++
++        error: invalid duration: ''2x''
++
++        '
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: expected output copied from the requester's example in the task
++    statement, not derived from the code
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: --total does not print a total on invalid input
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      argv:
++      - --total
++      - 1h
++      - nope
++      - 2x
++    expected:
++      code: 2
++      stdout: ''
++      stderr: 'error: invalid duration: ''nope''
++
++        error: invalid duration: ''2x''
++
++        '
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: expected output copied from the requester's example in the task
++    statement, not derived from the code
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: Valid arguments are unchanged
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      argv:
++      - 1h
++      - 30s
++    expected:
++      code: 0
++      stdout: '3600
++
++        30
++
++        '
++      stderr: ''
++    edge: false
++    note: ''
++  - input:
++      argv:
++      - --total
++      - 1h
++      - 30s
++    expected:
++      code: 0
++      stdout: '3630
++
++        '
++      stderr: ''
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: expected values copied from the requester's examples (1h=3600,
++    30s=30), independent of the implementation
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: 7a3c895d5f27a48131314dab340467cb9d2be3785cc2fcf8c2897509117b67f6
++  approved_by: null
++  approved_at: '2026-10-15T18:49:51Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: 496b950e0fd455c43bf434d62717cbecbbd9de20aaa33912cfe009c5d8fdfdd9
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: 672f20ad42180e70a2f2400a4ca38a32e63aa79d2946f5674eaa2afcaddc8ea9
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: 75f29d1161fcdf7c06ea6f1d93beb527bc201bed8deabab3aafd3faa3ed3174d
++    AC-002: 0db01696d23fb980a8f4d9f9f8e2e890e7ed1a3d0bfb7d19da96a75bb0f2f847
++    AC-003: bca2585c4a75f317438527d92e608fcefbcd7338bb710d2eb6c3095d22a0226f
++    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d
++  lane: light
+diff --git a/specs/SPEC-report-all-invalid.md b/specs/SPEC-report-all-invalid.md
+new file mode 100644
+index 0000000..70935ef
+--- /dev/null
++++ b/specs/SPEC-report-all-invalid.md
+@@ -0,0 +1,70 @@
++---
++type: spec
++task_slug: report-all-invalid
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, cli, error-reporting]
++test_framework: pytest
++interview_rounds: 0
++lane: light
++verification_tier: 1
++summary: "timeparse CLI main reports every invalid duration argument, not just the first"
++---
++
++# SPEC: report every invalid argument
++
++## 🎯 Intent
++`timeparse.cli.main` stops at the first invalid duration, so a user with several typos must re-run once per typo. The change makes `main` report all of them in one run.
++
++## 🌅 Outcomes
++One invocation prints an `error: invalid duration: '<text>'` line on stderr for every invalid argument, in argument order, with nothing on stdout and exit code 2. Valid input behaves as before.
++
++## 📋 In-Scope Scenarios
++
++### AC-001: Several invalid arguments are all reported
++**Given** `main(["1h", "nope", "2x", "30s"])`
++**When** it runs
++**Then** stderr is exactly `error: invalid duration: 'nope'` then `error: invalid duration: '2x'`, one line each, in that order
++**And** stdout is empty and the return value is 2
++
++### AC-002: `--total` does not print a total on invalid input
++**Given** `main(["--total", "1h", "nope", "2x"])`
++**When** it runs
++**Then** stderr holds the two error lines for `'nope'` and `'2x'`, stdout is empty (no total) and the return value is 2
++
++### AC-003: Valid arguments are unchanged
++**Given** `main(["1h", "30s"])` and `main(["--total", "1h", "30s"])`
++**When** each runs
++**Then** the first prints `3600` and `30` on separate lines, the second prints `3630`, and both return 0 with empty stderr
++
++## 🚫 Non-Goals
++- No change to anything in `timeparse/` other than `main` in `cli.py` (`parse.py`, `format.py`, `_parser`, `_total` stay as they are).
++- No change to the message format, argparse behavior or exit code 2.
++- No deduplication of repeated invalid arguments.
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | already used by `tests/` |
++| Editable code | `main` in `timeparse/cli.py`; tests under `tests/` | stated in the ask |
++| Compatibility | existing `tests/test_cli.py::test_invalid_exits_2` keeps passing | message format and exit code unchanged |
++
++## 🔒 Irreversible Decisions
++none — the stderr line format and exit code are already the current contract and do not change.
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| AC-001 | unit | `test_reports_every_invalid` |
++| AC-002 | unit | `test_total_reports_every_invalid` |
++| AC-003 | unit | `test_prints_each`, `test_total_valid` |
++
++Oracle: golden for all three. The expected strings and values come from the requester's examples in the task statement, not from the implementation.
++
++## ❓ Open Questions
++none
++
++## 🔍 Refinement Decisions
++- Lane `light`: one source file plus tests, one session, no irreversible decision. Interview skipped: the ask already gives the scenarios, non-goals and exact expected output; autopilot `auto_full` so no question was asked.
++- Intent layer not filled in — no intent linked.
++- spec-validator not dispatched: `irreversible_decisions` is empty and the change is a one-function behavior fix with fully specified outputs.
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 66d606e..ec77f47 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -14,3 +14,27 @@ def test_invalid_exits_2(capsys: pytest.CaptureFixture[str]) -> None:
+     captured = capsys.readouterr()
+     assert captured.out == ""
+     assert "nope" in captured.err
++
++
++_NOPE_2X = "error: invalid duration: 'nope'\nerror: invalid duration: '2x'\n"
++
++
++def test_reports_every_invalid(capsys: pytest.CaptureFixture[str]) -> None:
++    assert main(["1h", "nope", "2x", "30s"]) == 2
++    captured = capsys.readouterr()
++    assert captured.out == ""
++    assert captured.err == _NOPE_2X
++
++
++def test_total_reports_every_invalid(capsys: pytest.CaptureFixture[str]) -> None:
++    assert main(["--total", "1h", "nope", "2x"]) == 2
++    captured = capsys.readouterr()
++    assert captured.out == ""
++    assert captured.err == _NOPE_2X
++
++
++def test_total_valid(capsys: pytest.CaptureFixture[str]) -> None:
++    assert main(["--total", "1h", "30s"]) == 0
++    captured = capsys.readouterr()
++    assert captured.out == "3630\n"
++    assert captured.err == ""
+diff --git a/timeparse/cli.py b/timeparse/cli.py
+index 6cb13cc..1ff848f 100644
+--- a/timeparse/cli.py
++++ b/timeparse/cli.py
+@@ -24,15 +24,19 @@ def _total(values: list[int]) -> int:
+ 
+ 
+ def main(argv: list[str] | None = None) -> int:
+-    """Print one line of seconds per argument; exit 2 on the first invalid one."""
++    """Print one line of seconds per argument; report every invalid one and exit 2."""
+     args = _parser().parse_args(argv)
+     results: list[int] = []
++    invalid: list[str] = []
+     for text in args.durations:
+         try:
+             results.append(parse_duration(text))
+         except ValueError:
++            invalid.append(text)
++    if invalid:
++        for text in invalid:
+             print(f"error: invalid duration: {text!r}", file=sys.stderr)
+-            return 2
++        return 2
+     if args.total:
+         print(_total(results))
+         return 0
+diff --git a/work-docs/PLAN-report-all-invalid.md b/work-docs/PLAN-report-all-invalid.md
+new file mode 100644
+index 0000000..f71ada6
+--- /dev/null
++++ b/work-docs/PLAN-report-all-invalid.md
+@@ -0,0 +1,23 @@
++---
++type: plan
++task_slug: report-all-invalid
++status: done
++created: 2026-10-15
++spec: "[[SPEC-report-all-invalid]]"
++adrs: 1
++summary: "main reports every invalid duration argument instead of the first"
++spec_need_verdict: none
++spec_need_target: report-all-invalid
++---
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — collect all invalid arguments in main** — scope: timeparse/cli.py (main only), tests/test_cli.py · exit: `uv run pytest -q` · risk: changing the early return could alter valid-path output · rollback: git checkout the two files
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/parse.py` — the ask limits the change to `main`
++- `timeparse/format.py` — the ask limits the change to `main`
++- `timeparse/__init__.py` — the ask limits the change to `main`
++
++## 📐 Architecture Decision Records
++- ADR-001: keep the loop in `main`, record invalid texts in a list and return 2 after the loop, before any stdout output. **Decided by:** agent
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]

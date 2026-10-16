@@ -53,17 +53,15 @@ def _spec(claude_alias: str, effort: _Effort) -> AgentModelSpec:
 #     finding gets a VOTE. A wrong call there deletes a finding silently, and nothing
 #     downstream can tell. It is the one place a cheap judgment is unrecoverable.
 #
-# `stuck` keeps opus because it is near-zero volume and fires only after everything else has
-# already failed — not because escalation is "reasoning-heavy".
+# (0.64.0: `stuck`, `executor`, `security-auditor` and `autoloop-coder` retired with their stages;
+# their entries went with them, and an `agent_models` override naming one is an inert-key warning.)
 #
 # (REVIEW Phase 5 CP-1: trajectory-monitor removed — agent is dormant, not in
 # `synthesize._ALL_AGENTS` / `_ALL_SKILLS` / `_COMMUNICATION_VARIANT`. Reactivate by adding to
 # those tables AND restoring the entry here.)
 _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
     # Low volume — opus is affordable here
-    "autoloop-coder": _spec("opus", "high"),
     "spec-validator": _spec("opus", "high"),
-    "stuck": _spec("opus", "high"),
     # Low volume, but PROCEDURAL — see the exception note above
     "stage-delegate": _spec("sonnet", "medium"),
     # Low volume, and the one cheap judgment that is unrecoverable — see the note above
@@ -72,10 +70,8 @@ _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
     "code-reviewer": _spec("sonnet", "medium"),
     "concurrency-reviewer": _spec("sonnet", "medium"),
     "consensus-arbiter": _spec("sonnet", "medium"),
-    "executor": _spec("sonnet", "medium"),
     "judgment-reviewer": _spec("sonnet", "medium"),
     "performance-reviewer": _spec("sonnet", "medium"),
-    "security-auditor": _spec("sonnet", "medium"),
     "security-reviewer": _spec("sonnet", "medium"),
     "test-reviewer": _spec("sonnet", "medium"),
     "ux-reviewer": _spec("sonnet", "medium"),
@@ -86,19 +82,15 @@ _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
 # reviewers drop to low. (CP-1: trajectory-monitor removed — see _PRODUCTION_MAP comment.)
 _SIDE_MAP: dict[str, AgentModelSpec] = {
     # Reasoning agents (still need decent quality even in Side)
-    "autoloop-coder": _spec("sonnet", "medium"),
     "spec-validator": _spec("sonnet", "medium"),
     "stage-delegate": _spec("sonnet", "medium"),
-    "stuck": _spec("sonnet", "medium"),
     # Reviewers downshift
     "code-reviewer": _spec("sonnet", "low"),
     "code-verifier": _spec("sonnet", "low"),
     "concurrency-reviewer": _spec("sonnet", "low"),
     "consensus-arbiter": _spec("sonnet", "low"),
-    "executor": _spec("sonnet", "low"),
     "judgment-reviewer": _spec("sonnet", "low"),
     "performance-reviewer": _spec("sonnet", "low"),
-    "security-auditor": _spec("sonnet", "low"),
     "security-reviewer": _spec("sonnet", "low"),
     "test-reviewer": _spec("sonnet", "low"),
     "ux-reviewer": _spec("sonnet", "low"),

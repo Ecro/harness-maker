@@ -21,13 +21,11 @@ import yaml
 
 from harness_maker.improvement import ActionItem
 
-# Pinned 4 LLM-judgment skills (PLAN-antisycophancy-2026-05 ADR-005;
-# relevance-filter removed in 0.22.3 per ADR-0007 health-crawl-removal).
+# Pinned LLM-judgment skills (PLAN-antisycophancy-2026-05 ADR-005; relevance-filter removed in
+# 0.22.3 per ADR-0007; security-scanner and refdocs-search retired in 0.64.0).
 PINNED_SKILLS: tuple[str, ...] = (
     "agent-quality-rubric",
     "ai-readiness-rubric",
-    "security-scanner",
-    "refdocs-search",
 )
 
 VALID_VARIANTS: frozenset[str] = frozenset({"full", "reframe", "soft"})

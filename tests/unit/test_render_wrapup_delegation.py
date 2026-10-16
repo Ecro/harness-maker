@@ -15,9 +15,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from harness_maker.context_lint import _count_body_lines
 from harness_maker.models import (
     DelegationConfig,
     InterviewAnswers,
@@ -86,15 +83,6 @@ def test_the_default_render_carries_no_dispatch_block(tmp_path: Path) -> None:
     assert "wrapup_brief" not in body
 
 
-def test_the_default_render_still_carries_the_whole_body(tmp_path: Path) -> None:
-    """Negative control for the test above: "no dispatch" must not have been achieved
-    by dropping the body."""
-    body = _wrapup(tmp_path)
-
-    assert "Step 5 — Memory append" in body
-    assert "Steps 6 → 7.6 — Stage, commit, pop, drain" in body
-
-
 # ------------------------------------------------------------------ delegate ON
 
 
@@ -105,16 +93,6 @@ def test_the_delegate_on_render_carries_the_dispatch(tmp_path: Path) -> None:
     assert "hm wrapup_brief" in body
 
 
-def test_the_delegate_on_render_still_carries_the_inline_body(tmp_path: Path) -> None:
-    """ADR-006's reachability fix, and the defect it was written against: with the two
-    paths in mutually-exclusive branches there is no inline body to degrade INTO, so
-    an incomplete brief or an unavailable dispatch tool strands the stage entirely."""
-    body = _wrapup(tmp_path, stages=["wrapup"])
-
-    assert "Step 5 — Memory append" in body
-    assert "Steps 6 → 7.6 — Stage, commit, pop, drain" in body
-
-
 def test_the_inline_body_is_labelled_as_the_degraded_path(tmp_path: Path) -> None:
     """Without the heading, a reader of the delegate-on artifact sees the body twice
     over and cannot tell which one runs."""
@@ -123,202 +101,7 @@ def test_the_inline_body_is_labelled_as_the_degraded_path(tmp_path: Path) -> Non
     assert "degraded" in body.lower()
 
 
-def test_the_dispatch_block_self_skips_when_the_tool_is_unavailable(tmp_path: Path) -> None:
-    """ADR-002's per-target mechanism. There is no `is_cursor` render branch to key
-    on, so Cursor and Codex degrade at RUNTIME — the same shape the autopilot block
-    already uses. Without the self-skip those sessions get a dispatch instruction they
-    cannot execute."""
-    body = _wrapup(tmp_path, stages=["wrapup"])
-
-    lowered = body.lower()
-    assert "unavailable" in lowered
-    assert "inline" in lowered
-
-
-def test_the_receipt_is_reconciled_before_the_commit(tmp_path: Path) -> None:
-    """Order is the contract (ADR-012): reconciling AFTER the commit means a mismatch
-    is discovered once it is already in history."""
-    body = _wrapup(tmp_path, stages=["wrapup"])
-
-    reconcile_at = body.index("wrapup_receipt")
-    commit_at = body.index("Steps 6 → 7.6 — Stage, commit, pop, drain")
-    assert reconcile_at < commit_at
-
-
-def test_the_git_tail_stays_in_the_main_loop(tmp_path: Path) -> None:
-    """ADR-004: `git add`/`commit`, the stash pop, the drain and `task-land` stay
-    outside the delegated portion — as a prompt instruction, not a runtime boundary
-    (the agent has Bash). The delegated body must be told so explicitly."""
-    body = _wrapup(tmp_path, stages=["wrapup"])
-
-    assert "Step 7.7" in body
-    assert "task-land" in body
-    # The dispatch section must name the exclusion rather than leaving it implied.
-    dispatch = body[body.index("stage-delegate") : body.index("Step 5 — Memory append")]
-    assert "git" in dispatch.lower()
-
-
-def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
-    """`delegation.stages` is a LIST precisely so one stage's opt-in does not turn on
-    another's (ADR-011 rejected `wrapup.delegate` for exactly this). Turning on verify
-    alone must leave wrapup inline."""
-    body = _wrapup(tmp_path, stages=["verify"])
-
-    assert "stage-delegate" not in body
-    assert "Step 5 — Memory append" in body
-
-
 # ------------------------------------------------------------------ size
-
-
-# 628 → 627 / 661 → 660 (PLAN-sessionid-env-propagation Phase 5): the `stage_end_summary`
-# NO-OP paragraph was compacted by one line to pay for the `--session-id` flags rather than
-# raise a per-command ceiling (ADR-011).
-# 627 → 625 / 660 → 658 (PLAN-harness-diet ADR-001): each stage template carried a
-# two-line `{% if workflow_context %}` header naming the fused workflow it was invoked
-# from. With no fused workflows those lines can never render, so they were deleted.
-# Both moves SHRINK the render — this ratchet is being tightened, not loosened, and the
-# direction is why the constant is allowed to move at all.
-# 625 → 658 / 658 → 691 (PLAN-harness-diet ADR-010): the FIRST upward move of this
-# constant, so it does not get the "direction justifies it" pass the two above rely on.
-# Attribution was measured, not inferred: the delta is +33 in both presets, and the
-# session-start autopilot picker block is 31 non-blank lines plus its two blank separators.
-# The picker renders under `config.autonomy.level != "gated"`; ADR-010 flipped the class
-# DEFAULT to `auto_safe`, so a block that was previously gated OUT of the default render is
-# now in it. Nothing about the delegation feature changed — `stage-delegate` is still absent
-# from the body, which the assertion above checks independently of this count.
-# NOTE for the next reader: 658 is numerically the OLD Production value.
-# That is a coincidence of a uniform +33, not a mis-edited parametrize.
-# 658 → 668 / 691 → 701 (execute-step5-model-mismatch, 2026-08-08). Second upward move,
-# uniform +10, and it is the same paragraph in both presets: the receipt-reading block now
-# describes the `worktree-sweep` row and tells the operator to check `index_after` for their
-# CODE. That is not narration — `wrapup_land`'s manifest omitted the implementation from its
-# own commit TWICE while returning `ok: true` and `commit.status: created`, and `index_after`
-# is the only field in the receipt that distinguishes the two outcomes. The prose was written,
-# reverted in `a3cd8c16` to avoid moving this pin, and restored here on the explicit rule that
-# a ceiling gives way to correctness — with the reasoning recorded rather than the number
-# quietly bumped. The delegation assertion above is independent of this count, as before.
-# 668 → 674 / 701 → 707 (PLAN-workflow-time-token-savings B3/B4, uniform +6, same two
-# shared partials in both presets): `stage_end_summary` gained the judgment-gate
-# discriminator and `step_manifest` the `ask-pending` picker branch. wrapup owns NEITHER
-# gate — it is a human-gated land, not a judgment — so what it inlines is the `{% else %}`
-# side plus the picker's new branch. Bumped rather than compressed because the branches
-# are what make `auto_full` and `ask` real; the aggregate cost is attributed in
-# work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
-# 674 → 675 / 707 → 708 (+1, review round 2): the judgment branch gained the third gate
-# value `blocked`, and the boundary command lost its bracketed placeholder in favour of an
-# append instruction. wrapup owns no judgment gate, so it inlines only the `{% else %}`
-# side; the +1 is the shared restructure.
-# 675 → 674 / 708 → 707 (-1, 2026-08-16): the autopilot picker's gate in the shared
-# `step_manifest.md.j2` lost its runtime half (`not is_codex` — arming is a marker-file write
-# and works in every runtime; only auto-advance needs the Claude-only `Skill` tool), and the
-# rationale moved into a `{#- … -#}` comment whose whitespace control absorbs one blank line.
-# The prose is unchanged; this is purely the gate line. DOWN is the allowed direction.
-# 674 → 672 / 707 → 705 (-2, 2026-08-16, PLAN-codex-lens-dispatch): the judgment-reviewer
-# dispatch moved to the shared dispatch macro, collapsing a four-line `Task(` call into one
-# line plus a one-line intent sentence. No step was removed; the call is the same call.
-# 672 → 673 / 705 → 706 (+1, SPEC-ci-derived-verification-plan): Step 2's four EXAMPLE gate
-# commands are replaced by one `verification_plan commands` call plus the degraded-fallback
-# branch a derived plan needs and a hardcoded list does not. Uniform +1 across both presets,
-# as expected — the block sits outside every preset gate, so a change reaching only one arm
-# would mean something else moved with it. The four removed `!` lines are declared in
-# `test_instruction_preservation._ALLOWED_REMOVALS`, and the char cost is attributed in
-# work-docs/BASELINE-DELTA-ci-derived-verification-plan.md. UP is the disallowed direction by
-# default, so it is bought deliberately: without the fallback branch a project whose CI cannot
-# be read has no instruction at all, which is worse than the guess this replaces.
-# 673 → 683 / 706 → 716 (+10, PLAN-token-efficiency-autopilot-ux-speed review fix P1-4): Step 7.7
-# now PRODUCES `work-docs/BASELINE-ledger-rollup.md` before the `wrapup_land` manifest stages it.
-# The manifest already named the path as `--optional` and nothing wrote it — grep for
-# `autopilot_ledger` across every template returned only `health.md.j2`'s `smoke` verb — so
-# `wrapup_land` recorded `absent-optional` on every harness and ADR-002's "the aggregate survives a
-# fresh clone" was unreachable. +10 = 3 lines of prose, 1 blank, and the two fenced invocation
-# branches (codex / non-codex) at 3 lines each. This equality pin is the FOURTH normative site for
-# the wrapup body size, alongside `_ATOMIC_RATCHET`, `surface_baseline.json` and this task's
-# `surface_allowance`; a change to that command moves all four, which is worth stating once here.
-# 702/735 → 709/742 (outcome-measure, 2026-09-17): wrapup 5.7's third answer-gated block
-# (`outcome-measure`, 7 body lines) — attributed in work-docs/BASELINE-DELTA-outcome-measure.md §3.
-# 709/742 → 711/744 (intent-layer-ops, 2026-09-18): wrapup 5.7 gained the one-sentence
-# `withdrawal.due` line after the outcome-measure block (the sentence + its blank line).
-# 711/744 → 713/746 (assumption-entry-and-evidence-locator, 2026-09-18): the 5.7 assumption
-# block gained the "new" branch — one prose line and one `hm world assume add` call line.
-# 713/746 → 735/768 (observed-harness-gaps-salvage, 2026-09-19): the main-loop proposal-backlog
-# paragraph at the head of `Steps 6 → 7.6` (22 body lines: call, JSON contract, warning line,
-# degrade + halt-exemption) — attributed in
-# work-docs/BASELINE-DELTA-observed-harness-gaps-salvage.md.
-# 713/746 → 726/759 (mission-context-loop, 2026-09-19): wrapup 5.1 gained the 5.1.0 fact-safe
-# search-before-write blockquote (6 lines), its fenced `hm memory_retrieve` call (both
-# `is_codex` arms render one fence) and spacing; +13 per preset, attributed in
-# work-docs/BASELINE-DELTA-mission-context-loop.md §3. 726/759 → 728/761: the review's Codex P1
-# fix added the exact-slug Grep check to that blockquote (+2 lines); 728/761 → 729/762: the
-# re-review's P1 fix made that check state the base path (+1 line).
-# 735/768 + 729/762 → 751/784 (rebase onto observed-harness-gaps-salvage, 2026-09-19): the two
-# tasks' additions are disjoint (Steps 6 → 7.6 vs 5.1.0), so the deltas add: +22 and +16.
-# 751/784 → 769/802 (ai-native-sdlc-vs-intent-world, 2026-09-19): +18 per preset — the
-# "Before landing — the DRI's acceptance of the SPEC" block ahead of the roll-up: the fenced
-# `hm spec_machine approval-status` call, the ok/hold/no-answer bullets. Attributed in
-# work-docs/BASELINE-DELTA-ai-native-sdlc-vs-intent-world.md §3.
-# 769/802 → 800/802 (dev-mode-removal, 2026-09-21): Side only, +31. The delegate-OFF wrapup
-# renders Step 3.6 (the oracle-waiver advisory) at `warn` strictness, and a default-answers Side
-# harness now DERIVES `warn` from its preset. It used to inherit the model's `spec-driven`
-# default and skip the step. Production still derives `block` and is unchanged, which is why
-# only one arm moved.
-# 800/802 → 823/825 (world-intent-closed-loop): shared feedback/trial hooks
-# and measure-before-closure integration add 23 lines; delegation remains OFF.
-# 823/825 → 848/850 (understanding-handoff, 2026-09-26): +25, the `Steps 6 → 7.6` paragraph
-# and fenced example for the commit-body `Understanding:` block, and the instruction to print
-# it before the closing banner. Both arms, same delta.
-# 848/850 → 850/852 (understanding-handoff follow-up, 2026-09-27): +2, the closing print
-# reads `steps.understanding_block` and handles a receipt without the key.
-# 850/852 → 840/842 (intent-layer-improvements, 2026-09-29): −10, Step 5.7's three answer-gated
-# questions became one record batch plus a close question, and the feedback partials became
-# collect-only (wrapup's close block is the one-line 5.7 cutoff). Both arms, same delta;
-# delegation remains OFF. Then 840/842 → 841/843 in the same task's /hm:review round 2: the
-# metric-row item added to the 5.7 record batch (review finding cea50c76).
-# 841/843 → 828/830 (top-issues-2026-09, 2026-09-30): −13, Step 2's check + verification_plan +
-# mark-pass prose became one `verification_cache run` with its exit-code list; `mark-pass` kept
-# only in the degraded block. Both arms, same delta; delegation remains OFF. Then 828/830 →
-# 829/831 at the task's /hm:verify: the run call lifts its budget and says to run in the
-# background (a real suite outlives the 10-minute foreground cap).
-# 829/831 → 817/819 (intent-surface-diet, 2026-10-04): −12, the feedback-entry/close partial
-# blocks left every stage (wrapup's one-line 5.7 cutoff with them) and Step 5.7 was compressed
-# around its guard phrases (its two question calls kept on their own lines, so both still count
-# as mandated calls). Both arms, same delta; delegation remains OFF.
-# 817/819 → 771/773 (hm-light-lane-s2, 2026-10-14): −46, the auto-advance block became a stub
-# pointing at `.claude/hm/autopilot-advance.md`, and Gate 0 stopped rendering with the loop off
-# (this render's default). Both arms, same delta; delegation remains OFF. Then 771/773 →
-# 772/774 in the same task's /hm:review round 1: the stub's Step 2 gained the `--slug` quoting
-# rule (security finding).
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 772), ("Production", 774)])
-def test_the_default_render_costs_existing_users_nothing(
-    tmp_path: Path, preset: str, expected: int
-) -> None:
-    """The shipped artifact is the delegate-OFF one for at least this release
-    (ADR-011), so the whole Jinja block must be gated.
-
-    Re-measured 2026-07-29 (was 662 / 695): PLAN-workflow-step-audit Phase 2 collapsed
-    Steps 6 → 7.6 into one `hm wrapup_land` call, removing 44 body lines. This constant
-    is an equality pin, so it moves only in the commit that moves the render — and it
-    moved DOWN here, which is the direction this phase promised.
-
-    Re-measured 2026-07-31 (was 618 / 651): +10. PLAN-autopilot-advance-noop rewrote the two
-    SHARED partials — the picker now asks `hm autopilot status` instead of guessing from
-    the marker file, and the auto-advance block passes `--slug`/`task_slug` — and every
-    stage includes them, wrapup among them. +2 of the +10 are the review's own findings: a
-    `degraded-idless` picker branch (without it, a WSL2 session is told a peer owns its own
-    marker and never re-arms) and the `rejected*` slug sources; +3 more came from round 5,
-    which removed the pre-rendered `--slug '<slug>'` placeholder (it fails the allowlist,
-    and a bad slug now HALTS, so a model copying the shipped line would stop the chain at
-    every stage) and added the `bad_slug` recovery clause. Wrapup's own body is
-    untouched: it is human-gated (`_HUMAN_GATED_STAGES`), so the chain never auto-enters it
-    and its terminal STOP needed no exception clause.
-
-    Re-measured 2026-09-12 (was 683 / 716): +1. The roll-up step now says what to do when
-    `hm autopilot_ledger rollup` fails with `invalid choice: 'rollup'` — the rendered command
-    pins the released plugin, and the subcommand shipped after 0.55.0, so on every harness
-    rendered before the next release the step errored and a hand-made document was the
-    tempting (and wrong) recovery. Attributed in
-    `work-docs/BASELINE-DELTA-observability-rows-at-base.md`."""
-    assert _count_body_lines(_wrapup(tmp_path, preset=preset)) == expected
 
 
 # Expanded-stage cost of delegating wrapup: the dispatch block, the existence check and the
@@ -332,81 +115,4 @@ def test_the_default_render_costs_existing_users_nothing(
 _DELEGATED_EXPANDED_DELTA = 76
 
 
-@pytest.mark.parametrize("preset", ["Side", "Production"])
-def test_delegation_adds_a_bounded_amount_of_prose(tmp_path: Path, preset: str) -> None:
-    """ADR-006 warned that the delegate-on command GROWS rather than shrinks, and bounded the
-    growth at +60 body lines of the command itself. Stage 2b (SPEC-hm-light-lane-s2b) moved Steps
-    1-5.6 out of a delegated command, so that quantity is now negative (the `on < off - 200` arm
-    below) and a `<= 60` bound on it could no longer fail. What delegation costs is the dispatch
-    prose, measured on the stage as the model meets it (command plus the file it reads); the
-    `_DELEGATED_EXPANDED_DELTA` equality pin is the guard.
-    """
-    off = _count_body_lines(_wrapup(tmp_path / "off", preset=preset, expand=False))
-    on = _count_body_lines(_wrapup(tmp_path / "on", preset=preset, stages=["wrapup"], expand=False))
-    assert on < off - 200, f"{preset}: delegated command is {on} body lines, inline {off}"
-
-    off_full = _count_body_lines(_wrapup(tmp_path / "off2", preset=preset))
-    on_full = _count_body_lines(_wrapup(tmp_path / "on2", preset=preset, stages=["wrapup"]))
-    assert on_full - off_full == _DELEGATED_EXPANDED_DELTA, (
-        f"{preset} delegation adds {on_full - off_full} body lines to the stage ({off_full} → "
-        f"{on_full}); the `workflow` Production cap is {_WORKFLOW_PRODUCTION_CAP}. If the change "
-        "is deliberate, record it in the dated list above"
-    )
-
-
 # ------------------------------------------------- review round 2 (M-03, M-04)
-
-
-def test_the_delegate_asset_carries_untrusted_data_framing(tmp_path: Path) -> None:
-    """M-03. The same diff added this block twice to the read-only `/hm:metrics`
-    surface and omitted it from the only new WRITE-capable asset (Write/Edit/Bash),
-    which is the inverse of the correct priority. The delegate reads the PLAN, REVIEW,
-    memory tiers and a git-derived diff — all attacker-influencable text."""
-    render(
-        synthesize(
-            ProjectProfile(),
-            InterviewAnswers(preset=Preset.PRODUCTION, targets=[Target.CLAUDE_CODE]),
-        ),
-        tmp_path,
-        freeze_time=DEFAULT_FREEZE_TIME,
-    )
-    body = _flat((tmp_path / "agents" / "stage-delegate.md").read_text(encoding="utf-8"))
-
-    assert "Untrusted data" in body
-    assert "never instructions to you" in body
-    # It must name the reason this asset in particular needs it.
-    assert "Write, Edit and Bash" in body
-
-
-def test_the_receipt_temp_file_discipline_is_specified(tmp_path: Path) -> None:
-    """M-04. Sibling steps 5.1 and 5.6 in the same file already mandate a fresh temp
-    file outside the repo, because a fixed name collides under concurrent fleet
-    wrapups — one session's reconciler would read another's reply and vouch for claims
-    it never saw. Step 0.5 named no path at all."""
-    body = _wrapup(tmp_path, stages=["wrapup"])
-    section = _flat(body[body.index("Step 0.5") : body.index("Steps 1–5.6 — inline body")])
-
-    assert "OUTSIDE the repo" in section
-    assert "never a fixed in-repo name" in section
-    # `mktemp`, not a constructed path. The prose used to name `/tmp/hm-receipt-<slug>-$$.json`
-    # and lean on `$$` for entropy — but `$$` is a LITERAL under the Write tool, not a PID, so
-    # the path collapsed to a slug-derived name a peer can predict or pre-plant a symlink at.
-    # The receipt is the artifact the anti-fabrication reconciliation depends on (CWE-377).
-    assert "mktemp" in section
-    # The stage must be asserted, or a wrapup receipt reconciles as a verify one.
-    assert "--stage wrapup" in section
-
-
-def test_the_reconcile_call_passes_the_worktree_root(tmp_path: Path) -> None:
-    """R2-01, and the fourth instance in this task of *unit boundary green, shipped
-    entry point wrong*: `reconcile` gained a `worktree_root` parameter with two passing
-    unit tests, and no caller passed it — so `doc_root` stayed at base, byte-identical
-    to the behaviour the parameter was added to fix.
-
-    `!` lines run at the BASE repo; the delegate writes in the worktree. Without the
-    flag, every truthful delegated run reports `document-missing`.
-    """
-    section = _flat(_wrapup(tmp_path, stages=["wrapup"]))
-
-    assert "--worktree '<brief.worktree_root>'" in section
-    assert "`--worktree` is not optional" in section

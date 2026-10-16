@@ -443,6 +443,11 @@ def make(
     )
     _warn_world_model_handle_taken(target, a)
     _warn_removed_cursor_inputs(pre_yaml_body, targets_override, a, target)
+    # SPEC-hm-overhaul-p1 AC-007 / IRR-006: once per make, read from the file as the user left it.
+    from harness_maker.inert_keys import inert_key_warnings
+
+    for line in inert_key_warnings(pre_yaml_body):
+        typer.echo(f"warn: inert key {line}", err=True)
     # Seed `toolchains` from manifest detection, fill-if-empty (ADR-007). Placed AFTER the
     # override pass so a `--preset` rebuild cannot discard what we just seeded, and so a
     # user-authored value round-tripped from harness.yaml wins — `seed_toolchains` returns the
@@ -1050,10 +1055,12 @@ def _emit_install_summary(
             typer.echo(f"Mechanical checks: {'; '.join(answers.mechanical_checks)}")
 
         typer.echo("\nQuick start:")
-        typer.echo("  /hm:execute <task>       — implement a feature with TDD")
-        typer.echo("  /hm:health               — check the 2-layer harness health")
-        typer.echo("  /hm:configure            — adjust settings later")
-        typer.echo("  /hm:make                 — re-render after plugin update")
+        typer.echo("  /hm:spec <task>          — lock what to build and how to verify it")
+        typer.echo("  /hm:execute <task>       — tests first, then code, then one review")
+        typer.echo("  /hm:health               — check the harness health")
+        typer.echo(
+            "  /hm:make                 — re-render after a plugin update or a harness.yaml edit"
+        )
     except Exception:  # noqa: BLE001 — diagnostic, never fail the make
         pass
 
@@ -1640,7 +1647,16 @@ def _apply_dimension_overrides(
                 # `--preset` switch. `update` restores it only when the flag carried it.
                 comprehension_depth=effective_depth,
             )
-            result = rebuilt.model_copy(update=update)
+            # `reviewers` and `reviewers_fanout` likewise: both presets ship the same reviewer
+            # lists, and a reset would turn a user's fan-out off and name no lens, so the
+            # orphan sweep would delete the lens agents (SPEC-hm-overhaul-p1 D-9).
+            result = rebuilt.model_copy(
+                update={
+                    "reviewers": {k: list(v) for k, v in answers.reviewers.items()},
+                    "reviewers_fanout": answers.reviewers_fanout,
+                    **update,
+                }
+            )
             if focus_override:
                 additional = _focus_to_additional_reviewers(focus_override, new_preset)
                 if additional:
@@ -2277,14 +2293,16 @@ def security_scan_cmd(
     """Run the bundled security scanner and print a compact summary."""
     from collections import Counter
 
-    from harness_maker.security_scanner import scan_all
+    from harness_maker.security_scanner import scan_all_with_status
 
     target = target.resolve()
     harness_config = _read_harness_config(target / ".claude" / "harness.yaml")
-    findings = scan_all(target, harness_config=harness_config, force=force)
+    findings, status = scan_all_with_status(target, harness_config=harness_config, force=force)
     by_severity = Counter(f.severity for f in findings)
 
     typer.echo(f"Security scan: {len(findings)} finding(s)")
+    for gate, state in sorted(status.items()):
+        typer.echo(f"{gate}: {state}")
     if by_severity:
         bits = [f"{severity}={count}" for severity, count in sorted(by_severity.items())]
         typer.echo("Severity: " + ", ".join(bits))

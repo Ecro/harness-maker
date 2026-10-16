@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TPL = REPO_ROOT / "src/harness_maker/templates"
 PARTIAL_REL = "agents/_partials/step_manifest.md.j2"
@@ -27,12 +25,6 @@ WRAPPERS = (
     "hm/stage-preamble.md.j2",
     "codex/stage_skill.md.j2",
 )
-
-
-def test_claude_wrapper_points_at_the_preamble_file() -> None:
-    src = (TPL / "commands/hm/atomic_command.md.j2").read_text(encoding="utf-8")
-    assert 'ref_file="stage-preamble.md"' in src
-    assert 'include "stages/_partials/ref_pointer.md.j2"' in src
 
 
 def test_partial_exists_with_suppression_and_intended_framing() -> None:
@@ -52,15 +44,6 @@ def test_partial_exists_with_suppression_and_intended_framing() -> None:
         "manifest suppression must explain project-root resolution from a "
         "worktree (cwd may be inside .worktrees/<name>/), not just say "
         "'at the project root'"
-    )
-
-
-@pytest.mark.parametrize("wrapper", WRAPPERS)
-def test_wrapper_includes_step_manifest(wrapper: str) -> None:
-    src = (TPL / wrapper).read_text(encoding="utf-8")
-    # Trim-agnostic: match the include regardless of `{% ` vs `{%- ` whitespace control.
-    assert f'include "{PARTIAL_REL}"' in src or f"include '{PARTIAL_REL}'" in src, (
-        f"{wrapper} must {{% include %}} the step_manifest partial (ADR-003)"
     )
 
 

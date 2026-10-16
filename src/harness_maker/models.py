@@ -771,7 +771,10 @@ class AgentModelSpec(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-DELEGATABLE_STAGES: tuple[str, ...] = ("wrapup", "verify")
+DELEGATABLE_STAGES: tuple[str, ...] = ("wrapup",)
+#: Named by a 0.62 `delegation.stages` but retired with their stages (SPEC-hm-overhaul-p1);
+#: `harness_maker.inert_keys` warns on them, so `unknown_stages` does not report them twice.
+RETIRED_DELEGATION_STAGES: tuple[str, ...] = ("review", "verify")
 
 
 class DelegationConfig(BaseModel):
@@ -806,7 +809,9 @@ class DelegationConfig(BaseModel):
 
     @property
     def unknown_stages(self) -> tuple[str, ...]:
-        return tuple(s for s in self.stages if s not in DELEGATABLE_STAGES)
+        return tuple(
+            s for s in self.stages if s not in (*DELEGATABLE_STAGES, *RETIRED_DELEGATION_STAGES)
+        )
 
 
 class PermissionsConfig(BaseModel):
@@ -1047,10 +1052,10 @@ class AutonomyConfig(BaseModel):
     step_cap: int | None = Field(default=20, gt=0)
     time_cap_min: int | None = Field(default=300, gt=0)
     extra_deny: list[str] = Field(default_factory=list)
-    # ADR-003: when True, a SessionStart hook (``harness_maker.hooks.autopilot_autoarm``)
-    # re-arms a fresh ``.hm-autopilot`` marker each session from the committed level/pipeline,
-    # so the 18h TTL never trips in practice. The committed ``false`` is the real off-switch.
-    autopilot_persistent: bool = True
+    # Inert since 0.64.0 (SPEC-hm-overhaul-p1 IRR-005): the `autopilot_autoarm` hook that read it
+    # is retired with autopilot auto-advance. Kept so a 0.62 harness.yaml still parses; an
+    # explicit ``true`` gives one "autopilot retired" warning per `make` run.
+    autopilot_persistent: bool = False
 
     @field_validator("level", mode="before")
     @classmethod
@@ -1454,6 +1459,11 @@ class InterviewAnswers(BaseModel):
     auto_fix: bool = True
     grade_threshold: str = "A"  # 'A' | 'B' | 'C'
     max_review_rounds: int = 3
+    # SPEC-hm-overhaul-p1 D-9: the lens reviewer fan-out is opt-in. False renders no lens agent
+    # and execute dispatches `code-reviewer` alone; true renders and dispatches the lenses named
+    # in `reviewers.installed`. Rendered beside `max_review_rounds` and read back by
+    # `answers_from_harness_yaml`, so a re-render never drops a user's `true`.
+    reviewers_fanout: bool = False
     # Repair-round re-review gate (PLAN-review-loop-empirics ADR-004). Absent key in an
     # older harness.yaml resolves to these same defaults via review_churn — the gate is
     # on and the threshold is 0.30 — so a re-render never silently disables it.

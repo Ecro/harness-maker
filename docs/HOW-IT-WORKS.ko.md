@@ -3,22 +3,22 @@
 # harness-maker 동작 원리 완전 가이드
 
 > **대상 독자**: harness-maker 를 처음 접하는 개발자, 또는 내부 동작을 깊이 이해하고 싶은 사용자.
-> **Version**: 0.63.0
+> **Version**: 0.64.0
 >
 > 코드 세부 구현이 아닌 **절차·흐름·책임** 중심 설명.
 
 > 현재 릴리스 계약(소스에서 자동 검증):
 >
 > <!-- hm-doc-contract:pipeline:start -->
-> **현재 파이프라인:** `research` → `spec` → `execute` → `review` → `verify` → `wrapup`
+> **현재 파이프라인:** `research` → `spec` → `execute` → `wrapup`
 > <!-- hm-doc-contract:pipeline:end -->
 >
 > <!-- hm-doc-contract:agents:start -->
-> **현재 에이전트:** `autoloop-coder`, `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `executor`, `judgment-reviewer`, `performance-reviewer`, `security-auditor`, `security-reviewer`, `spec-validator`, `stage-delegate`, `stuck`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
+> **현재 에이전트:** `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `judgment-reviewer`, `performance-reviewer`, `security-reviewer`, `spec-validator`, `stage-delegate`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`, `world-model`
+> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `worktree-isolator`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > <!-- hm-doc-contract:mechanisms:start -->
@@ -28,6 +28,15 @@
 > <!-- hm-doc-contract:version-files:start -->
 > **릴리스 버전 파일:** `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
 > <!-- hm-doc-contract:version-files:end -->
+
+> **0.64.0 (SPEC-hm-overhaul-p1).** 워크플로는 4단계다: `/hm:research` (선택) → `/hm:spec` →
+> `/hm:execute` → `/hm:wrapup`. 리뷰는 `/hm:execute` 의 Step 6 이고, 결정적 게이트는 `hm check`
+> 하나다. 은퇴: `hm:review`, `hm:verify`, `hm:loop`, `hm:loop-p5-batch`, `hm:configure` 명령;
+> autopilot 자동 진행; `stuck`, `security-auditor`, `executor`, `autoloop-coder` 에이전트;
+> `security-scanner`, `verify-before-completion`, `targeted-test-selection`, `conditional-router`,
+> `autoloop-driver`, `refdocs-search` 스킬. 렌즈 리뷰어는 `reviewers.fanout` 일 때만 렌더된다.
+> 아래에서 은퇴한 부분을 설명하는 절은 동작 기록으로 남겨 두며, 더는 명령이 아니므로 앞의
+> 슬래시 없이 이름을 쓴다.
 
 ---
 
@@ -40,11 +49,11 @@
    - 3.2 [/hm:spec — 인수 조건](#32-hmspec--인수-조건)
    - 3.3 [plan 스테이지는 흡수됐다](#33-plan-스테이지는-흡수됐다--내용물이-간-곳)
    - 3.4 [/hm:execute — TDD 구현](#34-hmexecute--tdd-구현)
-   - 3.5 [/hm:review — 코드 리뷰](#35-hmreview--코드-리뷰)
-   - 3.6 [/hm:verify — 완료 검증](#36-hmverify--완료-검증)
+   - 3.5 [hm:review — 코드 리뷰](#35-hmreview--코드-리뷰)
+   - 3.6 [hm:verify — 완료 검증](#36-hmverify--완료-검증)
    - 3.7 [/hm:wrapup — 커밋 마무리](#37-hmwrapup--커밋-마무리)
 4. [단계 연결](#4-단계-연결)
-5. [/hm:loop — 자동 반복 루프](#5-hmloop--자동-반복-루프)
+5. [hm:loop — 자동 반복 루프](#5-hmloop--자동-반복-루프)
 6. [특수 명령](#6-특수-명령)
    - 6.1 [/hm:health — structural 레이어](#61-hmhealth--structural-레이어)
    - 6.2 [/hm:health — personalization 레이어](#62-hmhealth--personalization-레이어)
@@ -91,16 +100,16 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 
 | 범주 | 내용 |
 |------|------|
-| **명령(Commands)** | `/hm:` 슬래시 명령 14개 (원자 단계 6 + 루프 드라이버 2 + 유틸리티 6: `configure` `health` `help` `make` `metrics` `uninstall`) |
-| **스킬(Skills)** | 명령에서 호출하는 재사용 능력 모듈 14개 |
-| **에이전트(Agents)** | 특정 역할의 서브-에이전트 16개 |
-| **훅(Hooks)** | 도구 호출 전후에 자동 실행되는 이벤트 핸들러 5종 |
+| **명령(Commands)** | `/hm:` 슬래시 명령 9개 (단계 4 + 유틸리티 5: `health` `help` `make` `metrics` `uninstall`) |
+| **스킬(Skills)** | 재사용 능력 모듈 7개 (`second_opinion.models` 설정 시 `second-opinion-gate` 추가) |
+| **에이전트(Agents)** | 기본 서브-에이전트 3개 (`code-reviewer`, `judgment-reviewer`, `spec-validator`) + opt-in second-opinion·delegation·렌즈 에이전트 |
+| **훅(Hooks)** | 도구 호출 전후에 자동 실행되는 이벤트 핸들러 |
 
 ### 설계 원칙
 
 - **LLM 판단 우선**: 패턴 매칭보다 LLM 이 문맥을 읽고 직접 판단
-- **원자성**: 각 단계는 독립 실행 가능. 단계 간 결합은
-  `/hm:loop --per-iter-stages` 또는 autopilot 이 담당
+- **원자성**: 각 단계는 독립 실행 가능. 각 단계는 다음 단계를 알려주고 끝나며, 실행은 사용자가
+  결정
 - **워크트리 격리**: 구현 변경은 `.worktrees/<name>-<ts>/` 안에서만 발생 — 메인 브랜치 보호
 - **커밋은 wrapup 이 한 번만**: 여러 단계를 거쳐도 커밋은 wrapup 이 단 한 번 생성
 - **외부 전송 없음**: 모든 텔레메트리는 100% 로컬
@@ -386,7 +395,7 @@ machine SPEC에 `approval: {kind: human, content_hash, approved_by, approved_at}
 
 `hm spec_machine approval-status --root . --slug <slug>` 가 상태를 알려줍니다. autopilot은
 SPEC이 승인·면제 상태가 아니면 `spec` 에서 멈추고(`auto_full` 은 도장 없이 진행), wrapup
-커밋·`worktree task-land`·`/hm:loop` 의 `finalize success` 는 되돌릴 수 없는 결정에 유효한
+커밋·`worktree task-land`·`hm:loop` 의 `finalize success` 는 되돌릴 수 없는 결정에 유효한
 승인이 없으면 `hold:` 줄과 함께 land를 거부합니다. wrapup은 먼저 DRI에게 묻고, 응답이 없거나
 질문 도구가 없거나 loop 모드면 승인으로 보지 않습니다. 도장은 흐름을 기록할 뿐 사람임을
 증명하지 않습니다(objective 승인과 같은 한계).
@@ -412,7 +421,7 @@ auto-advance 게이트를 제거했다. **PLAN 문서는 남는다** — 컨텍�
 | 되돌리기 어려운 결정 (스키마 · 공개 API/CLI · 파일 포맷 · 마이그레이션 · 보안 경계 · 새 의존성) | **`/hm:spec`** 의 `irreversible_decisions` — land hold 기준이기도 하다 |
 | objective 연결 (Step 0.5) | **`/hm:spec`** Step 0.5, 그리고 SPEC frontmatter `intent:`. intent 초안은 Maker / intent-layer skill 로만 만든다 (Step 4.9 초안은 intent-surface-diet 에서 제거됨) |
 | phase · 파일 목록 · 순서 · 위험 · exit criteria | **`/hm:execute` Step 0** 이 사람 게이트 없이 작성 |
-| SPEC-need 판정 (`spec_need_verdict` / `spec_need_target`) | **`/hm:execute` Step 0.1** — `prefilter` + `record` + 선존재 보존 쓰기. *멈춤* 은 의도적으로 버렸고 집행은 `/hm:verify` Check 6 이 맡는다 |
+| SPEC-need 판정 (`spec_need_verdict` / `spec_need_target`) | **`/hm:execute` Step 0.1** — `prefilter` + `record` + 선존재 보존 쓰기. *멈춤* 은 의도적으로 버렸고 집행은 `hm:verify` Check 6 이 맡는다 |
 | loop per-iter PLAN | **`/hm:execute` Step 0.2** |
 | `plan-validator` | **`spec-validator`** 로 `/hm:spec` Step 4.6 에 재배치 — 단일 패스, 조건부, 승인을 막지 않는다 |
 
@@ -552,7 +561,7 @@ uv run python -m harness_maker.worktree finalize <WT> fail
 
 ---
 
-### 3.5 /hm:review — 코드 리뷰
+### 3.5 hm:review — 코드 리뷰
 
 **목적**: 구현된 변경을 다수의 전문 리뷰어가 독립적으로 검토하고, 합의를 거쳐 품질 등급을 산출한다. 문제가 있으면 자동 수정 루프를 돌린다.
 
@@ -672,7 +681,7 @@ P0/P1 개수 기반 등급:
 
 - executor 가 P0/P1 findings 를 순서대로 수정하고, 빌드를 깨는 수정은 되돌린다.
 - **재리뷰는 churn 으로 게이팅된다.** 라운드마다 pin 된 두 트리 — 그 라운드 자신의 수정 전/후
-  상태 — 사이에서 측정한다. **`HEAD` 가 아니다**: `/hm:review` 는 커밋하지 않으므로
+  상태 — 사이에서 측정한다. **`HEAD` 가 아니다**: `hm:review` 는 커밋하지 않으므로
   `HEAD..HEAD` 는 무엇을 고쳤든 항상 0.0 을 보고한다. 집계는 **파일별 최대값**이라 5000줄
   파일의 1줄 수정이 30줄 파일 전면 재작성을 가리지 못한다. `reviewers.rereview_churn_ratio`
   (기본 0.20) 미만이면 재리뷰를 건너뛰고 비교식을 기록, 이상이면 **정확히 1명**의 구조화된
@@ -700,7 +709,7 @@ P0/P1 개수 기반 등급:
 
 ---
 
-### 3.6 /hm:verify — 완료 검증
+### 3.6 hm:verify — 완료 검증
 
 **목적**: 커밋 전 마지막 관문. 6개 체크포인트를 순서대로 검사하고, 첫 번째 실패에서 블로킹한다.
 
@@ -770,7 +779,7 @@ BLOCKED: check <N> (<이름>) — <이유>
 `--force` 플래그 시 첫 번째 실패에서 멈추지 않고 계속 진행 (결과는 jsonl 에 기록).
 
 #### 출력물
-- 텍스트 결과만. `/hm:verify` 단계 자체의 JSONL 레저는 없음 — 옛 `verify-{date}.jsonl` 기록은
+- 텍스트 결과만. `hm:verify` 단계 자체의 JSONL 레저는 없음 — 옛 `verify-{date}.jsonl` 기록은
   아무도 읽지 않는 손글씨 prose 였기에 은퇴됨 (커밋 `51b5bbfb`); stage 진입/종료는 이미
   `stage-spans.jsonl` 과 `auto-advance.jsonl` 이 담당. CI 용 `verify` 명령(`cli.py`)은 여전히
   그 파일군에 자체 machine record 를 남긴다.
@@ -838,10 +847,10 @@ EOF
 | 장치 | 하는 일 | 멈추는 곳 |
 |---|---|---|
 | **autopilot** (`autonomy.level`) | 스테이지 종료 시 `autonomy.pipeline` 의 다음 항목으로 진행 | plan 아키텍처 인터뷰, CHANGES_REQUESTED 리뷰, wrapup land — **모든 레벨**에서 |
-| **`/hm:loop`** | 선택한 부분집합(`--per-iter-stages`, 기본 `execute,review`)을 목표 달성 또는 상한까지 재실행 | 반복/시간 상한, 그리고 blocking gate 를 보고하는 스테이지 |
+| **`hm:loop`** | 선택한 부분집합(`--per-iter-stages`, 기본 `execute,review`)을 목표 달성 또는 상한까지 재실행 | 반복/시간 상한, 그리고 blocking gate 를 보고하는 스테이지 |
 
 기본값은 둘 다 아닙니다: 새로 렌더된 하네스는 `autonomy.level: ask` 이므로, 세션의 첫 적격
-스테이지가 선택지를 제시하고 그것을 고르기 전까지는 아무것도 자동 진행하지 않습니다. `/hm:loop`
+스테이지가 선택지를 제시하고 그것을 고르기 전까지는 아무것도 자동 진행하지 않습니다. `hm:loop`
 전문은 §5, autopilot 픽커는 §6 에 있습니다.
 
 **좁히기 (narrow)**: 무장된 autopilot 세션은 `hm autopilot narrow --until <stage>` 로 특정
@@ -857,7 +866,7 @@ EOF
 
 ---
 
-## 5. /hm:loop — 자동 반복 루프
+## 5. hm:loop — 자동 반복 루프
 
 **목적**: 하나의 목표를 향해 여러 번 반복하며 점진적으로 개선한다. 루프마다 독립된 워크트리를 사용하고, 안전 레일이 무한 반복을 방지한다.
 
@@ -867,8 +876,8 @@ EOF
 
 | 모드 | 사용 방법 | 동작 |
 |------|---------|------|
-| **feature** | `/hm:loop feature <설명>` | 새 기능을 여러 반복으로 점진 구현 |
-| **improve** | `/hm:loop improve <설명>` | 기존 코드를 반복적으로 개선 |
+| **feature** | `hm:loop feature <설명>` | 새 기능을 여러 반복으로 점진 구현 |
+| **improve** | `hm:loop improve <설명>` | 기존 코드를 반복적으로 개선 |
 
 ### 5단계 필수 컨텍스트 차원
 
@@ -914,7 +923,7 @@ EOF
 ### 루프 시나리오 추적 예시 (feature 모드, 3반복)
 
 ```
-1. /hm:loop feature "CSV 파서에 에러 핸들링 추가"
+1. hm:loop feature "CSV 파서에 에러 핸들링 추가"
 2. autoloop-driver 가 설명 분석 → purpose 확인됨, invariants/priority 미확인
 3. 구조화 질문: "불변 조건과 우선순위는?" 
 4. 사용자 답변: "기존 API 유지, 품질 우선"
@@ -943,7 +952,7 @@ EOF
 >   실행에서 12건 중 11건이 기각되며 91% 노이즈로 판명된 뒤, ADR-0007 이 crawler
 >   모듈·relevance 필터·stale-asset 코드·명령 템플릿을 전부 제거했습니다. 가치가 있던
 >   유일한 소스인 OSV CVE 탐지만 `secscan/dependency_cves.py` 로 독립 생존해
->   `/hm:verify` Check 4 가 소비합니다. 크롤에 대응하는 후속 명령은 없습니다 — 그래서
+>   `hm:verify` Check 4 가 소비합니다. 크롤에 대응하는 후속 명령은 없습니다 — 그래서
 >   이 절은 재작성이 아니라 삭제됐습니다.
 
 ---
@@ -1006,10 +1015,10 @@ Layer 2: 각 루브릭 YAML 을 순서대로 LLM 이 평가.
 **Step 4 — 개선 우선순위 결정**
 
 발견된 문제를 두 범주로 분류:
-- **AI-fixable**: `/hm:loop improve` 로 자동 개선 가능한 것
+- **AI-fixable**: `hm:loop improve` 로 자동 개선 가능한 것
 - **Human-required**: 아키텍처 결정 등 사람이 개입해야 하는 것
 
-각 AI-fixable 항목에 대해 `/hm:loop` 명령을 제안.
+각 AI-fixable 항목에 대해 `hm:loop` 명령을 제안.
 
 #### 출력물
 - `docs/ai-readiness-{date}.md` (대시보드)
@@ -1142,14 +1151,14 @@ v0 루브릭은 잠정적. 30+ 프로젝트가 audit 실행을 누적한 후 등
 
 ### 7.3 autoloop-driver
 
-**역할**: `/hm:loop` 명령의 WHY 를 설명하고, 5차원 컨텍스트 수집 방법을 정의한다.
+**역할**: `hm:loop` 명령의 WHY 를 설명하고, 5차원 컨텍스트 수집 방법을 정의한다.
 
 **핵심 기여**:
 - 5개 필수 차원 정의 (purpose, invariants, priority, test_reliability, stopping_criteria)
 - 커버리지 기반 적응형 인터뷰 원리 (추출 먼저, 질문 나중)
 - 안전 레일 문서화
 
-이 스킬은 **문서 스킬** — 직접 코드를 실행하지 않고 `/hm:loop` 명령이 어떻게 동작해야 하는지 가이드를 제공한다.
+이 스킬은 **문서 스킬** — 직접 코드를 실행하지 않고 `hm:loop` 명령이 어떻게 동작해야 하는지 가이드를 제공한다.
 
 ---
 
@@ -1236,7 +1245,7 @@ osv_dev.crawl(packages=osv_dev.parse_uv_lock("uv.lock"))
 - 모든 4개 소스가 실행됨 (하나 실패해도 나머지 계속)
 - 24시간 이내 raw 파일 있으면 크롤 생략
 - 오프라인 상태 시: 조용히 건너뜀 + stderr 경고
-- **직접 변경 없음** — raw 데이터만 저장. 이를 적용하던 `hm:refresh` 는 ADR-0007 에서 제거됐고, OSV CVE 경로만 살아남아 `/hm:verify` Check 4 가 읽는다
+- **직접 변경 없음** — raw 데이터만 저장. 이를 적용하던 `hm:refresh` 는 ADR-0007 에서 제거됐고, OSV CVE 경로만 살아남아 `hm:verify` Check 4 가 읽는다
 
 **출력**: `.claude/observability/refresh/raw-{date}.jsonl`
 
@@ -1274,8 +1283,8 @@ high-severity findings → wrapup/verify 블로킹
 
 **호출 위치**:
 - `/hm:wrapup` 의 Step 2
-- `/hm:loop` 의 각 반복 종료 시
-- 수동: `/hm:verify`
+- `hm:loop` 의 각 반복 종료 시
+- 수동: `hm:verify`
 
 ---
 
@@ -1333,7 +1342,7 @@ Claude Code/Cursor 는 `disable-model-invocation: true`, Codex 는
 `/intent-layer` (또는 `$intent-layer`) 를 직접 입력하면 여전히 실행된다. Maker 는 쓰기 전에 그
 `SKILL.md` 를 Read 해서 도달하며, 동의 규칙은 바뀌지 않는다. `/hm:help` 는 둘을 `typed only` 로
 표시한다. 모든 `/hm:` 스테이지 description 은
-`Only when typed, or via <Name>, autopilot or /hm:loop.` (Codex 는 `$hm-loop`) 로 끝난다 — Maker 의 handoff, autopilot 진행, `/hm:loop` 가 모델
+`Only when typed, or via <Name>, autopilot or hm:loop.` (Codex 는 `hm-loop`) 로 끝난다 — Maker 의 handoff, autopilot 진행, `hm:loop` 가 모델
 쪽에서 스테이지를 호출하므로 권고 수준의 게이트일 뿐이다. 항상 로드되는 포인터 둘 (`CLAUDE.md`,
 `AGENTS.md`, `.cursor/rules/harness.mdc`) 이 라우팅을 싣는다: `## World model` (변형당 ≤ 400자) 은
 목표·지표·사실·현황 요청을 이름을 부르지 않아도, 스테이지 중에도 Maker 로 보내고 (일반적인
@@ -1401,7 +1410,7 @@ null 이면 "no artifact recorded" 와 함께 그 작업의 `work-docs/`/`specs/
 
 ### 8.1 autoloop-coder
 
-**역할**: `/hm:loop` 에서 각 반복의 구현을 담당하는 제한적 스코프 에이전트.
+**역할**: `hm:loop` 에서 각 반복의 구현을 담당하는 제한적 스코프 에이전트.
 
 **권한 (허용)**:
 - `Read(*)`, `Grep(*)`, `Glob(*)` — 읽기 전체
@@ -1421,7 +1430,7 @@ Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 
 
 ### 8.2 code-reviewer
 
-**역할**: 모든 `/hm:review` 에서 항상 포함되는 범용 코드 리뷰어.
+**역할**: 모든 `hm:review` 에서 항상 포함되는 범용 코드 리뷰어.
 
 **권한**: Read, Grep, Glob + `Bash(git diff:*)`, `Bash(git log:*)`, `Bash(git status:*)`
 **금지**: Write(*), Edit(*), 모든 실행 Bash (rm, curl, npm, eval, python, node, sh, bash)
@@ -1473,7 +1482,7 @@ Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 
 
 ### 8.5 executor
 
-**역할**: `/hm:review` 의 자동 수정 루프에서 P0/P1 findings 를 실제로 수정하는 에이전트.
+**역할**: `hm:review` 의 자동 수정 루프에서 P0/P1 findings 를 실제로 수정하는 에이전트.
 
 **권한 (허용)**:
 - `Read(*)`, `Grep(*)`, `Glob(*)` — 읽기 전체
@@ -1548,7 +1557,7 @@ Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 
 
 ### 8.9 security-reviewer
 
-**역할**: `/hm:review` 에서 보안 관련 diff 를 전문으로 검토하는 conditional reviewer.
+**역할**: `hm:review` 에서 보안 관련 diff 를 전문으로 검토하는 conditional reviewer.
 
 **트리거** (conditional-router): `.env`, `/auth/`, `/secret` 포함 파일
 
@@ -1575,7 +1584,7 @@ Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 
 - `/hm:execute` Phase A.5: test-reviewer FAIL 재시도 예산 소진
 - `/hm:execute` Phase D: PLAN 범위 변경 없이 수정 불가한 실패
 - `/hm:execute` ADR 충돌: 구현이 ADR 을 위반해야만 진행 가능
-- `/hm:review` 합의 교착: 3개 리뷰어가 동일 이슈에 상충 CONCLUDE
+- `hm:review` 합의 교착: 3개 리뷰어가 동일 이슈에 상충 CONCLUDE
 - `/hm:spec` spec-validator: critical 미해결
 
 **분석 과정**:
@@ -1780,7 +1789,7 @@ hooks.json 은 security-auditor 의 **게이트 3** 검사 대상:
 - `eval "$..."` 인젝션
 - 사용자 쓰기 가능 파일 → stdout → LLM 인젝션 경로
 
-훅 코드 수정 시 항상 security-scanner 스킬 (또는 `/hm:verify` Check 4) 로 검토 권장.
+훅 코드 수정 시 항상 security-scanner 스킬 (또는 `hm:verify` Check 4) 로 검토 권장.
 
 ---
 
@@ -1905,7 +1914,7 @@ ref_folders:
 
 **Q: 커밋이 여러 개 생기지 않나요?**
 
-A: 아닙니다. `execute`, `review` 단계는 커밋하지 않습니다. `wrapup` 이 단 하나의 커밋을 생성합니다. `/hm:loop` 로 여러 단계를 이어 돌려도 마찬가지.
+A: 아닙니다. `execute`, `review` 단계는 커밋하지 않습니다. `wrapup` 이 단 하나의 커밋을 생성합니다. `hm:loop` 로 여러 단계를 이어 돌려도 마찬가지.
 
 **Q: 워크트리가 너무 많이 쌓이면?**
 
@@ -2407,18 +2416,18 @@ PLAN 저장 전, "Accept?", "OK?", "Verify?", "Should we?" 같은 표현을 스�
 
 ---
 
-### 11.22 /hm:loop 적응형 인터뷰 + 수렴 루프 — 반복 실행이 목표를 향해 수렴한다
+### 11.22 hm:loop 적응형 인터뷰 + 수렴 루프 — 반복 실행이 목표를 향해 수렴한다
 
 **Before**: "이 코드를 개선해줘" 같은 열린 요청은 한 턴으로 끝나거나, 각 턴이 서로 맥락을 잃고 무관한 방향으로 진행된다.
 
-**After**: `/hm:loop` 는 **time-and-iteration bounded** 루프를 실행한다. 각 반복이 이전 반복의 결과를 읽고, 목표를 향해 수렴하는지 LLM 이 판단한다.
+**After**: `hm:loop` 는 **time-and-iteration bounded** 루프를 실행한다. 각 반복이 이전 반복의 결과를 읽고, 목표를 향해 수렴하는지 LLM 이 판단한다.
 
 #### 두 가지 모드
 
 | 모드 | 명령 | 목적 |
 |-----|------|-----|
-| **feature** | `/hm:loop feature "설명"` | 목표 또는 SPEC 파일을 향해 점진적 구현 |
-| **improve** | `/hm:loop improve "설명"` | 기존 코드를 반복적으로 개선, 수렴 조건 충족 시 종료 |
+| **feature** | `hm:loop feature "설명"` | 목표 또는 SPEC 파일을 향해 점진적 구현 |
+| **improve** | `hm:loop improve "설명"` | 기존 코드를 반복적으로 개선, 수렴 조건 충족 시 종료 |
 
 #### autoloop-driver 의 5차원 적응형 인터뷰
 
@@ -2520,7 +2529,7 @@ PLAN 저장 전, "Accept?", "OK?", "Verify?", "Should we?" 같은 표현을 스�
 
 **Before**: "테스트가 통과하면 완료"로 간주한다. PLAN 에 쓴 내용이 실제 구현됐는지, 보안 취약점이 없는지, 다른 품질 지표가 후퇴하지 않았는지는 검사하지 않는다.
 
-**After**: `/hm:verify` (= `verify-before-completion` 스킬) 가 6개 체크포인트를 순서대로 실행하고 **첫 번째 실패에서 즉시 블로킹**한다.
+**After**: `hm:verify` (= `verify-before-completion` 스킬) 가 6개 체크포인트를 순서대로 실행하고 **첫 번째 실패에서 즉시 블로킹**한다.
 
 #### 6개 체크포인트
 
@@ -2575,4 +2584,4 @@ PLAN 이행 여부는 체크박스 체크만으로는 판정할 수 없다. PLAN
 
 ---
 
-*이 문서는 harness-maker 0.63.0 기준. 생성: `/hm:execute how-it-works-docs`*
+*이 문서는 harness-maker 0.64.0 기준. 생성: `/hm:execute how-it-works-docs`*

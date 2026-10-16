@@ -15,7 +15,6 @@ than the live working tree.
 
 **Invoke when:**
 - Any `/hm:` stage starts AND `harness.yaml.worktree.enabled` is true.
-- `/hm:loop` allocates the per-loop worktree at iteration start.
 
 **Skip when:**
 - `worktree.enabled` is false (skill becomes a no-op — nothing is isolated).
@@ -98,7 +97,7 @@ worktree:
   enabled: true               # isolate every /hm: stage (false = none)
 ```
 
-Change it with `/hm:configure` or the `--worktree` / `--no-worktree` make flag. OFF
+Change it in `.claude/harness.yaml` or with the `--worktree` / `--no-worktree` make flag. OFF
 is refused while task worktrees or finalize stashes are in flight.
 
 <!-- @hm:user:extensions -->

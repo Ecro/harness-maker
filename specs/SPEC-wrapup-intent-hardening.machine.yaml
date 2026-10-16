@@ -43,8 +43,7 @@ ac:
   title: Every non-file shell argument has a stated format
   type: mechanical
   test_ids:
-  - tests/unit/test_wrapup_intent_hardening.py::test_ac002_every_arg_has_a_format
-  - tests/unit/test_wrapup_intent_hardening.py::test_ac002_inventory_kept
+  - tests/unit/test_overhaul_p1_kept.py::test_intent_skill_and_wrapup_call_the_intent_verbs
   executable_predicate: all(p in rendered_57_and_close(arm) for p in FORMAT_PATTERNS)
     and 'whole value' in rendered_57(arm) and set(placeholders(golden_57(arm))) <=
     set(placeholders(rendered_57(arm))) and all(ruled(a) for a in placeholders(rendered_57_and_close(arm)))

@@ -11,7 +11,7 @@
 | `structural`     | ai_readiness 3-layer score (CLAUDE.md, ADRs, frontmatter, etc.) |
 | `personalization`| ADR-011 rubric: L1 conversion (0.4) + L2 stability (0.3) + L3 cadence (0.3) |
 
-CVE detection lives in `/hm:verify` (`secscan/dependency_cves.py` via OSV.dev),
+CVE detection lives in `hm check` (`secscan/dependency_cves.py` via OSV.dev),
 not here. ADR-0007 removed the external_risks layer after 2026-05-22 runtime
 evidence showed 91% noise on a representative run.
 
@@ -52,7 +52,7 @@ rate-limit / subscription cap, schema/flag drift) look identical to "model agree
 add". A silently-degraded model means every *mandatory* review/plan second opinion is running
 without that voice and nobody notices.
 > **Same entrypoint, base-only.** The smoke calls `harness_maker.second_opinion_invoke` — the
-> identical path `/hm:review` and `/hm:spec` use. A hand-copied duplicate drifted before and
+> identical path `/hm:execute`'s review step uses. A hand-copied duplicate drifted before and
 > reported green for months against a dead codex vote. But `/hm:health` has no worktree
 > preflight, so a pass proves the shared path works *from the base* only; the worktree branch of
 > base-root/config resolution is carried by unit tests and the manual check. Never read green
@@ -107,37 +107,9 @@ If the command is missing, exits non-zero, or its output does not parse: print n
 move on. This is advisory — `/hm:health` must never fail or block on it.
 
 If `codex` or `antigravity` reports `installed: true`, surface ONE Layer 1 advisory:
-the CLI is on PATH but casts no vote, and `{% if is_codex %}$hm-configure{% else %}/hm:configure{% endif %}`
-→ "Cross-model second opinion" enables it. Say `installed` means the binary resolves —
+the CLI is on PATH but casts no vote; listing it in `second_opinion.models` enables it. Say `installed` means the binary resolves —
 authentication is not checked here. If neither is installed, print nothing: a user without
 these tools does not need to be told about them on every audit.
-{% endif %}
-{% if config.autonomy.level == "ask" %}
-## Autopilot auto-advance smoke check — not applicable
-
-`autonomy.level` is `ask`, so the level is chosen per session and is not knowable at
-render time. The smoke check takes a concrete `--level`, and interpolating a meta-level
-into it would make the probe fail on an argument error and report that as a degraded
-harness (ADR-007). Report one line: autopilot smoke skipped — level resolved per session.
-{% elif config.autonomy.level != "gated" %}
-## Autopilot auto-advance smoke check (PLAN-human-bottleneck-auto-advance P7, ADR-009)
-
-`autonomy.level` is `{{ config.autonomy.level }}` (not `gated`), so autopilot CAN
-auto-advance — verify it actually has. This is a **positive** check: an armed-but-never-firing
-autopilot (a broken boundary CLI, a marker that never gets written, a chain that always
-kill-switches) looks identical to "the user just never turned it on". Run the degradation probe:
-
-```bash
-!uv run --with {{ harness_maker_src_path }} hm autopilot_ledger smoke --root . --level {{ config.autonomy.level }} --targets {{ config.targets | join(',') }}
-```
-
-Report the JSON as a Layer 1 ActionItem:
-- `degraded: false` → pass (ledger has entries, or correctly off).
-- `degraded: true` → **surface it**: autopilot is configured but `.claude/observability/auto-advance.jsonl`
-  has zero `advanced`/`gate_blocked`/`halted_cap` entries across recent sessions — the feature
-  is armed yet never fired. Likely causes: marker never written (`autopilot on` / the
-  session-start picker not used), or the boundary CLI is failing. Investigate before trusting
-  that "the pipeline just stops" is the user's intent.
 {% endif %}
 <!-- @hm:economics-doctor -->
 ## Economics reader liveness (no score impact)

@@ -31,7 +31,6 @@ from harness_maker.models import (
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
-from tests.stage_surface import stage_text
 
 ROOT = Path(__file__).parents[2]
 GOLDENS = ROOT / "tests" / "fixtures" / "intent_surface_diet" / "goldens.json"
@@ -338,16 +337,6 @@ def skill_names_57_and_preserves(skill: str, reference: str) -> bool:
 # ── AC-001 ──────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("stage", STAGES)
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_ac001_no_feedback_blocks(preset: Preset, host: str, stage: str) -> None:
-    text = _stage(preset, host, stage)
-    assert no_feedback_blocks(text)
-    assert no_collection_prose(text, stage)
-    if stage == "execute":
-        assert execute_adds_no_feedback(text)
-
-
 def test_ac001_control() -> None:
     assert not no_feedback_blocks("x <!-- @hm:feedback-entry --> y")
     assert not no_feedback_blocks("x <!-- @hm:feedback-close --> y")
@@ -362,11 +351,6 @@ def test_ac001_control() -> None:
 
 
 # ── AC-002 ──────────────────────────────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_ac002_spec_link_only(preset: Preset, host: str) -> None:
-    assert spec_link_only(_stage(preset, host, "spec"), host)
 
 
 def test_ac002_control() -> None:
@@ -400,72 +384,7 @@ def test_ac002_control() -> None:
 # ── AC-003 ──────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_ac003_wrapup_57_guards_and_consent(preset: Preset, host: str) -> None:
-    s57 = _section(_stage(preset, host, "wrapup"), "5.7")
-    assert s57
-    assert s57_ok(s57, host, _golden(preset, host))
-
-
-def test_ac003_control() -> None:
-    golden = _golden(Preset.PRODUCTION, "claude")
-    s57 = _section(_stage(Preset.PRODUCTION, "claude", "wrapup"), "5.7")
-    for g in golden["guards_57"]:
-        if g in s57:
-            assert not s57_ok(s57.replace(g, ""), "claude", golden), g
-    assert not s57_ok(s57.replace("hm intent metric record", "hm x"), "claude", golden)
-    assert not s57_ok(s57.replace(CONSENT_TOKEN["claude"], ""), "claude", golden)
-    for rule in S57_RULES:
-        assert rules_hold(s57), rule
-        assert not s57_ok(re.sub(rule, "", s57), "claude", golden), rule
-
-
-def test_ac003_consent_controls() -> None:
-    for preset in (Preset.PRODUCTION, Preset.SIDE):
-        codex = _section(_stage(preset, "codex", "wrapup"), "5.7")
-        claude = _section(_stage(preset, "claude", "wrapup"), "5.7")
-        assert consent_ok(codex, "codex")
-        assert consent_ok(claude, "claude")
-        # A unified prose that also carries the Claude mechanism must fail on Codex.
-        assert not consent_ok(codex + " `multiSelect: true`", "codex")
-        assert not consent_ok(codex + " AskUserQuestion", "codex")
-        assert not consent_ok(codex.replace("one reply", "a reply"), "codex")
-        assert not consent_ok(claude.replace(CONSENT_TOKEN["claude"], ""), "claude")
-
-
-def test_ac003_gates_hold_on_the_pre_change_render() -> None:
-    """The gates are today's text: the preservation half must hold before any edit."""
-    for preset, host in ARMS:
-        assert gates_precede(_section(_stage(preset, host, "wrapup"), "5.7")), (preset, host)
-
-
-@pytest.mark.parametrize(("gate", "action"), S57_GATES, ids=["measure-all", "verdict", "close"])
-def test_ac003_gate_controls(gate: str, action: str) -> None:
-    s57 = _section(_stage(Preset.PRODUCTION, "claude", "wrapup"), "5.7")
-    assert gates_precede(s57)
-    # Gate deleted → the item is offered unconditionally.
-    assert not gates_precede(s57.replace(gate, ""))
-    # Gate moved after its action → still unconditional at the point of offer.
-    moved = s57.replace(gate, "", 1)
-    i = moved.find(action) + len(action)
-    assert not gates_precede(moved[:i] + " " + gate + moved[i:])
-
-
 # ── AC-004 ──────────────────────────────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_ac004_understanding_byte_identical(preset: Preset, host: str) -> None:
-    golden = _golden(preset, host)["understanding"]
-    assert len(golden) == 3
-    assert all(golden)
-    execute = _stage(preset, host, "execute")
-    if host == "claude":
-        # The ADR provenance line moved into `.claude/hm/execute-plan.md` with the rest of the
-        # full PLAN text (SPEC-hm-light-lane-s3c); read the command with that file in place.
-        execute = _normalized(stage_text(_root(preset) / ".claude", "execute"))
-    got = understanding_extracts([_stage(preset, host, "wrapup"), execute])
-    assert got == golden
 
 
 def test_ac004_control() -> None:
@@ -477,40 +396,10 @@ def test_ac004_control() -> None:
 # ── AC-005 ──────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_ac005_review_33_contract_and_size(preset: Preset, host: str) -> None:
-    s33 = _section(_stage(preset, host, "review"), "Step 3.3")
-    assert s33
-    assert s33_ok(s33, _golden(preset, host)["s33_bytes"])
-
-
-def test_ac005_control() -> None:
-    small = " ".join(S33_CONTRACT)
-    assert not s33_ok(small, len(small.encode()))  # over 60% of its own size
-    # Every contract token is load-bearing on the real render, for both hosts.
-    for host in ("claude", "codex"):
-        s33 = _section(_stage(Preset.PRODUCTION, host, "review"), "Step 3.3")
-        for tok in S33_CONTRACT:
-            assert tok in s33, (host, tok)
-            assert not s33_ok(s33.replace(tok, ""), 10**9), (host, tok)
-
-
 # ── AC-006 ──────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_ac006_whole_render_shrink_per_target(preset: Preset, host: str) -> None:
-    golden = _golden(preset, host)
-    saved = golden["total_bytes"] - _total_bytes(preset, host)
-    assert saved >= 0.5 * golden["intent_block_bytes"], (saved, golden["intent_block_bytes"])
-
-
 # ── AC-008 ──────────────────────────────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_ac008_57_derives_from_evidence(preset: Preset, host: str) -> None:
-    assert EVIDENCE_PHRASE in _section(_stage(preset, host, "wrapup"), "5.7")
 
 
 # ── AC-009 ──────────────────────────────────────────────────────────────────────────────

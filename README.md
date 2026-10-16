@@ -13,20 +13,20 @@
 
 > **A different harness for every project — built from yours, never generic.**
 
-> **Version**: 0.63.0
+> **Version**: 0.64.0
 >
 > Current release contract (validated from source):
 >
 > <!-- hm-doc-contract:pipeline:start -->
-> **Current pipeline:** `research` → `spec` → `execute` → `review` → `verify` → `wrapup`
+> **Current pipeline:** `research` → `spec` → `execute` → `wrapup`
 > <!-- hm-doc-contract:pipeline:end -->
 >
 > <!-- hm-doc-contract:agents:start -->
-> **Current agents:** `autoloop-coder`, `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `executor`, `judgment-reviewer`, `performance-reviewer`, `security-auditor`, `security-reviewer`, `spec-validator`, `stage-delegate`, `stuck`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
+> **Current agents:** `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `judgment-reviewer`, `performance-reviewer`, `security-reviewer`, `spec-validator`, `stage-delegate`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`, `world-model`
+> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `worktree-isolator`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > `world-model` renders as Maker (`.claude/skills/<handle>/`). `intent-layer` and `project-knowledge` are typed-only — not model-invocable — and are otherwise reached through Maker ([below](#maker--the-world-models-front-door)).
@@ -115,7 +115,7 @@ Most AI coding setups start from a generic template and drift from day one — s
 | | Principle | What this means in practice |
 |--|---|---|
 | 🎯 | **Personalized** | Profiler reads 12+ stack/framework/CI signals. Interview locks 10+ dimensions. A `Side` experiment and a `Production` service get **structurally different** harnesses — different reviewer sets, different workflow stages, different security gates. No generic defaults silently shipped. |
-| 🛡️ | **Trusted** | With `worktree.enabled: true` (the Production default) every `/hm:` stage for a task runs in one **persistent** worktree — `.worktrees/<slug>/` on branch `hm/<slug>`, **shared** by plan/execute/review and squash-landed by `/hm:wrapup` — and the TDD loop runs there. With `worktree.enabled: false` (the Side default) **no worktree** is created and every stage runs in the current tree. `/hm:review` doesn't just report — it applies consensus-passed fixes and re-reviews until grade ≥ A. Mechanical checks (lint/tests) gate the LLM reviewer before any token is spent. |
+| 🛡️ | **Trusted** | With `worktree.enabled: true` (the Production default) every `/hm:` stage for a task runs in one **persistent** worktree — `.worktrees/<slug>/` on branch `hm/<slug>`, **shared** by spec/execute and squash-landed by `/hm:wrapup` — and the TDD loop runs there. With `worktree.enabled: false` (the Side default) **no worktree** is created and every stage runs in the current tree. `/hm:execute`'s review step doesn't just report — every finding gets a disposition, and accepted ones are fixed and re-reviewed for at most `max_review_rounds`. `hm check` (tests, lint, `mechanical_checks`) runs before and after. |
 | 🧭 | **Human-owned** | AI takes as much of the *how* as it can; you keep the *why*, the *what* and the trade-offs. `/hm:spec` locks intent, scope and `irreversible_decisions` with you before any code, autopilot stops at stages that need a human decision, and intent records change only with your consent. **Not shipped yet:** a wrapup summary of how the system's assumptions changed, so you can explain a change without reading the diff. |
 | 🌱 | **Self-evolving** | Hand-edit any agent, skill, CLAUDE.md — block-merge markers preserve your edits across `--update`. Memory accumulates project-specific patterns; recurring failures auto-propose new guardrails. |
 | 🎛️ | **Multi-IDE** | Claude Code + Codex. One `harness.yaml`, two target-native renders. Existing Cursor rules / Aider config / Copilot instructions get absorbed on first run — no manual port. |
@@ -162,7 +162,7 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
 | **Second Brain** | Obsidian vault path + project_id | Where cross-session memory writes |
-| **Second opinion** | `second_opinion.models` | A list of cross-model reviewer CLIs — `codex` (Codex), `antigravity` (`agy`), and `claude` (Claude Code), independently or together. Each enabled model casts a real k-of-N consensus vote in `/hm:review` — but only after its findings survive a refutation gate (`code-verifier` mode B) that dispositions each one against injected test-oracle output; only `accepted` findings vote. Models are invoked **once per review**, not per auto-fix round. Reconciled in `/hm:spec`; a missing/unauthenticated/rate-limited CLI degrades gracefully (warn + skip, never blocks). Requires the corresponding CLI (`codex login` / an authenticated `agy` / `claude` login); orthogonal to `targets` |
+| **Second opinion** | `second_opinion.models` | A list of cross-model reviewer CLIs — `codex` (Codex), `antigravity` (`agy`), and `claude` (Claude Code), independently or together. Each enabled model casts a real k-of-N consensus vote in `/hm:execute`'s review step — but only after its findings survive a refutation gate (`code-verifier` mode B) that dispositions each one against injected test-oracle output; only `accepted` findings vote. Models are invoked **once per review**, not per auto-fix round. A missing/unauthenticated/rate-limited CLI degrades gracefully (warn + skip, never blocks). Requires the corresponding CLI (`codex login` / an authenticated `agy` / `claude` login); orthogonal to `targets` |
 | **Recommended model** | `opus` default | The model frontmatter on every generated agent |
 
 > **Result:** `.claude/harness.yaml` — a single source of truth that survives upgrades.
@@ -380,7 +380,7 @@ The world model is what the harness keeps between sessions: **intents** (goals, 
 | a goal, metric, assumption or intent; a project fact | **Goals and facts** — recorded through the intent or knowledge procedure |
 | "what next?" | **Briefing** plus 2–4 options; starts no stage |
 
-**The only entrance.** `intent-layer` and `project-knowledge` are not model-invocable. Typing `/intent-layer` or `/project-knowledge` (`$…` on Codex) still runs them; otherwise Maker reads their procedure before any write, and their ask-before-write rule is unchanged. An always-loaded `## World model` pointer in `CLAUDE.md` / `AGENTS.md` sends goal, metric, fact and status requests to Maker even when you don't name it, and even mid-stage. Ordinary build and fix requests are not rerouted. `/hm:` stages still run when typed, or via Maker, autopilot or `/hm:loop`.
+**The only entrance.** `intent-layer` and `project-knowledge` are not model-invocable. Typing `/intent-layer` or `/project-knowledge` (`$…` on Codex) still runs them; otherwise Maker reads their procedure before any write, and their ask-before-write rule is unchanged. An always-loaded `## World model` pointer in `CLAUDE.md` / `AGENTS.md` sends goal, metric, fact and status requests to Maker even when you don't name it, and even mid-stage. Ordinary build and fix requests are not rerouted. `/hm:` stages still run when typed, or via Maker.
 
 **Scope follows the ask.** "research X" ends at research, "spec X" at spec, "build X" / "fix X" runs the full pipeline; an unclear ask starts at research. With autopilot armed, Maker runs `hm autopilot narrow --until <end>` on every ask, so "research X" stops after research and the armed pipeline is restored at that boundary. Maker never arms autopilot.
 
@@ -405,7 +405,7 @@ Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`). Claude Co
 | **Python 3.12+** and **[`uv`](https://docs.astral.sh/uv/)** | Required wherever Claude Code runs against your project — even if your project's primary language is Rust, Node, or Go. Hooks invoke `uv run python -m harness_maker.gates.*`; without `uv` they are silent no-ops. |
 | **Claude Code CLI** (plugin + hook support) | Optional for plugin mode (`claude --plugin-dir /path/to/harness-maker`). Not required — the `harness-maker` CLI can generate harnesses independently. |
 | **OpenAI Codex CLI** | Optional. When `targets` includes `codex`, harness-maker renders Codex-native `.codex/` config, `AGENTS.md`, and `.agents/skills/` assets from the same workflow definitions. |
-| **Git** | Required for worktree isolation (every `/hm:execute` and `/hm:loop` run). |
+| **Git** | Required for worktree isolation (`/hm:spec` → `/hm:wrapup` with `worktree.enabled: true`). |
 
 ---
 
@@ -425,7 +425,7 @@ Grouped by what they do for your project, not by component.
 ### 🛡️ Trust — *grade-gated work*
 
 - **A seven-lens review axis, covered in four dispatches, where one lens is enough to carry a finding.** Round 1 covers `design`, `functionality`, `robustness`, `consistency`, `security`, `concurrency` and `tests` — six textbook categories merged down from nine on measured redundancy (`consistency` duplicated another lens on 80 % of its findings; `security`, `concurrency` and `tests` on 0 %). The four core lenses share one `code-reviewer` dispatch (they differed only by one brief sentence), leaving as a single `core.json` whose findings each carry their own member lens; the three domain lenses stay their own dispatches. Production makes all seven lenses mandatory; Side makes the four core ones mandatory and routes the three domain lenses — but **both cover all seven**, because a router can only drop what was dispatched. A finding raised by exactly one lens is `consensus-passed`: two lenses agreeing is corroboration, and requiring it discards whatever only one specialist could have seen. K=2 still applies to cross-model voters and to the same lens speaking twice.
-- **Grade-based auto-fix loop, with three ways to stop.** `/hm:review` applies consensus-passed fixes → re-reviews → regrades. It ends when the grade meets the threshold **and a confirmation pass over a frozen artifact finds nothing new**, or when no lifecycle transition happened in a round (`no-progress`), or when `max_review_rounds` runs out — three different endings that are reported as three different things. Weak-consensus and manual-only findings are never auto-applied.
+- **Bounded review-fix loop.** `/hm:execute`'s review step gives every finding a disposition (`accepted`, `rejected` with an authority, `duplicate`, `unresolved`), fixes the accepted ones, reruns `hm check` and reviews again — at most `reviewers.max_review_rounds` rounds. What is still open goes to the DRI as `unresolved`.
 - **The repair round is gated on how much it rewrote.** Fixes introduce defects at close to 1:1, so each round's churn is measured over pinned pre/post trees — the maximum across touched files, so a one-line edit to a 5000-line file can't mask a small file rewritten whole. Below `reviewers.rereview_churn_ratio` the re-review is skipped and the comparison recorded; at or above it, exactly one structured reviewer runs. A round whose churn could not be measured re-reviews anyway. `rereview_churn_gate: false` restores the previous behaviour verbatim.
 - **A hunk one round removes and a later round restores is a SPEC gap, not a defect.** It is reported as `manual-only` P1 `spec_gap` and never moves the grade — a review whose only real problem is that nobody wrote down which behaviour was wanted must still be able to reach A.
 - **Test runs are sized to the machine and the runner.** `hm test_runners plan` names the project's runner, the three levers it actually has (parallel / change-based selection / re-run-failed), and a worker count capped near half the visible cores. `-n auto` is not portable advice: `cargo`, `go`, `vitest`, `jest` and `flutter` are already parallel, where a worker flag caps or nests rather than accelerates, and `pytest` is the one common runner that is serial by default. On Python projects the `targeted-test-selection` skill additionally selects by import graph, falling back to `mode: full` whenever the changed set can't be resolved — the safety property is the fallback, not the optimisation.
@@ -458,7 +458,6 @@ Grouped by what they do for your project, not by component.
 ### 🔁 Workflow primitives — *the rest of the toolchain*
 
 - **Deep interview before every implementation.** `/hm:spec` runs a 6-category interview (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification) scored for completeness. The decisions that cannot be cheaply undone are locked in that same interview as `irreversible_decisions`; the *how* — phases, ordering, risk — is authored by `/hm:execute` Step 0 with no human gate.
-- **Autoloop with adaptive interview + 4-gate convergence.** `/hm:loop` runs time-and-iteration-bounded loops. `autoloop-driver` reads the goal, asks only what's missing, locks intensity + exit checklist, then requires mechanical checks + LLM judgment + regression comparison + 2-iter convergence streak before accepting completion.
 - **3-tier context loading + compaction recovery.** Hot tier (today's session) · Warm tier (wiki/failures entries matched to the stage topic — lexical hits first, up to 3 high-recurrence failures only in slots left over, one 8 KB cap for the whole block) · Cold tier (git log / PLANs on demand). `PreCompact` hook flushes session before context compaction; next turn detects the marker and resumes from the last in-progress phase.
 - **Cross-process memory safety.** `.claude/memory/` writers serialise via re-entrant POSIX flock. Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤PIPE_BUF) so concurrent Claude Code + Codex sessions cannot interleave JSONL lines.
 - **Intent layer — purpose, metrics and accountable work.** `.claude/intent.yaml` holds purpose, metrics, open questions and optional owner/dri/team roles; `intent/<ID>.md` records each intent across one or more SPECs. `hm intent status` combines gaps, revisits and withdrawal; writes remain answer-gated. Reached through Maker or by typing `/intent-layer`. Owners warnings are advisory, and `hm intent migrate` preserves legacy approvals and history. `hm world` remains a deprecated alias for one release.
@@ -495,7 +494,7 @@ flowchart TD
 
 **19 mechanisms** (M1-M19) back every feature. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full breakdown including the privilege-separation model, security gate triggers, and reconcile invariants.
 
-Since 0.12.0 the synthesis pipeline also threads through a typed `Recommendation` registry: every `recommend_<axis>(profile, project_dir)` function declares per-detection confidence (ADR-007), and the `interview.py` dispatcher routes by bucket. Detection results land in `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime + 24h-ceiling invalidation. Foreign AI config files detected at `/hm:configure` time can be imported into `harness.yaml` and re-rendered single-source with `@hm:harness:*` inverted block markers (ADR-009).
+Since 0.12.0 the synthesis pipeline also threads through a typed `Recommendation` registry: every `recommend_<axis>(profile, project_dir)` function declares per-detection confidence (ADR-007), and the `interview.py` dispatcher routes by bucket. Detection results land in `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime + 24h-ceiling invalidation. Foreign AI config files detected at `/harness-maker:make` time can be imported into `harness.yaml` and re-rendered single-source with `@hm:harness:*` inverted block markers (ADR-009).
 
 ---
 
@@ -503,95 +502,31 @@ Since 0.12.0 the synthesis pipeline also threads through a typed `Recommendation
 
 After install, the rendered harness exposes commands under `/hm:*`:
 
-### Atomic stages (always available)
+### Stages (always available)
 
 | Command | Purpose |
 |---|---|
-| `/hm:research` | Gather facts, user-workflow signals, best practices, and options |
-| `/hm:spec` | Write acceptance criteria from research |
-| `/hm:execute` | Implement with TDD + worktree isolation |
-| `/hm:review` | Multi-reviewer consensus (mechanical pre-check → conditional routing) |
-| `/hm:wrapup` | Clean, document, commit |
-| `/hm:verify` | 6-check gate before completion |
+| `/hm:research` | Optional. Gather facts, best practices, and options (`--deep` for more) |
+| `/hm:spec` | Interview, then write acceptance criteria and the plan |
+| `/hm:execute` | Implement with TDD, then review (Step 6) — code reviewer, plus lens reviewers when `reviewers.fanout` is on and a second opinion when `second_opinion.models` is set |
+| `/hm:wrapup` | `hm check`, judgment, memory, commit, land |
 
-> **Recommended:** for any non-trivial change, follow the full 6-stage sequence in order — `/hm:research` → `/hm:spec` → `/hm:execute` → `/hm:review` → `/hm:verify` → `/hm:wrapup`. Each stage's output feeds the next; jumping straight to `/hm:execute` forfeits the SPEC gate, consensus review, and verify checks that make the harness trustworthy. To chain stages without a hand-off between each, use `/hm:loop` (bounded autoloop) or arm autopilot.
+> **Recommended:** `/hm:research` (when the problem is unclear) → `/hm:spec` → `/hm:execute` → `/hm:wrapup`. Each stage ends by naming the next one; running it is the user's call. Jumping straight to `/hm:execute` forfeits the SPEC gate.
 
-### Chaining stages
-
-There is no fused-workflow command. Two mechanisms chain the atomic stages: <!-- @hm:axis-removed -->
-
-| Mechanism | What it does |
-|---|---|
-| `/hm:loop` | Bounded autoloop. `--per-iter-stages execute,review` (default) sets the per-iteration sequence; `wrapup` is rejected there because loop-close owns it. **Opt-in** via `harness.yaml`'s `loop.enabled` — a fresh install renders without it; an existing harness keeps it unless the key is set. |
-| Autopilot | Auto-advances the configured `autonomy.pipeline` past two-way-door boundaries, always stopping at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge. Claude Code and Codex. |
+0.64.0 retired the former `hm:review` and `hm:verify` stages (review is `/hm:execute`'s Step 6; the deterministic gates are `hm check`), the `hm:loop` and `hm:loop-p5-batch` drivers, autopilot auto-advance, and `hm:configure` (edit `.claude/harness.yaml` and re-run `/harness-maker:make`). These are written without a leading slash because they are no longer commands.
 
 ### Utility commands
 
 | Command | Purpose |
 |---|---|
-| `/hm:loop "<goal>"` | Autoloop driver — `feature` or `improve` mode, time/iter-bounded |
 | `/hm:metrics` | Reflection metrics, read-only and never a gate: CFR + post-merge churn from local git, **plus token economics** — where a workflow's spend goes, per stage, classified by function (produce / verify / rework / carry) from Claude Code's own session transcripts. Deliberately reports NO cost-per-deliverable ratio: any such ratio makes verification spend look like waste |
 | `/hm:health` | Two-layer harness audit. Absorbed the former `hm:ai-readiness` (3-layer readiness score + P0/P1/P2 ranked actions), `hm:personalization-audit` (composite Bronze/Silver/Gold/Platinum rubric from telemetry + harness.yaml + ProjectProfile), and `hm:refresh` (anti-rot crawl, manual confirm required) — written without a leading slash because they are no longer commands; see `docs/adr/0006-three-layer-health-audit.md`. Those three names no longer exist as commands. |
 
 ---
 
-## Autopilot (pipeline auto-advance)
+## Autonomy
 
-**Autopilot** advances the pipeline through stages where no human decision is actually
-required, and stops at the ones where it is.
-
-- **On by default since 0.47.0 for non-interactive installs** (`autonomy.level: auto_safe`,
-  `autopilot_persistent: true`) — that is the common case, since a `/harness-maker:make`
-  invoked as a slash command has no tty and takes the defaults silently.
-- **The interactive interview still asks, and still defaults to off.** `Enable autopilot
-  auto-advance? [y/N]` — a bare Enter is a non-answer, not consent, so it pins `gated`, and
-  an explicit "no" is never overridden by the promoted default. Answer `y` to arm it.
-- **Existing projects are NOT switched, and `--update` does not switch them either.**
-  Every `harness.yaml` a previous version rendered already spells out its `autonomy:` block,
-  and a re-render round-trips those values verbatim — so the flip reaches **new installs
-  only**. To adopt it on an existing project, edit `.claude/harness.yaml`, or run this
-  from the repo root:
-
-  ```bash
-  harness-maker make . --update --autonomy-level auto_safe --autonomy-persistent
-  ```
-- **To turn it off**, set `autonomy.level: gated` and `autopilot_persistent: false` in
-  `harness.yaml`. Per-session control is `harness-maker autopilot on|off`; `autopilot narrow`
-  stops the armed pipeline earlier and restores it at that boundary (it never widens; `narrow --until wrapup`,
-  or the armed end stage, undoes it). Maker runs it on every ask while autopilot is armed.
-- **Mandatory human gates always stop the chain** — a `/hm:spec` acceptance interview,
-  a `/hm:review` `CHANGES_REQUESTED`, the `/hm:wrapup` commit/push, or a `/hm:verify`
-  failure. These safety gates are non-negotiable at every level (`full` does **not**
-  bypass them) — they, not the caps, are the real safety boundary.
-- **Runaway guards (optional)**: `autonomy.step_cap` / `autonomy.time_cap_min` halt a chain
-  that runs too long. Each accepts a positive integer **or `null` = unlimited** (the new
-  interview default, since the mandatory gates above bound the pipeline regardless). Existing
-  harnesses keep their committed caps on `--update`; only a fresh interview defaults to
-  unlimited. Removing the marker (`harness-maker autopilot off`) is an instant
-  kill switch honored at the next boundary. The marker is **one file per session**
-  (`.claude/.hm-autopilot-<id>`), so `off` with no `--session-id` disarms **every** session
-  in this project; pass `--session-id "$HM_SESSION_ID"` to disarm only your own.
-- **Check the state, don't guess it**: `harness-maker autopilot status` (or `hm autopilot
-  status`) prints JSON — `active`, plus a `reason` that distinguishes "never armed" from
-  "expired", "owned by another session", and "this session can't read its own id". The
-  marker is keyed to the session that armed it, so arming refuses to overwrite a live
-  peer's marker unless you pass `--force`.
-- **Auditable**: the ledger `.claude/observability/auto-advance.jsonl` separates
-  `advance_authorized` (the boundary granted the advance) from `advance_entered` (the next
-  stage actually started), so a chain that announces a stage and then stalls leaves a
-  visible gap rather than a clean record. Gate-stops and cap-halts are recorded too, and
-  `/hm:health` surfaces an "armed but never fired" degradation signal.
-- **Arming works in every runtime; auto-advance supports Claude Code and Codex.**
-  Claude dispatches through its Skill tool. Codex reads and executes the next local
-  stage skill in the same conversation only after the shared boundary returns
-  `proceed: true`. Missing skills produce an explicit handoff. Approval, review, verification and cap gates still apply.
-  Sessions without a usable session ID share the degraded marker.
-- **Feedback follows ordinary work.** Entry/resume, material observations and
-  closeout load the intent feedback procedure. Existing authorization is reused
-  for the same scope; writes are read back before dependent decisions. SPEC and
-  PLAN links lead to the existing intent and shared-state records.
-  A separately activated trial observes the next three actual task slugs in
-  first-start order. Implementation completion does not claim trial success.
+`autonomy.level` decides what a stage does at a point that needs the DRI: `ask` (the default a fresh install renders) stops and asks; `auto_full` proceeds — for example, `/hm:execute` accepts a SPEC whose approval is still `missing`. Autopilot auto-advance was retired in 0.64.0 (in eval 2, 36 of 80 auto-advances were gate-blocked), so `autonomy.autopilot_persistent` defaults to `false` and an explicit `true` prints one "autopilot retired" warning and does nothing. The DRI gates — the `/hm:spec` acceptance interview, an `irreversible` land hold in `/hm:wrapup`, and every push — stop at every level.
 
 ---
 
@@ -609,36 +544,36 @@ Other harnesses give everyone the same starting point. harness-maker reads YOUR 
 harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static template gives you a starting point. harness-maker gives you a starting point that knows who it was created for, and can be updated without losing your changes.
 
 <!-- hm:eval:start -->
-**Measured: plain prompt vs `/hm:`** at harness `6b7c30d9e175`, same model and budget; n is the number of runs behind each figure. Leads follow the fixed bands in [docs/evals/README.md](docs/evals/README.md); the full scorecard is [docs/evals/RESULTS.md](docs/evals/RESULTS.md).
+**Measured: plain prompt vs `/hm:`** at harness `a2fe560a4018`, same model and budget; n is the number of runs behind each figure. Leads follow the fixed bands in [docs/evals/README.md](docs/evals/README.md); the full scorecard is [docs/evals/RESULTS.md](docs/evals/RESULTS.md).
 
 **What the extra cost buys, tier 1: 5 task(s) x 3 run(s) per arm (t1, t2, t3, t4, t5)**
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.061 (n=15) | $1.396 (n=15) | 26.42x (CLI 22.79x, transcript 26.42x) | plain |
-| wall time per run | 18s (n=15) | 7m 59s (n=15) | 26.16x | plain |
+| cost ratio (cells: mean CLI $/run) | $0.063 (n=15) | $0.722 (n=15) | 12.97x (CLI 11.49x, transcript 12.97x) | plain |
+| wall time per run | 22s (n=15) | 5m 41s (n=15) | 15.26x | plain |
 | Δ solved runs | 15 (n=15) | 15 (n=15) | +0 | tie |
 | Δ hidden-case pass fraction | 1.00 (n=15) | 1.00 (n=15) | +0.00 | tie |
 | Δ regressions per run | 0.00 (n=15) | 0.00 (n=15) | +0.00 | tie |
-| Δ new lint+type errors per run | 0.27 (n=15) | 0.07 (n=15) | -0.20 | hm |
+| Δ new lint+type errors per run | 0.47 (n=15) | 0.07 (n=15) | -0.40 | hm |
 | traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
 | Δ judge overall | 4.27 (n=15) | 3.87 (n=15) | -0.40 (single-sample scores, judge noise ±0.67; tie band 0.25 over 15 pairs) | plain |
-| cost per solved run | $0.061 (n=15) | $1.396 (n=15) |  | plain |
+| cost per solved run | $0.063 (n=15) | $0.722 (n=15) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
 **What the extra cost buys, tier 2: 7 task(s) x 3 run(s) per arm (t10, t11, t12, t6, t7, t8, t9)**
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.051 (n=21) | $1.011 (n=21) | 22.68x (CLI 19.76x, transcript 22.68x) | plain |
-| wall time per run | 13s (n=21) | 4m 26s (n=21) | 19.84x | plain |
-| Δ solved runs | 21 (n=21) | 19 (n=21) | -2 | plain |
-| Δ hidden-case pass fraction | 1.00 (n=21) | 0.96 (n=21) | -0.04 | tie |
-| Δ regressions per run | 0.00 (n=20) | 0.00 (n=20) | +0.00 | tie |
-| Δ new lint+type errors per run | 0.20 (n=20) | 0.15 (n=20) | -0.05 | hm |
-| traps caught | 9/9 | 8/8 | +0.00 | tie |
-| Δ judge overall | 4.58 (n=20) | 4.50 (n=20) | -0.08 (single-sample scores, judge noise ±0.67; tie band 0.25 over 20 pairs) | tie |
-| cost per solved run | $0.051 (n=21) | $1.117 (n=19) |  | plain |
+| cost ratio (cells: mean CLI $/run) | $0.052 (n=21) | $0.627 (n=21) | 13.60x (CLI 11.97x, transcript 13.60x) | plain |
+| wall time per run | 16s (n=21) | 4m 46s (n=21) | 17.46x | plain |
+| Δ solved runs | 21 (n=21) | 21 (n=21) | +0 | tie |
+| Δ hidden-case pass fraction | 1.00 (n=21) | 1.00 (n=21) | +0.00 | tie |
+| Δ regressions per run | 0.00 (n=21) | 0.00 (n=21) | +0.00 | tie |
+| Δ new lint+type errors per run | 0.10 (n=21) | 0.10 (n=21) | +0.00 | tie |
+| traps caught | 9/9 | 9/9 | +0.00 | tie |
+| Δ judge overall | 4.60 (n=21) | 4.16 (n=21) | -0.44 (single-sample scores, judge noise ±0.67; tie band 0.25 over 21 pairs) | plain |
+| cost per solved run | $0.052 (n=21) | $0.627 (n=21) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
 **Tier 3** (the answer is in the repo or an earlier session, not the prompt): plain solved 23 of 27 pilot runs, so 1 task survived the pre-registered drop rule where 4 are needed; tier 3 is inconclusive and the per-task code-quality claim is withdrawn. A diagnostic on t20 and t21, not a verdict: hm solved t20 2/3 and t21 1/2 at $3.172/run; plain (pilot) 0/3 and 3/3 at $0.145/run; plain-careful 2/3 and 3/3 at $0.203/run; plain-continue 3/3 and 3/3 at $0.108/run ([details](docs/evals/RESULTS.md#tier-3)). Each $ is the CLI cost per run, which excludes subagent spend, so an hm $ understates what the run spent.
@@ -764,15 +699,14 @@ project from writing into another project's note namespace.
    `.obsidian/`). The interview then asks for `project_id` and a writable
    folder, defaulting to `99_HM/{project_id}/` (matches the `99_*/01_*`
    numeric-prefix organization style).
-2. **Post-install adjustment** — run `/hm:configure` to revisit Second Brain
-   settings. The slash command dispatches to
+2. **Post-install adjustment** — run
    `harness-maker configure-second-brain --check`, which inspects state and
-   returns guidance JSON so the slash command can prompt only when something
-   is missing. To add a folder non-interactively, call
+   returns guidance JSON naming only what is missing (the former
+   `hm:configure` slash command was retired in 0.64.0). To add a folder non-interactively, call
    `harness-maker configure-second-brain --add-folder 99_HM/my-project/`.
 3. **Existing harnesses upgraded from a pre-fix release** — the loader now
    tolerates `folders: []` (logs a one-shot warning + remediation hint
-   pointing at `/hm:configure`); writes raise `SecondBrainError` with the
+   pointing at `harness-maker configure-second-brain --add-folder`); writes raise `SecondBrainError` with the
    same hint instead of an obscure "not under a configured write folder"
    message.
 
@@ -836,7 +770,7 @@ All observability is 100% local — nothing is transmitted externally.
 | `.claude/observability/metrics-YYYY-MM-DD.jsonl` | Per-turn telemetry (cache hit %, tool calls, durations) — date-rotated daily (ADR-103, 0.7.1). Pre-0.7.1 `metrics.jsonl` is read as the trailing legacy shard. |
 | `.claude/observability/refresh/raw-*.jsonl` | Anti-rot crawl evidence (accepted / rejected items) |
 | `.claude/observability/security/findings-*.jsonl` | 7-gate security scan findings |
-| `.claude/observability/adaptive/overrides.jsonl` | `harness_yaml_override` events with `schema_version: 1`, dual capture sites (`/hm:configure` exit primary + SessionStart secondary), dedup-keyed |
+| `.claude/observability/adaptive/overrides.jsonl` | `harness_yaml_override` events with `schema_version: 1`, dual capture sites (re-render exit primary + SessionStart secondary), dedup-keyed |
 | `.claude/observability/adaptive/last-audit.txt` | Last personalization-audit run timestamp (that layer now runs inside `/hm:health`) |
 | `.claude/observability/second-opinion.jsonl` | One row per cross-model second-opinion call (`finding_ref: "n/a"`) plus one row per finding disposition (`finding_ref` set). Both carry `status: "invoked"`, so `finding_ref` is the only discriminator — aggregate the loss rate as `(skipped + failed) / total`, **per model**, excluding `stage: "health"` rows |
 | `.claude/observability/.ledger-exclusions.json` | Optional. A list of `{key, value, reason}` predicates (`key` is `run_id`, `slug` or `stage`) naming rows the aggregates must ignore — synthetic rows from a past leak, a known-bad run. Read by `harness_maker.ledger_exclusions`, the single reader for both the second-opinion ledger and the verifier-discrimination aggregates. A malformed file **fails open with a loud stderr line**: excluding nothing loudly beats a silently empty aggregate, which is indistinguishable from having nothing to exclude. Filtered reports publish `exclusions: {applied, rows_dropped}` so a filtered number cannot be mistaken for an unfiltered one |
@@ -875,7 +809,7 @@ harness-maker is on `0.x` and stays there until enough projects depend on it tha
 
 **Frozen surfaces** — these will not break in any 0.x.minor without a deprecation cycle:
 
-- **Slash command names**: `/hm:make`, `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/harness-maker:make`.
+- **Slash command names**: `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:wrapup`, `/hm:health`, `/hm:metrics`, `/hm:help`, `/hm:uninstall`, `/harness-maker:make`.
 - **`harness.yaml` top-level keys**: `targets`, `preset`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
 - **Plugin manifest schemas**: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — fields covered by each marketplace's published spec.
 - **Local-only telemetry guarantee** — see [`PRIVACY.md`](PRIVACY.md). A documented-vs-actual mismatch is treated as a P0 bug.
@@ -898,7 +832,7 @@ The hooks (`permission_gate`, `worktree_gate`, `telemetry`) call `uv run python 
 No. Every generated file carries a `content_hash` in its provenance frontmatter. Re-render compares the new template's hash against the file on disk. If they differ — meaning you edited the file — it keeps yours. See [Reconcile rules](#reconcile-rules-re-rendering-an-existing-harness).
 
 **Q: What's the difference between `Side` and `Production`?**
-`Side` is lean: 1 reviewer (code), verify-before-completion optional, worktree isolation off. `Production` is thorough: 5 reviewers, verify required, worktree isolation on, security on high-finding = block. Isolation is a single `worktree.enabled` boolean either preset can override (`--worktree` / `--no-worktree`, or `/hm:configure`). Both share the same anti-rot and caching defaults.
+`Side` is lean: 1 reviewer (code), verify-before-completion optional, worktree isolation off. `Production` is thorough: 5 reviewers, verify required, worktree isolation on, security on high-finding = block. Isolation is a single `worktree.enabled` boolean either preset can override (`--worktree` / `--no-worktree`, or `worktree.enabled` in `harness.yaml`). Both share the same anti-rot and caching defaults.
 
 **Q: Does anti-rot ever auto-apply?**
 Never. Every anti-rot item surfaces via a structured question (`AskUserQuestion` in Claude Code) in `/hm:health`'s anti-rot layer. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.
@@ -913,7 +847,7 @@ No. `metrics.jsonl`, dashboard, and security findings are written to `.claude/ob
 Run `/harness-maker:make` → choose **Update**. For files where your hash matches the old template, the new version is applied. For files you edited (hash mismatch), yours is kept. To force a full refresh, `rm .claude/harness.yaml` and re-run.
 
 **Q: What are `mechanical_checks` and when should I use them?**
-Shell commands listed under `reviewers.mechanical_checks` in `harness.yaml` run at the start of every `/hm:review` — before any LLM reviewer spawns. The first command that exits non-zero emits `## MECHANICAL_BLOCK: <cmd> exit=<N>` and halts review immediately (`CHANGES_REQUESTED`). Use them for fast, deterministic gates (lint, type-check, unit test) that shouldn't waste LLM tokens when the basics are broken. The list is user-managed; harness-maker never populates it automatically. `--no-auto-fix` does not skip mechanical checks — they are a hard gate, not part of the fix loop.
+Shell commands listed under `reviewers.mechanical_checks` in `harness.yaml` run as part of `hm check`, which `/hm:execute` runs before its review step and `/hm:wrapup` runs as its gate — before any LLM reviewer spawns. A non-zero exit fails the check. Use them for fast, deterministic gates (lint, type-check, unit test) that shouldn't waste LLM tokens when the basics are broken. The list is user-managed; harness-maker never populates it automatically. They are a hard gate, not part of the fix loop.
 
 **Q: Why doesn't harness-maker rewrite prompts to be model-agnostic?**
 The prompts are tuned for `opus` — `<thinking>` blocks, role framing, chain-of-thought structure. Rewriting for model-neutrality would degrade quality on the recommended model for hypothetical gains on others. Override `recommended_model` in `harness.yaml` if you want a different model; the prompts remain as-is.
@@ -930,7 +864,7 @@ harness-maker 0.12.0 introduces three tracks of personalization depth:
   framework. Cache at `~/.cache/harness-maker/profile-<repo-hash>.json`
   (manifest-mtime invalidation + 24h TTL).
 
-- **Foreign AI Config Migration (Track D)** — `/hm:configure` detects
+- **Foreign AI Config Migration (Track D)** — `/harness-maker:make` detects
   `.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`,
   `.aider.conf.yml`, and `.github/copilot-instructions.md`. With user
   confirmation, harness-maker imports the foreign config's intent into
@@ -978,7 +912,7 @@ All adaptive features run **100% locally** — no network calls
 - PyPI publish — remove the editable-from-clone requirement.
 - Claude Code + Codex Marketplace listings — submit all plugin manifests.
 - User-configurable anti-rot repo list — `harness.yaml.anti_rot.github_repos` to track additional Claude Code ecosystem repos beyond the default.
-- Demo screencast — record a first-install + `/hm:loop` session.
+- Demo screencast — record a first-install + `/hm:spec` → `/hm:wrapup` session.
 - `Enterprise` preset — stricter security gates, `block` SPEC strictness that cannot be overridden.
 
 ---

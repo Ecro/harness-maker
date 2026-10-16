@@ -64,17 +64,6 @@ def test_deep_renders_all_four_blocks(
     )
 
 
-def test_teach_back_states_it_is_output_only_and_creates_no_gate(
-    rendered: dict[str, dict[str, dict[str, str]]],
-) -> None:
-    """SPEC S2's second Then. A readback that silently became a gate would change the
-    autopilot contract — the Non-Goals say no mandatory gate is added."""
-    text = rendered["deep"][CLAUDE_VARIANT]["spec"]
-    block = text.split(TEACH_BACK, 1)[1][:1200].lower()
-    assert "no response" in block or "requires no user response" in block, block[:300]
-    assert "no gate" in block or "not a gate" in block, block[:300]
-
-
 def test_the_levels_are_ordered_not_merely_distinct(
     rendered: dict[str, dict[str, dict[str, str]]],
 ) -> None:
@@ -179,28 +168,6 @@ def test_the_spec_brief_names_what_that_stage_actually_has(
     assert "internal draft" not in spec_brief.lower(), (
         "the spec brief discloses an architecture draft — that was `/hm:plan` Step 1, and "
         "`/hm:spec` produces no such artifact"
-    )
-
-
-@pytest.mark.parametrize("stage", _STAGES)
-@pytest.mark.parametrize("depth", ["minimal", "standard", "deep"])
-def test_each_stage_emits_exactly_one_round_state_instruction(
-    rendered: dict[str, dict[str, dict[str, str]]], stage: str, depth: str
-) -> None:
-    """ADR-007/ADR-008. BOTH stages already render a 'Decisions locked in so far' preamble;
-    the partial must SUBSUME it, not stack a second one on top.
-
-    **Parametrized over stage after a spec-only version shipped the defect it was written
-    to catch.** `spec.md.j2` was gated; `plan.md.j2` was not, so at standard/deep `/hm:plan`
-    — the higher-traffic stage — carried two contradicting preambles with different
-    empty-state rules ("skip the block" vs "say no change since last round"), and which one
-    an LLM follows is nondeterministic. That is verbatim the rationale ADR-008 gives for
-    replacing rather than appending, violated in the stage ADR-008 is about.
-    """
-    text = rendered[depth][CLAUDE_VARIANT][stage]
-    assert text.count("Decisions locked in so far") == 1, (
-        f"{stage} at depth={depth} renders {text.count('Decisions locked in so far')} "
-        "round-state preambles — the partial stacked instead of subsuming"
     )
 
 

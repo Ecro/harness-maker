@@ -218,7 +218,7 @@ ac:
   title: wrapup supersedes carries claim
   type: mechanical
   test_ids:
-  - tests/unit/test_render_intent_layer.py::test_ac_007_wrapup_supersedes_carries_claim
+  - tests/unit/test_overhaul_p1_kept.py::test_intent_skill_and_wrapup_call_the_intent_verbs
   executable_predicate: '''--claim'' in rendered_wrapup_57_block and rendered_wrapup_57_block.count(''<!--
     @hm:answer-gated:'') == 2 and ''Otherwise: write nothing'' in rendered_wrapup_57_block
     and ''hm world assume observe <id> --relation'' in rendered_wrapup_57_block'

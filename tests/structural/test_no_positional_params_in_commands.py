@@ -58,7 +58,7 @@ def rendered_commands(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str
 
 def test_the_fixture_actually_rendered_commands(rendered_commands: dict[str, str]) -> None:
     """Positive control: an empty mapping would make every check below vacuous."""
-    assert len(rendered_commands) >= 10, sorted(rendered_commands)
+    assert len(rendered_commands) >= 9, sorted(rendered_commands)  # nine since 0.64.0
 
 
 def test_no_rendered_command_uses_a_positional_parameter(

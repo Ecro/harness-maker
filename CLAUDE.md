@@ -40,7 +40,7 @@ harness-maker 는 Claude Code + Codex 의 플러그인으로, **LLM 판단력을
 - **Codex dual role** (PLAN-codex-second-llm-integration ADR-009): `codex` 는 IDE asset 렌더링 (`.codex/`) 뿐 아니라 second-LLM provider 역할도 한다. 이 provider 축은 **`harness.yaml.second_opinion`** (PLAN-second-opinion-multi-model 이 옛 `codex_second_opinion` 을 대체) 로 제어된다 — `targets` 와 직교. 자세한 건 아래 **Cross-model second opinion (multi-model)**.
   - **Cross-model second opinion (multi-model)** — full rules: [`docs/reference/second-opinion.md`](docs/reference/second-opinion.md). Load-bearing rules:
     - `harness.yaml.second_opinion.models` (`codex`/`antigravity`, orthogonal to `targets`). Every CLI call goes through `harness_maker.second_opinion_invoke`; never inline a raw CLI in a recipe (four silent-skip bugs shipped that way).
-    - k-of-N consensus with K=2 fixed; PIDA acceptance gate plus a vote freeze (one model call per `/hm:review`); every failure mode is warn-and-proceed.
+    - k-of-N consensus with K=2 fixed; PIDA acceptance gate plus a vote freeze (one model call per review in `/hm:execute`); every failure mode is warn-and-proceed.
     - Never hand-compute ledger rates. Use `hm verifier_discrimination report --ledger .claude/observability/second-opinion.jsonl`. It applies `.ledger-exclusions.json`; a hand count was 30× off.
     - A green `/hm:health` smoke proves the base path only, not the worktree path.
 
@@ -96,7 +96,7 @@ harness-maker 는 **dual plugin** — 두 marketplace 에 등록 가능:
 - `.codex/agents/<name>.toml` — 에이전트 TOML (developer_instructions = agent body)
 - `AGENTS.md` — 프로젝트 루트 instructions (block-merge markers 포함)
 - `.agents/skills/<name>/SKILL.md` — 기존 skill 의 Codex 경로 dual-render (개수는 `templates/skills/` 가 소스; 고정 숫자를 여기 적으면 skill 하나 추가할 때마다 이 줄이 조용히 틀려진다)
-- `.agents/skills/hm-<stage>/SKILL.md` — 7개 atomic stage 용 stage-trigger skill
+- `.agents/skills/hm-<stage>/SKILL.md` — 4개 stage (research/spec/execute/wrapup) + `hm-help` 의 stage-trigger skill
 
 **Worktree 공유**: `.worktrees/` 단일 디렉토리. cleanup 은 prefix 매치로 자기 것만 (`execute-*`, `plan-*`, `phase-*`, `autoloop-*`).
 
@@ -196,7 +196,7 @@ Deliberately deferred; this has not been left unreviewed. Full reasoning: [`docs
 
 ## Step sensitivity classes (COMP / HOST / INV / TUNE)
 
-`src/harness_maker/step_sensitivity.py` 가 렌더된 7 stage 의 모든 `Step|Phase|Check` 헤딩에
+`src/harness_maker/step_sensitivity.py` 가 렌더된 4 stage 의 모든 `Step|Phase|Check` 헤딩에
 감도 클래스를 붙인다 (PLAN-workflow-steps-vs-model-capability). **COMP** = 모델 능력 보상 —
 모델이 좋아질수록 줄여도 되는 산문. **HOST** = 호스트 하네스(Claude Code/Codex)가 이제
 네이티브로 하는 것. **INV** = 모델과 무관하게 유지 — 컨텍스트 창을 넘어 살아남는 상태, 결정적
@@ -208,7 +208,7 @@ plan-validator, fan-out) — `remeasure_on`/`measure_cmd` 필드가 재측정 �
   strictness) 렌더의 모든 헤딩이 레지스트리에 있어야 하고(무분류 헤딩 = 테스트 실패), Side 기본값은 knob 을
   가진 어떤 엔트리(HOST 포함)에서도 Production 보다 공격적일 수 없다 (`knob`/`ordering`, 비공허 바닥 ≥3).
   렌더는 레지스트리를 읽지 않는다 — 검사이지 파생이 아니다 (ADR-005).
-- **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 31` 는 기준을 충족하는 근거가
+- **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 20` 는 기준을 충족하는 근거가
   없는 항목 수 — RESEARCH 행 없이 이웃에서 상속했거나 (ADR-009), 조사했지만 찾지 못했다
   (`RESEARCH-source-plan-steps`). TUNE 수치는 전부 **Side-preset only, n=** 표기 —
   stage-agent ledger 에 Production 행이 0 이다. FAIL 율은 가치 증명이 아니다 (plan-validator 는
@@ -219,9 +219,9 @@ plan-validator, fan-out) — `remeasure_on`/`measure_cmd` 필드가 재측정 �
   각 `measure_cmd` 를 돌린 뒤 등급/클래스를 갱신한다. 캡·산문 삭제는 그 결과로만.
 
 ## Workflow (autoloop CODER 가 알아야 할 점)
-- **Atomic stage**: 7개 (research/spec/plan/execute/review/wrapup/verify)
-- **Stage 연결** = `/hm:loop --per-iter-stages` 또는 autopilot. 융합 명령 축은 0.47.0 에서 제거됨 (PLAN-harness-diet ADR-001/002).
-- Renderer 가 stage prompt fragment 들을 합성해 단일 명령 파일 생성
+- **Stage**: 4개 (research/spec/execute/wrapup, 0.64.0 SPEC-hm-overhaul-p1). review 는 execute 안에서, 검증은 wrapup 의 `hm check` 로. `/hm:review`·`/hm:verify`·`/hm:configure`·`/hm:loop` 은 은퇴.
+- **Stage 연결** = 사용자가 다음 stage 를 직접 친다. 루프는 호스트의 `/loop`. 융합 명령 축은 0.47.0 에서 제거됨 (PLAN-harness-diet ADR-001/002).
+- 각 stage 명령은 self-contained — 런타임에 `.claude/stages/`·`.claude/hm/` 를 읽지 않는다.
 
 ## Context discipline
 
@@ -244,7 +244,7 @@ plan-validator, fan-out) — `remeasure_on`/`measure_cmd` 필드가 재측정 �
 
 Full specification (per-task model, 5-layer defense, loop-marker and per-session marker scoping): [`docs/reference/multi-session-worktree.md`](docs/reference/multi-session-worktree.md). **Read it before touching `worktree.py`, `loop_marker.py`, `autopilot.py` or `worktree_gate.py`.** Invariants that break most often:
 - There is exactly one reader, `worktree.worktree_enabled(base)`, and exactly one writer, `cli._apply_worktree_enabled`. A true→false flip is refused while a task worktree, stash or loop marker is live.
-- Flag ON: `task-create/preflight/refresh/land` on `hm/<slug>`. `/hm:wrapup` lands exactly one squash commit. Flag OFF (the `/hm:loop` `execute-<uuid>` worktree): the 5-layer defense stays active.
+- Flag ON: `task-create/preflight/refresh/land` on `hm/<slug>`. `/hm:wrapup` lands exactly one squash commit. Flag OFF (an `execute-<uuid>` worktree left by the retired `/hm:loop`): the 5-layer defense stays active.
 - `[finalize] stash-pop conflict`: never recommend `git stash drop` without first showing `git stash show -p <ref>`. Recover with `git reflog --all | grep "wip(execute)"` → cherry-pick.
 - Queue-guard foreign counting is load-bearing; do not make it per-session.
 - `HM_SESSION_ID` is a **shell variable**, never exported. A Python consumer must take it as an explicit argument, and a new marker content field must update **every** reader.

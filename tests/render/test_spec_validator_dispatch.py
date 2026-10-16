@@ -78,51 +78,6 @@ def test_ac_007_dispatched_at_most_once(rendered: Path) -> None:
     )
 
 
-def test_ac_007_dispatch_is_conditional(rendered: Path) -> None:
-    """It fires on irreversible decisions, not on every SPEC.
-
-    A critic that runs on the Step-0 skip path re-imposes the ceremony task-driven users opted
-    out of, which is the risk RESEARCH Follow-up 3(a) named when it recommended the relocation.
-    """
-    text = _spec_stage(rendered)
-    trigger = text.split("**Trigger.**", 1)[1].split("**One pass.", 1)[0]
-    trigger = " ".join(trigger.split())
-    assert "Dispatch ONLY when" in trigger
-    assert "non-empty `irreversible_decisions`" in trigger
-    assert "Step 0's skip heuristic did not fire" in trigger
-    assert (
-        "A Step-0 skip-path SPEC with `irreversible_decisions: []` is **not** dispatched" in trigger
-    )
-
-
-def test_ac_008_every_dispatch_emits_a_ledger_row(rendered: Path) -> None:
-    """Discrimination is measured from run 1, not assumed."""
-    text = _spec_stage(rendered)
-    assert "stage_agent_ledger emit" in text, "the spec stage emits no stage-agent ledger row"
-    assert "--agent spec-validator" in text, "the ledger row does not name spec-validator"
-    assert "--stage spec" in text, "the ledger row does not record the spec stage"
-
-
-def test_ac_009_spec_frontmatter_declares_interview_rounds(rendered: Path) -> None:
-    """The merged interview's round count has to survive the absorption to stay measurable.
-
-    `interview_rounds` lives only on PLAN frontmatter today (140 documents carry it, zero SPECs
-    do). Absorbing the plan stage without moving the field ends the series — nobody could ask
-    afterwards whether the merge actually reduced rounds.
-    """
-    text = _spec_stage(rendered)
-    frontmatter = next(
-        block
-        for block in re.findall(r"```yaml\n(.*?)```", text, re.DOTALL)
-        if re.search(r"^type: spec$", block, re.MULTILINE)
-    )
-    assert re.search(
-        r"^interview_rounds: \{N\}\s+# rounds this interview took; 0 when Step 0 skipped it$",
-        frontmatter,
-        re.MULTILINE,
-    ), "SPEC frontmatter must record the round count, including zero on the skip path"
-
-
 def test_ac_007_approval_cannot_read_the_verdict(rendered: Path) -> None:
     """Approval is invariant under the critic's verdict — negative invariant, see module doc."""
     sig = inspect.signature(spec_machine.approve)

@@ -106,9 +106,9 @@ def test_stage_skill_research_mentions_harness_maker() -> None:
 
 
 def test_codex_stage_skills_returns_7_entries() -> None:
-    """_codex_stage_skills() must return 7 entries (one per atomic stage)."""
+    """_codex_stage_skills() returns one entry per atomic stage (four since 0.64.0)."""
     specs = _codex_stage_skills()
-    assert len(specs) == 6, f"Expected 6 stage skill specs, got {len(specs)}"
+    assert len(specs) == 4, f"Expected 4 stage skill specs, got {len(specs)}"
 
 
 def test_codex_stage_skills_output_paths() -> None:
@@ -177,4 +177,10 @@ def test_codex_target_files_total_skill_count() -> None:
     #
     # 22 → 23 (2026-10-02, SPEC-world-model-name): the `/<handle>` world-model router skill,
     # rendered at a user-named path from `skills/world-model/`; it is NOT in `_ALL_SKILLS`.
-    assert len(out_paths) == 23, f"Expected 23 skill paths, got {len(out_paths)}"
+    #
+    # 23 → 12 (0.64.0, SPEC-hm-overhaul-p1): hm-review and hm-verify retired with their
+    # stages; security-scanner, verify-before-completion, targeted-test-selection,
+    # conditional-router, autoloop-driver and refdocs-search retired; second-opinion-gate
+    # renders only with `second_opinion.models` (off in this default config). 6 base + the
+    # world-model router + 4 stage + help.
+    assert len(out_paths) == 12, f"Expected 12 skill paths, got {len(out_paths)}"

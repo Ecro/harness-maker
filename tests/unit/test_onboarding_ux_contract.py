@@ -41,7 +41,7 @@ def test_make_command_explains_receipt_safety_boundaries() -> None:
         "Dropping a target does not delete",
         "trade-off",
         "without predicting exact review time",
-        "/hm:configure",
+        "hand-edit `.claude/harness.yaml`",  # hm:configure retired in 0.64.0
         # Phase 6 (PLAN-onboarding-backup-friction): preservation matrix +
         # prune-backups CLI mentioned in the safety receipt prose.
         "docs/reference/preservation-matrix.md",
@@ -49,44 +49,3 @@ def test_make_command_explains_receipt_safety_boundaries() -> None:
     ]
     for needle in required:
         assert needle in text
-
-
-def test_configure_template_has_per_setting_tradeoffs_and_second_brain_advanced_path() -> None:
-    text = _read("src/harness_maker/templates/commands/hm/configure.md.j2")
-    required = [
-        "multi-select",
-        "current value",
-        "new value",
-        "trade-off",
-        "re-render",
-        "preservation note",
-        "review time",
-        "Second Brain",
-        "read-first",
-        "allowlist",
-        "project_id",
-        "Markdown",
-        "frontmatter",
-        "writable",
-        "/hm:configure",
-        "ref_folders",
-        "sibling_repos",
-        "--ref-folders",
-        "--sibling-repos",
-        "refdocs-search",
-    ]
-    for needle in required:
-        assert needle in text
-
-
-def test_deep_interview_templates_have_configured_locale_contracts() -> None:
-    paths = [
-        "src/harness_maker/templates/stages/research.md.j2",
-        "src/harness_maker/templates/stages/spec.md.j2",
-        "src/harness_maker/templates/commands/hm/loop.md.j2",
-    ]
-    for relpath in paths:
-        text = _read(relpath)
-        assert "{{ config.locale }}" in text, relpath
-        assert "configured locale" in text, relpath
-        assert "question text and option labels" in text, relpath

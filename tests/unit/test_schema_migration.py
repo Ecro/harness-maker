@@ -136,18 +136,19 @@ def test_stage_template_reads_config_not_hardcoded(tmp_path: Path) -> None:
     survives, and what this test pins, is the config-rendered open-ended cap: the value and the
     locale must come from config, not be hardcoded in the template.
     """
+    # 0.64.0: the cap lives in `/hm:spec`, the one interview (research asks 3–5 scoping
+    # questions only under `--deep`); stage bodies render into `commands/hm/` directly.
     out = _render_preset(tmp_path, Preset.SIDE)
-    research = (out / "stages" / "research.md").read_text(encoding="utf-8")
-    assert "open-ended question(s) per turn for locale `en`" in research
-    assert "closed-form (multi-select / yes-no) questions are unrestricted" in research
+    spec = (out / "commands" / "hm" / "spec.md").read_text(encoding="utf-8")
+    assert "(closed ones are unlimited)" in spec
     cap = interview_deep_gate_defaults()["open_ended_cap_by_locale"]
     expected = cap.get("en", cap["default"])
-    assert f"at most `{expected}` open-ended question(s)" in research
+    assert f"At most {expected} open-ended follow-up(s) per turn" in spec
 
     out_prod = _render_preset(tmp_path / "prod", Preset.PRODUCTION)
-    research_prod = (out_prod / "stages" / "research.md").read_text(encoding="utf-8")
+    spec_prod = (out_prod / "commands" / "hm" / "spec.md").read_text(encoding="utf-8")
     # Both presets render the same cap (ADR-007 uniformity)
-    assert f"at most `{expected}` open-ended question(s)" in research_prod
+    assert f"At most {expected} open-ended follow-up(s) per turn" in spec_prod
 
 
 def test_stage_template_no_3layer_remnants(tmp_path: Path) -> None:
@@ -164,9 +165,8 @@ def test_stage_template_no_3layer_remnants(tmp_path: Path) -> None:
         "deep_gate.streak_target",
     )
     targets = {
-        "stages/research.md": out / "stages" / "research.md",
-        "stages/spec.md": out / "stages" / "spec.md",
-        "commands/hm/loop.md": out / "commands" / "hm" / "loop.md",
+        "commands/hm/research.md": out / "commands" / "hm" / "research.md",
+        "commands/hm/spec.md": out / "commands" / "hm" / "spec.md",
     }
     for label, path in targets.items():
         body = path.read_text(encoding="utf-8")
@@ -184,9 +184,9 @@ def test_spec_template_reads_main_loop_config(tmp_path: Path) -> None:
     was kept in 0.16.0 and would have become inert; it is wired to `/hm:spec` Step 2 instead.
     """
     out = _render_preset(tmp_path, Preset.SIDE)
-    plan = (out / "stages" / "spec.md").read_text(encoding="utf-8")
-    assert "up to 5 rounds" in plan
+    plan = (out / "commands" / "hm" / "spec.md").read_text(encoding="utf-8")
+    assert "`interview.main_loop.max_rounds` (5) rounds" in plan
 
     out_prod = _render_preset(tmp_path / "prod", Preset.PRODUCTION)
-    plan_prod = (out_prod / "stages" / "spec.md").read_text(encoding="utf-8")
-    assert "unlimited rounds" in plan_prod
+    plan_prod = (out_prod / "commands" / "hm" / "spec.md").read_text(encoding="utf-8")
+    assert "`interview.main_loop.max_rounds` (unlimited) rounds" in plan_prod

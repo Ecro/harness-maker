@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Iterator
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +44,36 @@ def _candidate_files(obs_dir: Path, days: int) -> list[Path]:
     if legacy is not None:
         files.append(legacy)
     return files
+
+
+NO_TELEMETRY_SOURCE = "no telemetry source"
+
+
+#: How old the newest metrics file may be and still count as a live source.
+FRESH_DAYS = 2
+
+
+def has_telemetry_source(obs_dir: Path, *, today: date | None = None) -> bool:
+    """The `telemetry` hook is retired (0.64.0), so an absent file is not evidence of anything.
+
+    Readers branch on this to say "no telemetry source" instead of reporting the empty read
+    as a clean result (SPEC-hm-overhaul-p1 AC-011). A file only counts while it is fresh: an
+    upgraded install keeps its last `metrics-*.jsonl` (or a pre-0.7.1 `metrics.jsonl`) forever,
+    and presence alone would keep every reader on "scanned" (PLAN ADR-013). A dated file's age
+    is its date stem; the legacy file has none, so its mtime is used.
+    """
+    cutoff = (today or date.today()) - timedelta(days=FRESH_DAYS)
+    for path in _candidate_files(obs_dir, days=1):
+        m = _DATED_RE.match(path.name)
+        try:
+            stamp = (
+                date.fromisoformat(m.group(1)) if m else date.fromtimestamp(path.stat().st_mtime)
+            )
+        except (OSError, ValueError):
+            continue
+        if stamp >= cutoff:
+            return True
+    return False
 
 
 def iter_recent_entries(

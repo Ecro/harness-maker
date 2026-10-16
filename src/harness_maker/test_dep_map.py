@@ -626,6 +626,10 @@ CONFIG_SUITES: tuple[str, ...] = (
 #: a directory entry would dispose of every suite beneath it, now and in future, which is how
 #: this kind of opt-out list goes silently inert. Enforced by the coverage gate.
 TESTS_NOT_CONFIG_AFFECTING: tuple[str, ...] = (
+    # Writes a synthetic pyproject.toml into each sandbox project `hm check` runs on.
+    "tests/unit/test_overhaul_p1_hm_check.py",
+    # Reads the db19f023 bench fixture's pyproject.toml (git archive), never the repo's.
+    "tests/integration/test_overhaul_p1_eval3_replay.py",
     # Writes a synthetic pyproject.toml into a sandbox copy.
     "tests/e2e/test_hook_consumption_canary.py",
     # Mentions ci_provider only to tolerate it being empty in a worktree.

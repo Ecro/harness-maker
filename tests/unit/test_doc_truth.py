@@ -62,9 +62,7 @@ from typing import get_args
 import pytest
 import yaml
 
-from harness_maker.conditional_router import lens_dispatch
 from harness_maker.hooks import sessionstart_drift
-from harness_maker.interview import _ALL_REVIEWERS
 from harness_maker.io_utils import load_harness_yaml
 from harness_maker.models import (
     AdaptiveConfig,
@@ -169,25 +167,14 @@ _DISCLOSURES: tuple[_Disclosure, ...] = (
         ),
         keys=("level", "persistent"),
         why="the in-make disclosure table the user reads before answering the autonomy question",
+        # (A third disclosure, in `agents/_partials/step_manifest.md.j2`, retired with the
+        # stage picker in 0.64.0; no stage renders that partial any more.)
     ),
     _Disclosure(
         doc="commands/make.md",
         pattern=r"`(?P<level>\w+)`\s*\(\*{0,2}the default a fresh install renders",
         keys=("level",),
         why="the interview prompt's own parenthetical, 128 lines from the table above it",
-    ),
-    _Disclosure(
-        doc="src/harness_maker/templates/agents/_partials/step_manifest.md.j2",
-        pattern=(
-            r"`autonomy\.autopilot_persistent: true` to auto-arm every session; "
-            r"the default is `(?P<persistent>\w+)`"
-        ),
-        keys=("persistent",),
-        # Read from the TEMPLATE, not a render, on purpose: the line sits inside the `{% if %}`
-        # gated picker block, and the claim is arm-independent, so one template read covers every
-        # arm at once. The sibling AC-015 reads rendered output because ITS subject is what a
-        # given harness receives. The asymmetry is deliberate (A.5 round 1, A8).
-        why="renders into every stage command, so a wrong value ships seven times per harness",
     ),
 )
 
@@ -550,14 +537,20 @@ def test_ac_015_no_rendered_command_instructs_from_an_ignored_list(tmp_path: Pat
     positive for the regex that tried), whereas the absence of the key from the rendered command
     is mechanical.
     """
+    # 0.64.0: the lens fan-out is `/hm:execute`'s review step and renders only with
+    # `reviewers.fanout`; its dispatch set is `installed` ∩ lenses (`synthesize.lens_agents`).
+    from harness_maker.synthesize import LENS_REVIEWERS
+
+    installed = ["code-reviewer", *LENS_REVIEWERS]
     answers = InterviewAnswers(
         preset=Preset.PRODUCTION,
         targets=[Target.CLAUDE_CODE],
-        reviewers={"installed": list(_ALL_REVIEWERS), "enabled": list(_NARROWED_ENABLED)},
+        reviewers={"installed": installed, "enabled": list(_NARROWED_ENABLED)},
+        reviewers_fanout=True,
     )
     render(synthesize(ProjectProfile(), answers), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
 
-    review = (tmp_path / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    review = (tmp_path / "commands" / "hm" / "execute.md").read_text(encoding="utf-8")
     # the production reader, not a second one: a rendered harness.yaml is TWO YAML documents
     # (provenance frontmatter + body), so `yaml.safe_load` raises `ComposerError` on it
     enabled = set(
@@ -569,22 +562,14 @@ def test_ac_015_no_rendered_command_instructs_from_an_ignored_list(tmp_path: Pat
         "differential below would compare against something no user chose"
     )
 
-    dispatched = {row["agent"] for row in lens_dispatch(str(answers.preset.value))}
-    ignored = dispatched - enabled
-
-    # Vacuity guard: if the mechanism ever honours `enabled`, the conjunction AC-015 forbids
-    # becomes unreachable and this test would pass for the wrong reason. Say so loudly instead.
-    assert ignored, (
-        "the dispatch table no longer names an agent outside `enabled`, so AC-015's second "
-        "conjunct is false and this test proves nothing — re-derive the AC"
-    )
+    ignored = set(LENS_REVIEWERS) - enabled
+    # Vacuity guard: if the mechanism ever honours `enabled`, this test proves nothing.
     assert {a for a in ignored if a in review}, (
-        f"the rendered review.md names none of {sorted(ignored)}, so the dispatch half of the "
+        f"the rendered execute.md names none of {sorted(ignored)}, so the dispatch half of the "
         "differential is not observable in the artifact"
     )
 
     assert "reviewers.enabled" not in review, (
-        "the rendered review.md still names `reviewers.enabled` while the lens table it "
-        f"dispatches ({sorted(dispatched)}) is composed without it — the narrowed harness gets "
-        f"{sorted(ignored)} anyway"
+        "the rendered execute.md still names `reviewers.enabled` while the lens set it "
+        f"dispatches is composed without it — the narrowed harness gets {sorted(ignored)} anyway"
     )

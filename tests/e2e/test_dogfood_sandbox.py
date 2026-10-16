@@ -31,9 +31,7 @@ REQUIRED_COMMANDS = [
     "research",
     "spec",
     "execute",
-    "review",
     "wrapup",
-    "verify",
     "health",
 ]
 
@@ -220,7 +218,12 @@ def test_security_scan_detects_seeded_vulns(tmp_path: Path) -> None:
 
 
 def test_reconcile_preserves_user_edits() -> None:
-    """User-modified files must survive a second `make` (KEEP decision)."""
+    """A user's text in a stage command's `@hm:user:extensions` block survives a second `make`.
+
+    0.64.0: the stage wrappers carry the user-block markers literally, so reconcile MERGEs a
+    user-modified stage command (the template's new text plus the user's blocks) instead of
+    freezing it with KEEP. Text outside a block is template-owned.
+    """
     _ensure_sandbox_applied()
 
     # Subject was `exec-rev.md` until the fused axis was deleted (PLAN-harness-diet
@@ -231,8 +234,10 @@ def test_reconcile_preserves_user_edits() -> None:
 
     sentinel = "\n<!-- USER EDIT: phase11 reconcile sentinel -->\n"
     original = target_file.read_text(encoding="utf-8")
+    close = "<!-- @hm:/user:extensions -->"
     if sentinel not in original:
-        target_file.write_text(original + sentinel, encoding="utf-8")
+        assert close in original, "research.md lost its user:extensions block"
+        target_file.write_text(original.replace(close, sentinel + close, 1), encoding="utf-8")
     modified = target_file.read_text(encoding="utf-8")
     assert sentinel in modified, "sentinel must be present before second make"
 
@@ -268,7 +273,7 @@ def test_reconcile_preserves_user_edits() -> None:
 
     after = target_file.read_text(encoding="utf-8")
     assert sentinel in after, (
-        "user-edited research.md was overwritten — reconcile KEEP decision missed"
+        "user block text in research.md was dropped — reconcile MERGE_BLOCK missed it"
     )
 
 

@@ -20,8 +20,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 _TEMPLATES = Path(__file__).parents[2] / "src" / "harness_maker" / "templates"
 
 _FOUR_STEP_SOURCE = _TEMPLATES / "agents" / "_partials" / "reasoning.md.j2"
@@ -43,15 +41,6 @@ def test_the_authority_really_mandates_four_steps() -> None:
     body = _text(_FOUR_STEP_SOURCE).lower()
     for step in ("observe", "trace", "infer", "conclude"):
         assert step in body, f"the shared reasoning partial no longer names {step!r}"
-
-
-@pytest.mark.parametrize("path", _LIVE_CONSUMERS, ids=lambda p: p.name)
-def test_live_consumers_compare_the_four_step_chain(path: Path) -> None:
-    """A consumer that compares three steps is comparing a shape its reviewers were never
-    told to emit — findings arrive with `trace` populated and match no documented step."""
-    body = _text(path)
-    assert "TRACE" in body, f"{path.name} does not name the TRACE step"
-    assert "three reasoning steps" not in body, f"{path.name} still gates on a 3-step chain"
 
 
 def test_arbiter_calls_the_helper_with_its_real_signature() -> None:

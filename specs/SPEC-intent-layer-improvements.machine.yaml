@@ -78,7 +78,7 @@ ac:
   title: Step 5.7 asks one batched record question
   type: property
   test_ids:
-  - tests/unit/test_render_intent_feedback_batch.py::test_wrapup_5_7_record_batch
+  - tests/unit/test_overhaul_p1_kept.py::test_wrapup_prints_the_understanding_block_and_gates_intent_writes
   executable_predicate: null
   golden_table: []
   rubric_id: null

@@ -13,20 +13,20 @@
 
 > **프로젝트마다 다른 하네스 — 당신 프로젝트로부터 빚어지고, 절대 generic 하지 않습니다.**
 
-> **Version**: 0.63.0
+> **Version**: 0.64.0
 >
 > 현재 릴리스 계약(소스에서 자동 검증):
 >
 > <!-- hm-doc-contract:pipeline:start -->
-> **현재 파이프라인:** `research` → `spec` → `execute` → `review` → `verify` → `wrapup`
+> **현재 파이프라인:** `research` → `spec` → `execute` → `wrapup`
 > <!-- hm-doc-contract:pipeline:end -->
 >
 > <!-- hm-doc-contract:agents:start -->
-> **현재 에이전트:** `autoloop-coder`, `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `executor`, `judgment-reviewer`, `performance-reviewer`, `security-auditor`, `security-reviewer`, `spec-validator`, `stage-delegate`, `stuck`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
+> **현재 에이전트:** `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `judgment-reviewer`, `performance-reviewer`, `security-reviewer`, `spec-validator`, `stage-delegate`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`, `world-model`
+> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `worktree-isolator`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > `world-model` 은 Maker 로 렌더된다 (`.claude/skills/<handle>/`). `intent-layer` 와 `project-knowledge` 는 직접 입력해야만 실행되고 (모델이 스스로 호출하지 않음), 그 외에는 Maker 를 거쳐 도달한다 ([아래](#maker--world-model-입구)).
@@ -95,7 +95,7 @@ action items).
 | | 원칙 | 실제 의미 |
 |--|---|---|
 | 🎯 | **개인화 (Personalized)** | 프로파일러가 12개 이상의 스택/프레임워크/CI 신호를 읽음. 인터뷰가 10개 이상의 차원을 lock. `Side` 실험과 `Production` 서비스는 **구조적으로 다른** 하네스를 받음 — 다른 reviewer 셋, 다른 워크플로 stage, 다른 보안 게이트. 범용 default가 조용히 깔리는 일 없음. |
-| 🛡️ | **신뢰 (Trusted)** | 모든 `/hm:execute`는 fresh worktree + TDD 루프. `/hm:review`는 보고만 하지 않음 — consensus-passed fix를 적용하고 등급 ≥ A까지 재리뷰. Mechanical check (lint/test)가 LLM reviewer가 토큰 쓰기 전에 게이트. |
+| 🛡️ | **신뢰 (Trusted)** | 모든 `/hm:execute`는 fresh worktree + TDD 루프. `/hm:execute`의 리뷰 단계는 보고만 하지 않음 — 모든 finding에 disposition을 매기고, accepted는 고친 뒤 `max_review_rounds` 이내로 재리뷰. `hm check` (test, lint, `mechanical_checks`)가 전후로 게이트. |
 | 🧭 | **사람이 소유 (Human-owned)** | *어떻게*는 AI 가 최대한 가져가고, *왜*·*무엇을*·트레이드오프는 당신이 소유. `/hm:spec` 이 코드 이전에 의도·범위·`irreversible_decisions` 를 당신과 함께 lock 하고, autopilot 은 사람의 결정이 필요한 stage 에서 멈추며, intent 기록은 당신의 동의로만 바뀜. **아직 출하 전:** 시스템의 가정이 어떻게 바뀌었는지 wrapup 이 요약해, diff 를 읽지 않고도 변경을 설명할 수 있게 하는 기능. |
 | 🌱 | **자기진화 (Self-evolving)** | agent, skill, CLAUDE.md 어디든 손편집 — block-merge 마커가 `--update` 너머에서도 보존. 메모리가 프로젝트 고유 패턴을 축적; 반복되는 실패는 새 가드레일을 자동 제안. |
 | 🌀 | **무방부패 (Anti-rot)** | 4개 소스 주간 크롤 (Anthropic, GitHub releases, arXiv, OSV CVE). 사용자 accept/reject 이력으로 적응형 relevance filter. 항상 수동 확인 — silent auto-apply 경로는 존재하지 않음. |
@@ -336,7 +336,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 | 목표·지표·가정·intent; 프로젝트 사실 | **Goals and facts** — intent 또는 knowledge 절차로 기록 |
 | "뭐 하지?", "what next?" | **Briefing** + 선택지 2–4개; 어떤 단계도 시작하지 않음 |
 
-**유일한 입구.** `intent-layer` 와 `project-knowledge` 는 모델이 스스로 호출하지 않는다. `/intent-layer` 나 `/project-knowledge` (Codex 는 `$…`) 를 직접 입력하면 여전히 실행되고, 그 외에는 Maker 가 쓰기 전에 해당 절차를 읽는다. 쓰기 전에 묻는 규칙은 그대로다. `CLAUDE.md` / `AGENTS.md` 에 항상 로드되는 `## World model` 포인터가 목표·지표·사실·현황 요청을 이름을 부르지 않아도, 단계 진행 중에도 Maker 로 보낸다. 일반적인 만들기·고치기 요청은 경로가 바뀌지 않는다. `/hm:` 단계는 여전히 직접 입력하거나 Maker, autopilot, `/hm:loop` 를 통해 실행된다.
+**유일한 입구.** `intent-layer` 와 `project-knowledge` 는 모델이 스스로 호출하지 않는다. `/intent-layer` 나 `/project-knowledge` (Codex 는 `$…`) 를 직접 입력하면 여전히 실행되고, 그 외에는 Maker 가 쓰기 전에 해당 절차를 읽는다. 쓰기 전에 묻는 규칙은 그대로다. `CLAUDE.md` / `AGENTS.md` 에 항상 로드되는 `## World model` 포인터가 목표·지표·사실·현황 요청을 이름을 부르지 않아도, 단계 진행 중에도 Maker 로 보낸다. 일반적인 만들기·고치기 요청은 경로가 바뀌지 않는다. `/hm:` 단계는 여전히 직접 입력하거나 Maker 를 통해 실행된다.
 
 **범위는 요청을 따른다.** "X 리서치해줘" 는 research 에서, "X 스펙 잡자" 는 spec 에서 끝나고, "만들어줘" / "고쳐줘" 는 전체 파이프라인을 돈다. 불분명한 요청은 research 에서 시작한다. autopilot 이 켜져 있으면 Maker 는 매 요청마다 `hm autopilot narrow --until <end>` 를 실행한다 — "X 리서치해줘" 는 research 후 멈추고, 그 경계에서 원래 armed 파이프라인이 복원된다. Maker 는 autopilot 을 켜지 않는다.
 
@@ -407,9 +407,8 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 
 ### 🔁 워크플로 프리미티브 — *나머지 툴체인*
 
-- **권장 순서.** 사소하지 않은 변경은 6-stage 시퀀스를 순서대로 따르는 것을 권장합니다 — `/hm:research` → `/hm:spec` → `/hm:execute` → `/hm:review` → `/hm:verify` → `/hm:wrapup`. 각 stage의 출력이 다음 stage로 이어지며, `/hm:execute`로 바로 건너뛰면 SPEC 게이트·consensus 리뷰·verify 체크를 잃습니다. stage 사이 hand-off 없이 이어가려면 `/hm:loop`(경계 있는 autoloop) 또는 autopilot 을 사용하세요.
+- **권장 순서.** `/hm:research` (문제가 불분명할 때) → `/hm:spec` → `/hm:execute` → `/hm:wrapup`. 각 stage는 다음 stage를 알려주고 끝나며, 실행은 사용자가 결정합니다. `/hm:execute`로 바로 건너뛰면 SPEC 게이트를 잃습니다. 0.64.0 에서 `hm:review`·`hm:verify` (리뷰는 `/hm:execute` 의 Step 6, 결정적 게이트는 `hm check`), `hm:loop`·`hm:loop-p5-batch`, autopilot 자동 진행, `hm:configure` (`.claude/harness.yaml` 을 직접 고치고 `/harness-maker:make` 재실행) 가 은퇴했습니다.
 - **구현 전 깊은 인터뷰.** `/hm:spec`이 6-카테고리 인터뷰 (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification)를 완전성 점수화하여 실행. 되돌리기 어려운 결정은 같은 인터뷰의 `irreversible_decisions` 로 잠기고, phase·순서·위험 같은 *how* 는 `/hm:execute` Step 0 이 사람 게이트 없이 직접 씁니다.
-- **적응형 인터뷰 + 4-게이트 수렴 autoloop.** `/hm:loop`이 time-and-iteration-bounded 루프 실행. `autoloop-driver`가 goal을 읽고 누락된 것만 질문, loop intensity + exit checklist lock, 그 후 mechanical check + LLM judgment + regression 비교 + 2-iter convergence streak가 완료 수락 전 모두 필요.
 - **3-tier 컨텍스트 로딩 + compaction 복구.** Hot tier (오늘 session) · Warm tier (stage 주제에 맞는 wiki/failures 항목 — lexical 매치 우선, 남는 슬롯에만 고재발 failure 최대 3개, 블록 전체에 8 KB 상한 하나) · Cold tier (git log / PLAN on demand). `PreCompact` hook이 context compaction 전에 session flush; 다음 turn이 마커를 감지하고 마지막 in-progress phase에서 resume.
 - **Cross-process 메모리 안전성.** `.claude/memory/` 쓰기는 re-entrant POSIX flock으로 serialize. Telemetry hook이 `O_APPEND`에 raw `os.write()`로 원자적 append (single-syscall, ≤PIPE_BUF) — concurrent Claude Code + Codex 세션이 JSONL 라인을 interleave 불가.
 
@@ -423,7 +422,7 @@ harness-maker는 `0.x` 단계이며 1.0 약속이 정직해질 만큼의 의존 
 
 **고정 표면(Frozen surfaces)** — deprecation cycle 없이는 어떤 0.x.minor에서도 깨지지 않습니다:
 
-- **슬래시 명령 이름**: `/hm:make`, `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/harness-maker:make`.
+- **슬래시 명령 이름**: `/hm:research`, `/hm:spec`, `/hm:execute`, `/hm:wrapup`, `/hm:health`, `/hm:metrics`, `/hm:help`, `/hm:uninstall`, `/harness-maker:make`.
 - **`harness.yaml` 최상위 키**: `targets`, `preset`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
 - **Plugin manifest 스키마**: `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` — 각 marketplace 공식 spec에 포함된 필드들.
 - **로컬 전용 telemetry 보장** — [`PRIVACY.md`](PRIVACY.md) 참조. 문서-vs-실제 불일치는 P0 버그로 취급합니다.

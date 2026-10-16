@@ -58,9 +58,25 @@ def blueprint() -> Blueprint:
     """The synthesizer's OUTPUT. The population tests below read this, not `_ALL_AGENTS`
     — that constant is the synthesizer's input, so asserting on it checks the renderer
     against itself (PLAN-probe-envelope-contract ADR-003)."""
+    # Every opt-in that adds an agent is on, so the population is every template (0.64.0
+    # renders lens reviewers only with `reviewers.fanout`, the second-opinion pair only with
+    # `second_opinion.models` and the stage delegate only with `delegation.stages`).
+    from harness_maker.models import DelegationConfig, SecondOpinionConfig
+    from harness_maker.synthesize import LENS_REVIEWERS
+
     return synthesize(
         ProjectProfile(),
-        InterviewAnswers(preset=Preset.PRODUCTION, targets=[Target.CLAUDE_CODE]),
+        InterviewAnswers(
+            preset=Preset.PRODUCTION,
+            targets=[Target.CLAUDE_CODE],
+            reviewers={
+                "installed": ["code-reviewer", *LENS_REVIEWERS],
+                "enabled": ["code-reviewer"],
+            },
+            reviewers_fanout=True,
+            second_opinion=SecondOpinionConfig(models=["codex"]),
+            delegation=DelegationConfig(stages=["wrapup"]),
+        ),
     )
 
 
@@ -145,14 +161,9 @@ _DANGEROUS = frozenset({"Write", "Edit", "Bash"})
 #: dangerous grants each agent may hold — an exact set, so a write-privileged agent
 #: silently gaining Bash is caught too.
 _WRITE_PRIVILEGED: dict[str, frozenset[str]] = {
-    # Writes the implementation during an autoloop iteration.
-    "autoloop-coder": frozenset({"Write", "Edit", "Bash"}),
-    # The general workflow executor; edits the worktree and runs checks.
-    "executor": frozenset({"Write", "Edit", "Bash"}),
-    # Runs a whole stage body (wrapup/verify), which writes memory and runs commands.
+    # Runs the wrapup body, which writes memory and runs commands. (autoloop-coder, executor and
+    # security-auditor left with their stages in 0.64.0.)
     "stage-delegate": frozenset({"Write", "Edit", "Bash"}),
-    # Read-only in intent, but its 5-gate audit shells out (CVE lookup, secret scan).
-    "security-auditor": frozenset({"Bash"}),
 }
 
 

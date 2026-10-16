@@ -278,59 +278,32 @@ def test_memory_continuity_stub_failures_fails_content(tmp_path: Path) -> None:
 def test_observability_setup_full(tmp_path: Path) -> None:
     obs = tmp_path / ".claude" / "observability"
     obs.mkdir(parents=True)
-    (obs / "metrics.jsonl").write_text("\n".join("{}" for _ in range(10)) + "\n")
     (obs / "dashboard.md").write_text("# dashboard\n")
     res = compute_readiness(tmp_path, Preset.SIDE)
     o = res.dimensions["observability_setup"]
     sigs = {s.id: s for s in o.signals}
     assert sigs["observability_dir_present"].passed
-    assert sigs["metrics_jsonl_present"].passed
     assert sigs["dashboard_md_present"].passed
-    assert sigs["metrics_has_samples"].passed
     assert o.score == 100
 
 
-def test_observability_setup_metrics_too_few_samples(tmp_path: Path) -> None:
-    obs = tmp_path / ".claude" / "observability"
-    obs.mkdir(parents=True)
-    (obs / "metrics.jsonl").write_text("{}\n{}\n")  # only 2 entries
-    res = compute_readiness(tmp_path, Preset.SIDE)
-    sigs = {s.id: s for s in res.dimensions["observability_setup"].signals}
-    assert sigs["metrics_jsonl_present"].passed
-    assert not sigs["metrics_has_samples"].passed
+def test_observability_setup_telemetry_signals_are_na_with_or_without_files(
+    tmp_path: Path,
+) -> None:
+    """The telemetry hook is retired (0.64.0): a stale metrics file is not a live signal either.
 
-
-def test_observability_setup_metrics_jsonl_present_with_rotated_only(tmp_path: Path) -> None:
-    """Regression: signal must recognize date-sharded files when legacy metrics.jsonl is absent.
-
-    Pre-fix: both `metrics_jsonl_present` and `metrics_has_samples` failed on a
-    project that had rotated telemetry but no legacy `metrics.jsonl` — yielding
-    the misleading "Install the PostToolUse telemetry hook" recommendation on
-    an already-correctly-instrumented project.
+    The rotation-counting regressions this replaces tested a writer that no longer runs.
     """
     obs = tmp_path / ".claude" / "observability"
     obs.mkdir(parents=True)
-    (obs / "metrics-2026-05-10.jsonl").write_text("\n".join("{}" for _ in range(6)) + "\n")
+    (obs / "metrics-2026-05-10.jsonl").write_text("{}\n{}\n")
     res = compute_readiness(tmp_path, Preset.SIDE)
     sigs = {s.id: s for s in res.dimensions["observability_setup"].signals}
-    assert sigs["metrics_jsonl_present"].passed
-    assert sigs["metrics_has_samples"].passed
-
-
-def test_observability_setup_metrics_counts_across_rotation(tmp_path: Path) -> None:
-    """Regression: sample count must sum across rotated + legacy files.
-
-    Pre-fix: only the legacy `metrics.jsonl` was counted; rotated files were
-    silently ignored even when they held thousands of entries.
-    """
-    obs = tmp_path / ".claude" / "observability"
-    obs.mkdir(parents=True)
-    (obs / "metrics-2026-05-10.jsonl").write_text("{}\n{}\n{}\n")  # 3 entries
-    (obs / "metrics.jsonl").write_text("{}\n{}\n")  # 2 entries — 5 total
-    res = compute_readiness(tmp_path, Preset.SIDE)
-    sigs = {s.id: s for s in res.dimensions["observability_setup"].signals}
-    assert sigs["metrics_jsonl_present"].passed
-    assert sigs["metrics_has_samples"].passed
+    for sid in ("metrics_jsonl_present", "metrics_has_samples"):
+        assert sigs[sid].not_applicable
+        assert sigs[sid].weight == 0
+        assert "telemetry hook retired" in sigs[sid].evidence
+    assert res.dimensions["observability_setup"].score == 50  # dir present, no dashboard
 
 
 # ── governance ──────────────────────────────────────────────────────────────

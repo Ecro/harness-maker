@@ -223,17 +223,16 @@ def test_render_with_merge_paths_preserves_user_blocks(tmp_path: Path) -> None:
     bp = synthesize(p, a)
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
 
-    review_path = tmp_path / "stages" / "review.md"
+    review_path = tmp_path / "commands" / "hm" / "wrapup.md"
     text = review_path.read_text(encoding="utf-8")
     edited = text.replace(
-        "<!-- Free-form project-specific additions to the review stage. "
-        "Preserved across harness-maker upgrades. -->",
+        "<!-- Your additions; kept on upgrade. -->",
         "## Project rule\n\nAlways check telemetry impact for hot-path changes.",
     )
     review_path.write_text(edited, encoding="utf-8")
 
     bp2 = synthesize(p, a)
-    merge_paths = {Path("stages/review.md")}
+    merge_paths = {Path("commands/hm/wrapup.md")}
     merge_reports: dict[Path, MergeReport] = {}
     render(
         bp2,
@@ -245,8 +244,8 @@ def test_render_with_merge_paths_preserves_user_blocks(tmp_path: Path) -> None:
 
     final = review_path.read_text(encoding="utf-8")
     assert "Always check telemetry impact" in final
-    assert Path("stages/review.md") in merge_reports
-    report = merge_reports[Path("stages/review.md")]
+    assert Path("commands/hm/wrapup.md") in merge_reports
+    report = merge_reports[Path("commands/hm/wrapup.md")]
     assert "extensions" in report.user_blocks_preserved
 
 
@@ -287,14 +286,14 @@ def test_render_without_merge_paths_overwrites(tmp_path: Path) -> None:
     bp = synthesize(p, a)
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
 
-    review_path = tmp_path / "stages" / "review.md"
+    review_path = tmp_path / "commands" / "hm" / "wrapup.md"
     review_path.write_text("# user wrote this\n", encoding="utf-8")
 
     bp2 = synthesize(p, a)
     render(bp2, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
     final = review_path.read_text(encoding="utf-8")
     assert "# user wrote this" not in final
-    assert "Stage: review" in final
+    assert "# /hm:wrapup" in final
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -535,15 +534,8 @@ def test_render_agents_have_no_inert_permissions_frontmatter(tmp_path: Path) -> 
     bp = synthesize(p, a)
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
 
-    names = [
-        "code-reviewer",
-        "security-reviewer",
-        "performance-reviewer",
-        "ux-reviewer",
-        "concurrency-reviewer",
-        "executor",
-        "autoloop-coder",
-    ]
+    # 0.64.0: a default render has three agents (lens reviewers need `reviewers.fanout`).
+    names = ["code-reviewer", "judgment-reviewer", "spec-validator"]
     for name in names:
         agent_path = tmp_path / "agents" / f"{name}.md"
         assert agent_path.exists(), f"missing rendered agent: {name}"

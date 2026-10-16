@@ -317,8 +317,10 @@ def test_every_flag_the_template_passes_is_one_the_cli_accepts(
     # Scope to the text AFTER the module name: everything before it belongs to `uv`
     # (`uv run --with <path> python -m …`), and its flags are not this parser's.
     line = _rendered_reconcile_line()
-    _, sep, tail = line.partition(" hm wrapup_receipt")
+    # 0.64.0: the call is a code span inside a prose line; scope to that span.
+    _, sep, tail = line.partition("`hm wrapup_receipt")
     assert sep, f"reconcile line does not invoke the module by name: {line}"
+    tail = tail.split("`", 1)[0]
     flags = re.findall(r"(?<!\w)--[a-z][a-z-]*", tail)
     assert flags, f"no flags found after the module name in: {line}"
 

@@ -34,9 +34,9 @@ def test_production_preset_reviewer_gets_medium_effort() -> None:
 
 
 def test_production_preset_reasoning_agent_gets_high_effort() -> None:
-    """Production preset → autoloop-coder (reasoning-heavy) gets high effort."""
+    """Production preset → spec-validator (reasoning-heavy) gets high effort."""
     specs = _codex_agent_files(preset=Preset.PRODUCTION)
-    ctx = _ctx_for("autoloop-coder", specs)
+    ctx = _ctx_for("spec-validator", specs)
     assert ctx["codex_reasoning_effort"] == "high"
 
 

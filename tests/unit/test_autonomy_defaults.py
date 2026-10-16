@@ -31,7 +31,8 @@ def test_the_class_default_is_promoted() -> None:
     """ADR-010: a new harness auto-arms without the user re-enabling it every session."""
     cfg = AutonomyConfig()
     assert cfg.level == "ask"  # ADR-012: the class default now ASKS per session.
-    assert cfg.autopilot_persistent is True
+    # SPEC-hm-overhaul-p1 Constraints (Config): autopilot is retired, so persistence defaults off.
+    assert cfg.autopilot_persistent is False
 
 
 def test_an_absent_autonomy_block_stays_gated() -> None:
@@ -149,7 +150,7 @@ def test_both_presets_render_the_promoted_default(tmp_path: Path, preset_name: s
     docs: list[Any] = list(yaml.safe_load_all((out / "harness.yaml").read_text(encoding="utf-8")))
     body = [d for d in docs if d and isinstance(d, dict) and "preset" in d][0]
     assert body["autonomy"]["level"] == "ask"  # ADR-012: the class default now ASKS per session.
-    assert body["autonomy"]["autopilot_persistent"] is True
+    assert body["autonomy"]["autopilot_persistent"] is False  # retired in 0.64.0
     assert body["autonomy"]["step_cap"] == 20
     assert body["autonomy"]["time_cap_min"] == 300
 

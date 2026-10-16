@@ -129,7 +129,7 @@ ac:
   title: An existing harness.yaml without the key keeps the loop
   type: mechanical
   test_ids:
-  - tests/unit/test_loop_opt_in.py::test_ac005_existing_absent_key_keeps_loop
+  - tests/unit/test_overhaul_p1_kept.py::test_existing_loop_setting_survives_every_rerender
   executable_predicate: all(update_render(v).yaml['loop']['enabled'] is True and LOOP_CLAUDE
     <= update_render(v).paths for v in (NO_VERSION, V5, V6_NO_KEY, EMPTY_LOOP_BLOCK))
   golden_table: []
@@ -266,8 +266,7 @@ ac:
   title: An existing harness.yaml keeps the loop on every re-render path
   type: mechanical
   test_ids:
-  - tests/unit/test_loop_opt_in.py::test_ac010_existing_yaml_keeps_loop_on_every_path
-  - tests/unit/test_loop_opt_in.py::test_ac010_preset_switch_keeps_existing_loop
+  - tests/unit/test_overhaul_p1_kept.py::test_existing_loop_setting_survives_every_rerender
   executable_predicate: reinterview_render(V5).yaml['loop']['enabled'] is True and
     fallback_render(UNLOADABLE_YAML).yaml['loop']['enabled'] is True and reinterview_render(EXPLICIT_FALSE).yaml['loop']['enabled']
     is False

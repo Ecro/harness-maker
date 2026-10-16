@@ -7,47 +7,35 @@
 
 ## 📋 Available commands
 
-### Atomic stages (6)
+### Stages (4)
 
 | Command | Purpose |
 |---|---|
-| `{{ cmd }}research` | Gather context, prior art, library docs |
-| `{{ cmd }}spec`     | Lock acceptance criteria (intent / outcomes / scenarios) |
-| `{{ cmd }}execute`  | TDD machine — RED → GREEN per PLAN phase |
-| `{{ cmd }}review`   | Multi-reviewer consensus + grade gate + auto-fix |
-| `{{ cmd }}wrapup`   | Single commit, CHANGELOG, doc updates |
-| `{{ cmd }}verify`   | Independent pre-wrapup invariant checks |
+| `{{ cmd }}research` | Optional: facts, prior art, alternatives |
+| `{{ cmd }}spec`     | Lock acceptance criteria and how each is verified |
+| `{{ cmd }}execute`  | Tests RED, code GREEN, one review; never commits |
+| `{{ cmd }}wrapup`   | Gate, memory, one commit |
 
 ### Meta
 
 | Command | Purpose |
 |---|---|
 {% if not is_codex -%}
-| `{{ cmd }}make`      | Full re-render (interactive) |
-{% endif -%}
-{% if not is_codex -%}
-| `{{ cmd }}configure` | Targeted setting change (no full re-interview) |
-{% endif -%}
-{% if not is_codex -%}
+| `{{ cmd }}make`      | Re-render the harness (edit `.claude/harness.yaml` first to change a setting) |
 | `{{ cmd }}health`    | 3-layer audit (structural / external / personalization) |
-{% endif -%}
-{% if config.loop.enabled -%}
-| `{{ cmd }}loop`      | Bounded autoloop with safety rails |
-{% endif -%}
-{% if not is_codex -%}
 | `{{ cmd }}uninstall` | Remove the harness |
 {% endif -%}
 | `{{ cmd }}help`      | (this command) |
 {% if not is_codex -%}
-| `{{ cmd }}metrics`   | Delivery metrics — CFR + churn trend, LLM interpretation (manual, read-only) |
+| `{{ cmd }}metrics`   | Delivery and spend trend, for reflection (read-only) |
 {% endif -%}
 ## 🔁 Recommended workflow
 
 ```
-  research ─► spec ─► execute ─► review ─► verify ─► wrapup
+  [research] ─► spec ─► execute ─► wrapup
 ```
 
-{% if config.loop.enabled %}Stages are chained by `{{ cmd }}loop` or by autopilot — there is no fused workflow command. <!-- @hm:axis-removed -->{% else %}Stages are chained by autopilot — there is no fused workflow command; `{{ cmd }}loop` is off (set `loop.enabled: true` in `.claude/harness.yaml` and run `/hm:make` to enable it). <!-- @hm:axis-removed -->{% endif %}
+Each stage stops when it is done; you type the next one. `hm check` is the one gate execute and wrapup run.
 
 ## ⚙️ Your current settings
 
@@ -56,7 +44,7 @@
 | preset | `{{ config.preset }}` |
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
-| autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, re-armed every session{% endif %} |
+| autonomy | `{{ config.autonomy.level }}` |
 | intent-layer | skill, typed only{% if is_codex %} (`$intent-layer`){% endif %} — goals, metrics, observations; otherwise ask {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) |
 | project-knowledge | skill, typed only{% if is_codex %} (`$project-knowledge`){% endif %} — record or correct a project fact in the shared wiki, not auto-memory; otherwise ask {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) |
 | {{ (config.world_model or {}).get('name', 'Maker') }} | world model front door — {% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}: briefing, start or resume work, facts, goals |
@@ -67,9 +55,9 @@
 
 ## 💡 Next steps
 
-- New to this harness?  →  run `{{ cmd }}research`, then follow the stage order above
+- New to this harness?  →  run `{{ cmd }}spec`, then follow the stage order above
 {% if not is_codex -%}
-- Change a setting?     →  run `{{ cmd }}configure`
+- Change a setting?     →  edit `.claude/harness.yaml`, then run `{{ cmd }}make`
 {% endif -%}
 {% if not is_codex -%}
 - Audit harness health? →  run `{{ cmd }}health`

@@ -81,98 +81,28 @@ _DEFAULT_LOCALE = "en"
 
 # Stages displayed 1-indexed in the interview.
 
-# Inventory of all reviewers/skills the synthesizer installs. The `enabled`
-# subset depends on preset.
-_ALL_REVIEWERS: list[str] = [
-    "code-reviewer",
-    "security-reviewer",
-    "security-auditor",
-    "performance-reviewer",
-    "ux-reviewer",
-    "concurrency-reviewer",
-    "consensus-arbiter",
-    "executor",
-    "autoloop-coder",
-    # `test-reviewer` carries the MANDATORY `tests` lens and is in `_PROD_ENABLED_REVIEWERS`, but
-    # was missing here — so the rendered `installed` list under-reported what the harness ships.
-    # AC-010 of PLAN-token-efficiency-autopilot-ux-speed.
-    #
-    # CORRECTED (review finding P2-3): an earlier version of this comment said "no consumer
-    # validates against `installed`". **False** — `templates/stages/review.md.j2:74` tells the model
-    # that `--with-reviewers=<csv>` entries "must exist in `reviewers.installed`". So this line does
-    # more than fix a display list: it makes `test-reviewer` ad-hoc addable. Writing a comment that
-    # the shipped prose contradicts is the exact defect class the unit that added this line exists
-    # to remove, so the correction is recorded rather than quietly swapped.
-    #
-    # This list is deliberately NOT derived from `synthesize._ALL_AGENTS`. Five agents are shipped
-    # and absent here — `code-verifier`, `judgment-reviewer`, `plan-validator`, `stage-delegate`,
-    # `stuck` — and deriving would make all five `--with-reviewers` addable, which is wrong for
-    # `stage-delegate` and `stuck` (not reviewers, and dispatched by their own stages). That
-    # `judgment-reviewer` is an installed reviewer agent yet un-addable is a real gap; widening the
-    # ad-hoc reviewer set is a review-flow decision, not a bookkeeping fix, so it is left as a
-    # named follow-up rather than smuggled in here.
-    "test-reviewer",
-]
+# What a fresh harness.yaml lists (SPEC-hm-overhaul-p1). `installed` names no lens reviewer, so a
+# fresh tree gives no inert-lens warning: the fan-out is opted into by setting
+# `reviewers.fanout: true` and naming the lenses wanted in `installed` (D-9).
+_ALL_REVIEWERS: list[str] = ["code-reviewer"]
 _ALL_SKILLS: list[str] = [
-    "verify-before-completion",
-    "autoloop-driver",
     "ai-readiness-rubric",
     "agent-quality-rubric",
-    "conditional-router",
     "worktree-isolator",
-    "security-scanner",
     "context-linter",
-    "refdocs-search",
-    # Enabled in BOTH presets, not just Production. Its §2-§4 (the cross-model gate) only
-    # matter when `second_opinion.models` is non-empty, but §5 — the auto-fix loop's
-    # round-state contract — governs Claude findings too, and `review.md.j2` points at it
-    # from an UNGUARDED line. Omitting it from Side's enabled list would leave that pointer
-    # dangling in every Side harness.
-    "second-opinion-gate",
-    # SPEC-intent-world-model-objective-layer S13: on-demand skill, both presets — it is the
-    # only way an operator finds the `hm world` verbs without remembering them.
     "intent-layer",
-    # Same unguarded-pointer situation as `second-opinion-gate`: review.md.j2's auto-fix
-    # verify step names this skill with no `{% if %}` around it, and /hm:execute Phase D
-    # runs the same selector. Enabled in BOTH presets for that reason.
-    "targeted-test-selection",
-    # SPEC-mission-context-loop: the always-loaded pointer names it in every preset, so it is
-    # enabled in both (same unguarded-pointer reason).
     "project-knowledge",
 ]
 
 _SIDE_ENABLED_REVIEWERS: list[str] = ["code-reviewer"]
-_SIDE_ENABLED_SKILLS: list[str] = [
-    "verify-before-completion",
-    "autoloop-driver",
-    "ai-readiness-rubric",
-    "agent-quality-rubric",
-    "refdocs-search",
-    # See the note in _ALL_SKILLS: §5 (the auto-fix round-state contract) is pointed at from
-    # an unguarded line in review.md.j2, so Side must enable it too or that pointer dangles.
-    "second-opinion-gate",
-    # Same reason — review.md.j2's verify step points here unguarded.
-    "targeted-test-selection",
-    "intent-layer",
-    "project-knowledge",
-]
-_PROD_ENABLED_REVIEWERS: list[str] = [
-    "code-reviewer",
-    "security-reviewer",
-    "performance-reviewer",
-    "ux-reviewer",
-    "concurrency-reviewer",
-    # `tests` is a MANDATORY lens on Production and `test-reviewer` carries it, so omitting it
-    # here left the coverage gate demanding a result from an agent the config never enabled —
-    # `blocks_approval: true` on every Production review, forever.
-    "test-reviewer",
-]
+_SIDE_ENABLED_SKILLS: list[str] = list(_ALL_SKILLS)
+_PROD_ENABLED_REVIEWERS: list[str] = ["code-reviewer"]
 _PROD_ENABLED_SKILLS: list[str] = list(_ALL_SKILLS)
 
 _FOCUS_REVIEWERS: dict[str, list[str]] = {
     "feature": ["code-reviewer", "ux-reviewer"],
     "bugfix": ["code-reviewer", "test-reviewer"],
-    "security": ["code-reviewer", "security-reviewer", "security-auditor"],
+    "security": ["code-reviewer", "security-reviewer"],
     "performance": ["code-reviewer", "performance-reviewer"],
     "refactoring": ["code-reviewer", "concurrency-reviewer"],
 }
@@ -499,8 +429,8 @@ def _ask_second_opinion() -> SecondOpinionConfig:
     from harness_maker.tool_detect import _BINARIES, INSTALLED_MEANS, detect_tools
 
     print("\nCross-model second opinion (Codex / Antigravity / Claude).")
-    print("  Enabled models cast a real k-of-N consensus vote in /hm:review and are")
-    print("  reconciled in /hm:plan. A missing/unauthenticated CLI degrades gracefully")
+    print("  Enabled models vote in /hm:execute's review step (one call per model per")
+    print("  review). A missing/unauthenticated CLI degrades gracefully")
     print("  (warn + skip). Prereqs: `codex login` (codex), authenticated `agy` (antigravity).")
     print("  Claude requires an authenticated `claude` CLI supporting --safe-mode.")
     found = detect_tools()
@@ -1059,12 +989,16 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         "world_model": parse_world_model(data.get("world_model", _ABSENT)),
         "sibling_repos": sibling_repos,
         "wrapup_docs": wrapup_docs,
+        # SPEC-hm-overhaul-p1 IRR-006: a re-render keeps each value. `installed` is also the
+        # lens fan-out's opt-in list (D-9), so re-deriving it from the inventory would erase it.
         "reviewers": {
-            "installed": list(base.reviewers["installed"]),
+            "installed": _list_of_strings(reviewers_data.get("installed"))
+            or list(base.reviewers["installed"]),
             "enabled": reviewers_enabled,
         },
         "skills": {
-            "installed": list(base.skills["installed"]),
+            "installed": _list_of_strings(skills_data.get("installed"))
+            or list(base.skills["installed"]),
             "enabled": skills_enabled,
         },
     }
@@ -1228,6 +1162,10 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         update["grade_threshold"] = grade_threshold
     if isinstance(max_review_rounds, int):
         update["max_review_rounds"] = max_review_rounds
+    # SPEC-hm-overhaul-p1 D-9: absent reads as false; only a real bool round-trips.
+    fanout = reviewers_data.get("fanout")
+    if isinstance(fanout, bool):
+        update["reviewers_fanout"] = fanout
 
     # Churn gate — a WELL-FORMED user setting must not be silently restored by a re-render
     # (checkpoint 6: what we write, we read back). Absent key -> field default.

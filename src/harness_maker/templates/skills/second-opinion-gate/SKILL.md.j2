@@ -1,24 +1,21 @@
 {% import "agents/_partials/dispatch.md.j2" as dsp -%}
 ---
 name: {{ name }}
-description: Procedure /hm:review follows for the auto-fix loop's round-state contract (finding identity, monotonic progress, per-round voter state) in EVERY harness, and additionally for the cross-model second-opinion acceptance gate (oracle gathering, PIDA dispositions, the frozen finding set) when harness.yaml second_opinion.models is non-empty.
+description: Procedure the review step of /hm:execute follows for the auto-fix loop's round-state contract (finding identity, monotonic progress, per-round voter state) in EVERY harness, and additionally for the cross-model second-opinion acceptance gate (oracle gathering, PIDA dispositions, the frozen finding set) when harness.yaml second_opinion.models is non-empty.
 ---
 
 # {{ name }}
 
-The procedure `/hm:review` follows to admit, refute and carry cross-model findings.
+The procedure the review step of `/hm:execute` follows to admit, refute and carry cross-model findings.
 
-**Why this is a skill and not inline stage prose.** `/hm:loop` re-reads the whole review
-stage on every iteration that lists `review` in `--per-iter-stages`, so a
-character added to that stage is paid five times in the shipped command surface — which the
-repo's `test_command_size_budget` / `test_aggregate_shipped_surface_does_not_grow` arms
-deliberately refuse. A skill is loaded on demand and is not fanned out. The rules below are
+**Why this is a skill and not inline stage prose.** It loads on demand, only when
+`second_opinion.models` is set, so `/hm:execute` stays within its budget. The rules below are
 binding on the main loop even though they live here.
 
 Companion: the **`code-verifier` agent, mode B** owns the refutation *rubric*, the oracle-input
 rules and the output schema. This file owns what the main loop does around it.
 
-## 1. Finding identity (`/hm:review` Step 3.4) — applies to EVERY finding
+## 1. Finding identity (the review step of `/hm:execute` Step 3.4) — applies to EVERY finding
 
 Reviewers never emit `id`; an LLM-generated one differs per run, which defeats the point.
 **Do not compute the hash yourself** — you cannot reproduce `json.dumps`'s exact separators, so a
@@ -177,7 +174,7 @@ cd <the task worktree> && uv run --with {{ harness_maker_src_path }} hm second_o
 
 > **A disposition is not a lifecycle transition.** The four PIDA values
 > (`accepted`/`rejected`/`duplicate`/`unresolved`) and this section's lattice
-> (`pending`→`resolved`/`stale`) are **orthogonal** and neither implies the other. `/hm:review`
+> (`pending`→`resolved`/`stale`) are **orthogonal** and neither implies the other. the review step of `/hm:execute`
 > Step 4e now assigns a disposition to every finding on every path, so the two vocabularies are
 > both present on the same record; treating a `rejected` as a `resolved` would let the progress
 > invariant read a re-classification as work done and keep a stalled loop running.
@@ -251,7 +248,7 @@ scratch each round, which is safe **only** because voices persist by `id` — ov
 replacement, one reviewer's non-determinism drops a corroborating voice, pushes a cluster below
 the consensus threshold, and improves the grade with no code change behind it.
 
-**Do not re-invoke the models.** Each enabled model runs **exactly once per `/hm:review`
+**Do not re-invoke the models.** Each enabled model runs **exactly once per the review step of `/hm:execute`
 invocation**, in round 1. Rounds 2..N re-read the frozen set (§6) and update statuses.
 Re-invoking injects a fresh stochastic voter every round, so `Remaining`/`New` can never drain
 and the loop exits on the round cap instead of converging.

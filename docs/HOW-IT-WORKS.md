@@ -3,22 +3,22 @@
 # harness-maker: How It Works — Complete Guide
 
 > **Audience**: Developers new to harness-maker, or users who want a deep understanding of internal behavior.
-> **Version**: 0.63.0
+> **Version**: 0.64.0
 >
 > Focus is on **procedures, flow, and responsibilities** — not implementation details.
 
 > Current release contract (validated from source):
 >
 > <!-- hm-doc-contract:pipeline:start -->
-> **Current pipeline:** `research` → `spec` → `execute` → `review` → `verify` → `wrapup`
+> **Current pipeline:** `research` → `spec` → `execute` → `wrapup`
 > <!-- hm-doc-contract:pipeline:end -->
 >
 > <!-- hm-doc-contract:agents:start -->
-> **Current agents:** `autoloop-coder`, `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `executor`, `judgment-reviewer`, `performance-reviewer`, `security-auditor`, `security-reviewer`, `spec-validator`, `stage-delegate`, `stuck`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
+> **Current agents:** `code-reviewer`, `code-verifier`, `concurrency-reviewer`, `consensus-arbiter`, `judgment-reviewer`, `performance-reviewer`, `security-reviewer`, `spec-validator`, `stage-delegate`, `test-reviewer`, `trajectory-monitor`, `ux-reviewer`
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `autoloop-driver`, `conditional-router`, `context-linter`, `intent-layer`, `project-knowledge`, `refdocs-search`, `second-opinion-gate`, `security-scanner`, `targeted-test-selection`, `trajectory-monitor`, `verify-before-completion`, `worktree-isolator`, `world-model`
+> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `worktree-isolator`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > <!-- hm-doc-contract:mechanisms:start -->
@@ -28,6 +28,16 @@
 > <!-- hm-doc-contract:version-files:start -->
 > **Release version files:** `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
 > <!-- hm-doc-contract:version-files:end -->
+
+> **0.64.0 (SPEC-hm-overhaul-p1).** The workflow is four stages: `/hm:research` (optional) →
+> `/hm:spec` → `/hm:execute` → `/hm:wrapup`. Review is `/hm:execute`'s Step 6, and the
+> deterministic gates are one command, `hm check`. Retired: the `hm:review`, `hm:verify`,
+> `hm:loop`, `hm:loop-p5-batch` and `hm:configure` commands; autopilot auto-advance; the `stuck`,
+> `security-auditor`, `executor` and `autoloop-coder` agents; and the `security-scanner`,
+> `verify-before-completion`, `targeted-test-selection`, `conditional-router`, `autoloop-driver`
+> and `refdocs-search` skills. The lens reviewers render only with `reviewers.fanout`. Sections
+> below that still describe a retired piece are a record of how it worked; they name it without
+> the leading slash because it is no longer a command.
 
 ---
 
@@ -58,11 +68,11 @@ visible. Implementation completion and trial outcome are separate.
    - 3.2 [/hm:spec — Acceptance Criteria](#32-hmspec--acceptance-criteria)
    - 3.3 [The plan stage was absorbed](#33-the-plan-stage-was-absorbed--where-its-content-went)
    - 3.4 [/hm:execute — TDD Implementation](#34-hmexecute--tdd-implementation)
-   - 3.5 [/hm:review — Code Review](#35-hmreview--code-review)
-   - 3.6 [/hm:verify — Completion Verification](#36-hmverify--completion-verification)
+   - 3.5 [hm:review — Code Review](#35-hmreview--code-review)
+   - 3.6 [hm:verify — Completion Verification](#36-hmverify--completion-verification)
    - 3.7 [/hm:wrapup — Commit Finalization](#37-hmwrapup--commit-finalization)
 4. [Chaining the Stages](#4-chaining-the-stages)
-5. [/hm:loop — Automated Iteration Loop](#5-hmloop--automated-iteration-loop)
+5. [hm:loop — Automated Iteration Loop](#5-hmloop--automated-iteration-loop)
 6. [Special Commands](#6-special-commands)
    - 6.1 [/hm:health — structural layer](#61-hmhealth--structural-layer)
    - 6.2 [/hm:health — personalization layer](#62-hmhealth--personalization-layer)
@@ -93,7 +103,7 @@ visible. Implementation completion and trial outcome are separate.
     - 11.19 [Atomic File Writes — Files Don't Corrupt on Interrupt](#1119-atomic-file-writes--files-dont-corrupt-on-interrupt)
     - 11.20 [100% Local Telemetry](#1120-100-local-telemetry)
     - 11.21 [Deep Interview (spec/plan) — Lock Architecture Through Dialogue, Not Assumptions](#1121-deep-interview-specplan--lock-architecture-through-dialogue-not-assumptions)
-    - 11.22 [/hm:loop Adaptive Interview + Convergence Loop — Iterations Converge Toward the Goal](#1122-hmloop-adaptive-interview--convergence-loop--iterations-converge-toward-the-goal)
+    - 11.22 [hm:loop Adaptive Interview + Convergence Loop — Iterations Converge Toward the Goal](#1122-hmloop-adaptive-interview--convergence-loop--iterations-converge-toward-the-goal)
     - 11.23 [TDD Phase A.5 Gate — Verify Tests Are Genuinely RED Before Implementation](#1123-tdd-phase-a5-gate--verify-tests-are-genuinely-red-before-implementation)
     - 11.24 [`stuck` Escalation Agent — A Dedicated Analyst Intervenes on Repeated Blockers](#1124-stuck-escalation-agent--a-dedicated-analyst-intervenes-on-repeated-blockers)
     - 11.25 [6-Checkpoint Verify Gate — Dual Validation of "Done" via Diff and Health Metrics](#1125-6-checkpoint-verify-gate--dual-validation-of-done-via-diff-and-health-metrics)
@@ -108,16 +118,16 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 
 | Category | Content |
 |----------|---------|
-| **Commands** | 14 `/hm:` slash commands (6 atomic stages + 2 loop drivers + 6 utility: `configure` `health` `help` `make` `metrics` `uninstall`) |
-| **Skills** | 14 reusable capability modules invoked by commands |
-| **Agents** | 16 sub-agents with specific roles |
-| **Hooks** | 5 event handler types that run automatically before/after tool calls |
+| **Commands** | 9 `/hm:` slash commands (4 stages + 5 utility: `health` `help` `make` `metrics` `uninstall`) |
+| **Skills** | 7 reusable capability modules (plus `second-opinion-gate` when `second_opinion.models` is set) |
+| **Agents** | 3 sub-agents by default (`code-reviewer`, `judgment-reviewer`, `spec-validator`), plus opt-in second-opinion, delegation and lens agents |
+| **Hooks** | event handlers that run automatically before/after tool calls |
 
 ### Design principles
 
 - **LLM judgment first**: LLM reads context and makes direct judgments rather than using pattern matching
-- **Atomicity**: Each stage can be run independently. Coupling between stages is handled by
-  `/hm:loop --per-iter-stages` or autopilot
+- **Atomicity**: Each stage can be run independently. Each one ends by naming the next; running
+  it is the user's call
 - **Worktree isolation**: Implementation changes happen only inside `.worktrees/<name>-<ts>/` — protecting the main branch
 - **Commit only in wrapup**: Even after multiple stages, a commit is created exactly once in wrapup
 - **No external transmission**: All telemetry is 100% local
@@ -136,8 +146,8 @@ calling an update complete; custom blocks and saved preferences are preserved.
 Start a new Codex thread when needed to discover newly installed skills.
 
 Invoke generated stages with `$hm-research topic`, `$hm-spec task-slug` and
-`$hm-execute task-slug` in Codex. The remaining stages are `$hm-review`, `$hm-verify`
-and `$hm-wrapup`; research recommends spec, and execute writes the PLAN. There is
+`$hm-execute task-slug` in Codex. The remaining stage is `$hm-wrapup`; research
+recommends spec, execute writes the PLAN and reviews the change. There is
 no separate plan skill. Regenerate the project harness after updating to repair
 owned guidance while preserving user extension blocks.
 
@@ -453,7 +463,7 @@ longer owe a test.
 `hm spec_machine approval-status --root . --slug <slug>` reports the state
 (`approved / exempt / missing / invalid / malformed / legacy / no_spec`). Autopilot stops at
 `spec` unless the SPEC is approved or exempt (`auto_full` proceeds without writing a stamp), and
-every land path — wrapup's commit, `worktree task-land`, `/hm:loop`'s `finalize success` —
+every land path — wrapup's commit, `worktree task-land`, `hm:loop`'s `finalize success` —
 refuses with `hold:` lines while irreversible decisions lack a valid approval. Wrapup asks the
 DRI first; no answer, no question tool, or loop mode is never an approval. The stamp records the
 flow; it does not prove a human (the same limit as objective approval). The stamp also carries a
@@ -485,7 +495,7 @@ Content moved by owner:
 | Irreversible decisions (schema · public API/CLI · file format · migration · security boundary · new dependency) | **`/hm:spec`** — `irreversible_decisions`, which is also the land-hold criterion |
 | Objective link (Step 0.5) | **`/hm:spec`** Step 0.5, plus SPEC frontmatter `intent:`. Intents are drafted only through Maker / the intent-layer skill (the Step 4.9 draft was removed in intent-surface-diet) |
 | Phases, file lists, order, risks, exit criteria | **`/hm:execute` Step 0**, authored with no human gate |
-| SPEC-need verdict (`spec_need_verdict` / `spec_need_target`) | **`/hm:execute` Step 0.1** — `prefilter` + `record` + a presence-preserving write. The *halt* was dropped on purpose; `/hm:verify` Check 6 is the enforcement point |
+| SPEC-need verdict (`spec_need_verdict` / `spec_need_target`) | **`/hm:execute` Step 0.1** — `prefilter` + `record` + a presence-preserving write. The *halt* was dropped on purpose; `hm:verify` Check 6 is the enforcement point |
 | Loop per-iter PLAN | **`/hm:execute` Step 0.2** |
 | `plan-validator` | **`spec-validator`**, relocated to `/hm:spec` Step 4.6 — one pass, conditional, and it never blocks approval |
 
@@ -647,7 +657,7 @@ uv run python -m harness_maker.worktree finalize <WT> fail
 
 ---
 
-### 3.5 /hm:review — Code Review
+### 3.5 hm:review — Code Review
 
 **Purpose**: Multiple specialist reviewers independently examine the implemented changes, reach consensus, and produce a quality grade. Automatically enters a fix loop if issues are found.
 
@@ -780,10 +790,10 @@ review → fix → measure churn → (maybe) re-review → regrade → …
   wider fix, and the refusal records `unresolved`/`oracle-blocked` (retagged `manual-only`).
 - **`hm review_churn complexity`** reports per-file LOC and AST-node deltas — `null`, not `0`,
   for a file it cannot diff (e.g. binary, or absent at one revision). It is still callable, but
-  `/hm:review` no longer runs it: SPEC-hm-light-lane-s2 removed step 5c and its "Size and
+  `hm:review` no longer runs it: SPEC-hm-light-lane-s2 removed step 5c and its "Size and
   Complexity" report section.
 - **The re-review is gated on churn.** Each round's churn is measured between two pinned
-  trees — the round's own pre-fix and post-fix state, never `HEAD`, because `/hm:review` does
+  trees — the round's own pre-fix and post-fix state, never `HEAD`, because `hm:review` does
   not commit and `HEAD..HEAD` would read 0.0 for every round. It aggregates as the **maximum
   across touched files**, so a one-line edit to a 5000-line file cannot mask a 30-line file
   rewritten whole. Below `reviewers.rereview_churn_ratio` (default 0.20) the re-review is
@@ -812,7 +822,7 @@ Save to `work-docs/REVIEW-{slug}-{date}.md`:
 
 ---
 
-### 3.6 /hm:verify — Completion Verification
+### 3.6 hm:verify — Completion Verification
 
 **Purpose**: The final gate before committing. Inspects 6 checkpoints in order and blocks on the first failure.
 
@@ -882,7 +892,7 @@ Remediation hints for each blocking check:
 With `--force` flag, continue without stopping at first failure (results recorded in jsonl).
 
 #### Outputs
-- Text result only. There is no `/hm:verify`-stage JSONL ledger — the former
+- Text result only. There is no `hm:verify`-stage JSONL ledger — the former
   `verify-{date}.jsonl` record was retired (commit `51b5bbfb`) because it was hand-written
   prose nothing read; stage entry/exit is already covered by `stage-spans.jsonl` and
   `auto-advance.jsonl`. The CI-facing `verify` command in `cli.py` still writes its own
@@ -952,11 +962,11 @@ stop:
 | Mechanism | What it does | Where it stops |
 |---|---|---|
 | **autopilot** (`autonomy.level`) | at the end of a stage, advances to the next entry in `autonomy.pipeline` | the plan architecture interview, a CHANGES_REQUESTED review, and the wrapup land — at **every** level |
-| **`/hm:loop`** | re-runs a chosen subset (`--per-iter-stages`, default `execute,review`) until a goal or a cap is reached | iteration / time caps, and any stage that reports a blocking gate |
+| **`hm:loop`** | re-runs a chosen subset (`--per-iter-stages`, default `execute,review`) until a goal or a cap is reached | iteration / time caps, and any stage that reports a blocking gate |
 
 The default is neither: a fresh harness renders `autonomy.level: ask`, so the first eligible
 stage of each session offers the choice and nothing advances until you take it. §5 covers
-`/hm:loop` in full; the autopilot picker is described in §6.
+`hm:loop` in full; the autopilot picker is described in §6.
 
 **Narrowing**: an armed autopilot session can be shortened to end at a given stage with
 `hm autopilot narrow --until <stage>` — Maker (§7.15) runs it on every ask so a "research X"
@@ -971,7 +981,7 @@ until 0.47.0 and was removed — see PLAN-harness-diet ADR-001/002/014. <!-- @hm
 
 ---
 
-## 5. /hm:loop — Automated Iteration Loop
+## 5. hm:loop — Automated Iteration Loop
 
 **Purpose**: Progressively improve toward a single goal through multiple iterations. Each loop uses one shared worktree, and safety rails prevent infinite loops.
 
@@ -981,8 +991,8 @@ until 0.47.0 and was removed — see PLAN-harness-diet ADR-001/002/014. <!-- @hm
 
 | Mode | Usage | Behavior |
 |------|-------|----------|
-| **feature** | `/hm:loop --mode feature <description>` | Incrementally implement a new feature over multiple iterations |
-| **improve** | `/hm:loop --mode improve <description>` | Review first, then iteratively improve existing code until exit criteria pass |
+| **feature** | `hm:loop --mode feature <description>` | Incrementally implement a new feature over multiple iterations |
+| **improve** | `hm:loop --mode improve <description>` | Review first, then iteratively improve existing code until exit criteria pass |
 
 ### Required Context + Loop Intensity
 
@@ -1030,7 +1040,7 @@ Loop start
 ### Example Loop Scenario Trace (feature mode, 3 iterations)
 
 ```
-1. /hm:loop feature "Add error handling to CSV parser"
+1. hm:loop feature "Add error handling to CSV parser"
 2. autoloop-driver analyzes description → purpose confirmed, invariants/priority unconfirmed
 3. Structured question: "What are the invariants and priority?"
 4. User reply: "Maintain existing API, quality first"
@@ -1060,7 +1070,7 @@ Loop start
 >   the crawler modules, the relevance filter, the stale-asset code, and the command
 >   template after a production run surfaced 12 items of which 11 were rejected — 91%
 >   noise. The one source worth keeping, OSV CVE detection, survives independently as
->   `secscan/dependency_cves.py`, consumed by `/hm:verify` Check 4. There is no
+>   `secscan/dependency_cves.py`, consumed by `hm:verify` Check 4. There is no
 >   replacement command for the crawl; the section that described it was deleted rather
 >   than rewritten, because the feature is gone.
 
@@ -1124,10 +1134,10 @@ Integrate 3-layer scores to create `docs/ai-readiness-{date}.md`:
 **Step 4 — Determine Improvement Priority**
 
 Classify discovered issues into two categories:
-- **AI-fixable**: Things that can be automatically improved with `/hm:loop improve`
+- **AI-fixable**: Things that can be automatically improved with `hm:loop improve`
 - **Human-required**: Things requiring human involvement such as architecture decisions
 
-Propose a `/hm:loop` command for each AI-fixable item.
+Propose a `hm:loop` command for each AI-fixable item.
 
 #### Outputs
 - `docs/ai-readiness-{date}.md` (dashboard)
@@ -1260,14 +1270,14 @@ See [Section 6.2](#62-hmai-readiness--ai-readiness-analysis) for 3-layer details
 
 ### 7.3 autoloop-driver
 
-**Role**: Explains the WHY of the `/hm:loop` command and defines the method for collecting loop context, intensity, and exit criteria.
+**Role**: Explains the WHY of the `hm:loop` command and defines the method for collecting loop context, intensity, and exit criteria.
 
 **Key contributions**:
 - Define 5 required dimensions (purpose, invariants, priority, test_reliability, stopping_criteria)
 - Coverage-based adaptive interview principle (extract first, ask later)
 - Define the 4-gate convergence model and safety rails
 
-This skill is a **documentation skill** — it does not execute code directly, but provides guidance on how the `/hm:loop` command should behave.
+This skill is a **documentation skill** — it does not execute code directly, but provides guidance on how the `hm:loop` command should behave.
 
 ---
 
@@ -1354,7 +1364,7 @@ osv_dev.crawl(packages=osv_dev.parse_uv_lock("uv.lock"))
 - All 4 sources are executed (if one fails, the rest continue)
 - Skip crawl if raw file exists within 24 hours
 - Offline state: silently skip + stderr warning
-- **No direct changes** — only saves raw data. The consumer that applied it (`hm:refresh`) was removed by ADR-0007; only the OSV CVE path survives, read by `/hm:verify` Check 4
+- **No direct changes** — only saves raw data. The consumer that applied it (`hm:refresh`) was removed by ADR-0007; only the OSV CVE path survives, read by `hm:verify` Check 4
 
 **Output**: `.claude/observability/refresh/raw-{date}.jsonl`
 
@@ -1414,7 +1424,7 @@ non-Python harness with neither selection nor parallelism.
 Lint and type checks stay unconditional: repo-wide, cheap, no selection concept.
 
 **Called from**:
-- The `/hm:review` auto-fix loop's **verify build** step (replacing an unconditional
+- The `hm:review` auto-fix loop's **verify build** step (replacing an unconditional
   `uv run pytest -x` on every fix round). Deliberately named, not numbered — the round
   loop's step numbers move (`PLAN-review-round-inflation` inserted a grouping step and
   shifted verify from 3 to 5), and pinning the number is the
@@ -1436,8 +1446,8 @@ See [Section 3.6](#36-hmverify--completion-verification) for 6-checkpoint detail
 
 **Called from**:
 - Step 2 of `/hm:wrapup`
-- At the end of each iteration in `/hm:loop`
-- Manually: `/hm:verify`
+- At the end of each iteration in `hm:loop`
+- Manually: `hm:verify`
 
 ---
 
@@ -1708,8 +1718,8 @@ change something.
 `/intent-layer` (or `$intent-layer`) still runs them; Maker reaches them by Reading their
 `SKILL.md` before any write, with their consent rules unchanged. `/hm:help` lists both as
 `typed only`. Every `/hm:` stage description ends with
-`Only when typed, or via <Name>, autopilot or /hm:loop.` (`$hm-loop` on Codex) — advisory gating only, because Maker handoff, autopilot
-advance and `/hm:loop` invoke stages model-side. Two always-loaded pointers (in `CLAUDE.md`,
+`Only when typed, or via <Name>, autopilot or hm:loop.` (`hm-loop` on Codex) — advisory gating only, because Maker handoff, autopilot
+advance and `hm:loop` invoke stages model-side. Two always-loaded pointers (in `CLAUDE.md`,
 `AGENTS.md` and `.cursor/rules/harness.mdc`) carry the routing: `## World model` (≤ 400 chars per
 variant) sends goal, metric, fact and status asks to Maker even unnamed or mid-stage — not
 ordinary build/fix asks — and carries the decision-capture and aside rules; `## Project knowledge`
@@ -1776,7 +1786,7 @@ Agents are sub-agents with independent contexts. When the main Claude context in
 
 ### 8.1 autoloop-coder
 
-**Role**: A limited-scope agent responsible for implementing each iteration within `/hm:loop`.
+**Role**: A limited-scope agent responsible for implementing each iteration within `hm:loop`.
 
 **Permissions (allowed)**:
 - `Read(*)`, `Grep(*)`, `Glob(*)` — full read access
@@ -1796,7 +1806,7 @@ list (Write/Edit/Bash are granted without path restriction). See §11.16.
 
 ### 8.2 code-reviewer
 
-**Role**: General-purpose code reviewer always included in every `/hm:review`.
+**Role**: General-purpose code reviewer always included in every `hm:review`.
 
 **Permissions**: Read, Grep, Glob + `Bash(git diff:*)`, `Bash(git log:*)`, `Bash(git status:*)`
 **Denied**: Write(*), Edit(*), all execution Bash (rm, curl, npm, eval, python, node, sh, bash)
@@ -1848,7 +1858,7 @@ list (Write/Edit/Bash are granted without path restriction). See §11.16.
 
 ### 8.5 executor
 
-**Role**: Agent that actually fixes P0/P1 findings in the automatic fix loop of `/hm:review`.
+**Role**: Agent that actually fixes P0/P1 findings in the automatic fix loop of `hm:review`.
 
 **Permissions (allowed)**:
 - `Read(*)`, `Grep(*)`, `Glob(*)` — full read access
@@ -1924,7 +1934,7 @@ second validator pass.
 
 ### 8.9 security-reviewer
 
-**Role**: Conditional reviewer specialized in security-related diffs within `/hm:review`.
+**Role**: Conditional reviewer specialized in security-related diffs within `hm:review`.
 
 **Trigger** (conditional-router): Files containing `.env`, `/auth/`, `/secret`
 
@@ -1951,7 +1961,7 @@ second validator pass.
 - `/hm:execute` Phase A.5: test-reviewer FAIL retry budget exhausted
 - `/hm:execute` Phase D: failure that cannot be resolved without PLAN scope change
 - `/hm:execute` ADR conflict: implementation can only proceed by violating an ADR
-- `/hm:review` consensus deadlock: 3 reviewers have conflicting CONCLUDE on the same issue
+- `hm:review` consensus deadlock: 3 reviewers have conflicting CONCLUDE on the same issue
 - `/hm:spec` spec-validator: an unresolved critical
 
 **Analysis process**:
@@ -2172,7 +2182,7 @@ hooks.json is a target of security-auditor's **gate 3** inspection:
 - Injection via `eval "$..."`
 - User-writable file → stdout → LLM injection path
 
-Always recommended to review with the security-scanner skill (or `/hm:verify` Check 4) when modifying hook code.
+Always recommended to review with the security-scanner skill (or `hm:verify` Check 4) when modifying hook code.
 
 ---
 
@@ -2312,7 +2322,7 @@ On failure (fail):
 
 **Q: Don't multiple commits get created?**
 
-A: No. The `execute` and `review` stages do not commit. `wrapup` creates exactly one commit. The same applies under `/hm:loop`, which defers wrapup to loop close.
+A: No. The `execute` and `review` stages do not commit. `wrapup` creates exactly one commit. The same applies under `hm:loop`, which defers wrapup to loop close.
 
 **Q: What if worktrees accumulate too many?**
 
@@ -2578,7 +2588,7 @@ PDFs are processed page-by-page with Read multimodal. DOCX is not supported (con
 
 `second_brain` connects a generated harness to an Obsidian-compatible Markdown vault as a typed graph of decisions, preferences, failures, projects, references, and journals. Notes use YAML frontmatter plus tags and `[[links]]`, so stages can retrieve targeted memory instead of loading the whole vault.
 
-First install keeps this setup read-first and points advanced write-capable configuration to `/hm:configure`, where the user can review the allowlist, namespace, and writable-folder trade-offs deliberately.
+First install keeps this setup read-first and points advanced write-capable configuration to `hm:configure`, where the user can review the allowlist, namespace, and writable-folder trade-offs deliberately.
 
 Writes are intentionally full Markdown writes inside trusted allowlisted folders. To keep several projects from colliding in the same vault, any writable folder requires `second_brain.project_id`, and the writable folder path must include that project id as a path segment, such as `Projects/my-app`. Managed notes also warn when frontmatter omits the project namespace.
 
@@ -2828,7 +2838,7 @@ include one shared partial, so the enabled block set cannot drift between them.
 
 **Existing projects are retrofitted.** A `harness.yaml` with no `comprehension` key acquires
 `standard` on its next `/harness-maker:make --update`, and its `/hm:spec` grows
-accordingly. Opt out with `/hm:configure` → Interview comprehension → `minimal`
+accordingly. Opt out with `hm:configure` → Interview comprehension → `minimal`
 (or `harness-maker make . --comprehension-depth minimal`), which restores the previous
 output exactly. An unrecognized value warns and is rewritten to `standard`.
 
@@ -2855,18 +2865,18 @@ Before saving the PLAN, scan for expressions like "Accept?", "OK?", "Verify?", "
 
 ---
 
-### 11.22 /hm:loop Adaptive Interview + Convergence Loop — Iterations Converge Toward the Goal
+### 11.22 hm:loop Adaptive Interview + Convergence Loop — Iterations Converge Toward the Goal
 
 **Before**: Open-ended requests like "improve this code" either end in one turn, or each turn loses context and drifts in unrelated directions.
 
-**After**: `/hm:loop` executes a **time-and-iteration bounded** loop. Each iteration reads the results of the previous iteration, then convergence is accepted only after mechanical checks, LLM criterion checks, regression comparison, and a two-iteration streak all pass.
+**After**: `hm:loop` executes a **time-and-iteration bounded** loop. Each iteration reads the results of the previous iteration, then convergence is accepted only after mechanical checks, LLM criterion checks, regression comparison, and a two-iteration streak all pass.
 
 #### Two Modes
 
 | Mode | Command | Purpose |
 |------|---------|---------|
-| **feature** | `/hm:loop --mode feature "description"` | Incrementally implement toward a goal or SPEC file |
-| **improve** | `/hm:loop --mode improve "description"` | Iteratively improve existing code, stop when exit criteria converge |
+| **feature** | `hm:loop --mode feature "description"` | Incrementally implement toward a goal or SPEC file |
+| **improve** | `hm:loop --mode improve "description"` | Iteratively improve existing code, stop when exit criteria converge |
 
 #### autoloop-driver's 5-Dimension Adaptive Interview
 
@@ -2981,7 +2991,7 @@ The `stuck` agent reads the full PLAN + SPEC + REVIEW + latest 3 reviewer output
 
 **Before**: "Tests pass" is considered done. Whether what was written in the PLAN was actually implemented, whether there are security vulnerabilities, and whether other quality metrics have regressed are not checked.
 
-**After**: `/hm:verify` (= `verify-before-completion` skill) executes 6 checkpoints in order and **immediately blocks on the first failure**.
+**After**: `hm:verify` (= `verify-before-completion` skill) executes 6 checkpoints in order and **immediately blocks on the first failure**.
 
 #### 6 Checkpoints
 
@@ -3036,4 +3046,4 @@ Even when tests pass, the AI Readiness composite score can drop by 5 or more poi
 
 ---
 
-*This document is current as of harness-maker 0.63.0. Generated via: `/hm:execute how-it-works-docs`*
+*This document is current as of harness-maker 0.64.0. Generated via: `/hm:execute how-it-works-docs`*

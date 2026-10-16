@@ -6,47 +6,35 @@
 
 ## 📋 사용 가능한 명령
 
-### Atomic stages (6)
+### Stages (4)
 
 | 명령 | 용도 |
 |---|---|
-| `{{ cmd }}research` | 컨텍스트·선행 작업·라이브러리 문서 조사 |
-| `{{ cmd }}spec`     | 수용 기준 확정 (intent / outcomes / scenarios) |
-| `{{ cmd }}execute`  | TDD 머신 — PLAN 단계별 RED → GREEN |
-| `{{ cmd }}review`   | 다중 reviewer 합의 + grade gate + auto-fix |
-| `{{ cmd }}wrapup`   | 단일 commit, CHANGELOG, 문서 갱신 |
-| `{{ cmd }}verify`   | wrapup 전 독립 invariant 검증 |
+| `{{ cmd }}research` | 선택: 사실·선행 작업·대안 조사 |
+| `{{ cmd }}spec`     | 수용 기준과 각 기준의 검증 방법 확정 |
+| `{{ cmd }}execute`  | 테스트 RED → 코드 GREEN → 리뷰 1회. commit 하지 않음 |
+| `{{ cmd }}wrapup`   | 게이트, 메모리, 단일 commit |
 
 ### Meta
 
 | 명령 | 용도 |
 |---|---|
 {% if not is_codex -%}
-| `{{ cmd }}make`      | 전체 재렌더 (인터랙티브) |
-{% endif -%}
-{% if not is_codex -%}
-| `{{ cmd }}configure` | 개별 설정 변경 (재인터뷰 없이) |
-{% endif -%}
-{% if not is_codex -%}
+| `{{ cmd }}make`      | 하네스 재렌더 (설정 변경은 `.claude/harness.yaml` 수정 후) |
 | `{{ cmd }}health`    | 3-layer 진단 (structural / external / personalization) |
-{% endif -%}
-{% if config.loop.enabled -%}
-| `{{ cmd }}loop`      | 안전 레일 있는 bounded autoloop |
-{% endif -%}
-{% if not is_codex -%}
 | `{{ cmd }}uninstall` | 하네스 제거 |
 {% endif -%}
 | `{{ cmd }}help`      | (이 명령) |
 {% if not is_codex -%}
-| `{{ cmd }}metrics`   | Delivery metrics — CFR + churn 추이, LLM 해석 (수동, 읽기 전용) |
+| `{{ cmd }}metrics`   | Delivery·비용 추이, 회고용 (읽기 전용) |
 {% endif -%}
 ## 🔁 추천 워크플로
 
 ```
-  research ─► spec ─► execute ─► review ─► verify ─► wrapup
+  [research] ─► spec ─► execute ─► wrapup
 ```
 
-{% if config.loop.enabled %}stage 연결은 `{{ cmd }}loop` 또는 autopilot 이 담당합니다 — 융합 워크플로우 명령은 없습니다. <!-- @hm:axis-removed -->{% else %}stage 연결은 autopilot 이 담당합니다 — 융합 워크플로우 명령은 없습니다. `{{ cmd }}loop` 는 꺼져 있습니다 (켜려면 `.claude/harness.yaml` 에 `loop.enabled: true` 를 설정하고 `/hm:make` 를 실행하세요). <!-- @hm:axis-removed -->{% endif %}
+각 stage 는 끝나면 멈춥니다. 다음 stage 는 직접 입력하세요. `hm check` 가 execute 와 wrapup 이 돌리는 단일 게이트입니다.
 
 ## ⚙️ 현재 설정
 
@@ -55,7 +43,7 @@
 | preset | `{{ config.preset }}` |
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
-| autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, 매 세션 자동 재무장{% endif %} |
+| autonomy | `{{ config.autonomy.level }}` |
 | intent-layer | skill, typed only (직접 입력할 때만{% if is_codex %}, `$intent-layer`{% endif %}) — 목표·지표·관찰. 그 외엔 {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) 에게 |
 | project-knowledge | skill, typed only (직접 입력할 때만{% if is_codex %}, `$project-knowledge`{% endif %}) — 코드에 없는 프로젝트 사실 기록·정정, auto-memory 가 아니라 공유 wiki. 그 외엔 {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) 에게 |
 | {{ (config.world_model or {}).get('name', 'Maker') }} | world model 정면 입구 — {% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}: 브리핑, 작업 시작·재개, 사실 기록, 목표 |
@@ -66,9 +54,9 @@
 
 ## 💡 다음 단계
 
-- 처음이라면      →  `{{ cmd }}research` 로 시작해 위 stage 순서를 따르세요
+- 처음이라면      →  `{{ cmd }}spec` 으로 시작해 위 stage 순서를 따르세요
 {% if not is_codex -%}
-- 설정 변경       →  `{{ cmd }}configure`
+- 설정 변경       →  `.claude/harness.yaml` 수정 후 `{{ cmd }}make`
 {% endif -%}
 {% if not is_codex -%}
 - 하네스 진단     →  `{{ cmd }}health`
