@@ -1,0 +1,2 @@
+# the compact default keeps its output (docs/DECISIONS.md D-6)
+test_the_compact_default_is_unchanged

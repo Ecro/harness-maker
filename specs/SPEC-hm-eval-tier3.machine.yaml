@@ -1,0 +1,477 @@
+schema_version: 3
+spec_slug: hm-eval-tier3
+parent_spec: SPEC-hm-eval
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Dev-only eval script outside src; each scenario is pinned
+  by task fixtures checked against their start trees, golden rows and a fake claude,
+  so mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Every tier-3 task discriminates, and its careless overlay fails hidden but
+    passes visible
+  type: property
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_tier3_tasks_discriminate
+  - tests/unit/test_bench_tier3.py::test_tier3_ships_nine_tasks_in_four_families
+  - tests/unit/test_bench_tier3.py::test_a_careless_overlay_that_passes_is_a_problem
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: The hidden tests and careless overlays are frozen before any arm runs and
+    covered by tier3_hash; the DRI signs that hash before the hm arm runs.
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Each task's hidden tests are written from the cited sentence in
+    its start-tree file or prompt (scripts/bench/tier3/base/docs/DECISIONS.md, docs/config.md,
+    timeparse/pack.py, the session prompts), independent of the reference overlay;
+    the careless/ overlay is the plausible-but-wrong path named in the approved DESIGN,
+    so a reference that passes and a careless copy that fails are two independent
+    witnesses that the tests measure the trap.
+  oracle_independence_waiver: null
+  input_domain: every task directory under scripts/bench/tier3/tasks/ (t13-t21)
+  transformation: grade the grading tree (fixture + base + seed + every session overlay),
+    the grading tree plus reference/, and the grading tree plus careless/, with the
+    hidden tests and with the tree's own visible tests
+  expected_relation: all(t fails on start for t in hidden - guards) and all(t passes
+    on start for t in guards) and grade(reference).passed and visible(reference).passed
+    and visible(start).passed and not grade(careless).passed and visible(careless).passed
+    and ids == ['t13', 't14', 't15', 't16', 't17', 't18', 't19', 't20', 't21'] and
+    guard_tasks == ['t21']
+  preconditions: []
+  observable_output: check_task problems per tier-3 task (empty list = sound)
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Every tier-3 hidden test quotes a sentence found in its named home
+  type: property
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_every_tier3_hidden_test_cites_a_findable_sentence
+  - tests/unit/test_bench_tier3.py::test_a_quote_missing_from_its_home_is_a_problem
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: Replaces tier 2's "the prompt states every case" with "the answer is on disk
+    or in a prompt" (DESIGN fairness rule 3).
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The home text is read from the grading tree on disk (a path such
+    as docs/DECISIONS.md) or from the session prompt files, independent of the runner's
+    citation parser; the negative case plants a quote that is in no file, so the relation
+    is checked from both sides.
+  oracle_independence_waiver: null
+  input_domain: every test function in scripts/bench/tier3/tasks/*/hidden/*.py
+  transformation: split the docstring at its last `Source:` line into quote and home,
+    and read the home (a grading-tree file, the prompt, or session n's prompt)
+  expected_relation: all(normalise(quote) in normalise(home_text) and home in grading_tree_files
+    | {'prompt'} | session_homes for each hidden test) and problems(quote_not_in_home)
+    != []
+  preconditions: []
+  observable_output: citation problems from check_task
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Tier-3 prompts carry no harness vocabulary and no clarifying path
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_tier3_prompts_carry_no_harness_word
+  - tests/unit/test_bench_tier3.py::test_the_prompt_lint_rejects_each_listed_word
+  executable_predicate: null
+  golden_table:
+  - input:
+      prompt: Fix issue
+    expected:
+      problems: 0
+    edge: false
+    note: an issue number and a module name are what a real ticket carries
+  - input:
+      prompt: Write a spec first, then fix it.
+    expected:
+      problems: 1
+    edge: false
+    note: whole word spec, any case
+  - input:
+      prompt: Make a Plan and remember the cap.
+    expected:
+      problems: 2
+    edge: false
+    note: plan and remember
+  - input:
+      prompt: See docs/DECISIONS.md.
+    expected:
+      problems: 1
+    edge: false
+    note: the clarifying files live under docs/
+  - input:
+      prompt: Cover AC-1 and note this.
+    expected:
+      problems: 2
+    edge: false
+    note: a REDACTIONS pattern and the phrase note this
+  - input:
+      prompt: The planner keeps its specification.
+    expected:
+      problems: 0
+    edge: true
+    note: whole words only, so planner and specification pass
+  rubric_id: null
+  note: The listed words are DESIGN fairness rule 2; REDACTIONS is the judge's blinding
+    table, reused.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The golden prompts and their problem counts are written by hand
+    from the word list in the approved DESIGN rule 2, independent of the lint's regex.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: The differential oracles equal the unchanged start tree
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_goldens_match_the_unchanged_start_tree
+  executable_predicate: null
+  golden_table:
+  - input:
+      task: t16
+      oracle: _PACKED (value -> packed string)
+    expected:
+      equal_to: start-tree pack(value) for every recorded value
+    edge: false
+    note: a differential oracle that owes nothing to the reference
+  - input:
+      task: t18
+      oracle: the frozen parse_duration copy in the hidden test, over its 5,000-string
+        ASCII corpus
+    expected:
+      equal_to: start-tree parse_duration outcome (value or ValueError) per string
+    edge: false
+    note: ASCII only, per the DRI default of 2026-10-15
+  - input:
+      task: t13
+      oracle: _compact(seconds) over _SWEEP
+    expected:
+      equal_to: start-tree format_duration(seconds)
+    edge: false
+    note: the default output must stay byte-identical (D-6)
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The oracle values are compared against the start tree built from
+    scripts/bench/timeparse plus scripts/bench/tier3/base, which no arm has touched;
+    the reference overlays play no part.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: A multi-session run is sequential fresh sessions on one work dir, graded
+    once
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_sessions_run_in_order_as_fresh_processes_in_one_work_dir
+  - tests/unit/test_bench_tier3.py::test_the_teammate_commit_holds_only_the_overlay_paths
+  - tests/unit/test_bench_tier3.py::test_an_overlay_the_arm_already_wrote_is_recorded_as_clobbered
+  - tests/unit/test_bench_tier3.py::test_a_failed_session_stops_the_run_and_grades_once
+  executable_predicate: calls == [(work, prompt_1), (work, prompt_2)] and all('--continue'
+    not in argv and '--resume' not in argv for argv in main_arm_argvs) and hm_prompts
+    == ['/hm:spec ' + p for p in session_prompts] and teammate_commit_paths == overlay_paths
+    and arm_file_uncommitted_after_teammate_commit and row['overlay_clobbered'] ==
+    ['timeparse/locale.py'] and len(row['sessions']) == 2 and row['cost_usd'] == sum(s['cost_usd']
+    for s in row['sessions']) and failed_row['stopped_at'] == 1 and len(failed_row['sessions'])
+    == 1 and grades_per_run == 1 and solved_row['outcome'] == 'solved'
+  golden_table: []
+  rubric_id: null
+  note: DESIGN §3. A session boundary is a fresh process, the case hm's persisted
+    state claims to cover.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fake claude records each call's cwd, argv and prompt, writes
+    a fixed per-session cost and the overlay the test chooses, so the expected order,
+    sums and commit contents are set by the fake and read back from git with `git
+    show --name-only`, independent of the runner.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Tier 3 has its own hash and sign-off gate, and rows never mix
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_tier3_hash_covers_tier3_files_only
+  - tests/unit/test_bench_tier3.py::test_a_tier3_run_with_the_hm_arm_needs_the_signoff
+  - tests/unit/test_bench_tier3.py::test_tier3_rows_record_their_hash_and_never_mix
+  executable_predicate: tier3_hash(edited_tier3_copy) != tier3_hash(copy) and tier3_hash(edited_tier2_copy)
+    == tier3_hash(copy) and bench_hash(edited_tier3_copy) == bench_hash(copy) and
+    run(tier='3', arms='plain,hm', signoff=None) == 2 and run(tier='3', arms='plain,hm',
+    signoff=stale) == 2 and run(tier='3', arms='plain,hm', signoff=current) == 0 and
+    run(tier='3', arms='plain', signoff=None) == 0 and all(r['tier3_hash'] == tier3_hash()
+    for r in tier3_rows) and raises(MixedResultsError, ensure_consistent, two_hash_rows)
+  golden_table: []
+  rubric_id: null
+  note: The pilot is plain-only and ungated (coordinator, 2026-10-15); its rows record
+    the hash the DRI signs.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The test edits a private copy of scripts/bench/ and compares hashes
+    across the edit, and the gate cases are fixed sign-off files written by the test;
+    the expected exit codes follow from the SPEC S6 rule read by hand.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Tiers 1-2 keep their hashes, rows and published output
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_tier_one_and_two_hashes_are_unchanged
+  - tests/unit/test_bench_tier3.py::test_a_tier_two_row_has_no_tier3_fields
+  - tests/unit/test_bench_light_lane.py::test_the_committed_results_and_readme_block_are_published_from_the_committed_rows
+  executable_predicate: 'bench_hash() == ''569e17ef29ab'' and tier2_hash() == ''1cf707c57e12''
+    and runner_hash(''model-x'', 400, 1800, 5.0, (), ''fake 1.0'', quality_tools={''ruff'':
+    ''r'', ''mypy'': ''m''}) == ''17f703bf0fcc'' and not {''tier3_hash'', ''sessions'',
+    ''stopped_at'', ''overlay_clobbered''} & set(tier2_row) and republished == committed'
+  golden_table: []
+  rubric_id: null
+  note: The pinned values were recorded from origin/main db19f023 before any runner
+    change.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The three hash literals were computed by the unchanged runner at
+    db19f023 (bench 569e17ef29ab is the bench named in docs/evals/RESULTS.md), and
+    the committed docs/evals/results.jsonl with its RESULTS.md and README block is
+    the golden for publish.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: The two plain controls run as their own arms, outside the main scorecard
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_the_careful_variant_appends_one_sentence
+  - tests/unit/test_bench_tier3.py::test_the_continue_variant_continues_after_the_first_session
+  - tests/unit/test_bench_tier3.py::test_control_rows_stay_out_of_the_main_scorecard
+  executable_predicate: careful_prompts == [p + '\n\n' + CAREFUL_SENTENCE for p in
+    session_prompts] and continue_argvs[0].count('--continue') == 0 and continue_argvs[1].count('--continue')
+    == 1 and scorecard(rows + control_rows) == scorecard(rows) and runner_hash(arms=('plain',))
+    == runner_hash()
+  golden_table: []
+  rubric_id: null
+  note: The fixed sentence is DESIGN §3's.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fake claude records each argv and prompt, and the scorecard
+    comparison uses golden rows written by the test; the sentence is copied from the
+    approved DESIGN.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: The tier-3 report lists each task, the pilot drop rule and uncalibrated judge
+    lines
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_the_tier3_report_lists_each_task_and_the_pilot_drop
+  - tests/unit/test_bench_tier3.py::test_tier3_judge_lines_are_labelled_uncalibrated
+  executable_predicate: null
+  golden_table:
+  - input:
+      plain_solved: t13 0/3, t14 2/3, t15 3/3, t21 1/3
+    expected:
+      pilot: t13 keep, t14 drop, t15 drop, t21 guard
+    edge: false
+    note: drop at 2 or more of 3; the guard is exempt
+  - input:
+      plain_solved: t13 1/2
+    expected:
+      pilot: t13 n/a (n=2)
+    edge: true
+    note: the rule needs 3 runs
+  - input:
+      rows: tier 1 and 2 only
+    expected:
+      report: byte-identical to the report before tier 3
+    edge: true
+    note: no tier-3 block, no label change
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The golden rows and the expected keep/drop/guard labels are worked
+    by hand from the pilot rule in the approved DESIGN §5.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: Tier 3 publishes beside the scorecard, refuses rows it cannot report honestly,
+    and ties to the signed hash
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_tier3_publishes_the_pilot_rule_and_withdraws_the_claim
+  - tests/unit/test_bench_tier3.py::test_four_kept_tasks_make_tier3_measurable_and_keep_the_claim_open
+  - tests/unit/test_bench_tier3.py::test_tier3_publish_refuses_rows_it_cannot_report_honestly
+  - tests/unit/test_bench_tier3.py::test_without_tier3_rows_publish_writes_what_it_wrote_before
+  - tests/unit/test_bench_tier3.py::test_the_committed_tier3_rows_carry_the_signed_tier3_hash
+  - tests/unit/test_bench_tier3.py::test_tier3_costs_say_they_are_cli_totals_without_subagent_spend
+  - tests/unit/test_bench_tier3.py::test_tier3_costs_omit_the_unpriced_note_when_every_row_is_priced
+  - tests/unit/test_bench_tier3.py::test_the_committed_tier3_rows_publish_the_committed_section
+  executable_predicate: null
+  golden_table:
+  - input:
+      pilot_plain_solved: t13-t17 3/3, t18 2/3, t19 3/3, t20 0/3, t21 3/3
+      diagnostic: hm on t20 and t21, plain-careful on t20
+    expected:
+      results_md: tiers 1-2 render unchanged as a prefix, then T = 1 (t20), inconclusive,
+        the per-task claim withdrawn, the hm rows under a diagnostic-not-a-verdict
+        heading
+      readme: the old block unchanged, then one to three tier-3 sentences
+    edge: false
+    note: the DRI's card of 2026-10-16 (publish + hm diagnostic)
+  - input:
+      tier3_dir: absent
+    expected:
+      results_md_and_readme: byte-identical to the publish before tier 3
+    edge: true
+    note: tiers 1-2 keep every byte
+  - input:
+      pilot_or_diagnostic: mixed tier3_hash; an hm row in the pilot; a task with 2
+        pilot runs; a tier-2 row; mixed harness_sha in one dir; every t16 row runner_error;
+        no t21 row; an unknown arm; a row without rep
+    expected:
+      publish: exit 2, refusing to publish on stderr, no file written
+    edge: true
+    note: the pilot's task set must equal the tier-3 tasks under scripts/bench/tier3/tasks/,
+      so a dropped task cannot leave T's denominator
+  - input:
+      cost: one diagnostic row without a price
+    expected:
+      cost_note: every $ is the CLI cost, which excludes subagent spend; 1 of 36 runs
+        has no price and is left out of the $ means
+    edge: true
+    note: with every row priced the unpriced clause is absent
+  - input:
+      rows: the committed docs/evals/tier3 rows
+    expected:
+      tier3_hash: scripts/bench/tier3-signoff.json tier3_hash == tier3_hash() == the
+        rows' tier3_hash
+    edge: false
+    note: the signed bytes are the published bytes
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The keep/drop/guard labels and T are worked by hand from the pre-registered
+    drop rule (DESIGN §5); the expected hash is the DRI's own scripts/bench/tier3-signoff.json;
+    the cost caveat restates docs/evals/tier3/notes.md (transcript-priced about $22.2
+    against $18.1 by the CLI for the diagnostic rows); the no-tier3 golden is the
+    committed tests/unit/fixtures/hm_eval/README.after.md.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 6b648676d4e48fd52d40068a42ba11be51f0da7995ff50c58147d7a7fd3ac7c7
+  approved_by: Ecro
+  approved_at: '2026-10-16T09:29:06Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: d6600a56500d4c37c60c9dceadfa0d6fd8af5dc2e9a9b7150cf277c5a6bb0a5b
+    parent_spec: d3ea6fcacb049196495e4f82523e3385697a941aa9ca959918936786b21f97af
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: dbf99c34cc97c3f3694a80e513f563049b9b24fa5ffc751a57b67a662786396d
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 217d39fb9cc340bc4c6fc3548060589458208cbac9a324f1824f32b5e9a4c58e
+    AC-002: 02d21d10eb6a99e598c6d4ba0c7851fb6cca61e9adc8122bfb5b3357202a65e6
+    AC-003: a2e46e8fa34e38ed220d3be5717a10b478a7854ed249656685645ec81513e9b0
+    AC-004: e4e2bb12da1fa9629f570d5d86b918be8c3f2ed4e74e35dbb37af09667d470c3
+    AC-005: 52109cacc11eaff603e857d6110871cc2290f3347cb0f2a8e3b74d0445726b3f
+    AC-006: af42986fd8fd8788333741d5f61adaea6f57cdda1efaaeca33c6ae0047dcbac0
+    AC-007: d373b8f1d511cfd6dd81a08866255ade2e3782f73a8b2849c82412544364d56f
+    AC-008: 77c7a136a8b5a95a3273ef24d5938e59b8c8e4582786df5b180ca1224132260a
+    AC-009: 7c0c73c4fe6883cb6706505785b0392a32e43a72680f46d3f51d4249f07410ca
+    AC-010: 7a5c289c1166489e10dd7bb9687e9cc2537e0a4dd230375802a238f674aed197
+    ac_order: 9197b2c918245ab06ace42d9ff4679ea85b92fa0c38b4938b0bc74e8d2d86aab
+  lane: full

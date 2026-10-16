@@ -80,6 +80,22 @@ TASKS_DIR = BENCH_DIR / "tasks"
 RESULTS = "results.jsonl"
 SIGNOFF_FILE = BENCH_DIR / "tier2-signoff.json"  # the DRI's {tier2_hash, signed_by, signed_at}
 CALIBRATION_FILE = BENCH_DIR / "judge-calibration.json"  # canary --judge-calibration --record
+# Tier 3 (SPEC-hm-eval-tier3) lives apart from tasks/, so bench_hash and tier2_hash of tiers 1-2
+# keep their values; tier3_hash covers it instead.
+TIER3 = "tier3"
+TIER3_SIGNOFF_FILE = BENCH_DIR / "tier3-signoff.json"  # the DRI's {tier3_hash, signed_by, ...}
+# Plain controls (SPEC-hm-eval-tier3 S8): their own arms, never part of the plain-vs-hm scorecard.
+CONTROL_ARMS = ("plain-careful", "plain-continue")
+ALL_ARMS = (*ARMS, *CONTROL_ARMS)
+CAREFUL_SENTENCE = (
+    "Before changing code, read the documentation and every caller that the change could affect."
+)
+# Words a tier-3 prompt must not hold (whole words, any case), beside the REDACTIONS patterns
+# and any path under docs/, where the clarifying files live (DESIGN fairness rule 2).
+PROMPT_LINT = (
+    r"\b(?:spec|plan|memory|remember|acceptance)\b", r"\bnon-goal\b", r"\bnote this\b",
+    r"\bdocs/",
+)  # fmt: skip
 LOCK_FILE = ".run.lock"
 # Statuses that are the runner's fault: left out of the report and retried on resume.
 UNUSABLE = ("setup_error", "runner_error")
@@ -218,6 +234,12 @@ class Trap:
 
 
 @dataclass(frozen=True)
+class Session:
+    prompt: str
+    overlay: Path | None = None  # a teammate's files, committed before this session starts
+
+
+@dataclass(frozen=True)
 class Task:
     id: str
     prompt: str
@@ -229,6 +251,17 @@ class Task:
     damaged_dir: Path | None = None  # reference with planted defects, for judge calibration
     trap: Trap | None = None
     control_dir: Path | None = None  # reference made longer but still clean, for calibration
+    # Tier 3 (SPEC-hm-eval-tier3): sessions run in order on one work dir; empty is one session
+    # from `prompt`. The base overlay goes on before the seed; careless/ is the plausible wrong
+    # fix, which must fail the hidden tests; a guard task is exempt from the pilot drop.
+    sessions: tuple[Session, ...] = ()
+    base_dir: Path | None = None
+    careless_dir: Path | None = None
+    guard: bool = False
+
+    @property
+    def session_prompts(self) -> tuple[str, ...]:
+        return tuple(s.prompt for s in self.sessions) if self.sessions else (self.prompt,)
 
 
 @dataclass(frozen=True)
@@ -277,6 +310,7 @@ class Options:
     judge_model: str = ""  # empty means the agent's --model
     judge_budget_usd: float = DEFAULT_JUDGE_BUDGET_USD
     judge_timeout_s: int = JUDGE_TIMEOUT_S
+    tier3_hash: str = ""  # recorded on tier-3 rows only
 
 
 # --- fixture and tasks ------------------------------------------------------------------------
@@ -316,12 +350,38 @@ def load_trap(task_dir: Path) -> Trap | None:
     return trap
 
 
+def _read_sessions(task_dir: Path) -> tuple[Session, ...]:
+    """`sessions/<n>/prompt.md` (and an optional `overlay/`) in session order, or ()."""
+    root = task_dir / "sessions"
+    if not root.is_dir():
+        return ()
+    numbered = sorted((int(p.name), p) for p in root.iterdir() if p.is_dir() and p.name.isdigit())
+    if [n for n, _ in numbered] != list(range(1, len(numbered) + 1)):
+        raise ValueError(f"{root}: sessions must be numbered 1..n")
+    if numbered and (numbered[0][1] / "overlay").exists():
+        raise ValueError(f"{root}: session 1 takes no overlay; put a starting file in seed/")
+    return tuple(
+        Session((p / "prompt.md").read_text(encoding="utf-8").strip(), _optional_dir(p / "overlay"))
+        for _, p in numbered
+    )
+
+
 def load_tasks(tasks_dir: Path = TASKS_DIR) -> list[Task]:
     tasks = []
     for d in sorted(p for p in tasks_dir.iterdir() if p.is_dir()):
-        prompt = (d / "prompt.md").read_text(encoding="utf-8").strip()
+        sessions = _read_sessions(d)
+        if sessions:
+            prompt = "\n\n".join(f"Session {n}:\n{s.prompt}" for n, s in enumerate(sessions, 1))
+        else:
+            prompt = (d / "prompt.md").read_text(encoding="utf-8").strip()
         tier_file = d / "tier"
         tier = int(tier_file.read_text("utf-8").strip()) if tier_file.exists() else 1
+        base_file = d / "base"
+        base = (
+            tasks_dir.parent / base_file.read_text("utf-8").strip() if base_file.exists() else None
+        )
+        if base is not None and not base.is_dir():
+            raise ValueError(f"{base_file}: names {base}, which is not a directory")
         tasks.append(
             Task(
                 d.name,
@@ -334,9 +394,19 @@ def load_tasks(tasks_dir: Path = TASKS_DIR) -> list[Task]:
                 _optional_dir(d / "damaged"),
                 load_trap(d),
                 _optional_dir(d / "control"),
+                sessions,
+                base,
+                _optional_dir(d / "careless"),
+                (d / "guard").exists(),
             )  # fmt: skip
         )
     return tasks
+
+
+def load_tier3_tasks(root: Path = BENCH_DIR) -> list[Task]:
+    """The tier-3 tasks under `root/tier3/tasks/`, or [] when the bench has no tier 3."""
+    tasks_dir = root / TIER3 / "tasks"
+    return load_tasks(tasks_dir) if tasks_dir.is_dir() else []
 
 
 def bench_hash(root: Path = BENCH_DIR) -> str:
@@ -348,6 +418,18 @@ def bench_hash(root: Path = BENCH_DIR) -> str:
             cache = {"__pycache__", ".pytest_cache"} & set(rel.parts)
             if path.is_file() and not cache and path.suffix != ".pyc":
                 digest.update(rel.as_posix().encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()[:12]
+
+
+def tier3_hash(root: Path = BENCH_DIR) -> str:
+    """Content hash of `root/tier3/` (base overlay and tasks), which the DRI's tier-3 sign-off
+    names and every tier-3 row records. bench_hash leaves tier 3 out, so tiers 1-2 keep theirs."""
+    digest = hashlib.sha256()
+    base = root / TIER3
+    for path in sorted(base.rglob("*")) if base.is_dir() else []:
+        rel = path.relative_to(root)
+        if path.is_file() and not _SKIP_PARTS & set(rel.parts) and path.suffix != ".pyc":
+            digest.update(rel.as_posix().encode() + b"\0" + path.read_bytes() + b"\0")
     return digest.hexdigest()[:12]
 
 
@@ -429,11 +511,20 @@ def apply_overlay(work: Path, overlay: Path) -> None:
     shutil.copytree(overlay, work, dirs_exist_ok=True, ignore=_IGNORED)
 
 
-def start_tree(dest: Path, task: Task, fixture: Path = FIXTURE_DIR) -> None:
-    """The tree a run starts from: the fixture plus the task's seed overlay."""
+def start_tree(
+    dest: Path, task: Task, fixture: Path = FIXTURE_DIR, *, overlays: int | None = None
+) -> None:
+    """The tree a run is graded against: the fixture, the task's base and seed overlays, then
+    the teammate overlays of its later sessions (all of them, or the first `overlays` that a
+    stopped run reached), so a teammate's file is never counted as the arm's change."""
     copy_fixture(dest, fixture)
-    if task.seed_dir is not None:
-        apply_overlay(dest, task.seed_dir)
+    for overlay in (task.base_dir, task.seed_dir):
+        if overlay is not None:
+            apply_overlay(dest, overlay)
+    later = [s.overlay for s in task.sessions[1:]]
+    for overlay in later if overlays is None else later[:overlays]:
+        if overlay is not None:
+            apply_overlay(dest, overlay)
 
 
 def snapshot_bench() -> tuple[Path, str]:
@@ -443,7 +534,9 @@ def snapshot_bench() -> tuple[Path, str]:
     try:
         shutil.copytree(BENCH_DIR, root / "bench", ignore=_IGNORED)
         snap = root / "bench"
-        if (digest := bench_hash(snap)) != bench_hash(BENCH_DIR):
+        if (digest := bench_hash(snap)) != bench_hash(BENCH_DIR) or tier3_hash(snap) != tier3_hash(
+            BENCH_DIR
+        ):
             raise OSError("bench files changed while the snapshot was taken")
     except BaseException:
         shutil.rmtree(root, ignore_errors=True)
@@ -623,6 +716,8 @@ def check_task(task: Task, scratch: Path, log: Callable[[str], None] | None = No
             problems.append(f"{task.id}: visible tests fail on the {name} copy")
     if task.trap is not None:
         problems += _trap_problems(task, pristine, reference, hidden_ref)
+    if task.tier == 3:
+        problems += _tier3_problems(task, pristine, scratch)
     calibrated = task.tier == 2 and task.trap is None
     for kind, overlay in (("damaged", task.damaged_dir), ("control", task.control_dir)):
         if calibrated and overlay is None:
@@ -652,6 +747,85 @@ def _trap_problems(task: Task, pristine: Path, reference: Path, graded: Grade) -
     if not (result and result["caught"]):
         problems.append(f"{task.id}: the reference does not pass its own {trap.kind} trap")
     return problems
+
+
+def _tier3_problems(task: Task, pristine: Path, scratch: Path) -> list[str]:
+    """The tier-3 rules (SPEC-hm-eval-tier3 S1-S3): the careless overlay fails the hidden tests
+    and passes the visible ones, every hidden test cites a findable sentence, and no prompt
+    holds harness vocabulary."""
+    problems = []
+    if task.careless_dir is None:
+        problems.append(f"{task.id}: a tier-3 task needs a careless/ overlay (the wrong fix)")
+    else:
+        careless = scratch / "careless"
+        start_tree(careless, task)
+        apply_overlay(careless, task.careless_dir)
+        if grade(careless, task.hidden_dir, scratch / "g-careless").passed:
+            problems.append(f"{task.id}: the careless overlay passes the hidden tests, so the "
+                            "trap is not real")  # fmt: skip
+        if not grade(careless, careless / "tests", scratch / "v-careless").passed:
+            problems.append(f"{task.id}: the careless overlay fails the visible tests, so a "
+                            "visible test catches the trap")  # fmt: skip
+    problems += citation_problems(task, pristine)
+    for number, prompt in enumerate(task.session_prompts, 1):
+        problems += [f"{task.id}: prompt {number} holds {hit!r}" for hit in prompt_lint(prompt)]
+    return problems
+
+
+SOURCE_LINE = "Source:"
+
+
+def hidden_citations(task: Task) -> list[tuple[str, str, str]]:
+    """(test, quoted sentence, home) for each hidden test: the docstring is the quote, then a
+    last line `Source: <home>`. A test without that line has an empty quote and home."""
+    found = []
+    for path in sorted(task.hidden_dir.glob("test_*.py")):
+        for node in ast.parse(path.read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
+                quote, sep, home = (ast.get_docstring(node) or "").rpartition(SOURCE_LINE)
+                found.append(
+                    (node.name, quote.strip(), home.strip()) if sep else (node.name, "", "")
+                )
+    return found
+
+
+def _home_text(task: Task, tree: Path, home: str) -> str | None:
+    """The text a citation's home names: a file of the grading tree, `prompt` (a one-session
+    task's prompt) or `session <n>`; None when it names none of these."""
+    if home == "prompt":
+        return None if task.sessions else task.prompt
+    if home.startswith("session "):
+        number = home.removeprefix("session ").strip()
+        ok = number.isdigit() and 1 <= int(number) <= len(task.sessions)
+        return task.sessions[int(number) - 1].prompt if ok else None
+    path = tree / home
+    if Path(home).is_absolute() or ".." in Path(home).parts or not path.is_file():
+        return None
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def citation_problems(task: Task, tree: Path) -> list[str]:
+    """Hidden tests whose quoted sentence is missing from the home they name (DESIGN fairness
+    rule 3): the answer must be on disk or in a prompt, never only in the designer's head."""
+    problems = []
+    for name, quote, home in hidden_citations(task):
+        if not quote or not home:
+            problems.append(f"{task.id}: {name} has no quoted sentence and `{SOURCE_LINE} <home>`")
+            continue
+        text = _home_text(task, tree, home)
+        if text is None:
+            problems.append(f"{task.id}: {name} cites {home}, which is not a file of the grading "
+                            "tree, `prompt` or `session <n>`")  # fmt: skip
+        elif " ".join(quote.split()) not in " ".join(text.split()):
+            problems.append(f"{task.id}: {name} quotes a sentence that {home} does not hold")
+    return problems
+
+
+def prompt_lint(prompt: str) -> list[str]:
+    """Harness vocabulary in a tier-3 prompt: each REDACTIONS match, then each PROMPT_LINT match
+    (whole words, any case). An empty list is a clean prompt."""
+    hits = [hit for pattern, _neutral in REDACTIONS for hit in re.findall(pattern, prompt)]
+    return hits + [hit for p in PROMPT_LINT for hit in re.findall(p, prompt, re.IGNORECASE)]
 
 
 def tier2_hash(tasks_dir: Path = TASKS_DIR) -> str:
@@ -1230,6 +1404,23 @@ def signoff_problem(tasks_dir: Path = TASKS_DIR) -> str | None:
     return None
 
 
+def tier3_gate(root: Path = BENCH_DIR) -> list[str]:
+    """Problems that stop a live tier-3 run with the hm arm before any copy or spend: the DRI
+    signs tier3_hash, as for tier 2. A plain-only run (the pilot) is not gated; its rows carry
+    the hash the DRI later signs, so the signed bytes can be checked against the piloted ones."""
+    try:
+        data = json.loads(TIER3_SIGNOFF_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return [f"no DRI sign-off for tier 3 at {TIER3_SIGNOFF_FILE}"]
+    current = tier3_hash(root)
+    if not isinstance(data, dict) or data.get("tier3_hash") != current:
+        signed = data.get("tier3_hash") if isinstance(data, dict) else None
+        return [f"the sign-off names tier-3 hash {signed}; the tasks now hash to {current}"]
+    if not str(data.get("signed_by") or "").strip():
+        return ["the tier-3 sign-off names no signer (signed_by)"]
+    return []
+
+
 def tier2_gate(tasks: list[Task], judge_model: str | None = None) -> list[str]:
     """Problems that stop a live tier-2 run before any copy or spend."""
     problems = [p for p in (signoff_problem(),) if p]
@@ -1261,18 +1452,20 @@ def _git(work: Path, *args: str) -> None:
 
 
 def build_template(
-    dest: Path, arm: str, fixture: Path = FIXTURE_DIR, seed: Path | None = None
-) -> None:
-    """Fixture (plus a task's seed) in a clean git repo; the hm arm adds this checkout's harness
-    as a second commit.
+    dest: Path, arm: str, fixture: Path = FIXTURE_DIR, seed: Path | None = None,
+    *, base: Path | None = None,
+) -> None:  # fmt: skip
+    """Fixture (plus a tier-3 task's base, then a task's seed) in a clean git repo; the hm arm
+    adds this checkout's harness as a second commit.
 
     Built once per run (and seed) and copied per cell, so every cell of an arm starts from the
     same bytes and a render failure surfaces before any model spend. The seed goes into the
     first commit: a separate commit would let either arm read the planted bug out of git log.
     """
     copy_fixture(dest, fixture)
-    if seed is not None:
-        apply_overlay(dest, seed)
+    for overlay in (base, seed):
+        if overlay is not None:
+            apply_overlay(dest, overlay)
     _git(dest, "init", "-q")
     _git(dest, "add", "-A")
     _git(dest, "commit", "-q", "-m", "fixture")
@@ -1361,11 +1554,28 @@ def prepare_work(work: Path, template: Path) -> None:
 
 
 def template_key(task: Task, arm: str) -> str:
-    return arm if task.seed_dir is None else f"{arm}-{task.id}"
+    """The template an arm's cell copies; the plain controls start from the plain one."""
+    start = "hm" if arm == "hm" else "plain"
+    return start if task.seed_dir is None and task.base_dir is None else f"{start}-{task.id}"
 
 
-def prompt_for(task: Task, arm: str) -> str:
-    return HM_PREFIX + task.prompt if arm == "hm" else task.prompt
+def prompt_for(task: Task, arm: str, session: int = 0) -> str:
+    """The prompt of a session (0-based): hm gets its prefix on every session, plain-careful
+    one fixed extra sentence."""
+    prompt = task.session_prompts[session]
+    if arm == "plain-careful":
+        return f"{prompt}\n\n{CAREFUL_SENTENCE}"
+    return HM_PREFIX + prompt if arm == "hm" else prompt
+
+
+def session_argv(task: Task, arm: str, session: int, opts: Options) -> list[str]:
+    """The same argv for every session but its prompt; plain-continue alone resumes the
+    previous conversation after the first session."""
+    argv = agent_argv(
+        opts.claude_bin, prompt_for(task, arm, session), opts.model, opts.max_turns,
+        opts.max_budget_usd,
+    )  # fmt: skip
+    return [*argv, "--continue"] if arm == "plain-continue" and session > 0 else argv
 
 
 def agent_argv(
@@ -1524,26 +1734,66 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
         prepare_work(work, opts.templates[template_key(task, arm)])
     except (OSError, shutil.Error, subprocess.SubprocessError) as exc:
         return {**row, "status": "setup_error", "error": failure_text(exc)}
+    if task.tier == 3:
+        row["tier3_hash"] = opts.tier3_hash
     if STOP.is_set():
         return {**row, "status": "interrupted"}
-    argv = agent_argv(
-        opts.claude_bin, prompt_for(task, arm), opts.model, opts.max_turns, opts.max_budget_usd
-    )
-    start = time.monotonic()
+    ran: list[tuple[str, str, int | None, float]] = []
+    clobbered: list[str] = []
+    for index in range(len(task.session_prompts)):
+        try:
+            if index and (overlay := task.sessions[index].overlay) is not None:
+                clobbered += land_teammate(work, overlay)
+            argv = session_argv(task, arm, index, opts)
+            start = time.monotonic()
+            stdout, stderr, code = _invoke(argv, work, opts.timeout_s, opts.pass_env)
+        except (OSError, shutil.Error, subprocess.SubprocessError) as exc:
+            if not ran:
+                return {**row, "status": "setup_error", "error": failure_text(exc)}
+            return {**row, "status": "runner_error", "error": failure_text(exc),
+                    **_salvage(work, ran, opts)}  # fmt: skip
+        ran.append((stdout, stderr, code, time.monotonic() - start))
+        if STOP.is_set():
+            return {**row, "status": "interrupted"}
+        if len(task.sessions) > 1:  # each session's own output, beside the last one's
+            for stream in ("stdout", "stderr"):
+                with contextlib.suppress(OSError):
+                    shutil.copyfile(
+                        run_dir / f"agent.{stream}", run_dir / f"agent-{index + 1}.{stream}"
+                    )
+        if _status(code, parse_cli_result(stdout)) != "ok":
+            break
     try:
-        stdout, stderr, code = _invoke(argv, work, opts.timeout_s, opts.pass_env)
-    except OSError as exc:
-        return {**row, "status": "setup_error", "error": failure_text(exc)}
-    wall = time.monotonic() - start
-    if STOP.is_set():
-        return {**row, "status": "interrupted"}
-    try:
-        return _record(row, task, opts, work, (stdout, stderr, code), wall)
+        return _record(row, task, opts, work, ran, clobbered)
     except Exception as exc:  # noqa: BLE001 - the agent already ran and spent; keep what we know
         return {
             **row, "status": "runner_error", "error": f"{type(exc).__name__}: {failure_text(exc)}",
-            "exit_code": code, **_salvage(work, stdout, opts),
+            "exit_code": ran[-1][2], **_salvage(work, ran, opts),
         }  # fmt: skip
+
+
+def land_teammate(work: Path, overlay: Path) -> list[str]:
+    """Copy a teammate's files into the work dir and commit only those paths (`--only`), so
+    the arm's own staged or unstaged work never enters the teammate commit. Returns the paths
+    the arm had already written, which the teammate's copy overwrites."""
+    paths = sorted(
+        p.relative_to(overlay).as_posix() for p in overlay.rglob("*")
+        if p.is_file() and not _SKIP_PARTS & set(p.relative_to(overlay).parts)
+    )  # fmt: skip
+    clobbered = [rel for rel in paths if os.path.lexists(work / rel)]
+    apply_overlay(work, overlay)
+    _git(work, "add", "--force", "--", *paths)
+    _git(work, "commit", "-q", "--no-verify", "--allow-empty", "-m", "teammate", "--only", "--",
+         *paths)  # fmt: skip
+    return clobbered
+
+
+def _status(code: int | None, result: dict[str, Any] | None) -> str:
+    if code is None:
+        return "timeout"
+    if code != 0 or result is None or result.get("is_error"):
+        return "agent_error"
+    return "ok"
 
 
 def _cli_cost(result: dict[str, Any] | None) -> float | None:
@@ -1551,29 +1801,57 @@ def _cli_cost(result: dict[str, Any] | None) -> float | None:
     return float(raw) if isinstance(raw, int | float) else None
 
 
-def _salvage(work: Path, stdout: str, opts: Options) -> dict[str, Any]:
+def _cli_total(ran: list[tuple[str, str, int | None, float]]) -> float | None:
+    """The CLI's total over every session that ran, or None when any session lost its result:
+    a partial sum would look like a cheaper run."""
+    costs = [_cli_cost(parse_cli_result(stdout)) for stdout, *_rest in ran]
+    if not costs or any(c is None for c in costs):
+        return None
+    return math.fsum(c for c in costs if c is not None)
+
+
+def _salvage(
+    work: Path, ran: list[tuple[str, str, int | None, float]], opts: Options
+) -> dict[str, Any]:
     """Whatever cost evidence survives a failure after the agent ran, so its spend still counts."""
     found: dict[str, Any] = {}
     with contextlib.suppress(Exception):
-        found["cli_cost_usd"] = _cli_cost(parse_cli_result(stdout))
+        found["cli_cost_usd"] = _cli_total(ran)
     with contextlib.suppress(Exception):
         found["transcript_cost_usd"] = round(transcript_cost(work, opts.transcript_root).usd, 6)
     return found
 
 
+def _sessions_record(ran: list[tuple[str, str, int | None, float]]) -> list[dict[str, Any]]:
+    out = []
+    for stdout, _stderr, code, wall in ran:
+        result = parse_cli_result(stdout)
+        out.append({"status": _status(code, result), "cost_usd": _cli_cost(result),
+                    "turns": result.get("num_turns") if result else None,
+                    "subtype": result.get("subtype") if result else None,
+                    "wall_s": round(wall, 1)})  # fmt: skip
+    return out
+
+
 def _record(
     row: dict[str, Any], task: Task, opts: Options, work: Path,
-    ran: tuple[str, str, int | None], wall: float,
+    ran: list[tuple[str, str, int | None, float]], clobbered: list[str],
 ) -> dict[str, Any]:  # fmt: skip
-    stdout, stderr, code = ran
+    """One row for the cell: a session's status, cost, turns and wall are summed over the
+    sessions that ran, the first non-ok status is the row's, and the work dir is graded once,
+    against the start tree plus the teammate overlays that were applied."""
+    stdout, _stderr, code, _wall = ran[-1]
     result = parse_cli_result(stdout)
-    if code is None:
-        status = "timeout"
-    elif code != 0 or result is None or result.get("is_error"):
-        status = "agent_error"
-    else:
-        status = "ok"
-    cli_cost = _cli_cost(result)
+    sessions = _sessions_record(ran)
+    status = next((s["status"] for s in sessions if s["status"] != "ok"), "ok")
+    cli_cost = _cli_total(ran)
+    wall = math.fsum(w for *_rest, w in ran)
+    turns = [s["turns"] for s in sessions]
+    num_turns = sum(turns) if all(isinstance(t, int) for t in turns) else None
+    if len(ran) == 1:
+        num_turns = result.get("num_turns") if result else None
+    capped = [s["subtype"] for s in sessions if s["subtype"] == BUDGET_SUBTYPE]
+    subtype = capped[0] if capped else (result.get("subtype") if result else None)
     spend = transcript_cost(work, opts.transcript_root)
     cost, source = pick_cost(cli_cost, spend)
     scratch = Path(tempfile.mkdtemp(prefix="hm-bench-grade-"))
@@ -1582,7 +1860,7 @@ def _record(
             work, task.hidden_dir, scratch / "g", expected=hidden_ids(task, opts.fixture)
         )
         start = scratch / "start"
-        start_tree(start, task, opts.fixture)
+        start_tree(start, task, opts.fixture, overlays=len(ran) - 1)
         outcome = outcome_for(start, work, graded.passed)
         quality = quality_for(
             start, work, opts.fixture / "tests", scratch / "q", stalled=outcome == "stalled"
@@ -1599,21 +1877,26 @@ def _record(
             judge = judge_change(task, start, work, opts)
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
-    return {
+    recorded = {
         **row, "status": status, "exit_code": code,
         "cost_usd": None if cost is None else round(cost, 6),
         "cost_source": source, "cli_cost_usd": cli_cost,
         "transcript_cost_usd": round(spend.usd, 6), "transcript_turns": spend.turns,
         "subagent_turns": spend.subagent_turns,
-        "num_turns": result.get("num_turns") if result else None,
-        "subtype": result.get("subtype") if result else None, "wall_s": round(wall, 1),
+        "num_turns": num_turns, "subtype": subtype, "wall_s": round(wall, 1),
         "hidden": {"tests": graded.tests, "failures": graded.failures,
                    "errors": graded.errors, "skipped": graded.skipped},
-        "passed": graded.passed, "leak_suspect": leaked(work, [stdout, stderr], opts),
+        "passed": graded.passed,
+        "leak_suspect": leaked(work, [text for out, err, *_ in ran for text in (out, err)], opts),
         "tokens": spend.tokens, "outcome": outcome, "quality": quality, "trap": trap,
         "quality_tools": opts.quality_tools, "judge": judge,
         "judge_model": (opts.judge_model or opts.model) if opts.judge else None,
     }  # fmt: skip
+    if len(task.sessions) > 1:
+        stopped = len(ran) if status != "ok" else None
+        recorded |= {"sessions": [{k: v for k, v in s.items() if k != "subtype"} for s in sessions],
+                     "stopped_at": stopped, "overlay_clobbered": clobbered}  # fmt: skip
+    return recorded
 
 
 # --- results ----------------------------------------------------------------------------------
@@ -1670,6 +1953,12 @@ def ensure_consistent(rows: list[dict[str, Any]], expected: dict[str, str] | Non
             seen.add(expected[name])
         if len(seen) > 1:
             raise MixedResultsError(f"results mix {name} values {sorted(seen)}; use a fresh --out")
+    tier3 = [r for r in usable if tier_of(r) == 3]
+    seen = {str(r.get("tier3_hash")) for r in tier3}
+    if expected is not None and tier3 and expected.get("tier3_hash"):
+        seen.add(expected["tier3_hash"])
+    if len(seen) > 1:
+        raise MixedResultsError(f"results mix tier3_hash values {sorted(seen)}; use a fresh --out")
 
 
 def _mean(values: list[float]) -> float | None:
@@ -1697,7 +1986,8 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     hidden tests: both bias the cost or the pass rate in hm's favour.
     """
     ensure_consistent(rows)
-    rows = [r for r in rows if tier_of(r) == 1]  # the metric's baseline is the tier-1 tasks
+    # the metric's baseline is the tier-1 tasks, plain vs hm (never a plain control)
+    rows = [r for r in rows if tier_of(r) == 1 and r.get("arm") in ARMS]
     usable = [r for r in rows if r.get("status") not in UNUSABLE]
     tasks = sorted({r["task"] for r in usable})
     per_task: dict[str, dict[str, dict[str, Any]]] = {}
@@ -2150,8 +2440,12 @@ def flags_text(tier: dict[str, Any]) -> str:
     )
 
 
+UNCALIBRATED = " (uncalibrated)"  # tier 3 has no judge calibration (SPEC-hm-eval-tier3 S9)
+
+
 def scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    usable = [r for r in rows if r.get("status") not in UNUSABLE]
+    """Plain vs hm per tier; the plain controls (CONTROL_ARMS) are left out."""
+    usable = [r for r in rows if r.get("status") not in UNUSABLE and r.get("arm") in ARMS]
     tiers = []
     for tier in sorted({tier_of(r) for r in usable}):
         mine = [r for r in usable if tier_of(r) == tier]
@@ -2161,9 +2455,16 @@ def scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
         for r in kept:
             if isinstance(r.get("hidden"), dict):
                 totals[r["task"]] = max(totals.get(r["task"], 0), int(r["hidden"].get("tests", 0)))
+        value = _value(kept, totals)
+        if tier == 3:
+            for line in value["lines"]:
+                if line["metric"].startswith("judge_"):
+                    line["label"] += UNCALIBRATED
         lines = []
         for metric, label, section, _fmt in _LINES:
             p, h = (_measure(metric, [r for r in kept if r["arm"] == a], totals) for a in ARMS)
+            if tier == 3 and metric.startswith("judge_"):
+                label += UNCALIBRATED
             lines.append({
                 "metric": metric, "label": label, "section": section,
                 "plain": {"value": p[0], "n": p[1]}, "hm": {"value": h[0], "n": h[1]},
@@ -2176,7 +2477,7 @@ def scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
         costs = [j.get("cost_usd") for j in called]
         tiers.append({
             "tier": tier, "tasks": tasks, "excluded": excluded, "runs_per_cell": per_cell,
-            "value": _value(kept, totals), "lines": lines, "flags": _flags(kept),
+            "value": value, "lines": lines, "flags": _flags(kept),
             "judge_cost": {
                 "usd": math.fsum(float(c) for c in costs if isinstance(c, int | float)),
                 "calls": len(called), "unpriced": sum(1 for c in costs if c is None),
@@ -2307,11 +2608,51 @@ def render_scorecard(card: dict[str, Any]) -> str:
     return "\n".join(out)
 
 
+TIER3_TITLE = "Per task (tier 3)"
+PILOT_RUNS = 3  # DESIGN-hm-eval-tier3 §5: a task drops when plain solves 2 or more of 3
+
+
+def pilot_label(task: str, solved: int, runs: int, guards: set[str]) -> str:
+    """The pre-registered pilot rule for a plain cell: drop at 2 or more solved of 3 (the same
+    share of more runs); the guard task is exempt; fewer than 3 runs decide nothing."""
+    if task in guards:
+        return "guard"
+    if runs < PILOT_RUNS:
+        return f"n/a (n={runs})"
+    return "drop" if solved * PILOT_RUNS >= 2 * runs else "keep"
+
+
+def tier3_block(rows: list[dict[str, Any]]) -> list[str]:
+    """Per tier-3 task and arm (the plain controls included): solved/runs, mean cost and mean
+    wall, and for plain the pilot rule. Empty when there is no tier-3 row."""
+    usable = [r for r in rows if r.get("status") not in UNUSABLE and tier_of(r) == 3]
+    if not usable:
+        return []
+    guards = {t.id for t in load_tier3_tasks() if t.guard}
+    lines = [f"{TIER3_TITLE}: solved/runs, mean $/run and wall s per arm; pilot rule for plain: "
+             f"drop at 2 or more solved of {PILOT_RUNS}",
+             f"  {'task':<6}{'arm':<16}{'solved':>8}{'$/run':>10}{'wall s':>8}  pilot"]  # fmt: skip
+    for task in sorted({str(r["task"]) for r in usable}, key=lambda t: (len(t), t)):
+        for arm in ALL_ARMS:
+            mine = [r for r in usable if r["task"] == task and r.get("arm") == arm]
+            if not mine:
+                continue
+            solved = sum(1 for r in mine if outcome_of(r) == "solved")
+            cell = _cell(mine)
+            pilot = pilot_label(task, solved, len(mine), guards) if arm == "plain" else "—"
+            lines.append(f"  {task:<6}{arm:<16}{f'{solved}/{len(mine)}':>8}"
+                         f"{'$' + _money(cell['mean_cost']):>10}{_secs(cell['mean_wall_s']):>8}"
+                         f"  {pilot}")  # fmt: skip
+    return lines
+
+
 def report_text(rows: list[dict[str, Any]]) -> str:
     """What the extra cost buys, quality, efficiency, then the unchanged intent-metric block
-    (tier 1 only)."""
+    (tier 1 only), then the per-task block when there are tier-3 rows."""
     summary = summarize(rows)
-    return f"{render_scorecard(scorecard(rows))}\n\n{METRIC_HEADER}\n{render_report(summary)}"
+    text = f"{render_scorecard(scorecard(rows))}\n\n{METRIC_HEADER}\n{render_report(summary)}"
+    block = tier3_block(rows)
+    return text + "\n\n" + "\n".join(block) if block else text
 
 
 # --- publish (SPEC-hm-eval S9-S12) ------------------------------------------------------------
@@ -2361,7 +2702,7 @@ _PRE_EVAL_NOTE = (
 )
 
 
-def render_readme_block(rows: list[dict[str, Any]]) -> str:
+def render_readme_block(rows: list[dict[str, Any]], tier3: dict[str, Any] | None = None) -> str:
     lines = [
         f"**Measured: plain prompt vs `/hm:`** at harness `{rows[0]['harness_sha']}`, same model "
         "and budget; n is the number of runs behind each figure. Leads follow the fixed bands in "
@@ -2372,7 +2713,8 @@ def render_readme_block(rows: list[dict[str, Any]]) -> str:
     ]
     if _pre_eval(rows):
         lines += [f"_{_PRE_EVAL_NOTE}_"]
-    return "\n".join(lines).rstrip("\n") + "\n"
+    block = "\n".join(lines).rstrip("\n") + "\n"
+    return block if tier3 is None else f"{block}\n{render_tier3_readme(tier3)}"
 
 
 def _setup_table(rows: list[dict[str, Any]], card: dict[str, Any]) -> list[str]:
@@ -2405,9 +2747,9 @@ def _setup_table(rows: list[dict[str, Any]], card: dict[str, Any]) -> list[str]:
     ]  # fmt: skip
 
 
-def render_results_md(rows: list[dict[str, Any]]) -> str:
-    """The scorecard as Markdown, what the extra cost buys first; no clock, path or host, so
-    the git history of this file is the eval's trend."""
+def render_results_md(rows: list[dict[str, Any]], tier3: dict[str, Any] | None = None) -> str:
+    """The scorecard as Markdown, what the extra cost buys first, then any tier-3 section; no
+    clock, path or host, so the git history of this file is the eval's trend."""
     card, summary = scorecard(rows), summarize(rows)
     lines = [
         "# hm eval results", "",
@@ -2440,15 +2782,250 @@ def render_results_md(rows: list[dict[str, Any]]) -> str:
                           "", f"Run flags: {flags_text(tier)}."]  # fmt: skip
             lines.append("")
     lines += [f"## {METRIC_HEADER}", "", "```text", render_report(summary), "```"]
+    if tier3 is not None:
+        lines += ["", *render_tier3_md(tier3)]
     return "\n".join(lines) + "\n"
 
 
-def publish(out: Path, docs: Path, readme: Path) -> None:
+# --- tier-3 publish (DRI, 2026-10-16) ---------------------------------------------------------
+# Tier 3 is published beside the scorecard, never in it: the pilot is plain-only and the hm runs
+# are a diagnostic, so neither forms a balanced plain-vs-hm cell. Its rows live in their own dir
+# (`<docs>/tier3/pilot/` and `diagnostic/`), and without that dir publish writes what it wrote
+# before, byte for byte.
+
+TIER3_MIN_KEPT = 4  # SPEC-hm-eval-tier3 pre-registration (4): fewer surviving tasks is inconclusive
+TIER3_PILOT, TIER3_DIAGNOSTIC, TIER3_NOTES = "pilot", "diagnostic", "notes.md"
+TIER3_WITHDRAWN = (
+    "The per-task code-quality claim is withdrawn under the pre-registered rule: an "
+    'inconclusive tier 3 counts as "plain cannot be made to fail fairly", so this eval makes '
+    "no claim that `/hm:` writes better code than a plain prompt on any task."
+)
+
+
+def _tier3_rows(directory: Path, what: str) -> list[dict[str, Any]]:
+    rows = [r for r in read_rows(directory) if r.get("status") not in UNUSABLE]
+    try:
+        ensure_consistent(rows)
+    except MixedResultsError as exc:
+        raise PublishError(f"tier-3 {what} rows: {exc}") from exc
+    if any(tier_of(r) != 3 for r in rows):
+        raise PublishError(f"tier-3 {what} rows in {directory / RESULTS} hold a non-tier-3 row")
+    for r in rows:  # checked before the sort, which would raise on either
+        if not isinstance(r.get("task"), str) or r.get("arm") not in ALL_ARMS:
+            raise PublishError(f"a tier-3 {what} row has task {r.get('task')!r} and arm "
+                               f"{r.get('arm')!r}; arms are {list(ALL_ARMS)}")  # fmt: skip
+        if not isinstance(r.get("rep"), int) or isinstance(r.get("rep"), bool):
+            raise PublishError(f"the tier-3 {what} row {r['task']} {r['arm']} has rep "
+                               f"{r.get('rep')!r}, not a run number")  # fmt: skip
+    return sorted(rows, key=lambda r: ((len(str(r["task"])), str(r["task"])),
+                                       ALL_ARMS.index(str(r["arm"])), r["rep"]))  # fmt: skip
+
+
+def tier3_inputs(root: Path) -> dict[str, Any] | None:
+    """The pilot rows, the diagnostic rows and the hand-written notes under `root`, or None
+    when there is no pilot; PublishError when they cannot be reported honestly."""
+    if not (root / TIER3_PILOT / RESULTS).exists():
+        return None
+    pilot = _tier3_rows(root / TIER3_PILOT, TIER3_PILOT)
+    diagnostic = _tier3_rows(root / TIER3_DIAGNOSTIC, TIER3_DIAGNOSTIC)
+    if not pilot:
+        raise PublishError(f"no usable tier-3 pilot rows in {root / TIER3_PILOT / RESULTS}")
+    if any(r["arm"] != "plain" for r in pilot):
+        raise PublishError("the tier-3 pilot is plain-only; it holds another arm's row")
+    hashes = sorted({str(r.get("tier3_hash")) for r in pilot + diagnostic})
+    if len(hashes) > 1:
+        raise PublishError(f"the tier-3 pilot and diagnostic mix tier3_hash values {hashes}")
+    bench_tasks = load_tier3_tasks()
+    guards = {t.id for t in bench_tasks if t.guard}
+    # A task whose rows were all dropped as unusable would leave T's denominator silently.
+    expected, seen = {t.id for t in bench_tasks}, {str(r["task"]) for r in pilot}
+    if seen != expected:
+        missing, extra = sorted(expected - seen), sorted(seen - expected)
+        raise PublishError(f"the tier-3 pilot must cover every tier-3 task; missing {missing}, "
+                           f"unknown {extra}")  # fmt: skip
+    tasks: list[dict[str, Any]] = []
+    for task in sorted(seen, key=lambda t: (len(t), t)):
+        mine = [r for r in pilot if r["task"] == task]
+        solved = sum(1 for r in mine if outcome_of(r) == "solved")
+        label = pilot_label(task, solved, len(mine), guards)
+        if label.startswith("n/a"):
+            raise PublishError(f"the tier-3 pilot has {len(mine)} run(s) of {task}; the drop "
+                               f"rule needs {PILOT_RUNS}")  # fmt: skip
+        tasks.append({"task": task, "rows": mine, "solved": solved, "label": label})
+    notes = root / TIER3_NOTES
+    return {
+        "pilot": pilot, "diagnostic": diagnostic, "tasks": tasks, "tier3_hash": hashes[0],
+        "kept": [t["task"] for t in tasks if t["label"] == "keep"],
+        "guards": [t["task"] for t in tasks if t["label"] == "guard"],
+        "notes": notes.read_text(encoding="utf-8").strip("\n") if notes.exists() else "",
+    }  # fmt: skip
+
+
+def _tier3_solved(rows: list[dict[str, Any]]) -> int:
+    return sum(1 for r in rows if outcome_of(r) == "solved")
+
+
+def _tier3_cases(rows: list[dict[str, Any]]) -> str:
+    graded = [r for r in rows if isinstance(r.get("hidden"), dict)]
+    passed = sum(_cases_passed(r) for r in graded)
+    return f"{passed}/{sum(int(r['hidden'].get('tests', 0)) for r in graded)}"
+
+
+def _tier3_money(rows: list[dict[str, Any]]) -> str:
+    cell = _cell(rows)
+    return "n/a" if cell["mean_cost"] is None else f"${cell['mean_cost']:.3f}"
+
+
+def _tier3_cost_note(t3: dict[str, Any]) -> str:
+    """Every tier-3 $ is the CLI total, which leaves out subagent spend (docs/evals/tier3/
+    notes.md), and an unpriced row is left out of a mean: say both rather than imply more."""
+    rows = t3["pilot"] + t3["diagnostic"]
+    unpriced = _cell(rows)["cost_unknown"]
+    note = "Each $ is the CLI cost per run, which excludes subagent spend"
+    if any(r["arm"] == "hm" for r in rows):
+        note += ", so an hm $ understates what the run spent"
+    if unpriced:
+        has, be = ("has", "is") if unpriced == 1 else ("have", "are")
+        note += f"; {unpriced} of {len(rows)} runs {has} no price and {be} left out of the $ means"
+    return note + "."
+
+
+def _tier3_wall(rows: list[dict[str, Any]]) -> str:
+    return format_duration(_cell(rows)["mean_wall_s"] or 0.0, len(rows)).split(" (")[0]
+
+
+def _tier3_verdict(t3: dict[str, Any]) -> str:
+    kept = t3["kept"]
+    named = f" ({', '.join(kept)})" if kept else ""
+    if len(kept) < TIER3_MIN_KEPT:
+        return (f"**Outcome: T = {len(kept)}{named}, below the {TIER3_MIN_KEPT} surviving tasks "
+                "the rule needs, so tier 3 is inconclusive.**")  # fmt: skip
+    return (f"**Outcome: T = {len(kept)}{named}; the pre-registered full run decides, and this "
+            "section makes no claim.**")  # fmt: skip
+
+
+def _setup_cell(rows: list[dict[str, Any]], field: str) -> str:
+    return ", ".join(f"`{v}`" for v in sorted({str(r.get(field)) for r in rows})) or "n/a"
+
+
+def render_tier3_md(t3: dict[str, Any]) -> list[str]:
+    """The tier-3 section of RESULTS.md: the plain pilot per task, the drop rule and its
+    outcome, the hm diagnostic labelled as one, then the hand-written notes. No model name,
+    clock, path or host."""
+    pilot, diag = t3["pilot"], t3["diagnostic"]
+    runs = len(pilot)
+    guards = ", ".join(t3["guards"]) or "none"
+    sets = [("pilot", pilot), *([("diagnostic", diag)] if diag else [])]
+
+    def dates(rows: list[dict[str, Any]]) -> str:
+        days = sorted(str(r["started_at"])[:10] for r in rows if r.get("started_at"))
+        return f"{days[0]} to {days[-1]}" if days else "n/a"
+
+    lines = [
+        "## Tier 3", "",
+        "Tasks whose prompt does not hold the answer: it sits in a file of the repo or in an "
+        f"earlier session. {guards} is the guard. These rows sit outside the scorecard above.", "",
+        "| Setup | " + " | ".join(name for name, _ in sets) + " |",
+        "|---|" + "---|" * len(sets),
+        f"| tier3_hash | `{t3['tier3_hash']}` |" + " |" * (len(sets) - 1),
+        "| harness_sha | " + " | ".join(_setup_cell(r, "harness_sha") for _, r in sets) + " |",
+        "| runner_hash | " + " | ".join(_setup_cell(r, "runner_hash") for _, r in sets) + " |",
+        "| arms | " + " | ".join(", ".join(a for a in ALL_ARMS if any(x["arm"] == a for x in r))
+                                 for _, r in sets) + " |",
+        "| runs started | " + " | ".join(dates(r) for _, r in sets) + " |",
+        "", _tier3_cost_note(t3),
+        "", "### Plain pilot", "",
+        f"Pre-registered drop rule: a task drops when plain solves 2 or more of {PILOT_RUNS} runs; "
+        f"the guard is exempt. Tier 3 needs at least {TIER3_MIN_KEPT} surviving tasks (T).", "",
+        "| Task | plain solved | hidden cases | $/run | wall/run | Pilot |",
+        "|---|---|---|---|---|---|",
+    ]  # fmt: skip
+    for task in t3["tasks"]:
+        rows = task["rows"]
+        lines.append(f"| {task['task']} | {task['solved']}/{len(rows)} | {_tier3_cases(rows)} | "
+                     f"{_tier3_money(rows)} | {_tier3_wall(rows)} | {task['label']} |")  # fmt: skip
+    lines += ["", f"Plain solved {_tier3_solved(pilot)} of {runs} pilot runs. {_tier3_verdict(t3)}"]
+    if len(t3["kept"]) < TIER3_MIN_KEPT:
+        lines += ["", f"**{TIER3_WITHDRAWN}**"]
+    if diag:
+        tasks = sorted({str(r["task"]) for r in diag}, key=lambda t: (len(t), t))
+        lines += [
+            "", f"### hm diagnostic on {', '.join(tasks)} (diagnostic, not a verdict)", "",
+            "Asked by the DRI to see whether `/hm:` carries state across fresh headless "
+            "sessions. It is not the pre-registered full run, too small to decide anything, and "
+            "it changes no outcome above.", "",
+            "| Task | Arm | Solved | hidden cases | $/run | wall/run |",
+            "|---|---|---|---|---|---|",
+        ]  # fmt: skip
+        for task in tasks:
+            for arm in ALL_ARMS:
+                mine = [r for r in diag if r["task"] == task and r["arm"] == arm]
+                if mine:
+                    lines.append(f"| {task} | {arm} | {_tier3_solved(mine)}/{len(mine)} | "
+                                 f"{_tier3_cases(mine)} | {_tier3_money(mine)} | "
+                                 f"{_tier3_wall(mine)} |")  # fmt: skip
+        lines += ["", "| Run | Solved | hidden cases | Sessions (status, $, wall) | $ | wall |",
+                  "|---|---|---|---|---|---|"]  # fmt: skip
+        for r in diag:
+            sessions = (
+                "; ".join(
+                    f"{s.get('status')}, {_tier3_money([s])}, {_tier3_wall([s])}"
+                    for s in r.get("sessions") or []
+                )
+                or "n/a"
+            )
+            lines.append(f"| {r['task']} {r['arm']} {r['rep']} | "
+                         f"{'yes' if outcome_of(r) == 'solved' else outcome_of(r) or 'no'} | "
+                         f"{_tier3_cases([r])} | {sessions} | {_tier3_money([r])} | "
+                         f"{_tier3_wall([r])} |")  # fmt: skip
+    if t3["notes"]:
+        lines += ["", "### Notes", "", t3["notes"]]
+    return lines
+
+
+def render_tier3_readme(t3: dict[str, Any]) -> str:
+    """One or two sentences for the README block, kept whichever arm they favour."""
+    pilot, kept = t3["pilot"], t3["kept"]
+    tasks_word = "task" if len(kept) == 1 else "tasks"
+    first = (f"**Tier 3** (the answer is in the repo or an earlier session, not the prompt): plain "
+             f"solved {_tier3_solved(pilot)} of {len(pilot)} pilot runs, so {len(kept)} "
+             f"{tasks_word} survived the pre-registered drop rule")  # fmt: skip
+    if len(kept) < TIER3_MIN_KEPT:
+        first += (f" where {TIER3_MIN_KEPT} are needed; tier 3 is inconclusive and the per-task "
+                  "code-quality claim is withdrawn.")  # fmt: skip
+    else:
+        first += "; the pre-registered full run decides."
+    hm = [r for r in t3["diagnostic"] if r["arm"] == "hm"]
+    if not hm:
+        return first + "\n"
+    tasks = sorted({str(r["task"]) for r in hm}, key=lambda t: (len(t), t))
+
+    def arm_text(arm: str, rows: list[dict[str, Any]], named: bool) -> str:
+        cells = []
+        for t in tasks:
+            mine = [r for r in rows if r["task"] == t]
+            cells.append(f"{t + ' ' if named else ''}{_tier3_solved(mine)}/{len(mine)}")
+        return f"{arm} {' and '.join(cells)} at {_tier3_money(rows)}/run"
+
+    parts = [
+        arm_text("hm solved", hm, True),
+        arm_text("plain (pilot)", [r for r in pilot if r["task"] in tasks], False),
+    ]
+    parts += [arm_text(arm, mine, False) for arm in CONTROL_ARMS
+              if (mine := [r for r in t3["diagnostic"] if r["arm"] == arm])]  # fmt: skip
+    second = (f" A diagnostic on {' and '.join(tasks)}, not a verdict: {'; '.join(parts)} "
+              "([details](docs/evals/RESULTS.md#tier-3)).")  # fmt: skip
+    return f"{first}{second} {_tier3_cost_note(t3)}\n"
+
+
+def publish(out: Path, docs: Path, readme: Path, tier3: Path | None = None) -> None:
     """Render RESULTS.md and the README block, then write both atomically, the README first: a
-    refusal writes nothing, and a failure after the README is completed by re-running publish."""
+    refusal writes nothing, and a failure after the README is completed by re-running publish.
+    Tier 3 comes from `tier3` (default `<docs>/tier3`) when it holds pilot rows."""
     rows = publish_rows(out)
-    results = render_results_md(rows)
-    text = splice_readme(readme.read_bytes().decode("utf-8"), render_readme_block(rows))
+    extra = tier3_inputs(docs / TIER3 if tier3 is None else tier3)
+    results = render_results_md(rows, extra)
+    text = splice_readme(readme.read_bytes().decode("utf-8"), render_readme_block(rows, extra))
     atomic_write(readme, text)
     atomic_write(docs / RESULTS_MD, results)
 
@@ -2566,10 +3143,11 @@ def _make_options(args: argparse.Namespace, out: Path, digest: str, snap_root: P
         ),
         max_budget_usd=args.max_budget_usd,
         total_budget_usd=getattr(args, "total_budget_usd", DEFAULT_TOTAL_BUDGET_USD),
-        leak_markers=(str(TASKS_DIR), str(snap_root), "scripts/bench/tasks", "/hidden/"),
+        leak_markers=(str(TASKS_DIR), str(snap_root), "scripts/bench/tasks", "/hidden/",
+                      str(BENCH_DIR / TIER3), "scripts/bench/tier3"),
         pass_env=pass_env, fixture=snap_root / "bench" / "timeparse", quality_tools=tools,
         judge=args.judge, judge_model=args.judge_model or args.model,
-        judge_budget_usd=args.judge_budget_usd,
+        judge_budget_usd=args.judge_budget_usd, tier3_hash=tier3_hash(snap_root / "bench"),
     )  # fmt: skip
 
 
@@ -2692,17 +3270,25 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if out is None:
         return 2
     all_tasks = load_tasks()
-    in_tier = [t for t in all_tasks if args.tier == "all" or str(t.tier) == args.tier]
+    # `all` keeps meaning tiers 1 and 2: tier 3 is paid for only when asked for by name.
+    tier3 = load_tier3_tasks() if args.tier == "3" else []
+    in_tier = tier3 or [t for t in all_tasks if args.tier == "all" or str(t.tier) == args.tier]
     wanted = args.tasks.split(",") if args.tasks else [t.id for t in in_tier]
     arms = args.arms.split(",")
     unknown = sorted(set(wanted) - {t.id for t in in_tier})
-    if unknown or not set(arms) <= set(ARMS):
+    if unknown or not set(arms) <= set(ALL_ARMS):
         print(f"unknown task (for --tier {args.tier}) or arm: {unknown or arms}", file=sys.stderr)
         return 2
     if any(t.tier == 2 for t in in_tier if t.id in wanted):
         problems = tier2_gate(all_tasks, args.judge_model or args.model)
         for problem in problems:
             print(f"refusing tier 2: {problem}", file=sys.stderr)
+        if problems:
+            return 2
+    if tier3 and "hm" in arms:
+        problems = tier3_gate()
+        for problem in problems:
+            print(f"refusing tier 3 with the hm arm: {problem}", file=sys.stderr)
         if problems:
             return 2
     out.mkdir(parents=True, exist_ok=True)
@@ -2719,13 +3305,14 @@ def _cmd_run(args: argparse.Namespace) -> int:
     try:
         snap, digest = snapshot_bench()
         snap_root = snap.parent
-        tasks = {t.id: t for t in load_tasks(snap / "tasks") if t.id in wanted}
+        snapped = load_tier3_tasks(snap) if tier3 else load_tasks(snap / "tasks")
+        tasks = {t.id: t for t in snapped if t.id in wanted}
         opts = _make_options(args, out, digest, snap_root)
         rows = read_rows(out)
         try:
             ensure_consistent(rows, {
                 "bench_hash": digest, "harness_sha": opts.harness_sha, "model": opts.model,
-                "runner_hash": opts.runner_hash,
+                "runner_hash": opts.runner_hash, "tier3_hash": opts.tier3_hash,
             })  # fmt: skip
         except MixedResultsError as exc:
             print(f"refusing to resume: {exc}", file=sys.stderr)
@@ -2733,13 +3320,16 @@ def _cmd_run(args: argparse.Namespace) -> int:
         cells = pending_cells(rows, list(tasks), arms, args.runs)
         (out / "runs").mkdir(exist_ok=True, mode=0o700)
         templates: dict[str, Path] = {}
-        needed = {template_key(tasks[t], a): (tasks[t], a) for t, a, _ in cells}
+        needed = {template_key(tasks[t], a): (tasks[t], "hm" if a == "hm" else "plain")
+                  for t, a, _ in cells}  # fmt: skip
         for key, (task, arm) in sorted(needed.items()):
             templates[key] = out / ".templates" / key
             shutil.rmtree(templates[key], ignore_errors=True)
             templates[key].parent.mkdir(exist_ok=True, mode=0o700)
             try:
-                build_template(templates[key], arm, snap / "timeparse", task.seed_dir)
+                build_template(
+                    templates[key], arm, snap / "timeparse", task.seed_dir, base=task.base_dir
+                )
             except (OSError, shutil.Error, subprocess.SubprocessError) as exc:
                 print(f"cannot build the {key} template: {failure_text(exc)}", file=sys.stderr)
                 return 2
@@ -2794,7 +3384,7 @@ def _cmd_report(args: argparse.Namespace) -> int:
 def _cmd_publish(args: argparse.Namespace) -> int:
     docs, readme = Path(args.docs), Path(args.readme)
     try:
-        publish(Path(args.out), docs, readme)
+        publish(Path(args.out), docs, readme, Path(args.tier3) if args.tier3 else None)
     except (MixedResultsError, PublishError, OSError, UnicodeDecodeError) as exc:
         print(f"refusing to publish: {exc}", file=sys.stderr)
         return 2
@@ -2814,9 +3404,16 @@ def _cmd_check(_args: argparse.Namespace) -> int:
     kinds = sorted(t.trap.kind for t in tasks if t.trap is not None)
     if kinds != sorted(TRAP_KINDS) or any(t.tier != 2 for t in tasks if t.trap is not None):
         problems.append(f"traps are {kinds}; tier 2 needs one trap task per kind {TRAP_KINDS}")
+    tier3 = load_tier3_tasks()
+    with tempfile.TemporaryDirectory(prefix="hm-bench-check-") as scratch:
+        for task in tier3:
+            problems += check_task(task, Path(scratch) / task.id, log=print)
+    problems += [f"{t.id}: a task under {TIER3}/ must say tier 3" for t in tier3 if t.tier != 3]
     for problem in problems:
         print(problem, file=sys.stderr)
     print(f"tier-2 hash to sign: {tier2_hash()}")
+    if tier3:
+        print(f"tier-3 hash to sign: {tier3_hash()}")
     print("check: ok" if not problems else f"check: {len(problems)} problem(s)")
     return 1 if problems else 0
 
@@ -2858,11 +3455,15 @@ def _parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="run both arms (live model; needs INTEGRATION=1)")
     run.add_argument("--out", default=None, help="results dir (default: fresh temp dir)")
     run.add_argument(
-        "--tier", choices=("1", "2", "all"), default="1",
-        help="task tier; 2 needs the DRI sign-off and a passing judge calibration",
+        "--tier", choices=("1", "2", "all", "3"), default="1",
+        help="task tier (all = 1 and 2); 2 needs the DRI sign-off and a passing judge "
+        "calibration, 3 with the hm arm needs the DRI's tier-3 sign-off",
     )  # fmt: skip
     run.add_argument("--tasks", default=None, help="comma-separated task ids (default: the tier)")
-    run.add_argument("--arms", default=",".join(ARMS))
+    run.add_argument(
+        "--arms", default=",".join(ARMS),
+        help=f"comma-separated, from {', '.join(ALL_ARMS)}; the plain controls are tier-3 arms",
+    )  # fmt: skip
     run.add_argument("--runs", type=int, default=3, help="runs per task and arm")
     run.add_argument(
         "--jobs", type=int, default=1,
@@ -2897,6 +3498,10 @@ def _parser() -> argparse.ArgumentParser:
     pub.add_argument("--out", required=True, help="results dir")
     pub.add_argument("--docs", default=str(REPO_ROOT / "docs" / "evals"))
     pub.add_argument("--readme", default=str(REPO_ROOT / "README.md"))
+    pub.add_argument(
+        "--tier3", default=None,
+        help="tier-3 rows dir with pilot/, diagnostic/ and notes.md (default: <docs>/tier3)",
+    )  # fmt: skip
     sub.add_parser("check", help="prove each task's hidden tests discriminate (offline)")
     return parser
 

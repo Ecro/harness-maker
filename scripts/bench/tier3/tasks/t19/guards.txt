@@ -1,0 +1,2 @@
+# parse_duration keeps its behaviour: the cap is for new functions only (session 1)
+test_parse_duration_keeps_long_totals

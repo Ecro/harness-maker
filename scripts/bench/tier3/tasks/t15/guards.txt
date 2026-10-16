@@ -1,0 +1,4 @@
+# behaviour the start tree already has and must keep (docs/DECISIONS.md D-1, D-2, docs/config.md)
+test_durations_with_units_are_unchanged
+test_a_number_after_units_is_still_an_error
+test_config_load_is_unchanged

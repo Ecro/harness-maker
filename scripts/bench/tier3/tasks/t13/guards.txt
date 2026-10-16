@@ -1,0 +1,3 @@
+# behaviour the start tree already has and the fix must keep (docs/DECISIONS.md D-6)
+test_compact_output_is_unchanged
+test_normalize_and_config_round_trips_hold

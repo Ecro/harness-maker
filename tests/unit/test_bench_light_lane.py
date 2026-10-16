@@ -2327,6 +2327,8 @@ def test_the_committed_results_and_readme_block_are_published_from_the_committed
     out = _results_dir(tmp_path / "out", rows)
     readme = (_ROOT / "README.md").read_text()
     repo = _repo(tmp_path / "repo", readme)
+    # the tier-3 section is published from its own rows, beside the tier 1-2 scorecard
+    shutil.copytree(_ROOT / "docs" / "evals" / "tier3", repo / "docs" / "evals" / "tier3")
     proc = _publish(out, repo)
     assert proc.returncode == 0, proc.stderr
     published = (repo / "docs" / "evals" / "RESULTS.md").read_text()
