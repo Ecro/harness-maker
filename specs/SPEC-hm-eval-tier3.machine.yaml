@@ -23,8 +23,8 @@ ac:
   executable_predicate: null
   golden_table: []
   rubric_id: null
-  note: The hidden tests and careless overlays are frozen before any arm runs and covered
-    by tier3_hash; the DRI signs that hash before the hm arm runs.
+  note: The hidden tests and careless overlays are frozen before any arm runs and
+    covered by tier3_hash; the DRI signs that hash before the hm arm runs.
   pending_test: false
   oracle_source: differential
   oracle_evidence: Each task's hidden tests are written from the cited sentence in
@@ -92,7 +92,7 @@ ac:
   executable_predicate: null
   golden_table:
   - input:
-      prompt: Fix issue #21 in the format module.
+      prompt: Fix issue
     expected:
       problems: 0
     edge: false
@@ -195,7 +195,8 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-005
-  title: A multi-session run is sequential fresh sessions on one work dir, graded once
+  title: A multi-session run is sequential fresh sessions on one work dir, graded
+    once
   type: mechanical
   test_ids:
   - tests/unit/test_bench_tier3.py::test_sessions_run_in_order_as_fresh_processes_in_one_work_dir
@@ -211,8 +212,8 @@ ac:
     == 1 and grades_per_run == 1 and solved_row['outcome'] == 'solved'
   golden_table: []
   rubric_id: null
-  note: DESIGN §3. A session boundary is a fresh process, the case hm's persisted state
-    claims to cover.
+  note: DESIGN §3. A session boundary is a fresh process, the case hm's persisted
+    state claims to cover.
   pending_test: false
   oracle_source: golden
   oracle_evidence: The fake claude records each call's cwd, argv and prompt, writes
@@ -239,11 +240,11 @@ ac:
   - tests/unit/test_bench_tier3.py::test_a_tier3_run_with_the_hm_arm_needs_the_signoff
   - tests/unit/test_bench_tier3.py::test_tier3_rows_record_their_hash_and_never_mix
   executable_predicate: tier3_hash(edited_tier3_copy) != tier3_hash(copy) and tier3_hash(edited_tier2_copy)
-    == tier3_hash(copy) and bench_hash(edited_tier3_copy) == bench_hash(copy) and run(tier='3',
-    arms='plain,hm', signoff=None) == 2 and run(tier='3', arms='plain,hm', signoff=stale)
-    == 2 and run(tier='3', arms='plain,hm', signoff=current) == 0 and run(tier='3',
-    arms='plain', signoff=None) == 0 and all(r['tier3_hash'] == tier3_hash() for r
-    in tier3_rows) and raises(MixedResultsError, ensure_consistent, two_hash_rows)
+    == tier3_hash(copy) and bench_hash(edited_tier3_copy) == bench_hash(copy) and
+    run(tier='3', arms='plain,hm', signoff=None) == 2 and run(tier='3', arms='plain,hm',
+    signoff=stale) == 2 and run(tier='3', arms='plain,hm', signoff=current) == 0 and
+    run(tier='3', arms='plain', signoff=None) == 0 and all(r['tier3_hash'] == tier3_hash()
+    for r in tier3_rows) and raises(MixedResultsError, ensure_consistent, two_hash_rows)
   golden_table: []
   rubric_id: null
   note: The pilot is plain-only and ungated (coordinator, 2026-10-15); its rows record
@@ -272,11 +273,10 @@ ac:
   - tests/unit/test_bench_tier3.py::test_tier_one_and_two_hashes_are_unchanged
   - tests/unit/test_bench_tier3.py::test_a_tier_two_row_has_no_tier3_fields
   - tests/unit/test_bench_light_lane.py::test_the_committed_results_and_readme_block_are_published_from_the_committed_rows
-  executable_predicate: >-
-    bench_hash() == '569e17ef29ab' and tier2_hash() == '1cf707c57e12'
-    and runner_hash('model-x', 400, 1800, 5.0, (), 'fake 1.0', quality_tools={'ruff':
-    'r', 'mypy': 'm'}) == '17f703bf0fcc' and not {'tier3_hash', 'sessions', 'stopped_at',
-    'overlay_clobbered'} & set(tier2_row) and republished == committed
+  executable_predicate: 'bench_hash() == ''569e17ef29ab'' and tier2_hash() == ''1cf707c57e12''
+    and runner_hash(''model-x'', 400, 1800, 5.0, (), ''fake 1.0'', quality_tools={''ruff'':
+    ''r'', ''mypy'': ''m''}) == ''17f703bf0fcc'' and not {''tier3_hash'', ''sessions'',
+    ''stopped_at'', ''overlay_clobbered''} & set(tier2_row) and republished == committed'
   golden_table: []
   rubric_id: null
   note: The pinned values were recorded from origin/main db19f023 before any runner
@@ -284,9 +284,9 @@ ac:
   pending_test: false
   oracle_source: golden
   oracle_evidence: The three hash literals were computed by the unchanged runner at
-    db19f023 (bench 569e17ef29ab is the bench named in docs/evals/RESULTS.md), and the
-    committed docs/evals/results.jsonl with its RESULTS.md and README block is the
-    golden for publish.
+    db19f023 (bench 569e17ef29ab is the bench named in docs/evals/RESULTS.md), and
+    the committed docs/evals/results.jsonl with its RESULTS.md and README block is
+    the golden for publish.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -376,3 +376,26 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: b0eb5183e3550deca434aeb4692ac53a4d07d104881cc2323712bc3793b8e144
+  approved_by: Ecro
+  approved_at: '2026-10-16T05:34:48Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: d6600a56500d4c37c60c9dceadfa0d6fd8af5dc2e9a9b7150cf277c5a6bb0a5b
+    parent_spec: d3ea6fcacb049196495e4f82523e3385697a941aa9ca959918936786b21f97af
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: dbf99c34cc97c3f3694a80e513f563049b9b24fa5ffc751a57b67a662786396d
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 217d39fb9cc340bc4c6fc3548060589458208cbac9a324f1824f32b5e9a4c58e
+    AC-002: 02d21d10eb6a99e598c6d4ba0c7851fb6cca61e9adc8122bfb5b3357202a65e6
+    AC-003: a2e46e8fa34e38ed220d3be5717a10b478a7854ed249656685645ec81513e9b0
+    AC-004: e4e2bb12da1fa9629f570d5d86b918be8c3f2ed4e74e35dbb37af09667d470c3
+    AC-005: 52109cacc11eaff603e857d6110871cc2290f3347cb0f2a8e3b74d0445726b3f
+    AC-006: af42986fd8fd8788333741d5f61adaea6f57cdda1efaaeca33c6ae0047dcbac0
+    AC-007: d373b8f1d511cfd6dd81a08866255ade2e3782f73a8b2849c82412544364d56f
+    AC-008: 77c7a136a8b5a95a3273ef24d5938e59b8c8e4582786df5b180ca1224132260a
+    AC-009: 7c0c73c4fe6883cb6706505785b0392a32e43a72680f46d3f51d4249f07410ca
+    ac_order: 164396d6c2494dc69325356de9d2f12b5629b3c0c73cb6ef656e4acf0aad5ff4
+  lane: full
