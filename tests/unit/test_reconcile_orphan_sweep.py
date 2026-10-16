@@ -346,3 +346,67 @@ def test_cursor_mdc_trailing_newline_perturbation_kept(project_root: Path) -> No
     report = sweep_orphans(project_root, _empty_blueprint())
     assert target_file.exists(), "byte-perturbed file must not match a normalized manifest hash"
     assert Path(".cursor/rules/perturbed.mdc") in [p for p, _ in report.kept]
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# A block-merged retired file (SPEC-hm-overhaul-p1 AC-007): its recorded hash is the hash of
+# its MERGED body, so a user's `@hm:user:` text hides behind a hash match. The template is gone
+# (ADR-022), so the default blocks are the comment-only text every shipped template carries.
+# ──────────────────────────────────────────────────────────────────────────
+
+_AGENT_DEFAULT_BLOCK = (
+    "<!-- @hm:user:extensions -->\n"
+    "<!-- Project-specific stuck rules. Preserved across harness-maker upgrades. -->\n"
+    "<!-- @hm:/user:extensions -->\n"
+)
+_TOML_DEFAULT_BLOCK = (
+    "# @hm:user:extensions\n# Add custom agent fields here.\n# @hm:/user:extensions\n"
+)
+
+
+def _merged_agent(project_root: Path, block: str) -> Path:
+    body = f"# stuck\n\nrules\n\n{block}"
+    target = project_root / ".claude" / "agents" / "stuck.md"
+    h = _hash_for(body)
+    _write(
+        target,
+        "---\ngenerated_by: harness-maker\nsource_template: agents/stuck.md.j2\n"
+        f"content_hash: {h}\n---\n{body}",
+    )
+    _append_manifest(project_root / ".claude", ".claude/agents/stuck.md", h)
+    return target
+
+
+def _merged_toml(project_root: Path, block: str) -> Path:
+    raw = f'name = "executor"\ndeveloper_instructions = """\nbody\n"""\n\n{block}'
+    target = project_root / ".codex" / "agents" / "executor.toml"
+    _write(target, raw)
+    _append_manifest(project_root / ".claude", ".codex/agents/executor.toml", _full_file_hash(raw))
+    return target
+
+
+@pytest.mark.parametrize("make", [_merged_agent, _merged_toml], ids=["agent-md", "codex-toml"])
+def test_retired_orphan_with_user_block_text_is_kept(
+    make: object, project_root: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    block = (
+        _AGENT_DEFAULT_BLOCK.replace("<!-- Project", "Always escalate to the on-call DRI.\n<!-- P")
+        if make is _merged_agent
+        else _TOML_DEFAULT_BLOCK.replace("# Add", "timeout = 900\n# Add")
+    )
+    target = make(project_root, block)  # type: ignore[operator]
+    before = target.read_bytes()
+    report = sweep_orphans(project_root, _empty_blueprint())
+    assert target.read_bytes() == before, "the user's block text must survive the sweep"
+    rel = target.relative_to(project_root)
+    assert (rel, "ours-modified") in report.kept
+    assert f"KEPT {rel.as_posix()} (ours-modified)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("make", [_merged_agent, _merged_toml], ids=["agent-md", "codex-toml"])
+def test_retired_orphan_with_default_blocks_is_deleted(make: object, project_root: Path) -> None:
+    block = _AGENT_DEFAULT_BLOCK if make is _merged_agent else _TOML_DEFAULT_BLOCK
+    target = make(project_root, block)  # type: ignore[operator]
+    report = sweep_orphans(project_root, _empty_blueprint())
+    assert not target.exists()
+    assert report.deleted == [target.relative_to(project_root)]
