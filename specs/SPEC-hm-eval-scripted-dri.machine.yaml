@@ -30,7 +30,7 @@ ac:
   note: The fake CLI writes specs/SPEC-x.md on turn 1 and reports one session_id;
     slug is "x". hm_argv_today is agent_argv with HM_PREFIX + task.prompt, built as
     today's test_arms_differ_only_by_harness_and_prefix builds it.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The expected prompts and their order are the literal strings pinned
     in SPEC S1 and the DRI's 2026-10-16 card (spec, approval, execute, wrapup), typed
@@ -64,7 +64,7 @@ ac:
   note: late_spec writes the SPEC only on the reply turn; no_spec never writes one
     and changes no code. A question at execute or wrapup gets no reply (covered by
     AC-009's run set).
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The reply string and the one-reply cap are pinned verbatim in SPEC
     S2; stalled is the existing outcome rule of SPEC-hm-eval S3 for an unchanged timeparse/
@@ -139,7 +139,7 @@ ac:
   rubric_id: null
   note: The integers are st_mtime_ns values set with os.utime in the test; the pattern
     is SPEC-([a-z0-9][a-z0-9-]*)\.md directly under work/specs/.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: Each expected slug follows by hand from SPEC S3's rule (directly
     under specs/, name pattern, absent from the template path, max of st_mtime_ns
@@ -237,7 +237,7 @@ ac:
     note: a lost result is unknown, never zero
   rubric_id: null
   note: tokens and transcript_* stay the transcript price over the work dir, as today.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The running-total reading comes from the committed path docs/evals/tier3/diagnostic/results.jsonl,
     where resumed plain-continue sessions report 0.0763 then 0.1134 against a transcript
@@ -274,7 +274,7 @@ ac:
     of max_budget_usd after approve; under_cap's fake reports totals 2.0 then 4.0
     under a 5.0 cap, which a sum of totals (6.0) would wrongly stop; lost's fake reports
     a new session_id on approve.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The stop reasons, the budget subtype and stopped_at positions are
     pinned in SPEC S5; error_max_budget_usd is the CLI subtype the bench already treats
@@ -308,7 +308,7 @@ ac:
   note: row's fake applies the task's reference overlay on the execute turn and commits
     nothing; late_fix applies it on the wrapup turn; leaky prints a leak marker only
     on the wrapup turn.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The reference overlay under scripts/bench/tasks/t1/reference/ is
     the independent witness that the hidden tests pass on a correct tree; the leak
@@ -339,7 +339,7 @@ ac:
   golden_table: []
   rubric_id: null
   note: TIER_TWO_ROW_KEYS is the key set test_bench_tier3.py already pins (_TIER_TWO_ROW_KEYS).
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The plain argv and row key set are the values already pinned in
     tests/unit/test_bench_tier3.py (path) before this change, and t19's session prompts
@@ -372,7 +372,7 @@ ac:
   note: script_variants patch APPROVE_TURN, REPLY_TURN, the execute and wrapup prefixes,
     the reply cap, the resume flag, the SPEC pattern and the tiers one at a time;
     old_row carries the runner_hash recorded in docs/evals/results.jsonl.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The old hashes 17f703bf0fcc and 10856c4eb248 are the runner_hash
     values pinned before this change in tests/unit/test_bench_tier3.py (path), the
@@ -401,7 +401,7 @@ ac:
   rubric_id: null
   note: The fake's result text carries a distinctive sentence on every turn so a reply
     built from it would show.
-  pending_test: true
+  pending_test: false
   oracle_source: property
   oracle_evidence: The allowed set is fixed by SPEC S9 and the DRI's card, independent
     of the runner; the fake CLI's result text holds a marker sentence on every turn,
