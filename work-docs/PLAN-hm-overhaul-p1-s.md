@@ -5,7 +5,7 @@ spec: specs/SPEC-hm-overhaul-p1.md
 spec_hash: a2058086eb49
 scope: PR-S (AC-003 … AC-011, re-checking AC-008; IRR-002 … IRR-006)
 version: 0.64.0
-status: planning
+status: complete
 summary: "Overhaul phase 1 PR-S: four stages, one hm check gate, retired hooks, brownfield sweep"
 surface_allowance:
   chars: 992

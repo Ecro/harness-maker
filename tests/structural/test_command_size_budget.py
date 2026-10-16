@@ -232,10 +232,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # per-stage ceilings are now AC-004's, in `tests/unit/test_overhaul_p1_surface.py`; this
     # table keeps the ±2%/−20% band around what ships so a later edit still has to say why.
     # Entry history before the collapse is in git and in work-docs/BASELINE-DELTA-*.md.
-    "execute": 7274,
+    # execute and wrapup re-measured after PR #36 folded PR-S's review-round-1 allowance
+    # (BASELINE-DELTA-hm-overhaul-p1-s.md, "Folded into the baseline from main").
+    "execute": 8072,
     "research": 4554,
     "spec": 7033,
-    "wrapup": 4407,
+    "wrapup": 4568,
 }
 
 
