@@ -50,3 +50,25 @@ Measured with the committed generator (`tests/structural/_surface_baseline.py`,
 `render_sha` and `payload_digest` moved mechanically with the re-freeze. Per ADR-010 the task
 that moved the surface owns its attribution, and writing it in the commit that moved it is what
 keeps this out of `ratchet-rebaselined-by-its-own-subject`.
+
+## Review round 1 (2026-10-16): held as an allowance, not re-frozen
+
+The review put back four rules the collapse had dropped and moved RED in front of the phases
+(PLAN ADR-044..ADR-047). The surface grew, so the frozen baseline stays as committed and the
+growth is held as this PLAN's `surface_allowance` until the DRI re-freezes from main.
+
+| variant | command | frozen (chars, round trips) | now | cause |
+|---|---|---|---|---|
+| claude | `execute` | 7 485, 2 | 8 397, 2 | Phase A writes every AC test and RED runs once (ADR-044); the irreversible-decision stop and the test-edit rule (ADR-046); the background-gate rule (ADR-045) |
+| claude | `wrapup` | 5 827, 2 | 5 875, 2 | the background-gate rule, answer-gated intent writes, the closing Understanding print; the rest compressed to stay at 3 497 of the 3 500 AC-004 budget |
+| codex | `hm-execute` | 7 541, 2 | 8 363, 2 | same text; Codex gets the no-JSON rule without a background call |
+| codex | `hm-wrapup` | 5 921, 2 | 5 929, 2 | same |
+
+| key | frozen | now | Δ |
+|---|---|---|---|
+| `aggregate_chars`.claude | 45 487 | 46 447 | +960 (the allowance's `chars`) |
+| `aggregate_chars`.codex | 27 381 | 28 211 | +830 |
+
+The per-command allowance (`execute: 653`, `wrapup: 41`) is the measured overshoot of the
+atomic ceilings in `test_command_size_budget.py` (8 072 vs 7 419 and 4 536 vs 4 495 on the
+opt-in arm).

@@ -17,6 +17,13 @@ Run `hm worktree task-preflight <slug> "$(pwd)" --stage hm:{{ stage }} --claude-
 {%- endif %}
 {%- endmacro -%}
 
+{#- A full `hm check` runs the suite, which can take 7-12 minutes; the host kills a foreground Bash
+    call at 10. Codex has no background call, so there the rule is only the no-JSON one. -#}
+{%- macro long_gate(why=true) -%}
+{%- if is_codex %}; no JSON line means the host killed it, never a pass
+{%- else %} in the background (`run_in_background: true`, `timeout: 3600000`{% if why %}; a suite outlives the 10-minute foreground cap{% endif %}); no JSON line is never a pass{% endif -%}
+{%- endmacro -%}
+
 {%- macro ask() -%}{% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}{%- endmacro -%}
 
 {%- macro dispatch(agent, brief) -%}

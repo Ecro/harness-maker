@@ -1,6 +1,7 @@
 {%- import "stages/_hm.md.j2" as hm with context -%}
 {%- set _rounds = config.reviewers.get('max_review_rounds', 3) -%}
 {%- set _so_models = (config.get('second_opinion') or {}).get('models', []) -%}
+{%- set _wt = '<WT>/' if config.worktree.get('enabled') else '' -%}
 # /hm:execute — tests first, then code, then one review
 
 `/hm:execute <slug>` builds what `specs/SPEC-<slug>.md` asks. It writes the AC tests, shows them RED through `hm check --red`, implements to GREEN, binds the tests to the SPEC and runs one review. It never commits; `/hm:wrapup` does. `--no-tdd` is retired: if passed, print "--no-tdd is retired; give untestable behaviour a judgment AC" and run TDD anyway.
@@ -20,7 +21,7 @@
 
 Run `hm spec_machine approval-status --root . --slug <slug>`. `approved` and `exempt` proceed; `missing` proceeds only at `autonomy.level: auto_full`; any other state, or a missing SPEC, stops: ask the DRI to approve with `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`, or point at `/hm:spec`.
 
-Write `<WT>/work-docs/PLAN-<slug>.md`, or extend it if it exists (never rewrite one). Frontmatter: `type: plan`, `task_slug`, `status: planning`, `created`, `spec: "[[SPEC-<slug>]]"`, `summary`. Body: one line per phase with `scope:`, `exit:` (a command), `risk:` and `rollback:`; `## 🚧 Contract Boundaries` with a `### Do not change` list of repo-relative paths (or the single bullet `none — this task has no contract boundaries`); and `ADR-NNN: <decision>. **Decided by:** <user (source) | agent>`. The PLAN holds no ACs; it points at the SPEC.
+Write `{{ _wt }}work-docs/PLAN-<slug>.md`, or extend it if it exists (never rewrite one). Frontmatter: `type: plan`, `task_slug`, `status: planning`, `created`, `spec: "[[SPEC-<slug>]]"`, `summary`. Body: one line per phase with `scope:`, `exit:` (a command), `risk:` and `rollback:`; `## 🚧 Contract Boundaries` with a `### Do not change` list of repo-relative paths (or the single bullet `none — this task has no contract boundaries`); and `ADR-NNN: <decision>. **Decided by:** <user (source) | agent>`. The PLAN holds no ACs; it points at the SPEC.
 
 ## Step 0.3 — Verify the PLAN
 
@@ -34,21 +35,21 @@ Read it fully. The ADRs bind. Restate the `Do not change` list once.
 
 From the SPEC and its machine.yaml, take `test_framework`, the scenarios, and the testable ACs: every AC that is not superseded and not `type: judgment`. Read the RESEARCH doc when the PLAN names one.
 
-## Step 3 — Per phase, test first
+## Step 3 — Tests first, then the phases
 
-### Phase A — Write the AC tests
+### Phase A — Write every AC test
 
-For each testable AC in the phase, write a test named `test_ac_NNN_<short>`. Its assertion is the AC's oracle, run against the real code: a mechanical AC asserts its `executable_predicate`; a parametric AC uses `@pytest.mark.parametrize` over `spec_machine.load_golden_table(<yaml>, "AC-NNN")`, with the yaml path relative to the test file; a property AC uses Hypothesis `@given` over `input_domain` and asserts `expected_relation`. No tautology and no mock-only body. Importing a first-party name that does not exist yet is a valid RED; that name must exist by GREEN.
+Before any code, write a test for every testable AC in the SPEC, across all phases, named `test_ac_NNN_<short>`. Its assertion is the AC's oracle, run against the real code: a mechanical AC asserts its `executable_predicate`; a parametric AC uses `@pytest.mark.parametrize` over `spec_machine.load_golden_table(<yaml>, "AC-NNN")`, with the yaml path relative to the test file; a property AC uses Hypothesis `@given` over `input_domain` and asserts `expected_relation`. No tautology and no mock-only body. Importing a first-party name that does not exist yet is a valid RED; that name must exist by GREEN.
 
 Put each test's node id in its AC's `test_ids` now, keeping `pending_test: true`, and run `hm spec_machine validate --yaml specs/SPEC-<slug>.machine.yaml`.
 
-**RED.** Run `hm check --red --slug <slug>`. Exit 0 means every testable AC has a test that fails for a real reason. On exit 1, fix what it names: a test that already passes, a syntax error, a missing fixture or node id. An AC whose behaviour already exists may be waived with `--green-ok AC-NNN`, and the reason goes to the reviewer. Keep the RED summary for the commit body.
+**RED**, once, before any code: run `hm check --red --slug <slug>`. It covers every testable AC, so it runs here and nowhere else. Exit 0 means every one has a test that fails for a real reason. On exit 1, fix what it names: a test that already passes, a syntax error, a missing fixture or node id. An AC whose behaviour already exists may be waived with `--green-ok AC-NNN`, and the reason goes to the reviewer. Keep the RED summary for the commit body.
 
-### Phase C — Implement
+### Phase C — Implement, phase by phase
 
-Make the smallest change that turns the tests GREEN, within the ADRs and outside `Do not change`.
+Per PLAN phase, make the smallest change that turns its ACs' tests GREEN, within the ADRs and outside `Do not change`, and run the phase's `exit:` command. A choice in an irreversible category (schema/file format/storage layout, public API/CLI contract, data migration, security/permission boundary, new external dependency) that the SPEC's `irreversible_decisions` does not list: append it as `{id: IRR-<next>, decision, category, rationale, source: execute}` (this voids the approval by design), then stop and ask the DRI: approve runs `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`, anything else stops the stage.
 
-**Bind, then gate.** For each AC run `hm spec_machine mark-tested --yaml specs/SPEC-<slug>.machine.yaml --md specs/SPEC-<slug>.md --ac AC-NNN`, then run `hm check --slug <slug>`, which prints one JSON line:
+**Bind, then gate**, after the last phase: for each AC run `hm spec_machine mark-tested --yaml specs/SPEC-<slug>.machine.yaml --md specs/SPEC-<slug>.md --ac AC-NNN`, then run `hm check --slug <slug>`{{ hm.long_gate() }}. It prints one JSON line:
 - 0: proceed.
 - 1: fix what it names and rerun.
 - 2: fix the call.
@@ -72,6 +73,6 @@ Dispatch {{ hm.dispatch("code-reviewer", "give it the SPEC, the PLAN, the diff a
 **Second opinion** ({{ _so_models | join(', ') }}). For each model, `mktemp` a path, write the diff and SPEC to it with the Write tool, then run `hm second_opinion_invoke --model <model> --prompt-file <path> --slug <slug> --stage review` as its own Bash call{% if not is_codex %} with `dangerouslyDisableSandbox: true`{% endif %}. Its JSON line carries `status` and `findings`; `skipped` or `failed` warns and proceeds. One call per model per review. A finding is accepted when two voters raise it (K=2); a single-voter finding goes to {{ hm.dispatch("code-verifier", "with the finding and the oracle output") }} for accepted, rejected, duplicate or unresolved, and `consensus-arbiter` resolves conflicting severities.
 {%- endif %}
 
-Write `work-docs/REVIEW-<slug>-<YYYY-MM-DD>.md` with a `## Findings` table: `| id | severity | file:line | finding | disposition | authority |`. Every finding gets a disposition: `accepted`, `rejected` (with an authority), `duplicate` or `unresolved`; with no findings write `none`. Note any drift from the PLAN's scope or the SPEC's intent as a finding. Fix the accepted findings, rerun `hm check --slug <slug>` and review again, for at most `reviewers.max_review_rounds` ({{ _rounds }}) rounds. What is still open after that goes to the DRI as `unresolved`.
+Write `work-docs/REVIEW-<slug>-<YYYY-MM-DD>.md` with a `## Findings` table: `| id | severity | file:line | finding | disposition | authority |`. Every finding gets a disposition: `accepted`, `rejected` (with an authority), `duplicate` or `unresolved`; with no findings write `none`. Note any drift from the PLAN's scope or the SPEC's intent as a finding. Fix the accepted findings (never edit a test file to resolve a finding whose target is not that test), rerun `hm check --slug <slug>` and review again, for at most `reviewers.max_review_rounds` ({{ _rounds }}) rounds. What is still open after that goes to the DRI as `unresolved`.
 
 Print the phases done, the `hm check` result and the REVIEW path, then STOP. `/hm:wrapup <slug>` is the user's call.

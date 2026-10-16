@@ -19,6 +19,16 @@ from pathlib import Path
 
 import pytest
 
+from harness_maker.models import (
+    DelegationConfig,
+    InterviewAnswers,
+    Preset,
+    ProjectProfile,
+    Target,
+)
+from harness_maker.render import DEFAULT_FREEZE_TIME as FREEZE
+from harness_maker.render import render
+from harness_maker.synthesize import synthesize
 from tests._overhaul_p1_ref import (
     HEAD_SRC,
     REPO_ROOT,
@@ -503,3 +513,145 @@ def test_ac009_differential_negative_control(hook_fixture: Path, tmp_path: Path)
     a = _run(HEAD_SRC, hook_fixture, work, *_case("permission_gate-curl-sh", work)[:2], {})
     b = _run(HEAD_SRC, hook_fixture, work, *_case("permission_gate-ls", work)[:2], {})
     assert (a[0], a[1]) != (b[0], b[1])
+
+
+# ── rules the collapse must still carry, in compact form ───────────────────────
+#
+# The collapse folded hundreds of lines of stage prose into four self-contained files. These
+# render-grep tests pin the few rules that are load-bearing for the DRI's non-negotiables (TDD RED,
+# irreversible-decision locks, the understanding delta, answer-gated writes) and for the host's
+# limits (a suite outlives a foreground Bash call). They prove the instruction is rendered; they
+# cannot prove a model obeys it. In-process renders, so they run in a second.
+
+
+def _render_rules(
+    tmp_path: Path,
+    *,
+    codex: bool = False,
+    worktree: bool = False,
+    delegation: list[str] | None = None,
+) -> Path:
+    targets = [Target.CLAUDE_CODE, Target.CODEX] if codex else [Target.CLAUDE_CODE]
+    answers = InterviewAnswers(
+        preset=Preset.SIDE,
+        targets=targets,
+        delegation=DelegationConfig(stages=delegation or []),
+        worktree={"enabled": worktree},
+    )
+    render(synthesize(ProjectProfile(), answers), tmp_path / ".claude", freeze_time=FREEZE)
+    return tmp_path
+
+
+def _flat_rule(path: Path) -> str:
+    return " ".join(path.read_text(encoding="utf-8").split())
+
+
+def _rule_stage(root: Path, stage: str, *, codex: bool = False) -> str:
+    if codex:
+        return _flat_rule(root / ".agents" / "skills" / f"hm-{stage}" / "SKILL.md")
+    return _flat_rule(root / ".claude" / "commands" / "hm" / f"{stage}.md")
+
+
+RULE_ARMS = [(False, False), (True, False), (False, True), (True, True)]
+RULE_IDS = ["claude", "codex", "claude-wt", "codex-wt"]
+
+
+@pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
+def test_red_runs_once_over_every_ac_before_any_phase(
+    tmp_path: Path, codex: bool, wt: bool
+) -> None:
+    """`hm check --red` covers every testable AC, and plain `hm check` fails on a pending one.
+
+    So a per-phase RED deadlocks (a later phase's AC has no test yet, an earlier one is already
+    green) and a per-phase plain gate fails mid-plan. RED runs once, before any code; the full
+    gate runs once, after the last phase.
+    """
+    text = _rule_stage(_render_rules(tmp_path, codex=codex, worktree=wt), "execute", codex=codex)
+    phase_a = text.index("### Phase A")
+    red = text.index("hm check --red --slug <slug>")
+    phase_c = text.index("### Phase C")
+    gate = text.index("hm check --slug <slug>", phase_c)
+    assert phase_a < red < phase_c < gate
+    assert "every testable AC in the SPEC, across all phases" in text
+    assert "once, before any code" in text
+    assert "after the last phase" in text
+    assert "For each testable AC in the phase" not in text
+
+
+@pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
+def test_wrapup_delegate_reads_the_wrapup_command(tmp_path: Path, codex: bool) -> None:
+    root = _render_rules(tmp_path, codex=codex, delegation=["wrapup"])
+    wrapup = _rule_stage(root, "wrapup", codex=codex)
+    assert "Steps 1–5 of `.claude/commands/hm/wrapup.md`" in wrapup
+    agent = (
+        root / ".codex" / "agents" / "stage-delegate.toml"
+        if codex
+        else root / ".claude" / "agents" / "stage-delegate.md"
+    )
+    body = _flat_rule(agent)
+    assert "`<base_root>/.claude/commands/hm/wrapup.md`" in body
+    assert "Steps 1–5" in body
+    assert ".claude/hm/" not in body
+    assert not re.search(r"\bverify\b", body), "the verify stage is retired"
+    assert (root / ".claude" / "commands" / "hm" / "wrapup.md").is_file()
+    assert not (root / ".claude" / "hm").exists()
+
+
+@pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
+@pytest.mark.parametrize("stage", ["execute", "wrapup"])
+def test_the_full_gate_runs_in_the_background_with_a_deadline(
+    tmp_path: Path, codex: bool, wt: bool, stage: str
+) -> None:
+    """Suites take 7-12 minutes and the host kills a foreground Bash call at 10."""
+    text = _rule_stage(_render_rules(tmp_path, codex=codex, worktree=wt), stage, codex=codex)
+    gate = text.index("hm check --slug <slug>")
+    window = text[gate : gate + 600]
+    assert "no JSON line" in window, window
+    assert "never a pass" in window, window
+    if codex:
+        assert "run_in_background" not in text
+    else:
+        assert "`run_in_background: true`" in window, window
+        assert "`timeout: 3600000`" in window, window
+
+
+@pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
+def test_execute_keeps_the_test_edit_and_irreversible_rules(
+    tmp_path: Path, codex: bool, wt: bool
+) -> None:
+    text = _rule_stage(_render_rules(tmp_path, codex=codex, worktree=wt), "execute", codex=codex)
+    review = text[text.index("## Step 6") :]
+    assert "never edit a test file to resolve a finding whose target is not that test" in review
+    implement = text[text.index("### Phase C") : text.index("## Step 4")]
+    for category in (
+        "schema/file format/storage layout",
+        "public API/CLI contract",
+        "data migration",
+        "security/permission boundary",
+        "new external dependency",
+    ):
+        assert category in implement, category
+    assert "`irreversible_decisions` does not list" in implement
+    assert "source: execute" in implement
+    assert "stop and ask the DRI" in implement
+
+
+@pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
+def test_wrapup_prints_the_understanding_block_and_gates_intent_writes(
+    tmp_path: Path, codex: bool, wt: bool
+) -> None:
+    text = _rule_stage(_render_rules(tmp_path, codex=codex, worktree=wt), "wrapup", codex=codex)
+    land = text.index("hm wrapup_land")
+    close = text.index("`steps.understanding_block` verbatim")
+    assert land < close, "the block is printed from the receipt, after the land"
+    assert "`steps.understanding.status`" in text[close - 300 : close + 300]
+    ask = "`request_user_input`" if codex else "`AskUserQuestion`"
+    intents = text[text.index("hm intent status --json") :]
+    assert f"ask the DRI once ({ask}, multi-select)" in intents
+    assert "run only the selected writes; no answer runs none" in intents
+
+
+@pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
+def test_execute_names_wt_only_with_the_worktree(tmp_path: Path, codex: bool, wt: bool) -> None:
+    text = _rule_stage(_render_rules(tmp_path, codex=codex, worktree=wt), "execute", codex=codex)
+    assert ("<WT>" in text) is wt

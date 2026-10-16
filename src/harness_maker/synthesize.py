@@ -564,7 +564,7 @@ _CODEX_AGENT_META: dict[str, str] = {
     "performance-reviewer": "Reviews changes for hot-path regressions, allocation hotspots, and algorithmic inefficiency",  # noqa: E501
     "spec-validator": "Critiques a SPEC and its machine.yaml for missing or contradictory ACs, circular oracles, and irreversible decisions the ACs imply but do not list. Single pass, advisory — never blocks approval. Read-only.",  # noqa: E501
     "security-reviewer": "Reviews changes for secrets exposure, injection, auth flaws, and unsafe permission grants",  # noqa: E501
-    "stage-delegate": "Runs a whole pipeline stage body (wrapup or verify) from a validated brief and returns a machine receipt, cutting main-loop context carry",  # noqa: E501
+    "stage-delegate": "Runs Steps 1-5 of the wrapup stage from a validated brief and returns a machine receipt, cutting main-loop context carry",  # noqa: E501
     "test-reviewer": "Phase A.5 gate for /hm:execute. Critiques RED-stage tests for SPEC alignment, banned-pattern violations, and assertion quality before Phase B (RED gate) runs. Read-only.",  # noqa: E501
     "ux-reviewer": "Reviews UI changes for accessibility, consistency, and interaction quality",
 }
