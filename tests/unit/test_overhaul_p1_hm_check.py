@@ -488,7 +488,14 @@ def _id_outside_root(p: Project) -> None:
     p.acs = [_ac(test_ids=["../outside/test_far.py::test_far"])]
 
 
+def _secret_behind_symlink(p: Project) -> None:
+    """A link to a file outside the root: the scan must not read through it."""
+    _write(p.root.parent, "elsewhere/creds.py", f'KEY = "{_secret()}"\n')
+    (p.root / "pkg" / "creds.py").symlink_to(p.root.parent / "elsewhere" / "creds.py")
+
+
 EXIT_ROWS += (
+    Row("secret-behind-symlink", _secret_behind_symlink, _exit(0, "security", ok=True)),
     Row(
         "review-no-disposition-column",
         _review("| id | finding |\n|---|---|\n| F1 | a defect |\n"),

@@ -64,7 +64,8 @@ def scan_files(target_dir: Path, rel_paths: list[str]) -> list[Finding]:
     """Scan exactly these files (relative to ``target_dir``), with the same filters as `scan`.
 
     `hm check` passes git's own file list, so an ignored `.worktrees/` copy of the tree is
-    never walked and the scan matches the snapshot it is reported beside.
+    never walked and the scan matches the snapshot it is reported beside. A symlink is never
+    followed: its target may sit outside the root, and a file inside is scanned at its own path.
     """
     files = [target_dir / rel for rel in rel_paths]
     return _scan_paths(
@@ -72,7 +73,8 @@ def scan_files(target_dir: Path, rel_paths: list[str]) -> list[Finding]:
         [
             f
             for f in files
-            if f.is_file()
+            if not f.is_symlink()
+            and f.is_file()
             and _should_scan(f)
             and not any(part in _SKIP_DIR_NAMES for part in f.relative_to(target_dir).parts)
         ],
