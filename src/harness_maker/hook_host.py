@@ -100,7 +100,9 @@ def is_claude_copy_in_cursor(payload: Mapping[str, object] | str, module: str) -
         text = (Path(root) / ".cursor" / "hooks.json").read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         text = ""
-    if text and _cursor_runs_module(text, module):
+    if not text:
+        return False
+    if _cursor_runs_module(text, module):
         return True
     gate = module.rsplit(".", 1)[-1]
     print(

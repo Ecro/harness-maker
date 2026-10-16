@@ -145,6 +145,14 @@ def test_unmarked_cursor_render_keeps_both(tmp_path: Path) -> None:
     assert not is_claude_copy_in_cursor(_cursor_payload(tmp_path / "missing"), MODULE)
 
 
+def test_no_cursor_hooks_file_runs_quietly(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """After retirement there is no Cursor copy to be stale, so the Claude copy says nothing."""
+    assert not is_claude_copy_in_cursor(_cursor_payload(tmp_path), MODULE)
+    assert capsys.readouterr().err == ""
+
+
 def test_malformed_text_is_not_a_cursor_copy() -> None:
     assert not is_claude_copy_in_cursor("{nope", MODULE)
     assert not is_claude_copy_in_cursor("[]", MODULE)

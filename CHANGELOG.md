@@ -194,8 +194,9 @@
 - **`hook_host` decides per hook.** The Claude copy of a hook stands down in Cursor only when a kept
   `.cursor/hooks.json` parses, holds a marked command that runs that same module, and the command's
   `--with` target exists. Before, the marker text anywhere in the file stood every hook down, spec_gate
-  included where the Cursor file never ran it. Any other case runs the Claude copy and prints one
-  `[hook-host] Cursor copy of <gate> is stale or missing` line.
+  included where the Cursor file never ran it. Any other case runs the Claude copy, and prints one
+  `[hook-host] Cursor copy of <gate> is stale or missing` line when a `.cursor/hooks.json` exists
+  (none, the normal state after retirement, runs silently).
 - **Intent trial machinery.** `hm intent trial`, `hm intent reconcile` and `hm intent record-decision`
   are gone, along with the frozen `intent_trial.py` module and its `worktree.py` hooks.
 - `hm intent new --from-proposal` no longer appends an `objective_proposed` ledger row. The event
