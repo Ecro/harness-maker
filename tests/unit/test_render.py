@@ -577,6 +577,61 @@ def test_no_cursor_tree_rendered(tmp_path: Path) -> None:
     )
 
 
+def _spec_gate_matchers(hooks: dict[str, object]) -> list[str]:
+    """Matchers of the PreToolUse entries whose nested hooks run spec_gate."""
+    entries = hooks.get("PreToolUse", [])
+    assert isinstance(entries, list)
+    return [
+        str(e.get("matcher"))
+        for e in entries
+        if any("harness_maker.gates.spec_gate" in h.get("command", "") for h in e["hooks"])
+    ]
+
+
+@pytest.mark.parametrize("strictness", ["warn", "block"])
+def test_render_settings_hooks_gate_spec_gate_on_strictness(
+    tmp_path: Path, strictness: str
+) -> None:
+    """settings.json runs spec_gate exactly at block, on Write|Edit|MultiEdit.
+
+    Replaces the 0.62 `.cursor/hooks.json` pair (SPEC-spec-gate AC-001): the strictness rule
+    now lives in the two hook files that still render.
+    """
+    import json as _json
+
+    from harness_maker.models import Target
+
+    target = tmp_path / ".claude"
+    target.mkdir()
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CLAUDE_CODE], "strictness": strictness},
+    )
+    render(synthesize(p, a), target, freeze_time=DEFAULT_FREEZE_TIME)
+    hooks = _json.loads((target / "settings.json").read_text(encoding="utf-8"))["hooks"]
+    expected = ["Write|Edit|MultiEdit"] if strictness == "block" else []
+    assert _spec_gate_matchers(hooks) == expected
+
+
+@pytest.mark.parametrize("strictness", ["warn", "block"])
+def test_render_codex_hooks_gate_spec_gate_on_strictness(tmp_path: Path, strictness: str) -> None:
+    """`.codex/hooks.json` runs spec_gate exactly at block, on Codex's `apply_patch`."""
+    import json as _json
+
+    from harness_maker.models import Target
+
+    target = tmp_path / ".claude"
+    target.mkdir()
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CODEX], "strictness": strictness},
+    )
+    render(synthesize(p, a), target, freeze_time=DEFAULT_FREEZE_TIME)
+    hooks = _json.loads((tmp_path / ".codex" / "hooks.json").read_text(encoding="utf-8"))["hooks"]
+    expected = ["apply_patch"] if strictness == "block" else []
+    assert _spec_gate_matchers(hooks) == expected
+
+
 def test_resolve_output_path_codex_routes_to_parent() -> None:
     """.codex/ assets route to target_dir.parent (sibling of .claude/)."""
     from harness_maker.render import resolve_output_path

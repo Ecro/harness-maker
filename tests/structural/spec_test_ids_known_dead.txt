@@ -1,0 +1,69 @@
+# SPEC test_ids that name no test. Shrink-only: tests/structural/test_spec_test_ids_collect.py
+# fails when one of these resolves again, so a fixed binding leaves this file in the same change.
+
+[pr-c-cursor]
+# SPEC-hm-overhaul-p1 PR-C deleted these Cursor tests. Their SPECs are pre-approval (`legacy`, no
+# stamp). `mark-tested` bound the surviving tests; no spec_machine command removes an id, so
+# the dead ones wait on the DRI.
+tests/integration/test_boundary_cursor_mdc.py::test_rendered_cursor_mdc_frontmatter_passes_allowlist
+tests/unit/test_presets.py::test_cursor_model_ids_canonical_aliases_present
+tests/unit/test_presets.py::test_cursor_model_ids_values_look_like_concrete_ids
+tests/unit/test_presets.py::test_normalize_cursor_alias_pass_through_when_concrete
+tests/unit/test_render.py::test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven
+tests/unit/test_render.py::test_render_cursor_hooks_json_omits_spec_gate_when_task_driven
+
+[pre-existing]
+# Already dead at 0da08d03, before PR-C, in SPECs PR-C does not own.
+tests/integration/test_intent_trial_concurrency.py::test_ac_004_parallel_decisions_conserve_committed_records
+tests/render/test_render_review_lens_groups.py::test_round_one_sends_one_code_reviewer_dispatch
+tests/structural/test_command_size_budget.py::test_fused_loses_no_instruction
+tests/structural/test_command_size_budget.py::test_rendered_commands_within_budget
+tests/structural/test_command_size_budget.py::test_shared_blocks_appear_once
+tests/structural/test_comprehension_render_gate.py::test_spec_stage_carries_the_same_block_set
+tests/structural/test_roundtrip_budget.py::test_every_command_matches_its_budget
+tests/unit/crawler/test_anthropic_blog.py::test_crawl_caps_at_max_items
+tests/unit/crawler/test_anthropic_blog.py::test_crawl_returns_empty_list_on_http_error
+tests/unit/crawler/test_anthropic_blog.py::test_crawl_returns_items_from_mocked_html
+tests/unit/crawler/test_arxiv.py::test_crawl_returns_empty_on_parser_error
+tests/unit/crawler/test_arxiv.py::test_crawl_returns_items_from_mocked_feed
+tests/unit/crawler/test_arxiv.py::test_crawl_skips_entries_missing_required_fields
+tests/unit/crawler/test_github_releases.py::test_crawl_handles_non_200
+tests/unit/crawler/test_github_releases.py::test_crawl_handles_rate_limit
+tests/unit/crawler/test_github_releases.py::test_crawl_returns_items_for_each_release
+tests/unit/hooks/test_loop_gate.py::test_found_in_cwd
+tests/unit/test_bench_light_lane.py::test_five_tasks_ship
+tests/unit/test_communication_audit.py::test_discover_dispatchers_returns_14_agents
+tests/unit/test_communication_audit.py::test_discover_pinned_skills_returns_five_llm_judgment
+tests/unit/test_intent_doc_new.py::test_ac_003_a_failed_ledger_append_keeps_the_record_and_warns
+tests/unit/test_intent_doc_new.py::test_ac_003_a_linked_worktree_writes_the_row_at_base_and_the_record_in_the_worktree
+tests/unit/test_intent_doc_new.py::test_ac_003_from_proposal_prefills_rejected_and_emits_one_event
+tests/unit/test_intent_doc_new.py::test_ac_003_two_accepted_candidates_share_the_declined_list_and_emit_two_events
+tests/unit/test_intent_trial.py::test_ac_003_snapshot_permutation_and_replay
+tests/unit/test_intent_trial.py::test_ac_007_migration_preserves_history
+tests/unit/test_intent_trial.py::test_machine_golden_tables_are_exercised
+tests/unit/test_intent_trial.py::test_s1_next_session_enrolls_without_plan_or_collector
+tests/unit/test_intent_trial.py::test_s3_user_decision_is_persisted_and_replay_is_safe
+tests/unit/test_intent_trial_freeze.py::test_frozen_trial_is_inactive
+tests/unit/test_memory/test_episodic.py::test_concurrent_append_no_loss
+tests/unit/test_memory/test_episodic.py::test_multiple_writes_append
+tests/unit/test_memory/test_episodic.py::test_read_all_across_dates
+tests/unit/test_memory/test_profile.py::test_concurrent_set_no_lost_update
+tests/unit/test_memory/test_profile.py::test_empty_store
+tests/unit/test_memory/test_retrieval.py::test_retrieve_all_layers
+tests/unit/test_memory/test_retrieval.py::test_retrieve_episodic_without_date
+tests/unit/test_memory/test_retrieval.py::test_retrieve_semantic_only
+tests/unit/test_memory/test_semantic.py::test_concurrent_set_no_lost_update
+tests/unit/test_prompt_cache_control.py::test_relevance_cache_control
+tests/unit/test_relevance.py::test_adaptive_threshold_below_min_samples_returns_default
+tests/unit/test_relevance.py::test_adaptive_threshold_clamped_to_max
+tests/unit/test_render_delivery_metrics.py::test_metrics_command_blocks_when_enabled_and_absent_when_disabled
+tests/unit/test_render_intent_layer.py::test_ac_005_plan_offers_draft_after_none_and_creates_at_step_4_9
+tests/unit/test_render_intent_layer.py::test_ac_011_plan_loads_state_matches_rejected_and_loops_the_revisit_before_step_1
+tests/unit/test_second_opinion_backgrounding.py::test_ac_006_the_plan_render_refuses_to_background
+tests/unit/test_spec_quality.py::test_dev_mode_string_accepted
+tests/unit/test_verification_cache.py::test_env_ignore_patterns
+tests/unit/test_workflow_fuse.py::test_fuse_dev_workflow_orders_4_stages
+tests/unit/test_workflow_fuse.py::test_fuse_empty_stages_returns_header_only
+tests/unit/test_workflow_fuse.py::test_fuse_full_atomic_workflow
+tests/unit/test_worktree_gate.py::test_cursor_project_dir_used_when_claude_unset
+tests/unit/test_worktree_gate.py::test_edit_to_sibling_worktree_blocked
