@@ -33,3 +33,24 @@ The +340 is not new prose: it is the fan-out branch (+615) the research template
 for every non-Cursor harness, minus 275 chars of Cursor text removed. The allowance declares
 exactly `chars: 340` and `round_trips: {research: 3}`. (It was 332 until PR-C review round 1
 kept configure's "or combinations" so that line is a pure Cursor deletion: +8.)
+
+## Folded into the baseline (2026-10-16, after PR #31 landed)
+
+`tests/structural/surface_baseline.json` was re-frozen from main at `24d12cc5` (the PR-C squash),
+and this PLAN's `status` moved to `complete`, so the allowance no longer counts. The frozen
+numbers equal the measurement above, key for key:
+
+| key | before | after | why |
+|---|---|---|---|
+| `aggregate_chars`.claude | 240 359 | 240 699 | +340: the surface **grew**, as attributed above |
+| `aggregate_chars`.codex | 295 526 | 295 518 | −8: `hm-help` lost the Cursor row, so it **fell** |
+| `research` | 16 677 chars, 7 round trips | 17 292 chars, 10 round trips | the three-`Explore` fan-out branch |
+| `configure` | 12 704 | 12 604 | Cursor text removed |
+| `make` | 6 647 | 6 559 | `.cursor` dropped from the roots loop |
+| `help` | 2 183 | 2 103 | Cursor targets row removed |
+| `health` | 8 643 | 8 636 | `cursor` dropped from `--targets` |
+| `hm-help` | 2 030 | 2 022 | same help edit, Codex skill |
+
+`render_sha` and `payload_digest` moved mechanically with the re-freeze. Per ADR-010 the task
+that moved the surface owns its attribution, and folding it here rather than in a later task's
+commit is what keeps this out of `ratchet-rebaselined-by-its-own-subject`.
