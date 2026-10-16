@@ -107,6 +107,9 @@ TIER3_SIGNOFF_FILE = BENCH_DIR / "tier3-signoff.json"  # the DRI's {tier3_hash, 
 # Plain controls (SPEC-hm-eval-tier3 S8): their own arms, never part of the plain-vs-hm scorecard.
 CONTROL_ARMS = ("plain-careful", "plain-continue")
 ALL_ARMS = (*ARMS, *CONTROL_ARMS)
+# Arms whose sessions after the first resume the conversation, so the CLI's total_cost_usd is a
+# running total for the run and a session's own cost is the difference (as in the DRI path).
+RESUMED_ARMS = ("plain-continue",)
 CAREFUL_SENTENCE = (
     "Before changing code, read the documentation and every caller that the change could affect."
 )
@@ -1607,7 +1610,7 @@ def session_argv(task: Task, arm: str, session: int, opts: Options) -> list[str]
         opts.claude_bin, prompt_for(task, arm, session), opts.model, opts.max_turns,
         opts.max_budget_usd,
     )  # fmt: skip
-    return [*argv, "--continue"] if arm == "plain-continue" and session > 0 else argv
+    return [*argv, "--continue"] if arm in RESUMED_ARMS and session > 0 else argv
 
 
 def agent_argv(
@@ -1785,7 +1788,7 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
             if not ran:
                 return {**row, "status": "setup_error", "error": failure_text(exc)}
             return {**row, "status": "runner_error", "error": failure_text(exc),
-                    **_salvage(work, ran, opts)}  # fmt: skip
+                    **_salvage(work, ran, opts, cumulative=arm in RESUMED_ARMS)}  # fmt: skip
         ran.append((stdout, stderr, code, time.monotonic() - start))
         if STOP.is_set():
             return {**row, "status": "interrupted"}
@@ -1798,7 +1801,7 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 - the agent already ran and spent; keep what we know
         return {
             **row, "status": "runner_error", "error": f"{type(exc).__name__}: {failure_text(exc)}",
-            "exit_code": ran[-1][2], **_salvage(work, ran, opts),
+            "exit_code": ran[-1][2], **_salvage(work, ran, opts, cumulative=arm in RESUMED_ARMS),
         }  # fmt: skip
 
 
@@ -2056,12 +2059,18 @@ def _record(
     sessions that ran, the first non-ok status is the row's, and the work dir is graded once,
     against the start tree plus the teammate overlays that were applied. `dri` (a scripted hm
     session, see _run_dri) replaces the CLI cost, turns and wall with its running-total reading
-    and adds its own fields."""
+    and adds its own fields. A resumed arm (RESUMED_ARMS) reads its sessions' CLI totals as one
+    running total, by the DRI path's rule: each session costs the difference."""
     stdout, _stderr, code, _wall = ran[-1]
     result = parse_cli_result(stdout)
-    sessions = _sessions_record(ran)
+    resumed = dri_fields(["session"] * len(ran), ran) if row["arm"] in RESUMED_ARMS else None
+    if resumed is None:
+        sessions = _sessions_record(ran)
+    else:
+        sessions = [{k: v for k, v in s.items() if k != "kind"} for s in resumed["dri_turns"]]
     status = next((s["status"] for s in sessions if s["status"] != "ok"), "ok")
-    cli_cost = _cli_total(ran) if dri is None else dri["cli_cost_usd"]
+    reading = dri if dri is not None else resumed
+    cli_cost = _cli_total(ran) if reading is None else reading["cli_cost_usd"]
     wall = math.fsum(w for *_rest, w in ran)
     turns = [s["turns"] for s in sessions]
     num_turns = sum(turns) if all(isinstance(t, int) for t in turns) else None
@@ -2113,6 +2122,8 @@ def _record(
         stopped = len(ran) if status != "ok" else None
         recorded |= {"sessions": [{k: v for k, v in s.items() if k != "subtype"} for s in sessions],
                      "stopped_at": stopped, "overlay_clobbered": clobbered}  # fmt: skip
+    if resumed is not None:
+        recorded["cli_cost_shape"] = resumed["cli_cost_shape"]
     if dri is not None:
         recorded |= {"num_turns": dri["num_turns"], "wall_s": dri["wall_s"]}
         recorded |= {name: dri[name] for name in DRI_ROW_FIELDS}

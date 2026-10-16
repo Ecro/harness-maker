@@ -187,10 +187,10 @@ Asked by the DRI to see whether `/hm:` carries state across fresh headless sessi
 |---|---|---|---|---|---|
 | t20 | hm | 2/3 | 17/18 | $3.015 | 17m 26s |
 | t20 | plain-careful | 2/3 | 14/18 | $0.192 | 48s |
-| t20 | plain-continue | 3/3 | 18/18 | $0.179 | 36s |
+| t20 | plain-continue | 3/3 | 18/18 | $0.109 | 36s |
 | t21 | hm | 1/2 | 4/6 | $3.406 | 15m 24s |
 | t21 | plain-careful | 3/3 | 9/9 | $0.213 | 49s |
-| t21 | plain-continue | 3/3 | 9/9 | $0.179 | 36s |
+| t21 | plain-continue | 3/3 | 9/9 | $0.107 | 36s |
 
 | Run | Solved | hidden cases | Sessions (status, $, wall) | $ | wall |
 |---|---|---|---|---|---|
@@ -200,17 +200,17 @@ Asked by the DRI to see whether `/hm:` carries state across fresh headless sessi
 | t20 plain-careful 1 | yes | 6/6 | ok, $0.089, 21s; ok, $0.118, 30s | $0.207 | 51s |
 | t20 plain-careful 2 | wrong | 2/6 | ok, $0.095, 22s; ok, $0.070, 16s | $0.164 | 38s |
 | t20 plain-careful 3 | yes | 6/6 | ok, $0.123, 30s; ok, $0.082, 25s | $0.205 | 54s |
-| t20 plain-continue 1 | yes | 6/6 | ok, $0.076, 21s; ok, $0.113, 17s | $0.190 | 38s |
-| t20 plain-continue 2 | yes | 6/6 | ok, $0.074, 21s; ok, $0.117, 19s | $0.191 | 40s |
-| t20 plain-continue 3 | yes | 6/6 | ok, $0.061, 16s; ok, $0.096, 15s | $0.157 | 31s |
+| t20 plain-continue 1 | yes | 6/6 | ok, $0.076, 21s; ok, $0.037, 17s | $0.113 | 38s |
+| t20 plain-continue 2 | yes | 6/6 | ok, $0.074, 21s; ok, $0.043, 19s | $0.117 | 40s |
+| t20 plain-continue 3 | yes | 6/6 | ok, $0.061, 16s; ok, $0.035, 15s | $0.096 | 31s |
 | t21 hm 1 | yes | 3/3 | ok, $2.038, 9m 16s; ok, $1.902, 8m 18s | $3.940 | 17m 34s |
 | t21 hm 2 | wrong | 1/3 | ok, $1.713, 7m 31s; ok, $1.160, 5m 44s | $2.873 | 13m 15s |
 | t21 plain-careful 1 | yes | 3/3 | ok, $0.104, 24s; ok, $0.103, 27s | $0.207 | 51s |
 | t21 plain-careful 2 | yes | 3/3 | ok, $0.102, 23s; ok, $0.109, 24s | $0.210 | 47s |
 | t21 plain-careful 3 | yes | 3/3 | ok, $0.104, 24s; ok, $0.119, 27s | $0.222 | 51s |
-| t21 plain-continue 1 | yes | 3/3 | ok, $0.074, 20s; ok, $0.109, 16s | $0.183 | 36s |
-| t21 plain-continue 2 | yes | 3/3 | ok, $0.070, 21s; ok, $0.103, 17s | $0.173 | 38s |
-| t21 plain-continue 3 | yes | 3/3 | ok, $0.073, 20s; ok, $0.108, 16s | $0.180 | 36s |
+| t21 plain-continue 1 | yes | 3/3 | ok, $0.074, 20s; ok, $0.035, 16s | $0.109 | 36s |
+| t21 plain-continue 2 | yes | 3/3 | ok, $0.070, 21s; ok, $0.034, 17s | $0.103 | 38s |
+| t21 plain-continue 3 | yes | 3/3 | ok, $0.073, 20s; ok, $0.035, 16s | $0.108 | 36s |
 
 ### Notes
 
@@ -243,7 +243,17 @@ added `lang`. In the pilot, plain failed t20 the same two ways: `", "` for Korea
 once.
 
 **Cost.** Each hm row's cost is the CLI total, which leaves out subagent spend; the
-transcript-priced total for the 17 diagnostic rows is about $22.2 against $18.1 by the CLI.
+transcript-priced total for the 17 diagnostic rows is about $22.2 against $17.7 by the CLI.
+
+**Correction (plain-continue cost).** The first publish of these rows put `plain-continue` at
+$0.179/run on each task; the right figures are $0.109 (t20) and $0.107 (t21). A resumed
+session's `total_cost_usd` is the running total of the whole conversation, not that session's
+own spend, and the runner added the two sessions' totals, so session 1 was counted twice. The
+six rows were recomputed exactly from their recorded per-session totals: the run's cost is the
+last running total, and each session's own cost is the difference from the one before (the
+DRI path's rule), with the raw total kept as `cli_total_usd`. No row was estimated. The CLI
+total for the 17 rows fell from $18.1 to $17.7. The hm and `plain-careful` rows start a fresh
+process per session, so their summed totals were right and are unchanged.
 
 **Fairness notes.**
 
