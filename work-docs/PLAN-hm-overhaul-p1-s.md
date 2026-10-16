@@ -227,7 +227,7 @@ Phase 4 (each is the simplest option where the SPEC is silent):
 - [x] Phase 2 — telemetry readers
 - [x] Phase 3 — eval-3 replay
 - [x] Phase 4 — stage collapse
-- [ ] Phase 5 — ship
+- [x] Phase 5 — ship (0.64.0; AC-010 stays red until the DRI commits the eval re-run)
 
 ## Evidence
 
