@@ -2277,14 +2277,16 @@ def security_scan_cmd(
     """Run the bundled security scanner and print a compact summary."""
     from collections import Counter
 
-    from harness_maker.security_scanner import scan_all
+    from harness_maker.security_scanner import scan_all_with_status
 
     target = target.resolve()
     harness_config = _read_harness_config(target / ".claude" / "harness.yaml")
-    findings = scan_all(target, harness_config=harness_config, force=force)
+    findings, status = scan_all_with_status(target, harness_config=harness_config, force=force)
     by_severity = Counter(f.severity for f in findings)
 
     typer.echo(f"Security scan: {len(findings)} finding(s)")
+    for gate, state in sorted(status.items()):
+        typer.echo(f"{gate}: {state}")
     if by_severity:
         bits = [f"{severity}={count}" for severity, count in sorted(by_severity.items())]
         typer.echo("Severity: " + ", ".join(bits))

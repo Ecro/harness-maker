@@ -1676,20 +1676,18 @@ def _dim_observability_setup(project_dir: Path) -> DimensionScore:
             None if obs.is_dir() else "Run /hm:make to scaffold the observability directory",
         )
     )
-    has_telemetry = bool(metrics_files)
+    # The `telemetry` hook is retired (0.64.0, SPEC-hm-overhaul-p1 AC-011): no harness writes
+    # these files any more, so their absence is not a setup defect and a stale file is not a live
+    # signal. Both telemetry signals are n/a and leave the denominator (rescaled below).
+    retired = "telemetry hook retired"
     signals.append(
         _signal(
             "metrics_jsonl_present",
-            has_telemetry,
-            25,
-            f"telemetry present ({len(metrics_files)} file(s))"
-            if has_telemetry
-            else "no telemetry files (metrics.jsonl or metrics-YYYY-MM-DD.jsonl)",
-            None
-            if has_telemetry
-            else (
-                "First Claude Code tool use will create this file (PostToolUse hook is installed)."
-            ),
+            True,
+            0,
+            f"n/a — {retired} ({len(metrics_files)} legacy file(s))",
+            None,
+            not_applicable=True,
         )
     )
     signals.append(
@@ -1779,29 +1777,21 @@ def _dim_observability_setup(project_dir: Path) -> DimensionScore:
         )
     )
 
-    sample_size = 0
-    for path in metrics_files:
-        try:
-            sample_size += sum(1 for line in _read_text(path).splitlines() if line.strip())
-        except OSError:
-            continue
-    has_samples = sample_size >= 5
     signals.append(
         _signal(
             "metrics_has_samples",
-            has_samples,
-            25,
-            f"telemetry has {sample_size} entr{'y' if sample_size == 1 else 'ies'} "
-            f"across {len(metrics_files)} file(s)"
-            if has_telemetry
-            else "no telemetry files",
-            None if has_samples else "Use Claude Code for ≥ 5 turns to accumulate telemetry",
+            True,
+            0,
+            f"n/a — {retired}",
+            None,
+            not_applicable=True,
         )
     )
 
-    return DimensionScore(
-        name="observability_setup", score=_score_signals(signals), signals=signals
-    )
+    applicable = sum(sig.weight for sig in signals if not sig.not_applicable)
+    earned = sum(sig.weight for sig in signals if sig.passed and not sig.not_applicable)
+    score = round(100 * earned / applicable) if applicable else 100
+    return DimensionScore(name="observability_setup", score=score, signals=signals)
 
 
 def _dim_model_routing(project_dir: Path) -> DimensionScore:

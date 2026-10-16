@@ -100,6 +100,17 @@ Each phase ends at a commit with the local gate green for what it touched.
   "An import that resolves inside the project root never counts" is vacuous here: it is about the
   hallucination gate, which `hm check` does not run.
 
+- **ADR-013: readiness telemetry signals are n/a whether or not a file exists.** The AC-011 row
+  names the no-file case; a leftover `metrics-*.jsonl` from before 0.64.0 is a stale record of a
+  writer that no longer runs, so scoring it would make readiness depend on history. Both signals
+  carry weight 0 and `not_applicable`, and the dimension score is rescaled over the applicable
+  weights (dir + dashboard).
+- **ADR-014: "has a telemetry source" means a `metrics-*.jsonl` or legacy `metrics.jsonl` exists**
+  (`_metrics_io.has_telemetry_source`). Security reports `prod_name_guard: scanned` with a file and
+  `no telemetry source` without one; `telemetry_grep` keeps `""` for a file with no stop event
+  (a clean session, as before). The `telemetry` stub drains stdin; `telemetry.main()` stays a
+  library function. The `test_hook_host` writing control moved to `flush_session`.
+
 (Phase 4 ADRs are added when that phase starts.)
 
 ## Risks
@@ -130,7 +141,7 @@ Each phase ends at a commit with the local gate green for what it touched.
 ## Progress
 
 - [x] Phase 1 — `hm check`
-- [ ] Phase 2 — telemetry readers
+- [x] Phase 2 — telemetry readers
 - [ ] Phase 3 — eval-3 replay
 - [ ] Phase 4 — stage collapse
 - [ ] Phase 5 — ship
@@ -153,3 +164,21 @@ A first-party name absent at HEAD, which is the SPEC's own `red_by_import` RED.
 GREEN: `tests/unit/test_overhaul_p1_hm_check.py` 48 passed (25 exit rows, 16 RED rows, usage,
 one-line output, tree bytes x2, gate env). `mark-tested --ac AC-005`: OK; `approval-status` still
 `approved`.
+
+### Phase 2 (AC-011)
+
+RED, 2026-10-16, against 90573c8a:
+
+```
+>       findings, status = security_scanner.scan_all_with_status(empty, force=True)
+E       AttributeError: module 'harness_maker.security_scanner' has no attribute 'scan_all_with_status'
+FAILED tests/unit/test_overhaul_p1_telemetry_readers.py::test_ac011_reader_table
+```
+
+`test_ac011_reader_list_matches_grep` passed at RED: it is the pin (the four readers already are
+the grep set), there to fail when a fifth reader appears.
+
+GREEN: both AC-011 tests pass, including the Gate 7 differential against db19f023 on the same
+file. Tests whose subject was the retired behaviour were rewritten (readiness rotation counting,
+telemetry_grep empty-string, `scan_all` mocks → `scan_all_with_status`). `mark-tested --ac AC-011`:
+OK; `approval-status` still `approved`.

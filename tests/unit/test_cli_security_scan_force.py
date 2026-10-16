@@ -1,7 +1,8 @@
 """SPEC-hm-light-lane-s3a AC-008 (CLI half) — `hm cli security-scan --force` skips the scan cache.
 
 The light check runs the scan uncached on the change's checkout before reading Check 4's
-findings (IRR-004). `scan_all` is mocked: the real one walks the tree and queries OSV.dev.
+findings (IRR-004). `scan_all_with_status` is mocked: the real one walks the tree and queries
+OSV.dev.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from harness_maker.cli import app
 
 
 def _invoke(tmp_path: Path, *flags: str) -> Any:
-    with mock.patch.object(security_scanner, "scan_all", return_value=[]) as scan:
+    with mock.patch.object(security_scanner, "scan_all_with_status", return_value=([], {})) as scan:
         result = CliRunner().invoke(app, ["security-scan", str(tmp_path), *flags])
     assert result.exit_code == 0, result.output
     return scan

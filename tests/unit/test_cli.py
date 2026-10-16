@@ -653,7 +653,9 @@ def test_security_scan_command_reports_findings(tmp_path: Path) -> None:
         fix="Remove the instruction override.",
     )
 
-    with patch("harness_maker.security_scanner.scan_all", return_value=[finding]) as scan:
+    with patch(
+        "harness_maker.security_scanner.scan_all_with_status", return_value=([finding], {})
+    ) as scan:
         result = runner.invoke(app, ["security-scan", str(tmp_path)])
 
     assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
@@ -681,7 +683,7 @@ def test_security_scan_blocks_high_when_policy_blocks(tmp_path: Path) -> None:
         fix="Rotate and remove.",
     )
 
-    with patch("harness_maker.security_scanner.scan_all", return_value=[finding]):
+    with patch("harness_maker.security_scanner.scan_all_with_status", return_value=([finding], {})):
         result = runner.invoke(app, ["security-scan", str(tmp_path)])
 
     assert result.exit_code == 1, f"expected blocking exit:\n{result.output}"

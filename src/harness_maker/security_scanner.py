@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from harness_maker._metrics_io import iter_recent_entries
+from harness_maker._metrics_io import NO_TELEMETRY_SOURCE, has_telemetry_source, iter_recent_entries
 from harness_maker.llm_judge import AnthropicJudgeClient, JudgeClient
 from harness_maker.models import Finding
 from harness_maker.secscan import (
@@ -156,6 +156,28 @@ def scan_all(
     pi_client: JudgeClient | None = None,
     force: bool = False,
 ) -> list[Finding]:
+    """Findings only; callers that print a verdict use :func:`scan_all_with_status`."""
+    findings, _ = scan_all_with_status(target_dir, harness_config, pi_client=pi_client, force=force)
+    return findings
+
+
+def gate_status(target_dir: Path) -> dict[str, str]:
+    """Per-gate status for gates whose input can be absent rather than clean.
+
+    Gate 7 reads `metrics-*.jsonl`, which the retired `telemetry` hook no longer writes; zero
+    findings from no file must not read as "passed" (SPEC-hm-overhaul-p1 AC-011).
+    """
+    obs_dir = target_dir / ".claude" / "observability"
+    return {"prod_name_guard": "scanned" if has_telemetry_source(obs_dir) else NO_TELEMETRY_SOURCE}
+
+
+def scan_all_with_status(
+    target_dir: Path,
+    harness_config: dict[str, Any] | None = None,
+    *,
+    pi_client: JudgeClient | None = None,
+    force: bool = False,
+) -> tuple[list[Finding], dict[str, str]]:
     """Run all 7 security gates against ``target_dir``; persist + return findings.
 
     The prompt-injection gate runs both regex and an LLM second pass (via
@@ -167,7 +189,7 @@ def scan_all(
     if not force:
         cached = _check_fresh_scan(target_dir)
         if cached is not None:
-            return cached
+            return cached, gate_status(target_dir)
 
     findings: list[Finding] = []
 
@@ -189,8 +211,7 @@ def scan_all(
     findings.extend(scan_hallucination(target_dir))
 
     # Gate 7: Production-name guard — sequence detection over recent tool history.
-    # No-op when metrics.jsonl is empty or all entries pre-date 0.7.0
-    # tool_input persistence (graceful upgrade).
+    # With no metrics file this finds nothing; gate_status says so instead of "passed".
     tool_calls = _load_recent_tool_calls(target_dir)
     findings.extend(scan_prod_sequence(tool_calls))
 
@@ -233,7 +254,7 @@ def scan_all(
     # The on_finding policy (warn/block) is applied by callers — cli.py gates on
     # {"high","P0"} via _on_finding_policy. scan_all only collects + persists;
     # harness_config stays in the signature for that caller contract.
-    return findings
+    return findings, gate_status(target_dir)
 
 
 def scan_prompt_injection_regex_only(text: str) -> list[Finding]:

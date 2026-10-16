@@ -37,15 +37,21 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 # ── last_stop_with_trace ─────────────────────────────────────────────────────
 
 
-def test_last_stop_with_trace_clean_session_returns_empty(tmp_path: Path) -> None:
-    """(d) No telemetry dir → empty string. No exception."""
-    assert last_stop_with_trace(tmp_path / "nope") == ""
+def test_last_stop_with_trace_no_dir_has_no_source(tmp_path: Path) -> None:
+    """(d) No telemetry dir → "no telemetry source" (the hook is retired), never "" (clean)."""
+    assert last_stop_with_trace(tmp_path / "nope") == "no telemetry source"
 
 
-def test_last_stop_with_trace_empty_dir_returns_empty(tmp_path: Path) -> None:
-    """(d) Dir exists but no metrics-*.jsonl → empty string."""
+def test_last_stop_with_trace_empty_dir_has_no_source(tmp_path: Path) -> None:
+    """(d) Dir exists but no metrics-*.jsonl → "no telemetry source"."""
     (tmp_path / ".claude/observability").mkdir(parents=True)
-    assert last_stop_with_trace(tmp_path / ".claude/observability") == ""
+    assert last_stop_with_trace(tmp_path / ".claude/observability") == "no telemetry source"
+
+
+def test_last_stop_with_trace_file_without_stop_is_a_clean_session(tmp_path: Path) -> None:
+    obs = tmp_path / ".claude/observability"
+    _write_jsonl(_today_metrics_file(obs), [{"event": "post_tool_use", "tool_name": "Read"}])
+    assert last_stop_with_trace(obs) == ""
 
 
 def test_last_stop_with_trace_finds_stop_and_joins_tool_uses(tmp_path: Path) -> None:
@@ -123,10 +129,14 @@ def test_last_stop_with_trace_malformed_jsonl_silently_skipped(tmp_path: Path) -
 
 
 def test_gather_clean_session_returns_three_empty_buckets(tmp_path: Path) -> None:
-    """(d) No telemetry → bundle has all 3 keys with empty/falsy values, no crash."""
+    """(d) No telemetry → bundle has all 3 keys, metrics says it has no source, no crash."""
     out = gather_recent_signals(tmp_path / ".claude/observability")
     parsed = json.loads(out)
-    assert parsed == {"metrics": "", "silent_intent_miss": [], "build_break": []}
+    assert parsed == {
+        "metrics": "no telemetry source",
+        "silent_intent_miss": [],
+        "build_break": [],
+    }
 
 
 def test_gather_picks_up_silent_intent_miss_rows(tmp_path: Path) -> None:

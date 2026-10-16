@@ -859,7 +859,7 @@ ac:
     note: a new reader must join this table
   rubric_id: null
   note: PR-S. Found by grep of db19f023 for _metrics_io and metrics- on 2026-10-15.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The reader list is a grep of db19f023 made before implementation;
     the rule that a security reader must not read absent data as clean is the spec-validator's

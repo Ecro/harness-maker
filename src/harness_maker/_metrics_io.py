@@ -45,6 +45,18 @@ def _candidate_files(obs_dir: Path, days: int) -> list[Path]:
     return files
 
 
+NO_TELEMETRY_SOURCE = "no telemetry source"
+
+
+def has_telemetry_source(obs_dir: Path) -> bool:
+    """The `telemetry` hook is retired (0.64.0), so an absent file is not evidence of anything.
+
+    Readers branch on this to say "no telemetry source" instead of reporting the empty read
+    as a clean result (SPEC-hm-overhaul-p1 AC-011).
+    """
+    return bool(_candidate_files(obs_dir, days=1))
+
+
 def iter_recent_entries(
     obs_dir: Path,
     days: int = 7,
