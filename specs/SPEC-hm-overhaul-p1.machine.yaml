@@ -3,9 +3,10 @@ spec_slug: hm-overhaul-p1
 parent_spec: null
 verification_tier: 2
 mutation_threshold: null
-mutation_threshold_rationale: Render, reconcile and CLI-contract changes are pinned by db19f023
-  differentials, golden tables and the eval-3 replay; mutation testing is opt-in by DRI
-  decision (card c) and adds little over byte-level differentials here.
+mutation_threshold_rationale: Render, reconcile and CLI-contract changes are pinned
+  by db19f023 differentials, golden tables and the eval-3 replay; mutation testing
+  is opt-in by DRI decision (card c) and adds little over byte-level differentials
+  here.
 last_mutation_run: null
 paths_to_mutate: []
 mutation_runner: null
@@ -22,29 +23,32 @@ ac:
   executable_predicate: null
   golden_table: []
   rubric_id: null
-  note: 'PR-C. Removed: render._is_cursor_mdc, _is_cursor_command, _is_cursor_mcp_json and
-    their dispatch branches; the flat-schema branches of _entry_identity, _strip_shipped_commands,
-    _refresh_ref and the _merge_hooks_json schema select; .cursor/ in resolve_output_path and
-    _SIBLING_TREE_PREFIXES; synthesize._cursor_target_files and its Target.CURSOR branch; the
-    cursor_model context and _alias_by_cursor_id; presets.CURSOR_MODEL_IDS; readiness Cursor
-    advisory; Target.CURSOR; templates/cursor/; the cursor branches of help/make templates
-    and the plugin commands/make.md; .cursor-plugin/plugin.json. Kept: hook_host,
-    reconcile .cursor sweep root and backup, foreign_config detection of an existing .cursor/rules.
-    Lifecycle: the HEAD side is pinned to the PR-C merge commit, recorded by PR-S in tests/fixtures/overhaul_p1/prc_merge_sha
-    and rendered via git worktree add; before PR-C merges it is the working tree. Not superseded.'
+  note: 'PR-C. Removed: render._is_cursor_mdc, _is_cursor_command, _is_cursor_mcp_json
+    and their dispatch branches; the flat-schema branches of _entry_identity, _strip_shipped_commands,
+    _refresh_ref and the _merge_hooks_json schema select; .cursor/ in resolve_output_path
+    and _SIBLING_TREE_PREFIXES; synthesize._cursor_target_files and its Target.CURSOR
+    branch; the cursor_model context and _alias_by_cursor_id; presets.CURSOR_MODEL_IDS;
+    readiness Cursor advisory; Target.CURSOR; templates/cursor/; the cursor branches
+    of help/make templates and the plugin commands/make.md; .cursor-plugin/plugin.json.
+    Kept: hook_host, reconcile .cursor sweep root and backup, foreign_config detection
+    of an existing .cursor/rules. Lifecycle: the HEAD side is pinned to the PR-C merge
+    commit, recorded by PR-S in tests/fixtures/overhaul_p1/prc_merge_sha and rendered
+    via git worktree add; before PR-C merges it is the working tree. Not superseded.'
   pending_test: true
   oracle_source: differential
-  oracle_evidence: The reference is the db19f023 renderer run in a temp checkout from `git
-    show`/`git worktree add` before any edit, rendering T minus cursor; the relation holds
-    for any implementation that only removes Cursor, and the removed-symbol list was taken
-    by grep of db19f023 on 2026-10-15.
+  oracle_evidence: The reference is the db19f023 renderer run in a temp checkout from
+    `git show`/`git worktree add` before any edit, rendering T minus cursor; the relation
+    holds for any implementation that only removes Cursor, and the removed-symbol
+    list was taken by grep of db19f023 on 2026-10-15.
   oracle_independence_waiver: null
-  input_domain: targets {[claude-code,cursor], [claude-code,cursor,codex], [cursor], [claude-code],
-    [claude-code,codex]} x preset {Side, Production} x worktree.enabled {false, true}
-  transformation: render at HEAD with targets T; render at db19f023 with T minus cursor (empty
-    -> [claude-code]); normalise generated_at, harness_maker_version, content_hash and manifest
-    timestamps
-  expected_relation: file sets equal, and every differing hunk's old side contains /cursor/i
+  input_domain: targets {[claude-code,cursor], [claude-code,cursor,codex], [cursor],
+    [claude-code], [claude-code,codex]} x preset {Side, Production} x worktree.enabled
+    {false, true}
+  transformation: render at HEAD with targets T; render at db19f023 with T minus cursor
+    (empty -> [claude-code]); normalise generated_at, harness_maker_version, content_hash
+    and manifest timestamps
+  expected_relation: file sets equal, and every differing hunk's old side contains
+    /cursor/i
   preconditions:
   - same HOME pin and freeze_time for both renders
   observable_output: the list of files and hunks violating the relation, empty
@@ -62,20 +66,23 @@ ac:
   executable_predicate: null
   golden_table:
   - input:
-      case: 0.62 tree targets [claude-code,cursor,codex], .cursor/* pristine; make --update
-    expected: one 'cursor target removed' warning; .cursor/rules/harness.mdc, mcp.json, hooks.json
-      deleted; empty .cursor/ removed; harness.yaml targets [claude-code, codex]
+      case: 0.62 tree targets [claude-code,cursor,codex], .cursor/* pristine; make
+        --update
+    expected: one 'cursor target removed' warning; .cursor/rules/harness.mdc, mcp.json,
+      hooks.json deleted; empty .cursor/ removed; harness.yaml targets [claude-code,
+      codex]
     edge: false
-    note: pristine = on-disk sha256 equals the manifest hash and, for hooks.json, every entry
-      is harness-managed
+    note: pristine = on-disk sha256 equals the manifest hash and, for hooks.json,
+      every entry is harness-managed
   - input:
       case: as row 1, one byte of harness.mdc edited
-    expected: harness.mdc kept byte-identical with one KEPT warning; the other two deleted
+    expected: harness.mdc kept byte-identical with one KEPT warning; the other two
+      deleted
     edge: false
     note: ''
   - input:
-      case: as row 1, hooks.json carries a user entry folded in by an earlier merge (hash in
-        manifest)
+      case: as row 1, hooks.json carries a user entry folded in by an earlier merge
+        (hash in manifest)
     expected: hooks.json kept byte-identical, one KEPT warning
     edge: true
     note: the merged hash is ours by manifest but holds user content (the .claude/hooks/hooks.json
@@ -109,9 +116,10 @@ ac:
   note: PR-C
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The rows encode the DRI's 22:54Z rule (one warning then ignore; sweep only
-    byte-identical; keep edited) and pre-change-checklist items 1 and 5, with 0.62 trees rendered
-    from db19f023; none is derived from the new reconcile code.
+  oracle_evidence: The rows encode the DRI's 22:54Z rule (one warning then ignore;
+    sweep only byte-identical; keep edited) and pre-change-checklist items 1 and 5,
+    with 0.62 trees rendered from db19f023; none is derived from the new reconcile
+    code.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -134,7 +142,8 @@ ac:
   golden_table:
   - input:
       case: a registry key at db19f023 not in the SPEC cut ledger
-    expected: it is KEPT, so a heading with its ordinal renders in the same stage at HEAD
+    expected: it is KEPT, so a heading with its ordinal renders in the same stage
+      at HEAD
     edge: false
     note: ''
   - input:
@@ -154,8 +163,8 @@ ac:
     note: ''
   - input:
       case: a MOVED row
-    expected: the new owner (hm check section, execute review step, execute) contains the
-      named function (golden substring or CLI section)
+    expected: the new owner (hm check section, execute review step, execute) contains
+      the named function (golden substring or CLI section)
     edge: true
     note: ''
   rubric_id: null
@@ -190,14 +199,15 @@ ac:
   golden_table:
   - input:
       case: D-1 one reviewer default; claude-code
-    expected: .claude/agents/code-reviewer.md present, <= 3000 chars; execute.md dispatches code-reviewer
+    expected: .claude/agents/code-reviewer.md present, <= 3000 chars; execute.md dispatches
+      code-reviewer
     edge: false
     note: flip Q1 -> this row gains a review on/off axis
   - input:
       case: D-2 codex in targets
     expected: .agents/skills/hm-{research,spec,execute,wrapup,help}/SKILL.md, .codex/agents/<agent>.toml
-      per rendered agent, config.toml [agents.*] only for those, .codex/hooks.json, AGENTS.md;
-      no .agents/skills/hm-{review,verify,loop}
+      per rendered agent, config.toml [agents.*] only for those, .codex/hooks.json,
+      AGENTS.md; no .agents/skills/hm-{review,verify,loop}
     edge: false
     note: ''
   - input:
@@ -222,48 +232,49 @@ ac:
     note: D-6 and D-7 are defaults pending the DRI's card, see Open Questions 1
   - input:
       case: stage budgets, Side and Production, worktree off, depth standard
-    expected: spec.md <= 6500, execute.md <= 7000, wrapup.md <= 3500; codex SKILL.md <= 1.03x
-      the same
+    expected: spec.md <= 6500, execute.md <= 7000, wrapup.md <= 3500; codex SKILL.md
+      <= 1.03x the same
     edge: false
     note: wc -c of the rendered file, frontmatter included
   - input:
       case: worktree.enabled true
-    expected: spec <= 8000, execute <= 8500, wrapup <= 6300; each stage contains `hm worktree
-      task-preflight`; wrapup contains `task-land` and `commit-base-memory`
+    expected: spec <= 8000, execute <= 8500, wrapup <= 6300; each stage contains `hm
+      worktree task-preflight`; wrapup contains `task-land` and `commit-base-memory`
     edge: false
     note: ''
   - input:
       case: interview.comprehension.depth deep
-    expected: spec.md <= base + 800 and contains the per-question envelope and closing readback
+    expected: spec.md <= base + 800 and contains the per-question envelope and closing
+      readback
     edge: true
     note: ''
   - input:
       case: any render
     expected: absent .claude/stages/, .claude/hm/, commands review/verify/configure/loop/loop-p5-batch,
-      agents test-reviewer/stuck/security-auditor/executor/autoloop-coder and the 5 lens reviewers,
-      skills security-scanner/verify-before-completion/targeted-test-selection/conditional-router/
+      agents test-reviewer/stuck/security-auditor/executor/autoloop-coder and the
+      5 lens reviewers, skills security-scanner/verify-before-completion/targeted-test-selection/conditional-router/
       autoloop-driver/refdocs-search, .cursor/
     edge: false
     note: ''
   - input:
       case: settings.json hooks, strictness_of(config) block and not block
-    expected: exactly permission_gate, worktree_gate, flush_session, worktree span-end, loop_gate
-      --mode stop-hook, sessionid_envfile, plus spec_gate (Write|Edit|MultiEdit) exactly when strictness
-      is block
+    expected: exactly permission_gate, worktree_gate, flush_session, worktree span-end,
+      loop_gate --mode stop-hook, sessionid_envfile, plus spec_gate (Write|Edit|MultiEdit)
+      exactly when strictness is block
     edge: false
     note: keyed on strictness as at db19f023, not on preset
   - input:
       case: .codex/hooks.json hooks
-    expected: exactly permission_gate (PermissionRequest, PreToolUse), sessionstart_drift, sessionid_envfile,
-      loop_gate --mode stop-hook, flush_session, plus spec_gate (apply_patch) exactly when strictness
-      is block
+    expected: exactly permission_gate (PermissionRequest, PreToolUse), sessionstart_drift,
+      sessionid_envfile, loop_gate --mode stop-hook, flush_session, plus spec_gate
+      (apply_patch) exactly when strictness is block
     edge: false
     note: ''
   - input:
       case: D-8 no lanes, spec.md
-    expected: contains interview.main_loop.max_rounds and 'Approve this SPEC and end interview';
-      no 'lane:' field, no pick-the-lane step, no one-round mode; Step 5 exempt rule names irreversible_decisions
-      [] and no lane clause
+    expected: contains interview.main_loop.max_rounds and 'Approve this SPEC and end
+      interview'; no 'lane:' field, no pick-the-lane step, no one-round mode; Step
+      5 exempt rule names irreversible_decisions [] and no lane clause
     edge: false
     note: default pending the DRI's card
   - input:
@@ -274,24 +285,24 @@ ac:
     note: Session Context Loading is INV and kept
   - input:
       case: D-7 research.md
-    expected: <= 8000 chars; no other stage file requires research output; no auto-advance into
-      or out of research
+    expected: <= 8000 chars; no other stage file requires research output; no auto-advance
+      into or out of research
     edge: false
     note: default pending the DRI's card
   - input:
       case: every rendered stage file
-    expected: names no `.claude/hm/` or `.claude/stages/` path and no Read of another harness
-      prose file; keeps @hm:user:extensions
+    expected: names no `.claude/hm/` or `.claude/stages/` path and no Read of another
+      harness prose file; keeps @hm:user:extensions
     edge: false
     note: self-contained
   rubric_id: null
   note: PR-S
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The file lists come from the DRI-approved draft sections 1 and 6 as amended by
-    the 2026-10-15 corrections; the budgets are the DRI's 6k/7k/3k targets adjusted by the
-    scratchpad-draft estimates stated in Open Questions 5, fixed here before any template
-    is written.
+  oracle_evidence: The file lists come from the DRI-approved draft sections 1 and
+    6 as amended by the 2026-10-15 corrections; the budgets are the DRI's 6k/7k/3k
+    targets adjusted by the scratchpad-draft estimates stated in Open Questions 5,
+    fixed here before any template is written.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -315,8 +326,8 @@ ac:
   executable_predicate: null
   golden_table:
   - input:
-      case: approved SPEC, all gates pass, every non-judgment AC bound and passing, no security
-        or cve finding in touched paths
+      case: approved SPEC, all gates pass, every non-judgment AC bound and passing,
+        no security or cve finding in touched paths
     expected: exit 0, one JSON line, every section ok, tree_changed []
     edge: false
     note: tree_changed is always present
@@ -341,7 +352,8 @@ ac:
     edge: true
     note: ''
   - input:
-      case: skip-path SPEC (exempt stamp, ac []), change set touches only README.md and a .toml
+      case: skip-path SPEC (exempt stamp, ac []), change set touches only README.md
+        and a .toml
     expected: exit 0, sections.ac ok with reason skip-path
     edge: true
     note: the exempt stamp exempts the human, not the test
@@ -366,7 +378,8 @@ ac:
     edge: true
     note: ''
   - input:
-      case: as row 1, the only mapped test of an AC is deselected (collected, not run)
+      case: as row 1, the only mapped test of an AC is deselected (collected, not
+        run)
     expected: exit 1, outcome deselected
     edge: true
     note: ''
@@ -419,7 +432,8 @@ ac:
       case: a gate writes a tracked file during the run
     expected: exit 4, tree_changed lists that path
     edge: true
-    note: hm check itself writes nothing; the prompt reruns once and stops on a second exit 4
+    note: hm check itself writes nothing; the prompt reruns once and stops on a second
+      exit 4
   - input:
       case: as row 1, SPEC unstamped, autonomy.level ask
     expected: exit 5
@@ -466,20 +480,20 @@ ac:
     edge: true
     note: not a real RED
   - input:
-      case: --red, an AC's only test is skipped, xfailed, deselected or xpassed (one row each in
-        the test)
+      case: --red, an AC's only test is skipped, xfailed, deselected or xpassed (one
+        row each in the test)
     expected: exit 1, the AC not RED, outcome named
     edge: true
     note: none of these counts as RED
   - input:
-      case: --red, a test fails on ModuleNotFoundError for pkg.newmod, first-party and absent at
-        HEAD
+      case: --red, a test fails on ModuleNotFoundError for pkg.newmod, first-party
+        and absent at HEAD
     expected: exit 0, red_by_import lists {ac, test_id, module pkg.newmod}
     edge: true
     note: new in this SPEC; db19f023 Phase B counted import errors as a wrong reason
   - input:
-      case: --red, a test fails on ImportError of symbol new_fn from an existing first-party module,
-        new_fn absent at HEAD
+      case: --red, a test fails on ImportError of symbol new_fn from an existing first-party
+        module, new_fn absent at HEAD
     expected: exit 0, red_by_import lists {module, symbol new_fn}
     edge: true
     note: ''
@@ -489,17 +503,20 @@ ac:
     edge: true
     note: needs an AssertionError stub instead
   - input:
-      case: --red, a test fails on ImportError of a first-party name already present at HEAD
+      case: --red, a test fails on ImportError of a first-party name already present
+        at HEAD
     expected: exit 1, not RED
     edge: true
     note: ''
   - input:
-      case: plain hm check (GREEN), red_by_import name new_fn defined nowhere in the change set
+      case: plain hm check (GREEN), red_by_import name new_fn defined nowhere in the
+        change set
     expected: exit 1, sections.ac reason 'red_by_import not implemented'
     edge: true
     note: derived statically with ast; no state file
   - input:
-      case: plain hm check (GREEN), new_fn defined as a top-level def in a changed file
+      case: plain hm check (GREEN), new_fn defined as a top-level def in a changed
+        file
     expected: sections.ac ok for that AC
     edge: false
     note: ''
@@ -512,11 +529,12 @@ ac:
   note: PR-S
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The exit meanings, the pytest-outcome rule, the skip-path rule and the red_by_import
-    rule are fixed in this SPEC before implementation and are new here, not restated from db19f023
-    (db19f023 Phase B counted import errors as a wrong reason and Phase A.4 counted only passes).
-    The out-of-scope security, skip-path code-change and invalid-stamp rows reproduce shapes
-    observed in the eval-3 trees on 2026-10-15; the approval rows follow the db19f023 spec_machine
+  oracle_evidence: The exit meanings, the pytest-outcome rule, the skip-path rule
+    and the red_by_import rule are fixed in this SPEC before implementation and are
+    new here, not restated from db19f023 (db19f023 Phase B counted import errors as
+    a wrong reason and Phase A.4 counted only passes). The out-of-scope security,
+    skip-path code-change and invalid-stamp rows reproduce shapes observed in the
+    eval-3 trees on 2026-10-15; the approval rows follow the db19f023 spec_machine
     approval states; the RED requirement is DRI rule 23:12Z.
   oracle_independence_waiver: null
   input_domain: null
@@ -539,22 +557,23 @@ ac:
   executable_predicate: null
   golden_table:
   - input:
-      case: each of the 36 trees rebuilt from committed fixtures (db19f023 bench fixture + db19f023
-        harness render via git worktree add + the run's committed patch; .venv via venv --system-site-packages),
-        --offline
-    expected: security ok with 0 gating findings, although unscoped scan_all reports 10-15
-      high/P0 per tree; gates ok (pytest only, from pyproject); tree unchanged
+      case: each of the 36 trees rebuilt from committed fixtures (db19f023 bench fixture
+        + db19f023 harness render via git worktree add + the run's committed patch;
+        .venv via venv --system-site-packages), --offline
+    expected: security ok with 0 gating findings, although unscoped scan_all reports
+      10-15 high/P0 per tree; gates ok (pytest only, from pyproject); tree unchanged
     edge: false
     note: probe 2026-10-15
   - input:
       case: same, approval section, autonomy auto_full
-    expected: 31 exempt ok, 4 missing ok (t2-hm-1..3, t5-hm-3), t12-hm-2 invalid -> 5
+    expected: 31 exempt ok, 4 missing ok (t2-hm-1..3, t5-hm-3), t12-hm-2 invalid ->
+      5
     edge: false
     note: ''
   - input:
       case: same, ac section
-    expected: fails on all 36 (every AC pending_test true; t6-hm-2 has ac [] with an exempt stamp
-      and a code change, reason 'skip-path SPEC with a code change')
+    expected: fails on all 36 (every AC pending_test true; t6-hm-2 has ac [] with
+      an exempt stamp and a code change, reason 'skip-path SPEC with a code change')
     edge: false
     note: the SDD gap rule 3 targets; overall exit 1
   - input:
@@ -563,7 +582,8 @@ ac:
     edge: false
     note: PYTHONDONTWRITEBYTECODE=1 probe 2026-10-15
   - input:
-      case: negative control, a secret-shaped line appended to the tree's changed source file
+      case: negative control, a secret-shaped line appended to the tree's changed
+        source file
     expected: security section fails
     edge: false
     note: ''
@@ -578,16 +598,18 @@ ac:
     edge: false
     note: ''
   rubric_id: null
-  note: PR-S. Ungated, so it never skips (a skip fails the ac section). Fixtures committed under
-    tests/fixtures/hm_check_eval3/<run>/patch.diff (git diff --cached HEAD plus untracked unignored
-    files, .venv and __pycache__ excluded) with expected.json; the harness commit is regenerated from db19f023, which
-    needs full git history (CI fetch-depth 0). Precondition, pinned by the test, is that the
-    rebuilt tree's harness files equal the original's harness commit modulo provenance.
+  note: PR-S. Ungated, so it never skips (a skip fails the ac section). Fixtures committed
+    under tests/fixtures/hm_check_eval3/<run>/patch.diff (git diff --cached HEAD plus
+    untracked unignored files, .venv and __pycache__ excluded) with expected.json;
+    the harness commit is regenerated from db19f023, which needs full git history
+    (CI fetch-depth 0). Precondition, pinned by the test, is that the rebuilt tree's
+    harness files equal the original's harness commit modulo provenance.
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The verdicts were recorded on 2026-10-15 from the eval-3 artifacts (results.jsonl,
-    approval-status on each tree, a scoped-scan and pyproject-gate probe with PYTHONDONTWRITEBYTECODE=1)
-    before any hm check code exists; hidden-test results are not an input.
+  oracle_evidence: The verdicts were recorded on 2026-10-15 from the eval-3 artifacts
+    (results.jsonl, approval-status on each tree, a scoped-scan and pyproject-gate
+    probe with PYTHONDONTWRITEBYTECODE=1) before any hm check code exists; hidden-test
+    results are not an input.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -601,7 +623,8 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-007
-  title: Upgrading a 0.62 tree sweeps only pristine retired files and keeps every user edit
+  title: Upgrading a 0.62 tree sweeps only pristine retired files and keeps every
+    user edit
   type: property
   test_ids:
   - tests/integration/test_overhaul_p1_brownfield.py::test_ac007_pristine_trees_sweep_to_the_ac004_set
@@ -610,28 +633,31 @@ ac:
   executable_predicate: null
   golden_table: []
   rubric_id: null
-  note: 'PR-S. Fixtures: db19f023 renders for [claude-code] and [claude-code,codex] x {Side,
-    Production} x worktree {off,on}, and copies of the 36 eval-3 hm trees (pristine 0.62 claude-code,
-    verified by git status on 2026-10-15).'
+  note: 'PR-S. Fixtures: db19f023 renders for [claude-code] and [claude-code,codex]
+    x {Side, Production} x worktree {off,on}, and copies of the 36 eval-3 hm trees
+    (pristine 0.62 claude-code, verified by git status on 2026-10-15).'
   pending_test: true
   oracle_source: property
-  oracle_evidence: Expected sets are AC-004's golden list and the db19f023 render listing, both
-    fixed before implementation; the edit-preservation relation holds for any reconcile that
-    honours the content_hash/manifest contract of pre-change-checklist items 1 and 5.
+  oracle_evidence: Expected sets are AC-004's golden list and the db19f023 render
+    listing, both fixed before implementation; the edit-preservation relation holds
+    for any reconcile that honours the content_hash/manifest contract of pre-change-checklist
+    items 1 and 5.
   oracle_independence_waiver: null
-  input_domain: 'a 0.62 tree from the fixtures, optionally with one mutation from {one byte appended
-    to a retired file, text inside an @hm:user:* block of a kept stage, a user hook added to
-    a harness matcher group, a user hook group of its own}, or one harness.yaml key from the
-    AC-007 table: loop.enabled true; delegation.stages [review, execute]; delegation.stages [verify];
-    reviewers.max_review_rounds 2; reviewers.enabled naming a lens reviewer; skills.enabled naming
-    conditional-router; agent_models.test-reviewer set; autonomy.autopilot_persistent true'
+  input_domain: 'a 0.62 tree from the fixtures, optionally with one mutation from
+    {one byte appended to a retired file, text inside an @hm:user:* block of a kept
+    stage, a user hook added to a harness matcher group, a user hook group of its
+    own}, or one harness.yaml key from the AC-007 table: loop.enabled true; delegation.stages
+    [review, execute]; delegation.stages [verify]; reviewers.max_review_rounds 2;
+    reviewers.enabled naming a lens reviewer; skills.enabled naming conditional-router;
+    agent_models.test-reviewer set; autonomy.autopilot_persistent true'
   transformation: hm make <tree> --update at HEAD
-  expected_relation: 'pristine tree: files after == AC-004 set and every removed file was in the
-    db19f023 listing; mutated retired file kept byte-identical with one KEPT warning; user block
-    text present in the new stage; user hook commands present; retired invocations absent;
-    specs/, work-docs/, .claude/memory/, .claude/observability/ byte-identical; each inert harness.yaml
-    key gives exactly one warning naming it and keeps its value, reviewers.max_review_rounds gives
-    none and is still read by execute.md; the file still parses under extra=forbid'
+  expected_relation: 'pristine tree: files after == AC-004 set and every removed file
+    was in the db19f023 listing; mutated retired file kept byte-identical with one
+    KEPT warning; user block text present in the new stage; user hook commands present;
+    retired invocations absent; specs/, work-docs/, .claude/memory/, .claude/observability/
+    byte-identical; each inert harness.yaml key gives exactly one warning naming it
+    and keeps its value, reviewers.max_review_rounds gives none and is still read
+    by execute.md; the file still parses under extra=forbid'
   preconditions:
   - HOME pinned; freeze_time
   observable_output: per tree, the violating paths, empty
@@ -649,22 +675,23 @@ ac:
   executable_predicate: null
   golden_table: []
   rubric_id: null
-  note: PR-C and PR-S. Covers the leftover .cursor/hooks.json and the three stubbed entry points.
-    Out of reach, recorded in IRR-001, is a kept .cursor/hooks.json whose --with path names a pruned
-    plugin cache, because that command fails before any module loads.
+  note: PR-C and PR-S. Covers the leftover .cursor/hooks.json and the three stubbed
+    entry points. Out of reach, recorded in IRR-001, is a kept .cursor/hooks.json
+    whose --with path names a pruned plugin cache, because that command fails before
+    any module loads.
   pending_test: true
   oracle_source: differential
-  oracle_evidence: The command corpus and the reference exits come from db19f023 renders and
-    db19f023 modules loaded via `git show`; the relation (never fail where the old command did
-    not block) holds for any stub or kept module.
+  oracle_evidence: The command corpus and the reference exits come from db19f023 renders
+    and db19f023 modules loaded via `git show`; the relation (never fail where the
+    old command did not block) holds for any stub or kept module.
   oracle_independence_waiver: null
-  input_domain: every hook command in .claude/settings.json, .codex/hooks.json and .cursor/hooks.json
-    of db19f023 renders over targets x preset x strictness x worktree, with `--with` pointed
-    at HEAD; payloads {empty stdin, garbage, Claude, Codex and Cursor payloads for the event,
-    a live .hm-loop-active and .hm-autopilot marker}
+  input_domain: every hook command in .claude/settings.json, .codex/hooks.json and
+    .cursor/hooks.json of db19f023 renders over targets x preset x strictness x worktree,
+    with `--with` pointed at HEAD; payloads {empty stdin, garbage, Claude, Codex and
+    Cursor payloads for the event, a live .hm-loop-active and .hm-autopilot marker}
   transformation: run the command at HEAD and at db19f023 on the same tmp project
-  expected_relation: exit(HEAD) == 0, or exit(HEAD) == exit(db19f023) == 2; no 'Traceback' on
-    stderr(HEAD)
+  expected_relation: exit(HEAD) == 0, or exit(HEAD) == exit(db19f023) == 2; no 'Traceback'
+    on stderr(HEAD)
   preconditions:
   - same project fixture for both runs
   observable_output: cells violating the relation, empty
@@ -687,38 +714,44 @@ ac:
   executable_predicate: null
   golden_table: []
   rubric_id: null
-  note: 'PR-S. The reference union is extracted at test time from db19f023 renders (Side, [claude-code],
-    worktree on, .claude/hm/ helpers inlined) by the regex hm (\S+)( [a-z][\w-]*)?; the SPEC
-    AC-009 table records it as of 2026-10-15: research {autopilot on/status, autopilot_caps boundary/gate-blocked,
-    second_brain search, worktree task-preflight/task-refresh, memory_retrieve}; spec {autopilot
-    on/status, autopilot_caps boundary, intent status, spec_machine approval-status/approve/check,
-    worktree task-preflight/task-refresh, memory_retrieve}; execute {autopilot on/status, autopilot_caps
-    boundary/gate-blocked, cli security-scan, observability.verification_cache key/run, second_brain
-    search, spec_machine approval-status/approve/validate, spec_mutation gate, spec_need frontmatter-upsert/op-check/prefilter/record/waiver-check,
-    test_runners plan, worktree task-preflight/task-refresh, memory_retrieve, test_dep_map}; wrapup
-    {autopilot on/status, autopilot_caps boundary/gate-blocked, autopilot_ledger rollup, intent
-    close/metric/question/status, memory_md upsert-failure/upsert-wiki, observability.verification_cache
+  note: 'PR-S. The reference union is extracted at test time from db19f023 renders
+    (Side, [claude-code], worktree on, .claude/hm/ helpers inlined) by the regex hm
+    (\S+)( [a-z][\w-]*)?; the SPEC AC-009 table records it as of 2026-10-15: research
+    {autopilot on/status, autopilot_caps boundary/gate-blocked, second_brain search,
+    worktree task-preflight/task-refresh, memory_retrieve}; spec {autopilot on/status,
+    autopilot_caps boundary, intent status, spec_machine approval-status/approve/check,
+    worktree task-preflight/task-refresh, memory_retrieve}; execute {autopilot on/status,
+    autopilot_caps boundary/gate-blocked, cli security-scan, observability.verification_cache
+    key/run, second_brain search, spec_machine approval-status/approve/validate, spec_mutation
+    gate, spec_need frontmatter-upsert/op-check/prefilter/record/waiver-check, test_runners
+    plan, worktree task-preflight/task-refresh, memory_retrieve, test_dep_map}; wrapup
+    {autopilot on/status, autopilot_caps boundary/gate-blocked, autopilot_ledger rollup,
+    intent close/metric/question/status, memory_md upsert-failure/upsert-wiki, observability.verification_cache
     mark-pass/run, proposals list/summary, second_brain promote, spec_machine approval-status/approve/find-unbound/find-unjudged/mark-judged/mark-tested/waiver-check,
-    worktree commit-base-memory/task-land/task-preflight/task-refresh, memory_retrieve, wrapup_land}.
-    Each drop or move is a row of the SPEC AC-009 table tied to a ledger row; additions are hm
-    check. second_brain rows are checked with second_brain.enabled true.'
+    worktree commit-base-memory/task-land/task-preflight/task-refresh, memory_retrieve,
+    wrapup_land}. Each drop or move is a row of the SPEC AC-009 table tied to a ledger
+    row; additions are hm check. second_brain rows are checked with second_brain.enabled
+    true.'
   pending_test: true
   oracle_source: differential
-  oracle_evidence: Reference modules are loaded from `git show db19f023:` into a temp package
-    and reference stage renders come from a db19f023 checkout; the relation holds for any change
-    that leaves these behaviours alone.
+  oracle_evidence: Reference modules are loaded from `git show db19f023:` into a temp
+    package and reference stage renders come from a db19f023 checkout; the relation
+    holds for any change that leaves these behaviours alone.
   oracle_independence_waiver: null
-  input_domain: payload corpora for permission_gate (incl. curl|sh), flush_session, sessionstart_drift,
-    sessionid_envfile, worktree_gate, loop_gate --mode stop-hook, spec_gate; digest and spec_machine
-    fixtures; stage renders over worktree {off,on} x targets x strictness {block, warn} x second_brain.enabled
-    {false, true}
-  transformation: run each under the db19f023 module or render and under HEAD on the same fixture
-  expected_relation: stdout, exit code and written files equal; the union of kept CLI invocations
-    over the four stages equals the reference union minus the AC-009 table drops and moves, plus
-    hm check; spec_gate is present in settings.json and in .codex/hooks.json exactly when strictness_of(config)
-    == block, at HEAD as at db19f023; execute.md at HEAD contains the db19f023 hot-tier sentences
-    naming checkpoint:compaction and .claude-progress.json; make --autoloop --preset Side --targets
-    claude-code --autonomy-level auto_full exits 0 and spec.md matches `uv run --with (\S+) hm `
+  input_domain: payload corpora for permission_gate (incl. curl|sh), flush_session,
+    sessionstart_drift, sessionid_envfile, worktree_gate, loop_gate --mode stop-hook,
+    spec_gate; digest and spec_machine fixtures; stage renders over worktree {off,on}
+    x targets x strictness {block, warn} x second_brain.enabled {false, true}
+  transformation: run each under the db19f023 module or render and under HEAD on the
+    same fixture
+  expected_relation: stdout, exit code and written files equal; the union of kept
+    CLI invocations over the four stages equals the reference union minus the AC-009
+    table drops and moves, plus hm check; spec_gate is present in settings.json and
+    in .codex/hooks.json exactly when strictness_of(config) == block, at HEAD as at
+    db19f023; execute.md at HEAD contains the db19f023 hot-tier sentences naming checkpoint:compaction
+    and .claude-progress.json; make --autoloop --preset Side --targets claude-code
+    --autonomy-level auto_full exits 0 and spec.md matches `uv run --with (\S+) hm
+    `
   preconditions:
   - freeze_time and HOME pinned
   observable_output: differing cells, empty
@@ -736,16 +769,17 @@ ac:
   executable_predicate: t1_cost_ratio <= 8 and hm_hidden_pass_rate >= plain_hidden_pass_rate
   golden_table: []
   rubric_id: null
-  note: PR-S. Measured by scripts/bench_light_lane.py on tiers 1-2, 3 runs per cell. The test
-    reads the committed docs/evals/results.jsonl and uses the rows whose harness_sha is reachable
-    from HEAD and not from db19f023 (git merge-base --is-ancestor); with no such rows it fails,
-    never skips, so the published scorecard is the ship gate for PR-S wrapup. A ratio <= 5 meets
-    the intent metric; over 8x, trace with `economics stages` before cutting further. D-8 (no
-    lanes) is invisible to this headless eval; interactive cost is watched in use.
+  note: PR-S. Measured by scripts/bench_light_lane.py on tiers 1-2, 3 runs per cell.
+    The test reads the committed docs/evals/results.jsonl and uses the rows whose
+    harness_sha is reachable from HEAD and not from db19f023 (git merge-base --is-ancestor);
+    with no such rows it fails, never skips, so the published scorecard is the ship
+    gate for PR-S wrapup. A ratio <= 5 meets the intent metric; over 8x, trace with
+    `economics stages` before cutting further. D-8 (no lanes) is invisible to this
+    headless eval; interactive cost is watched in use.
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The thresholds are the DRI's 2026-10-15 ship bar and the pass-rate counter-signal
-    from the draft section 4, fixed before the re-run.
+  oracle_evidence: The thresholds are the DRI's 2026-10-15 ship bar and the pass-rate
+    counter-signal from the draft section 4, fixed before the re-run.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -768,8 +802,8 @@ ac:
   golden_table:
   - input:
       case: security_scanner.scan_all on a project with no metrics-*.jsonl
-    expected: Gate 7 reports prod_name_guard 'no telemetry source' as a status, not zero findings
-      and not passed
+    expected: Gate 7 reports prod_name_guard 'no telemetry source' as a status, not
+      zero findings and not passed
     edge: false
     note: a security reader never reports clean on absent data
   - input:
@@ -779,8 +813,8 @@ ac:
     note: behaviour with data is unchanged
   - input:
       case: readiness._dim_observability_setup with no metrics file
-    expected: the telemetry-presence and sample-count signals are n/a, labelled 'telemetry hook retired',
-      and excluded from the dimension score
+    expected: the telemetry-presence and sample-count signals are n/a, labelled 'telemetry
+      hook retired', and excluded from the dimension score
     edge: false
     note: ''
   - input:
@@ -795,17 +829,18 @@ ac:
     note: already transcript-based (economics_source.load_turns)
   - input:
       case: grep of src/ at HEAD for _metrics_io importers and metrics- readers
-    expected: exactly security_scanner, readiness, feedback/telemetry_grep and telemetry (the stubbed
-      writer)
+    expected: exactly security_scanner, readiness, feedback/telemetry_grep and telemetry
+      (the stubbed writer)
     edge: true
     note: a new reader must join this table
   rubric_id: null
   note: PR-S. Found by grep of db19f023 for _metrics_io and metrics- on 2026-10-15.
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The reader list is a grep of db19f023 made before implementation; the rule that
-    a security reader must not read absent data as clean is the spec-validator's P1-6 finding
-    and the 'never read it as a pass' rule of AC-005, neither derived from the new code.
+  oracle_evidence: The reader list is a grep of db19f023 made before implementation;
+    the rule that a security reader must not read absent data as clean is the spec-validator's
+    P1-6 finding and the 'never read it as a pass' rule of AC-005, neither derived
+    from the new code.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -820,49 +855,78 @@ ac:
   judgment_subject_hash: null
 irreversible_decisions:
 - id: IRR-001
-  decision: Drop the Cursor target (targets cursor ignored with a warning, no .cursor/ render,
-    .cursor-plugin/plugin.json deleted, version sync 4 files, Cursor-only Python deleted)
+  decision: Drop the Cursor target (targets cursor ignored with a warning, no .cursor/
+    render, .cursor-plugin/plugin.json deleted, version sync 4 files, Cursor-only
+    Python deleted)
   category: public API/CLI contract
-  rationale: Users and the Cursor Marketplace lose a supported target; restoring it means restoring
-    code and the listing. Pruned-cache risk, a kept user-edited .cursor/hooks.json runs uv run --with
-    a plugin cache path, and once that cache is pruned every command fails before any module loads;
-    AC-008 cannot cover it and Cursor's handling is unverified; the KEPT warning says so on every
-    update while the file exists.
+  rationale: Users and the Cursor Marketplace lose a supported target; restoring it
+    means restoring code and the listing. Pruned-cache risk, a kept user-edited .cursor/hooks.json
+    runs uv run --with a plugin cache path, and once that cache is pruned every command
+    fails before any module loads; AC-008 cannot cover it and Cursor's handling is
+    unverified; the KEPT warning says so on every update while the file exists.
   source: spec
 - id: IRR-002
-  decision: /hm:review, /hm:verify, /hm:configure and /hm:loop (and Codex $hm-review, $hm-verify,
-    $hm-loop) are no longer rendered; /hm:execute --no-tdd becomes a notice and TDD runs anyway
+  decision: /hm:review, /hm:verify, /hm:configure and /hm:loop (and Codex $hm-review,
+    $hm-verify, $hm-loop) are no longer rendered; /hm:execute --no-tdd becomes a notice
+    and TDD runs anyway
   category: public API/CLI contract
-  rationale: Scripts and habits that call them break; kept user-edited copies call CLI a later
-    phase may delete.
+  rationale: Scripts and habits that call them break; kept user-edited copies call
+    CLI a later phase may delete.
   source: spec
 - id: IRR-003
-  decision: New `hm check` CLI with its flags, JSON line and exit codes 0/1/2/3/4/5 and their precedence
+  decision: New `hm check` CLI with its flags, JSON line and exit codes 0/1/2/3/4/5
+    and their precedence
   category: public API/CLI contract
   rationale: Stage prompts and users script against it.
   source: spec
 - id: IRR-004
-  decision: hm check security scope is touched paths only, never counts self-imports, gates on
-    secrets and hook-injection only, and checks CVEs by default, gating only on added or re-pinned
-    dependencies
+  decision: hm check security scope is touched paths only, never counts self-imports,
+    gates on secrets and hook-injection only, and checks CVEs by default, gating only
+    on added or re-pinned dependencies
   category: security/permission boundary
-  rationale: It decides what can ship; a finding in an untouched file or dependency is reported
-    but never blocks.
+  rationale: It decides what can ship; a finding in an untouched file or dependency
+    is reported but never blocks.
   source: spec
 - id: IRR-005
-  decision: Retire the telemetry, post_write_reminder and autopilot_autoarm hooks through the
-    append-only retired set, stub their entry points, and end autopilot auto-advance
+  decision: Retire the telemetry, post_write_reminder and autopilot_autoarm hooks
+    through the append-only retired set, stub their entry points, and end autopilot
+    auto-advance
   category: public API/CLI contract
-  rationale: The retired set is append-only by test and re-rendering strips these hooks from
-    every user's settings.
+  rationale: The retired set is append-only by test and re-rendering strips these
+    hooks from every user's settings.
   source: spec
 - id: IRR-006
-  decision: harness.yaml keeps every key; keys whose consumer is retired (loop.enabled, delegation.stages
-    naming review or verify, retired lens reviewers and skills, agent_models of retired agents,
-    autonomy.autopilot_persistent) stay parseable, keep their value and become inert with one warning
-    each per make run; the only rewrite is dropping cursor from targets; no lane field remains
+  decision: harness.yaml keeps every key; keys whose consumer is retired (loop.enabled,
+    delegation.stages naming review or verify, retired lens reviewers and skills,
+    agent_models of retired agents, autonomy.autopilot_persistent) stay parseable,
+    keep their value and become inert with one warning each per make run; the only
+    rewrite is dropping cursor from targets; no lane field remains
   category: schema/file format/storage layout
-  rationale: A user's config silently changes meaning; ignoring keeps every 0.62 file loadable
-    under extra=forbid where a rewrite would discard values the user chose; restoring behaviour
-    means restoring the consumers, not the file.
+  rationale: A user's config silently changes meaning; ignoring keeps every 0.62 file
+    loadable under extra=forbid where a rewrite would discard values the user chose;
+    restoring behaviour means restoring the consumers, not the file.
   source: spec
+approval:
+  kind: human
+  content_hash: bd01dacbccab0b79821bbfda20c8897a26c07e3c3d0aa53e17d5c7010e3b390b
+  approved_by: Ecro
+  approved_at: '2026-10-16T04:30:12Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 85ab553117319db92c38915c816d1009855e530644a3d969781c75e63280b581
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: cd934b63d1089c97d3b93967cce536e6a1f32e551b01e580b519d597e98f562b
+    irreversible_decisions: cf03d7fcfa45855e7ee611ac681574b4c2610f82510930a06b0e8e0efd2779fd
+    AC-001: ac5ae08698c470e0c8e12b036b32536059e0be3b8a576ab886d6acb9a193fcdb
+    AC-002: 6d3caa5bdd110e41b480ee115c4aa354cc6b41296f6946bcae95727f353cf840
+    AC-003: 4f4714c9e25b4e1bbf76f881f046fb2e521e437eac8d79d2de5290976590470e
+    AC-004: ccee70828984253232f0592686bc36b76a885737a655e9175b7efbb2747186fb
+    AC-005: 4357acab2cdda3931617daf6497cbf54926751886a36284f87f481facc4b7642
+    AC-006: a10139afa0badb33107df90280af1e3a92ae36bfefc2063ce949b3ddcbb4bad8
+    AC-007: cc2fb296f61f0a80c5f26a90f9915ac5d92e9ca6bef033a373fa8bf5da4cbe5a
+    AC-008: 64216fdac18122458bb9567acd2f343c80b0001389013d11177606a699348fab
+    AC-009: 3d82bf6dcf5777a4c79e6110ebbf67a74ca0f33c9047cf75dcaaa21288212692
+    AC-010: ba6144c63efa449256ba6315de00b23d63a08cb3594e1e128279b153619064a1
+    AC-011: f2b0c6f3b7971a60cb42b3b6aa5debf15b68fddc8f3b4c7d02213f2cd9c68366
+    ac_order: 507fc837fd64ae8964fbe1ec5bd2043668206ddae62a90d715516324c2b27cdf
+  lane: full
