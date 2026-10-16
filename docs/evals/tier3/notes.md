@@ -27,7 +27,17 @@ added `lang`. In the pilot, plain failed t20 the same two ways: `", "` for Korea
 once.
 
 **Cost.** Each hm row's cost is the CLI total, which leaves out subagent spend; the
-transcript-priced total for the 17 diagnostic rows is about $22.2 against $18.1 by the CLI.
+transcript-priced total for the 17 diagnostic rows is about $22.2 against $17.7 by the CLI.
+
+**Correction (plain-continue cost).** The first publish of these rows put `plain-continue` at
+$0.179/run on each task; the right figures are $0.109 (t20) and $0.107 (t21). A resumed
+session's `total_cost_usd` is the running total of the whole conversation, not that session's
+own spend, and the runner added the two sessions' totals, so session 1 was counted twice. The
+six rows were recomputed exactly from their recorded per-session totals: the run's cost is the
+last running total, and each session's own cost is the difference from the one before (the
+DRI path's rule), with the raw total kept as `cli_total_usd`. No row was estimated. The CLI
+total for the 17 rows fell from $18.1 to $17.7. The hm and `plain-careful` rows start a fresh
+process per session, so their summed totals were right and are unchanged.
 
 **Fairness notes.**
 

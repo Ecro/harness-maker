@@ -624,6 +624,40 @@ def test_the_continue_variant_continues_after_the_first_session(
     assert row["arm"] == "plain-continue"
 
 
+def test_a_continued_session_costs_the_difference_of_running_totals(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    """A resumed session's total_cost_usd is the conversation's running total, so adding the
+    sessions' totals would count session 1 twice."""
+    row, _calls = _run(bench, tmp_path, "t19", [{"cost": 0.1}, {"cost": 0.25}],
+                       arm="plain-continue")  # fmt: skip
+    assert row["cost_usd"] == pytest.approx(0.25)
+    assert row["cli_cost_usd"] == pytest.approx(0.25)
+    assert row["cost_source"] == "cli"
+    assert [s["cost_usd"] for s in row["sessions"]] == pytest.approx([0.1, 0.15])
+    assert [s["cli_total_usd"] for s in row["sessions"]] == pytest.approx([0.1, 0.25])
+
+
+def test_a_continued_total_that_falls_is_not_read_as_a_running_total(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    row, _calls = _run(bench, tmp_path, "t19", [{"cost": 0.3}, {"cost": 0.2}],
+                       arm="plain-continue")  # fmt: skip
+    assert row["cli_cost_usd"] is None
+    assert row["cli_cost_shape"] == "not_cumulative"
+    assert row["cost_source"] != "cli"
+
+
+def test_fresh_control_sessions_still_sum_their_cli_totals(
+    bench: ModuleType, tmp_path: Path
+) -> None:
+    row, _calls = _run(bench, tmp_path, "t19", [{"cost": 0.1}, {"cost": 0.25}],
+                       arm="plain-careful")  # fmt: skip
+    assert row["cost_usd"] == pytest.approx(0.35)
+    assert [s["cost_usd"] for s in row["sessions"]] == pytest.approx([0.1, 0.25])
+    assert "cli_cost_shape" not in row
+
+
 def _row(task: str, arm: str, rep: int, *, solved: bool, cost: float = 0.1,
          judge: float | None = None, tier: int = 3) -> dict[str, Any]:  # fmt: skip
     scores = (
