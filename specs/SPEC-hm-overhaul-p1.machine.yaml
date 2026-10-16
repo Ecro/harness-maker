@@ -34,7 +34,7 @@ ac:
     of an existing .cursor/rules. Lifecycle: the HEAD side is pinned to the PR-C merge
     commit, recorded by PR-S in tests/fixtures/overhaul_p1/prc_merge_sha and rendered
     via git worktree add; before PR-C merges it is the working tree. Not superseded.'
-  pending_test: true
+  pending_test: false
   oracle_source: differential
   oracle_evidence: The reference is the db19f023 renderer run in a temp checkout from
     `git show`/`git worktree add` before any edit, rendering T minus cursor; the relation
@@ -114,7 +114,7 @@ ac:
     note: ''
   rubric_id: null
   note: PR-C
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The rows encode the DRI's 22:54Z rule (one warning then ignore;
     sweep only byte-identical; keep edited) and pre-change-checklist items 1 and 5,
@@ -679,7 +679,7 @@ ac:
     entry points. Out of reach, recorded in IRR-001, is a kept .cursor/hooks.json
     whose --with path names a pruned plugin cache, because that command fails before
     any module loads.
-  pending_test: true
+  pending_test: false
   oracle_source: differential
   oracle_evidence: The command corpus and the reference exits come from db19f023 renders
     and db19f023 modules loaded via `git show`; the relation (never fail where the

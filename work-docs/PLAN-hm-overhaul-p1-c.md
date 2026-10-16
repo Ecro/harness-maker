@@ -118,3 +118,35 @@ PASSED tests/integration/test_overhaul_p1_hook_commands.py::test_ac008_every_shi
 
 The first AC-008 run errored in the fixture (`autopilot.write` needs `AtomicStage` members, not
 strings); that was a test bug, fixed before the run above, not a RED.
+
+## GREEN evidence
+
+Run on 2026-10-16 against fb983924..49621612, all five AC tests together:
+
+```
+tests/unit/test_overhaul_p1_cursor_removal.py::test_ac001_render_equals_reference_without_cursor PASSED
+tests/unit/test_overhaul_p1_cursor_removal.py::test_ac001_cursor_only_paths_absent PASSED
+tests/unit/test_version_sync.py::test_four_manifests_share_one_version PASSED
+tests/unit/test_overhaul_p1_cursor_removal.py::test_ac002_cursor_brownfield_table PASSED
+tests/integration/test_overhaul_p1_hook_commands.py::test_ac008_every_shipped_hook_command_is_safe PASSED
+5 passed
+```
+
+`mark-tested` flipped AC-001, AC-002 and AC-008 to `pending_test: false`; `approval-status` still
+reads `approved`.
+
+### What moved besides the ACs, and why
+
+- **Version stamp pin.** The byte goldens (light lane s2b/s3a/s3c/s3d) embed
+  `harness_maker_version`. `tests/structural/_surface_baseline.pinned_install_ref` now also pins
+  the render version to 0.62.0, so the 0.63.0 bump does not read as a template change.
+- **This repo's `.claude/harness.yaml` still lists cursor.** It is dropped at parse, so the goldens
+  that render it see T minus cursor: research Phase 1 takes the Explore fan-out branch, help loses
+  its targets row and Cursor note, health's `--targets` list shrinks. The file is left unedited.
+- **Re-captures, each attributed:** the autopilot gate golden (configure, health, help, make,
+  research); the four snapshot `.expected.yaml` files (configure and make shas); the round-trip
+  budget (research 7 → 10); s3c undoes the fan-out branch in `_normalise` and widens the research
+  bound by exactly that branch.
+- **Surface ratchet.** Held as this PLAN's `surface_allowance` (+332 chars, +3 research round
+  trips), attributed in `BASELINE-DELTA-hm-overhaul-p1-c.md`. Fold it into
+  `surface_baseline.json` from main after PR-C lands, then set `status` away from `planning`.
