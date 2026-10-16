@@ -116,14 +116,14 @@ def test_an_upgraded_project_loads_its_answers_without_re_rendering(tmp_path: Pa
 def test_the_shipped_retired_key_fixtures_still_carry_the_old_shape() -> None:
     """Guard the inputs this phase exists for.
 
-    `tests/fixtures/harness_yaml_v1_with_provenance.yaml` and the cursor-compat fixture are
+    `tests/fixtures/harness_yaml_v1_with_provenance.yaml` and the pre-`targets` fixture are
     deliberately preserved in the retired format — Phase 1's sweep excludes them. If a future
     cleanup "fixes" them, every test above would still pass while testing nothing real.
     """
     root = Path(__file__).resolve().parents[2]
     for rel in (
         "tests/fixtures/harness_yaml_v1_with_provenance.yaml",
-        "tests/cursor-compat/fixture/.claude/harness.yaml",
+        "tests/fixtures/harness_yaml_pre_targets.yaml",
     ):
         text = (root / rel).read_text(encoding="utf-8")
         assert "workflows:" in text, rel

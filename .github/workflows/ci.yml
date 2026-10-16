@@ -131,7 +131,7 @@ jobs:
         # itself broke" (which we want to know about).
         run: npm install -g @openai/codex@0.144.4
       - name: Run BLOCKING install-cmd tests
-        # Positive PyPI install + Cursor git-clone + README lint allowlist.
+        # Positive PyPI install + README lint allowlist.
         # `-m "not advisory"` excludes the codex negative test from this step.
         env:
           INSTALL_CMD_TEST: "1"

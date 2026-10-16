@@ -25,7 +25,6 @@ body:
       multiple: true
       options:
         - Claude Code
-        - Cursor
         - Codex CLI
         - CLI only (not IDE-related)
     validations:

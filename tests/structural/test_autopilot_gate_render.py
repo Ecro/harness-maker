@@ -35,6 +35,9 @@ Re-captures (append; never silently overwrite):
   otherwise moved only in their rendered version: substituting `0.62.0` for `0.63.0` reproduced
   every other prior hash (`auto_safe@*` render at `_surface_baseline`'s pinned `0.62.0` stamp).
   No command was added or removed.
+  Re-captured again the same day after PR-C review round 1: `configure`'s targets line keeps
+  "or combinations" (a pure Cursor deletion, which AC-001's tightened relation requires). Only
+  `configure` moved, in all four arms.
 - **2026-10-15, `hm-light-lane-s3c`** — the six stage commands (`research`, `spec`, `execute`,
   `review`, `verify`, `wrapup`) moved in all four arms: the preamble (loop check, start banner,
   autopilot picker, output language) left each for `.claude/hm/stage-preamble.md` behind one

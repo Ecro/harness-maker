@@ -1,7 +1,7 @@
 {
   "arms": {
     "ask@flag_off": {
-      "configure": "3876c01cd6455316d929cebc5d0d507a6a77ea64e6faff12fa01b0ad2793a124",
+      "configure": "39ace49bae566838d0fd773d75e547bb7b02f8cfbab3851d68d03a177ba20d4f",
       "execute": "08a645b41895859df495973fb7b6d76007905af55155917847bd658ad95f3942",
       "health": "edb40062d869dce51879478acbe5cb4db0b7bdb86c8a0f48429748da0bcba20f",
       "help": "583dd7790226bf475f03dd44f39ffb949b791ff246ec8a2ba20dc81aa09481f1",
@@ -17,7 +17,7 @@
       "wrapup": "d257b4eba0edb3d1b343bfd0730cbd30a102889a97bd23ae641c9e1b66dea543"
     },
     "ask@flag_on": {
-      "configure": "3876c01cd6455316d929cebc5d0d507a6a77ea64e6faff12fa01b0ad2793a124",
+      "configure": "39ace49bae566838d0fd773d75e547bb7b02f8cfbab3851d68d03a177ba20d4f",
       "execute": "1a001efb6d2d9fe4be4b58e34c46d9fd0c4542387b116cd4d2d4b37dc08493aa",
       "health": "edb40062d869dce51879478acbe5cb4db0b7bdb86c8a0f48429748da0bcba20f",
       "help": "583dd7790226bf475f03dd44f39ffb949b791ff246ec8a2ba20dc81aa09481f1",
@@ -33,7 +33,7 @@
       "wrapup": "f5523f22fda3d97dda51506955a0e3dd48b7e517185944c003db18c85e826c3e"
     },
     "auto_safe@block": {
-      "configure": "2bcd7d3482131e10fdcc5945783683b780dd23d2b16dbb246cbdcd6d07967e16",
+      "configure": "701b657bb1e758c3e48dfde8073b243ca8eb78c99a180d251884182f3366ec7b",
       "execute": "e4e408456bd4b11cf55ef45b8342b35ed04c7e32d17d2a2efeb3ea4f2127cda7",
       "health": "32cd8f56e853301aaea96a61bd984c8b59320d0824395cd6bd5c849ada6ed78f",
       "help": "26a1bbd8a8618bf8a5eabf1e5fc548a0e2208f091163bc8b817aa4580e449773",
@@ -47,7 +47,7 @@
       "wrapup": "4b7c26401c7fd55d3a9d4fdc75f8d622d97bd8b14000119f147f8832256e6a4f"
     },
     "auto_safe@warn": {
-      "configure": "2bcd7d3482131e10fdcc5945783683b780dd23d2b16dbb246cbdcd6d07967e16",
+      "configure": "701b657bb1e758c3e48dfde8073b243ca8eb78c99a180d251884182f3366ec7b",
       "execute": "45ed60c8e353b7c8018cc0e69fba6b855906cd4c25bfecf7bce2f880967eb628",
       "health": "32cd8f56e853301aaea96a61bd984c8b59320d0824395cd6bd5c849ada6ed78f",
       "help": "26a1bbd8a8618bf8a5eabf1e5fc548a0e2208f091163bc8b817aa4580e449773",

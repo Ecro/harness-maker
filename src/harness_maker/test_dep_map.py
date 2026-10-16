@@ -555,7 +555,6 @@ RENDER_AFFECTING_SUITES: tuple[str, ...] = (
 TESTS_DIRS_NOT_RENDER_AFFECTING: tuple[str, ...] = (
     "tests/ablation",
     "tests/codex-compat",
-    "tests/cursor-compat",
     "tests/e2e",
     "tests/fixtures",
     "tests/integration",

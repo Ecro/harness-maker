@@ -996,7 +996,7 @@ bash .claude-verify.sh all          # phase-by-phase exit criteria + final accep
 
 ## Contributing
 
-See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for adding skills/agents/presets, test patterns, and the PR checklist (including the 5-file version bump invariant).
+See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for adding skills/agents/presets, test patterns, and the PR checklist (including the 4-file version bump invariant).
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the 19 mechanisms (M1-M19) behind the system.
 

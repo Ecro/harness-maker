@@ -10,8 +10,8 @@ Per CLAUDE.md §테스트 정책 + checkpoint 8 of §"무언가를 고치거나 
   reconcile → manifest → sweep_orphans chains directly with realistic
   synthesize() blueprints.
 - The **manual half** — verifying that Codex CLI actually FIRES
-  the merged hooks at runtime — lives in `tests/cursor-compat/MANUAL_CHECKLIST.md`
-  and is user-only (no IDE driver automation per CLAUDE.md ckpt 8).
+  the merged hooks at runtime — is user-only (no IDE driver automation per
+  CLAUDE.md ckpt 8).
 
 Gated by ``INTEGRATION=1`` to avoid loading on every unit test run.
 """

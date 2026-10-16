@@ -7,14 +7,27 @@ scope: PR-C (AC-001, AC-002, AC-008; IRR-001; the Cursor rows of IRR-006)
 version: 0.63.0
 status: planning
 surface_allowance:
-  chars: 332
+  chars: 340
   round_trips:
     research: 3
-  reason: "Research Phase 1 takes the Explore fan-out branch once the Cursor half of its condition is gone (+615 chars, +3 dispatches), net of 283 chars of Cursor text removed."
+  reason: "Research Phase 1 takes the Explore fan-out branch once the Cursor half of its condition is gone (+615 chars, +3 dispatches), net of 275 chars of Cursor text removed."
   delta_doc: BASELINE-DELTA-hm-overhaul-p1-c.md
 ---
 
 # PLAN: overhaul phase 1, PR-C (Cursor target removal)
+
+## Post-merge checklist (do these right after PR-C lands, in this order)
+
+`surface_allowance` has no expiry field, so this PLAN's headroom lasts exactly as long as
+`status` stays `planning`. Leaving it there funds every later change's growth and makes a second
+in-flight allowance refuse.
+
+1. From main (the baseline refuses to freeze on a commit main does not contain), fold the
+   allowance into `tests/structural/surface_baseline.json`: `+340` aggregate Claude chars and
+   `research` round trips `7 -> 10`, citing `work-docs/BASELINE-DELTA-hm-overhaul-p1-c.md`.
+2. Then set this PLAN's `status` to `complete` (the allowance stops counting at that moment).
+3. Confirm `uv run pytest tests/structural/test_surface_baseline.py
+   tests/structural/test_command_size_budget.py` is green on main.
 
 The SPEC holds the ACs. This PLAN holds the order of work, the calls the SPEC leaves to the
 implementer, and the AC→test map. PR-S (AC-003…011) is out of scope.

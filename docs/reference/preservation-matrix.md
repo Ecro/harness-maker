@@ -30,14 +30,14 @@ phases 1+3 and 2.
 | M4 | `harness.yaml` | always present | REPLACE + `_preserve_yaml_user_keys` + `answers_from_harness_yaml` | unchanged ✅ user top-level keys preserved | `test_m4_harness_yaml_preserves_user_keys` |
 | M5 | `settings.json` | always present | REPLACE + `_shallow_merge_existing_json` + `_merge_permissions` (list union) | unchanged ✅ user keys + permissions preserved | `test_m5_settings_json_preserves_permissions` |
 | M6a | `hooks/hooks.json` (Claude PascalCase nested) | shipped | **always-REPLACE** ❌ | **`MERGE_JSON`** (Phase 1+3, schema-aware merge per [ADR-006]) | `test_m6a_claude_hooks_json_merges` |
-| M6b | `.cursor/hooks.json` (Cursor flat camelCase) | shipped | **always-REPLACE** ❌ | **`MERGE_JSON`** (Phase 1+3) | `test_m6b_cursor_hooks_json_merges` |
+| M6b | `.cursor/hooks.json` (Cursor flat camelCase) | **no longer rendered (0.63.0)** | — | removed with the Cursor target. A kept 0.62 file is deleted only when the manifest recorded it AND every entry is one 0.62 shipped (`cursor_retire.hooks_json_is_pristine`); anything else is KEPT | `test_reconcile.py::test_cursor_hooks_the_user_touched_are_kept` |
 | M6c | `.codex/hooks.json` (Codex PascalCase + PermissionRequest) | shipped | `.codex/hooks.json` NOT in reconcile literal-match → falls through to KEEP-fallback (latent bug, [ADR-002]) | **`MERGE_JSON`** (Phase 1+3 fixes both literal-match AND wires merge) | `test_m6c_codex_hooks_json_merges` |
 | M7a | `.codex/config.toml` | shipped with `# @hm:user:extensions` block | **always-REPLACE** ❌ | ✅ **`MERGE_BLOCK` via marker-aware `_render_pure_toml(merge_with_existing=True)` + `block_merge.merge(style=HASH_COMMENT)`** (Phase 2 v0.23.1) | `test_m7a_codex_config_toml_marker_aware` + `test_e2e_codex_config_toml_user_block_survives` |
 | M7b | `.codex/agents/*.toml` | shipped agents with `# @hm:user:user-extensions` block | **always-REPLACE** ❌ | ✅ same path as M7a — TOML-level wrap of `developer_instructions` survives | `test_m7b_codex_agent_toml_marker_aware` |
 | M8 | `.claude/lib/*.sh` | (no `.sh` templates ship currently) | **always-REPLACE** ❌ | ✅ dispatch + merge engine ready; flips active when a `.sh` template ships with `# @hm:user:NAME` block | `test_m8_claude_lib_sh_marker_aware` xfail (no template) |
 | M9 | `AGENTS.md` (project root) | shipped | `MERGE_BLOCK` (codex-agents-merge rule, `reconcile.py:122-129`) | unchanged ✅ user blocks preserved | `test_m9_agents_md_block_merge` |
 | M10 | User custom file at blueprint root, NOT in blueprint | `.codex/agents/my-custom.toml` user-authored | orphan-sweep classifies as "theirs" → KEEP+warn | unchanged ✅ | `test_m10_user_orphan_kept` |
-| M11 | `.cursor/mcp.json` | shipped | pure-render REPLACE | unchanged (out of PLAN scope; not a hook file) | `test_m11_cursor_mcp_json_replaces` |
+| M11 | `.cursor/mcp.json` | **no longer rendered (0.63.0)** | — | removed with the Cursor target. The orphan sweep deletes a byte-identical recorded copy and KEEPs an edited one; MCP servers render only to `.codex/config.toml` | `test_overhaul_p1_cursor_removal.py::test_ac002_cursor_brownfield_table` |
 
 ## Phase 2 fully shipped (v0.23.1)
 
@@ -60,7 +60,7 @@ Phase 2 (TOML/sh hash-comment markers) is **complete end-to-end** as of v0.23.1:
 
 4. **Malformed JSON fallback (ADR-006).** If an existing `hooks.json` cannot be parsed as JSON, render falls back to template-overwrite (REPLACE) with a warning logged. Backup is the recovery path. Same fallback applies if the parsed JSON doesn't match the expected `{event: [entries]}` shape.
 
-5. **`.cursor/mcp.json`** is not a hook file and is deliberately out of scope. It retains the pure-render REPLACE behavior. MCP server config is owned by the harness; users should add MCP servers via `/hm:configure` rather than editing this file directly.
+5. **`.cursor/mcp.json`** is no longer rendered (the Cursor target was removed in 0.63.0); see M11 for what happens to a kept 0.62 copy.
 
 ## How to verify each cell
 

@@ -29,7 +29,6 @@ body:
       multiple: true
       options:
         - Claude Code
-        - Cursor
         - Codex CLI
         - All (cross-cutting)
     validations:
