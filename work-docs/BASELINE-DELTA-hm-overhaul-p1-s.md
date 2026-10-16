@@ -72,3 +72,23 @@ growth is held as this PLAN's `surface_allowance` until the DRI re-freezes from 
 The per-command allowance (`execute: 653`, `wrapup: 73`) is the measured overshoot of the
 atomic ceilings in `test_command_size_budget.py` (8 072 vs 7 419 and 4 568 vs 4 495 on the
 opt-in arm).
+
+## Folded into the baseline from main (2026-10-16, after PR #36 landed)
+
+`tests/structural/surface_baseline.json` was re-frozen from main at `8140dd86` (the PR-S squash), so
+`render_sha` now names the commit the numbers came from, and this PLAN's `status` moved to
+`complete`, so its `surface_allowance` (992 chars) no longer counts. Against the in-branch freeze,
+the surface **grew** by exactly the allowance, from the review-round-1 rules:
+
+| key | in-branch freeze | from main | why |
+|---|---|---|---|
+| `aggregate_chars`.claude | 45 487 | 46 479 | +992, the allowance |
+| `aggregate_chars`.codex | 27 381 | 28 243 | +862, the same rules in the Codex skills |
+| `execute` | 7 485 | 8 397 | one RED then phases, irreversible stop, test-edit rule, background gate |
+| `wrapup` | 5 827 | 5 907 | background gate, answer-gated intent writes, closing Understanding print |
+| `hm-execute` | 7 541 | 8 363 | same execute rules, Codex skill |
+| `hm-wrapup` | 5 921 | 5 961 | same wrapup rules, Codex skill |
+
+`render_sha` and `payload_digest` moved mechanically with the re-freeze. Per ADR-010 the task that
+moved the surface owns its attribution; folding it here, from main, keeps it out of
+`ratchet-rebaselined-by-its-own-subject`.
