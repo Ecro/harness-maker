@@ -196,8 +196,6 @@ def _plan_variants() -> dict[str, str]:
     return out
 
 
-
-
 def _fake_block(pairs: list[tuple[int, str]]) -> str:
     return "\n".join(f"{n}. **{h}** — …" for n, h in pairs)
 
@@ -280,14 +278,6 @@ def test_the_grammar_rejects_non_conforming_bullets(name: str) -> None:
 @pytest.mark.parametrize("name", sorted(_RIGHT_BULLETS))
 def test_the_grammar_admits_every_published_form(name: str) -> None:
     assert _admitted(_RIGHT_BULLETS[name]), f"{name} was rejected: {_RIGHT_BULLETS[name]!r}"
-
-
-
-
-
-
-
-
 
 
 def _git(argv: list[str]) -> subprocess.CompletedProcess[str] | None:

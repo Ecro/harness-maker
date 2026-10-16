@@ -26,8 +26,6 @@ def _file(files: dict[str, str], suffix: str) -> str:
     return next(t for p, t in files.items() if p.endswith(suffix))
 
 
-
-
 def test_health_narrative_always_present(tmp_path: Path) -> None:
     """AC-010 (0.36.0): /hm:health always carries the marker-fenced
     delivery-metrics narrative; its empty-ledger branch handles the never-run

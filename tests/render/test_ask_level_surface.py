@@ -54,7 +54,3 @@ def test_no_rendered_command_passes_level_ask(rendered: Path) -> None:
         if "--level ask" in text:
             offenders.append(str(f.relative_to(rendered)))
     assert not offenders, offenders
-
-
-
-

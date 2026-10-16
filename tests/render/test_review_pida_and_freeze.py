@@ -84,10 +84,6 @@ def gate_skill() -> str:
 # --------------------------------------------------------------------------------------
 
 
-
-
-
-
 def test_the_agent_that_emits_the_value_uses_the_ledger_vocabulary() -> None:
     """The gate that MISSED the shipped drift.
 
@@ -189,26 +185,14 @@ def test_verifier_carries_both_modes_and_no_stale_three_step_rubric() -> None:
     assert "three reasoning steps" not in body
 
 
-
-
 # --------------------------------------------------------------------------------------
 # ADR-010 — the guarded/unguarded split
 # --------------------------------------------------------------------------------------
 
 
-
-
-
-
-
-
 # --------------------------------------------------------------------------------------
 # ADR-002 — freeze, lifecycle, monotonic progress, voter state
 # --------------------------------------------------------------------------------------
-
-
-
-
 
 
 def test_resolution_requires_verification() -> None:
@@ -239,15 +223,9 @@ def test_merge_by_id_retains_an_unreported_finding() -> None:
     assert "retained" in body
 
 
-
-
-
-
 # --------------------------------------------------------------------------------------
 # ADR-007 / ADR-009 — the frozen set and the disposition write
 # --------------------------------------------------------------------------------------
-
-
 
 
 def test_frozen_set_schema_carries_the_join_key_and_the_stale_reason() -> None:
@@ -281,14 +259,4 @@ def test_disposition_write_failure_is_observable() -> None:
     assert "disposition rows NOT recorded" in gate_skill()
 
 
-
-
 # ── PLAN-review-round-inflation — measure A + measure C executed surface ─────
-
-
-
-
-
-
-
-

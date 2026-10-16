@@ -120,27 +120,15 @@ _WITH_CODEX = (Target.CLAUDE_CODE, Target.CODEX)
 # ── positive control ───────────────────────────────────────────────────────────
 
 
-
-
 # ── Phase 4 — execute Phase C per-file + Phase D select-then-one-call ───────────
-
-
-
-
-
-
 
 
 # ── Phase 5 — research fan-out, Claude-only ────────────────────────────────────
 
 
-
-
 def test_the_fan_out_is_absent_from_the_codex_render() -> None:
     body = _codex_skills(_WITH_CODEX)["hm-research"]
     assert "Explore" not in body
-
-
 
 
 def test_every_dispatched_agent_resolves_on_the_target_that_gets_it() -> None:
@@ -183,8 +171,6 @@ def test_spec_issues_one_check_call_instead_of_three() -> None:
     assert "hm spec_machine validate" not in body
     assert "from harness_maker.spec_machine import cross_validate" not in body
     assert "hm spec_quality eval" not in body
-
-
 
 
 # ── Phase 2 — wrapup Steps 6 → 7.6 collapse ────────────────────────────────────
@@ -236,11 +222,7 @@ def test_hm_call_sequence_skips_a_bang_line_that_invokes_no_hm_verb() -> None:
     )
 
 
-
-
 def test_wrapup_carries_the_stash_preview_obligation_into_the_prose() -> None:
     """The abort text is where a reader reaches for `drop`; the contract has to be there."""
     body = _commands(_CLAUDE_ONLY)["wrapup"]
     assert "git stash show -p" in body
-
-

@@ -168,10 +168,6 @@ def _section(text: str, heading: str) -> str:
     return text[i : i + nxt.start()] if nxt else text[i:]
 
 
-
-
-
-
 # ── AC-014: the minimal light machine.yaml ────────────────────────────────────
 
 RUBRIC = "light-rubric"

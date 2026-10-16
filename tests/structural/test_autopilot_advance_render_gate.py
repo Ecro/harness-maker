@@ -26,14 +26,6 @@ def _read(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
 
-
-
-
-
-
-
-
-
 def test_picker_branches_on_status_not_file_existence() -> None:
     """ADR-002 — the dominant failure path. With no command to ask, the model checks
     whether the marker FILE exists; a stale marker then suppresses arming indefinitely."""

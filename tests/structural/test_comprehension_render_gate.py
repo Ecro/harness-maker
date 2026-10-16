@@ -64,8 +64,6 @@ def test_deep_renders_all_four_blocks(
     )
 
 
-
-
 def test_the_levels_are_ordered_not_merely_distinct(
     rendered: dict[str, dict[str, dict[str, str]]],
 ) -> None:
@@ -171,8 +169,6 @@ def test_the_spec_brief_names_what_that_stage_actually_has(
         "the spec brief discloses an architecture draft — that was `/hm:plan` Step 1, and "
         "`/hm:spec` produces no such artifact"
     )
-
-
 
 
 # ---------------------------------------------------------------------------

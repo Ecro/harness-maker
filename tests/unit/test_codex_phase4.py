@@ -131,9 +131,8 @@ def test_codex_agents_md_names_the_stage_chaining_entry_point() -> None:
     tpl = env.get_template("codex/AGENTS.md.j2")
     rendered = tpl.render(config=_BASE_CONFIG, preset="Production")
     # 0.64.0 retired `$hm-loop`; the stages chain by hand, in the order the table lists.
-    assert "$hm-spec" in rendered and "$hm-wrapup" in rendered, (
-        "AGENTS.md no longer names the stage-chaining entry point"
-    )
+    for stage in ("$hm-spec", "$hm-wrapup"):
+        assert stage in rendered, f"AGENTS.md no longer names {stage}"
     assert "$hm-loop" not in rendered, "AGENTS.md still advertises the retired loop"
     for gone in ("$hm-exec-rev", "Fused workflows"):
         assert gone not in rendered, f"AGENTS.md still advertises the deleted axis: {gone}"

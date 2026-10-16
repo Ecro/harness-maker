@@ -78,12 +78,6 @@ def test_ac_007_dispatched_at_most_once(rendered: Path) -> None:
     )
 
 
-
-
-
-
-
-
 def test_ac_007_approval_cannot_read_the_verdict(rendered: Path) -> None:
     """Approval is invariant under the critic's verdict — negative invariant, see module doc."""
     sig = inspect.signature(spec_machine.approve)

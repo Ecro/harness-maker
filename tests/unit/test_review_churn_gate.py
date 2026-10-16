@@ -156,11 +156,3 @@ def _render_review(*, gate: bool) -> str:
     out = Path(tempfile.mkdtemp()) / ".claude"
     render(synthesize(profile, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
     return stage_text(out, "review")
-
-
-
-
-
-
-
-

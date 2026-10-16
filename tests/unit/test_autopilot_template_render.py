@@ -32,14 +32,6 @@ def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return out
 
 
-
-
-
-
-
-
-
-
 def test_runtime_dispatch_is_structural() -> None:
     partial = (_TEMPLATES / "agents/_partials/stage_end_summary.md.j2").read_text()
     assert 'include "agents/_partials/codex_autopilot_advance.md.j2"' in partial

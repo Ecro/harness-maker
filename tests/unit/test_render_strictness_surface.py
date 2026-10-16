@@ -151,12 +151,6 @@ def _hook_commands(settings_text: str) -> list[str]:
     ]
 
 
-
-
-
-
-
-
 def _gate_active(tmp_path: Path, body: str) -> bool:
     """True when the hook reaches its SPEC lookup instead of standing aside.
 

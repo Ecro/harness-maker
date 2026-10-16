@@ -38,8 +38,6 @@ def interview_questions(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return prompts
 
 
-
-
 def test_ac_009_onboarding_asks_no_strictness_question(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -49,7 +47,6 @@ def test_ac_009_onboarding_asks_no_strictness_question(
     # this invariant is about the removed strictness question, so it is not counted.
     counted = [p for p in prompts if not p.startswith("World model name")]
     assert len(counted) < _PRE_CHANGE_PROMPT_COUNT
-
 
     make_cmd = (ROOT / "commands" / "make.md").read_text(encoding="utf-8")
     assert not re.search(r"dev_mode|dev-mode", make_cmd), (

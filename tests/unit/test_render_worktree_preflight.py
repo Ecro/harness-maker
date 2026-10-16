@@ -51,11 +51,7 @@ def _stage(files: dict[str, str], name: str) -> str:
 # ── flag-ON: preflight present in every wired stage ──────────────────────────
 
 
-
-
 # ── flag-OFF: preflight absent; legacy paths intact ──────────────────────────
-
-
 
 
 def test_flag_off_render_succeeds_on_absent_key(tmp_path: Path) -> None:
@@ -72,14 +68,6 @@ def test_flag_off_render_succeeds_on_absent_key(tmp_path: Path) -> None:
 # emission reliability is coupled to stage reliability. That coupling only holds if
 # EVERY wired stage passes its own `--stage`; a template that forgets it degrades to
 # the `(unknown-stage)` sentinel, which is the absent case ADR-003 defines.
-
-
-
-
-
-
-
-
 
 
 # ── flag-ON determinism: full golden block (validator W2) ─────────────────────
@@ -106,8 +94,6 @@ _GOLDEN_PREFLIGHT = """### Task worktree preflight (feature-branch workflow)
   `task-refresh` rebases `hm/<slug>` onto the base tip (base HEAD, not a hardcoded `main`), preserving commits; a conflict aborts and leaves the branch untouched — resolve manually, then retry. Refuse to refresh a dirty worktree: commit or discard first."""
 
 
-
-
 # ── fused workflows inherit the preflight (master Phase 5 AC) ──────────────────
 
 
@@ -125,12 +111,4 @@ def test_fused_workflows_omit_preflight_when_flag_off(tmp_path: Path) -> None:
 # ── flag-ON: wrapup squash-lands the task branch (ADR-003 wiring; Phase 4 gap) ─
 
 
-
-
-
-
 # ── flag-ON: Step 6/7 commit inside <WT> so the curated commit lands on the branch ─
-
-
-
-

@@ -193,8 +193,6 @@ def test_tier_pathspec_corresponds_to_memory_md_writers() -> None:
     assert session_rel in _HUMAN_MEMORY_TIER_PATHSPEC
 
 
-
-
 def _render_wrapup(tmp_path: Path, *, flag_on: bool) -> str:
     from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
     from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -213,16 +211,4 @@ def _render_wrapup(tmp_path: Path, *, flag_on: bool) -> str:
     )
 
 
-
-
 # ── recurrence-dedup render gate (PLAN-failure-memory-recurrence-dedup) ──────────
-
-
-
-
-
-
-
-
-
-

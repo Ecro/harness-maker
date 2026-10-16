@@ -46,7 +46,10 @@ def _rendered_root() -> Path:
     # The matrix documents every shipped subject, so every opt-in that adds one is on (0.64.0:
     # lens reviewers with `reviewers.fanout`, the second-opinion pair and its skill with
     # `second_opinion.models`, the stage delegate with `delegation.stages`).
-    answers.reviewers = {"installed": ["code-reviewer", *LENS_REVIEWERS], "enabled": ["code-reviewer"]}
+    answers.reviewers = {
+        "installed": ["code-reviewer", *LENS_REVIEWERS],
+        "enabled": ["code-reviewer"],
+    }
     answers.reviewers_fanout = True
     answers.second_opinion = SecondOpinionConfig(models=["codex"])
     answers.delegation = DelegationConfig(stages=["wrapup"])

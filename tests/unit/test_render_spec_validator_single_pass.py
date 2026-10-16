@@ -61,12 +61,6 @@ def _text(commands: Path, stage: str) -> str:
     return (commands / f"{stage}.md").read_text(encoding="utf-8")
 
 
-
-
-
-
-
-
 def test_the_verdict_reaches_no_branch(commands: Path) -> None:
     """Advisory means nothing downstream reads it — assert the absence where it would live."""
     spec = _text(commands, "spec")
@@ -79,5 +73,3 @@ def test_the_verdict_reaches_no_branch(commands: Path) -> None:
             f"`{banned}` appears in the 1500 characters before the acceptance stamp — the "
             "critic's verdict must not stand between the DRI and the stamp"
         )
-
-

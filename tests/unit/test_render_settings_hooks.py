@@ -614,7 +614,9 @@ def test_render_settings_merges_hooks_and_preserves_foreign_keys(tmp_path: Path)
     assert data["enabledPlugins"] == {"harness-maker@local": True}, "Claude-owned key clobbered"
     cmds = _commands(data)
     assert "/usr/local/bin/mine.sh" in cmds, "user hook wiped by re-render"
-    assert any("harness_maker.hooks.flush_session" in c for c in cmds), "template hook not merged in"
+    assert any("harness_maker.hooks.flush_session" in c for c in cmds), (
+        "template hook not merged in"
+    )
     assert isinstance(data["permissions"]["deny"], list), "permissions regressed"
 
 

@@ -59,8 +59,6 @@ def _after(text: str, *needles: str) -> bool:
     return True
 
 
-
-
 def _render(target: Target) -> dict[str, str]:
     blueprint = synthesize(
         ProjectProfile(), InterviewAnswers(preset=Preset.PRODUCTION, targets=[target])

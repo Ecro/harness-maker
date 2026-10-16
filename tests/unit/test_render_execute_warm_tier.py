@@ -41,12 +41,6 @@ def test_execute_warm_tier_uses_memory_retrieve(tmp_path: Path) -> None:
     assert 'rg -F "[fail:"' not in body
 
 
-
-
-
-
-
-
 def test_execute_keeps_the_compaction_checkpoint_read(tmp_path: Path) -> None:
     """Regression guard: the hot-tier checkpoint read must survive this edit."""
     body = _render_execute(tmp_path)

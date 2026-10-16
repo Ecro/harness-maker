@@ -362,7 +362,3 @@ def _render_all(preset: Preset) -> dict[str, str]:
                 f = Path(walk_root) / name
                 out[str(f.relative_to(root))] = f.read_text(encoding="utf-8", errors="replace")
         return out
-
-
-
-

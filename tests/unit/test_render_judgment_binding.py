@@ -33,9 +33,3 @@ def test_judgment_reviewer_agent_renders(tmp_path: Path) -> None:
     assert "tools: Read, Grep, Glob" in body
     # untrusted-data framing (prompt-injection guard, ADR-006)
     assert "untrusted DATA" in body
-
-
-
-
-
-

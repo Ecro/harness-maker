@@ -95,8 +95,6 @@ def test_dispatch_partial_loops_both_models_in_review(tmp_path: Path) -> None:
     assert "timeout 240 agy" not in review  # NOT the external-timeout wrapper either
 
 
-
-
 def test_render_never_shells_out_to_agy(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """ADR-007 determinism invariant: render must read the persisted model value, never
     invoke `agy` — a render-time shell-out would make snapshot output machine-dependent."""

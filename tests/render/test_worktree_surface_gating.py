@@ -53,8 +53,6 @@ def _render(tmp_path: Path, *, enabled: bool, targets: list[Target] | None = Non
 _SURFACE_EXEMPT = {"health.md"}
 
 
-
-
 def test_off_execute_has_neither_isolation_step(tmp_path: Path) -> None:
     """The two sections ADR-005 removes. A blanket `"worktree" not in text` would also
     catch the shared loop-mode banner, which legitimately names `.worktrees/` when it
@@ -67,10 +65,6 @@ def test_off_execute_has_neither_isolation_step(tmp_path: Path) -> None:
 
 
 # ── ON: every stage isolates AND recovery survives ───────────────────────────
-
-
-
-
 
 
 def test_on_and_off_agree_with_the_runtime_reader(tmp_path: Path) -> None:
@@ -132,12 +126,6 @@ def test_on_render_recovery_sequence_restores_a_deferred_stash(tmp_path: Path) -
     assert restored or stash_kept, "the WIP was neither restored nor preserved"
 
 
-
-
-
-
-
-
 # ── RESEARCH V8: the deliverable write instruction must name its own target ──
 
 _DELIVERABLE_DIRS = {
@@ -156,11 +144,7 @@ _DELIVERABLE_WRITES = {
 }
 
 
-
-
 # ── the finalize instruction is scoped to the model it belongs to ─────────────
-
-
 
 
 def test_execute_step5_no_longer_cites_a_step_that_does_not_exist(tmp_path: Path) -> None:
@@ -174,7 +158,3 @@ def test_execute_step5_no_longer_cites_a_step_that_does_not_exist(tmp_path: Path
     assert "Step 0 `worktree create`" not in body
     assert "`execute-<uuid>-<ts>` worktree from Step 0" not in body
     assert "task-preflight" in body, "Step 0 is the preflight — the fixture rendered wrong"
-
-
-
-

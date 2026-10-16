@@ -364,10 +364,6 @@ def _tree(repo: Path) -> dict[str, bytes]:
 # ---------------------------------------------------------------------------
 
 
-
-
-
-
 # ---------------------------------------------------------------------------
 # AC-003 — enabled render == pre-change snapshot (reference read from git)
 # ---------------------------------------------------------------------------
@@ -381,8 +377,6 @@ def _isolate_home(
 ) -> None:
     fake_home = tmp_path_factory.mktemp("hm-home")
     monkeypatch.setattr(Path, "home", lambda: fake_home)
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -403,13 +397,9 @@ def _enable_hint_count(text: str) -> int:
     )
 
 
-
-
 # ---------------------------------------------------------------------------
 # AC-005 — an existing harness.yaml without the key keeps the loop
 # ---------------------------------------------------------------------------
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -439,8 +429,6 @@ def test_ac006_no_harness_yaml_writes_loop_off(tmp_path: Path, preset_flag: str)
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # AC-008 — an explicit value survives re-render (property)
 # ---------------------------------------------------------------------------
@@ -467,15 +455,9 @@ def test_ac008_explicit_value_round_trips(enabled: bool, preset: Preset) -> None
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # AC-010 — an existing harness.yaml keeps the loop on every re-render path
 # ---------------------------------------------------------------------------
-
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -518,5 +500,3 @@ def test_ac011_malformed_loop_value_fails_render(tmp_path: Path, bad: object) ->
 # SPEC-hm-light-lane-s2 (concurrency review P1): a loop-off render drops execute Step 5,
 # Gate 0 and verify Check 5, so turning the loop off under live loop residue is refused.
 # ---------------------------------------------------------------------------
-
-

@@ -90,8 +90,6 @@ def _block(text: str, open_marker: str) -> str:
     return text[start:end]
 
 
-
-
 # ── AC-019 ───────────────────────────────────────────────────────────────────
 
 
@@ -142,11 +140,7 @@ def test_ac_019_the_skill_description_and_body_carry_the_contract() -> None:
     assert _in_order(body, ORDERED_RULE), body
 
 
-
-
 # ── AC-007 (SPEC-playbook-alignment): the supersedes branch names --claim ────────────────────
-
-
 
 
 # ── AC-004 / AC-005 (SPEC-objective-gap-proposal): the proposer's rules and the plan draft ────
@@ -214,8 +208,6 @@ def test_ac_004_skill_renders_gap_situation_and_candidate_rules(target: Target, 
 # ── AC-007 (SPEC-outcome-measure) — the prose calls the verb ─────────────────
 
 
-
-
 @pytest.mark.parametrize(
     ("target", "path"),
     [
@@ -248,7 +240,3 @@ def _step57(wrapup: str) -> str:
     start = wrapup.index("#### 5.7 Intent state")
     end = wrapup.index("\n### ", start)
     return wrapup[start:end]
-
-
-
-

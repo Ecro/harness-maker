@@ -49,7 +49,3 @@ def test_make_command_explains_receipt_safety_boundaries() -> None:
     ]
     for needle in required:
         assert needle in text
-
-
-
-

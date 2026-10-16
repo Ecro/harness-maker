@@ -73,8 +73,6 @@ def rendered_commands() -> dict[str, str]:
     }
 
 
-
-
 def test_the_counter_discriminates_against_the_pre_change_render() -> None:
     """The anti-tautology arm: the counter must find the site on the frozen golden.
 

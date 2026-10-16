@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import re
-import subprocess
 from pathlib import Path
 
 from harness_maker.interview import interview
-from harness_maker.models import Preset, ProjectProfile
+from harness_maker.models import ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 from harness_maker.verify import verify
@@ -96,11 +94,3 @@ def test_verify_skip_hash_paths_exempts_kept_file(tmp_path: Path) -> None:
         f"KEPT file must be exempt from content_hash check; got: {errors}"
     )
     assert any("other.md" in e for e in errors), f"non-KEPT mismatch must still fail; got: {errors}"
-
-
-
-
-
-
-
-

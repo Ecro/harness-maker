@@ -224,5 +224,3 @@ def test_a_round_that_only_fixes_forward_reports_no_oscillation(tmp_path: Path) 
 
     assert main(["oscillation", "--slug", "s", "--rounds", "2,3", "--root", str(tmp_path)]) == 0
     assert not (tmp_path / ".claude" / "observability" / "review-oscillation-s.jsonl").exists()
-
-

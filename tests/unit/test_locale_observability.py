@@ -73,11 +73,7 @@ def _render(tpl: str, ctx: dict[str, object]) -> str:
     return _make_env().get_template(tpl).render(**ctx)
 
 
-
-
 # --- Locale directive (ADR-001/005) ---------------------------------------
-
-
 
 
 def test_claude_md_carries_locale_directive() -> None:
@@ -96,22 +92,10 @@ def test_agents_md_carries_locale_directive() -> None:
     assert "English" in out
 
 
-
-
-
-
-
-
 # --- Start banner (ADR-007: reframed step_manifest) ------------------------
 
 
-
-
-
-
 # --- End banner (ADR-006: per-stage, in stage bodies) ----------------------
-
-
 
 
 def test_stage_renders_with_no_strictundefined_for_summary_vars() -> None:
@@ -119,10 +103,6 @@ def test_stage_renders_with_no_strictundefined_for_summary_vars() -> None:
     # summary vars; a missing {% set %} would raise UndefinedError here.
     for stage in _ATOMIC_STAGES:
         _render(f"stages/{stage}.md.j2", _stage_ctx(stage))
-
-
-
-
 
 
 # --- /hm:health enforcement sub-checks (ADR-002) ---------------------------
@@ -160,8 +140,6 @@ def test_health_flags_silent_miss(tmp_path: Path) -> None:
     loc = _signal_by_id(dim, "output_language_present")
     assert not loc.passed
     assert loc.action
-
-
 
 
 def test_locale_field_sanitizes_injection() -> None:

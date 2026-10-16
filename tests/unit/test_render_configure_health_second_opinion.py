@@ -59,17 +59,7 @@ def _cmd(files: dict[str, str], name: str) -> str:
 # ── /hm:configure — the recovery path (P1-5) ───────────────────────────────────
 
 
-
-
-
-
-
-
-
-
 # ── /hm:health — the installed-but-disabled advisory (P1-6) ────────────────────
-
-
 
 
 def test_health_omits_the_advisory_once_a_model_is_enabled(tmp_path: Path) -> None:

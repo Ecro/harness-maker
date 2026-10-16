@@ -83,8 +83,6 @@ def test_the_default_render_carries_no_dispatch_block(tmp_path: Path) -> None:
     assert "wrapup_brief" not in body
 
 
-
-
 # ------------------------------------------------------------------ delegate ON
 
 
@@ -95,8 +93,6 @@ def test_the_delegate_on_render_carries_the_dispatch(tmp_path: Path) -> None:
     assert "hm wrapup_brief" in body
 
 
-
-
 def test_the_inline_body_is_labelled_as_the_degraded_path(tmp_path: Path) -> None:
     """Without the heading, a reader of the delegate-on artifact sees the body twice
     over and cannot tell which one runs."""
@@ -105,17 +101,7 @@ def test_the_inline_body_is_labelled_as_the_degraded_path(tmp_path: Path) -> Non
     assert "degraded" in body.lower()
 
 
-
-
-
-
-
-
-
-
 # ------------------------------------------------------------------ size
-
-
 
 
 # Expanded-stage cost of delegating wrapup: the dispatch block, the existence check and the
@@ -129,12 +115,4 @@ def test_the_inline_body_is_labelled_as_the_degraded_path(tmp_path: Path) -> Non
 _DELEGATED_EXPANDED_DELTA = 76
 
 
-
-
 # ------------------------------------------------- review round 2 (M-03, M-04)
-
-
-
-
-
-

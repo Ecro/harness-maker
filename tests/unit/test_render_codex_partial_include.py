@@ -62,10 +62,6 @@ def _has_command_line(text: str, needle: str) -> bool:
     return False
 
 
-
-
-
-
 def test_old_exec_section_deleted_from_all_agents(tmp_path: Path) -> None:
     files = _render(tmp_path, models=["codex"])
     for path, body in files.items():

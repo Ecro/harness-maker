@@ -174,22 +174,6 @@ def _step1_boundary_paragraph(text: str) -> str:
     return tail[: end.start()]
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def test_the_gate_predicate_rejects_real_gating_rewrites() -> None:
     """Fault-sensitivity for the negative above, which is otherwise unfalsifiable.
 

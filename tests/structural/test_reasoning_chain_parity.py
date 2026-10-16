@@ -43,8 +43,6 @@ def test_the_authority_really_mandates_four_steps() -> None:
         assert step in body, f"the shared reasoning partial no longer names {step!r}"
 
 
-
-
 def test_arbiter_calls_the_helper_with_its_real_signature() -> None:
     """`scope_aware_consensus` takes one argument. The 2-arg call in this prose could never
     have run — which is itself the tell that this agent is not on any live path."""

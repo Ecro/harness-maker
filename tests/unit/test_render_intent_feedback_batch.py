@@ -118,8 +118,6 @@ def _wrapup_regions(preset: Preset, host: str) -> tuple[str, str]:
     return delegated, inline
 
 
-
-
 def test_resume_predicate_controls() -> None:
     assert resumes_at_5_7("- exit 0 → proceed to Step 5.7.")
     assert not resumes_at_5_7("- exit 0 → proceed to Step 6.")
@@ -178,12 +176,6 @@ def record_batch_ok(section: str, host: str) -> bool:
     return all(c in block for c in _CODEX_CLAUSES) and "multiSelect" not in block
 
 
-
-
-
-
-
-
 _VERDICT_CLAUSES = (
     "measure: false",
     "`how_measured`",
@@ -199,10 +191,6 @@ _VERDICT_CLAUSES = (
 def verdict_item_ok(section: str) -> bool:
     block = _gated(section, "record-batch")
     return all(c in block for c in _VERDICT_CLAUSES)
-
-
-
-
 
 
 _CLOSE_CLAUSES = (
@@ -233,12 +221,8 @@ def close_after_readback(section: str) -> bool:
     return all(c in block for c in _CLOSE_CLAUSES)
 
 
-
-
 def _whole(section: str, name: str, mark: str) -> str:
     return mark + _gated(section, name) + "<!-- /@hm:answer-gated -->"
-
-
 
 
 # ── AC-007 ───────────────────────────────────────────────────────────────────

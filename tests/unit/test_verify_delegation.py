@@ -111,8 +111,6 @@ def _memory(base: Path, *, record: bool = True) -> None:
 # ------------------------------------------------------------------ brief, generalised
 
 
-
-
 def test_a_stage_that_is_not_delegatable_is_still_rejected(tmp_path: Path) -> None:
     """Generalising must not turn the stage field into a free string — a brief for a
     stage with no dispatch block is a caller bug, not a new feature."""
@@ -281,17 +279,3 @@ def test_a_check_verdict_outside_the_enum_is_rejected() -> None:
 
 
 # ------------------------------------------------------------------ render
-
-
-
-
-
-
-
-
-
-
-
-
-
-

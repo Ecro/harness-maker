@@ -353,8 +353,6 @@ def flag_on(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     )
 
 
-
-
 @pytest.fixture(scope="module")
 def flag_off(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     return _render(
@@ -581,10 +579,6 @@ def test_the_fingerprint_rejects_a_heading_with_an_empty_body(flag_on: dict[str,
     text = flag_on["wrapup"]
     for block, sentence in _FINGERPRINT.items():
         assert shared_prose_fingerprints(text.replace(sentence, ""), block) == 0, block
-
-
-
-
 
 
 # ── AC-007 ─────────────────────────────────────────────────────────────────────

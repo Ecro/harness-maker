@@ -231,8 +231,6 @@ def test_ac_002_a_lifetime_window_reports_every_dangling_authorization(tmp_path:
     )
 
 
-
-
 def test_ac_002_a_dangling_authorization_is_reported(tmp_path: Path) -> None:
     """AC-002 predicate: exactly the one authorization no entry confirmed."""
     obs = _observability(tmp_path)
@@ -307,8 +305,6 @@ def test_ac_001_the_rollup_reads_the_base_repo_not_the_worktree(
     assert not (base / autopilot_ledger.ROLLUP_RELPATH).exists(), (
         "the deliverable landed at BASE, where this worktree's wrapup will not commit it"
     )
-
-
 
 
 def test_rollup_on_an_empty_observability_dir_is_absence_not_health(tmp_path: Path) -> None:

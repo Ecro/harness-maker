@@ -58,8 +58,6 @@ def test_reviewers_never_carry_bash_tool_when_enabled(tmp_path: Path) -> None:
         )
 
 
-
-
 def test_no_frontmatter_second_opinion_permission_in_agents(tmp_path: Path) -> None:
     """Neither the codex exec nor agy allow rule may live in any agent frontmatter."""
     root = _render(tmp_path, models=["codex", "antigravity"])
@@ -129,5 +127,3 @@ def test_scoped_invoker_allow_rule_ships_whenever_any_model_is_enabled(tmp_path:
 def test_scoped_invoker_allow_rule_absent_when_no_model_is_enabled(tmp_path: Path) -> None:
     root = _render(tmp_path, models=[])
     assert _invoker_rules(json.loads((root / "settings.json").read_text(encoding="utf-8"))) == []
-
-

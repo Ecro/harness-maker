@@ -73,8 +73,6 @@ def _verify_step(body: str) -> str:
     return body[start : body.index(_STEP_END, start)]
 
 
-
-
 def test_every_review_bearing_artifact_routes_verification_through_the_skill() -> None:
     """The property, asserted over the discovered set rather than a listed one."""
     offenders = {
@@ -104,5 +102,3 @@ def test_the_verify_step_slice_is_non_empty_everywhere() -> None:
     """
     for path, body in _review_bearing_artifacts().items():
         assert len(_verify_step(body)) > 50, f"verify-step slice is degenerate in {path}"
-
-

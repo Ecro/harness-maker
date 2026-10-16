@@ -153,8 +153,6 @@ _MUTATIONS: dict[str, tuple[str, str]] = {
 }
 
 
-
-
 def test_the_step_renders_on_every_target() -> None:
     """P2 exit criterion, first half."""
     for name, text in execute_bearing_artifacts().items():
@@ -177,8 +175,6 @@ def test_the_step_runs_after_the_gates_it_distrusts() -> None:
     for name, text in execute_bearing_artifacts().items():
         assert text.index(_EXECUTE_MARKER) < text.index(_STEP_HEADING), f"{name}: D.5 precedes D"
         assert text.index(_STEP_HEADING) < text.index(_STEP_END), f"{name}: D.5 follows stage exit"
-
-
 
 
 # ── AC-002 binding ────────────────────────────────────────────────────────────

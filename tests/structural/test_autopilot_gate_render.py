@@ -491,12 +491,6 @@ def armed(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     return _render_at_level("auto_safe", tmp_path_factory.mktemp("armed"))
 
 
-
-
-
-
-
-
 def test_ac_005_the_dead_guard_name_appears_nowhere() -> None:
     """Zero producers, so the name is not a flag — it is a comment that looks like one.
 
@@ -526,10 +520,6 @@ def test_ac_005_the_dead_guard_name_appears_nowhere() -> None:
                 hits.append(str(rel))
 
     assert hits == [], f"{_DEAD_GUARD} still referenced in: {sorted(hits)}"
-
-
-
-
 
 
 def test_strictness_is_still_the_only_instruction_baseline_axis() -> None:

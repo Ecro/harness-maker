@@ -12,7 +12,6 @@ import re
 import tempfile
 from collections.abc import Callable
 from datetime import UTC, datetime
-from fnmatch import fnmatch
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -242,8 +241,6 @@ def _lookup(fm: dict[str, Any], path: str) -> Any:
         assert part in node, path
         node = node[part]
     return node
-
-
 
 
 # ── AC-012 ─────────────────────────────────────────────────────────────────

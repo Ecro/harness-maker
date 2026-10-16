@@ -344,8 +344,6 @@ def render_configure_command(tmp_path: Path) -> str:
     return (repo / ".claude/commands/hm/configure.md").read_text(encoding="utf-8")
 
 
-
-
 def test_handle_taken_by_user_skill_is_named(tmp_path: Path) -> None:
     """confirm-1 P1: a user-owned skill at the handle path is kept, so the router is NOT
     installed there — the run must say so instead of leaving the front door silently missing."""

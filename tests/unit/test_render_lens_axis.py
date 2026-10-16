@@ -106,16 +106,10 @@ def test_the_axis_itself_is_pinned_as_a_literal() -> None:
     }
 
 
-
-
-
-
 @pytest.mark.parametrize("preset", PRESETS)
 def test_mandatory_is_a_subset_of_dispatched(preset: str) -> None:
     """Dispatched ⊇ mandatory, always — approval cannot require a lens nobody was told to run."""
     assert set(mandatory_lenses(preset)) <= _expected_dispatch(preset)
-
-
 
 
 # ── AC-002: presets differ in mandatory-ness, never in availability ───────────
@@ -137,12 +131,6 @@ def test_the_domain_lenses_are_routable_on_side_only() -> None:
 
 
 # ── AC-015: the confirmation pass dispatches exactly the round-1 set ──────────
-
-
-
-
-
-
 
 
 # ── AC-003: a missing mandatory lens blocks approval ─────────────────────────
@@ -182,8 +170,6 @@ def test_a_side_review_is_not_blocked_by_an_unrouted_domain_lens(tmp_path: Path)
 
 
 # ── AC-017: the two brief clauses survive the axis rewrite ────────────────────
-
-
 
 
 def test_a_routed_in_domain_lens_is_reported_as_exercised_on_side(tmp_path: Path) -> None:

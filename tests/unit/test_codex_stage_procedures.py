@@ -65,8 +65,6 @@ def test_codex_stage_skills_context_has_stage_body() -> None:
         assert ctx["stage_body"], f"stage_body is empty for {path}"
 
 
-
-
 def test_codex_stage_skills_no_dollar_arguments() -> None:
     """No Codex stage skill body should contain '$ARGUMENTS' (Codex has no slash-args)."""
     for _tpl, path, ctx in _codex_stage_skills():
@@ -77,10 +75,6 @@ def test_codex_stage_skills_no_dollar_arguments() -> None:
 
 
 # ── Phase 1: loop_body in _codex_target_files() context ──────────────────────
-
-
-
-
 
 
 # ── Phase 2+3: is_codex render adaptations ───────────────────────────────────
@@ -94,26 +88,12 @@ def test_execute_codex_render_no_dollar_arguments() -> None:
     )
 
 
-
-
 def test_execute_codex_render_no_bang_prefix() -> None:
     """execute stage rendered with is_codex=True must not use '!uv run' shell prefix."""
     rendered = _render_stage("execute", is_codex=True)
     assert "!uv run" not in rendered, (
         "Codex execute render must not use '!' prefix — Codex uses Bash() tool calls"
     )
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ── AskUserQuestion absent in all Codex renders; request_user_input present ───
@@ -123,35 +103,13 @@ _ALL_STAGES = ["execute", "research", "spec", "review", "wrapup", "verify"]
 _STAGES_WITH_INTERVIEW = ["research", "spec", "verify"]
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def test_research_codex_render_no_dollar_arguments() -> None:
     """research rendered with is_codex=True must not contain $ARGUMENTS."""
     rendered = _render_stage("research", is_codex=True)
     assert "$ARGUMENTS" not in rendered, "Codex research render contains $ARGUMENTS"
 
 
-
-
-
-
 # ── Config threading: config_dump flows into stage_body ───────────────────────
-
-
-
-
-
-
 
 
 # ── stage_skill.md.j2 double-render safety ────────────────────────────────────
@@ -177,9 +135,3 @@ def test_stage_skill_renders_stage_body_without_double_rendering() -> None:
 
 
 # ── Claude Code regression guards ────────────────────────────────────────────
-
-
-
-
-
-

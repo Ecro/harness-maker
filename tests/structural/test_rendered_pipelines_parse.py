@@ -68,12 +68,6 @@ def _pipeline_lines(body: str) -> list[str]:
     ]
 
 
-
-
-
-
-
-
 @pytest.mark.skipif(_BASH is None, reason="bash is the consumer under test")
 def test_pipefail_actually_propagates_here() -> None:
     """The guarantee the assertion above depends on, measured rather than assumed."""

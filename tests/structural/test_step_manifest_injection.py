@@ -27,8 +27,6 @@ WRAPPERS = (
 )
 
 
-
-
 def test_partial_exists_with_suppression_and_intended_framing() -> None:
     assert PARTIAL.is_file(), f"missing step-manifest partial: {PARTIAL}"
     body = PARTIAL.read_text(encoding="utf-8")
@@ -47,8 +45,6 @@ def test_partial_exists_with_suppression_and_intended_framing() -> None:
         "worktree (cwd may be inside .worktrees/<name>/), not just say "
         "'at the project root'"
     )
-
-
 
 
 def test_skills_do_not_include_step_manifest() -> None:

@@ -105,11 +105,11 @@ def rendered(tmp_path_factory: pytest.TempPathFactory) -> set[tuple[str, str]]:
     """Ordinals HEAD renders over default Side and Production, plus every opt-in that adds one."""
     keys: set[tuple[str, str]] = set()
     for i, preset in enumerate(Preset):
-        for extra in ({}, {"worktree_enabled": True}):
+        for wt in (False, True):
             answers = _build_answers(
-                locale="en", targets=[Target.CLAUDE_CODE], preset=preset, **extra
+                locale="en", targets=[Target.CLAUDE_CODE], preset=preset, worktree_enabled=wt
             ).model_copy(update={"delegation": DelegationConfig(stages=["wrapup"])})
-            out = tmp_path_factory.mktemp(f"arm{i}{len(extra)}")
+            out = tmp_path_factory.mktemp(f"arm{i}{int(wt)}")
             with pytest.MonkeyPatch.context() as mp:
                 mp.setattr(synthesize, "_compute_install_ref", lambda: "$HOME/harness-maker")
                 render(

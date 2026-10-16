@@ -70,12 +70,6 @@ def models_off(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
     return _render_commands(tmp_path_factory.mktemp("off"), models=[])
 
 
-
-
-
-
-
-
 @pytest.mark.skipif(
     os.environ.get("INTEGRATION") != "1",
     reason=(

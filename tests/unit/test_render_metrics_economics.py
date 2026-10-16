@@ -38,23 +38,11 @@ def metrics_body(tmp_path_factory: pytest.TempPathFactory) -> str:
     return rendered.read_text(encoding="utf-8")
 
 
-
-
-
-
-
-
-
-
 def test_non_gate_framing_is_inherited(metrics_body: str) -> None:
     assert "never a gate" in metrics_body
 
 
-
-
 # ------------------------------------------------------ Phase 3: retroactive classification
-
-
 
 
 def test_the_classification_step_precedes_the_report_command(metrics_body: str) -> None:
@@ -65,11 +53,3 @@ def test_the_classification_step_precedes_the_report_command(metrics_body: str) 
     record_at = metrics_body.index("run_classify record")
     report_at = metrics_body.index("hm economics report")
     assert boundaries_at < record_at < report_at
-
-
-
-
-
-
-
-

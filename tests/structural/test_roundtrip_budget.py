@@ -98,8 +98,6 @@ def test_the_codex_variant_is_counted_by_its_own_call_form(
     assert len(re.findall(r"^!", execute, re.M)) == 0
 
 
-
-
 # ── the three mutations ADR-011 requires this arm to fail under ────────────────
 
 

@@ -367,12 +367,6 @@ def paired_review_renders_against_goldens() -> tuple[tuple[str, str], ...]:
 # ------------------------------------------------------------------ AC-008
 
 
-
-
-
-
-
-
 # The anchor MOVED once, deliberately: ADR-001 of PLAN-workflow-loop-efficiency removed
 # the Pass 1.5 `code-verifier` dispatch, so a multi-reviewer render carries 2 sites where
 # it used to carry 3. The goldens are frozen pre-change artifacts and are NOT re-captured
@@ -387,8 +381,6 @@ _PASS_REMOVED_BY_ADR001 = "#### Pass 1.5"
 
 def _site_headings(render_text: str) -> tuple[str, ...]:
     return tuple(site.splitlines()[0] for site in reviewer_dispatch_sites(render_text))
-
-
 
 
 def test_the_predicates_discriminate_against_the_pre_change_render() -> None:
@@ -414,10 +406,6 @@ def test_the_predicates_discriminate_against_the_pre_change_render() -> None:
 
 
 # ------------------------------------------------------------------ AC-009
-
-
-
-
 
 
 def test_the_invariance_guards_are_not_vacuous() -> None:

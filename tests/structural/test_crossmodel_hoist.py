@@ -90,8 +90,6 @@ def pass2_offset(text: str) -> int:
     return off
 
 
-
-
 def test_ac_009_crossmodel_launches_with_pass1() -> None:
     """AC-009's executable predicate, verbatim."""
     assert all(crossmodel_launch_offset(t) < pass2_offset(t) for t in render_all_targets().values())
@@ -118,7 +116,3 @@ def test_pida_still_follows_the_voters() -> None:
         pida = _offset(_PIDA, text)
         assert pida is not None, f"{name}: Step 3.6 (PIDA) is missing"
         assert crossmodel_launch_offset(text) < pida, f"{name}: PIDA is not after the voters"
-
-
-
-
