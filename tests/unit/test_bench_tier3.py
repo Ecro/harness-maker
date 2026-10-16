@@ -554,11 +554,13 @@ def test_tier3_rows_record_their_hash_and_never_mix(
 # --- AC-007: tiers 1-2 are unchanged ----------------------------------------------------------
 
 
-def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType) -> None:
+def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType, tmp_path: Path) -> None:
     """bench_hash, tier2_hash and the report and scorecard pins are the values recorded by the
     runner at origin/main 687a46c3, before tier 3 existed (the report and scorecard pins moved
     there when #30 added wall time to the headline). The runner_hash pins moved on purpose with
-    SPEC-hm-eval-scripted-dri: the hm arm's turn script is a new runner setting (S8)."""
+    SPEC-hm-eval-scripted-dri: the hm arm's turn script is a new runner setting (S8). The report
+    and scorecard pins read the eval-3 rows as committed in db19f023, so publishing a new run
+    does not move them; only a change to the report code does."""
     assert bench.bench_hash() == "569e17ef29ab"
     assert bench.tier2_hash() == "1cf707c57e12"
     tools = {"ruff": "r", "mypy": "m"}
@@ -571,7 +573,15 @@ def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType) -> None:
         )
         == "234f0721c2ae"
     )
-    rows = bench.read_rows(_ROOT / "docs" / "evals")
+    eval3 = subprocess.run(
+        ["git", "-C", str(_ROOT), "show", "db19f023:docs/evals/results.jsonl"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    ).stdout
+    (tmp_path / "results.jsonl").write_text(eval3, encoding="utf-8")
+    rows = bench.read_rows(tmp_path)
     report = hashlib.sha256(bench.report_text(rows).encode()).hexdigest()[:16]
     assert report == "a082ce5d4abd734b"
     card = json.dumps(bench.scorecard(rows), sort_keys=True)

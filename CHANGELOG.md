@@ -6,6 +6,11 @@
 
 Overhaul phase 1, PR-S (SPEC-hm-overhaul-p1): seven stages become four.
 
+Eval run 4 (`docs/evals/RESULTS.md`, harness `a2fe560a4018`): the tier-1 cost ratio fell from 26.4x
+to 13.0x with the hidden-test pass rate unchanged (15/15 for both arms), and the judge still favours
+plain (overall 4.27 vs 3.87). That missed the SPEC's 8x ship bar, which the DRI amended to "below
+eval 3's 26.418"; 8x is the phase-2 target.
+
 ### Added
 
 - **`hm check --slug <slug>`, one exit code for every deterministic gate.** Sections approval,

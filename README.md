@@ -544,36 +544,36 @@ Other harnesses give everyone the same starting point. harness-maker reads YOUR 
 harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static template gives you a starting point. harness-maker gives you a starting point that knows who it was created for, and can be updated without losing your changes.
 
 <!-- hm:eval:start -->
-**Measured: plain prompt vs `/hm:`** at harness `6b7c30d9e175`, same model and budget; n is the number of runs behind each figure. Leads follow the fixed bands in [docs/evals/README.md](docs/evals/README.md); the full scorecard is [docs/evals/RESULTS.md](docs/evals/RESULTS.md).
+**Measured: plain prompt vs `/hm:`** at harness `a2fe560a4018`, same model and budget; n is the number of runs behind each figure. Leads follow the fixed bands in [docs/evals/README.md](docs/evals/README.md); the full scorecard is [docs/evals/RESULTS.md](docs/evals/RESULTS.md).
 
 **What the extra cost buys, tier 1: 5 task(s) x 3 run(s) per arm (t1, t2, t3, t4, t5)**
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.061 (n=15) | $1.396 (n=15) | 26.42x (CLI 22.79x, transcript 26.42x) | plain |
-| wall time per run | 18s (n=15) | 7m 59s (n=15) | 26.16x | plain |
+| cost ratio (cells: mean CLI $/run) | $0.063 (n=15) | $0.722 (n=15) | 12.97x (CLI 11.49x, transcript 12.97x) | plain |
+| wall time per run | 22s (n=15) | 5m 41s (n=15) | 15.26x | plain |
 | Δ solved runs | 15 (n=15) | 15 (n=15) | +0 | tie |
 | Δ hidden-case pass fraction | 1.00 (n=15) | 1.00 (n=15) | +0.00 | tie |
 | Δ regressions per run | 0.00 (n=15) | 0.00 (n=15) | +0.00 | tie |
-| Δ new lint+type errors per run | 0.27 (n=15) | 0.07 (n=15) | -0.20 | hm |
+| Δ new lint+type errors per run | 0.47 (n=15) | 0.07 (n=15) | -0.40 | hm |
 | traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
 | Δ judge overall | 4.27 (n=15) | 3.87 (n=15) | -0.40 (single-sample scores, judge noise ±0.67; tie band 0.25 over 15 pairs) | plain |
-| cost per solved run | $0.061 (n=15) | $1.396 (n=15) |  | plain |
+| cost per solved run | $0.063 (n=15) | $0.722 (n=15) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
 **What the extra cost buys, tier 2: 7 task(s) x 3 run(s) per arm (t10, t11, t12, t6, t7, t8, t9)**
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.051 (n=21) | $1.011 (n=21) | 22.68x (CLI 19.76x, transcript 22.68x) | plain |
-| wall time per run | 13s (n=21) | 4m 26s (n=21) | 19.84x | plain |
-| Δ solved runs | 21 (n=21) | 19 (n=21) | -2 | plain |
-| Δ hidden-case pass fraction | 1.00 (n=21) | 0.96 (n=21) | -0.04 | tie |
-| Δ regressions per run | 0.00 (n=20) | 0.00 (n=20) | +0.00 | tie |
-| Δ new lint+type errors per run | 0.20 (n=20) | 0.15 (n=20) | -0.05 | hm |
-| traps caught | 9/9 | 8/8 | +0.00 | tie |
-| Δ judge overall | 4.58 (n=20) | 4.50 (n=20) | -0.08 (single-sample scores, judge noise ±0.67; tie band 0.25 over 20 pairs) | tie |
-| cost per solved run | $0.051 (n=21) | $1.117 (n=19) |  | plain |
+| cost ratio (cells: mean CLI $/run) | $0.052 (n=21) | $0.627 (n=21) | 13.60x (CLI 11.97x, transcript 13.60x) | plain |
+| wall time per run | 16s (n=21) | 4m 46s (n=21) | 17.46x | plain |
+| Δ solved runs | 21 (n=21) | 21 (n=21) | +0 | tie |
+| Δ hidden-case pass fraction | 1.00 (n=21) | 1.00 (n=21) | +0.00 | tie |
+| Δ regressions per run | 0.00 (n=21) | 0.00 (n=21) | +0.00 | tie |
+| Δ new lint+type errors per run | 0.10 (n=21) | 0.10 (n=21) | +0.00 | tie |
+| traps caught | 9/9 | 9/9 | +0.00 | tie |
+| Δ judge overall | 4.60 (n=21) | 4.16 (n=21) | -0.44 (single-sample scores, judge noise ±0.67; tie band 0.25 over 21 pairs) | plain |
+| cost per solved run | $0.052 (n=21) | $0.627 (n=21) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
 **Tier 3** (the answer is in the repo or an earlier session, not the prompt): plain solved 23 of 27 pilot runs, so 1 task survived the pre-registered drop rule where 4 are needed; tier 3 is inconclusive and the per-task code-quality claim is withdrawn. A diagnostic on t20 and t21, not a verdict: hm solved t20 2/3 and t21 1/2 at $3.172/run; plain (pilot) 0/3 and 3/3 at $0.145/run; plain-careful 2/3 and 3/3 at $0.203/run; plain-continue 3/3 and 3/3 at $0.108/run ([details](docs/evals/RESULTS.md#tier-3)). Each $ is the CLI cost per run, which excludes subagent spend, so an hm $ understates what the run spent.
