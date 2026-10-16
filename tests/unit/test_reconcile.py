@@ -295,69 +295,8 @@ def test_backup_missing_dir_returns_path(tmp_path: Path) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Cursor target reconcile — Phase 2.4
+# Cross-tree reconcile — Phase 2.4
 # ──────────────────────────────────────────────────────────────────────────────
-
-
-def test_reconcile_cursor_first_render_returns_both(tmp_path: Path) -> None:
-    """첫 render — existing 없음 → BOTH (render + symlink). cursor 자산도 동일."""
-    from harness_maker.interview import interview
-    from harness_maker.models import ProjectProfile, Target
-    from harness_maker.synthesize import synthesize
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-    bp = synthesize(p, a)
-
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    conflicts = reconcile(target_dir, bp)
-    cursor_decisions = {
-        str(c.path): c.decision for c in conflicts if str(c.path).startswith(".cursor/")
-    }
-    assert cursor_decisions == {
-        ".cursor/rules/harness.mdc": ReconcileDecision.BOTH,
-        ".cursor/hooks.json": ReconcileDecision.BOTH,
-        ".cursor/mcp.json": ReconcileDecision.BOTH,
-    }
-
-
-def test_reconcile_cursor_mdc_keeps_after_render(tmp_path: Path) -> None:
-    """첫 render 후 두 번째 reconcile: existing mdc 가 Cursor frontmatter
-    (description/globs/alwaysApply) 만 있고 우리 generated_by/content_hash
-    없음 (Cursor strict-reject 회피) → KEEP.
-
-    Trade-off: 사용자 수정 자동 보존 ✅, 우리 template 업데이트는 사용자가
-    수동 delete + re-render 필요. sidecar 메타 도입 시 변경 가능.
-    """
-    from harness_maker.interview import interview
-    from harness_maker.models import ProjectProfile, Target
-    from harness_maker.render import DEFAULT_FREEZE_TIME, render
-    from harness_maker.synthesize import synthesize
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    # 첫 render
-    bp = synthesize(p, a)
-    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
-
-    # 두 번째 reconcile
-    bp2 = synthesize(p, a)
-    conflicts = reconcile(target_dir, bp2)
-    mdc_conflicts = [c for c in conflicts if str(c.path) == ".cursor/rules/harness.mdc"]
-    assert len(mdc_conflicts) == 1
-    assert mdc_conflicts[0].decision == ReconcileDecision.KEEP
-    # Cursor frontmatter (description/globs/alwaysApply) is present; absence
-    # of generated_by routes through the new "frontmatter-no-hash-not-ours"
-    # branch so user mdc edits are preserved.
-    assert mdc_conflicts[0].reason == "frontmatter-no-hash-not-ours"
 
 
 def test_reconcile_legacy_ours_no_hash_returns_replace(tmp_path: Path) -> None:
@@ -439,38 +378,6 @@ def test_reconcile_legacy_ours_with_markers_returns_merge_block(tmp_path: Path) 
     assert len(conflicts) == 1
     assert conflicts[0].decision == ReconcileDecision.MERGE_BLOCK
     assert conflicts[0].reason == "memory-block-merge"
-
-
-def test_reconcile_cursor_hooks_json_merges_in_place(tmp_path: Path) -> None:
-    """`.cursor/hooks.json` is pure JSON (no frontmatter possible — Cursor's
-    parser is strict). Phase 1+3 (PLAN-onboarding-backup-friction, ADR-003/006):
-    in-place 3-way merge so user-added entries survive template updates.
-    Render dispatches the flat (Cursor) schema per ADR-006.
-    """
-    from harness_maker.models import Blueprint, FileEntry
-
-    target = tmp_path / ".claude"
-    target.mkdir()
-    cursor_dir = tmp_path / ".cursor"
-    cursor_dir.mkdir()
-    (cursor_dir / "hooks.json").write_text(
-        '{"version": 1, "hooks": {"preToolUse": [{"command": "user-edit"}]}}\n',
-        encoding="utf-8",
-    )
-    bp = Blueprint(
-        files=[
-            FileEntry(
-                path=Path(".cursor/hooks.json"),
-                template="cursor/hooks.json.j2",
-                context={},
-                frontmatter={},
-            ),
-        ],
-    )
-    conflicts = reconcile(target, bp)
-    assert len(conflicts) == 1
-    assert conflicts[0].decision == ReconcileDecision.MERGE_JSON
-    assert conflicts[0].reason == "hooks-in-place-merge"
 
 
 def test_reconcile_codex_hooks_json_merges_in_place(tmp_path: Path) -> None:
@@ -627,14 +534,18 @@ def test_reconcile_codex_toml_always_replaces(tmp_path: Path) -> None:
 
 
 def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: Path) -> None:
-    """B13 — backup() 가 .cursor/ 의 사용자 수정도 보존."""
+    """B13 — backup() 가 .cursor/ 의 사용자 수정도 보존.
+
+    The Cursor target is gone (0.63.0), but a 0.62 `.cursor/` can still be on disk
+    and `make` may delete its pristine files, so the backup keeps covering it.
+    """
     from harness_maker.interview import interview
-    from harness_maker.models import ProjectProfile, Target
+    from harness_maker.models import ProjectProfile
     from harness_maker.render import DEFAULT_FREEZE_TIME, render
     from harness_maker.synthesize import synthesize
 
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+    a = interview(p, autoloop_mode=True)
 
     project_root = tmp_path
     target_dir = project_root / ".claude"
@@ -643,8 +554,9 @@ def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: 
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
 
-    # 사용자 수정 시뮬레이션 (cursor mdc)
+    # A user-edited file left by a 0.62 Cursor render
     mdc = project_root / ".cursor" / "rules" / "harness.mdc"
+    mdc.parent.mkdir(parents=True)
     mdc.write_text("# user override\n", encoding="utf-8")
 
     bdir = backup(target_dir)

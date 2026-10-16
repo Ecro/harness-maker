@@ -34,6 +34,10 @@ from ._surface_baseline import (
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # +3 total, 141→144 (2026-10-16, SPEC-hm-overhaul-p1 PR-C): research 7→10. This repo's
+    # harness lists `cursor`, which 0.63.0 drops, and the research fan-out was gated off only
+    # while `cursor` was a target; its three `Explore` dispatches now render, as they always did
+    # for a Claude-only harness. No call was removed.
     # +1 total, 140→141 (2026-10-15, SPEC-hm-light-lane-s3c): execute 25→26, the
     # `spec_machine approval-status` call Step 0 now makes before it picks the light or the full
     # PLAN. The three new `.claude/hm/` files (preamble, full PLAN text, full schema) hold no
@@ -180,7 +184,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # DROPPED with the gate (see tests/unit/test_render_execute_spec_need.py), while
     # `prefilter` / `record` moved to execute Step 0.1 and the validator + cross-model
     # calls to spec Step 4.6 — both accounted for in those rows above.
-    "research": 7,
+    "research": 10,
     # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
     #
     # 8 → 16 (PLAN-ai-review-exit-criteria Phase 4). The largest single-stage round-trip rise
@@ -408,12 +412,15 @@ def test_the_fan_out_is_counted_as_three_though_it_costs_one_turn(
     exactly what ADR-011 forbids — but the Phase 7 receipt reports main-loop turns and
     subagent turns separately (ADR-012) precisely because this proxy conflates them.
 
-    In THIS repo the fan-out does not render at all: `targets` includes `cursor`, and
-    Cursor reads the Claude command file (`.cursor/commands/` is dead code), so shipping
-    it here would emit a dispatch Cursor cannot resolve.
+    Until 0.63.0 the fan-out did not render in THIS repo: `targets` included `cursor`, and
+    Cursor read the Claude command file. The Cursor target is gone, so it renders here too.
     """
     body = surface[CLAUDE_VARIANT]["research"]
-    assert "Explore" not in body, "this repo includes cursor in targets — see the docstring"
+    assert body.count('Task(subagent_type="Explore"') == 3
+    without = body.replace('Task(subagent_type="Explore"', "")
+    assert (
+        count_round_trips(body, CLAUDE_VARIANT) - count_round_trips(without, CLAUDE_VARIANT) == 3
+    ), "ADR-011 counts each of the three dispatches"
 
 
 # ── the three mutations ADR-011 requires this arm to fail under ────────────────

@@ -239,7 +239,7 @@ def test_settings_hooks_use_claude_nested_schema(template: str) -> None:
     for event, entries in hooks.items():
         assert isinstance(entries, list), f"{template}: {event} must be a list"
         for entry in entries:
-            assert "command" not in entry, f"{template}: {event} uses Cursor's flat shape"
+            assert "command" not in entry, f"{template}: {event} uses a flat entry shape"
             inner = entry.get("hooks")
             assert isinstance(inner, list), f"{template}: {event} needs a nested hooks[] list"
             assert inner, f"{template}: {event} has an empty nested hooks[]"
@@ -271,7 +271,7 @@ def test_merge_preserves_user_authored_hook() -> None:
             "PostToolUse": [_nested("*", "uv run --with /p python -m harness_maker.telemetry")]
         }
     }
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     cmds = [h["command"] for e in merged["hooks"]["PostToolUse"] for h in e["hooks"]]
     assert "/usr/local/bin/my-own-hook.sh" in cmds
 
@@ -291,7 +291,7 @@ def test_merge_never_deletes_a_hook_in_our_namespace_that_we_do_not_ship() -> No
     hand_wired = "uv run --with /p python -m harness_maker.gates.spec_gate"
     existing = {"hooks": {"PreToolUse": [_nested("Write|Edit", hand_wired)]}}
     new: dict[str, Any] = {"hooks": {"PreToolUse": []}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
     assert hand_wired in cmds, "a user's hand-wired harness-module hook was silently deleted"
 
@@ -312,7 +312,7 @@ def test_merge_dedups_harness_hook_across_plugin_path_change() -> None:
             ]
         }
     }
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     assert len(merged["hooks"]["PostToolUse"]) == 1, "same hook at a new cache path duplicated"
 
 
@@ -323,7 +323,7 @@ def test_merge_preserves_user_added_event() -> None:
             "PostToolUse": [_nested("*", "uv run --with /p python -m harness_maker.telemetry")]
         }
     }
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     assert "Notification" in merged["hooks"]
 
 
@@ -337,14 +337,12 @@ def test_merge_no_duplication_when_target_template_ships_the_same_command() -> N
     cmd = "uv run --with /p python -m harness_maker.gates.permission_gate"
     on_disk = {"hooks": {"PreToolUse": [_nested("Bash", cmd)]}}
 
-    ships = _merge_hooks_json(
-        on_disk, {"hooks": {"PreToolUse": [_nested("Bash", cmd)]}}, schema="nested"
-    )
+    ships = _merge_hooks_json(on_disk, {"hooks": {"PreToolUse": [_nested("Bash", cmd)]}})
     ships_cmds = [h["command"] for e in ships["hooks"]["PreToolUse"] for h in e["hooks"]]
     assert ships_cmds.count(cmd) == 1, "template ships it → dedup to one, not two"
 
     silent: dict[str, Any] = {"hooks": {"PreToolUse": []}}
-    kept = _merge_hooks_json(on_disk, silent, schema="nested")
+    kept = _merge_hooks_json(on_disk, silent)
     kept_cmds = [h["command"] for e in kept["hooks"]["PreToolUse"] for h in e["hooks"]]
     assert kept_cmds == [cmd], "template silent → preserve, never delete"
 
@@ -367,7 +365,7 @@ def test_merge_entry_identity_covers_all_commands_in_group() -> None:
     existing = {"hooks": {"PostToolUse": [_nested("*", hm_cmd, "/usr/local/bin/user-extra.sh")]}}
     new = {"hooks": {"PostToolUse": [_nested("*", hm_cmd)]}}
 
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     cmds = [h["command"] for e in merged["hooks"]["PostToolUse"] for h in e["hooks"]]
     assert "/usr/local/bin/user-extra.sh" in cmds, (
         "user command inside a harness matcher group was dropped — the group's identity "
@@ -400,7 +398,7 @@ def test_merge_preserves_both_all_harness_and_mixed_groups_when_template_is_sile
         }
     }
     new: dict[str, Any] = {"hooks": {"PreToolUse": []}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
     assert "/usr/local/bin/mine.sh" in cmds, "mixed group holds user content — must survive"
     assert guard in cmds, "an all-harness group the template does not ship is not ours to delete"
@@ -430,7 +428,7 @@ def test_merge_group_growth_neither_duplicates_nor_loses() -> None:
     old_on_disk = {"hooks": {"PreToolUse": [_nested("Bash", grown)]}}
     grown_template = {"hooks": {"PreToolUse": [_nested("Bash", gate, grown)]}}
 
-    merged = _merge_hooks_json(old_on_disk, grown_template, schema="nested")
+    merged = _merge_hooks_json(old_on_disk, grown_template)
     cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
     assert cmds.count(grown) == 1, f"worktree_gate duplicated across the group growth: {cmds}"
     assert cmds.count(gate) == 1, f"permission_gate missing or duplicated: {cmds}"
@@ -452,7 +450,7 @@ def test_merge_group_growth_keeps_a_user_command_in_the_grown_group() -> None:
     on_disk = {"hooks": {"PreToolUse": [_nested("Bash", grown, mine)]}}
     grown_template = {"hooks": {"PreToolUse": [_nested("Bash", gate, grown)]}}
 
-    merged = _merge_hooks_json(on_disk, grown_template, schema="nested")
+    merged = _merge_hooks_json(on_disk, grown_template)
     cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
     assert mine in cmds, f"user command lost across the group growth: {cmds}"
     assert cmds.count(grown) == 1, f"worktree_gate duplicated: {cmds}"
@@ -479,7 +477,7 @@ def test_merge_retires_autopilot_guard_when_template_drops_it() -> None:
     guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard"
     on_disk = {"hooks": {"PreToolUse": [_nested("Bash", gate, guard)]}}
     new = {"hooks": {"PreToolUse": [_nested("Bash", gate)]}}  # template no longer ships guard
-    merged = _merge_hooks_json(on_disk, new, schema="nested")
+    merged = _merge_hooks_json(on_disk, new)
     cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
     assert guard not in cmds, "retired autopilot_guard survived the merge"
     assert cmds.count(gate) == 1, "still-shipped permission_gate must remain exactly once"
@@ -492,7 +490,7 @@ def test_merge_retires_autopilot_guard_stop_mode() -> None:
     guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard --mode stop-hook"
     on_disk = {"hooks": {"Stop": [_nested("", loop, guard)]}}
     new = {"hooks": {"Stop": [_nested("", loop)]}}
-    merged = _merge_hooks_json(on_disk, new, schema="nested")
+    merged = _merge_hooks_json(on_disk, new)
     cmds = [h["command"] for e in merged["hooks"]["Stop"] for h in e["hooks"]]
     assert guard not in cmds, "retired autopilot_guard (stop-hook) survived the merge"
     assert cmds.count(loop) == 1, "still-shipped loop_gate must remain exactly once"
@@ -508,7 +506,7 @@ def test_merge_retirement_preserves_a_users_appended_command() -> None:
     mine = "/usr/local/bin/my-audit.sh"
     on_disk = {"hooks": {"PreToolUse": [_nested("Bash", gate, guard, mine)]}}
     new = {"hooks": {"PreToolUse": [_nested("Bash", gate)]}}
-    merged = _merge_hooks_json(on_disk, new, schema="nested")
+    merged = _merge_hooks_json(on_disk, new)
     cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
     assert guard not in cmds, "retired guard survived"
     assert mine in cmds, "user's own command dropped alongside the retired guard"
@@ -523,11 +521,10 @@ def test_retired_invocations_absent_from_current_templates(template: str) -> Non
     (unlike the deny-literal set, there is no "provably enforces nothing" second
     invariant for a live hook). `_strip_shipped_commands` applies the retired set to
     EVERY nested-schema merge — settings.json AND `.codex/hooks.json` (both routed
-    through `_merge_hooks_json(schema="nested")`) — so the invariant must hold for the
-    codex hook template too, not just settings (REVIEW P2, 2026-07-21). Cursor's
-    `.cursor/hooks.json` is FLAT-schema and the retirement path skips flat entirely, so
-    it needs no check here. Every retired invocation must be absent from every current
-    nested hook template's rendered output — in BOTH dev_modes.
+    through `_merge_hooks_json`) — so the invariant must hold for the
+    codex hook template too, not just settings (REVIEW P2, 2026-07-21). Every retired
+    invocation must be absent from every current nested hook template's rendered
+    output — in BOTH dev_modes.
     """
     for strictness in ("warn", "block"):
         cmds = " ".join(_commands(_render(template, strictness=strictness)))
@@ -536,38 +533,6 @@ def test_retired_invocations_absent_from_current_templates(template: str) -> Non
             assert f"python -m {invocation}" not in cmds, (
                 f"{template} ({strictness}) still ships a RETIRED invocation: {invocation}"
             )
-
-
-def _flat(matcher: str, command: str) -> dict[str, Any]:
-    """A flat (Cursor) entry — one command, no nested hooks[] list."""
-    return {"matcher": matcher, "command": command}
-
-
-def test_merge_flat_cursor_schema_preserves_and_dedups() -> None:
-    """`_entry_identity` + `_strip_shipped_commands` are shared with `.cursor/hooks.json`.
-
-    That file uses the FLAT schema (one command per entry, no nested `hooks[]`), so it
-    must survive the nested-schema-driven changes untouched.
-    """
-    hm = "uv run --with /p python -m harness_maker.telemetry"
-    existing = {"hooks": {"postToolUse": [_flat("*", hm), _flat("*", "/usr/local/bin/mine.sh")]}}
-    new = {
-        "hooks": {
-            "postToolUse": [_flat("*", "uv run --with /NEW python -m harness_maker.telemetry")]
-        }
-    }
-    merged = _merge_hooks_json(existing, new, schema="flat")
-    cmds = [e["command"] for e in merged["hooks"]["postToolUse"]]
-    assert sum("harness_maker.telemetry" in c for c in cmds) == 1, "flat: path change must dedup"
-    assert "/usr/local/bin/mine.sh" in cmds, "flat: user entry must survive"
-
-
-def test_merge_flat_empty_command_is_preserved() -> None:
-    """A degenerate entry is still the user's — never silently dropped."""
-    existing = {"hooks": {"preToolUse": [_flat("*", "")]}}
-    new: dict[str, Any] = {"hooks": {"preToolUse": []}}
-    merged = _merge_hooks_json(existing, new, schema="flat")
-    assert len(merged["hooks"]["preToolUse"]) == 1
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -590,19 +555,17 @@ def test_merge_prunes_stale_preset_key_for_codex() -> None:
         "hooks": {"PostToolUse": [_nested("*", hm), _nested("*", "/usr/local/bin/mine.sh")]},
     }
     new = {"hooks": {"PostToolUse": [_nested("*", hm)]}}
-    merged = _merge_hooks_json(
-        existing, new, schema="nested", allowed_top_level=_CODEX_HOOKS_ALLOWED_TOP_LEVEL
-    )
+    merged = _merge_hooks_json(existing, new, allowed_top_level=_CODEX_HOOKS_ALLOWED_TOP_LEVEL)
     assert set(merged) <= {"description", "hooks"}, f"unknown top-level key survived: {set(merged)}"
     cmds = [h["command"] for e in merged["hooks"]["PostToolUse"] for h in e["hooks"]]
     assert "/usr/local/bin/mine.sh" in cmds, "pruning must not cost the user their hooks"
 
 
 def test_merge_keeps_top_level_keys_when_no_allowlist_given() -> None:
-    """The prune is opt-in per consumer — Cursor's `"version": 1` must still survive."""
-    existing = {"version": 1, "hooks": {"postToolUse": [_flat("*", "/usr/local/bin/mine.sh")]}}
-    new: dict[str, Any] = {"hooks": {"postToolUse": []}}
-    merged = _merge_hooks_json(existing, new, schema="flat")
+    """The prune is opt-in per consumer — a foreign top-level key must still survive."""
+    existing = {"version": 1, "hooks": {"PostToolUse": [_nested("*", "/usr/local/bin/mine.sh")]}}
+    new: dict[str, Any] = {"hooks": {"PostToolUse": []}}
+    merged = _merge_hooks_json(existing, new)
     assert merged["version"] == 1
 
 
@@ -687,7 +650,7 @@ def test_a_mixed_group_keeps_its_harness_command() -> None:
     matcher — that group is theirs, and our command stays inside it."""
     existing = {"hooks": {"PreToolUse": [_nested("Edit", _GATE, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     user_groups = [e for e in merged["hooks"]["PreToolUse"] if e["matcher"] == "Edit"]
     assert user_groups, "the user's scoped group was dropped entirely"
     assert _GATE in _cmds(user_groups[0]), "the harness command was stripped from a MIXED group"
@@ -699,7 +662,7 @@ def test_the_template_drops_only_the_scoped_command_keeping_siblings() -> None:
     it — a co-located command the user never scoped."""
     existing = {"hooks": {"PreToolUse": [_nested("Edit", _GATE, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _PERM, _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     template = [e for e in merged["hooks"]["PreToolUse"] if e["matcher"] == "Write|Edit"]
     assert template, "the template group vanished — siblings were dropped with the scoped command"
     assert _cmds(template[0]) == [_PERM], (
@@ -712,7 +675,7 @@ def test_a_template_entry_left_empty_is_not_emitted() -> None:
     """ADR-004's tail: a group whose only command was scoped away registers nothing."""
     existing = {"hooks": {"PreToolUse": [_nested("Edit", _GATE, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     assert all(e["matcher"] != "Write|Edit" for e in merged["hooks"]["PreToolUse"]), (
         "an emptied template group was still emitted"
     )
@@ -729,7 +692,7 @@ def test_no_tool_is_gated_twice_by_the_scoped_command() -> None:
     """
     existing = {"hooks": {"PreToolUse": [_nested("Edit", _GATE, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     carrying = [
         set(e["matcher"].split("|")) for e in merged["hooks"]["PreToolUse"] if _GATE in _cmds(e)
     ]
@@ -751,7 +714,7 @@ def test_a_pure_harness_entry_under_a_different_matcher_is_still_stripped() -> N
     """
     existing = {"hooks": {"PreToolUse": [_nested("Edit", _GATE)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     assert all(e["matcher"] != "Edit" for e in merged["hooks"]["PreToolUse"]), (
         "a pure-harness group was preserved — that is the unsound branch ADR-003 rejects"
     )
@@ -767,7 +730,7 @@ def test_a_retired_command_is_removed_even_from_a_mixed_group() -> None:
     retired = next(iter(_HARNESS_RETIRED_HOOK_INVOCATIONS))
     existing = {"hooks": {"PreToolUse": [_nested("Edit", retired, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     for entry in merged["hooks"]["PreToolUse"]:
         assert retired not in _cmds(entry), "a retired invocation survived inside a mixed group"
     user_groups = [e for e in merged["hooks"]["PreToolUse"] if e["matcher"] == "Edit"]
@@ -779,68 +742,10 @@ def test_a_users_own_command_is_never_removed() -> None:
     """The narrow-filter invariant — only `<HM>:`-normalized commands may be stripped."""
     existing = {"hooks": {"PreToolUse": [_nested("Edit", _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     user_groups = [e for e in merged["hooks"]["PreToolUse"] if e["matcher"] == "Edit"]
     assert user_groups
     assert _cmds(user_groups[0]) == [_USER]
-
-
-# ---------------------------------------------------------------------------
-# Phase 2b — ADR-006. Flat (Cursor) suppression.
-#
-# `_strip_shipped_commands` returns flat entries unchanged, and flat identity is
-# (matcher, command, ""), so a user's re-scoped flat entry ALREADY survives on
-# identity alone — ADR-003 is a structural no-op here. What is missing is ADR-004's
-# double-fire suppression: without it Cursor registers the command twice, once under
-# the user's narrow matcher and once under ours.
-# ---------------------------------------------------------------------------
-
-
-def test_flat_a_rescoped_user_entry_survives() -> None:
-    """Baseline for the schema — identity alone already preserves it."""
-    existing = {"hooks": {"beforeShellExecution": [_flat("Edit", _GATE)]}}
-    new = {"hooks": {"beforeShellExecution": [_flat("*", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="flat")
-    assert any(e["matcher"] == "Edit" for e in merged["hooks"]["beforeShellExecution"]), (
-        "the user's scoped flat entry was dropped"
-    )
-
-
-def test_flat_the_template_entry_still_ships_and_is_allowed_to_double_fire() -> None:
-    """ADR-009 SUPERSEDES ADR-006 — this assertion is INVERTED on purpose.
-
-    It used to assert the template's entry was suppressed. ADR-006 justified that on
-    "a re-scoped flat entry already survives on identity, so ADR-003 is a no-op here" —
-    true of PRESERVATION, false of SUPPRESSION. A flat entry holds one command, so the
-    mixed-group evidence ADR-003 depends on is *structurally unavailable*, leaving only
-    the matcher-difference inference ADR-003 was rewritten to reject: if harness-maker
-    changes a flat matcher between releases, the on-disk entry suppresses the new one and
-    Cursor runs the previous release's matcher forever, silently.
-
-    So Cursor double-fires until manifest provenance lands. That is the accepted cost —
-    a duplicate is visible and harmless, a version-lock is neither. Kept as a live
-    assertion rather than deleted, because a deleted test is how ADR-006 gets re-derived
-    as a missing feature.
-    """
-    existing = {"hooks": {"beforeShellExecution": [_flat("Edit", _GATE)]}}
-    new = {"hooks": {"beforeShellExecution": [_flat("*", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="flat")
-    matchers = [e["matcher"] for e in merged["hooks"]["beforeShellExecution"]]
-    assert "*" in matchers, (
-        "the template's entry must still ship — ADR-009 withdrew flat suppression"
-    )
-    assert "Edit" in matchers, "the user's scoped entry must still survive on identity"
-
-
-def test_flat_an_unscoped_template_entry_is_untouched() -> None:
-    """No user entry for that command → the template ships it exactly as before."""
-    existing = {"hooks": {"beforeShellExecution": [_flat("Edit", _USER)]}}
-    new = {"hooks": {"beforeShellExecution": [_flat("*", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="flat")
-    assert any(
-        e["matcher"] == "*" and e["command"] == _GATE
-        for e in merged["hooks"]["beforeShellExecution"]
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -869,7 +774,7 @@ def test_a_preserved_command_is_refreshed_to_the_templates_text() -> None:
     """
     existing = {"hooks": {"PreToolUse": [_nested("Edit", _STALE, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _FRESH)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     user = [e for e in merged["hooks"]["PreToolUse"] if e["matcher"] == "Edit"]
     assert user, "the user's scoped group was dropped"
     cmds = _cmds(user[0])
@@ -883,7 +788,7 @@ def test_no_stale_ref_survives_anywhere_in_the_merged_output() -> None:
     at the pruned cache, in the user's entry or the template's."""
     existing = {"hooks": {"PreToolUse": [_nested("Edit", _STALE, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _FRESH)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     every = [c for e in merged["hooks"]["PreToolUse"] for c in _cmds(e)]
     assert _STALE not in every, f"a stale invocation survived the merge: {every}"
 
@@ -898,7 +803,7 @@ def test_scoping_one_matcher_leaves_the_sibling_entry_intact() -> None:
     new = {
         "hooks": {"PreCompact": [_nested("auto", _FLUSH, _SPAN), _nested("manual", _FLUSH, _SPAN)]}
     }
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     manual = [e for e in merged["hooks"]["PreCompact"] if e["matcher"] == "manual"]
     assert manual, "the untouched `manual` entry was emptied and dropped"
     assert _cmds(manual[0]) == [_FLUSH, _SPAN], (
@@ -935,7 +840,7 @@ def test_the_template_keeps_the_residual_matcher_when_the_user_narrows() -> None
             ]
         }
     }
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     gated = {
         t
         for e in merged["hooks"]["PreToolUse"]
@@ -969,7 +874,7 @@ def test_an_ambiguous_multi_matcher_scope_suppresses_nothing_and_warns(
     """
     existing = {"hooks": {"PreToolUse": [_nested("Edit", _GATE, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _GATE), _nested("Bash", _GATE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     for m in ("Write|Edit", "Bash"):
         entry = [e for e in merged["hooks"]["PreToolUse"] if e["matcher"] == m]
         assert entry, f"{m} entry vanished under ambiguity"
@@ -989,7 +894,7 @@ def test_disjoint_matchers_are_not_warned_about(capsys: pytest.CaptureFixture[st
     new = {
         "hooks": {"PreCompact": [_nested("auto", _FLUSH, _SPAN), _nested("manual", _FLUSH, _SPAN)]}
     }
-    _merge_hooks_json(existing, new, schema="nested")
+    _merge_hooks_json(existing, new)
     assert capsys.readouterr().err == "", "warned about matchers that cannot both fire"
 
 
@@ -1004,7 +909,7 @@ def test_the_warning_does_not_fire_when_the_command_was_suppressed_somewhere(
     new = {
         "hooks": {"PreCompact": [_nested("auto", _FLUSH, _SPAN), _nested("manual", _FLUSH, _SPAN)]}
     }
-    _merge_hooks_json(existing, new, schema="nested")
+    _merge_hooks_json(existing, new)
     assert "not suppressing" not in capsys.readouterr().err
 
 
@@ -1016,63 +921,10 @@ def test_the_merge_converges_after_one_render() -> None:
     current: dict[str, Any] = {"hooks": {"PreToolUse": [_nested("Edit", _STALE, _USER)]}}
     seen = []
     for _ in range(3):
-        current = _merge_hooks_json(current, template, schema="nested")
+        current = _merge_hooks_json(current, template)
         seen.append([(e["matcher"], _cmds(e)) for e in current["hooks"]["PreToolUse"]])
     assert seen[1] == seen[2], f"the merge never reaches a fixed point: {seen[1]} vs {seen[2]}"
     assert all(_STALE not in c for _, cmds in seen[2] for c in cmds), "stale ref reappeared"
-
-
-# ---------------------------------------------------------------------------
-# Cursor / Claude gate-matcher parity.
-#
-# `.cursor/hooks.json` has NO frozen-baseline and NO snapshot coverage — `grep -c
-# cursor/hooks tests/structural/surface_baseline.json` returns 0 — which is how it
-# came to ship `spec_gate` under `Write|Edit` while both settings templates used
-# `Write|Edit|MultiEdit`. Cursor users' MultiEdit writes were simply not spec-gated,
-# and the only record of it was a Production.json.j2 comment describing the divergence
-# as intentional. It was not; it was the earlier mistake, uncorrected on one side.
-# ---------------------------------------------------------------------------
-
-
-def _gate_matchers(template: str, module: str, event: str, **cfg: Any) -> list[str]:
-    """Matchers a template registers `module` under, for one event, either schema."""
-    strictness = cfg.pop("strictness", None)
-    if strictness is not None:
-        cfg["spec"] = {"dir": "specs/", "strictness": strictness}
-    config = HarnessConfig(**cfg).model_dump(mode="json")
-    rendered = json.loads(
-        _make_env()
-        .get_template(template)
-        .render(preset="Side", config=config, harness_maker_src_path="/fake/src/path")
-    )
-    out: list[str] = []
-    for entry in rendered.get("hooks", {}).get(event, []):
-        cmds = (
-            [entry["command"]]
-            if "command" in entry
-            else [h["command"] for h in entry.get("hooks", [])]
-        )
-        if any(module in c for c in cmds):
-            out.append(entry.get("matcher", ""))
-    return out
-
-
-@pytest.mark.parametrize("module", sorted({*_BLOCKING_GATE_MODULES}))
-def test_cursor_and_claude_agree_on_every_blocking_gate_matcher(module: str) -> None:
-    """A gate that guards fewer tools on one IDE than the other is a silent hole.
-
-    Both files are rendered from the same `dev_mode`, so a matcher difference is never a
-    deliberate per-IDE policy — it is one side not being updated with the other. Claude's
-    `PreToolUse` and Cursor's `preToolUse` are the same stage under each IDE's own schema.
-    """
-    claude = _gate_matchers("settings/Production.json.j2", module, "PreToolUse", strictness="block")
-    cursor = _gate_matchers("cursor/hooks.json.j2", module, "preToolUse", strictness="block")
-    if not claude or not cursor:
-        pytest.skip(f"{module} is not wired on both IDEs — coverage parity is a separate claim")
-    assert set(claude) == set(cursor), (
-        f"{module}: Claude gates {claude} but Cursor gates {cursor}. A gate guarding fewer "
-        "tools on one IDE is a silent hole — align the templates, or state the reason here."
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -1093,10 +945,6 @@ _BARE = 'uv run --with "/new" python -m harness_maker.gates.spec_gate'
 _PERM_NEW = 'uv run --with "/new" python -m harness_maker.gates.permission_gate'
 
 
-def _flat_cmd(ref: str, module: str, args: str = "") -> str:
-    return f'{_PREFIX}uv run --with "{ref}" python -m harness_maker.{module}{args}'
-
-
 def test_an_argument_scoped_wrapper_suppresses_the_templates_bare_copy() -> None:
     """ADR-016 — THE reported incident, pinned.
 
@@ -1107,7 +955,7 @@ def test_an_argument_scoped_wrapper_suppresses_the_templates_bare_copy() -> None
     """
     existing = {"hooks": {"PreToolUse": [_nested("Write|Edit", _SCOPED, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _PERM_NEW, _BARE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     every = [c for e in merged["hooks"]["PreToolUse"] for c in _cmds(e)]
     gates = [c for c in every if "spec_gate" in c]
     assert len(gates) == 1, f"spec_gate registered {len(gates)}x — the exemption is defeated"
@@ -1125,50 +973,9 @@ def test_the_refresh_preserves_a_user_prefix_and_trailing_arguments() -> None:
     """
     existing = {"hooks": {"PreToolUse": [_nested("Write|Edit", _SCOPED, _USER)]}}
     new = {"hooks": {"PreToolUse": [_nested("Write|Edit", _BARE)]}}
-    merged = _merge_hooks_json(existing, new, schema="nested")
+    merged = _merge_hooks_json(existing, new)
     gate = next(c for e in merged["hooks"]["PreToolUse"] for c in _cmds(e) if "spec_gate" in c)
     assert '--with "/new"' in gate, f"the stale ref was not refreshed; got {gate}"
     assert '--with "/old"' not in gate, "the stale ref survived"
     assert gate.startswith(_PREFIX), f"the user's env prefix was discarded; got {gate}"
     assert gate.endswith("--exempt projects/"), f"the user's argument was discarded; got {gate}"
-
-
-def test_flat_a_matcher_change_ships_the_residual_and_refreshes_the_ref() -> None:
-    """ADR-015. The realistic Cursor route: harness-maker changes its OWN flat matcher.
-
-    ADR-009 had withdrawn flat suppression because the only action was delete-or-not.
-    ADR-011 added subtraction, so the on-disk entry keeps `Write|Edit`, the template
-    ships the residual `MultiEdit`, and nothing fires twice — while the preserved entry's
-    pruned `--with`, which ADR-009 left in place as "harmless", is repaired.
-    """
-    old = _flat_cmd("/old", "gates.spec_gate")
-    new_cmd = _flat_cmd("/new", "gates.spec_gate")
-    existing = {"hooks": {"preToolUse": [{"matcher": "Write|Edit", "command": old}]}}
-    new = {"hooks": {"preToolUse": [{"matcher": "Write|Edit|MultiEdit", "command": new_cmd}]}}
-    merged = _merge_hooks_json(existing, new, schema="flat")
-    entries = merged["hooks"]["preToolUse"]
-    covered: set[str] = set()
-    for e in entries:
-        terms = set(e["matcher"].split("|"))
-        assert not (terms & covered), f"a tool is gated twice: {terms & covered}"
-        covered |= terms
-        assert '--with "/new"' in e["command"], f"a stale flat ref survived: {e['command']}"
-    assert covered == {"Write", "Edit", "MultiEdit"}, f"coverage changed; got {covered}"
-
-
-def test_flat_a_wildcard_template_matcher_emits_both_and_warns(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """ADR-015's stated limit. `*` is not a decidable term set, so it cannot be subtracted
-    — the telemetry double-count survives and is warned about. Both refs are refreshed, so
-    nothing is dead; only the ledger double-counts."""
-    old = _flat_cmd("/old", "telemetry")
-    new_cmd = _flat_cmd("/new", "telemetry")
-    existing = {"hooks": {"postToolUse": [{"matcher": "Write", "command": old}]}}
-    new = {"hooks": {"postToolUse": [{"matcher": "*", "command": new_cmd}]}}
-    merged = _merge_hooks_json(existing, new, schema="flat")
-    entries = merged["hooks"]["postToolUse"]
-    assert {e["matcher"] for e in entries} == {"*", "Write"}, "an entry was suppressed under `*`"
-    for e in entries:
-        assert '--with "/new"' in e["command"], f"a stale flat ref survived: {e['command']}"
-    assert "registered twice" in capsys.readouterr().err, "the surviving duplicate was silent"

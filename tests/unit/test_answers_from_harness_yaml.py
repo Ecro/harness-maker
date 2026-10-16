@@ -308,11 +308,19 @@ def test_targets_present_in_yaml_parsed(tmp_path: Path) -> None:
         "preset: Side\nlocale: en\ndev_mode: task-driven\n"
         "default_workflow: exec-rev-wrap\n"
         "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n"
-        "targets:\n  - claude-code\n  - cursor\n",
+        "targets:\n  - claude-code\n  - codex\n",
     )
     answers = answers_from_harness_yaml(target)
     assert answers is not None
-    assert answers.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+    assert answers.targets == [Target.CLAUDE_CODE, Target.CODEX]
+
+
+def test_targets_removed_cursor_only_falls_back_to_claude_code(tmp_path: Path) -> None:
+    """0.63.0: a cursor-only 0.62 harness re-renders as [claude-code]; `make` warns."""
+    target = _write_yaml(tmp_path, "preset: Side\nlocale: en\ntargets:\n  - cursor\n")
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.targets == [Target.CLAUDE_CODE]
 
 
 def test_targets_missing_falls_back_with_warning(
@@ -417,7 +425,7 @@ def test_round_trip_targets_via_render_and_reverse(tmp_path: Path) -> None:
 
     p = profile(tmp_path)
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+        update={"targets": [Target.CLAUDE_CODE, Target.CODEX]},
     )
     bp = synthesize(p, a)
     target = tmp_path / ".claude"
@@ -425,26 +433,7 @@ def test_round_trip_targets_via_render_and_reverse(tmp_path: Path) -> None:
 
     reused = answers_from_harness_yaml(target / "harness.yaml")
     assert reused is not None
-    assert reused.targets == [Target.CLAUDE_CODE, Target.CURSOR]
-
-
-def test_round_trip_cursor_only_targets(tmp_path: Path) -> None:
-    """Cursor-only target 의 round-trip 도 보존."""
-    from harness_maker.interview import interview
-    from harness_maker.models import Target
-    from harness_maker.profile import profile
-    from harness_maker.render import render
-    from harness_maker.synthesize import synthesize
-
-    p = profile(tmp_path)
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-    bp = synthesize(p, a)
-    target = tmp_path / ".claude"
-    render(bp, target, dry_run=False)
-
-    reused = answers_from_harness_yaml(target / "harness.yaml")
-    assert reused is not None
-    assert reused.targets == [Target.CURSOR]
+    assert reused.targets == [Target.CLAUDE_CODE, Target.CODEX]
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -49,8 +49,6 @@ def resolve_target_roots(targets: Iterable[str]) -> list[str]:
     """Generated-content roots for the selected IDE targets (``.claude/`` always present)."""
     tset = {str(t) for t in targets}
     roots = [".claude/"]
-    if "cursor" in tset:
-        roots.append(".cursor/")
     if "codex" in tset:
         roots.extend([".codex/", ".agents/", "AGENTS.md"])
     return roots

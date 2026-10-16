@@ -268,6 +268,13 @@ _REMOVED_COMMANDS = {
 }
 
 _COLLAPSED_MULTILINE = {
+    # SPEC-hm-overhaul-p1 PR-C (2026-10-16): the Cursor target was removed, so `/hm:make` and
+    # `/hm:configure` name only `AskUserQuestion`. The question is still asked at each site —
+    # one tool name fewer, no dispatch lost. `tests/unit/test_overhaul_p1_cursor_removal.py`
+    # pins that `make.md.j2` names no Cursor tool.
+    "(`AskUserQuestion` in Claude Code, `AskQuestion` in Cursor) — **Proceed** /",
+    'Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code): "What would you like to change?" This is a',  # noqa: E501 — exact baseline string
+    "show current settings, then drive targeted changes via the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code).",  # noqa: E501 — exact baseline string
     # SPEC-hm-light-lane-s2 (2026-10-14): the auto-advance block became a per-stage stub and its
     # shared procedure moved to `.claude/hm/autopilot-advance.md` (IRR-001). The stub keeps the
     # dispatch as "`proceed: true` → `Skill(hm:<next_stage from the JSON>)`; else the file's

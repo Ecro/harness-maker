@@ -64,7 +64,7 @@ def _rendered_paths() -> set[str]:
     """
     profile = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     answers = interview(profile, autoloop_mode=True)
-    answers.targets = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+    answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
     out: set[str] = set()
     for entry in synthesize(profile, answers).files:
         raw = str(entry.path)

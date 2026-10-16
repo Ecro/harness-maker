@@ -1,4 +1,4 @@
-"""Boundary-parse tests for hooks.json (Claude Code + Cursor dual-schema).
+"""Boundary-parse tests for the Claude Code hooks block.
 
 PLAN-test-fidelity-gap Phase 0. Verifies that the renderer-produced
 hooks.json files pass each IDE's expected parser shape:
@@ -7,13 +7,9 @@ hooks.json files pass each IDE's expected parser shape:
   (`PreToolUse`/`PostToolUse`/`Stop`/`PreCompact`) + nested
   `{matcher?, hooks: [{type: "command", command, timeout?}]}` shape. (The old
   `.claude/hooks/hooks.json` is retired — Claude Code never read it, ADR-005.)
-- `.cursor/hooks.json` — Cursor: lowercase camelCase event keys
-  (`preToolUse`/`postToolUse`/`stop`/`preCompact`) + top-level
-  `version: 1` + flat `{matcher?, command, timeout?}` shape.
 
-The dual-schema is deliberate (CLAUDE.md §"Hook schema diverges by design";
-kairos 0.5.7 forensic on 2026-05-08). Tests pin this property so future
-"unify the schemas" refactors break the suite — exactly what we want.
+The Cursor half (`.cursor/hooks.json`, flat camelCase) left with the Cursor
+target in 0.63.0. `.codex/hooks.json` is covered by test_boundary_codex_toml.py.
 
 Negative tests (marker: ``boundary_negative``) inject synthetic bad bytes
 at the byte level — they do NOT depend on any production template emitting
@@ -34,7 +30,6 @@ import pytest
 from tests.integration._boundary_helpers import (
     BoundaryParseError,
     parse_claude_hooks_json,
-    parse_cursor_hooks_json,
 )
 
 # Positives consume the LIVE-rendered tree → require INTEGRATION=1.
@@ -73,44 +68,6 @@ def test_claude_hooks_json_pascalcase_and_nested(
     assert parsed["hooks"], "hooks dict must be non-empty"
 
 
-@INTEGRATION_GATE
-def test_cursor_hooks_json_lowercase_and_flat(
-    rendered_harness_all_targets: Path,
-) -> None:
-    """`.cursor/hooks.json` matches Cursor's expected schema.
-
-    Asserts: parseable JSON; ``version: 1`` present; every event key is
-    lowercase camelCase from the allow-list; every entry has the flat
-    ``{matcher?, command, timeout?}`` shape (NOT the nested Claude shape).
-    """
-    path = rendered_harness_all_targets / ".cursor" / "hooks.json"
-    assert path.is_file(), f"renderer did not produce {path}"
-
-    parsed = parse_cursor_hooks_json(path.read_text(encoding="utf-8"))
-    assert parsed["version"] == 1, "Cursor hooks file must declare version: 1"
-    assert parsed["hooks"], "hooks dict must be non-empty"
-
-
-@INTEGRATION_GATE
-def test_claude_and_cursor_hooks_are_byte_disjoint(
-    rendered_harness_all_targets: Path,
-) -> None:
-    """The two files are distinct on disk (sanity for dual-render contract).
-
-    Catches the silent-collapse failure mode where one render path is
-    accidentally pointed at both targets — they'd produce identical bytes,
-    which would mean one IDE is reading the wrong schema. Claude's hooks now
-    live in `.claude/settings.json` (the retired `.claude/hooks/hooks.json`
-    is no longer rendered, ADR-005); Cursor's stay in `.cursor/hooks.json`.
-    """
-    claude_path = rendered_harness_all_targets / ".claude" / "settings.json"
-    cursor_path = rendered_harness_all_targets / ".cursor" / "hooks.json"
-    assert claude_path.read_bytes() != cursor_path.read_bytes(), (
-        "Claude + Cursor hooks files have identical bytes — dual-render contract "
-        "broken. Each IDE owns its own schema; merging breaks one of them."
-    )
-
-
 # ──────────────────────────────────────────────────────────────────────────
 # Negative — synthetic bad bytes; template-state-independent; UNGATED
 # (run on every PR so parser regressions are caught immediately, not just
@@ -140,37 +97,6 @@ def test_claude_validator_rejects_flat_shape() -> None:
 
 
 @pytest.mark.boundary_negative
-def test_cursor_validator_rejects_pascalcase_keys() -> None:
-    """A hooks file with Claude-shape keys (PascalCase) must be rejected
-    by the Cursor parser. Synthetic bytes — no template dependency.
-    """
-    bad = '{"version": 1, "hooks": {"PreToolUse": [{"matcher": "Bash", "command": "x"}]}}'
-    with pytest.raises(BoundaryParseError, match="camelCase|event"):
-        parse_cursor_hooks_json(bad)
-
-
-@pytest.mark.boundary_negative
-def test_cursor_validator_rejects_missing_version() -> None:
-    """A hooks file without the top-level ``version: 1`` declaration must
-    be rejected. Cursor uses the version field to dispatch parser logic.
-    """
-    bad = '{"hooks": {"preToolUse": [{"matcher": "Bash", "command": "x"}]}}'
-    with pytest.raises(BoundaryParseError, match="version"):
-        parse_cursor_hooks_json(bad)
-
-
-@pytest.mark.boundary_negative
-def test_cursor_validator_rejects_nested_shape() -> None:
-    """A hooks file with Claude-shape nested ``hooks[]`` arrays inside
-    each entry must be rejected by the Cursor parser even with lowercase
-    keys. Synthetic bytes — no template dependency.
-    """
-    bad = '{"version": 1, "hooks": {"preToolUse": [{"matcher": "Bash", "hooks": []}]}}'
-    with pytest.raises(BoundaryParseError, match="flat|command"):
-        parse_cursor_hooks_json(bad)
-
-
-@pytest.mark.boundary_negative
 def test_invalid_json_raises_parse_error() -> None:
     """Malformed JSON bytes raise BoundaryParseError, not raw JSONDecodeError —
     callers handle a single exception type uniformly across all boundary
@@ -179,5 +105,3 @@ def test_invalid_json_raises_parse_error() -> None:
     bad = "{not even close to json"
     with pytest.raises(BoundaryParseError, match="JSON"):
         parse_claude_hooks_json(bad)
-    with pytest.raises(BoundaryParseError, match="JSON"):
-        parse_cursor_hooks_json(bad)

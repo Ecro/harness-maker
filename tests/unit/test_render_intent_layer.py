@@ -145,7 +145,7 @@ def _frontmatter_description(skill: str) -> str:
     raise AssertionError("no description in any frontmatter block")
 
 
-@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX])
+@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CODEX])
 def test_ac_019_the_skill_renders_for_every_target(target: Target) -> None:
     files = _render_target([target])
     assert ".claude/skills/intent-layer/SKILL.md" in files

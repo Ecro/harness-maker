@@ -15,7 +15,7 @@ from harness_maker.models import (
     HarnessConfig,
     Preset,
 )
-from harness_maker.presets import CURSOR_MODEL_IDS, resolve_agent_spec
+from harness_maker.presets import resolve_agent_spec
 from harness_maker.synthesize import _agent_files
 
 
@@ -30,7 +30,6 @@ def test_tier1_explicit_override_beats_preset() -> None:
     """Override in agent_models takes precedence over preset map."""
     custom = AgentModelSpec(
         claude="haiku",
-        cursor="haiku",
         codex=CodexAgentSpec(reasoning_effort="minimal"),
     )
     specs = _agent_files(
@@ -39,8 +38,7 @@ def test_tier1_explicit_override_beats_preset() -> None:
     )
     ctx = _spec_for("autoloop-coder", specs)
     assert ctx["claude_model"] == "haiku"
-    # Cursor field normalized to concrete ID via CURSOR_MODEL_IDS.
-    assert ctx["cursor_model"] == CURSOR_MODEL_IDS["haiku"]
+    assert "cursor_model" not in ctx, "the Cursor target was removed (0.63.0)"
     assert ctx["codex_reasoning_effort"] == "minimal"
 
 
@@ -49,7 +47,6 @@ def test_tier2_preset_production_reasoning_agent() -> None:
     specs = _agent_files(preset=Preset.PRODUCTION)
     ctx = _spec_for("autoloop-coder", specs)
     assert ctx["claude_model"] == "opus"
-    assert ctx["cursor_model"] == CURSOR_MODEL_IDS["opus"]
     assert ctx["codex_reasoning_effort"] == "high"
 
 
@@ -58,7 +55,6 @@ def test_tier2_preset_side_downshifts_reasoning_agent() -> None:
     specs = _agent_files(preset=Preset.SIDE)
     ctx = _spec_for("autoloop-coder", specs)
     assert ctx["claude_model"] == "sonnet"
-    assert ctx["cursor_model"] == CURSOR_MODEL_IDS["sonnet"]
     assert ctx["codex_reasoning_effort"] == "medium"
 
 
@@ -76,6 +72,5 @@ def test_resolve_agent_spec_directly_for_user_authored_agent() -> None:
     )
     spec = resolve_agent_spec("my-custom-domain-agent", config)
     assert spec.claude == "opus"
-    assert spec.cursor == CURSOR_MODEL_IDS["opus"]
     assert spec.codex is not None
     assert spec.codex.reasoning_effort == "medium"

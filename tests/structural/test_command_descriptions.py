@@ -27,7 +27,7 @@ from harness_maker.models import Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
-_ALL_TARGETS = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+_ALL_TARGETS = [Target.CLAUDE_CODE, Target.CODEX]
 
 
 def _blueprint(preset: Preset = Preset.PRODUCTION) -> Any:

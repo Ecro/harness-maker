@@ -54,8 +54,14 @@ def test_resolve_target_roots_claude_only() -> None:
 
 
 def test_resolve_target_roots_multi() -> None:
+    roots = gd.resolve_target_roots(["claude-code", "codex"])
+    assert roots == [".claude/", ".codex/", ".agents/", "AGENTS.md"]
+
+
+def test_resolve_target_roots_ignores_the_removed_cursor_target() -> None:
+    """0.63.0: a 0.62 `targets: [.., cursor, ..]` no longer adds `.cursor/` to the roots."""
     roots = gd.resolve_target_roots(["claude-code", "cursor", "codex"])
-    assert roots == [".claude/", ".cursor/", ".codex/", ".agents/", "AGENTS.md"]
+    assert roots == [".claude/", ".codex/", ".agents/", "AGENTS.md"]
 
 
 # ── compute_git_status ────────────────────────────────────────────────────
@@ -146,13 +152,13 @@ def test_multi_target_roots_undecided(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     _make_harness(
         tmp_path,
-        targets=("claude-code", "cursor", "codex"),
-        files=(".claude/harness.yaml", ".cursor/rules/r.mdc", ".codex/config.toml", "AGENTS.md"),
+        targets=("claude-code", "codex"),
+        files=(".claude/harness.yaml", ".codex/config.toml", "AGENTS.md"),
     )
     s = gd.compute_git_status(tmp_path)
     assert s.prior_decision == "undecided"
     assert "AGENTS.md" in s.untracked_files
-    assert ".cursor/rules/r.mdc" in s.untracked_files
+    assert ".codex/config.toml" in s.untracked_files
 
 
 def test_manifest_absent_fallback(tmp_path: Path) -> None:
@@ -206,11 +212,11 @@ def test_ignore_roots_multi_target(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     _make_harness(
         tmp_path,
-        targets=("claude-code", "cursor", "codex"),
-        files=(".claude/harness.yaml", ".cursor/rules/r.mdc", ".codex/config.toml", "AGENTS.md"),
+        targets=("claude-code", "codex"),
+        files=(".claude/harness.yaml", ".codex/config.toml", "AGENTS.md"),
     )
     ignored = gd.ignore_roots(tmp_path)
-    assert ".cursor/" in ignored
+    assert ".codex/" in ignored
     assert "AGENTS.md" in ignored
     assert gd.compute_git_status(tmp_path).prior_decision == "ignore"
 

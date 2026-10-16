@@ -52,7 +52,7 @@ def harness(tmp_path: Path) -> Path:
         p = dotclaude / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("x", encoding="utf-8")
-    for rel in (".cursor/hooks.json", ".codex/config.toml", ".agents/skills/hm-plan/SKILL.md"):
+    for rel in (".codex/hooks.json", ".codex/config.toml", ".agents/skills/hm-plan/SKILL.md"):
         p = tmp_path / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("x", encoding="utf-8")
@@ -64,7 +64,7 @@ def harness(tmp_path: Path) -> Path:
 _ALL = [
     "commands/hm/spec.md",
     "agents/code-reviewer.md",
-    ".cursor/hooks.json",
+    ".codex/hooks.json",
     ".codex/config.toml",
     ".agents/skills/hm-plan/SKILL.md",
     "AGENTS.md",
@@ -80,7 +80,7 @@ def test_files_outside_dotclaude_are_not_reported_as_new(
 
     counts = _counts(capsys.readouterr().out)
     assert counts["NEW"] == 0, (
-        f"{counts['NEW']} of 7 existing files reported as NEW. Sibling trees (.cursor/, "
+        f"{counts['NEW']} of 7 existing files reported as NEW. Sibling trees ("
         ".codex/, .agents/, AGENTS.md) and the root CLAUDE.md are written outside .claude/, "
         "so an existence check scoped to .claude/ can never see them."
     )
@@ -91,7 +91,7 @@ def test_a_genuinely_absent_file_is_still_reported_as_new(
     harness: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Negative control. Without it, `return 0` for NEW would pass the test above."""
-    _emit_dry_run_summary(_blueprint([*_ALL, ".cursor/rules/harness.mdc"]), harness)
+    _emit_dry_run_summary(_blueprint([*_ALL, ".agents/skills/hm-spec/SKILL.md"]), harness)
 
     counts = _counts(capsys.readouterr().out)
     assert counts["NEW"] == 1, "a sibling-tree file that is NOT on disk must count as NEW"
@@ -124,7 +124,7 @@ def test_the_four_buckets_partition_the_blueprint(
     got more files than the harness contains.
     """
     _emit_dry_run_summary(
-        _blueprint([*_ALL, ".cursor/rules/harness.mdc"]),
+        _blueprint([*_ALL, ".agents/skills/hm-spec/SKILL.md"]),
         harness,
         keep_paths=frozenset({Path("../CLAUDE.md")}),
         merge_paths=frozenset({Path("AGENTS.md")}),

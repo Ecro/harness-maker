@@ -32,7 +32,6 @@ _EXPECTED_MODULES: tuple[str, ...] = (
     "test_boundary_hooks_json.py",
     "test_boundary_codex_toml.py",
     "test_boundary_harness_yaml.py",
-    "test_boundary_cursor_mdc.py",
     "test_boundary_settings_json.py",
 )
 

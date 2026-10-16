@@ -189,8 +189,8 @@ def _compute_install_ref() -> str:
     name. As of 0.15.3 harness-maker is published on PyPI, so the
     ``"harness-maker"`` branch is reachable for users who install via
     ``pip install harness-maker`` or ``uv add harness-maker``. The
-    ``file://`` branch still dominates in practice because Claude Code /
-    Cursor / Codex marketplaces install via local plugin cache, not PyPI.
+    ``file://`` branch still dominates in practice because the Claude Code /
+    Codex marketplaces install via local plugin cache, not PyPI.
 
     Detection rule:
     1. ``distribution("harness-maker")`` raises → not installed (running from a
@@ -352,15 +352,15 @@ def _atomic_command_files(
 
 # ADR-016 — one-line `description:` per rendered `/hm:` command.
 #
-# Without it Claude Code and Cursor fall back to the command's first body line, which for
+# Without it Claude Code falls back to the command's first body line, which for
 # 14 of the 15 commands is the identical banner block; the tool listing showed one string
 # fifteen times. Keyed by the rendered path so the atomic-stage commands (generated in a
 # loop) and the standalone ones share one table.
 #
 # Per-target parser question (ADR-016 requires it ANSWERED, not assumed): commands render
-# to `.claude/commands/hm/*.md` only — never to `.codex/agents/*.toml` (agents) or
-# `.cursor/rules/*.mdc` (rules) — and `description` is a documented frontmatter key for
-# both readers of that path. So the field is unconditional.
+# to `.claude/commands/hm/*.md` only — never to `.codex/agents/*.toml` (agents) — and
+# `description` is a documented frontmatter key for the reader of that path. So the field
+# is unconditional.
 # `tests/structural/test_command_descriptions.py` pins that premise and fails if a future
 # release starts rendering commands to another target's path.
 #
@@ -453,8 +453,8 @@ _REVIEWER_KIND: dict[str, str] = {
 
 # Communication-protocol variant per agent (PLAN-antisycophancy-2026-05 ADR-002).
 # Claude render path reads source dispatcher frontmatter automatically via
-# render._extract_source_communication_variant. Codex/Cursor render paths
-# bypass dispatcher source — they need the variant explicitly in context.
+# render._extract_source_communication_variant. The Codex render path
+# bypasses dispatcher source — they need the variant explicitly in context.
 _COMMUNICATION_VARIANT: dict[str, str] = {
     "autoloop-coder": "full",
     "executor": "full",
@@ -492,14 +492,7 @@ def _agent_files(
     live HarnessConfig values at render time.
     """
     from harness_maker.models import HarnessConfig
-    from harness_maker.presets import CURSOR_MODEL_IDS, resolve_agent_spec
-
-    # Reverse map: a Tier-1 user override of `cursor:` only (no `claude:`) leaves
-    # spec.claude None. ADR-001 renders the agent `model:` from the Claude alias,
-    # so derive the alias back from the normalized cursor concrete id — otherwise
-    # the cursor-only override would silently fall through to the `sonnet` default
-    # in the partial, downgrading the user's intent.
-    _alias_by_cursor_id = {v: k for k, v in CURSOR_MODEL_IDS.items()}
+    from harness_maker.presets import resolve_agent_spec
 
     config = HarnessConfig(
         preset=preset,
@@ -509,7 +502,7 @@ def _agent_files(
     out: list[FileSpec] = []
     for n in _ALL_AGENTS:
         spec = resolve_agent_spec(n, config)
-        claude_model = spec.claude or _alias_by_cursor_id.get(spec.cursor or "")
+        claude_model = spec.claude
         out.append(
             (
                 f"agents/{n}.md.j2",
@@ -518,7 +511,6 @@ def _agent_files(
                     "name": n,
                     "reviewer_kind": _REVIEWER_KIND.get(n, ""),
                     "claude_model": claude_model,
-                    "cursor_model": spec.cursor,
                     "codex_reasoning_effort": (spec.codex.reasoning_effort if spec.codex else None),
                 },
             )
@@ -841,8 +833,8 @@ def _base_files(
         # PLAN-permission-deny-and-hooks-wiring). Claude Code reads project hooks ONLY
         # from settings files; that path is valid for a PLUGIN bundle only, so everything
         # rendered there was dead. Hooks now ship in settings.json's `hooks` key — see
-        # templates/settings/*.json.j2. `.cursor/hooks.json` and `.codex/hooks.json` are
-        # unaffected: their IDEs really do read them. A stale on-disk copy is retired by
+        # templates/settings/*.json.j2. `.codex/hooks.json` is unaffected: Codex really
+        # does read it. A stale on-disk copy is retired by
         # cli._retire_stale_hooks_json (pristine-exact-match only) + guarded from the
         # orphan sweep by reconcile._SWEEP_NEVER_DELETE so user-merged hooks are never lost.
         ("observability/dashboard.md.j2", "observability/dashboard.md", {}),
@@ -854,42 +846,6 @@ def _base_files(
 # fan-out is exercised through synthesize() at request time.
 SIDE_FILES: list[FileSpec] = _base_files(Preset.SIDE)
 PRODUCTION_FILES: list[FileSpec] = _base_files(Preset.PRODUCTION)
-
-
-def _cursor_target_files() -> list[FileSpec]:
-    """Cursor target 전용 자산 — ``targets`` 에 cursor 포함 시에만 추가.
-
-    **Hooks 정정 (PLAN-cursor-rootcause.md R1.A/B/C/D)**: Cursor IDE 는
-    ``.claude/hooks/hooks.json`` 을 안 읽음. 2.4 changelog 의 "Claude Code
-    hooks 호환" 은 CLI 한정. IDE 는 ``.cursor/hooks.json`` 만 봄. 또 schema 가
-    camelCase (``preToolUse`` 등) — PascalCase 는 silent ignore. 따라서 cursor
-    target 일 때는 **별도 렌더**:
-
-    - ``.cursor/rules/harness.mdc`` — Cursor IDE-rules (alwaysApply: true)
-    - ``.cursor/hooks.json`` — Cursor camelCase hooks + PATH wrap (R1.D 방어)
-    - ``.cursor/mcp.json`` — Cursor MCP 서버 정의 (pure JSON)
-
-    Agents / skills 는 여전히 single-source ``.claude/`` (Cursor 2.4+ 가
-    ``.claude/skills/`` / ``.claude/agents/`` 를 native 호환 — Cursor docs
-    공식 명시).
-    """
-    return [
-        (
-            "cursor/rules/harness.mdc.j2",
-            ".cursor/rules/harness.mdc",
-            {},
-        ),
-        (
-            "cursor/hooks.json.j2",
-            ".cursor/hooks.json",
-            {},
-        ),
-        (
-            "cursor/mcp.json.j2",
-            ".cursor/mcp.json",
-            {},
-        ),
-    ]
 
 
 def _codex_target_files(
@@ -1001,7 +957,7 @@ def _codex_skill_files() -> list[FileSpec]:
 
 
 # SPEC-maker-front-door-improvements IRR-001/002: reachable only by typing their name or through
-# the world model's Read. Claude Code/Cursor get `disable-model-invocation` from
+# the world model's Read. Claude Code gets `disable-model-invocation` from
 # `_command_frontmatter` (SPEC-hm-light-lane-s2 AC-009);
 # Codex gets `agents/openai.yaml` (policy.allow_implicit_invocation: false).
 #
@@ -1019,7 +975,7 @@ _TYPED_ONLY_SKILLS: tuple[str, ...] = (
 )
 
 
-#: Claude Code / Cursor read the flag from frontmatter; derived here, as `_TYPED_ONLY_COMMANDS` is
+#: Claude Code reads the flag from frontmatter; derived here, as `_TYPED_ONLY_COMMANDS` is
 #: for commands, so the list is the one place a skill becomes typed-only. Codex copies under
 #: `.agents/` never match: Codex gets `agents/openai.yaml` instead.
 _TYPED_ONLY_SKILL_PATHS: frozenset[str] = frozenset(
@@ -1206,9 +1162,6 @@ def synthesize(
         # PLAN-second-opinion-multi-model ADR-004 — schema only when a model is configured.
         *_schema_files(answers.second_opinion.enabled),
     ]
-
-    if Target.CURSOR in answers.targets:
-        file_specs.extend(_cursor_target_files())
 
     if Target.CODEX in answers.targets:
         file_specs.extend(

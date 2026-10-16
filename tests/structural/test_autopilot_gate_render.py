@@ -27,6 +27,14 @@ below which task moved what and why.** Refusing to re-capture in that case does 
 original proof — it only stops every future edit to any rendered command.
 
 Re-captures (append; never silently overwrite):
+- **2026-10-16, `hm-overhaul-p1-c` + release 0.63.0** — the Cursor target was removed. This repo's
+  harness still lists `cursor`, which is now dropped, so the `auto_safe@*` arms (rendered from it)
+  moved in `help` (targets row; the Cursor note gone), `health` (the `--targets` list) and
+  `research` (the Explore fan-out renders once `cursor` is not a target, as for any Claude-only
+  harness); `configure` and `make` lost their Cursor wording in every arm. The `ask@*` arms
+  otherwise moved only in their rendered version: substituting `0.62.0` for `0.63.0` reproduced
+  every other prior hash (`auto_safe@*` render at `_surface_baseline`'s pinned `0.62.0` stamp).
+  No command was added or removed.
 - **2026-10-15, `hm-light-lane-s3c`** — the six stage commands (`research`, `spec`, `execute`,
   `review`, `verify`, `wrapup`) moved in all four arms: the preamble (loop check, start banner,
   autopilot picker, output language) left each for `.claude/hm/stage-preamble.md` behind one

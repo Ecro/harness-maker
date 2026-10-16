@@ -229,7 +229,7 @@ PREVIOUS_ALLOWED = {".claude/harness.yaml", *LISTING_SURFACES, *LOOP_GATED_STAGE
 # SPEC-hm-light-lane-s2b widens it by exactly the two reference files that carry loop-only text.
 _S2B_LOOP_REFS = {".claude/hm/verify-checks.md", ".claude/hm/review-confirmation.md"}
 ALLOWED_BODY_DIFFS = PREVIOUS_ALLOWED | _S2B_LOOP_REFS
-ALL_TARGETS = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+ALL_TARGETS = [Target.CLAUDE_CODE, Target.CODEX]
 
 
 # ---------------------------------------------------------------------------

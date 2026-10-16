@@ -32,9 +32,8 @@ REQUIRED_TOKENS = (
 )
 TARGET_SETS = {
     "claude": [Target.CLAUDE_CODE],
-    "cursor": [Target.CURSOR],
     "codex": [Target.CODEX],
-    "all": [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX],
+    "all": [Target.CLAUDE_CODE, Target.CODEX],
 }
 _FRONTMATTER_BLOCK = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL | re.MULTILINE)
 

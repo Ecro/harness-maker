@@ -127,7 +127,7 @@ def rendered_cursor_codex(tmp_path_factory: pytest.TempPathFactory) -> Path:
     out = tmp_path_factory.mktemp("rendered-invocation-gate-multi")
     blueprint = synthesize(
         ProjectProfile(stack=["python"]),
-        InterviewAnswers(targets=[Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]),
+        InterviewAnswers(targets=[Target.CLAUDE_CODE, Target.CODEX]),
     )
     render(blueprint, out / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
     return out

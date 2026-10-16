@@ -37,7 +37,7 @@ def _rec(value: object, confidence: Confidence, axis: str = "preset") -> Recomme
     )
 
 
-@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX])
+@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CODEX])
 def test_dispatch_tri_ide_high_returns_same_value(target: Target) -> None:
     """HIGH rec: all three targets get the recommendation value silently."""
     rec = _rec(Preset.SIDE, Confidence.HIGH)
@@ -45,7 +45,7 @@ def test_dispatch_tri_ide_high_returns_same_value(target: Target) -> None:
     assert out == Preset.SIDE
 
 
-@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX])
+@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CODEX])
 def test_dispatch_tri_ide_low_returns_none(target: Target) -> None:
     """LOW rec: all three targets get None (no surface)."""
     rec = _rec(Preset.SIDE, Confidence.LOW)
@@ -53,7 +53,7 @@ def test_dispatch_tri_ide_low_returns_none(target: Target) -> None:
     assert out is None
 
 
-@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX])
+@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CODEX])
 def test_dispatch_tri_ide_medium_accept_returns_same_value(target: Target) -> None:
     """MEDIUM rec + accept (Y/blank): all three targets return rec.value."""
     rec = _rec(Preset.SIDE, Confidence.MEDIUM)
@@ -61,7 +61,7 @@ def test_dispatch_tri_ide_medium_accept_returns_same_value(target: Target) -> No
     assert out == Preset.SIDE
 
 
-@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX])
+@pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CODEX])
 def test_dispatch_tri_ide_medium_reject_returns_none(target: Target) -> None:
     """MEDIUM rec + reject ('n'): all three targets return None."""
     rec = _rec(Preset.SIDE, Confidence.MEDIUM)
@@ -81,19 +81,19 @@ def test_dispatch_tri_ide_payload_equivalence() -> None:
 
     outs_high = [
         _dispatch_recommendation(rec_high, target=t, input_provider=lambda _p: "")
-        for t in (Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX)
+        for t in (Target.CLAUDE_CODE, Target.CODEX)
     ]
     outs_medium_accept = [
         _dispatch_recommendation(rec_medium, target=t, input_provider=lambda _p: "yes")
-        for t in (Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX)
+        for t in (Target.CLAUDE_CODE, Target.CODEX)
     ]
     outs_medium_reject = [
         _dispatch_recommendation(rec_medium, target=t, input_provider=lambda _p: "n")
-        for t in (Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX)
+        for t in (Target.CLAUDE_CODE, Target.CODEX)
     ]
     outs_low = [
         _dispatch_recommendation(rec_low, target=t, input_provider=lambda _p: "")
-        for t in (Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX)
+        for t in (Target.CLAUDE_CODE, Target.CODEX)
     ]
 
     # All three must agree per bucket.

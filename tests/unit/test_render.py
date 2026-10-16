@@ -298,67 +298,8 @@ def test_render_without_merge_paths_overwrites(tmp_path: Path) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Cursor target — Phase 2.2/2.3
+# Target trees — Phase 2.2/2.3
 # ──────────────────────────────────────────────────────────────────────────────
-
-
-def test_render_cursor_target_emits_mdc_and_mcp_json(tmp_path: Path) -> None:
-    """targets=[cursor] full pipeline mirrors real CLI: target_dir 는 ``.claude/``,
-    ``.cursor/`` 자산은 그 sibling 으로 resolve.
-    """
-    from harness_maker.models import Target
-
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-    bp = synthesize(p, a)
-    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
-
-    mdc = project_root / ".cursor" / "rules" / "harness.mdc"
-    mcp = project_root / ".cursor" / "mcp.json"
-    assert mdc.exists()
-    assert mcp.exists()
-
-    # mdc: Cursor frontmatter 존재 + alwaysApply: true
-    mdc_text = mdc.read_text(encoding="utf-8")
-    assert mdc_text.startswith("---\n")
-    assert "alwaysApply: true" in mdc_text
-    assert "description:" in mdc_text
-
-    # mcp.json: pure JSON, frontmatter 없음
-    import json as _json
-
-    mcp_text = mcp.read_text(encoding="utf-8")
-    assert not mcp_text.startswith("---")
-    parsed = _json.loads(mcp_text)
-    assert isinstance(parsed, dict)
-    assert "mcpServers" in parsed
-
-
-def test_render_cursor_mdc_lacks_our_provenance_frontmatter(tmp_path: Path) -> None:
-    """Cursor .mdc 는 _render_pure_text 로 처리되어 우리 ``generated_by``,
-    ``content_hash``, ``source_template`` 메타가 박히지 않음 (Cursor strict-reject
-    회피, Phase 1 A1.frontmatter 결과에 따라 sidecar 메타 분리는 Phase 2.4+).
-    """
-    from harness_maker.models import Target
-
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-    bp = synthesize(p, a)
-    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
-
-    mdc_text = (project_root / ".cursor" / "rules" / "harness.mdc").read_text(encoding="utf-8")
-    assert "generated_by:" not in mdc_text
-    assert "content_hash:" not in mdc_text
-    assert "source_template:" not in mdc_text
-    assert "harness_maker_version:" not in mdc_text
 
 
 def test_render_claude_only_target_omits_cursor_directory(tmp_path: Path) -> None:
@@ -376,101 +317,12 @@ def test_render_claude_only_target_omits_cursor_directory(tmp_path: Path) -> Non
     assert not cursor_dir.exists()
 
 
-def test_render_cursor_hooks_json_camelcase_with_path_wrap(tmp_path: Path) -> None:
-    """Cursor IDE 가 .claude/hooks/hooks.json 을 안 읽으므로 cursor target 일 때
-    .cursor/hooks.json 을 별도 렌더 (PLAN-cursor-rootcause.md R1.A).
-
-    필수 보장:
-    - `version: 1` (Cursor 스키마)
-    - 이벤트 키 camelCase: preToolUse / postToolUse / preCompact (PascalCase X)
-    - 각 command 가 PATH wrap 으로 시작 — Cursor spawn shell 의 PATH 미보장 방어
-    - frontmatter 없음 (pure JSON)
-    """
-    from harness_maker.models import Target
-
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-    bp = synthesize(p, a)
-    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
-
-    cursor_hooks = project_root / ".cursor" / "hooks.json"
-    assert cursor_hooks.exists()
-
-    text = cursor_hooks.read_text(encoding="utf-8")
-    # pure JSON — no provenance frontmatter
-    assert not text.startswith("---")
-    import json as _json
-
-    parsed = _json.loads(text)
-    assert parsed["version"] == 1
-
-    hooks = parsed["hooks"]
-    assert "preToolUse" in hooks
-    # 0.7.0 wiring fix: postToolUse re-added so Cursor users get a per-tool
-    # timeline (tool_name + timestamp). Tokens are still null in Cursor —
-    # cache_diagnostics filters all-zero post_tool_use entries so they do
-    # NOT pollute hit-rate calc. stop continues to fire per-turn for
-    # status/loop_count/duration_ms signals.
-    assert "stop" in hooks
-    assert "postToolUse" in hooks
-    assert "preCompact" in hooks
-    # PascalCase must NOT appear — silent ignore in Cursor would produce no fire
-    assert "PreToolUse" not in hooks
-    assert "PostToolUse" not in hooks
-    assert "PreCompact" not in hooks
-    assert "Stop" not in hooks
-
-    # Every hook command must defensively prepend the user-local PATH so
-    # `uv` resolves even when Cursor spawns the subprocess from a shell
-    # without ~/.local/bin in PATH.
-    all_commands = [h["command"] for event_hooks in hooks.values() for h in event_hooks]
-    assert all_commands  # at least one
-    for cmd in all_commands:
-        # Round H GRADE-B 6: Cursor hook commands now also propagate
-        # CLAUDE_PROJECT_DIR (falls back to CURSOR_PROJECT_DIR / $PWD)
-        # so the gate's stdin-fallback chain works even when env vars
-        # are stripped or renamed in future Cursor releases. HM_HOOK_HOST marks the
-        # Cursor copy so the `.claude/settings.json` copy Cursor also runs stands down.
-        assert cmd.startswith(
-            "HM_HOOK_HOST=cursor "
-            'CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}" '
-            'PATH="$HOME/.local/bin:$PATH"',
-        ), cmd
-
-
-def test_render_cursor_hooks_json_omits_spec_gate_when_task_driven(
-    tmp_path: Path,
-) -> None:
-    """strictness=warn 이면 .cursor/hooks.json 의 preToolUse 에는 spec_gate
-    가 포함되지 않음 (.claude/hooks/hooks.json 과 동일 규칙)."""
-    from harness_maker.models import Target
-
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CURSOR], "strictness": "warn"},
-    )
-    bp = synthesize(p, a)
-    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
-
-    text = (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8")
-    assert "spec_gate" not in text
-    assert "permission_gate" in text  # always-on
-
-
 @pytest.mark.parametrize("strictness_label", ["warn", "block"])
 def test_render_hooks_json_valid_at_both_strictness_values(
     tmp_path: Path,
     strictness_label: str,
 ) -> None:
-    """Round H GRADE-B 5: both Claude Code and Cursor hooks templates must
+    """Round H GRADE-B 5: the Claude Code hooks must
     render valid JSON at both strictness values. The Jinja conditional for
     spec_gate uses inline `{% if %}` glued to commas (`}{% if ... %},`) —
     fragile under future maintainer reorderings. Lock both renderings via
@@ -486,7 +338,7 @@ def test_render_hooks_json_valid_at_both_strictness_values(
     strictness = "block" if strictness_label == "block" else "warn"
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR], "strictness": strictness},
+        update={"targets": [Target.CLAUDE_CODE], "strictness": strictness},
     )
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
@@ -507,68 +359,9 @@ def test_render_hooks_json_valid_at_both_strictness_values(
         "the retired .claude/hooks/hooks.json must no longer be rendered"
     )
 
-    # Cursor hooks
-    cursor_text = (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8")
-    cursor = _json.loads(cursor_text)  # raises on invalid JSON
-    assert "preToolUse" in cursor["hooks"]
-
-
-def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
-    tmp_path: Path,
-) -> None:
-    """Symmetric to the warn test: strictness=block includes spec_gate in
-    the cursor preToolUse list, under `Write|Edit|MultiEdit`. Both gates receive the
-    PATH wrap from the template.
-
-    **This assertion was inverted 2026-08-14** (PLAN-render-degrades-live-harness). It
-    used to pin `Write|Edit` here, matching the Cursor template — while both settings
-    templates used `Write|Edit|MultiEdit`, so a Cursor user's MultiEdit writes were
-    never spec-gated. A `Production.json.j2` comment even described the divergence as
-    intentional. It was not: it was the earlier mistake, corrected on one side only,
-    and this test held the uncorrected side in place. `.cursor/hooks.json` is in
-    neither the surface baseline nor any snapshot, so this was the only thing pinning
-    that matcher at all.
-    """
-    import json as _json
-
-    from harness_maker.models import Target
-
-    project_root = tmp_path
-    target_dir = project_root / ".claude"
-    target_dir.mkdir()
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CURSOR], "strictness": "block"},
-    )
-    bp = synthesize(p, a)
-    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
-
-    parsed = _json.loads(
-        (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8"),
-    )
-    pre_tool_use = parsed["hooks"]["preToolUse"]
-    # Bash×2 (loop_gate + permission_gate) + Write|Edit|MultiEdit ×2
-    # (worktree_gate + spec_gate)
-    assert len(pre_tool_use) == 4
-    matchers = [h["matcher"] for h in pre_tool_use]
-    assert matchers.count("Bash") == 2
-    assert matchers.count("Write|Edit|MultiEdit") == 2
-    assert "Write|Edit" not in matchers, (
-        "the bare Write|Edit matcher is the bug: it leaves MultiEdit ungated on Cursor "
-        "while both settings templates gate it"
-    )
-    spec_gate_hook = next(h for h in pre_tool_use if "spec_gate" in h["command"])
-    assert spec_gate_hook["matcher"] == "Write|Edit|MultiEdit"
-    assert spec_gate_hook["command"].startswith(
-        "HM_HOOK_HOST=cursor "
-        'CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}" '
-        'PATH="$HOME/.local/bin:$PATH"',
-    )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Cursor target snapshot determinism — Phase 2.7
+# Multi-target snapshot determinism — Phase 2.7
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -576,34 +369,13 @@ def _collect(root: Path) -> dict[Path, bytes]:
     return {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
 
 
-def test_render_cursor_target_byte_identical_across_runs(tmp_path: Path) -> None:
-    """Phase 2.7: targets=[cursor] 두 번 render → byte-identical (frozen time)."""
-    from harness_maker.models import Target
-
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
-
-    def _run(root: Path) -> dict[Path, bytes]:
-        target = root / ".claude"
-        target.mkdir()
-        bp = synthesize(p, a)
-        render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
-        return _collect(root)
-
-    r1 = tmp_path / "r1"
-    r1.mkdir()
-    r2 = tmp_path / "r2"
-    r2.mkdir()
-    assert _run(r1) == _run(r2)
-
-
 def test_render_both_targets_byte_identical_across_runs(tmp_path: Path) -> None:
-    """Phase 2.7: targets=[claude-code, cursor] 두 번 render → byte-identical."""
+    """Phase 2.7: targets=[claude-code, codex] 두 번 render → byte-identical."""
     from harness_maker.models import Target
 
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+        update={"targets": [Target.CLAUDE_CODE, Target.CODEX]},
     )
 
     def _run(root: Path) -> dict[Path, bytes]:
@@ -724,11 +496,10 @@ def test_render_harness_yaml_template_key_wins_over_user(tmp_path: Path) -> None
     assert body["preset"] != "USER_OVERRIDE"
 
 
-def test_render_cursor_target_writes_targets_to_harness_yaml(tmp_path: Path) -> None:
+def test_render_multi_target_writes_targets_to_harness_yaml(tmp_path: Path) -> None:
     """Phase 2.7 bug fix: targets / recommended_model 키가 harness.yaml 에
     실제로 박힘 — 그렇지 않으면 re-render 시 옛 yaml 으로 잘못 인식되어
-    silent fallback (`[claude-code]`) 으로 cursor 선택 손실. Phase 2.0/2.1 의
-    누락이 Phase 2.7 진행 중 발견되어 fix.
+    silent fallback (`[claude-code]`) 으로 target 선택 손실.
     """
     from harness_maker.models import Target
 
@@ -738,13 +509,13 @@ def test_render_cursor_target_writes_targets_to_harness_yaml(tmp_path: Path) -> 
 
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+        update={"targets": [Target.CLAUDE_CODE, Target.CODEX]},
     )
     bp = synthesize(p, a)
     render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
 
     yaml_text = (target / "harness.yaml").read_text(encoding="utf-8")
-    assert "targets: [claude-code, cursor]" in yaml_text
+    assert "targets: [claude-code, codex]" in yaml_text
     assert "default_model: opus" in yaml_text  # ADR-002: version-agnostic alias floor
 
 
@@ -786,16 +557,8 @@ def test_render_agents_have_no_inert_permissions_frontmatter(tmp_path: Path) -> 
         assert "tools:" in frontmatter, f"{name}: missing tools: — the actual boundary"
 
 
-def test_cursor_hooks_uses_lowercase_native_schema(tmp_path: Path) -> None:
-    """0.6.2 P1: .cursor/hooks.json MUST use Cursor-native lowercase schema.
-
-    Why: Cursor IDE reads its own .cursor/hooks.json with lowercase camelCase
-    keys (preToolUse, stop, preCompact) + version: 1 + flat {matcher, command}
-    shape. The Claude Code PascalCase shape would be silently ignored. Verified
-    via kairos 0.5.7 forensic — see tests/cursor-compat/results-2026-05-08.md.
-    """
-    import json
-
+def test_no_cursor_tree_rendered(tmp_path: Path) -> None:
+    """0.63.0: no target renders `.cursor/` (the Cursor target was removed)."""
     from harness_maker.models import Target
 
     project_root = tmp_path
@@ -803,153 +566,15 @@ def test_cursor_hooks_uses_lowercase_native_schema(tmp_path: Path) -> None:
     target.mkdir()
     p = _profile()
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+        update={"targets": [Target.CLAUDE_CODE, Target.CODEX]},
     )
     bp = synthesize(p, a)
     render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
 
-    cursor_hooks_path = project_root / ".cursor" / "hooks.json"
-    assert cursor_hooks_path.exists(), "Cursor hooks file not rendered"
-    cursor_hooks = json.loads(cursor_hooks_path.read_text(encoding="utf-8"))
-
-    # Cursor schema invariants
-    assert cursor_hooks.get("version") == 1, "Cursor hooks must have version: 1"
-    hooks = cursor_hooks.get("hooks", {})
-    # Lowercase event keys are required
-    has_lowercase = any(k in hooks for k in ("preToolUse", "stop", "preCompact"))
-    has_pascalcase = any(k in hooks for k in ("PreToolUse", "Stop", "PreCompact"))
-    assert has_lowercase, "Cursor hooks.json must use lowercase keys (preToolUse/stop/preCompact)"
-    assert not has_pascalcase, (
-        "Cursor hooks.json must NOT use PascalCase keys — those are Claude Code's "
-        "schema. Cursor will silently ignore them. See "
-        "tests/cursor-compat/results-2026-05-08.md."
-    )
-
-    # Claude's hooks must use the opposite schema (PascalCase + nested {hooks:[]}) — and
-    # they live in settings.json, not hooks/hooks.json, which Claude Code never reads
-    # (ADR-005 of PLAN-permission-deny-and-hooks-wiring). The dual-schema contrast is the
-    # point of this test and is unchanged; only Claude's location moved.
-    claude_settings_path = target / "settings.json"
-    assert claude_settings_path.exists()
-    claude_settings = json.loads(claude_settings_path.read_text(encoding="utf-8"))
-    claude_inner = claude_settings.get("hooks", {})
-    assert "PreToolUse" in claude_inner or "PostToolUse" in claude_inner, (
-        "Claude hooks.json must use PascalCase event keys"
-    )
-    # Claude shape is nested: {matcher, hooks: [{type, command}]}
-    sample = claude_inner.get("PostToolUse") or claude_inner.get("PreToolUse")
-    assert sample, "Claude hooks must contain at least one matcher entry"
-    assert "hooks" in sample[0], (
-        "Claude hooks must use nested {matcher, hooks:[{type,command}]} shape"
-    )
-
-
-def test_no_cursor_commands_rendered(tmp_path: Path) -> None:
-    """0.6.2 P4: targets:[claude-code,cursor] must NOT render .cursor/commands/.
-
-    Why: Cursor 2.4+ reads .claude/commands/hm/*.md natively (kairos 0.5.7
-    forensic). Mirroring to .cursor/commands/hm-*.md is unnecessary and
-    would just be dead duplication. This test guards against accidental
-    reintroduction of the mirror.
-    """
-    from harness_maker.models import Target
-
-    project_root = tmp_path
-    target = project_root / ".claude"
-    target.mkdir()
-    p = _profile()
-    a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
-    )
-    bp = synthesize(p, a)
-    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
-
-    cursor_dir = project_root / ".cursor"
-    assert cursor_dir.exists(), "Cursor target must render .cursor/ directory"
-    cursor_commands = cursor_dir / "commands"
-    assert not cursor_commands.exists(), (
-        f"Unexpected .cursor/commands/ directory found at {cursor_commands}. "
-        "Cursor 2.4+ reads .claude/commands/hm/*.md natively. If this directory "
-        "is needed because of a Cursor regression, also remove this assertion "
-        "and document the regression in tests/cursor-compat/results-*.md."
-    )
-
-    # Claude commands must still exist (the actual single-source location)
+    assert not (project_root / ".cursor").exists()
     assert (target / "commands" / "hm").exists(), (
         "Claude commands must be rendered at .claude/commands/hm/"
     )
-
-
-def test_cursor_mcp_propagates_servers_from_config(tmp_path: Path) -> None:
-    """0.6.2 P5: .cursor/mcp.json mirrors config.mcp_servers, not hardcoded {}.
-
-    Why: prior template hardcoded `{"mcpServers": {}}`. Users adding MCP servers
-    to harness.yaml.mcp_servers got nothing in Cursor. This test verifies the
-    propagation chain: InterviewAnswers.mcp_servers → HarnessConfig.mcp_servers
-    → Jinja context → .cursor/mcp.json content.
-    """
-    import json
-
-    from harness_maker.models import Target
-
-    project_root = tmp_path
-    target = project_root / ".claude"
-    target.mkdir()
-    p = _profile()
-    base = interview(p, autoloop_mode=True)
-    a = base.model_copy(
-        update={
-            "targets": [Target.CLAUDE_CODE, Target.CURSOR],
-            "mcp_servers": {
-                "context7": {
-                    "command": "npx",
-                    "args": ["-y", "@context7/server"],
-                    "env": {"API_KEY": "${CONTEXT7_KEY}"},
-                },
-                "playwright": {
-                    "command": "uvx",
-                    "args": ["mcp-server-playwright"],
-                },
-            },
-        },
-    )
-    bp = synthesize(p, a)
-    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
-
-    cursor_mcp_path = project_root / ".cursor" / "mcp.json"
-    assert cursor_mcp_path.exists()
-    cursor_mcp = json.loads(cursor_mcp_path.read_text(encoding="utf-8"))
-    servers = cursor_mcp.get("mcpServers", {})
-    assert "context7" in servers, "context7 MCP server not propagated to Cursor"
-    assert servers["context7"]["command"] == "npx"
-    assert servers["context7"]["args"] == ["-y", "@context7/server"]
-    assert servers["context7"]["env"]["API_KEY"] == "${CONTEXT7_KEY}"
-    assert "playwright" in servers
-
-
-def test_cursor_mcp_empty_default(tmp_path: Path) -> None:
-    """Empty mcp_servers must render as `{"mcpServers": {}}` (valid Cursor config)."""
-    import json
-
-    from harness_maker.models import Target
-
-    project_root = tmp_path
-    target = project_root / ".claude"
-    target.mkdir()
-    p = _profile()
-    a = interview(p, autoloop_mode=True).model_copy(
-        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
-    )
-    bp = synthesize(p, a)
-    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
-
-    cursor_mcp = json.loads((project_root / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
-    assert cursor_mcp == {"mcpServers": {}}
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Codex target — resolve_output_path routing (Phase 1)
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 def test_resolve_output_path_codex_routes_to_parent() -> None:
@@ -987,16 +612,6 @@ def test_resolve_output_path_agents_md_routes_to_parent() -> None:
 
     target_dir = Path("/project/.claude")
     assert resolve_output_path(target_dir, Path("AGENTS.md")) == Path("/project/AGENTS.md")
-
-
-def test_resolve_output_path_cursor_still_routes_correctly() -> None:
-    """.cursor/ routing unchanged after adding codex support."""
-    from harness_maker.render import resolve_output_path
-
-    target_dir = Path("/project/.claude")
-    assert resolve_output_path(target_dir, Path(".cursor/rules/harness.mdc")) == Path(
-        "/project/.cursor/rules/harness.mdc"
-    )
 
 
 def test_resolve_output_path_claude_unchanged() -> None:
@@ -1247,7 +862,7 @@ def test_render_agents_md_block_merge_fallback_on_missing_file(tmp_path: Path) -
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 1+3 (PLAN-onboarding-backup-friction, ADR-003/006):
-# _merge_hooks_json schema-aware in-place 3-way merge tests.
+# _merge_hooks_json in-place 3-way merge tests.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -1290,7 +905,7 @@ def test_merge_hooks_json_claude_nested_preserves_user_entries() -> None:
         },
         "preset": "Production",
     }
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     # PostToolUse: shipped (telemetry) + user (Write|Edit custom)
     post_tool = merged["hooks"]["PostToolUse"]
     assert len(post_tool) == 2
@@ -1303,47 +918,6 @@ def test_merge_hooks_json_claude_nested_preserves_user_entries() -> None:
     assert stop[1]["hooks"][0]["command"] == "user-custom-stop"
     # Top-level: template wins on conflict
     assert merged["preset"] == "Production"
-
-
-def test_merge_hooks_json_cursor_flat_preserves_user_entries() -> None:
-    """Cursor flat lowercase camelCase: command at entry level; matcher-less
-    events (stop, preCompact) work."""
-    from harness_maker.render import _merge_hooks_json
-
-    existing = {
-        "version": 1,
-        "hooks": {
-            "preToolUse": [
-                {"matcher": "Bash", "command": "shipped-perm-gate"},
-                {"matcher": "Custom", "command": "user-custom-pretool"},
-            ],
-            "stop": [
-                {"command": "shipped-stop-telemetry"},
-                {"command": "user-custom-stop-hook"},
-            ],
-        },
-    }
-    new_data = {
-        "version": 1,
-        "hooks": {
-            "preToolUse": [
-                {"matcher": "Bash", "command": "shipped-perm-gate"},
-            ],
-            "stop": [
-                {"command": "shipped-stop-telemetry"},
-            ],
-        },
-    }
-    merged = _merge_hooks_json(existing, new_data, schema="flat")
-    pretool = merged["hooks"]["preToolUse"]
-    assert len(pretool) == 2
-    assert pretool[0]["command"] == "shipped-perm-gate"
-    assert pretool[1]["command"] == "user-custom-pretool"
-    stop = merged["hooks"]["stop"]
-    assert len(stop) == 2
-    assert stop[0]["command"] == "shipped-stop-telemetry"
-    assert stop[1]["command"] == "user-custom-stop-hook"
-    assert merged["version"] == 1
 
 
 def test_merge_hooks_json_codex_permission_request_event() -> None:
@@ -1366,7 +940,7 @@ def test_merge_hooks_json_codex_permission_request_event() -> None:
             ],
         },
     }
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     pr = merged["hooks"]["PermissionRequest"]
     assert len(pr) == 2
     assert pr[0]["hooks"][0]["command"] == "shipped-permission-gate"
@@ -1394,7 +968,7 @@ def test_merge_hooks_json_user_event_unknown_to_template_preserved() -> None:
             ],
         },
     }
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     assert "UserSpecialEvent" in merged["hooks"]
     assert merged["hooks"]["UserSpecialEvent"][0]["hooks"][0]["command"] == "user-only"
 
@@ -1405,7 +979,7 @@ def test_merge_hooks_json_malformed_existing_falls_back_to_template() -> None:
 
     existing = {"hooks": "this is not a dict"}
     new_data = {"hooks": {"PostToolUse": [{"matcher": "*", "hooks": []}]}}
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     # Fell back to template (new_data) unchanged
     assert merged == new_data
 
@@ -1430,7 +1004,7 @@ def test_merge_hooks_json_collapses_duplicate_user_and_shipped() -> None:
             ],
         },
     }
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     # Both existing entries match template identity → no user-only addition;
     # result has exactly one entry from template.
     assert len(merged["hooks"]["PostToolUse"]) == 1
@@ -1458,7 +1032,7 @@ def test_merge_hooks_json_malformed_entries_dropped() -> None:
             ],
         },
     }
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     # Only the well-formed shipped entry; malformed entries dropped silently
     # (backup is the recovery path per ADR-001).
     assert len(merged["hooks"]["PostToolUse"]) == 1
@@ -1506,7 +1080,7 @@ def test_merge_hooks_json_dedupes_across_hm_cache_version_bumps() -> None:
             ],
         },
     }
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     # Exactly ONE entry — the new-version command. The old-version entry
     # MUST NOT survive as a "user addition" because it's the SAME semantic
     # hook, just pinned at the prior cache version.
@@ -1552,7 +1126,7 @@ def test_merge_hooks_json_preserves_genuine_user_added_command_alongside_hm() ->
             ],
         },
     }
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     cmds = [e["hooks"][0]["command"] for e in merged["hooks"]["PermissionRequest"]]
     # New hm-managed command replaces the old one; user-authored command
     # survives as a user addition.
@@ -1594,7 +1168,7 @@ def test_merge_hooks_json_dedupes_across_github_cache_version_bump() -> None:
 
     existing = {"hooks": {"PreToolUse": [_nested_entry(_hm_cmd(_GH_OLD), "Bash")]}}
     new_data = {"hooks": {"PreToolUse": [_nested_entry(_hm_cmd(_GH), "Bash")]}}
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     entries = merged["hooks"]["PreToolUse"]
     assert len(entries) == 1, f"github-cache version bump must dedup, got {len(entries)}"
     assert entries[0]["hooks"][0]["command"] == _hm_cmd(_GH)
@@ -1615,7 +1189,7 @@ def test_merge_hooks_json_collapses_marketplace_switch_local_and_devrepo() -> No
         },
     }
     new_data = {"hooks": {"PreToolUse": [_nested_entry(_hm_cmd(_GH), "Bash")]}}
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     entries = merged["hooks"]["PreToolUse"]
     assert len(entries) == 1, f"local+devrepo+github are one hook; got {len(entries)}"
     assert entries[0]["hooks"][0]["command"] == _hm_cmd(_GH)
@@ -1636,7 +1210,7 @@ def test_merge_hooks_json_self_heals_full_triplication() -> None:
         },
     }
     new_data = {"hooks": {"PreToolUse": [_nested_entry(_hm_cmd(_GH), "Bash")]}}
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     entries = merged["hooks"]["PreToolUse"]
     assert len(entries) == 1, f"triplication must self-heal to 1, got {len(entries)}"
     assert entries[0]["hooks"][0]["command"] == _hm_cmd(_GH)
@@ -1654,7 +1228,7 @@ def test_merge_hooks_json_normalizes_with_intermediate_uv_flag() -> None:
     new = f"uv run --with {local_new} --python 3.12 python -m harness_maker.telemetry"
     existing = {"hooks": {"PostToolUse": [_nested_entry(old, "*")]}}
     new_data = {"hooks": {"PostToolUse": [_nested_entry(new, "*")]}}
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     entries = merged["hooks"]["PostToolUse"]
     assert len(entries) == 1, f"intermediate-flag command must still dedup, got {len(entries)}"
 
@@ -1674,37 +1248,13 @@ def test_merge_hooks_json_matcherless_args_discriminate() -> None:
             "Stop": [_nested_entry(_hm_cmd(_GH, stop_a)), _nested_entry(_hm_cmd(_GH, stop_b))],
         },
     }
-    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    merged = _merge_hooks_json(existing, new_data)
     assert len(merged["hooks"]["Stop"]) == 2, "different --mode args must NOT collapse"
     # Same args, different paths → must collapse to one.
     existing2 = {"hooks": {"Stop": [_nested_entry(_hm_cmd(_LOCAL, stop_a))]}}
     new_data2 = {"hooks": {"Stop": [_nested_entry(_hm_cmd(_GH, stop_a))]}}
-    merged2 = _merge_hooks_json(existing2, new_data2, schema="nested")
+    merged2 = _merge_hooks_json(existing2, new_data2)
     assert len(merged2["hooks"]["Stop"]) == 1, "same module+args across paths must collapse"
-
-
-def test_merge_hooks_json_dedupes_across_paths_cursor_flat() -> None:
-    """Cursor flat schema (.cursor/hooks.json) must dedup across path forms too."""
-    from harness_maker.render import _merge_hooks_json
-
-    existing = {
-        "hooks": {
-            "afterFileEdit": [
-                {"matcher": "*", "command": _hm_cmd(_LOCAL, "harness_maker.telemetry")},
-            ],
-        },
-    }
-    new_data = {
-        "hooks": {
-            "afterFileEdit": [
-                {"matcher": "*", "command": _hm_cmd(_GH, "harness_maker.telemetry")},
-            ],
-        },
-    }
-    merged = _merge_hooks_json(existing, new_data, schema="flat")
-    entries = merged["hooks"]["afterFileEdit"]
-    assert len(entries) == 1, f"flat-schema path dedup broken, got {len(entries)}"
-    assert entries[0]["command"] == _hm_cmd(_GH, "harness_maker.telemetry")
 
 
 def test_rendered_hooks_template_has_unique_identity_per_event(tmp_path: Path) -> None:
@@ -1737,7 +1287,7 @@ def test_rendered_hooks_template_has_unique_identity_per_event(tmp_path: Path) -
     render(bp, target_dir, merge_json_paths={Path("hooks/hooks.json")})
     data = json.loads((target_dir / "hooks" / "hooks.json").read_text(encoding="utf-8"))
     for event, entries in data["hooks"].items():
-        idents = [_entry_identity(e, schema="nested") for e in entries]
+        idents = [_entry_identity(e) for e in entries]
         assert len(idents) == len(set(idents)), (
             f"template emits duplicate hook identities in event {event!r}: {idents}"
         )
@@ -1816,7 +1366,7 @@ def test_render_hooks_json_merged_manifest_records_merged_hash(tmp_path: Path) -
         json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines() if line
     ]
     # Manifest key for .claude/-bound files is prefixed with ".claude/" per
-    # _manifest_key_for (render.py:933-951). Cross-tree files (.cursor/, .codex/)
+    # _manifest_key_for (render.py:933-951). Cross-tree files (.codex/, .agents/)
     # keep their prefix; this is the .claude/-bound case.
     hooks_entries = [e for e in manifest_lines if e["path"] == ".claude/hooks/hooks.json"]
     assert hooks_entries, "Manifest must record an entry for hooks/hooks.json"

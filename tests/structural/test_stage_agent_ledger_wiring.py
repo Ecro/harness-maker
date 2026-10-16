@@ -51,7 +51,7 @@ _STAGE_MARKERS = {
 def _render_root() -> Path:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
-    answers.targets = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+    answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
     # ADR-011 made the ledger an opt-in axis that defaults OFF for a fresh install, so the
     # DEFAULT render legitimately carries none of the wiring this file exists to check. Pin
     # the axis ON here: the question is "when it is asked for, is it wired on every target?",

@@ -216,7 +216,11 @@ def test_user_owned_skill_dir_is_not_overwritten(tmp_path: Path) -> None:
 # AC-007 — every always-loaded file names the world model and its handle within budget
 # ---------------------------------------------------------------------------
 
-_AC007 = load_golden_table(_SPEC_YAML, "AC-007")
+# The `.cursor/rules/harness.mdc` row left with the Cursor target (0.63.0); the approved SPEC
+# table is left untouched, so the row is filtered here.
+_AC007 = [
+    r for r in load_golden_table(_SPEC_YAML, "AC-007") if not r.input["file"].startswith(".cursor/")
+]
 
 
 @pytest.mark.parametrize("preset", ["Side", "Production"])
@@ -225,7 +229,7 @@ def test_ac007_pointer_in_every_always_loaded_variant(
     preset: str, locale: str, tmp_path: Path
 ) -> None:
     repo = _bootstrap(
-        tmp_path, "--preset", preset, "--locale", locale, "--targets", "claude-code,cursor,codex"
+        tmp_path, "--preset", preset, "--locale", locale, "--targets", "claude-code,codex"
     )
     for row in _AC007:
         section = _pointer((repo / row.input["file"]).read_text(encoding="utf-8"))
@@ -238,13 +242,13 @@ def test_ac007_pointer_follows_rename(tmp_path: Path) -> None:
     repo = _bootstrap(
         tmp_path,
         "--targets",
-        "claude-code,cursor,codex",
+        "claude-code,codex",
         "--world-model-name",
         "비비",
         "--world-model-handle",
         "bibi",
     )
-    expect = {"CLAUDE.md": "/bibi", "AGENTS.md": "$bibi", ".cursor/rules/harness.mdc": "/bibi"}
+    expect = {"CLAUDE.md": "/bibi", "AGENTS.md": "$bibi"}
     for rel, token in expect.items():
         section = _pointer((repo / rel).read_text(encoding="utf-8"))
         assert "비비" in section, rel

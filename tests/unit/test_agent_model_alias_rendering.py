@@ -38,13 +38,10 @@ def _isolate_home(
 
 
 def _render_agent_files(tmp_path: Path, preset: Preset) -> list[Path]:
-    """Render a full harness with cursor in targets (so cursor_model — the
-    concrete CURSOR_MODEL_IDS value — is populated, which is exactly the
-    precedence the bug exploited) and return the rendered agent files.
-    """
+    """Render a full multi-target harness and return the rendered agent files."""
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
-        update={"preset": preset, "targets": [Target.CLAUDE_CODE, Target.CURSOR]}
+        update={"preset": preset, "targets": [Target.CLAUDE_CODE, Target.CODEX]}
     )
     bp = synthesize(p, a)
     render(bp, tmp_path, dry_run=False, freeze_time=DEFAULT_FREEZE_TIME)

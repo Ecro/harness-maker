@@ -1,17 +1,13 @@
-"""Phase 1 — preset default maps + 3-tier resolve_agent_spec + cursor alias normalization.
+"""Phase 1 — preset default maps + 3-tier resolve_agent_spec.
 
-ADR-003 R5: CURSOR_MODEL_IDS canonical table; renderer normalizes alias at boundary.
 ADR-005: 3-tier resolution chain (explicit override → preset map → default_model fallback).
 """
 
-import re
 from pathlib import Path
 
 from harness_maker.models import AgentModelSpec, CodexAgentSpec, HarnessConfig, Preset
 from harness_maker.presets import (
-    CURSOR_MODEL_IDS,
     PRESET_AGENT_MODELS,
-    _normalize_cursor_alias,
     _spec_from_default_model,
     resolve_agent_spec,
 )
@@ -83,33 +79,15 @@ def test_preset_agent_models_completeness_vs_shipped_templates() -> None:
     _ = dormant
 
 
-def test_cursor_model_ids_canonical_aliases_present() -> None:
-    """ADR-003 R5: alias → concrete-ID mapping table covers the standard aliases."""
-    assert "opus" in CURSOR_MODEL_IDS
-    assert "sonnet" in CURSOR_MODEL_IDS
-    assert "haiku" in CURSOR_MODEL_IDS
-
-
-def test_cursor_model_ids_values_look_like_concrete_ids() -> None:
-    """All concrete IDs match the claude-X-Y-{family} pattern."""
-    for alias, concrete in CURSOR_MODEL_IDS.items():
-        assert re.fullmatch(r"claude-\d+-\d+-\w+", concrete), (
-            f"{alias!r} → {concrete!r} does not look like a concrete ID"
-        )
-
-
 def test_resolve_agent_spec_tier1_explicit_override_beats_preset() -> None:
     """ADR-005 Tier 1: agent_models override wins over preset map."""
     custom = AgentModelSpec(
         claude="haiku",
-        cursor="haiku",
         codex=CodexAgentSpec(reasoning_effort="minimal"),
     )
     config = HarnessConfig(preset=Preset.PRODUCTION, agent_models={"autoloop-coder": custom})
     spec = resolve_agent_spec("autoloop-coder", config)
     assert spec.claude == "haiku"
-    # Cursor field comes in as alias, gets normalized to concrete ID.
-    assert spec.cursor == CURSOR_MODEL_IDS["haiku"]
     assert spec.codex is not None
     assert spec.codex.reasoning_effort == "minimal"
 
@@ -119,7 +97,7 @@ def test_resolve_agent_spec_tier2_preset_production_reasoning_agent() -> None:
     config = HarnessConfig(preset=Preset.PRODUCTION)
     spec = resolve_agent_spec("autoloop-coder", config)
     assert spec.claude == "opus"
-    assert spec.cursor == CURSOR_MODEL_IDS["opus"]
+    assert spec.cursor is None, "the removed Cursor target leaves no preset cursor model"
 
 
 def test_resolve_agent_spec_tier2_preset_side_downshifts() -> None:
@@ -135,25 +113,8 @@ def test_resolve_agent_spec_tier3_user_authored_agent_no_keyerror() -> None:
     config = HarnessConfig(preset=Preset.PRODUCTION, default_model="claude-opus-4-7")
     spec = resolve_agent_spec("my-custom-domain-agent", config)
     assert spec.claude == "opus"
-    assert spec.cursor == CURSOR_MODEL_IDS["opus"]
     assert spec.codex is not None
     assert spec.codex.reasoning_effort == "medium"
-
-
-def test_resolve_agent_spec_normalizes_cursor_alias_in_user_override() -> None:
-    """ADR-003 R5: user writes alias in cursor field → renderer normalizes."""
-    custom = AgentModelSpec(cursor="opus")  # alias form
-    config = HarnessConfig(preset=Preset.SIDE, agent_models={"foo": custom})
-    spec = resolve_agent_spec("foo", config)
-    assert spec.cursor == CURSOR_MODEL_IDS["opus"]
-
-
-def test_resolve_agent_spec_preserves_concrete_cursor_id() -> None:
-    """ADR-003 R5: user writes concrete ID → pass-through (no normalization)."""
-    custom = AgentModelSpec(cursor="claude-4-6-sonnet")  # concrete ID
-    config = HarnessConfig(preset=Preset.SIDE, agent_models={"foo": custom})
-    spec = resolve_agent_spec("foo", config)
-    assert spec.cursor == "claude-4-6-sonnet"
 
 
 def test_spec_from_default_model_handles_known_families() -> None:
@@ -178,18 +139,3 @@ def test_spec_from_default_model_safe_fallback_for_unknown() -> None:
     assert spec.claude == "sonnet"
     assert spec.codex is not None
     assert spec.codex.reasoning_effort == "medium"
-
-
-def test_normalize_cursor_alias_pass_through_when_none() -> None:
-    """Spec with cursor=None passes through unchanged."""
-    spec = AgentModelSpec(claude="opus", cursor=None)
-    out = _normalize_cursor_alias(spec)
-    assert out.cursor is None
-    assert out.claude == "opus"
-
-
-def test_normalize_cursor_alias_pass_through_when_concrete() -> None:
-    """Spec with concrete-ID cursor passes through unchanged."""
-    spec = AgentModelSpec(cursor="claude-4-6-sonnet")
-    out = _normalize_cursor_alias(spec)
-    assert out.cursor == "claude-4-6-sonnet"

@@ -42,6 +42,7 @@ from typing import Any
 import yaml
 
 from harness_maker.block_merge import MarkerStyle, ParseError, has_markers, parse_segments
+from harness_maker.cursor_retire import CURSOR_DIR, kept_warning
 from harness_maker.io_utils import atomic_append
 from harness_maker.locate import compare_version
 from harness_maker.models import Blueprint, ConflictItem, ReconcileDecision
@@ -100,7 +101,11 @@ _SWEEP_ROOT_FILES: tuple[str, ...] = ("AGENTS.md",)
 # `_merge_hooks_json` may have folded a user hook into it, and that MERGED hash is
 # what the render manifest records — so ours-clean would delete user work
 # (PLAN-permission-deny-and-hooks-wiring ADR-005, consensus P0).
-_SWEEP_NEVER_DELETE: frozenset[str] = frozenset({".claude/hooks/hooks.json"})
+#
+# `.cursor/hooks.json` is the same case since the Cursor target was removed (0.63.0): a 0.62
+# merge recorded a hash that can hold user entries. Its deletion path is
+# `cursor_retire.retire_hooks_json` (SPEC-hm-overhaul-p1, Constraints "Cursor sweep").
+_SWEEP_NEVER_DELETE: frozenset[str] = frozenset({".claude/hooks/hooks.json", ".cursor/hooks.json"})
 
 
 def parse_frontmatter(path: Path) -> tuple[dict[str, object] | None, bytes]:
@@ -239,14 +244,9 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
         # merge so user-added entries survive template updates. Schema dispatch
         # happens in render: Claude Code (hooks/hooks.json) and Codex
         # (.codex/hooks.json) use the nested {matcher?, hooks:[{type, command}]}
-        # shape; Cursor (.cursor/hooks.json) uses the flat {matcher?, command}
         # shape. `reason="hooks-in-place-merge"` is the dispatch flag the render
         # path reads to invoke _merge_hooks_json instead of overwriting.
-        if (
-            fe.path == Path("hooks/hooks.json")
-            or fe.path == Path(".cursor/hooks.json")
-            or fe.path == Path(".codex/hooks.json")
-        ):
+        if fe.path == Path("hooks/hooks.json") or fe.path == Path(".codex/hooks.json"):
             conflicts.append(
                 ConflictItem(
                     path=fe.path,
@@ -605,8 +605,8 @@ def _classify_orphan(
 
     if fm is not None:
         # Frontmatter present but not harness-maker provenance. The file may
-        # still be ours: pure-text renders (.cursor/rules/*.mdc,
-        # .cursor/commands/*.md) carry only the external consumer's frontmatter
+        # still be ours: pure-text renders (a 0.62 `.cursor/rules/*.mdc`, left
+        # behind by the removed Cursor target) carry only the external consumer's frontmatter
         # and have OUR provenance stripped (render._render_pure_text), yet the
         # render manifest records their full-file hash. Consult it — same
         # per-path scoping the no-frontmatter branch relies on — before
@@ -659,7 +659,7 @@ def _normalize_expected_path(fe_path: Path) -> str:
 
     ``synthesize.py`` stores ``.claude/``-bound paths WITHOUT the prefix
     (e.g. ``"commands/hm/refresh.md"``), but stores sibling-tree paths WITH
-    their prefix (e.g. ``".cursor/rules/harness.mdc"``, ``"AGENTS.md"``).
+    their prefix (e.g. ``".codex/config.toml"``, ``"AGENTS.md"``).
     ``_iter_disk_files`` always returns project-root-relative keys, so the
     ``.claude/``-bound case must be prefixed before set comparison —
     otherwise every ``.claude/`` blueprint file misses the ``expected`` set
@@ -667,17 +667,12 @@ def _normalize_expected_path(fe_path: Path) -> str:
     files (P0 bug).
 
     The branch list mirrors ``render.resolve_output_path``: any path string
-    starting with one of the renderer's sibling locations (``.cursor/``,
-    ``.codex/``, ``.agents/``) or equal to ``AGENTS.md`` is already
-    project-root-relative and passes through unchanged.
+    starting with one of the renderer's sibling locations (``.codex/``,
+    ``.agents/``) or equal to ``AGENTS.md`` is already project-root-relative
+    and passes through unchanged.
     """
     path_str = str(fe_path).replace("\\", "/")
-    if (
-        path_str.startswith(".cursor/")
-        or path_str.startswith(".codex/")
-        or path_str.startswith(".agents/")
-        or path_str == "AGENTS.md"
-    ):
+    if path_str.startswith((".codex/", ".agents/")) or path_str == "AGENTS.md":
         return path_str
     return ".claude/" + path_str
 
@@ -744,10 +739,15 @@ def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport
             report.deleted.append(rel_path)
             _remove_emptied_skill_dir(project_root / rel_path)
         else:
-            print(
-                f"WARN: orphan-sweep KEPT {rel_key} ({classification}) — manual review needed",
-                file=sys.stdout,
-            )
+            if rel_key.startswith(CURSOR_DIR + "/") and rel_key in manifest:
+                # A file the removed Cursor target rendered and the user then edited
+                # (PLAN-hm-overhaul-p1-c ADR-005). It will never be updated again.
+                print(kept_warning(rel_key), file=sys.stdout)
+            else:
+                print(
+                    f"WARN: orphan-sweep KEPT {rel_key} ({classification}) — manual review needed",
+                    file=sys.stdout,
+                )
             _log_orphan_kept(project_root, rel_path, classification, recorded_hash)
             report.kept.append((rel_path, classification))
     return report

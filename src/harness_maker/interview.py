@@ -41,6 +41,7 @@ from harness_maker.models import (
     DELEGATABLE_STAGES,
     LEGACY_LEVEL_ALIASES,
     OPERATIONAL_LEVELS,
+    REMOVED_CURSOR_TARGET,
     SECOND_OPINION_MODELS,
     AgentModelSpec,
     AutonomyConfig,
@@ -313,11 +314,8 @@ def _ask_world_model(locale: str = _DEFAULT_LOCALE) -> WorldModelConfig:
 def _ask_targets() -> list[Target]:
     """IDE target multi-select. comma-separated; 빈 입력은 default [claude-code].
 
-    PLAN-cursor-target-support.md § Targets 정책: single source 원칙으로
-    ``.claude/agents/``, ``.claude/skills/``, ``.claude/commands/hm/`` 는 양쪽
-    IDE 가 공유; hooks 는 IDE 별 native 파일 (Claude = ``.claude/settings.json``,
-    Cursor = ``.cursor/hooks.json``). cursor target 추가 시
-    ``.cursor/rules/harness.mdc``, ``.cursor/hooks.json``, ``.cursor/mcp.json`` 렌더.
+    ``codex`` adds ``.codex/``, ``.agents/`` and ``AGENTS.md``; hooks are IDE-native
+    files (Claude = ``.claude/settings.json``, Codex = ``.codex/hooks.json``).
     """
     options = ", ".join(t.value for t in Target)
     default = Target.CLAUDE_CODE.value
@@ -1289,7 +1287,7 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     # MCP servers — user adds these manually to harness.yaml; preserve on re-render.
     # REVIEW M5/M8 (2026-05-08): validate inner dict shape (command:str, args:list[str],
     # env:dict[str,str]) and warn when entries are dropped, since the rendered
-    # `.cursor/mcp.json` is executed by Cursor — silent drop on malformed yaml could
+    # `.codex/config.toml` is executed by Codex — silent drop on malformed yaml could
     # mask a typo that leaves the user with no MCP servers wired up.
     mcp_servers = data.get("mcp_servers")
     if isinstance(mcp_servers, dict):
@@ -1327,7 +1325,7 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
                 "harness.yaml mcp_servers: dropped %d malformed entries (%s). "
                 "Each entry must have command:str, args:list[str] (optional), "
                 "env:dict[str,str] (optional). Fix the yaml or those servers will "
-                "not appear in .cursor/mcp.json.",
+                "not appear in .codex/config.toml.",
                 len(dropped),
                 ", ".join(dropped[:5]),
             )
@@ -1430,7 +1428,7 @@ def _parse_targets(raw: object) -> list[Target]:
     if raw is None:
         logger.warning(
             "harness.yaml has no `targets` key — falling back to [claude-code]. "
-            "Re-run interview to opt into Cursor support.",
+            "Re-run interview to opt into Codex support.",
         )
         return [Target.CLAUDE_CODE]
     if not isinstance(raw, list):
@@ -1446,6 +1444,9 @@ def _parse_targets(raw: object) -> list[Target]:
             out.append(Target(item))
         except ValueError:
             continue
+    if not out and REMOVED_CURSOR_TARGET in raw:
+        # A cursor-only 0.62 harness: `make` warns once (cli._warn_removed_cursor_inputs).
+        return [Target.CLAUDE_CODE]
     if not out:
         logger.warning(
             "harness.yaml `targets` had no valid entries — falling back to [claude-code].",

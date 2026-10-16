@@ -27,12 +27,11 @@ def _fake_which(present: set[str]) -> object:
 def test_every_tool_reports_installed_when_its_binary_is_on_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(shutil, "which", _fake_which({"codex", "agy", "cursor", "claude"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"codex", "agy", "claude"}))
     result = tool_detect.detect_tools()
     assert result == {
         "codex": {"installed": True},
         "antigravity": {"installed": True},
-        "cursor": {"installed": True},
         "claude": {"installed": True},
     }
 
@@ -45,7 +44,6 @@ def test_every_tool_reports_absent_when_nothing_is_on_path(
     assert result == {
         "codex": {"installed": False},
         "antigravity": {"installed": False},
-        "cursor": {"installed": False},
         "claude": {"installed": False},
     }
 
@@ -62,7 +60,6 @@ def test_the_antigravity_key_is_driven_by_the_agy_binary(
     result = tool_detect.detect_tools()
     assert result["antigravity"] == {"installed": True}
     assert result["codex"] == {"installed": False}
-    assert result["cursor"] == {"installed": False}
 
     # And the reverse: a binary literally named `antigravity` is NOT what we look for.
     monkeypatch.setattr(shutil, "which", _fake_which({"antigravity"}))

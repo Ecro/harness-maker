@@ -149,9 +149,8 @@ def make(
         None,
         "--targets",
         help="Override IDE targets (comma-separated): 'claude-code', "
-        "'cursor', or 'claude-code,cursor'. Re-renders cursor assets when "
-        "'cursor' is added; leaves them in place (and unreferenced) when "
-        "removed — delete .cursor/ manually if undesired.",
+        "'codex', or 'claude-code,codex'. 'cursor' was removed in 0.63.0: it is "
+        "dropped with a warning.",
     ),
     grade_threshold_override: str | None = typer.Option(
         None,
@@ -293,8 +292,8 @@ def make(
     #   project the user is operating on (F7).
     # - Exit 3 (not 2) when no install found to match locate's contract (F2).
     # - Multi-IDE recovery message — installed_plugins.json only holds Claude
-    #   Code entries, but Cursor / Codex users may share that JSON or run
-    #   their own update flows; list all three commands so the user picks (F17).
+    #   Code entries, but Codex users may share that JSON or run their own
+    #   update flows; list both commands so the user picks (F17).
     # - Actionable "what to do" pointer for the no-install case (F18).
     if require_version is not None:
         entry = resolve_plugin(cwd=target.resolve())
@@ -316,8 +315,7 @@ def make(
                 f"harness-maker installed={entry.version} "
                 f"(marketplace={entry.marketplace}) "
                 f"required=>={require_version} — to update: "
-                "`claude plugin update harness-maker` (Claude Code), "
-                "`git -C <installPath> pull` (Cursor git clone), or "
+                "`claude plugin update harness-maker` (Claude Code), or "
                 "`codex plugin update harness-maker` (Codex CLI)",
                 err=True,
             )
@@ -444,6 +442,7 @@ def make(
         world_model_handle_override=world_model_handle_override,
     )
     _warn_world_model_handle_taken(target, a)
+    _warn_removed_cursor_inputs(pre_yaml_body, targets_override, a)
     # Seed `toolchains` from manifest detection, fill-if-empty (ADR-007). Placed AFTER the
     # override pass so a `--preset` rebuild cannot discard what we just seeded, and so a
     # user-authored value round-tripped from harness.yaml wins — `seed_toolchains` returns the
@@ -626,6 +625,7 @@ def make(
     # path for it. A copy holding user-merged hooks is preserved + warned. The
     # orphan sweep above is guarded (_SWEEP_NEVER_DELETE) and never deletes it.
     _retire_stale_hooks_json(target, full_bp)
+    _retire_cursor_leftovers(target, sweep_report)
     _emit_reconcile_report(keep_count, merge_reports)
     # Exempt reconcile-KEPT files from the content_hash check: we deliberately
     # left their on-disk body in place, so the declared hash (describing the
@@ -748,8 +748,7 @@ def locate_cmd(
                 f"harness-maker installed={entry.version} "
                 f"(marketplace={entry.marketplace}) "
                 f"required=>={require_version} — to update: "
-                "`claude plugin update harness-maker` (Claude Code), "
-                "`git -C <installPath> pull` (Cursor git clone), or "
+                "`claude plugin update harness-maker` (Claude Code), or "
                 "`codex plugin update harness-maker` (Codex CLI)",
                 err=True,
             )
@@ -1440,7 +1439,7 @@ def _apply_dimension_overrides(
     (grade_threshold, domains, etc.) are re-applied AFTER the rebuild.
     """
     from harness_maker.interview import _build_answers, _focus_to_additional_reviewers
-    from harness_maker.models import Preset, Target
+    from harness_maker.models import REMOVED_CURSOR_TARGET, Preset, Target
 
     update: dict[str, object] = {}
     # PLAN-worktree-side-defaults ADR-002/007. Only the explicit flag is seeded here;
@@ -1470,6 +1469,9 @@ def _apply_dimension_overrides(
         if not raw:
             typer.echo("--targets must specify at least one target", err=True)
             raise typer.Exit(code=1)
+        # The removed Cursor target is dropped, not refused: a script written for 0.62 must
+        # still render. `_warn_removed_cursor_inputs` prints the one warning.
+        raw = [t for t in raw if t != REMOVED_CURSOR_TARGET] or [Target.CLAUDE_CODE.value]
         try:
             parsed = [Target(t) for t in raw]
         except ValueError as e:
@@ -1874,6 +1876,43 @@ def _retire_stale_hooks_json(project_root: Path, blueprint: Blueprint) -> None:
             ".claude/settings.json, then delete the file.",
             err=True,
         )
+
+
+def _warn_removed_cursor_inputs(
+    disk_yaml: dict[str, Any], targets_flag: str | None, answers: InterviewAnswers
+) -> None:
+    """One warning per `make` run for each removed-Cursor input (SPEC-hm-overhaul-p1 AC-002).
+
+    Here and nowhere else: every parser already dropped the value silently, so stage-time
+    readers never warn (IRR-006).
+    """
+    from harness_maker import cursor_retire
+
+    if cursor_retire.target_requested(disk_yaml, targets_flag):
+        typer.echo(cursor_retire.removed_warning([t.value for t in answers.targets]), err=True)
+    for line in cursor_retire.agent_model_warnings(disk_yaml):
+        typer.echo(line, err=True)
+
+
+def _retire_cursor_leftovers(project_root: Path, sweep_report: OrphanSweepReport) -> None:
+    """Retire `.cursor/hooks.json` when pristine, then drop an emptied `.cursor/`.
+
+    Runs after the orphan sweep, which already deleted the pristine `.mdc` and `mcp.json`
+    and printed the KEPT line for edited ones; it never touches `hooks.json`.
+    """
+    from harness_maker import cursor_retire
+    from harness_maker.reconcile import _load_render_manifest
+
+    recorded = _load_render_manifest(project_root / ".claude").get(
+        cursor_retire.CURSOR_HOOKS_JSON, set()
+    )
+    line = cursor_retire.retire_hooks_json(project_root, recorded)
+    if line is not None:
+        typer.echo(line, err=line.startswith("WARN"))
+    if any(p.parts[:1] == (cursor_retire.CURSOR_DIR,) for p in sweep_report.deleted) or (
+        line is not None and "RETIRED" in line
+    ):
+        cursor_retire.remove_empty_dirs(project_root)
 
 
 def _world_model_from_flags(

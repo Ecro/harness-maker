@@ -31,7 +31,7 @@ def _rendered(preset: Preset, locale: str = "en", loop: bool = True) -> dict[str
         InterviewAnswers(
             preset=preset,
             locale=locale,
-            targets=[Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX],
+            targets=[Target.CLAUDE_CODE, Target.CODEX],
             loop=LoopConfig(enabled=loop),
         ),
     )
@@ -138,7 +138,6 @@ def test_preserves_executable_and_non_codex_content() -> None:
     assert stage_invocation(text, False) == text
     files = _rendered(Preset.SIDE)
     assert "Y → run `/hm:spec {slug}`" in files[".claude/commands/hm/research.md"]
-    assert "/hm:" in files[".cursor/rules/harness.mdc"]
 
 
 @pytest.mark.parametrize("loop", [True, False], ids=["loop-on", "loop-off"])

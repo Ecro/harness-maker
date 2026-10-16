@@ -3,7 +3,7 @@
 The install ref is home-prefixed and machine-specific; baked verbatim into committed
 hook / command bodies it flip-flops across a team repo. These tests lock the two guards:
 the render-time leak-check assert (ADR-005) and the actual rendered form across all three
-IDE hook surfaces (settings.json / .cursor/hooks.json / .codex/hooks.json — ADR-002/003).
+IDE hook surfaces (settings.json / .codex/hooks.json — ADR-002/003).
 """
 
 from __future__ import annotations
@@ -56,8 +56,8 @@ def _hook_files(root: Path) -> list[Path]:
     found: list[Path] = []
     for name in ("settings.json", "hooks.json"):
         found.extend(p for p in root.rglob(name) if p.is_file())
-    # `.cursor/` and `.codex/` render as project-root siblings of `.claude/`.
-    for sib in (".cursor", ".codex"):
+    # `.codex/` renders as a project-root sibling of `.claude/`.
+    for sib in (".codex",):
         hooks = root.parent / sib / "hooks.json"
         if hooks.is_file():
             found.append(hooks)
@@ -65,7 +65,7 @@ def _hook_files(root: Path) -> list[Path]:
 
 
 def test_all_hook_surfaces_render_portable_home(tmp_path: Path) -> None:
-    """settings.json + .cursor/hooks.json + .codex/hooks.json all embed --with "$HOME/.
+    """settings.json + .codex/hooks.json both embed --with "$HOME/.
 
     conftest pins _compute_install_ref to the portable `$HOME/harness-maker` form, so the
     rendered `--with` argument must be the double-quoted, shell-expanding `"$HOME/..."` —
@@ -74,7 +74,7 @@ def test_all_hook_surfaces_render_portable_home(tmp_path: Path) -> None:
     target_dir = tmp_path / ".claude"
     answers = InterviewAnswers(
         preset=Preset.PRODUCTION,
-        targets=[Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX],
+        targets=[Target.CLAUDE_CODE, Target.CODEX],
     )
     render(
         synthesize(ProjectProfile(stack=["python"]), answers),
@@ -84,9 +84,8 @@ def test_all_hook_surfaces_render_portable_home(tmp_path: Path) -> None:
 
     hook_files = _hook_files(target_dir)
     surfaces = {p.parent.name for p in hook_files}
-    # At least the Claude settings.json + the cursor + codex hooks must be present.
+    # At least the Claude settings.json + the codex hooks must be present.
     assert any(p.name == "settings.json" for p in hook_files), "no settings.json rendered"
-    assert ".cursor" in surfaces, "no .cursor/hooks.json rendered"
     assert ".codex" in surfaces, "no .codex/hooks.json rendered"
 
     home = str(Path.home())
@@ -101,12 +100,12 @@ def test_all_hook_surfaces_render_portable_home(tmp_path: Path) -> None:
         assert "--with '" not in text, f"{hf} still single-quotes --with (blocks $HOME expansion)"
 
 
-def test_leaked_ref_raises_on_fresh_cursor_codex_render(
+def test_leaked_ref_raises_on_fresh_codex_render(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A home-prefixed leak must RAISE even for cursor/codex on a FRESH render.
+    """A home-prefixed leak must RAISE even for codex on a FRESH render.
 
-    Fresh render (no existing hooks.json) routes .cursor/.codex hooks through
+    Fresh render (no existing hooks.json) routes .codex hooks through
     `_render_pure_json`, not `_render_hooks_json_merged`. Regression lock for the
     guard-coverage gap (REVIEW P2): the assert must fire on that path too, so this
     only passes because `_render_pure_json` calls `_assert_portable_install_ref`.
@@ -117,7 +116,7 @@ def test_leaked_ref_raises_on_fresh_cursor_codex_render(
     monkeypatch.setattr(_synth, "_compute_install_ref", lambda: leaked)
     answers = InterviewAnswers(
         preset=Preset.PRODUCTION,
-        targets=[Target.CURSOR, Target.CODEX],
+        targets=[Target.CODEX],
     )
     with pytest.raises(ValueError, match="non-portable install ref"):
         render(

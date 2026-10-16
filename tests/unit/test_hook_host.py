@@ -77,7 +77,19 @@ def test_malformed_text_is_not_a_cursor_copy() -> None:
 
 
 def test_every_cursor_command_carries_the_marker() -> None:
-    text = (TEMPLATES / "cursor" / "hooks.json.j2").read_text(encoding="utf-8")
+    """The last shipped Cursor hooks template (db19f023, 0.62) marked every command.
+
+    The template left with the Cursor target (0.63.0), but a kept `.cursor/hooks.json`
+    still runs, so the stand-down below is only sound if every command it can hold is marked.
+    """
+    text = subprocess.run(
+        ["git", "show", "db19f023:src/harness_maker/templates/cursor/hooks.json.j2"],
+        cwd=SRC.parent,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    ).stdout
     commands = re.findall(r'"command": "([^"\\]*(?:\\.[^"\\]*)*)"', text)
     assert commands
     assert all(c.startswith(CURSOR_HOST_MARKER + " ") for c in commands)

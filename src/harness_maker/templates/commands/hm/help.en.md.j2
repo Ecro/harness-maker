@@ -61,9 +61,6 @@
 | project-knowledge | skill, typed only{% if is_codex %} (`$project-knowledge`){% endif %} — record or correct a project fact in the shared wiki, not auto-memory; otherwise ask {{ (config.world_model or {}).get('name', 'Maker') }} ({% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}) |
 | {{ (config.world_model or {}).get('name', 'Maker') }} | world model front door — {% if is_codex %}`${{ (config.world_model or {}).get('handle', 'maker') }}`{% else %}`/{{ (config.world_model or {}).get('handle', 'maker') }}`{% endif %}: briefing, start or resume work, facts, goals |
 
-{% if not is_codex and "cursor" in config.targets -%}
-> **Cursor:** `/hm:*` commands work identically. Subagents and skills are read from `.claude/`.
-{% endif -%}
 {% if "codex" in config.targets -%}
 > **Codex CLI:** invoke as `$hm-*` (e.g. `$hm-help`, `$hm-execute`). Skills live under `.agents/skills/`.
 {% endif -%}

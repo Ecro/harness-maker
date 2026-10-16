@@ -8,11 +8,11 @@ Each `test_boundary_<filetype>.py` module imports:
   ``yaml.YAMLError``) are wrapped so callers handle one type.
 
 * Parser helpers per file type (``parse_claude_hooks_json``,
-  ``parse_cursor_hooks_json``, …). Each enforces the consumer's schema:
+  ``parse_settings_json``, …). Each enforces the consumer's schema:
   not just "is it valid JSON?" but "does it have the keys and shape the
   REAL consumer expects?". This is the boundary the PLAN targets — the
   gap between Python's lenient JSON loader and the strict shape the
-  consumer (Claude Code / Cursor / Codex / jq) actually requires.
+  consumer (Claude Code / Codex / jq) actually requires.
 
 The session-scoped ``rendered_harness_all_targets`` fixture lives in
 ``conftest.py`` (pytest only discovers fixtures from conftest or
@@ -86,23 +86,6 @@ _CLAUDE_EVENTS: frozenset[str] = frozenset(
     }
 )
 
-# Cursor's documented lowercase camelCase event keys. Mirrors the Claude
-# set in terminology but lowercase per Cursor's documented schema; see
-# kairos 0.5.7 forensic (CLAUDE.md §"Hook schema diverges by design").
-_CURSOR_EVENTS: frozenset[str] = frozenset(
-    {
-        "preToolUse",
-        "postToolUse",
-        "stop",
-        "preCompact",
-        "sessionStart",
-        "sessionEnd",
-        "notification",
-        "subagentStop",
-        "userPromptSubmit",
-    }
-)
-
 # Codex's documented PascalCase event keys (ADR-004/006 in
 # PLAN-codex-target-support). Shares Claude's PascalCase + nested-hooks
 # shape but: adds ``PermissionRequest`` (Codex-exclusive), and Codex does
@@ -144,7 +127,7 @@ def parse_claude_hooks_json(text: str) -> dict[str, Any]:
     3. Every event key is in ``_CLAUDE_EVENTS`` (PascalCase allow-list).
     4. Every entry is an object with a nested ``hooks: [...]`` list
        (Claude's documented shape). The presence of a top-level ``command``
-       field on the entry — Cursor's flat shape — is a hard reject.
+       field on the entry — the flat shape — is a hard reject.
     5. Every inner-hooks entry has ``type`` and ``command`` keys.
     """
     parsed = _load_json(text)
@@ -169,7 +152,7 @@ def parse_claude_hooks_json(text: str) -> dict[str, Any]:
             if "command" in entry and "hooks" not in entry:
                 raise BoundaryParseError(
                     f"event {event_name!r} entry uses flat command shape "
-                    f"(Cursor schema). Claude requires nested 'hooks: [...]'."
+                    f"(flat schema). Claude requires nested 'hooks: [...]'."
                 )
             if "hooks" not in entry:
                 raise BoundaryParseError(f"event {event_name!r} entry missing nested 'hooks' list")
@@ -181,49 +164,6 @@ def parse_claude_hooks_json(text: str) -> dict[str, Any]:
                     raise BoundaryParseError("inner hook entry must be an object")
                 if "type" not in h or "command" not in h:
                     raise BoundaryParseError("inner hook entry requires 'type' and 'command' keys")
-    return parsed
-
-
-def parse_cursor_hooks_json(text: str) -> dict[str, Any]:
-    """Validate Cursor's hooks.json schema and return the parsed mapping.
-
-    Required invariants:
-    1. Parseable JSON object at top level.
-    2. ``version: 1`` declared at top level.
-    3. Top-level key ``hooks`` mapping event name → list of entries.
-    4. Every event key is in ``_CURSOR_EVENTS`` (lowercase camelCase allow-list).
-    5. Every entry is an object with a flat ``command`` field. Presence of
-       a nested ``hooks: [...]`` list — Claude's shape — is a hard reject.
-    """
-    parsed = _load_json(text)
-    if not isinstance(parsed, dict):
-        raise BoundaryParseError("top level must be a JSON object")
-
-    if parsed.get("version") != 1:
-        raise BoundaryParseError("Cursor hooks file must declare 'version: 1' at top level")
-
-    hooks = parsed.get("hooks")
-    if not isinstance(hooks, dict):
-        raise BoundaryParseError("top-level 'hooks' must be an object")
-
-    for event_name, entries in hooks.items():
-        if event_name not in _CURSOR_EVENTS:
-            raise BoundaryParseError(
-                f"event {event_name!r} is not a Cursor camelCase event "
-                f"(allow-list: {sorted(_CURSOR_EVENTS)})"
-            )
-        if not isinstance(entries, list):
-            raise BoundaryParseError(f"event {event_name!r} value must be a list")
-        for entry in entries:
-            if not isinstance(entry, dict):
-                raise BoundaryParseError(f"event {event_name!r} entry must be an object")
-            if "hooks" in entry:
-                raise BoundaryParseError(
-                    f"event {event_name!r} entry uses nested 'hooks' list "
-                    f"(Claude schema). Cursor requires a flat 'command' field."
-                )
-            if "command" not in entry:
-                raise BoundaryParseError(f"event {event_name!r} entry missing flat 'command' field")
     return parsed
 
 
@@ -339,117 +279,6 @@ def parse_harness_yaml_at(path: Path) -> dict[str, Any]:
             )
 
     return body
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# Cursor .mdc frontmatter
-#
-# ALLOW-LIST (frontmatter keys Cursor's parser is documented to accept):
-#   - description  (string)
-#   - globs        (string | list[string])
-#   - alwaysApply  (bool)
-#
-# Source: Cursor docs — "Rules" section
-#   (https://cursor.com/docs/context/rules)
-# Retrieved: 2026-05-19
-# Upgrade path: Cursor parser source remains unavailable; the eventual catch
-# for parser drift beyond this allow-list is Layer 3 transcript canary
-# (deferred to a follow-up PLAN per PLAN-test-fidelity-gap ADR-001).
-# Re-reconcile this allow-list when bumping the minimum supported Cursor
-# version (CLAUDE.md §Targets 정책 — currently min Cursor 2.4).
-# ──────────────────────────────────────────────────────────────────────────
-
-_CURSOR_MDC_FRONTMATTER_KEYS: frozenset[str] = frozenset(
-    {
-        "description",
-        "globs",
-        "alwaysApply",
-    }
-)
-
-
-def parse_cursor_mdc(text: str) -> dict[str, Any]:
-    """Validate a Cursor .mdc file's frontmatter shape and return the parsed mapping.
-
-    Required invariants:
-    1. File starts with ``---\\n`` (frontmatter open).
-    2. Exactly two ``---`` blocks at the top (open + close); a third
-       ``---`` block before the close is the hallmark of
-       ``[fail:render] yaml-colon-in-unquoted-frontmatter-description``
-       (2026-05-10): unquoted colon in description → renderer prepends
-       provenance → file ends up with TWO frontmatter blocks, Cursor reads
-       only the first (provenance-only), reports "missing description".
-    3. Frontmatter parses as a YAML mapping.
-    4. Every frontmatter key is in ``_CURSOR_MDC_FRONTMATTER_KEYS``.
-    5. ``description`` value type is str.
-    6. ``alwaysApply`` value (when present) is bool.
-    """
-    import yaml
-
-    if not text.startswith("---\n"):
-        raise BoundaryParseError(".mdc file must begin with frontmatter marker '---\\n'")
-
-    # Walk past the opening "---\n" and locate the closing "---" on its own
-    # line. Operate on lines so the body cleanly begins at the line after
-    # the closer — avoids dash-stripping ambiguity.
-    lines = text.split("\n")
-    if lines[0] != "---":
-        raise BoundaryParseError(".mdc opening marker malformed")
-    close_lineno: int | None = None
-    for idx in range(1, len(lines)):
-        if lines[idx] == "---":
-            close_lineno = idx
-            break
-    if close_lineno is None:
-        raise BoundaryParseError(".mdc frontmatter has no closing '---' line")
-    frontmatter_text = "\n".join(lines[1:close_lineno])
-    body_lines_after = lines[close_lineno + 1 :]
-
-    # Regression detection: if the first non-empty line after the closing
-    # marker is another '---', the renderer produced TWO frontmatter blocks
-    # (provenance + template) — the yaml-colon-in-unquoted-description
-    # failure mode.
-    for body_line in body_lines_after:
-        stripped = body_line.strip()
-        if not stripped:
-            continue
-        if stripped == "---":
-            raise BoundaryParseError(
-                ".mdc has TWO frontmatter blocks — likely "
-                "[fail:render] yaml-colon-in-unquoted-frontmatter-description "
-                "(unquoted ':' in description trips YAML parser, renderer "
-                "prepends a second --- block)."
-            )
-        break
-
-    try:
-        frontmatter = yaml.safe_load(frontmatter_text)
-    except yaml.YAMLError as exc:
-        raise BoundaryParseError(f".mdc frontmatter is not valid YAML: {exc}") from exc
-
-    if not isinstance(frontmatter, dict):
-        raise BoundaryParseError(
-            f".mdc frontmatter must be a YAML mapping, got {type(frontmatter).__name__}"
-        )
-
-    unknown_keys = set(frontmatter) - _CURSOR_MDC_FRONTMATTER_KEYS
-    if unknown_keys:
-        raise BoundaryParseError(
-            f".mdc frontmatter has unknown keys {sorted(unknown_keys)} "
-            f"(allow-list: {sorted(_CURSOR_MDC_FRONTMATTER_KEYS)}). "
-            f"Cursor may reject these; route metadata to a sidecar file."
-        )
-
-    if "description" in frontmatter and not isinstance(frontmatter["description"], str):
-        raise BoundaryParseError(
-            f"'description' must be str, got {type(frontmatter['description']).__name__}"
-        )
-    if "alwaysApply" in frontmatter and not isinstance(frontmatter["alwaysApply"], bool):
-        raise BoundaryParseError(
-            f"'alwaysApply' must be bool, got {type(frontmatter['alwaysApply']).__name__}"
-        )
-
-    return frontmatter
 
 
 def parse_settings_json(text: str) -> dict[str, Any]:
@@ -577,11 +406,11 @@ def parse_codex_config_toml(text: str) -> dict[str, Any]:
 
 
 def invoke_make_all_targets(project_dir: Path) -> None:
-    """Run ``harness-maker make`` with all three IDE targets via Typer's CliRunner.
+    """Run ``harness-maker make`` with every IDE target via Typer's CliRunner.
 
     Pattern mirrors ``test_fresh_install_readiness._invoke_make`` but
     overrides ``--targets`` to the full set so boundary tests can inspect
-    .claude/, .cursor/, and .codex/ artifacts from a single rendered tree.
+    .claude/ and .codex/ artifacts from a single rendered tree.
     """
     from typer.testing import CliRunner
 
@@ -602,7 +431,7 @@ def invoke_make_all_targets(project_dir: Path) -> None:
                 "--locale",
                 "en",
                 "--targets",
-                "claude-code,cursor,codex",
+                "claude-code,codex",
             ],
             catch_exceptions=False,
         )
