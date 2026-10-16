@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: hm-overhaul-p1
-status: approved
+status: draft
 created: 2026-10-15
 tags: [harness-maker, spec, python, overhaul, stages, hooks, cli, cursor, brownfield]
 test_framework: pytest
@@ -46,7 +46,7 @@ unnecessary, and areas the model or the host already handles well. The repo's ow
   judgment under Step 2's existing stop rule. No fixed one-round mode exists.
 - One reviewer runs by default.
 - These stay opt-in: the cross-model second opinion, mutation testing (`hm check --mutation`), Second
-  Brain promotion and delegation.
+  Brain promotion, delegation, and the lens reviewer fan-out (`reviewers.fanout`).
 - CVE scanning runs in `hm check`.
 - The Cursor target is gone. An existing Cursor install upgrades without errors and without losing
   user edits.
@@ -209,6 +209,7 @@ evidence. Each reader has its disposition in the AC-011 table. A security reader
 | D-6 | `/hm:metrics` stays as a slim command (default pending the DRI's card) | on | the `metrics.md` row |
 | D-7 | `/hm:research` stays as a slim optional command, outside the default chain: the registry grades Phases 1–3 INV (default pending the DRI's card; see Open Questions 1) | on | the `research.md` row; spec.md treats research output as optional input |
 | D-8 | No lanes. Interview length is the LLM's judgment under Step 2's existing stop rule (default pending the DRI's card) | on | the spec.md lane substring rows; the exempt-stamp rule in spec Step 5 |
+| D-9 | The lens reviewer fan-out is opt-in through `reviewers.fanout` (DRI card, 2026-10-16) | off | the † lens agent rows; the Not-rendered lens bullet; the fan-out dispatch in execute.md renders only when `reviewers.fanout`; the AC-007 `reviewers.fanout` rows |
 
 **Rendered for `[claude-code]`**, rows marked † only when the condition holds:
 
@@ -224,19 +225,26 @@ evidence. Each reader has its disposition in the AC-011 table. A security reader
 | `.claude/agents/spec-validator.md` (D-3), `judgment-reviewer.md` | ≤ db19f023 size |
 | † `.claude/agents/{code-verifier,consensus-arbiter}.md` | `second_opinion.models` non-empty |
 | † `.claude/agents/stage-delegate.md` | `delegation.stages` non-empty |
+| † `.claude/agents/<lens>.md` for each lens reviewer named in `reviewers.installed` (D-9) | `reviewers.fanout` is true; each file ≤ db19f023 size |
 | `.claude/skills/{maker,intent-layer,project-knowledge,agent-quality-rubric,ai-readiness-rubric,context-linter,worktree-isolator}/` | unchanged content |
 | † `.claude/skills/second-opinion-gate/` | `second_opinion.models` non-empty |
 | `.claude/{settings.json,harness.yaml,intent.yaml}`, `.claude/memory/*`, `.claude/rubrics/*`, `.claude/observability/dashboard.md`, `CLAUDE.md` | present; CLAUDE.md names no removed command |
 
-Opt-in blocks (second opinion, delegation, Second Brain) add ≤ 1,500 chars each to their stage and are
-outside the base budget.
+Opt-in blocks (second opinion, delegation, Second Brain, lens fan-out) add ≤ 1,500 chars each to their
+stage and are outside the base budget.
+
+**The lens reviewers** are the five reviewer agents other than `code-reviewer` that db19f023's review
+dispatched: `security-reviewer`, `concurrency-reviewer` and `test-reviewer` (the domain lenses of
+`conditional_router.LENS_DISPATCH`), and `performance-reviewer` and `ux-reviewer` (the optional
+reviewers). `test-reviewer` renders only as a lens: its Phase A.5 role stays merged into the one
+reviewer.
 
 **Not rendered, on any target:**
 - `.claude/commands/hm/{review,verify,configure,loop,loop-p5-batch}.md`;
 - `.claude/stages/`;
 - `.claude/hm/`;
-- the agents `test-reviewer`, `stuck`, `security-auditor`, `executor`, `autoloop-coder` and the five
-  lens reviewers;
+- the agents `stuck`, `security-auditor`, `executor` and `autoloop-coder`;
+- the five lens reviewers, unless `reviewers.fanout` is true (D-9);
 - the skills `security-scanner`, `verify-before-completion`, `targeted-test-selection`,
   `conditional-router`, `autoloop-driver` and `refdocs-search`;
 - `.cursor/`.
@@ -245,7 +253,8 @@ outside the base budget.
 - `.agents/skills/hm-{research,spec,execute,wrapup,help}/SKILL.md`, which inline the same text under
   the same budgets +3% (the `Bash("…")` wrappers);
 - `.agents/skills/` for each kept skill;
-- `.codex/agents/<name>.toml` and its `[agents.<name>]` entry in `config.toml`, for each rendered agent;
+- `.codex/agents/<name>.toml` and its `[agents.<name>]` entry in `config.toml`, for each rendered agent,
+  the † lens agents included when they render;
 - `.codex/hooks.json`;
 - `AGENTS.md`.
 
@@ -284,6 +293,10 @@ Absent: `.agents/skills/hm-{review,verify,loop}`.
   - `hm check --red`, then `hm check`;
   - `spec_machine mark-tested`;
   - the `code-reviewer` dispatch (D-1), with its fix loop capped by `reviewers.max_review_rounds`;
+  - only when `reviewers.fanout` (D-9): the lens agents named in `reviewers.installed` dispatched in
+    parallel alongside `code-reviewer`, their findings merged and de-duplicated into the same fix loop
+    under the same cap. The merge is a union, not a K=2 vote; K=2 stays with `second_opinion.models`.
+    With `reviewers.fanout` false, no lens agent name appears in execute.md;
   - `--no-tdd` appears only in its retirement notice;
   - `second_brain search` only when `second_brain.enabled` (D-4);
   - no `spec_mutation` (D-5).
@@ -428,9 +441,11 @@ gives one warning per `make` run, and the warning names the key. Nothing warns a
 | `loop.enabled: true` | one warning: `/hm:loop` is retired, use the host's `/loop`; the value is kept and inert |
 | `delegation.stages` naming `review` or `verify` | one warning naming the dropped stages; the other stages still delegate |
 | `reviewers.max_review_rounds: 2` | **no** warning: it still caps execute's review fix loop (the execute.md substring row) |
-| `reviewers.installed` or `reviewers.enabled` naming a retired lens reviewer | one warning; no agent file is rendered for it |
+| `reviewers.installed` or `reviewers.enabled` naming a lens reviewer, with `reviewers.fanout` false or absent | one warning, which names `reviewers.fanout` as the switch; no agent file is rendered for it |
+| `reviewers.fanout: true`, with lens reviewers in `reviewers.installed` | **no** warning: those lens agents render and execute dispatches them (D-9). `reviewers.enabled` does not narrow the set, as at db19f023 |
+| `reviewers.fanout: true`, with no lens reviewer in `reviewers.installed` | one warning: the fan-out is on but has no lens to dispatch, so only `code-reviewer` runs |
 | `skills.enabled` naming `conditional-router` or another retired skill | one warning; nothing rendered |
-| `agent_models.<retired agent>` (`test-reviewer`, `stuck`, `security-auditor`, `executor`, `autoloop-coder`, a lens) | one warning; key kept, inert |
+| `agent_models.<retired agent>` (`stuck`, `security-auditor`, `executor`, `autoloop-coder`), or `agent_models.<lens>` while `reviewers.fanout` is false | one warning; key kept, inert. With `reviewers.fanout: true`, `agent_models.<lens>` applies to that rendered lens agent and gives no warning |
 | `autonomy.autopilot_persistent: true` | one warning: autopilot is retired (Constraints, *Config*) |
 | `targets` holding `cursor` | the one exception that is rewritten: AC-002 |
 | none of the above | no warning |
@@ -494,6 +509,7 @@ The readers were found with a grep of db19f023 for `_metrics_io` and `metrics-`.
 | Kept hooks | `loop_gate`, `worktree span-end` and `sessionid_envfile` stay rendered | the multi-session doc must not change; `HM_SESSION_ID` and the stage spans feed task-preflight and the digest |
 | Cursor sweep | add `.cursor/hooks.json` to `reconcile._SWEEP_NEVER_DELETE`, with a pristine-exact retire path like `cli._retire_stale_hooks_json`; `.cursor` stays in `_SWEEP_ROOTS` and in the backup | the manifest hash of a merged hooks file can include user entries |
 | `hook_host` | keep `is_claude_copy_in_cursor` and `tests/unit/test_hook_host.py`. The back-off lasts exactly as long as a `.cursor/hooks.json` carrying `HM_HOOK_HOST=cursor` exists, with no version cut-off (see AC-002, *hook_host lifetime*) | a kept `.cursor/hooks.json` still runs in Cursor, and Cursor imports `.claude/settings.json` too; without the back-off, `permission_gate` and `flush_session` fire twice. Once the file is gone, the Claude copy runs alone, so Cursor users keep `permission_gate` |
+| Fan-out key | `reviewers.fanout: bool`, default `false` on both presets. `HarnessConfig.reviewers` is a free dict, so the key parses as is; `InterviewAnswers` (`extra="forbid"`) gains the field, `answers_from_harness_yaml` round-trips it, and `Side.yaml.j2`/`Production.yaml.j2` render it beside `max_review_rounds`. An absent key reads as `false`. A fresh render's `reviewers.installed` names no lens reviewer, so a fresh tree gives no lens warning; opting in means setting `fanout: true` and naming the lenses wanted in `installed` | pre-change-checklist item 6 (bidirectional mapper); a re-render must not drop a user's `true` |
 | Review cap | execute's review fix loop and the `hm check` exit-1 loop read `reviewers.max_review_rounds` (default 3), as review did at db19f023. The `lane: light` hardcode of 2 goes with lanes | the knob stays live, so no inert-key warning is needed (AC-007 table) |
 | Frozen template | `templates/hooks/hooks.json.j2` is unchanged | `_retire_stale_hooks_json` compares against it |
 | User blocks | the new stage templates keep the block ids `@hm:user:extra-quality-checks` and `@hm:user:extensions` | MERGE_BLOCK carries user content across |
@@ -512,7 +528,7 @@ The readers were found with a grep of db19f023 for `_metrics_io` and `metrics-`.
 | IRR-003 | New `hm check` CLI: flags, JSON shape, and exit codes 0/1/2/3/4/5 with their precedence | public API/CLI contract | Stage prompts and users will script against it |
 | IRR-004 | `hm check` security scope covers only touched paths, never counts self-imports, gates only on secrets and hook-injection, and checks CVEs by default with gating only on added or re-pinned dependencies | security/permission boundary | This decides what can ship. A finding in an untouched file or dependency is reported but never blocks |
 | IRR-005 | Retire the `telemetry`, `post_write_reminder` and `autopilot_autoarm` hooks through the append-only retired set; stub their entry points; end autopilot auto-advance | public API/CLI contract | The retire set is append-only by test, and re-rendering strips these from every user's settings |
-| IRR-006 | harness.yaml semantics: the schema keeps every key. Keys whose consumer is retired stay parseable, keep their value, and become inert with one warning each per `make` run (AC-007 table). The only rewrite is dropping `cursor` from `targets`. No lane field exists any more; a `lane:` in an old SPEC's frontmatter is ignored | schema/file format/storage layout | A user's config silently changes meaning: `loop.enabled: true` or a lens list no longer does anything. Ignoring keeps every 0.62 file loadable under `extra="forbid"`, where rewriting would discard values the user chose. Restoring the behaviour later means restoring the consumers, not the file |
+| IRR-006 | harness.yaml semantics: the schema keeps every key. Keys whose consumer is retired stay parseable, keep their value, and become inert with one warning each per `make` run (AC-007 table). The only rewrite is dropping `cursor` from `targets`. No lane field exists any more; a `lane:` in an old SPEC's frontmatter is ignored. Lens names in `reviewers.installed` are inert only while `reviewers.fanout` is false. `reviewers.fanout` is a new additive key, default `false`: a file without it parses and behaves as with `false`, so it adds no irreversible decision | schema/file format/storage layout | A user's config silently changes meaning: `loop.enabled: true` no longer does anything, and a lens list does nothing until `reviewers.fanout: true`. Ignoring keeps every 0.62 file loadable under `extra="forbid"`, where rewriting would discard values the user chose. Restoring the behaviour later means restoring the consumers, not the file |
 
 ## ✅ Verification
 | Scenario | Mode | Oracle |
@@ -556,8 +572,8 @@ Every db19f023 registry heading not listed here is **KEPT** in its stage. Dispos
 | review Phase 0 | INV | MOVED to `hm check` gates (`reviewers.mechanical_checks`) |
 | review Step 0, 2, 3.3, 3.4, 5 | INV | MOVED to execute's review step: `review_run` ids, drift against PLAN scope, intent drift, the REVIEW record |
 | review Step 4e | TUNE (the cap); the registry says "the disposition mechanism itself is invariant" | MOVED: a disposition for every finding goes to execute's review step. The TUNE value, the cap, is **unchanged**: `reviewers.max_review_rounds` still sets it, at the same default of 3 (Constraints, *Review cap*). The `lane: light` hardcode of 2 goes with lanes, under DRI D-8 (default pending the DRI's card). So for tasks that were light, the effective cap rises from 2 to 3 without a measurement. That one change is DRI, and the AC-010 re-run measures it with the registry's `measure_cmd` (bench) |
-| review Step 1 | INV | VACUOUS: one reviewer, plus any second-opinion voters |
-| review Step 3 | TUNE | DRI (Q1, D-1): fan-out 1. Stage-level evidence, not the registry's `measure_cmd`: eval 3 showed no hidden-test or trap gain at tiers 1–2, judge scope 4.73 for plain against 4.00, and a cost of 26.4x |
+| review Step 1 | INV | MOVED to execute's review step: the set is `code-reviewer`, plus the lens agents in `reviewers.installed` when `reviewers.fanout` is true (D-9), plus any second-opinion voters. The set is read from config; nothing routes it |
+| review Step 3 | TUNE | DRI (Q1, D-1, and the card of 2026-10-16, D-9): default fan-out 1, with the lens fan-out kept as an opt-in behind `reviewers.fanout` and dispatched from execute's review step. Stage-level evidence for the default, not the registry's `measure_cmd`: eval 3 showed no hidden-test or trap gain at tiers 1–2, judge scope 4.73 for plain against 4.00, and a cost of 26.4x. The opt-in keeps the registry's own evidence for fan-out reachable (+52% unique findings on Python, bench §13) for a repo where it pays |
 | review Steps 3.5, 3.6, 4, 4a–4d | INV | MOVED to execute's review step, live when `second_opinion.models` is non-empty (heterogeneous voters, K=2) |
 | review Steps C1–C3 | TUNE | DRI (Q1 and the 23:15Z rule): cut. Stage-level evidence stands in for the registry's `measure_cmd`, which was not run: the eval-3 result, and review's 4.4 VERIFY turns per PRODUCE turn from RESEARCH-harness-diet. The registry grades C1 at `*` with n=4. The AC-010 re-run re-measures |
 | verify Checks 1–4, 6 | INV | MOVED to `hm check`: review, gates, `--harness`, security, ac (stronger than spec_need) |
@@ -580,7 +596,10 @@ Every db19f023 registry heading not listed here is **KEPT** in its stage. Dispos
   reads it.
 - `post_write_reminder` is CUT-COMP.
 - `refdocs-search` is CUT-HOST: the host Grep reaches any folder.
-- `conditional-router` and `stuck` are VACUOUS (fan-out 1, A.5 merged).
+- `conditional-router` is VACUOUS: the default fan-out is 1, and the opt-in fan-out dispatches exactly
+  the lens agents in `reviewers.installed`, so nothing is routed. `stuck` is VACUOUS (A.5 merged).
+- The five lens reviewers are KEPT as an opt-in behind `reviewers.fanout` (D-9, DRI card 2026-10-16).
+  They render, on both targets, only when it is true.
 - `autoloop-driver`, `executor` and `autoloop-coder` are VACUOUS (no loop).
 - `security-auditor`, `security-scanner`, `verify-before-completion` and `targeted-test-selection` are
   MOVED to `hm check`.
@@ -637,6 +656,16 @@ Every db19f023 registry heading not listed here is **KEPT** in its stage. Dispos
   - Card b: the spec-validator stays.
   - Card c: mutation is opt-in through `hm check --mutation`.
   - The 23:15Z cut rule, with CVE kept and the second opinion opt-in.
+- **Lens fan-out opt-in per DRI card 2026-10-16 (revision 3).** The lens fan-out is kept as an opt-in
+  feature instead of being removed; one `code-reviewer` stays the default (D-1). The switch is a new
+  key, `reviewers.fanout` (default `false`, D-9). `reviewers.installed` cannot be the switch: every
+  0.62 harness.yaml lists every lens there by default, so existing users would get the fan-out by
+  default. `reviewers.enabled` was never a dispatch knob (CLAUDE.md, fan-out retraction). The other
+  existing keys are not off switches: `reviewers.routing` narrows a fan-out and defaults to
+  `always-all`, and `reviewers.consensus` is preset-derived and display-only. The amendment touches
+  D-9, the † lens row, the Not-rendered list, the execute.md golden, the AC-007 table, IRR-006 (an
+  additive key, so no new IRR), the *Fan-out key* constraint and the review Step 1 and Step 3 ledger
+  rows. The approval stamp is void until the DRI re-approves.
 - **Defaults pending the DRI's card:**
   - `/hm:metrics` stays as a slim command (D-6).
   - `/hm:research` stays slim and optional (D-7).

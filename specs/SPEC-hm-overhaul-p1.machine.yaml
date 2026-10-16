@@ -204,6 +204,24 @@ ac:
     edge: false
     note: flip Q1 -> this row gains a review on/off axis
   - input:
+      case: D-9 reviewers.fanout false (default), installed naming every lens reviewer
+    expected: no .claude/agents/ or .codex/agents/ file for security-reviewer, concurrency-reviewer,
+      test-reviewer, performance-reviewer or ux-reviewer; execute.md names no lens agent
+    edge: false
+    note: DRI card 2026-10-16; installed lists every lens by default, so it cannot
+      be the switch
+  - input:
+      case: D-9 reviewers.fanout true, installed naming security-reviewer and ux-reviewer,
+        targets [claude-code, codex]
+    expected: .claude/agents/{security-reviewer,ux-reviewer}.md and .codex/agents/{security-reviewer,ux-reviewer}.toml
+      with their config.toml [agents.*] entries, and no other lens agent; execute.md
+      names exactly those two lens agents and dispatches them in parallel alongside code-reviewer, merges and de-duplicates
+      their findings into the same fix loop capped by reviewers.max_review_rounds;
+      execute.md <= its base budget + 1500
+    edge: true
+    note: the opt-in block is outside the base budget, like second opinion, delegation
+      and Second Brain
+  - input:
       case: D-2 codex in targets
     expected: .agents/skills/hm-{research,spec,execute,wrapup,help}/SKILL.md, .codex/agents/<agent>.toml
       per rendered agent, config.toml [agents.*] only for those, .codex/hooks.json,
@@ -251,8 +269,8 @@ ac:
   - input:
       case: any render
     expected: absent .claude/stages/, .claude/hm/, commands review/verify/configure/loop/loop-p5-batch,
-      agents test-reviewer/stuck/security-auditor/executor/autoloop-coder and the
-      5 lens reviewers, skills security-scanner/verify-before-completion/targeted-test-selection/conditional-router/
+      agents stuck/security-auditor/executor/autoloop-coder, the 5 lens reviewers
+      unless reviewers.fanout is true, skills security-scanner/verify-before-completion/targeted-test-selection/conditional-router/
       autoloop-driver/refdocs-search, .cursor/
     edge: false
     note: ''
@@ -280,7 +298,8 @@ ac:
   - input:
       case: execute.md content
     expected: contains checkpoint:compaction and .claude-progress.json; reviewers.max_review_rounds;
-      --no-tdd only inside its retirement notice; second_brain search only when second_brain.enabled
+      --no-tdd only inside its retirement notice; second_brain search only when second_brain.enabled;
+      the lens fan-out dispatch only when reviewers.fanout
     edge: false
     note: Session Context Loading is INV and kept
   - input:
@@ -300,7 +319,8 @@ ac:
   pending_test: true
   oracle_source: golden
   oracle_evidence: The file lists come from the DRI-approved draft sections 1 and
-    6 as amended by the 2026-10-15 corrections; the budgets are the DRI's 6k/7k/3k
+    6 as amended by the 2026-10-15 corrections and the DRI card of 2026-10-16 (D-9,
+    lens fan-out opt-in); the budgets are the DRI's 6k/7k/3k
     targets adjusted by the scratchpad-draft estimates stated in Open Questions 5,
     fixed here before any template is written.
   oracle_independence_waiver: null
@@ -648,8 +668,10 @@ ac:
     stage, a user hook added to a harness matcher group, a user hook group of its
     own}, or one harness.yaml key from the AC-007 table: loop.enabled true; delegation.stages
     [review, execute]; delegation.stages [verify]; reviewers.max_review_rounds 2;
-    reviewers.enabled naming a lens reviewer; skills.enabled naming conditional-router;
-    agent_models.test-reviewer set; autonomy.autopilot_persistent true'
+    reviewers.enabled naming a lens reviewer with reviewers.fanout absent; reviewers.fanout
+    true with installed naming lens reviewers; reviewers.fanout true with no lens in
+    installed; skills.enabled naming conditional-router;
+    agent_models.test-reviewer set with reviewers.fanout absent; autonomy.autopilot_persistent true'
   transformation: hm make <tree> --update at HEAD
   expected_relation: 'pristine tree: files after == AC-004 set and every removed file
     was in the db19f023 listing; mutated retired file kept byte-identical with one
@@ -657,7 +679,8 @@ ac:
     retired invocations absent; specs/, work-docs/, .claude/memory/, .claude/observability/
     byte-identical; each inert harness.yaml key gives exactly one warning naming it
     and keeps its value, reviewers.max_review_rounds gives none and is still read
-    by execute.md; the file still parses under extra=forbid'
+    by execute.md; reviewers.fanout true with lenses installed gives none, renders
+    those lens agents and survives the re-render; the file still parses under extra=forbid'
   preconditions:
   - HOME pinned; freeze_time
   observable_output: per tree, the violating paths, empty
@@ -897,10 +920,12 @@ irreversible_decisions:
   source: spec
 - id: IRR-006
   decision: harness.yaml keeps every key; keys whose consumer is retired (loop.enabled,
-    delegation.stages naming review or verify, retired lens reviewers and skills,
-    agent_models of retired agents, autonomy.autopilot_persistent) stay parseable,
-    keep their value and become inert with one warning each per make run; the only
-    rewrite is dropping cursor from targets; no lane field remains
+    delegation.stages naming review or verify, retired skills, agent_models of retired
+    agents, autonomy.autopilot_persistent, and lens reviewers while reviewers.fanout
+    is false) stay parseable, keep their value and become inert with one warning each
+    per make run; the only rewrite is dropping cursor from targets; no lane field
+    remains. reviewers.fanout is a new additive key (default false); a file without
+    it parses and behaves as with false, so it adds no irreversible decision
   category: schema/file format/storage layout
   rationale: A user's config silently changes meaning; ignoring keeps every 0.62 file
     loadable under extra=forbid where a rewrite would discard values the user chose;
