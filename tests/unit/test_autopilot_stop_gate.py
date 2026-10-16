@@ -728,8 +728,13 @@ def test_the_cli_entry_point_stands_down_in_cursor(tmp_path: Path) -> None:
     ledger.parent.mkdir(parents=True, exist_ok=True)
     ledger.write_text(json.dumps(row) + "\n", encoding="utf-8")
     (tmp_path / ".cursor").mkdir()
+    # A kept 0.62 file stands the Claude copy down only for a marked, runnable entry of the
+    # same module (SPEC-hm-overhaul-p1 PR-C review round 1).
+    command = (
+        f'HM_HOOK_HOST=cursor uv run --with "{tmp_path}" python -m harness_maker.hooks.loop_gate'
+    )
     (tmp_path / ".cursor" / "hooks.json").write_text(
-        '{"version": 1, "hooks": {"stop": [{"command": "HM_HOOK_HOST=cursor true"}]}}',
+        json.dumps({"version": 1, "hooks": {"preToolUse": [{"command": command}]}}),
         encoding="utf-8",
     )
     payload |= {"cursor_version": "2.4.0", "workspace_roots": [str(tmp_path)]}
