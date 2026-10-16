@@ -375,6 +375,80 @@ ac:
   judgment_evidence: null
   judgment_subject_paths: []
   judgment_subject_hash: null
+- id: AC-010
+  title: Tier 3 publishes beside the scorecard, refuses rows it cannot report honestly,
+    and ties to the signed hash
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_tier3.py::test_tier3_publishes_the_pilot_rule_and_withdraws_the_claim
+  - tests/unit/test_bench_tier3.py::test_four_kept_tasks_make_tier3_measurable_and_keep_the_claim_open
+  - tests/unit/test_bench_tier3.py::test_tier3_publish_refuses_rows_it_cannot_report_honestly
+  - tests/unit/test_bench_tier3.py::test_without_tier3_rows_publish_writes_what_it_wrote_before
+  - tests/unit/test_bench_tier3.py::test_the_committed_tier3_rows_carry_the_signed_tier3_hash
+  - tests/unit/test_bench_tier3.py::test_tier3_costs_say_they_are_cli_totals_without_subagent_spend
+  - tests/unit/test_bench_tier3.py::test_tier3_costs_omit_the_unpriced_note_when_every_row_is_priced
+  - tests/unit/test_bench_tier3.py::test_the_committed_tier3_rows_publish_the_committed_section
+  executable_predicate: null
+  golden_table:
+  - input:
+      pilot_plain_solved: t13-t17 3/3, t18 2/3, t19 3/3, t20 0/3, t21 3/3
+      diagnostic: hm on t20 and t21, plain-careful on t20
+    expected:
+      results_md: tiers 1-2 render unchanged as a prefix, then T = 1 (t20), inconclusive,
+        the per-task claim withdrawn, the hm rows under a diagnostic-not-a-verdict heading
+      readme: the old block unchanged, then one to three tier-3 sentences
+    edge: false
+    note: the DRI's card of 2026-10-16 (publish + hm diagnostic)
+  - input:
+      tier3_dir: absent
+    expected:
+      results_md_and_readme: byte-identical to the publish before tier 3
+    edge: true
+    note: tiers 1-2 keep every byte
+  - input:
+      pilot_or_diagnostic: mixed tier3_hash; an hm row in the pilot; a task with 2 pilot
+        runs; a tier-2 row; mixed harness_sha in one dir; every t16 row runner_error;
+        no t21 row; an unknown arm; a row without rep
+    expected:
+      publish: exit 2, refusing to publish on stderr, no file written
+    edge: true
+    note: the pilot's task set must equal the tier-3 tasks under scripts/bench/tier3/tasks/,
+      so a dropped task cannot leave T's denominator
+  - input:
+      cost: one diagnostic row without a price
+    expected:
+      cost_note: every $ is the CLI cost, which excludes subagent spend; 1 of 36 runs has
+        no price and is left out of the $ means
+    edge: true
+    note: with every row priced the unpriced clause is absent
+  - input:
+      rows: the committed docs/evals/tier3 rows
+    expected:
+      tier3_hash: scripts/bench/tier3-signoff.json tier3_hash == tier3_hash() == the rows'
+        tier3_hash
+    edge: false
+    note: the signed bytes are the published bytes
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The keep/drop/guard labels and T are worked by hand from the pre-registered
+    drop rule (DESIGN §5); the expected hash is the DRI's own scripts/bench/tier3-signoff.json;
+    the cost caveat restates docs/evals/tier3/notes.md (transcript-priced about $22.2 against
+    $18.1 by the CLI for the diagnostic rows); the no-tier3 golden is the committed
+    tests/unit/fixtures/hm_eval/README.after.md.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
 irreversible_decisions: []
 approval:
   kind: human

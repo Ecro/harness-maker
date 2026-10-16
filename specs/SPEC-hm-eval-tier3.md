@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: hm-eval-tier3
-status: approved
+status: draft
 created: 2026-10-15
 tags: [harness-maker, spec, eval, hidden-tests, multi-session, fairness]
 test_framework: pytest
@@ -157,6 +157,21 @@ wall, and for the plain arm the pilot rule: `drop` when plain solved 2 or more o
 runs, `keep` otherwise, `guard` for the exempt task. Tier-3 judge lines in the scorecard read
 `(uncalibrated)`. A results dir without tier-3 rows prints exactly what it printed before.
 
+### S10: Tier 3 is published beside the scorecard, never in it
+
+**Given** plain pilot rows in `docs/evals/tier3/pilot/` and, optionally, hm diagnostic rows in
+`docs/evals/tier3/diagnostic/`
+**When** `publish` runs
+**Then** `RESULTS.md` gains a tier-3 section after the unchanged tiers 1-2 render (the pilot per
+task, the drop rule and its outcome, the hm runs labelled a diagnostic, the hand-written notes),
+and the README block gains one to three tier-3 sentences after the unchanged tiers 1-2 text.
+Every $ is named as the CLI cost, which excludes subagent spend, and an unpriced row is counted.
+It refuses, writing nothing, when the pilot does not cover every tier-3 task (a task whose rows
+were all dropped as unusable, a missing guard), holds an hm row or a task with fewer than 3
+runs, or when any row has another tier, a mixed `tier3_hash` or `harness_sha`, an unknown arm
+or no rep. Without a tier-3 dir it writes what it wrote before, byte for byte. The committed
+rows' `tier3_hash` equals the DRI's sign-off and the checkout's `tier3_hash()`.
+
 ## ⚖️ Pre-registration (DESIGN §4, committed before the full run)
 
 - **Cells:** plain, hm, plain-careful (all tasks), plain-continue (t19, t20, t21); 5 runs per
@@ -181,8 +196,8 @@ runs, `keep` otherwise, `guard` for the exempt task. Tier-3 judge lines in the s
 
 - Running the hm arm or the full run. This SPEC delivers the instrument and the plain pilot.
 - Calibrating the judge for tier 3; its lines stay `uncalibrated` and never decide.
-- Publishing tier 3 into `RESULTS.md`: `publish` refuses an incomplete tier, and the plain-only
-  pilot is one. The pilot rows are reported to the DRI as they are.
+- Folding tier 3 into the plain-vs-hm scorecard: the pilot is plain-only and the hm runs are a
+  diagnostic, so neither forms a balanced cell (S10 publishes it beside the scorecard instead).
 - The hm mechanism smoke (DESIGN §5, optional), and adding the cited sentences to the judge
   input; both are follow-ups.
 
@@ -215,6 +230,8 @@ dev-only file whose readers tolerate their absence.
 | S7 | unit (pinned values, committed rows) | `test_tier_one_and_two_hashes_are_unchanged`, `test_a_tier_two_row_has_no_tier3_fields`, `tests/unit/test_bench_light_lane.py::test_the_committed_results_and_readme_block_are_published_from_the_committed_rows` |
 | S8 | unit (fake claude, golden rows) | `test_the_careful_variant_appends_one_sentence`, `test_the_continue_variant_continues_after_the_first_session`, `test_control_rows_stay_out_of_the_main_scorecard` |
 | S9 | unit (golden rows) | `test_the_tier3_report_lists_each_task_and_the_pilot_drop`, `test_tier3_judge_lines_are_labelled_uncalibrated` |
+| S10 | unit (golden rows, committed rows) | `test_tier3_publishes_the_pilot_rule_and_withdraws_the_claim`, `test_four_kept_tasks_make_tier3_measurable_and_keep_the_claim_open`, `test_tier3_publish_refuses_rows_it_cannot_report_honestly`, `test_without_tier3_rows_publish_writes_what_it_wrote_before` |
+| S10 (cost, hash) | unit (golden rows, committed rows) | `test_tier3_costs_say_they_are_cli_totals_without_subagent_spend`, `test_tier3_costs_omit_the_unpriced_note_when_every_row_is_priced`, `test_the_committed_tier3_rows_carry_the_signed_tier3_hash`, `test_the_committed_tier3_rows_publish_the_committed_section` |
 
 ### AC-001: Every tier-3 task discriminates, and its careless overlay fails hidden but passes visible
 ### AC-002: Every tier-3 hidden test quotes a sentence found in its named home
@@ -225,6 +242,7 @@ dev-only file whose readers tolerate their absence.
 ### AC-007: Tiers 1-2 keep their hashes, rows and published output
 ### AC-008: The two plain controls run as their own arms, outside the main scorecard
 ### AC-009: The tier-3 report lists each task, the pilot drop rule and uncalibrated judge lines
+### AC-010: Tier 3 publishes beside the scorecard, refuses rows it cannot report honestly, and ties to the signed hash
 
 ## ❓ Open Questions
 
@@ -261,3 +279,8 @@ dev-only file whose readers tolerate their absence.
 - **t21:** its S2 restates the clock format, since a fresh session has no "as above".
 - Controls are built as arms (`plain-careful`, `plain-continue`) rather than a `variant` field
   on plain rows, so no plain-only reader can count them as plain by accident.
+- **Publishing tier 3 (2026-10-16):** the Non-Goal "Publishing tier 3 into `RESULTS.md`" is
+  dropped. The DRI chose by decision card on 2026-10-16 ("publish + hm diagnostic") to publish
+  the inconclusive pilot with an hm diagnostic on t20 and t21. S10 and AC-010 cover it: beside
+  the scorecard, never in it, with the refusals, the no-tier-3 byte identity, the CLI-cost
+  caveat and the tie to the signed `tier3_hash`. The status returns to `draft` for re-approval.
