@@ -99,6 +99,9 @@ file, `damaged/` and `control/` overlays for the judge calibration (t6-t9; the t
 tree is the fixture plus the seed, committed as one commit, so neither arm can read the planted bug
 out of `git log`.
 
+**Tier 3 (t13-t21)** holds tasks whose prompt does not hold the answer. It has its own layout
+and sits outside the scorecard; see [Tier 3](#tier-3).
+
 ## How to read the scorecard
 
 Figures for a tier use only tasks whose task x arm cells are complete for both arms (the full
@@ -313,6 +316,43 @@ family; residual self-preference is not corrected.
    preference for one arm's style, self-preference for the agent's model family, unreliable
    ranking between two different clean solutions, or noise beyond what three samples average out. A pass is
    necessary for the judge lines to mean anything; it is not proof that they are right.
+
+## Tier 3
+
+Tier 3 (t13-t21, `scripts/bench/tier3/`) asks whether hm buys anything when the prompt does
+**not** hold the answer: the answer sits in a file of the repo (`docs/DECISIONS.md`, an issue, a
+caller no visible test covers) or in an earlier session. t19-t21 run as fresh `claude -p`
+sessions on one work dir, with a teammate commit between them; t21 is the guard, where session 2
+supersedes session 1. SPEC: `specs/SPEC-hm-eval-tier3.md`, which fixes the decision rule before
+anything was measured.
+
+```
+# the plain pilot (3 runs, no judge); the hm arm also needs scripts/bench/tier3-signoff.json
+INTEGRATION=1 uv run python scripts/bench_light_lane.py run --tier 3 --arms plain --runs 3 \
+    --no-judge --out DIR
+# one task and arm subset, e.g. the hm diagnostic
+INTEGRATION=1 uv run python scripts/bench_light_lane.py run --tier 3 --tasks t20,t21 \
+    --arms hm,plain-careful,plain-continue --runs 3 --no-judge --out DIR
+```
+
+- **Drop rule (pre-registered):** a task drops when plain solves 2 or more of 3 pilot runs; the
+  guard is exempt. T is the number of tasks that survive. Tier 3 needs T ≥ 4; with fewer it is
+  **inconclusive**, which counts as "plain cannot be made to fail fairly", and the per-task
+  quality claim is dropped. Tasks are only ever dropped, never edited because plain passed.
+- **Controls:** `plain-careful` adds one sentence ("Before changing code, read the documentation
+  and every caller that the change could affect."), `plain-continue` passes `--continue` to every
+  session after the first. They are their own arms and never enter the plain-vs-hm scorecard.
+- **Published apart from the scorecard.** Tier 3 never forms balanced plain-vs-hm cells (the
+  pilot is plain-only), so `publish` keeps it out of the scorecard and adds a `## Tier 3` section
+  at the end of RESULTS.md, plus one or two sentences under the README tables. Its inputs are
+  `docs/evals/tier3/pilot/results.jsonl`, `docs/evals/tier3/diagnostic/results.jsonl` (optional)
+  and `docs/evals/tier3/notes.md`, the hand-written observations and fairness notes, which are
+  copied in as they are (`--tier3 DIR` points elsewhere). Without `docs/evals/tier3/pilot/`,
+  `publish` writes exactly what it wrote before. It refuses a pilot with another arm's row, a
+  task with fewer than 3 pilot runs, a non-tier-3 row, or rows that mix setups or `tier3_hash`.
+- **Current outcome:** T = 1 (t20), so tier 3 is inconclusive and the per-task code-quality claim
+  is withdrawn; see [RESULTS.md](RESULTS.md#tier-3). The hm runs on t20 and t21 there are a
+  diagnostic of state carried across headless sessions, not a verdict.
 
 ## Improvement loop
 

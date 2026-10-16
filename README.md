@@ -640,6 +640,8 @@ harness-maker generates and **owns the lifecycle** of your `.claude/` directory.
 | Δ judge overall | 4.58 (n=20) | 4.50 (n=20) | -0.08 (single-sample scores, judge noise ±0.67; tie band 0.25 over 20 pairs) | tie |
 | cost per solved run | $0.051 (n=21) | $1.117 (n=19) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
+
+**Tier 3** (the answer is in the repo or an earlier session, not the prompt): plain solved 23 of 27 pilot runs, so 1 task survived the pre-registered drop rule where 4 are needed; tier 3 is inconclusive and the per-task code-quality claim is withdrawn. A diagnostic on t20 and t21, not a verdict: hm solved t20 2/3 and t21 1/2 at $3.172/run; plain (pilot) 0/3 and 3/3 at $0.145/run; plain-careful 2/3 and 3/3 at $0.203/run; plain-continue 3/3 and 3/3 at $0.179/run ([details](docs/evals/RESULTS.md#tier-3)).
 <!-- hm:eval:end -->
 
 ---
