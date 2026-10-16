@@ -1,0 +1,382 @@
+schema_version: 3
+spec_slug: hm-eval-scripted-dri
+parent_spec: SPEC-hm-eval
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Dev-only eval script outside src; every scenario is pinned
+  by a scripted fake CLI, golden work dirs and golden CLI results, so mutation testing
+  adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: The hm arm sends spec, approval, execute and wrapup in order in one resumed
+    session
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_scripted_dri.py::test_hm_cell_sends_spec_approve_execute_wrapup_in_one_resumed_session
+  - tests/unit/test_bench_scripted_dri.py::test_later_turns_differ_from_turn_one_only_by_prompt_and_resume
+  executable_predicate: 'sent == [HM_PREFIX + task.prompt, APPROVE_TURN, "/hm:execute
+    " + slug, "/hm:wrapup " + slug] and argvs[0] == hm_argv_today and all(a[:-2] ==
+    with_prompt(argvs[0], p) and a[-2:] == ["--resume", first_session_id] for a, p
+    in zip(argvs[1:], sent[1:])) and APPROVE_TURN == "I approve this SPEC as written.
+    For each open question, take the option you recommend and record it in the SPEC.
+    Stamp the approval, then stop."'
+  golden_table: []
+  rubric_id: null
+  note: The fake CLI writes specs/SPEC-x.md on turn 1 and reports one session_id;
+    slug is "x". hm_argv_today is agent_argv with HM_PREFIX + task.prompt, built as
+    today's test_arms_differ_only_by_harness_and_prefix builds it.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The expected prompts and their order are the literal strings pinned
+    in SPEC S1 and the DRI's 2026-10-16 card (spec, approval, execute, wrapup), typed
+    into the test, not read from the runner's constants; turn 1's argv is the argv
+    the existing plain-vs-hm argv test already pins.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: A run with no SPEC after turn 1 gets one fixed reply, then stops as no_spec
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_scripted_dri.py::test_no_spec_after_turn_one_gets_one_fixed_reply
+  - tests/unit/test_bench_scripted_dri.py::test_no_spec_after_the_reply_stops_as_no_spec
+  executable_predicate: 'kinds(late_spec) == ["spec", "reply", "approve", "execute",
+    "wrapup"] and kinds(no_spec) == ["spec", "reply"] and no_spec["dri_stop"] == "no_spec"
+    and no_spec["stopped_at"] == 2 and no_spec["outcome"] == "stalled" and sent(no_spec)[1]
+    == REPLY_TURN == "I have nothing to add. For each open question, take the option
+    you recommend, then write the SPEC."'
+  golden_table: []
+  rubric_id: null
+  note: late_spec writes the SPEC only on the reply turn; no_spec never writes one
+    and changes no code. A question at execute or wrapup gets no reply (covered by
+    AC-009's run set).
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The reply string and the one-reply cap are pinned verbatim in SPEC
+    S2; stalled is the existing outcome rule of SPEC-hm-eval S3 for an unchanged timeparse/
+    and tests/ scope, computed by outcome_for, which this SPEC does not change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: The slug is the newest matching SPEC the run created, else none
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_scripted_dri.py::test_slug_is_the_newest_spec_the_run_created
+  - tests/unit/test_bench_scripted_dri.py::test_template_specs_and_other_names_give_no_slug
+  executable_predicate: null
+  golden_table:
+  - input:
+      work_specs: {SPEC-a.md: 1, SPEC-b.md: 2}
+      template_specs: []
+    expected:
+      slug: b
+    edge: false
+    note: the larger st_mtime_ns wins
+  - input:
+      work_specs: {SPEC-a.md: 5, SPEC-b.md: 5}
+      template_specs: []
+    expected:
+      slug: b
+    edge: true
+    note: equal mtimes, the larger name wins
+  - input:
+      work_specs: {SPEC-old.md: 9, SPEC-new.md: 1}
+      template_specs: [SPEC-old.md]
+    expected:
+      slug: new
+    edge: true
+    note: a SPEC already in the arm's template is not one the run created
+  - input:
+      work_specs: {SPEC-x.machine.yaml: 3, notes.md: 4, SPEC-Bad_Name.md: 5, sub/SPEC-y.md: 6}
+      template_specs: []
+    expected:
+      slug: null
+    edge: true
+    note: machine yaml, other names, a name outside the pattern and subdirectories
+      give no slug
+  - input:
+      work_specs: {}
+      template_specs: []
+    expected:
+      slug: null
+    edge: true
+    note: no specs/ dir at all
+  rubric_id: null
+  note: The integers are st_mtime_ns values set with os.utime in the test; the pattern
+    is SPEC-([a-z0-9][a-z0-9-]*)\.md directly under work/specs/.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Each expected slug follows by hand from SPEC S3's rule (directly
+    under specs/, name pattern, absent from the template path, max of st_mtime_ns then
+    name) applied to the table's file list; the file layout matches the PR-S spec stage's
+    specs/SPEC-<slug>.md path seen in /var/tmp/hm-eval-p1 work dirs.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Turn costs, turns and wall time are summed into one row from the running CLI
+    total
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_scripted_dri.py::test_turn_costs_are_differences_of_the_running_cli_total
+  - tests/unit/test_bench_scripted_dri.py::test_a_falling_or_missing_total_falls_back_to_the_transcript_price
+  - tests/unit/test_bench_scripted_dri.py::test_turns_and_wall_time_are_summed
+  executable_predicate: null
+  golden_table:
+  - input:
+      cli_totals: [0.25, 0.3, 0.9, 1.0]
+      num_turns: [2, 1, 30, 5]
+      wall_s: [80.0, 10.0, 400.0, 60.0]
+    expected:
+      own_costs: [0.25, 0.05, 0.6, 0.1]
+      cli_cost_usd: 1.0
+      cost_source: cli
+      num_turns: 38
+      wall_s: 550.0
+      cli_cost_shape: null
+    edge: false
+    note: a full four-turn run; own costs compared with math.isclose
+  - input:
+      cli_totals: [0.25, 0.2, 0.9, 1.0]
+      num_turns: [2, 1, 30, 5]
+      wall_s: [80.0, 10.0, 400.0, 60.0]
+    expected:
+      cli_cost_usd: null
+      cost_source: transcript
+      cli_cost_shape: not_cumulative
+    edge: true
+    note: a total that falls disproves the running-total reading for the row
+  - input:
+      cli_totals: [0.25, null]
+      num_turns: [2, null]
+      wall_s: [80.0, 10.0]
+    expected:
+      cli_cost_usd: null
+      cost_source: transcript
+      num_turns: null
+      wall_s: 90.0
+    edge: true
+    note: a lost result is unknown, never zero
+  rubric_id: null
+  note: tokens and transcript_* stay the transcript price over the work dir, as today.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The running-total reading comes from the committed path docs/evals/tier3/diagnostic/results.jsonl,
+    where resumed plain-continue sessions report 0.0763 then 0.1134 against a transcript
+    price of 0.1285; the expected own costs are hand differences of the table's totals,
+    independent of the runner code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: A failed turn, the run budget or a lost session stops the run with its reason
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_scripted_dri.py::test_a_failed_turn_stops_the_run_with_its_status
+  - tests/unit/test_bench_scripted_dri.py::test_the_run_budget_stops_the_next_turn
+  - tests/unit/test_bench_scripted_dri.py::test_a_lost_session_id_stops_the_run
+  executable_predicate: '(timed_out["status"], kinds(timed_out), timed_out["stopped_at"],
+    timed_out["dri_stop"]) == ("timeout", ["spec", "approve", "execute"], 3, None)
+    and (capped["dri_stop"], capped["subtype"], kinds(capped)) == ("budget", "error_max_budget_usd",
+    ["spec", "approve"]) and kinds(under_cap)[:3] == ["spec", "approve", "execute"] and
+    (lost["dri_stop"], kinds(lost)) == ("session_lost", ["spec", "approve"]) and all(t
+    == opts.timeout_s for t in invoke_timeouts)'
+  golden_table: []
+  rubric_id: null
+  note: timed_out's fake times out on execute; capped's fake reports a running total
+    of max_budget_usd after approve; under_cap's fake reports totals 2.0 then 4.0 under
+    a 5.0 cap, which a sum of totals (6.0) would wrongly stop; lost's fake reports a
+    new session_id on approve.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The stop reasons, the budget subtype and stopped_at positions are
+    pinned in SPEC S5; error_max_budget_usd is the CLI subtype the bench already treats
+    as a capped run (BUDGET_SUBTYPE, SPEC-hm-eval), so the expected tuples are written
+    from the SPEC, not from the new loop.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: The run is graded once on the final work tree, and every turn's output is
+    kept and leak-checked
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_scripted_dri.py::test_the_run_is_graded_once_after_its_last_turn
+  - tests/unit/test_bench_scripted_dri.py::test_every_turn_output_is_kept_and_leak_checked
+  executable_predicate: grade_calls == 1 and row["outcome"] == "solved" and late_fix["outcome"]
+    == "solved" and sorted(p.name for p in run_dir.glob("agent-*.stdout")) == ["agent-1.stdout",
+    "agent-2.stdout", "agent-3.stdout", "agent-4.stdout"] and leaky["leak_suspect"]
+    is True
+  golden_table: []
+  rubric_id: null
+  note: row's fake applies the task's reference overlay on the execute turn and commits
+    nothing; late_fix applies it on the wrapup turn; leaky prints a leak marker only
+    on the wrapup turn.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The reference overlay under scripts/bench/tasks/t1/reference/ is
+    the independent witness that the hidden tests pass on a correct tree; the leak marker
+    is one of opts.leak_markers, and both expectations follow from SPEC S6 rather than
+    from the new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: The plain arm and tier-3 cells run exactly as before
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_scripted_dri.py::test_the_plain_arm_runs_one_unchanged_call
+  - tests/unit/test_bench_scripted_dri.py::test_tier3_cells_keep_one_call_per_session
+  executable_predicate: len(plain_argvs) == 1 and plain_argvs[0] == agent_argv(claude,
+    task.prompt, model, max_turns, max_budget) and set(plain_row) == TIER_TWO_ROW_KEYS
+    and tier3_hm_prompts == [HM_PREFIX + p for p in t19.session_prompts] and not any(k.startswith("dri_")
+    for k in tier3_row)
+  golden_table: []
+  rubric_id: null
+  note: TIER_TWO_ROW_KEYS is the key set test_bench_tier3.py already pins (_TIER_TWO_ROW_KEYS).
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The plain argv and row key set are the values already pinned in
+    tests/unit/test_bench_tier3.py (path) before this change, and t19's session prompts
+    are read from its committed scripts/bench/tier3/tasks/t19/sessions/ files, so the
+    expectation predates the new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: runner_hash covers the turn script, so rows from before are refused
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_scripted_dri.py::test_runner_hash_covers_the_turn_script
+  - tests/unit/test_bench_scripted_dri.py::test_rows_from_before_the_turn_script_are_refused
+  executable_predicate: 'all(hash_with(name, changed) != base for name, changed in
+    script_variants) and base not in ("17f703bf0fcc", "10856c4eb248") and raises(MixedResultsError,
+    ensure_consistent, [old_row, new_row]) and bench_hash() == "569e17ef29ab" and tier2_hash()
+    == "1cf707c57e12"'
+  golden_table: []
+  rubric_id: null
+  note: script_variants patch APPROVE_TURN, REPLY_TURN, the execute and wrapup prefixes,
+    the reply cap, the resume flag, the SPEC pattern and the tiers one at a time; old_row
+    carries the runner_hash recorded in docs/evals/results.jsonl.
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The old hashes 17f703bf0fcc and 10856c4eb248 are the runner_hash
+    values pinned before this change in tests/unit/test_bench_tier3.py (path), the old
+    row's hash is read from the committed docs/evals/results.jsonl, and bench_hash/tier2_hash
+    are the values SPEC-hm-eval-tier3 S7 pins.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Every prompt the bench sends is a fixed string, the task prompt or the discovered
+    slug
+  type: property
+  test_ids:
+  - tests/unit/test_bench_scripted_dri.py::test_every_sent_prompt_is_fixed_or_the_task_or_the_slug
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: The fake's result text carries a distinctive sentence on every turn so a reply
+    built from it would show.
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: The allowed set is fixed by SPEC S9 and the DRI's card, independent
+    of the runner; the fake CLI's result text holds a marker sentence on every turn,
+    so the relation is checked against a prompt that would carry the agent's words
+    if the runner ever composed one.
+  oracle_independence_waiver: null
+  input_domain: every scripted fake-CLI run of AC-001, AC-002 and AC-005 (full sequence,
+    reply then SPEC, reply then no SPEC, timeout, budget stop, lost session), on tasks
+    t1 and t6
+  transformation: collect the -p value of every argv the fake CLI received and every
+    specs/SPEC-*.md name the fake wrote
+  expected_relation: all(p == HM_PREFIX + task.prompt or p in (REPLY_TURN, APPROVE_TURN)
+    or (p.split(" ", 1)[0] in ("/hm:execute", "/hm:wrapup") and p.split(" ", 1)[1]
+    in written_slugs) for p in sent) and not any(MARKER in p for p in sent)
+  preconditions: []
+  observable_output: the list of prompts the fake CLI received, per run
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
