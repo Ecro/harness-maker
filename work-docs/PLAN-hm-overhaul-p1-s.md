@@ -203,6 +203,52 @@ Phase 4 (each is the simplest option where the SPEC is silent):
   blocks with the template's (and its literal includes'); an unreadable template counts as
   edited. Unedited files still REPLACE, so the render summary's merge count does not grow.
 
+- **ADR-044: RED runs once, over every testable AC, before any phase (P1-b).** `hm check --red`
+  covers the whole SPEC and plain `hm check` fails on any pending AC, so the per-phase RED and
+  gate the collapse rendered deadlock on phase 2. Phase A writes every test, RED once, then the
+  phases, then bind and gate once. **Decided by:** agent
+- **ADR-045: the full gate runs in the background with a one-hour deadline (P1-h).** A suite
+  outlives the host's 10-minute foreground cap; a missing JSON line is never a pass. The deadline
+  is the host's `timeout: 3600000`, not a `--deadline-s` flag: a new flag would change the
+  IRR-003 CLI contract, which is a SPEC change. **Decided by:** agent
+- **ADR-046: the collapse restores three dropped rules (P1-i):** never edit a test file to resolve
+  a finding whose target is not that test; the irreversible-category stop in execute
+  (`source: execute`, stop and ask the DRI); wrapup prints `steps.understanding_block` and asks
+  once, multi-select, before any intent write. `<WT>` renders only with the worktree. The wrapup
+  prose was compressed to keep its 3500 budget; execute's growth is held as this PLAN's
+  `surface_allowance` (`BASELINE-DELTA-hm-overhaul-p1-s.md`, "Review round 1"). **Decided by:** agent
+- **ADR-047: the wrapup delegate reads `.claude/commands/hm/wrapup.md`, Steps 1-5 (P1-c).** The
+  `.claude/hm/` path it named no longer renders; the verify branch is gone. **Decided by:** agent
+- **ADR-048: `hm check` reads only `REVIEW-<slug>-<date>.md`, and an `unresolved` finding fails
+  the review section (exit 1) (P1-f).** Another slug's REVIEW no longer leaks in. Reading the
+  SPEC's exit-1 row as covering an open finding is the agent's; the DRI may want it at 5.
+  **Decided by:** agent
+- **ADR-049: no SPEC (`no_spec`, `malformed`) gives exit 5 from the ac, RED and mutation
+  sections**, per the SPEC's "always give 5". **Decided by:** agent
+- **ADR-050: `cve` with dependencies but no `uv.lock` is `unavailable`, not clean** (amends
+  ADR-008). A gate step that times out exits 124, kills its process group and is never a pass;
+  test files follow `--`, and an id outside the root is "not collected". The secret scan skips
+  symlinks. **Decided by:** agent
+- **ADR-051: a retired orphan whose user block holds user text is kept (P1-a).** It becomes
+  `ours-modified` and prints WARN KEPT. Comment-only default blocks still delete; a repeated block
+  id (Codex stage skills) is our own render. **Decided by:** agent
+- **ADR-052: a telemetry file older than two days is no telemetry source (P1-d)** (amends
+  ADR-014). The dated stem, or the legacy file's mtime, must be within `FRESH_DAYS = 2`.
+  **Decided by:** agent
+- **ADR-053: a `--preset` switch keeps `reviewers` and `reviewers_fanout` (P1-g).** The rebuild's
+  allowlist dropped them, and the sweep then deleted the lens agents. **Decided by:** agent
+- **ADR-054: the ship bar refuses untrusted scorecards (P1-e).** A `suspect`/`no_data` verdict,
+  a cell with fewer than 3 runs, a capped or leak-suspect run, or an unknown reference commit
+  fails AC-010 rather than passing it. **Decided by:** agent
+- **ADR-055: legacy SPEC ids whose behaviour survived are rebound (P1-j)** to live tests in
+  `tests/unit/test_overhaul_p1_kept.py`, by an in-place swap in each machine.yaml.
+  `mark-tested` was tried first: it probes every id in a file with one collection, so a sibling
+  AC's id in a deleted file fails it whole, and its rewrite drops the yaml's comments.
+  `approval-status` is byte-identical before and after for all 17 SPECs. Not rebound, because
+  the behaviour itself was retired: SPEC-intent-surface-diet AC-008 (the evidence phrase),
+  SPEC-intent-layer-improvements AC-012 (close after readback), SPEC-assumption-entry-and-evidence-locator
+  AC-010 (stale questions first). **Decided by:** agent
+
 ## Risks
 
 - **Disk.** The AC-006 replay builds 36 trees plus venvs; each is created and deleted inside the
@@ -235,6 +281,7 @@ Phase 4 (each is the simplest option where the SPEC is silent):
 - [x] Phase 3 — eval-3 replay
 - [x] Phase 4 — stage collapse
 - [x] Phase 5 — ship (0.64.0; AC-010 stays red until the DRI commits the eval re-run)
+- [x] Review round 1 — P1-a..P1-j and the P2 items (ADR-044..ADR-055)
 
 ## Evidence
 
@@ -299,3 +346,27 @@ AC-004 surface and AC-009 kept suites pass; AC-008 passes. `mark-tested --ac AC-
 `approval-status` still `approved`. Full suite: only the five allowed failures plus
 `test_ac010_scorecard_meets_bar` (by design, ADR-042).
 
+### Review round 1 (ADR-044..ADR-055)
+
+RED, 2026-10-16, each test committed with its fix and run first against the unfixed tree:
+- P1-a: `test_retired_orphan_with_user_block_text_is_kept[agent-md|codex-toml]` failed; the
+  orphan was deleted as `ours-clean`.
+- P1-g: the brownfield `fanout-preset` row failed; `--preset Production` reset
+  `reviewers_fanout` and swept the lens agents.
+- P1-d: `test_ac011_a_stale_file_is_no_telemetry_source[stale-dated|stale-legacy]` failed.
+- P1-f and P2 (`hm check`): the new `EXIT_ROWS` (other slug's REVIEW, `unresolved`, no SPEC,
+  no `uv.lock`, outside-root id, symlinked secret) and the timeout and `--` tests failed.
+- P1-b, P1-c, P1-h, P1-i: the six rule tests in `test_overhaul_p1_kept.py` failed on the
+  collapsed renders (per-phase RED, `.claude/hm/` delegate path, foreground gate, missing rules).
+- P1-e: `test_ac010_untrusted_scorecards_do_not_pass` and `..._an_unknown_reference_commit_fails`
+  failed against the old ship-bar predicate.
+- P1-j: characterization tests of kept behaviour, so no RED applies. A mutation (a stage command
+  added to the typed-only set; a second backlog call) turned them red, and that change was
+  reverted.
+
+GREEN: the targeted suites pass; the full gate is recorded in the round's final commit.
+
+
+Not fixed: the stale names in `templates/hooks/hooks.json.j2` (the SPEC's Constraints freeze that
+template, since `_retire_stale_hooks_json` compares against it; changing it is a SPEC change) and
+the cosmetic Codex stage-skill placeholder (P2-8).
