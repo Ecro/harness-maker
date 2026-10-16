@@ -112,7 +112,13 @@ from harness_maker.spec_machine import GoldenRow, load_golden_table  # noqa: E40
 from harness_maker.strictness import Strictness  # noqa: E402
 
 _SPEC_YAML = Path(__file__).parents[2] / "specs" / "SPEC-mission-context-loop.machine.yaml"
-_AC005_ROWS = load_golden_table(_SPEC_YAML, "AC-005")
+# SPEC-hm-overhaul-p1 PR-C removed the Cursor target; that SPEC's `.cursor/` rows describe a file
+# no render produces any more, and the stamped SPEC is not edited.
+_AC005_ROWS = [
+    r
+    for r in load_golden_table(_SPEC_YAML, "AC-005")
+    if not str(r.input["file"]).startswith(".cursor/")
+]
 _POINTER_HEADING = "## Project knowledge"
 _PRESETS = {"Production": Preset.PRODUCTION, "Side": Preset.SIDE}
 

@@ -211,7 +211,6 @@ LISTING_SURFACES = (
     ".claude/commands/hm/help.md",
     "CLAUDE.md",
     "AGENTS.md",
-    ".cursor/rules/harness.mdc",
     # The Codex rendering of help.md (review finding cd14c78815a4027d surfaced it once
     # AC-009 compared real rendered bodies).
     ".agents/skills/hm-help/SKILL.md",
@@ -244,7 +243,7 @@ def _profile() -> ProjectProfile:
 def _norm(fe_path: Path) -> str:
     """Project-root-relative key, the same mapping reconcile._normalize_expected_path uses."""
     s = str(fe_path).replace("\\", "/")
-    if s.startswith((".cursor/", ".codex/", ".agents/")) or s == "AGENTS.md":
+    if s.startswith((".codex/", ".agents/")) or s == "AGENTS.md":
         return s
     return posixpath.normpath(".claude/" + s)
 
@@ -626,10 +625,7 @@ def test_ac009_disable_removes_only_loop_files(tmp_path: Path) -> None:
             continue
         if p.startswith(
             (".claude/agents/", ".claude/skills/", ".agents/skills/", ".codex/")
-        ) or p in {
-            ".claude/settings.json",
-            ".cursor/hooks.json",
-        }:
+        ) or p in {".claude/settings.json"}:
             assert disabled[p] == enabled[p], f"{p} changed"
 
 
