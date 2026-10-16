@@ -5,7 +5,8 @@ library (`scripts/bench/timeparse/`):
 
 - **plain**: the task prompt as written, in a repo with no harness;
 - **hm**: the same prompt with a `/hm:spec ` prefix, in the same repo plus this checkout's rendered
-  harness.
+  harness. On tiers 1 and 2 the bench then plays the DRI in the same session (see
+  [The hm arm's turn script](#the-hm-arms-turn-script)).
 
 hm is expected to spend more tokens than plain, so the scorecard opens with what that extra spend
 buys, then the quality detail, then the cost detail. It reports what comes out: if plain writes
@@ -44,6 +45,46 @@ ancestor.
 
 The judge is on by default: one extra `claude -p` call per changed run (`--no-judge` turns it off,
 `--judge-model` defaults to `--model`, `--judge-budget-usd` defaults to 0.5).
+
+## The hm arm's turn script
+
+The harness keeps human SPEC approval, so `/hm:spec` writes a SPEC and stops. On a tier-1 or tier-2
+task the bench therefore sends the stage commands in order, as a person would, in one CLI session
+that each later turn resumes with `--resume <session_id of turn 1>`
+(`specs/SPEC-hm-eval-scripted-dri.md`):
+
+| # | kind | prompt sent |
+|---|---|---|
+| 1 | `spec` | `/hm:spec ` + the task prompt (the same argv as before this change) |
+| 1b | `reply` | only when turn 1 wrote no SPEC: `I have nothing to add. For each open question, take the option you recommend, then write the SPEC.` |
+| 2 | `approve` | `I approve this SPEC as written. For each open question, take the option you recommend and record it in the SPEC. Stamp the approval, then stop.` |
+| 3 | `execute` | `/hm:execute <slug>` |
+| 4 | `wrapup` | `/hm:wrapup <slug>` |
+
+- **Slug**: the newest `specs/SPEC-<slug>.md` directly under the work dir that is not in the arm's
+  template, name pattern `SPEC-([a-z0-9][a-z0-9-]*)\.md`, looked up after each spec-stage turn. The
+  slug found after `approve` is the one sent. The bench never reads the agent's text.
+- **Stops**: a turn that is not `ok` ends the run with that status. No SPEC after the one reply, or
+  after `approve`, ends it as `dri_stop: no_spec` (graded as usual, so normally `stalled`). Before
+  each later turn the run stops as `dri_stop: budget` once its spend reaches `--max-budget-usd` or a
+  turn's cost is unknown (a spend at the cap also records `subtype: error_max_budget_usd`, which
+  makes the verdict `suspect`). A missing or changed `session_id` stops it as
+  `dri_stop: session_lost`. Every turn gets the same flags and its own `--timeout-s`.
+- **One row**: each turn's `total_cost_usd` is read as the session's running total, so the row's
+  `cli_cost_usd` is the last turn's total. A missing or falling total makes `cli_cost_usd` null and
+  the row takes the transcript price (`cli_cost_shape: not_cumulative` for a falling one).
+  `num_turns` and `wall_s` are summed over the turns. The row adds `dri_turns` (each turn's kind,
+  status, own cost, running total, turns, subtype and wall), `dri_slug`, `dri_stop` and
+  `stopped_at` (the 1-based last turn sent, null when `wrapup` ran `ok`). The tree is graded once
+  after the last turn, and each turn's output is kept as `agent-<n>.stdout`/`.stderr` and
+  leak-checked.
+- **Unchanged**: the plain arm (one call), the plain controls and tier 3 (one call per session).
+  The turn script is part of `runner_hash`, so rows from before it never mix with new ones: a run
+  with the script needs a fresh `--out`, for plain as well as hm.
+- **Precondition**: the running-total reading is observed CLI behaviour, not documented. Before a
+  re-run, `INTEGRATION=1 uv run pytest tests/integration/test_boundary_bench_resume.py` checks on the
+  live CLI that a resumed turn keeps the session id, its total does not fall, and the total stays
+  within `SUSPECT_GAP` of the transcript price.
 
 ## Tasks
 
@@ -263,7 +304,8 @@ family; residual self-preference is not corrected.
 ## Fairness rules
 
 - Both arms use the same model, budget, turn cap, flags and fixture bytes. They differ only by the
-  rendered harness and the `/hm:spec ` prefix.
+  rendered harness, the `/hm:spec ` prefix and, on tiers 1-2, the hm arm's fixed later turns,
+  which carry no task information (the slug is the agent's own file name).
 - Hidden tests and references never enter a work dir; grading runs from a private snapshot.
 - Tier-2 prompts name no harness step. Each tier-2 hidden test's docstring quotes, word for word,
   the prompt sentence it follows from, and each prompt states every case its hidden tests check.

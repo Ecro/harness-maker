@@ -555,19 +555,21 @@ def test_tier3_rows_record_their_hash_and_never_mix(
 
 
 def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType) -> None:
-    """Values recorded by the runner at origin/main 687a46c3, before tier 3 existed (the report
-    and scorecard pins moved there when #30 added wall time to the headline)."""
+    """bench_hash, tier2_hash and the report and scorecard pins are the values recorded by the
+    runner at origin/main 687a46c3, before tier 3 existed (the report and scorecard pins moved
+    there when #30 added wall time to the headline). The runner_hash pins moved on purpose with
+    SPEC-hm-eval-scripted-dri: the hm arm's turn script is a new runner setting (S8)."""
     assert bench.bench_hash() == "569e17ef29ab"
     assert bench.tier2_hash() == "1cf707c57e12"
     tools = {"ruff": "r", "mypy": "m"}
     assert bench.runner_hash("model-x", 400, 1800, 5.0, (), "fake 1.0", quality_tools=tools) == (
-        "17f703bf0fcc"
+        "76dcd05532e7"
     )
     assert (
         bench.runner_hash(
             "model-x", 400, 1800, 5.0, ("IS_SANDBOX",), "fake 1.0", quality_tools=tools, judge=False
         )
-        == "10856c4eb248"
+        == "234f0721c2ae"
     )
     rows = bench.read_rows(_ROOT / "docs" / "evals")
     report = hashlib.sha256(bench.report_text(rows).encode()).hexdigest()[:16]
