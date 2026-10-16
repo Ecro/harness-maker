@@ -403,7 +403,10 @@ FANOUT_BRANCH = _RESEARCH_TEMPLATE[_FANOUT_START:_FANOUT_MID]
 PLAIN_BRANCH = _RESEARCH_TEMPLATE[
     _FANOUT_MID + len(_FANOUT_ELSE) : _RESEARCH_TEMPLATE.index(_FANOUT_END, _FANOUT_MID)
 ]
-FANOUT_DELTA = len(FANOUT_BRANCH) - len(PLAIN_BRANCH)
+#: PR-C's research growth, measured 2026-10-16 (surface baseline 16 677 -> 17 292 chars). Fixed
+#: here, not derived, so a later edit to either branch moves the bound only by a deliberate edit.
+FANOUT_DELTA = 615
+assert len(FANOUT_BRANCH) - len(PLAIN_BRANCH) == FANOUT_DELTA, "the fan-out branch changed size"
 
 
 def without_cursor_fanout(text: str) -> str:

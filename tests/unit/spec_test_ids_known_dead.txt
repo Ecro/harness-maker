@@ -1,5 +1,5 @@
-# SPEC test_ids that name no test. Shrink-only: tests/structural/test_spec_test_ids_collect.py
-# fails when one of these resolves again, so a fixed binding leaves this file in the same change.
+# SPEC test_ids that name no test. Shrink-only: test_known_dead_test_ids_are_still_dead in
+# tests/unit/test_spec_machine.py fails once one resolves again, so a fix removes it here too.
 
 [pr-c-cursor]
 # SPEC-hm-overhaul-p1 PR-C deleted these Cursor tests. Their SPECs are pre-approval (`legacy`, no

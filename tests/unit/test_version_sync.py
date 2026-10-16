@@ -56,7 +56,7 @@ def test_runtime_init_and_pyproject_versions_match() -> None:
 
 
 def test_codex_plugin_and_pyproject_versions_match() -> None:
-    """0.16.0: codex-plugin manifest joins the 5-file sync policy."""
+    """0.16.0: codex-plugin manifest joined the version sync (four files since 0.63.0)."""
     assert _codex_plugin_version() == _pyproject_version()
 
 
@@ -74,3 +74,16 @@ def test_four_manifests_share_one_version() -> None:
     }
     unique = set(versions.values())
     assert len(unique) == 1, f"version drift detected: {versions}"
+
+
+def test_claude_and_codex_manifests_share_required_metadata() -> None:
+    """The two marketplace manifests describe one plugin: same identity, version and links.
+
+    Replaces the claude-vs-cursor check that left with `.cursor-plugin/plugin.json` (0.63.0).
+    Description and keywords may differ per marketplace.
+    """
+    claude: dict[str, object] = json.loads(_read_text(".claude-plugin/plugin.json"))
+    codex: dict[str, object] = json.loads(_read_text(".codex-plugin/plugin.json"))
+    for key in ("name", "version", "author", "license", "repository", "homepage"):
+        assert claude.get(key) is not None, f".claude-plugin/plugin.json has no {key!r}"
+        assert claude.get(key) == codex.get(key), f"manifest drift on key={key!r}"

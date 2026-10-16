@@ -89,7 +89,7 @@ def _tool(matcher: str) -> tuple[str, dict[str, object]]:
     return "Bash", {"command": "ls -la"}
 
 
-def _payloads(hook: _Hook, project: Path) -> dict[str, str]:
+def _payloads(hook: _Hook, project: Path, trigger: str = "auto") -> dict[str, str]:
     tool_name, tool_input = _tool(hook.matcher)
     if "file_path" in tool_input:
         tool_input = {**tool_input, "file_path": str(project / "src" / "app.py")}
@@ -99,7 +99,7 @@ def _payloads(hook: _Hook, project: Path) -> dict[str, str]:
     if event == "PostToolUse":
         common["tool_response"] = {"stdout": "", "success": True}
     if event == "PreCompact":
-        common["trigger"] = "auto"
+        common["trigger"] = trigger
     if event == "SessionStart":
         common["source"] = "startup"
     if event == "Stop":
@@ -175,8 +175,12 @@ def _run(
 @pytest.fixture(scope="module")
 def corpus(
     tmp_path_factory: pytest.TempPathFactory,
-) -> tuple[Path, dict[tuple[str, str], tuple[_Hook, Path]]]:
-    """Every distinct (event, command) of the db19f023 renders, with the tree it came from."""
+) -> tuple[Path, dict[tuple[str, str, str, str], tuple[_Hook, Path]]]:
+    """Every distinct (event, matcher, command, file) of the db19f023 renders, with its tree.
+
+    The file and matcher are part of the key: the same spec_gate command ships on Claude's
+    `Write|Edit|MultiEdit` and on Codex's `apply_patch`, and each needs its own payload.
+    """
     base = tmp_path_factory.mktemp("ac008")
     ref = ref_root(base)
     cells = list(itertools.product(("Side", "Production"), ("block", "warn"), (True, False)))
@@ -204,10 +208,11 @@ def corpus(
 
     with ThreadPoolExecutor(_WORKERS) as pool:
         projects = list(pool.map(render, cells))
-    found: dict[tuple[str, str], tuple[_Hook, Path]] = {}
+    found: dict[tuple[str, str, str, str], tuple[_Hook, Path]] = {}
     for project in projects:
         for hook in _hooks_of(project):
-            key = (hook.event.lower(), _WITH_RE.sub("--with <REF>", hook.command))
+            command = _WITH_RE.sub("--with <REF>", hook.command)
+            key = (hook.event.lower(), hook.matcher, command, hook.file)
             found.setdefault(key, (hook, project))
     return ref, found
 
@@ -228,36 +233,100 @@ def _shim_home(home: Path) -> Path:
     return home
 
 
+_MODULE_RE = re.compile(r"python -m ([\w.]+)")
+#: Every module a 0.62 hook ran. The floor keeps a corpus regression (a hook file that stopped
+#: parsing, a dedupe key that collapsed two files) from passing on fewer cells.
+_MODULE_FLOOR = frozenset(
+    {
+        "harness_maker.telemetry",
+        "harness_maker.worktree",
+        "harness_maker.hooks.loop_gate",
+        "harness_maker.hooks.autopilot_autoarm",
+        "harness_maker.hooks.flush_session",
+        "harness_maker.hooks.post_write_reminder",
+        "harness_maker.hooks.sessionid_envfile",
+        "harness_maker.gates.permission_gate",
+        "harness_maker.gates.worktree_gate",
+        "harness_maker.gates.spec_gate",
+    }
+)
+
+
+def _module(hook: _Hook) -> str:
+    match = _MODULE_RE.search(hook.command)
+    assert match, hook.command
+    return match.group(1)
+
+
+def _verdict(
+    hook: _Hook,
+    project: Path,
+    kind: str,
+    markers: bool,
+    trigger: str,
+    *,
+    head: Path,
+    ref: Path,
+    home: Path,
+    scratch: Path,
+) -> str | None:
+    """None when the cell holds AC-008; otherwise the line that says why it does not."""
+    tag = f"{scratch.name}-{kind}-{markers}-{trigger}"
+    head_p = _copy(project, scratch / f"head-{tag}", markers=markers)
+    ref_p = _copy(project, scratch / f"ref-{tag}", markers=markers)
+    head_payload = _payloads(hook, head_p, trigger)[kind]
+    ref_payload = _payloads(hook, ref_p, trigger)[kind]
+    head_exit, head_err = _run(hook.command, head, head_p, home, head_payload, kind)
+    ref_exit, _ = _run(hook.command, ref, ref_p, home, ref_payload, kind)
+    ok = head_exit == 0 or (head_exit == 2 and ref_exit == 2)
+    if ok and "Traceback" not in head_err:
+        return None
+    return (
+        f"{hook.file} {hook.event} [{hook.matcher}] {_module(hook)} "
+        f"[{kind}, markers={markers}, trigger={trigger}]: HEAD exit {head_exit}, "
+        f"db19f023 exit {ref_exit}: {head_err.strip()[-300:]}"
+    )
+
+
+def _triggers(hook: _Hook) -> tuple[str, ...]:
+    return ("auto", "manual") if hook.event.lower() == "precompact" else ("auto",)
+
+
 def test_ac008_every_shipped_hook_command_is_safe(
-    tmp_path: Path, corpus: tuple[Path, dict[tuple[str, str], tuple[_Hook, Path]]]
+    tmp_path: Path, corpus: tuple[Path, dict[tuple[str, str, str, str], tuple[_Hook, Path]]]
 ) -> None:
     ref, hooks = corpus
     files = {h.file for h, _ in hooks.values()}
     assert files == set(_HOOK_FILES), f"corpus misses a hook file: {sorted(files)}"
+    modules = {_module(h) for h, _ in hooks.values()}
+    assert modules >= _MODULE_FLOOR, f"corpus lost modules: {sorted(_MODULE_FLOOR - modules)}"
+    assert any(
+        h.file == ".codex/hooks.json" and "apply_patch" in h.matcher for h, _ in hooks.values()
+    ), "the Codex apply_patch entries were folded into another file's"
     home = _shim_home(tmp_path / "home")
     jobs = [
-        (i, hook, project, kind, payload, markers)
+        (i, hook, project, kind, markers, trigger)
         for i, (hook, project) in enumerate(hooks.values())
         for markers in (False, True)
-        for kind, payload in _payloads(hook, project).items()
+        for trigger in _triggers(hook)
+        for kind in _payloads(hook, project)
     ]
+    assert any(t == "manual" for *_, t in jobs), "no PreCompact manual cell"
 
-    def cell(job: tuple[int, _Hook, Path, str, str, bool]) -> str | None:
-        i, hook, project, kind, _, markers = job
-        tag = f"{i}-{kind}-{markers}"
-        head_p = _copy(project, tmp_path / f"head-{tag}", markers=markers)
-        ref_p = _copy(project, tmp_path / f"ref-{tag}", markers=markers)
-        head_payload = _payloads(hook, head_p)[kind]
-        ref_payload = _payloads(hook, ref_p)[kind]
-        head_exit, head_err = _run(hook.command, REPO_ROOT, head_p, home, head_payload, kind)
-        ref_exit, _ = _run(hook.command, ref, ref_p, home, ref_payload, kind)
-        ok = head_exit == 0 or (head_exit == 2 and ref_exit == 2)
-        if ok and "Traceback" not in head_err:
-            return None
-        return (
-            f"{hook.file} {hook.event} {hook.command.split('python -m')[-1].strip()} "
-            f"[{kind}, markers={markers}]: HEAD exit {head_exit}, db19f023 exit {ref_exit}: "
-            f"{head_err.strip()[-300:]}"
+    def cell(job: tuple[int, _Hook, Path, str, bool, str]) -> str | None:
+        i, hook, project, kind, markers, trigger = job
+        scratch = tmp_path / f"c{i}"
+        scratch.mkdir(exist_ok=True)
+        return _verdict(
+            hook,
+            project,
+            kind,
+            markers,
+            trigger,
+            head=REPO_ROOT,
+            ref=ref,
+            home=home,
+            scratch=scratch,
         )
 
     with ThreadPoolExecutor(_WORKERS) as pool:
@@ -265,3 +334,27 @@ def test_ac008_every_shipped_hook_command_is_safe(
     assert not failures, f"{len(failures)}/{len(jobs)} cells violate AC-008:\n" + "\n".join(
         failures[:30]
     )
+
+
+def test_ac008_a_hook_that_raises_is_reported(
+    tmp_path: Path, corpus: tuple[Path, dict[tuple[str, str, str, str], tuple[_Hook, Path]]]
+) -> None:
+    """Negative control: the same verdict must fail a cell whose module raises."""
+    _ref, hooks = corpus
+    stub = tmp_path / "stub"
+    (stub / "src").mkdir(parents=True)
+    (stub / "src" / "ac008_stub_raises.py").write_text(
+        'raise RuntimeError("ac008 negative control")\n', encoding="utf-8"
+    )
+    real, project = next(iter(hooks.values()))
+    hook = _Hook(
+        real.file, real.event, real.matcher, f'uv run --with "{stub}" python -m ac008_stub_raises'
+    )
+    home = _shim_home(tmp_path / "home")
+    scratch = tmp_path / "neg"
+    scratch.mkdir()
+    verdict = _verdict(
+        hook, project, "claude", False, "auto", head=stub, ref=stub, home=home, scratch=scratch
+    )
+    assert verdict is not None
+    assert "ac008 negative control" in verdict

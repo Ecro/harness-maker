@@ -172,10 +172,19 @@ def test_the_fan_out_is_absent_from_the_codex_render() -> None:
     assert "Explore" not in body
 
 
-@pytest.mark.parametrize("targets", [_CLAUDE_ONLY, _WITH_CODEX])
-def test_every_source_class_survives_in_both_renders(targets: tuple[Target, ...]) -> None:
-    """Redistributed, not deleted — a fan-out that loses source classes is a regression."""
-    body = _commands(targets)["research"]
+@pytest.mark.parametrize("reader", ["claude", "codex"])
+def test_every_source_class_survives_in_both_renders(reader: str) -> None:
+    """Redistributed, not deleted — a fan-out that loses source classes is a regression.
+
+    The two renders are the two branches: Claude's fan-out and Codex's plain list. (The second
+    case used to render with cursor, which took the plain branch in the Claude file.)
+    """
+    if reader == "claude":
+        body = _commands(_CLAUDE_ONLY)["research"]
+        assert "Fan out" in body
+    else:
+        body = _codex_skills(_WITH_CODEX)["hm-research"]
+        assert "Run these in parallel where the answers are independent" in body
     for marker in (
         "Codebase patterns",
         "Prior-art search in memory",
