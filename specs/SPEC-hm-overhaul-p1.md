@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: hm-overhaul-p1
-status: draft
+status: approved
 created: 2026-10-15
 tags: [harness-maker, spec, python, overhaul, stages, hooks, cli, cursor, brownfield]
 test_framework: pytest

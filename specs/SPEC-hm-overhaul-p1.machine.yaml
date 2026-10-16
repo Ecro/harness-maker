@@ -206,7 +206,8 @@ ac:
   - input:
       case: D-9 reviewers.fanout false (default), installed naming every lens reviewer
     expected: no .claude/agents/ or .codex/agents/ file for security-reviewer, concurrency-reviewer,
-      test-reviewer, performance-reviewer or ux-reviewer; execute.md names no lens agent
+      test-reviewer, performance-reviewer or ux-reviewer; execute.md names no lens
+      agent
     edge: false
     note: DRI card 2026-10-16; installed lists every lens by default, so it cannot
       be the switch
@@ -215,9 +216,9 @@ ac:
         targets [claude-code, codex]
     expected: .claude/agents/{security-reviewer,ux-reviewer}.md and .codex/agents/{security-reviewer,ux-reviewer}.toml
       with their config.toml [agents.*] entries, and no other lens agent; execute.md
-      names exactly those two lens agents and dispatches them in parallel alongside code-reviewer, merges and de-duplicates
-      their findings into the same fix loop capped by reviewers.max_review_rounds;
-      execute.md <= its base budget + 1500
+      names exactly those two lens agents and dispatches them in parallel alongside
+      code-reviewer, merges and de-duplicates their findings into the same fix loop
+      capped by reviewers.max_review_rounds; execute.md <= its base budget + 1500
     edge: true
     note: the opt-in block is outside the base budget, like second opinion, delegation
       and Second Brain
@@ -320,9 +321,9 @@ ac:
   oracle_source: golden
   oracle_evidence: The file lists come from the DRI-approved draft sections 1 and
     6 as amended by the 2026-10-15 corrections and the DRI card of 2026-10-16 (D-9,
-    lens fan-out opt-in); the budgets are the DRI's 6k/7k/3k
-    targets adjusted by the scratchpad-draft estimates stated in Open Questions 5,
-    fixed here before any template is written.
+    lens fan-out opt-in); the budgets are the DRI's 6k/7k/3k targets adjusted by the
+    scratchpad-draft estimates stated in Open Questions 5, fixed here before any template
+    is written.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -669,9 +670,9 @@ ac:
     own}, or one harness.yaml key from the AC-007 table: loop.enabled true; delegation.stages
     [review, execute]; delegation.stages [verify]; reviewers.max_review_rounds 2;
     reviewers.enabled naming a lens reviewer with reviewers.fanout absent; reviewers.fanout
-    true with installed naming lens reviewers; reviewers.fanout true with no lens in
-    installed; skills.enabled naming conditional-router;
-    agent_models.test-reviewer set with reviewers.fanout absent; autonomy.autopilot_persistent true'
+    true with installed naming lens reviewers; reviewers.fanout true with no lens
+    in installed; skills.enabled naming conditional-router; agent_models.test-reviewer
+    set with reviewers.fanout absent; autonomy.autopilot_persistent true'
   transformation: hm make <tree> --update at HEAD
   expected_relation: 'pristine tree: files after == AC-004 set and every removed file
     was in the db19f023 listing; mutated retired file kept byte-identical with one
@@ -933,22 +934,22 @@ irreversible_decisions:
   source: spec
 approval:
   kind: human
-  content_hash: bd01dacbccab0b79821bbfda20c8897a26c07e3c3d0aa53e17d5c7010e3b390b
+  content_hash: a2058086eb49639ee7da69382cee6303cf08f47067b1e56d83e43b8ab807320c
   approved_by: Ecro
-  approved_at: '2026-10-16T04:30:12Z'
+  approved_at: '2026-10-16T08:55:19Z'
   field_hashes:
     schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
     spec_slug: 85ab553117319db92c38915c816d1009855e530644a3d969781c75e63280b581
     verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
     mutation_threshold_rationale: cd934b63d1089c97d3b93967cce536e6a1f32e551b01e580b519d597e98f562b
-    irreversible_decisions: cf03d7fcfa45855e7ee611ac681574b4c2610f82510930a06b0e8e0efd2779fd
+    irreversible_decisions: 388d11188a93a4f2660b48b7c5bda6cb3ede4c6745630f5d4b9191bb924d9a0e
     AC-001: ac5ae08698c470e0c8e12b036b32536059e0be3b8a576ab886d6acb9a193fcdb
     AC-002: 6d3caa5bdd110e41b480ee115c4aa354cc6b41296f6946bcae95727f353cf840
     AC-003: 4f4714c9e25b4e1bbf76f881f046fb2e521e437eac8d79d2de5290976590470e
-    AC-004: ccee70828984253232f0592686bc36b76a885737a655e9175b7efbb2747186fb
+    AC-004: e3cacefc91a3725d1420227969007b08cbb68d651eca7f70d60a2474dbf12741
     AC-005: 4357acab2cdda3931617daf6497cbf54926751886a36284f87f481facc4b7642
     AC-006: a10139afa0badb33107df90280af1e3a92ae36bfefc2063ce949b3ddcbb4bad8
-    AC-007: cc2fb296f61f0a80c5f26a90f9915ac5d92e9ca6bef033a373fa8bf5da4cbe5a
+    AC-007: 7bd6ccbb2dfdbe05b2a6683813d5ef7d9efe34a78ec8cfa39a498b8b3546b6d3
     AC-008: 64216fdac18122458bb9567acd2f343c80b0001389013d11177606a699348fab
     AC-009: 3d82bf6dcf5777a4c79e6110ebbf67a74ca0f33c9047cf75dcaaa21288212692
     AC-010: ba6144c63efa449256ba6315de00b23d63a08cb3594e1e128279b153619064a1
