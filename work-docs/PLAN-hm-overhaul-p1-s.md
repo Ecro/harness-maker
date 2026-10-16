@@ -57,10 +57,18 @@ Each phase ends at a commit with the local gate green for what it touched.
   `PYTHONDONTWRITEBYTECODE=1`; a pytest-kind command gets `-p no:cacheprovider` appended. The AC
   run writes its junit XML to a temp dir outside the project. Gates all run (no stop at the first
   failure), so the JSON names every failing gate.
-- **ADR-004: one pytest run for `ac`.** The runner is the project's `.venv/bin/python -m pytest`
-  when present, else the pytest prefix of the first CI test gate; with neither, `ac` cannot run
-  and the result is exit 3 (degraded). A listed id missing from the junit XML is classified by a
-  `--collect-only -o addopts=` probe: collected means `deselected`, otherwise `not collected`.
+- **ADR-004: one pytest run for `ac`, over the files of the listed ids.** The runner is the
+  project's `.venv/bin/python -m pytest` when present, else the pytest prefix of the first CI test
+  gate; with neither, `ac` cannot run and the result is exit 3 (degraded). Pytest is given the
+  test *files* with `--continue-on-collection-errors`, because a node id inside a module that
+  fails to import, or one that does not exist, makes pytest abort the whole run. Outcomes are read
+  from the junit XML. Two outcomes junit cannot express are settled before or around it:
+  - a listed id that names no test (statically, by `ast`) is `not collected` and never reaches
+    pytest;
+  - a statically present id missing from the XML is `deselected` (an `addopts -m` filter);
+  - a non-strict XPASS is a plain pass in junit, so a 9-line plugin, put on `PYTHONPATH` from the
+    run's temp dir, adds a `hm_check_outcome=xpassed` property to that test's junit entry. The
+    outcome still comes from the XML.
 - **ADR-005: the RED reason test.** A body failure or a setup error is a real reason, except a
   fixture-not-found setup error. A collection error counts only through the `red_by_import`
   guard (`ImportError`/`ModuleNotFoundError`, or `AttributeError: module 'x' has no attribute
@@ -81,9 +89,16 @@ Each phase ends at a commit with the local gate green for what it touched.
   (`ai_readiness.run_structural`): score and failed signals. The AC-005 exit-1 list does not name
   it, so it never changes the exit code; an exception there is reported as `ok: false` with the
   reason and still does not gate.
-- **ADR-010: `hm check --red` with `--mutation` or `--harness`.** The RED run is the AC run only;
-  approval, review, security and cve are reported but cannot turn a RED pass into exit 1, because
-  RED runs before the change exists. Gates do not run in `--red` (the code is absent by design).
+- **ADR-010: `--red` runs approval and the RED check only.** RED runs before the change exists,
+  so gates, review, security and cve are reported as `skipped: --red`, and `--mutation` and
+  `--harness` are ignored there. Approval still gives 5, and a tree change still gives 4.
+- **ADR-011: the plain `ac` run always re-derives `red_by_import`.** Every first-party import in an
+  AC's test files that is absent at HEAD is listed with `implemented`; one not implemented fails
+  its AC and sets `ac.reason: red_by_import not implemented`, whatever the test outcome says.
+- **ADR-012: the security scan walks git's file list.** `secscan.secrets` gains `scan_files`, fed by
+  the same `git ls-files` list the snapshot uses, so an ignored `.worktrees/` copy is never read.
+  "An import that resolves inside the project root never counts" is vacuous here: it is about the
+  hallucination gate, which `hm check` does not run.
 
 (Phase 4 ADRs are added when that phase starts.)
 
@@ -114,8 +129,27 @@ Each phase ends at a commit with the local gate green for what it touched.
 
 ## Progress
 
-- [ ] Phase 1 — `hm check`
+- [x] Phase 1 — `hm check`
 - [ ] Phase 2 — telemetry readers
 - [ ] Phase 3 — eval-3 replay
 - [ ] Phase 4 — stage collapse
 - [ ] Phase 5 — ship
+
+## Evidence
+
+### Phase 1 (AC-005)
+
+RED, 2026-10-16, against b5ff8af0 with `src/harness_maker/check.py` absent:
+
+```
+tests/unit/test_overhaul_p1_hm_check.py:25: in <module>
+    from harness_maker import check, spec_machine
+E   ImportError: cannot import name 'check' from 'harness_maker'
+ERROR tests/unit/test_overhaul_p1_hm_check.py
+```
+
+A first-party name absent at HEAD, which is the SPEC's own `red_by_import` RED.
+
+GREEN: `tests/unit/test_overhaul_p1_hm_check.py` 48 passed (25 exit rows, 16 RED rows, usage,
+one-line output, tree bytes x2, gate env). `mark-tested --ac AC-005`: OK; `approval-status` still
+`approved`.

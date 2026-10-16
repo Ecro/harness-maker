@@ -40,6 +40,7 @@ _DISPATCHABLE: frozenset[str] = frozenset(
         "autopilot_caps",
         "codex_adapter",
         "autopilot_ledger",
+        "check",
         "mutation_receipt",
         "cli",
         "delegation_ledger",

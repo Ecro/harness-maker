@@ -548,7 +548,7 @@ ac:
     note: unchanged from db19f023 spec_mutation gate
   rubric_id: null
   note: PR-S
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The exit meanings, the pytest-outcome rule, the skip-path rule
     and the red_by_import rule are fixed in this SPEC before implementation and are

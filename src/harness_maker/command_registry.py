@@ -124,6 +124,8 @@ MODULES: dict[str, ModuleSpec] = {
     ),
     # flagonly: no subcommand, so guard-exempt — the argparse layer owns its own errors.
     "second_opinion_invoke": ModuleSpec("flagonly"),
+    # SPEC-hm-overhaul-p1 AC-005: one exit code for every deterministic gate.
+    "check": ModuleSpec("flagonly"),
     "test_dep_map": ModuleSpec("flagonly"),
     "wrapup_brief": ModuleSpec("flagonly"),
     "wrapup_land": ModuleSpec("flagonly"),
