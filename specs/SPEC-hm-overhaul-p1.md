@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: hm-overhaul-p1
-status: approved
+status: draft
 created: 2026-10-15
 tags: [harness-maker, spec, python, overhaul, stages, hooks, cli, cursor, brownfield]
 test_framework: pytest
@@ -50,8 +50,9 @@ unnecessary, and areas the model or the host already handles well. The repo's ow
 - CVE scanning runs in `hm check`.
 - The Cursor target is gone. An existing Cursor install upgrades without errors and without losing
   user edits.
-- The eval re-run meets the ship bar. On tier 1 the cost ratio is ≤ 8x, and hm's hidden-test pass rate
-  is no lower than plain's.
+- The eval re-run meets the ship bar (amended 2026-10-16). On tier 1 the cost ratio is below eval 3's
+  26.418, and hm's hidden-test pass rate is no lower than plain's. The re-run measured 12.97x; the
+  original ≤ 8x bar was missed, and 8x is the phase-2 target.
 
 ## 📋 In-Scope Scenarios
 
@@ -97,7 +98,8 @@ the run (a gate, or a concurrent edit) is detected, listed in `tree_changed`, an
 ### S7: ship bar (AC-010)
 **Given** the eval re-run on tiers 1–2, 3 runs per cell
 **When** the scorecard is published
-**Then** the t1 cost ratio is ≤ 8x and hm's hidden-test pass rate is at least plain's.
+**Then** the t1 cost ratio is below the eval-3 baseline of 26.418 and hm's hidden-test pass rate is at
+least plain's.
 
 ### S8: telemetry readers after the telemetry hook goes (AC-011)
 **Given** a project where no `metrics-*.jsonl` is written any more
@@ -184,11 +186,17 @@ db19f023 also exited 2, and never prints a traceback.
 - the bench contract.
 
 ### AC-010: The eval re-run meets the ship bar
-**[S]** On tier 1 the cost ratio is ≤ 8x, and on tiers 1–2 hm's hidden-test pass rate is ≥ plain's.
+**[S]** On tier 1 the judged cost ratio is below the eval-3 baseline of 26.418 (the last published ratio
+before this phase), and on tiers 1–2 hm's hidden-test pass rate is ≥ plain's, on rows measured on this
+harness. The ratio is compared at its published precision (3 decimals). The verdict, runs-per-cell,
+capped and leak checks are unchanged.
 The test reads the committed `docs/evals/results.jsonl`. It uses the rows whose `harness_sha` is
 reachable from HEAD but not from db19f023. When no such rows exist, the test **fails**; it never
 skips. That makes the published eval the ship gate: PR-S wrapup cannot pass `hm check` before the
 scorecard is committed.
+Measured at harness a2fe560a4018 (2026-10-16): tier-1 judged ratio 12.97x (CLI 11.49x), tier 2
+13.60x; both arms solved 36/36. The original bar of ≤ 8x was missed, and the 4.5x (3.5–6.5x)
+prediction in `PREDICTION-p1.md` was wrong. 8x is the phase-2 target.
 
 ### AC-011: Every metrics-*.jsonl reader says it has no telemetry source
 **[S]** Once the `telemetry` hook is retired, no module may read an absent `metrics-*.jsonl` as
@@ -539,7 +547,7 @@ The readers were found with a grep of db19f023 for `_metrics_io` and `metrics-`.
 | S4 | unit + integration | golden tables (AC-002, AC-007); property over hook commands (AC-008) |
 | S5 | unit | differential against db19f023 modules via `git show` (AC-009) |
 | S6 | unit | golden: the db19f023 registry (AC-003) |
-| S7 | integration, reads the committed scorecard | golden thresholds from the DRI (AC-010) |
+| S7 | integration, reads the committed scorecard | golden thresholds from the DRI, amended by the card of 2026-10-16 (AC-010) |
 | S8 | unit | golden: the reader list grepped from db19f023 (AC-011) |
 
 ## Cut ledger (AC-003)
@@ -696,3 +704,12 @@ Every db19f023 registry heading not listed here is **KEPT** in its stage. Dispos
   measured use, but no class justifies cutting them either.
 - **The spec-validator** reviewed revision 1 and returned MAJOR_REVISION. Revision 2 addresses
   every finding.
+- **AC-010 bar amended per DRI card 2026-10-16 ("기준 고치고 출시", revision 4).** The bar was changed
+  after the result was seen. The re-run at harness a2fe560a4018 measured a tier-1 judged ratio of
+  12.97x (CLI 11.49x; tier 2 13.60x), so the 2026-10-15 bar of ≤ 8x was missed, and the 4.5x
+  prediction in `PREDICTION-p1.md` was wrong. Both arms solved 36/36, and the judge still scored plain
+  ahead (overall 4.27 vs 3.87 on tier 1, 4.60 vs 4.16 on tier 2). The DRI chose to ship on the
+  improvement: the bar is now a tier-1 ratio below eval 3's 26.418, with the pass-rate, verdict,
+  runs-per-cell, capped and leak checks unchanged. 8x moves to phase 2 as its target. The amendment
+  touches AC-010, S7, the Outcomes line and the S7 Verification row. The approval stamp is void until
+  the DRI re-approves.

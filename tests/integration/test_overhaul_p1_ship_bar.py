@@ -3,9 +3,11 @@
 Reads the committed `docs/evals/results.jsonl` and keeps the rows whose `harness_sha` is
 reachable from HEAD but not from db19f023, i.e. rows measured on this overhaul's harness. With no
 such rows the test fails and never skips: the committed scorecard is PR-S's ship gate.
-Predicate (the DRI's 2026-10-15 bar): tier-1 cost ratio <= 8, and on tiers 1-2 hm's hidden-test
-pass rate >= plain's. The ratio is `bench_light_lane.summarize`'s judged ratio (the larger of the
-CLI and transcript ratios), so the gate and the published number are one computation.
+Predicate (amended by the DRI's card of 2026-10-16, after the re-run missed the 2026-10-15 bar of
+<= 8): tier-1 cost ratio below the eval-3 baseline of 26.418, and on tiers 1-2 hm's hidden-test
+pass rate >= plain's. 8x is the phase-2 target. The ratio is `bench_light_lane.summarize`'s
+judged ratio (the larger of the CLI and transcript ratios), so the gate and the published number
+are one computation.
 """
 
 from __future__ import annotations
@@ -24,7 +26,10 @@ from tests._overhaul_p1_ref import REF_SHA, REPO_ROOT
 
 RESULTS = REPO_ROOT / "docs" / "evals" / "results.jsonl"
 _SCRIPT = REPO_ROOT / "scripts" / "bench_light_lane.py"
-MAX_T1_RATIO = 8.0
+#: The eval-3 tier-1 judged ratio, the last one published before this phase: `summarize` over
+#: docs/evals/results.jsonl as committed in db19f023 (harness 6b7c30d9e175) gives 26.4177,
+#: published as 26.418 in that commit's RESULTS.md.
+EVAL3_T1_RATIO = 26.418
 
 
 @cache
@@ -91,8 +96,9 @@ def ship_bar_violations(rows: list[dict[str, Any]]) -> list[str]:
     ratio = summary.get("judged_ratio")
     if ratio is None:
         out.append("tier 1 has no priced plain/hm pair, so the cost ratio is undefined")
-    elif ratio > MAX_T1_RATIO:
-        out.append(f"tier-1 cost ratio {ratio:.3f} > {MAX_T1_RATIO:g}")
+    elif round(ratio, 3) >= EVAL3_T1_RATIO:
+        # Compared at the published precision: eval 3's own unrounded 26.4177 must not pass.
+        out.append(f"tier-1 cost ratio {ratio:.3f} is not below the eval-3 {EVAL3_T1_RATIO:g}")
     usable = [
         r for r in rows if r.get("status") not in bench.UNUSABLE and bench.tier_of(r) in (1, 2)
     ]
@@ -150,7 +156,8 @@ def _row(arm: str, task: str, cost: float, passed: bool, rep: int, **extra: Any)
 
 
 def test_ac010_predicate_controls() -> None:
-    """The bar is two-sided: a cheap-enough hm arm passes, a 9x or a lower pass rate does not."""
+    """The bar is two-sided: a ratio below the eval-3 baseline passes, a ratio at or above it, or
+    a lower pass rate, does not. 12.97 is the measured PR-S ratio, which the 8x bar rejected."""
 
     def rows(hm_cost: float, hm_passed: bool) -> list[dict[str, Any]]:
         return [_row("plain", "t1", 1.0, True, i) for i in range(3)] + [
@@ -158,9 +165,24 @@ def test_ac010_predicate_controls() -> None:
         ]
 
     assert ship_bar_violations(rows(5.0, True)) == []
-    assert any("cost ratio" in v for v in ship_bar_violations(rows(9.0, True)))
+    assert ship_bar_violations(rows(12.97, True)) == []
+    assert any("cost ratio" in v for v in ship_bar_violations(rows(EVAL3_T1_RATIO, True)))
+    assert any("cost ratio" in v for v in ship_bar_violations(rows(27.0, True)))
     assert any("pass rate" in v for v in ship_bar_violations(rows(2.0, False)))
     assert ship_bar_violations([])
+
+
+def test_ac010_the_eval3_scorecard_itself_does_not_pass() -> None:
+    """The baseline's own rows sit at the baseline, so they miss a bar that asks for less."""
+    text = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "show", f"{REF_SHA}:docs/evals/results.jsonl"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    ).stdout
+    rows = [json.loads(line) for line in text.splitlines() if line.strip()]
+    assert any("cost ratio" in v for v in ship_bar_violations(rows))
 
 
 def test_ac010_untrusted_scorecards_do_not_pass() -> None:

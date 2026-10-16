@@ -790,20 +790,27 @@ ac:
   type: mechanical
   test_ids:
   - tests/integration/test_overhaul_p1_ship_bar.py::test_ac010_scorecard_meets_bar
-  executable_predicate: t1_cost_ratio <= 8 and hm_hidden_pass_rate >= plain_hidden_pass_rate
+  executable_predicate: round(t1_judged_cost_ratio, 3) < 26.418 and hm_hidden_pass_rate
+    >= plain_hidden_pass_rate
   golden_table: []
   rubric_id: null
   note: PR-S. Measured by scripts/bench_light_lane.py on tiers 1-2, 3 runs per cell.
     The test reads the committed docs/evals/results.jsonl and uses the rows whose
     harness_sha is reachable from HEAD and not from db19f023 (git merge-base --is-ancestor);
     with no such rows it fails, never skips, so the published scorecard is the ship
-    gate for PR-S wrapup. A ratio <= 5 meets the intent metric; over 8x, trace with
-    `economics stages` before cutting further. D-8 (no lanes) is invisible to this
-    headless eval; interactive cost is watched in use.
+    gate for PR-S wrapup. 26.418 is the eval-3 tier-1 judged ratio, the last published
+    before this phase; the verdict, runs-per-cell, capped and leak checks are unchanged.
+    Measured at harness a2fe560a4018 on 2026-10-16 as 12.97x (CLI 11.49x), tier 2 13.60x,
+    both arms 36/36. The original <= 8 bar was missed and the 4.5x prediction in PREDICTION-p1.md
+    was wrong; 8x is the phase-2 target. A ratio <= 5 meets the intent metric; over 8x,
+    trace with `economics stages` before cutting further. D-8 (no lanes) is invisible
+    to this headless eval; interactive cost is watched in use.
   pending_test: true
   oracle_source: golden
-  oracle_evidence: The thresholds are the DRI's 2026-10-15 ship bar and the pass-rate
-    counter-signal from the draft section 4, fixed before the re-run.
+  oracle_evidence: The pass-rate counter-signal is from the draft section 4, fixed before
+    the re-run. The ratio threshold was amended after the re-run by the DRI's card of
+    2026-10-16 ("기준 고치고 출시"), replacing the 2026-10-15 bar of <= 8 that the
+    measured 12.97x missed.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
