@@ -491,8 +491,14 @@ def _agent_files(
     the FileSpec list stays import-time-evaluable; synthesize() passes the
     live HarnessConfig values at render time.
     """
-    from harness_maker.models import HarnessConfig
+    from harness_maker.models import HarnessConfig, ModelTier
     from harness_maker.presets import resolve_agent_spec
+
+    # A 0.62 cursor-only override (`cursor: opus`, no `claude:`) chose this agent's model, and
+    # 0.62 rendered the Claude `model:` from it. The cursor key is otherwise inert now, but
+    # dropping that fallback would quietly move such an agent to the template's floor model.
+    # Only a tier alias carries over; a concrete Cursor id never named a Claude model.
+    tier_aliases = {t.value for t in ModelTier}
 
     config = HarnessConfig(
         preset=preset,
@@ -502,7 +508,7 @@ def _agent_files(
     out: list[FileSpec] = []
     for n in _ALL_AGENTS:
         spec = resolve_agent_spec(n, config)
-        claude_model = spec.claude
+        claude_model = spec.claude or (spec.cursor if spec.cursor in tier_aliases else None)
         out.append(
             (
                 f"agents/{n}.md.j2",

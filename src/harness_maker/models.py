@@ -735,9 +735,10 @@ _MODEL_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_.:-]+$")
 class AgentModelSpec(BaseModel):
     """Per-agent override carrying optional Claude / Codex values.
 
-    ``cursor`` is inert since the Cursor target was removed (0.63.0): it stays a parseable
-    field so a 0.62 harness.yaml still loads under ``extra="forbid"`` (IRR-006), feeds no
-    render, and ``make`` warns once per agent that sets it.
+    ``cursor`` names no Cursor model since the Cursor target was removed (0.63.0): it stays a
+    parseable field so a 0.62 harness.yaml still loads under ``extra="forbid"`` (IRR-006), and
+    ``make`` warns once per agent that sets it. With no ``claude``, a tier alias in it still
+    picks the Claude model, as 0.62 rendered it (``synthesize._agent_files``).
 
     Security: ``claude``/``cursor`` values flow into Jinja2-rendered YAML
     frontmatter (``model: {{ claude_model }}``); a field_validator enforces a

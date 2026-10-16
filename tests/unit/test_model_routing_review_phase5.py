@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from harness_maker.io_utils import atomic_write
@@ -223,15 +224,26 @@ def test_cp2_all_agents_subset_of_communication_variant() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_user_override_cursor_only_is_inert() -> None:
-    """0.63.0 (SPEC-hm-overhaul-p1 IRR-006): `agent_models.<a>.cursor` still loads
-    but no longer feeds the Claude model.
+@pytest.mark.parametrize(
+    ("cursor", "claude_model", "model_line"),
+    [
+        # A tier alias carries over, exactly as db19f023's `_alias_by_cursor_id` derived it.
+        ("sonnet", "sonnet", "model: sonnet"),
+        ("haiku", "haiku", "model: haiku"),
+        # Anything else never named a Claude model: the template floor renders.
+        ("some-concrete-id", None, "model: opus"),
+    ],
+)
+def test_user_override_cursor_only_keeps_its_alias(
+    cursor: str, claude_model: str | None, model_line: str
+) -> None:
+    """0.63.0 (SPEC-hm-overhaul-p1 AC-001, PR-C review round 1): a cursor-only override still
+    picks the Claude model when it holds a tier alias.
 
-    A user who writes `agent_models: {autoloop-coder: {cursor: opus}}` (no `claude:`)
-    leaves spec.claude None, and `_agent_files` no longer derives an alias from the
-    cursor value: `claude_model` is None and the template's alias floor renders. The
-    `model:` line must still be valid (MV-3), never the bare `None` / `null`. `make`
-    warns once that the key is ignored.
+    A user who writes `agent_models: {autoloop-coder: {cursor: sonnet}}` (no `claude:`) leaves
+    spec.claude None. 0.62 rendered the Claude `model:` from that alias; dropping the fallback
+    would move the agent to the template floor, so "T minus cursor" would not render the same.
+    The `model:` line must stay valid (MV-3), never the bare `None` / `null`.
     """
     from jinja2 import Environment, FileSystemLoader
 
@@ -239,18 +251,18 @@ def test_user_override_cursor_only_is_inert() -> None:
 
     config = HarnessConfig(
         preset=Preset.PRODUCTION,
-        agent_models={"autoloop-coder": AgentModelSpec(cursor="sonnet")},
+        agent_models={"autoloop-coder": AgentModelSpec(cursor=cursor)},
     )
     spec = resolve_agent_spec("autoloop-coder", config)
     assert spec.claude is None  # Tier-1 cursor-only override
-    assert spec.cursor == "sonnet"  # parsed, carried, unused
+    assert spec.cursor == cursor  # parsed and carried unnormalized
 
     ctx = next(
         c
         for tmpl, dst, c in _agent_files(preset=Preset.PRODUCTION, agent_models=config.agent_models)
         if dst == "agents/autoloop-coder.md"
     )
-    assert ctx["claude_model"] is None, "the inert cursor value must not pick the Claude model"
+    assert ctx["claude_model"] == claude_model
 
     templates_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
@@ -261,9 +273,7 @@ def test_user_override_cursor_only_is_inert() -> None:
     assert _VALID_MODEL_LINE.search(rendered) is not None, (
         f"invalid model: line rendered; head:\n{rendered[:300]}"
     )
-    # The template floor, not the cursor value.
-    assert "model: opus" in rendered
-    assert "model: sonnet" not in rendered
+    assert f"\n{model_line}\n" in rendered
 
 
 # Phase A.5 / B reference: pytest -k phase5_test_model_routing
