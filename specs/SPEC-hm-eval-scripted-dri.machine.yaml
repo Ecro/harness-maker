@@ -3,9 +3,9 @@ spec_slug: hm-eval-scripted-dri
 parent_spec: SPEC-hm-eval
 verification_tier: 2
 mutation_threshold: null
-mutation_threshold_rationale: Dev-only eval script outside src; every scenario is pinned
-  by a scripted fake CLI, golden work dirs and golden CLI results, so mutation testing
-  adds little.
+mutation_threshold_rationale: Dev-only eval script outside src; every scenario is
+  pinned by a scripted fake CLI, golden work dirs and golden CLI results, so mutation
+  testing adds little.
 last_mutation_run: null
 paths_to_mutate: []
 mutation_runner: null
@@ -19,12 +19,12 @@ ac:
   test_ids:
   - tests/unit/test_bench_scripted_dri.py::test_hm_cell_sends_spec_approve_execute_wrapup_in_one_resumed_session
   - tests/unit/test_bench_scripted_dri.py::test_later_turns_differ_from_turn_one_only_by_prompt_and_resume
-  executable_predicate: 'sent == [HM_PREFIX + task.prompt, APPROVE_TURN, "/hm:execute
+  executable_predicate: sent == [HM_PREFIX + task.prompt, APPROVE_TURN, "/hm:execute
     " + slug, "/hm:wrapup " + slug] and argvs[0] == hm_argv_today and all(a[:-2] ==
     with_prompt(argvs[0], p) and a[-2:] == ["--resume", first_session_id] for a, p
     in zip(argvs[1:], sent[1:])) and APPROVE_TURN == "I approve this SPEC as written.
     For each open question, take the option you recommend and record it in the SPEC.
-    Stamp the approval, then stop."'
+    Stamp the approval, then stop."
   golden_table: []
   rubric_id: null
   note: The fake CLI writes specs/SPEC-x.md on turn 1 and reports one session_id;
@@ -54,11 +54,11 @@ ac:
   test_ids:
   - tests/unit/test_bench_scripted_dri.py::test_no_spec_after_turn_one_gets_one_fixed_reply
   - tests/unit/test_bench_scripted_dri.py::test_no_spec_after_the_reply_stops_as_no_spec
-  executable_predicate: 'kinds(late_spec) == ["spec", "reply", "approve", "execute",
+  executable_predicate: kinds(late_spec) == ["spec", "reply", "approve", "execute",
     "wrapup"] and kinds(no_spec) == ["spec", "reply"] and no_spec["dri_stop"] == "no_spec"
     and no_spec["stopped_at"] == 2 and no_spec["outcome"] == "stalled" and sent(no_spec)[1]
     == REPLY_TURN == "I have nothing to add. For each open question, take the option
-    you recommend, then write the SPEC."'
+    you recommend, then write the SPEC."
   golden_table: []
   rubric_id: null
   note: late_spec writes the SPEC only on the reply turn; no_spec never writes one
@@ -90,28 +90,39 @@ ac:
   executable_predicate: null
   golden_table:
   - input:
-      work_specs: {SPEC-a.md: 1, SPEC-b.md: 2}
+      work_specs:
+        SPEC-a.md: 1
+        SPEC-b.md: 2
       template_specs: []
     expected:
       slug: b
     edge: false
     note: the larger st_mtime_ns wins
   - input:
-      work_specs: {SPEC-a.md: 5, SPEC-b.md: 5}
+      work_specs:
+        SPEC-a.md: 5
+        SPEC-b.md: 5
       template_specs: []
     expected:
       slug: b
     edge: true
     note: equal mtimes, the larger name wins
   - input:
-      work_specs: {SPEC-old.md: 9, SPEC-new.md: 1}
-      template_specs: [SPEC-old.md]
+      work_specs:
+        SPEC-old.md: 9
+        SPEC-new.md: 1
+      template_specs:
+      - SPEC-old.md
     expected:
       slug: new
     edge: true
     note: a SPEC already in the arm's template is not one the run created
   - input:
-      work_specs: {SPEC-x.machine.yaml: 3, notes.md: 4, SPEC-Bad_Name.md: 5, sub/SPEC-y.md: 6}
+      work_specs:
+        SPEC-x.machine.yaml: 3
+        notes.md: 4
+        SPEC-Bad_Name.md: 5
+        sub/SPEC-y.md: 6
       template_specs: []
     expected:
       slug: null
@@ -131,9 +142,9 @@ ac:
   pending_test: true
   oracle_source: golden
   oracle_evidence: Each expected slug follows by hand from SPEC S3's rule (directly
-    under specs/, name pattern, absent from the template path, max of st_mtime_ns then
-    name) applied to the table's file list; the file layout matches the PR-S spec stage's
-    specs/SPEC-<slug>.md path seen in /var/tmp/hm-eval-p1 work dirs.
+    under specs/, name pattern, absent from the template path, max of st_mtime_ns
+    then name) applied to the table's file list; the file layout matches the PR-S
+    spec stage's specs/SPEC-<slug>.md path seen in /var/tmp/hm-eval-p1 work dirs.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -147,8 +158,8 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-004
-  title: Turn costs, turns and wall time are summed into one row from the running CLI
-    total
+  title: Turn costs, turns and wall time are summed into one row from the running
+    CLI total
   type: parametric
   test_ids:
   - tests/unit/test_bench_scripted_dri.py::test_turn_costs_are_differences_of_the_running_cli_total
@@ -157,11 +168,27 @@ ac:
   executable_predicate: null
   golden_table:
   - input:
-      cli_totals: [0.25, 0.3, 0.9, 1.0]
-      num_turns: [2, 1, 30, 5]
-      wall_s: [80.0, 10.0, 400.0, 60.0]
+      cli_totals:
+      - 0.25
+      - 0.3
+      - 0.9
+      - 1.0
+      num_turns:
+      - 2
+      - 1
+      - 30
+      - 5
+      wall_s:
+      - 80.0
+      - 10.0
+      - 400.0
+      - 60.0
     expected:
-      own_costs: [0.25, 0.05, 0.6, 0.1]
+      own_costs:
+      - 0.25
+      - 0.05
+      - 0.6
+      - 0.1
       cli_cost_usd: 1.0
       cost_source: cli
       num_turns: 38
@@ -170,9 +197,21 @@ ac:
     edge: false
     note: a full four-turn run; own costs compared with math.isclose
   - input:
-      cli_totals: [0.25, 0.2, 0.9, 1.0]
-      num_turns: [2, 1, 30, 5]
-      wall_s: [80.0, 10.0, 400.0, 60.0]
+      cli_totals:
+      - 0.25
+      - 0.2
+      - 0.9
+      - 1.0
+      num_turns:
+      - 2
+      - 1
+      - 30
+      - 5
+      wall_s:
+      - 80.0
+      - 10.0
+      - 400.0
+      - 60.0
     expected:
       cli_cost_usd: null
       cost_source: transcript
@@ -180,9 +219,15 @@ ac:
     edge: true
     note: a total that falls disproves the running-total reading for the row
   - input:
-      cli_totals: [0.25, null]
-      num_turns: [2, null]
-      wall_s: [80.0, 10.0]
+      cli_totals:
+      - 0.25
+      - null
+      num_turns:
+      - 2
+      - null
+      wall_s:
+      - 80.0
+      - 10.0
     expected:
       cli_cost_usd: null
       cost_source: transcript
@@ -217,18 +262,18 @@ ac:
   - tests/unit/test_bench_scripted_dri.py::test_a_failed_turn_stops_the_run_with_its_status
   - tests/unit/test_bench_scripted_dri.py::test_the_run_budget_stops_the_next_turn
   - tests/unit/test_bench_scripted_dri.py::test_a_lost_session_id_stops_the_run
-  executable_predicate: '(timed_out["status"], kinds(timed_out), timed_out["stopped_at"],
+  executable_predicate: (timed_out["status"], kinds(timed_out), timed_out["stopped_at"],
     timed_out["dri_stop"]) == ("timeout", ["spec", "approve", "execute"], 3, None)
     and (capped["dri_stop"], capped["subtype"], kinds(capped)) == ("budget", "error_max_budget_usd",
-    ["spec", "approve"]) and kinds(under_cap)[:3] == ["spec", "approve", "execute"] and
-    (lost["dri_stop"], kinds(lost)) == ("session_lost", ["spec", "approve"]) and all(t
-    == opts.timeout_s for t in invoke_timeouts)'
+    ["spec", "approve"]) and kinds(under_cap)[:3] == ["spec", "approve", "execute"]
+    and (lost["dri_stop"], kinds(lost)) == ("session_lost", ["spec", "approve"]) and
+    all(t == opts.timeout_s for t in invoke_timeouts)
   golden_table: []
   rubric_id: null
   note: timed_out's fake times out on execute; capped's fake reports a running total
-    of max_budget_usd after approve; under_cap's fake reports totals 2.0 then 4.0 under
-    a 5.0 cap, which a sum of totals (6.0) would wrongly stop; lost's fake reports a
-    new session_id on approve.
+    of max_budget_usd after approve; under_cap's fake reports totals 2.0 then 4.0
+    under a 5.0 cap, which a sum of totals (6.0) would wrongly stop; lost's fake reports
+    a new session_id on approve.
   pending_test: true
   oracle_source: golden
   oracle_evidence: The stop reasons, the budget subtype and stopped_at positions are
@@ -266,9 +311,9 @@ ac:
   pending_test: true
   oracle_source: golden
   oracle_evidence: The reference overlay under scripts/bench/tasks/t1/reference/ is
-    the independent witness that the hidden tests pass on a correct tree; the leak marker
-    is one of opts.leak_markers, and both expectations follow from SPEC S6 rather than
-    from the new code.
+    the independent witness that the hidden tests pass on a correct tree; the leak
+    marker is one of opts.leak_markers, and both expectations follow from SPEC S6
+    rather than from the new code.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -298,8 +343,8 @@ ac:
   oracle_source: golden
   oracle_evidence: The plain argv and row key set are the values already pinned in
     tests/unit/test_bench_tier3.py (path) before this change, and t19's session prompts
-    are read from its committed scripts/bench/tier3/tasks/t19/sessions/ files, so the
-    expectation predates the new code.
+    are read from its committed scripts/bench/tier3/tasks/t19/sessions/ files, so
+    the expectation predates the new code.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -318,20 +363,20 @@ ac:
   test_ids:
   - tests/unit/test_bench_scripted_dri.py::test_runner_hash_covers_the_turn_script
   - tests/unit/test_bench_scripted_dri.py::test_rows_from_before_the_turn_script_are_refused
-  executable_predicate: 'all(hash_with(name, changed) != base for name, changed in
+  executable_predicate: all(hash_with(name, changed) != base for name, changed in
     script_variants) and base not in ("17f703bf0fcc", "10856c4eb248") and raises(MixedResultsError,
-    ensure_consistent, [old_row, new_row]) and bench_hash() == "569e17ef29ab" and tier2_hash()
-    == "1cf707c57e12"'
+    ensure_consistent, [old_row, new_row]) and bench_hash() == "569e17ef29ab" and
+    tier2_hash() == "1cf707c57e12"
   golden_table: []
   rubric_id: null
   note: script_variants patch APPROVE_TURN, REPLY_TURN, the execute and wrapup prefixes,
-    the reply cap, the resume flag, the SPEC pattern and the tiers one at a time; old_row
-    carries the runner_hash recorded in docs/evals/results.jsonl.
+    the reply cap, the resume flag, the SPEC pattern and the tiers one at a time;
+    old_row carries the runner_hash recorded in docs/evals/results.jsonl.
   pending_test: true
   oracle_source: golden
   oracle_evidence: The old hashes 17f703bf0fcc and 10856c4eb248 are the runner_hash
-    values pinned before this change in tests/unit/test_bench_tier3.py (path), the old
-    row's hash is read from the committed docs/evals/results.jsonl, and bench_hash/tier2_hash
+    values pinned before this change in tests/unit/test_bench_tier3.py (path), the
+    old row's hash is read from the committed docs/evals/results.jsonl, and bench_hash/tier2_hash
     are the values SPEC-hm-eval-tier3 S7 pins.
   oracle_independence_waiver: null
   input_domain: null
@@ -380,3 +425,26 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: b2e8b75cb916dcff568b13323813506f3fdccc962b0760b9c6f6173233dce99d
+  approved_by: Ecro
+  approved_at: '2026-10-16T14:02:36Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 9554fe267ca1c22a51052797ccb93a757056776426dfec59e50e8b85b42d8e7d
+    parent_spec: d3ea6fcacb049196495e4f82523e3385697a941aa9ca959918936786b21f97af
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 02472dd03a89f5c8fc2dec8253e0f2d53bd52a07e6dbc61cef680784621638de
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: f94ca35015792a5853f3a6f0207074000a7ba809c38a3bf830e4206e3f505e05
+    AC-002: a8194912a732dc1166ff43ffa103d8a12a8a9eced7ebfd45c48244569b2547c8
+    AC-003: 18e692a119848cc00ffe614521ca8ed9b1bbb27a78787ddbaa81dc23a7267d33
+    AC-004: 54dcda61e631656665ee0224b83e0520e3ee4883474b7c6df8c2e33e0f1958a4
+    AC-005: fdbf92168245243c2d0327c662e65861e90f6120e33914598a29e207b0ad3144
+    AC-006: 5a6f2a3208f743f225c5c98cf18dd5942bfa83dd816578f1307dc96bc0775198
+    AC-007: 9a2dc51afb2c3a25a0b99f2d8b39a8f459881b5a6a50e44026ea22c4cb0f00eb
+    AC-008: 05568b3f490ce4c59899e57b3d4db9f6b369b9b0f1a2c0aa688d49622a48155a
+    AC-009: 3d268a1fa743bdf82b5fd019450f58019fb00e983fef284ad180f5fe3bfe4193
+    ac_order: 164396d6c2494dc69325356de9d2f12b5629b3c0c73cb6ef656e4acf0aad5ff4
+  lane: full

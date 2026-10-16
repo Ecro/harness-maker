@@ -1,7 +1,7 @@
 ---
 type: spec
 task_slug: hm-eval-scripted-dri
-status: draft
+status: approved
 created: 2026-10-16
 tags: [harness-maker, spec, eval, bench, fairness, multi-turn]
 test_framework: pytest
