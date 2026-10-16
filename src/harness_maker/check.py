@@ -270,12 +270,16 @@ class Outcome:
     detail: str = ""
 
 
+# The one level at which a SPEC with no approval stamp may proceed (AC-005 approval row).
+_SELF_APPROVING = "auto_full"
+
+
 def approval_section(root: Path, slug: str, config: dict[str, Any]) -> Section:
-    """approved/exempt pass; missing (and legacy, ADR-006) pass only at `auto_full`."""
+    """approved/exempt pass; missing (and legacy, ADR-006) pass only at `_SELF_APPROVING`."""
     from harness_maker import spec_machine
 
     state = spec_machine.approval_state(root, slug)
-    level = _dig(config, "autonomy", "level") or "ask"
+    level = _dig(config, "autonomy", "level")
     body: dict[str, Any] = {"state": state.state, "level": level}
     if state.detail:
         body["detail"] = state.detail
@@ -284,7 +288,7 @@ def approval_section(root: Path, slug: str, config: dict[str, Any]) -> Section:
     if state.state in ("approved", "exempt"):
         return Section({"ok": True, **body})
     if state.state in ("missing", "legacy"):
-        if level == "auto_full":
+        if level == _SELF_APPROVING:
             return Section({"ok": True, "pending": True, **body})
         return Section({"ok": False, **body}, EXIT_APPROVAL)
     return Section({"ok": False, **body}, EXIT_APPROVAL)

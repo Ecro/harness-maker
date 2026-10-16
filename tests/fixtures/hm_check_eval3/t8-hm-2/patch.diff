@@ -1,0 +1,572 @@
+diff --git a/specs/SPEC-parse-duration-contract.machine.yaml b/specs/SPEC-parse-duration-contract.machine.yaml
+new file mode 100644
+index 0000000..9b9d609
+--- /dev/null
++++ b/specs/SPEC-parse-duration-contract.machine.yaml
+@@ -0,0 +1,158 @@
++schema_version: 3
++spec_slug: parse-duration-contract
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/parse.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: ASCII whitespace ignored
++  type: mechanical
++  test_ids: []
++  executable_predicate: parse_duration(" 1h\t") == 3600 and parse_duration("\n45s\n")
++    == 45 and parse_duration("007s") == 7
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Expected values are the requester's stated contract (S1, S5), not
++    derived from the implementation.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: Other whitespace rejected
++  type: mechanical
++  test_ids: []
++  executable_predicate: all(raises_value_error(parse_duration, s) for s in ["\u00a01h",
++    "1h\u2003", "\u30001h", "\x851h", "\x1c1h", "\r1h", "1h\x0b", "\x0c1h", "", "
++    \t\n"])
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Rejected inputs are listed by the requester (S2, S7); CR/VT/FF
++    follow from "any other whitespace".
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: Signs rejected
++  type: mechanical
++  test_ids: []
++  executable_predicate: all(raises_value_error(parse_duration, s) for s in ["+1h",
++    "-1h", "1h-30m"])
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Rejected inputs are listed by the requester (S3).
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-004
++  title: Only ASCII digits accepted
++  type: mechanical
++  test_ids: []
++  executable_predicate: all(raises_value_error(parse_duration, s) for s in ["\u0661h",
++    "\uff11h"])
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Rejected inputs are listed by the requester (S4).
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-005
++  title: Total capped at 2**63 - 1
++  type: mechanical
++  test_ids: []
++  executable_predicate: parse_duration("9223372036854775807s") == 2**63 - 1 and parse_duration("106751991167300d")
++    == 9223372036854720000 and all(raises_value_error(parse_duration, s) for s in
++    ["9223372036854775808s", "106751991167301d", "106751991167300d16h"])
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: The bound 2**63 - 1 is a requester-stated constant; boundary strings
++    verified by independent arithmetic, not by reading parse.py.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: c675544af776b240455ef86ea96803324992c08169b44d2229aa04e81e85ffe3
++  approved_by: null
++  approved_at: '2026-10-15T19:45:01Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: b2f31715b8e2c0129a87772fdbea71fc87a17a3376b0a79acf0be56223f62ff5
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: 883315a76c8190a9b07a1993b43b739b8a21e6cdbad00f661a8e7725d143e1cc
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: 444851c84c208e96e93d823560c227741654d4599cf1bb0e3127154d7319282c
++    AC-002: bdba29676ce5cb80845fe8806d616f5fa292d3ca9f95afc8696772c425a3a9c9
++    AC-003: 999a30b5fd337ba9c68bd0c21d28c0ffa37c0806671323cb367ec95339e500e0
++    AC-004: 5f503d9bac201b442ede228ccebabd78b3d727e3145371666109a2c4dd67ad0f
++    AC-005: ec04b97d3157632db5f9f14524af9f2756b29093b14dc98e6ad7d8d4248c5f77
++    ac_order: cfc9fb435de75930cafd810096796d10be9ac4c71f34dd372a974dea553fb9bd
++  lane: light
+diff --git a/specs/SPEC-parse-duration-contract.md b/specs/SPEC-parse-duration-contract.md
+new file mode 100644
+index 0000000..bd27df4
+--- /dev/null
++++ b/specs/SPEC-parse-duration-contract.md
+@@ -0,0 +1,122 @@
++---
++type: spec
++task_slug: parse-duration-contract
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, parsing, input-contract]
++test_framework: pytest
++interview_rounds: 0
++lane: light
++summary: "Pin parse_duration's whitespace, sign, digit, leading-zero, overflow and empty-input contract"
++---
++
++# SPEC: parse_duration input contract
++
++## 🎯 Intent
++`parse_duration` in `timeparse/parse.py` currently defers to `str.strip()` and `\d`, which accept Unicode whitespace and Unicode digits, and it has no upper bound. The requester supplied an explicit contract for every accepted/rejected input class; this SPEC records it as testable criteria.
++
++## 🌅 Outcomes
++Each input class below has one fixed, observable result. Any input not listed behaves exactly as it does today.
++
++## 📋 In-Scope Scenarios
++
++### S1: Surrounding ASCII whitespace is ignored
++**Given** a duration with spaces, tabs or newlines around it
++**When** `parse_duration` is called
++**Then** `" 1h\t"` returns 3600 and `"\n45s\n"` returns 45
++
++### S2: Any other whitespace raises
++**Given** a duration with non-ASCII or other whitespace before or after the text
++**When** `parse_duration` is called
++**Then** `"\u00a01h"` and `"1h\u2003"` raise `ValueError`
++**And** so do `"\u30001h"`, `"\x851h"`, `"\x1c1h"`, `"\r1h"`, `"1h\x0b"` and `"\x0c1h"` (CR, VT, FF are "other whitespace")
++
++### S3: Signs raise
++**Given** a duration containing a sign
++**When** `parse_duration` is called
++**Then** `"+1h"`, `"-1h"` and `"1h-30m"` raise `ValueError`
++
++### S4: Only ASCII digits are digits
++**Given** a duration using non-ASCII decimal digits
++**When** `parse_duration` is called
++**Then** `"\u0661h"` and `"\uff11h"` raise `ValueError`
++
++### S5: Leading zeros are allowed
++**Given** a duration with leading zeros
++**When** `parse_duration("007s")` is called
++**Then** it returns 7
++
++### S6: Total is capped at 2**63 - 1 seconds
++**Given** a duration whose total is at, just under, or above the cap
++**When** `parse_duration` is called
++**Then** `"9223372036854775807s"` returns 9223372036854775807
++**And** `"106751991167300d"` returns 9223372036854720000
++**And** `"9223372036854775808s"`, `"106751991167301d"` and `"106751991167300d16h"` raise `ValueError`
++
++### S7: Empty or all-whitespace input raises
++**Given** an empty or all-whitespace string
++**When** `parse_duration` is called
++**Then** `""` and `" \t\n"` raise `ValueError`
++
++## 🚫 Non-Goals
++- Changing unit handling (case-insensitivity, unit order, one use per unit, unknown units).
++- Changing `timeparse/cli.py` or `timeparse/format.py`.
++- Adding new units, fractional amounts or a new exception type.
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | Already configured in `pyproject.toml` (`testpaths = ["tests"]`) |
++| Performance | no new budget | Cap check is an integer comparison |
++| Security | digit and whitespace checks are ASCII-only | Avoid Unicode lookalike acceptance |
++| Compatibility | existing `tests/test_parse.py` stays green | Unlisted inputs unchanged |
++
++## 🔒 Irreversible Decisions
++none
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| S1 | unit | `test_s1_s5_s6_accepted` |
++| S2 | unit | `test_s2_other_whitespace_raises` |
++| S3 | unit | `test_s3_sign_raises` |
++| S4 | unit | `test_s4_non_ascii_digits_raise` |
++| S5 | unit | `test_s1_s5_s6_accepted` |
++| S6 | unit | `test_s1_s5_s6_accepted` and `test_s6_over_cap_raises` |
++| S7 | unit | `test_s7_empty_or_blank_raises` |
++
++Acceptance criteria (machine-checked):
++
++### AC-001: ASCII whitespace ignored
++Covers S1 and S5.
++
++### AC-002: Other whitespace rejected
++Covers S2 and S7 (all-whitespace input).
++
++### AC-003: Signs rejected
++Covers S3.
++
++### AC-004: Only ASCII digits accepted
++Covers S4.
++
++### AC-005: Total capped at 2**63 - 1
++Covers S6.
++
++## ❓ Open Questions
++none
++
++## 🔍 Refinement Decisions
++- Skip heuristic did not fire (several input classes, not title-obvious); no interview needed because the requester's contract covers every class.
++- Lane `light`: one source file, one session; `irreversible_decisions` is empty because the change tightens/clarifies behavior of one function and is reversible by revert.
++- Interpretation: "ASCII whitespace" is exactly space, tab and newline (the three the requester lists); `\r`, `\x0b`, `\x0c` therefore count as "other whitespace" and raise.
++- Empty/blank: `"\u00a0"` alone raises `ValueError` either way (S2/S7).
++- Oracle: golden values are the requester's contract; the cap values were checked by independent arithmetic (106751991167300 * 86400 + 16 * 3600 = 9223372036854777600 > 2**63 - 1).
++
++## 🔎 Spec Validation
++Advisory single pass (`MAJOR_REVISION`; does not gate).
++- **critical, S1/S2 contradiction on bare space: rejected as a false positive.** No AC rejects a bare-space-padded input; AC-002 lists only non-(space/tab/newline) whitespace plus `""` and `" \t\n"`.
++- **critical, irreversible decision not listed: left to the DRI.** The tightened contract is requester-dictated and obvious, not a trade-off, so the list stays empty. Callers passing CRLF-terminated or Unicode-padded text, or totals above the cap, will now get `ValueError`. Consumers were not audited.
++- warning, Unicode whitespace unpinned: fixed (`\u3000`, `\x85`, `\x1c` added to S2/AC-002).
++- warning, S6 wording and near-boundary case: fixed (Given reworded, `106751991167300d` accepted case added).
++- suggestion, unlisted inputs lack ACs: accepted; covered only by existing tests staying green.
++- Review fix: raw non-ASCII characters in tests and machine.yaml replaced by escapes (no semantic change); exempt stamp renewed.
+diff --git a/tests/test_parse_contract.py b/tests/test_parse_contract.py
+new file mode 100644
+index 0000000..08248b1
+--- /dev/null
++++ b/tests/test_parse_contract.py
+@@ -0,0 +1,65 @@
++"""parse_duration input contract (SPEC-parse-duration-contract)."""
++
++import pytest
++from timeparse import parse_duration
++
++CAP = 2**63 - 1
++
++
++@pytest.mark.parametrize(
++    ("text", "seconds"),
++    [
++        (" 1h\t", 3600),
++        ("\n45s\n", 45),
++        ("007s", 7),
++        ("106751991167300d", 9223372036854720000),
++        ("9223372036854775807s", CAP),
++    ],
++)
++def test_s1_s5_s6_accepted(text: str, seconds: int) -> None:
++    assert parse_duration(text) == seconds
++
++
++@pytest.mark.parametrize(
++    "text",
++    [
++        "\u00a01h",
++        "1h\u2003",
++        "\u30001h",
++        "\x851h",
++        "\x1c1h",
++        "\r1h",
++        "1h\x0b",
++        "\x0c1h",
++        "\u00a0",
++    ],
++)
++def test_s2_other_whitespace_raises(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
++
++
++@pytest.mark.parametrize("text", ["+1h", "-1h", "1h-30m"])
++def test_s3_sign_raises(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
++
++
++@pytest.mark.parametrize("text", ["\u0661h", "\uff11h", "1h\u0662m"])
++def test_s4_non_ascii_digits_raise(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
++
++
++@pytest.mark.parametrize(
++    "text", ["9223372036854775808s", "106751991167301d", "106751991167300d16h"]
++)
++def test_s6_over_cap_raises(text: str) -> None:
++    with pytest.raises(ValueError, match="^duration too large"):
++        parse_duration(text)
++
++
++@pytest.mark.parametrize("text", ["", " \t\n"])
++def test_s7_empty_or_blank_raises(text: str) -> None:
++    with pytest.raises(ValueError, match="^empty duration$"):
++        parse_duration(text)
+diff --git a/timeparse/parse.py b/timeparse/parse.py
+index 9c1a7fb..c4a3fdd 100644
+--- a/timeparse/parse.py
++++ b/timeparse/parse.py
+@@ -7,16 +7,23 @@ import re
+ # Largest first; the order is also the order units must appear in a string.
+ UNITS: dict[str, int] = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+ 
+-_TOKEN = re.compile(r"(\d+)([a-z])")
++# Largest accepted total, in seconds (2**63 - 1).
++MAX_SECONDS = 2**63 - 1
++
++# Only these characters are ignored around the text; any other whitespace is invalid.
++_PAD = " \t\n"
++
++_TOKEN = re.compile(r"([0-9]+)([a-z])")
+ 
+ 
+ def parse_duration(text: str) -> int:
+     """Return the number of seconds in `text`, e.g. '1h30m' -> 5400.
+ 
+-    Surrounding whitespace is ignored and units are case-insensitive. Each unit may appear
+-    once, largest first. Anything else raises ValueError.
++    Surrounding spaces, tabs and newlines are ignored and units are case-insensitive. Each unit
++    may appear once, largest first. Amounts use ASCII digits only and the total may not exceed
++    MAX_SECONDS. Anything else raises ValueError.
+     """
+-    cleaned = text.strip().lower()
++    cleaned = text.strip(_PAD).lower()
+     if not cleaned:
+         raise ValueError("empty duration")
+     total = 0
+@@ -35,6 +42,8 @@ def parse_duration(text: str) -> int:
+         last_rank = rank
+         total += int(amount) * UNITS[unit]
+         pos = match.end()
++        if total > MAX_SECONDS:
++            raise ValueError(f"duration too large: {text!r}")
+     if pos != len(cleaned):
+         raise ValueError(f"invalid duration: {text!r}")
+     return total
+diff --git a/work-docs/PLAN-parse-duration-contract.md b/work-docs/PLAN-parse-duration-contract.md
+new file mode 100644
+index 0000000..ce360d8
+--- /dev/null
++++ b/work-docs/PLAN-parse-duration-contract.md
+@@ -0,0 +1,22 @@
++---
++type: plan
++task_slug: parse-duration-contract
++status: done
++created: 2026-10-15
++spec: "[[SPEC-parse-duration-contract]]"
++adrs: 1
++summary: "Tighten parse_duration whitespace/digit handling and cap the total at 2**63-1"
++spec_need_verdict: none
++spec_need_target: none
++---
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — Input contract** — scope: timeparse/parse.py, tests/test_parse_contract.py · exit: `uv run pytest -q` · risk: callers lose Unicode-padded input · rollback: git revert
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/cli.py` — SPEC non-goal
++- `timeparse/format.py` — SPEC non-goal
++
++## 📐 Architecture Decision Records
++- ADR-001: strip only " \t\n", match digits with re.ASCII, reject totals above 2**63-1. **Decided by:** user (source: SPEC input contract)
+diff --git a/work-docs/REVIEW-parse-duration-contract-2026-10-15.md b/work-docs/REVIEW-parse-duration-contract-2026-10-15.md
+new file mode 100644
+index 0000000..3329225
+--- /dev/null
++++ b/work-docs/REVIEW-parse-duration-contract-2026-10-15.md
+@@ -0,0 +1,49 @@
++---
++type: review
++task_slug: parse-duration-contract
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
++consensus_method: cross-check
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: parse-duration-contract
++  computed_at: 2026-10-15T19:46:00Z
++---
++
++## 🎯 Round 1 Summary
++Grade A, 0 P0, 0 P1 counted. All 7 lenses delivered (coverage clean). 45 tests pass; T1 mutation gate 87% (threshold 85%).
++
++## 🔍 Drift Findings
++None. Changed files are inside the PLAN scope plus SPEC/PLAN artifacts.
++
++## ✅ Consensus Findings
++- F1 / T1 (P1, rejected, AC-001; duplicate): both reviewers read the test's no-break-space and em-space literals as ASCII space and reported a space/tab contradiction. The tests passed, and the contract is internally consistent. The raw characters were still a real review hazard (see T4).
++- F2 (P2, accepted): test names differed from the SPEC table. SPEC table updated to the real names.
++- T4 (P3, accepted, fixed): raw Unicode characters in tests and machine.yaml were replaced by escapes. The light-lane exempt stamp was renewed.
++- F3 (P3, accepted, carried): rank table rebuilt per call; negligible.
++- F4 / T2 (P3, accepted, carried): two tests pin message text; kept because it kills mutants of the new cap and empty paths.
++
++## ⚠️ Weak Consensus
++None.
++
++## 📝 Manual-Only Findings
++None.
++
++## 🤝 Disagreements
++None.
++
++## Review Iteration Summary
++
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|-----------|-------|---------------|-----------|-----|
++| 1 (init)  | A     | escape fix, SPEC table | 3 (P3) | — |
++
++Final grade: A
++Iterations used: 1 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false
++confirm_pass_ran: false (lane light; the only post-review edits were escape-only and tests re-ran green)
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]

@@ -111,6 +111,25 @@ Each phase ends at a commit with the local gate green for what it touched.
   (a clean session, as before). The `telemetry` stub drains stdin; `telemetry.main()` stays a
   library function. The `test_hook_host` writing control moved to `flush_session`.
 
+- **ADR-015: a run's "staged diff" is its change against HEAD, staged or not.** In 21 of the 36
+  trees part of the change was never staged (e.g. t1-hm-3's `tests/test_format.py`, all of
+  t10-hm-2), and the 2026-10-15 probe ran on the working tree. `git diff --cached HEAD` alone would
+  rebuild a tree the golden was not recorded on, so `patch.diff` is `git diff --binary HEAD` plus
+  each untracked, unignored file. Tool caches are left out with `.venv` and `__pycache__`:
+  `.mutmut-cache` (3 trees, a SQLite file) and `.pytest_cache`. **For the DRI:** the SPEC's wording
+  ("its staged diff") and the machine note (`git diff --cached HEAD`) say staged-only.
+- **ADR-016: the replay venv is `venv --system-site-packages --without-pip` plus one `.pth`.**
+  `--system-site-packages` from a uv interpreter sees the base install, not the suite's venv where
+  pytest lives; the `.pth` adds the running environment's site-packages. pip is never used.
+- **ADR-017: "modulo provenance" masks the version stamps and the install ref.** The harness
+  digest is `_overhaul_p1_ref.normalise` plus a literal replacement of the checkout path the
+  render was installed from (read from the rendered `execute.md`). The 36 original harness
+  commits are identical once masked, so `harness_manifest.json` holds one digest (71 files).
+- **ADR-018: `expected.json` is written from the golden rows, not from `hm check`.** Approval
+  state per run, `ac` failing everywhere (t6-hm-2 with its skip-path reason), security and gates
+  ok, `tree_changed` empty, exit 1. Negative controls use t1-hm-1 (`timeparse/format.py`): the
+  harness-file control commits the line on top of the harness commit, so it stays untouched.
+
 (Phase 4 ADRs are added when that phase starts.)
 
 ## Risks
@@ -142,7 +161,7 @@ Each phase ends at a commit with the local gate green for what it touched.
 
 - [x] Phase 1 — `hm check`
 - [x] Phase 2 — telemetry readers
-- [ ] Phase 3 — eval-3 replay
+- [x] Phase 3 — eval-3 replay
 - [ ] Phase 4 — stage collapse
 - [ ] Phase 5 — ship
 
@@ -182,3 +201,16 @@ GREEN: both AC-011 tests pass, including the Gate 7 differential against db19f02
 file. Tests whose subject was the retired behaviour were rewritten (readiness rotation counting,
 telemetry_grep empty-string, `scan_all` mocks → `scan_all_with_status`). `mark-tested --ac AC-011`:
 OK; `approval-status` still `approved`.
+
+### Phase 3 (AC-006)
+
+RED, 2026-10-16: the replay helpers with `hm check` taken from b5ff8af0 (before Phase 1) on
+t1-hm-1: `No module named harness_maker.check`.
+
+GREEN: `tests/integration/test_overhaul_p1_eval3_replay.py` 38 passed in 43 s at `-n 4` (36 trees,
+negative controls, fixture-set pin); every rebuilt harness commit matched the manifest. Fixtures:
+830 KB of patches. `mark-tested --ac AC-006`: OK; `approval-status` still `approved`.
+
+Phase 1 full-suite gate (run while Phase 2 edits landed): besides the five allowed failures it
+found `test_autonomy_level_literals` (check.py restated `ask`/`auto_full`) and
+`test_test_dep_map_config_class` (the two new suites unlisted); both fixed here.

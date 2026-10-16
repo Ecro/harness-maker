@@ -1,0 +1,22 @@
+{
+  "recorded": "2026-10-15",
+  "slug": "parse-duration-contract",
+  "verdicts": {
+    "ac": {
+      "ok": false
+    },
+    "approval": {
+      "ok": true,
+      "state": "exempt"
+    },
+    "exit": 1,
+    "gates": {
+      "ok": true
+    },
+    "security": {
+      "gating": 0,
+      "ok": true
+    },
+    "tree_changed": []
+  }
+}

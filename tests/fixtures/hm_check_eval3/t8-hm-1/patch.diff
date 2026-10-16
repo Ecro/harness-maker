@@ -1,0 +1,676 @@
+diff --git a/tests/test_parse.py b/tests/test_parse.py
+index f6a9db8..63085bc 100644
+--- a/tests/test_parse.py
++++ b/tests/test_parse.py
+@@ -16,3 +16,62 @@ def test_valid(text: str, seconds: int) -> None:
+ def test_invalid(text: str) -> None:
+     with pytest.raises(ValueError):
+         parse_duration(text)
++
++
++MAX = 2**63 - 1
++
++
++@pytest.mark.parametrize(("text", "seconds"), [(" 1h\t", 3600), ("\n45s\n", 45), ("\r\n1m\r\n", 60)])
++def test_s1_surrounding_ascii_whitespace_ignored(text: str, seconds: int) -> None:
++    assert parse_duration(text) == seconds
++
++
++@pytest.mark.parametrize(
++    "text", [" 1h", "1h ", "\v1h", "1h\f", "\x1c1h", "1h\x85", "　1h"]
++)
++def test_s2_other_whitespace_rejected(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
++
++
++@pytest.mark.parametrize("text", ["+1h", "-1h", "1h-30m", "1h+30m"])
++def test_s3_sign_rejected(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
++
++
++@pytest.mark.parametrize("text", ["١h", "１h", "1h٢m"])
++def test_s4_non_ascii_digits_rejected(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
++
++
++def test_s5_leading_zeros_allowed() -> None:
++    assert parse_duration("007s") == 7
++
++
++@pytest.mark.parametrize(
++    ("text", "seconds"),
++    [
++        ("9223372036854775807s", MAX),
++        ("106751991167300d15h30m7s", MAX),
++        ("106751991167300d", 9223372036854720000),
++    ],
++)
++def test_s6_total_cap_accepted(text: str, seconds: int) -> None:
++    assert parse_duration(text) == seconds
++
++
++@pytest.mark.parametrize(
++    "text",
++    ["9223372036854775808s", "106751991167301d", "106751991167300d16h", "106751991167300d15h30m8s"],
++)
++def test_s6_total_cap_rejected(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
++
++
++@pytest.mark.parametrize("text", ["", " \t\n", "\n"])
++def test_s7_empty_and_blank_rejected(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
+diff --git a/timeparse/parse.py b/timeparse/parse.py
+index 9c1a7fb..f4da848 100644
+--- a/timeparse/parse.py
++++ b/timeparse/parse.py
+@@ -7,16 +7,24 @@ import re
+ # Largest first; the order is also the order units must appear in a string.
+ UNITS: dict[str, int] = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+ 
+-_TOKEN = re.compile(r"(\d+)([a-z])")
++_TOKEN = re.compile(r"([0-9]+)([a-z])")
++
++# Only these characters are ignored around the text; any other whitespace is invalid.
++_PAD = " \t\n\r"
++
++# Largest accepted total, in seconds.
++MAX_SECONDS = 2**63 - 1
+ 
+ 
+ def parse_duration(text: str) -> int:
+     """Return the number of seconds in `text`, e.g. '1h30m' -> 5400.
+ 
+-    Surrounding whitespace is ignored and units are case-insensitive. Each unit may appear
++    Surrounding ASCII space, tab, newline and carriage return are ignored (other
++    whitespace is invalid), digits are ASCII only, the total
++    may not exceed 2**63 - 1 seconds, and units are case-insensitive. Each unit may appear
+     once, largest first. Anything else raises ValueError.
+     """
+-    cleaned = text.strip().lower()
++    cleaned = text.strip(_PAD).lower()
+     if not cleaned:
+         raise ValueError("empty duration")
+     total = 0
+@@ -37,4 +45,6 @@ def parse_duration(text: str) -> int:
+         pos = match.end()
+     if pos != len(cleaned):
+         raise ValueError(f"invalid duration: {text!r}")
++    if total > MAX_SECONDS:
++        raise ValueError(f"duration too large: {text!r}")
+     return total
+diff --git a/specs/SPEC-parse-duration-contract.machine.yaml b/specs/SPEC-parse-duration-contract.machine.yaml
+new file mode 100644
+index 0000000..c832b38
+--- /dev/null
++++ b/specs/SPEC-parse-duration-contract.machine.yaml
+@@ -0,0 +1,286 @@
++schema_version: 3
++spec_slug: parse-duration-contract
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/parse.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: Surrounding ASCII whitespace ignored
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: " 1h\t"
++    expected: 3600
++    edge: false
++    note: ''
++  - input:
++      text: '
++
++        45s
++
++        '
++    expected: 45
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Expected values are stated verbatim in the caller's contract, not
++    derived from the implementation.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: Other whitespace rejected
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text:  1h
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 1h 
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Inputs and the ValueError outcome are stated verbatim in the caller's
++    contract.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: Sign rejected
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: +1h
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: -1h
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 1h-30m
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Inputs and the ValueError outcome are stated verbatim in the caller's
++    contract.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-004
++  title: Only ASCII digits accepted
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: ١h
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: １h
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Inputs and the ValueError outcome are stated verbatim in the caller's
++    contract.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-005
++  title: Leading zeros allowed
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: 007s
++    expected: 7
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Expected value is stated verbatim in the caller's contract.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-006
++  title: Total capped at 2**63 - 1
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: 9223372036854775807s
++    expected: 9223372036854775807
++    edge: false
++    note: ''
++  - input:
++      text: 9223372036854775808s
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 106751991167301d
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 106751991167300d16h
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Boundary values come from the caller's contract; 2**63-1 is an
++    external constant, not read from the code.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-007
++  title: Empty or blank input rejected
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: ''
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: " \t\n"
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Inputs and the ValueError outcome are stated verbatim in the caller's
++    contract.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: f94f481f66e2eceb1bd8eb1063f4e8b8ddce52aef9a675c39b5640755ba4e50b
++  approved_by: null
++  approved_at: '2026-10-15T19:39:17Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: b2f31715b8e2c0129a87772fdbea71fc87a17a3376b0a79acf0be56223f62ff5
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: 883315a76c8190a9b07a1993b43b739b8a21e6cdbad00f661a8e7725d143e1cc
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: 2619334df7dd50f8a1f0ef0e5f1ba1227b7ac7f5082727b4b7217471988cce0d
++    AC-002: f0c2e28adf231de529b5a41c93f0c8dd48101847270f1125e26afc43819856f7
++    AC-003: 7a03b3ba1ee85869d8ca08f4cf68407a813d9ffe301d722d2c4650170d1f08b5
++    AC-004: aa6d52b2f1e27ad9a573628fd67aaf4f86b8519f16405374dc15f4d8b874e9a9
++    AC-005: 89c611a01a50552931896fed4215a63573331ab76f8d711ac86d63f1fdbaca8a
++    AC-006: a8d4aae83f21a4678fe6532c4f5b90f776e73274c63d7379a1dda757b898c8d5
++    AC-007: a34cbb2454479ac2c09f4ec42540a2f6756cb76d86bc233089eb77b7652c71ea
++    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c
++  lane: light
+diff --git a/specs/SPEC-parse-duration-contract.md b/specs/SPEC-parse-duration-contract.md
+new file mode 100644
+index 0000000..7b83ca0
+--- /dev/null
++++ b/specs/SPEC-parse-duration-contract.md
+@@ -0,0 +1,118 @@
++---
++type: spec
++task_slug: parse-duration-contract
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, parsing, input-contract]
++test_framework: pytest
++interview_rounds: 0
++lane: light
++summary: "Input contract for timeparse.parse.parse_duration: whitespace, sign, ASCII digits, 2**63-1 cap"
++---
++
++# SPEC: parse_duration input contract
++
++## 🎯 Intent
++`parse_duration` in `timeparse/parse.py` currently leans on `str.strip()`, `\d` and `int()`, which
++accept any Unicode whitespace and any Unicode decimal digit, and it has no upper bound on the total.
++The caller supplied an exhaustive input contract; this SPEC pins it so behavior is explicit and testable.
++
++## 🌅 Outcomes
++Every input class below is accepted or rejected exactly as listed. Any input not in a listed class
++behaves as it does today (unit case-insensitivity, largest-first unit order, no repeated units,
++no inner whitespace, unknown units rejected).
++
++## 📋 In-Scope Scenarios
++
++### S1: Surrounding ASCII whitespace is ignored
++**Given** a duration wrapped in spaces, tabs or newlines
++**When** `parse_duration` is called
++**Then** `" 1h\t"` returns 3600 and `"\n45s\n"` returns 45
++
++### S2: Other whitespace is rejected, also around the text
++**Given** a string with a non-ASCII-space whitespace character before or after the text
++**When** `parse_duration` is called
++**Then** `" 1h"` and `"1h "` raise `ValueError`
++
++### S3: A sign is rejected
++**Given** a string containing `+` or `-`
++**When** `parse_duration` is called
++**Then** `"+1h"`, `"-1h"` and `"1h-30m"` raise `ValueError`
++
++### S4: Only ASCII digits are digits
++**Given** a string using Arabic-Indic or fullwidth digits
++**When** `parse_duration` is called
++**Then** `"١h"` and `"１h"` raise `ValueError`
++
++### S5: Leading zeros are allowed
++**Given** a number with leading zeros
++**When** `parse_duration("007s")` is called
++**Then** it returns 7
++
++### S6: Total is capped at 2**63 - 1 seconds
++**Given** a duration whose total seconds is at or above the cap
++**When** `parse_duration` is called
++**Then** `"9223372036854775807s"` returns 9223372036854775807
++**And** `"9223372036854775808s"`, `"106751991167301d"` and `"106751991167300d16h"` raise `ValueError`
++
++### S7: Empty or all-whitespace input is rejected
++**Given** an empty or all-whitespace string
++**When** `parse_duration` is called
++**Then** `""` and `" \t\n"` raise `ValueError`
++
++## 🚫 Non-Goals
++- No change to unit set, unit order, repeat rules, case-insensitivity, or inner-whitespace handling.
++- No change to `timeparse` modules other than `parse.py`.
++- No new error types or messages contract (only `ValueError`).
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | Existing `tests/test_parse.py` uses it |
++| Compatibility | Python as already supported by the repo | No new dependency |
++| Performance | none | Not a stated concern |
++
++## 🔒 Irreversible Decisions
++none
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| S1 | unit | `test_surrounding_ascii_whitespace_ignored` |
++| S2 | unit | `test_other_whitespace_rejected` |
++| S3 | unit | `test_sign_rejected` |
++| S4 | unit | `test_non_ascii_digits_rejected` |
++| S5 | unit | `test_leading_zeros_allowed` |
++| S6 | unit | `test_total_cap` |
++| S7 | unit | `test_empty_and_blank_rejected` |
++
++### AC-001: Surrounding ASCII whitespace ignored
++Covers S1. Oracle: golden values taken verbatim from the caller's contract.
++
++### AC-002: Other whitespace rejected
++Covers S2. Oracle: golden inputs from the caller's contract.
++
++### AC-003: Sign rejected
++Covers S3. Oracle: golden inputs from the caller's contract.
++
++### AC-004: Only ASCII digits accepted
++Covers S4. Oracle: golden inputs from the caller's contract.
++
++### AC-005: Leading zeros allowed
++Covers S5. Oracle: golden value from the caller's contract.
++
++### AC-006: Total capped at 2**63 - 1
++Covers S6. Oracle: golden values from the contract; boundary arithmetic checked by hand
++(106751991167300 * 86400 + 16 * 3600 = 9223372036854777600 > 2**63 - 1).
++
++### AC-007: Empty or blank input rejected
++Covers S7. Oracle: golden inputs from the caller's contract.
++
++## ❓ Open Questions
++(none)
++
++## 🔍 Refinement Decisions
++- Lane `light`: one file, one session, no irreversible decision. Contract is exhaustive, so no interview rounds were needed (autopilot `auto_full`, no question asked).
++- "Spaces, tabs and newlines" is read as ASCII space, `\t`, `\n` and `\r` (`\r` kept ignored, as today, as part of a line ending). `\v`, `\f`, `\x1c`-`\x1f`, `\x85` and all Unicode whitespace raise `ValueError` as "other whitespace".
++- The cap applies to the total after summing all units, not per unit.
++- Spec-validator not dispatched: light lane, `irreversible_decisions: []`, ACs imply no irreversible category.
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/PLAN-parse-duration-contract.md b/work-docs/PLAN-parse-duration-contract.md
+new file mode 100644
+index 0000000..8238240
+--- /dev/null
++++ b/work-docs/PLAN-parse-duration-contract.md
+@@ -0,0 +1,21 @@
++---
++type: plan
++task_slug: parse-duration-contract
++status: planning
++created: 2026-10-15
++spec: "[[SPEC-parse-duration-contract]]"
++adrs: 1
++summary: "Tighten parse_duration whitespace, digit, sign and 2**63-1 total rules"
++spec_need_verdict: change
++spec_need_target: parse-duration-contract
++---
++
++## 📝 Implementation Plan
++- [ ] 1. **Phase 1 — Enforce input contract** — scope: timeparse/parse.py, tests/test_parse.py · exit: `python -m pytest tests -q` · risk: existing callers relying on Unicode whitespace or digits · rollback: git checkout the two files
++
++## 🚧 Contract Boundaries
++### Do not change
++- `none — this task has no contract boundaries`
++
++## 📐 Architecture Decision Records
++- ADR-001: Strip only ASCII " \t\n\r"; use re.ASCII-style [0-9] digits; check total against 2**63-1 after summing. **Decided by:** agent
+diff --git a/work-docs/REVIEW-parse-duration-contract-2026-10-15.md b/work-docs/REVIEW-parse-duration-contract-2026-10-15.md
+new file mode 100644
+index 0000000..7eb05e1
+--- /dev/null
++++ b/work-docs/REVIEW-parse-duration-contract-2026-10-15.md
+@@ -0,0 +1,36 @@
++---
++type: review
++task_slug: parse-duration-contract
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
++consensus_method: cross-check
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: parse-duration-contract
++  computed_at: 2026-10-15T19:41:36Z
++---
++
++## Round 1 Summary
++Grade A (P0 0, P1 0, P2 1, P3 7). All 7 lenses exercised. Light lane, no auto-fix loop.
++
++## Findings
++- P2 tests: S6 lacked a multi-unit exact-cap case. Fixed by the orchestrator: added `106751991167300d15h30m7s` accepted and `...15h30m8s` rejected; S6 split into accepted/rejected parametrized tests.
++- P3 consistency: docstring omitted \r. Fixed.
++- P3 consistency/tests: test names use s1_..s7_ rather than SPEC table names. Not changed (scenario IDs are the convention); SPEC table left as is.
++- P3 design: unit rank could be a constant. Not changed (out of scope).
++- P3 security: error messages echo unbounded input. Pre-existing behavior, not changed.
++- P3 tests: S3 guards weak; duplicate empty-string row. Not changed.
++- concurrency: none.
++
++## Note
++The P2 fix and docstring edit were applied after the review round, outside the auto-fix loop, and were not re-reviewed (tests-only plus docstring; 48 tests pass, ruff clean). Confirmation pass skipped: confirm_pass_ran false.
++
++## Review Iteration Summary
++Final grade: A
++Iterations used: 1 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false

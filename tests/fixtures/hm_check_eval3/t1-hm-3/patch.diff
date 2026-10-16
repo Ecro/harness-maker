@@ -1,0 +1,690 @@
+diff --git a/specs/SPEC-format-duration-max-units.machine.yaml b/specs/SPEC-format-duration-max-units.machine.yaml
+new file mode 100644
+index 0000000..19688a7
+--- /dev/null
++++ b/specs/SPEC-format-duration-max-units.machine.yaml
+@@ -0,0 +1,306 @@
++schema_version: 3
++spec_slug: format-duration-max-units
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/format.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: Default output unchanged
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      seconds: 5400
++      max_units: null
++    expected: 1h30m
++    edge: false
++    note: ''
++  - input:
++      seconds: 0
++      max_units: null
++    expected: 0s
++    edge: false
++    note: ''
++  - input:
++      seconds: 90061
++      max_units: null
++    expected: 1d1h1m1s
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: values are pre-change outputs already pinned in tests/test_format.py,
++    independent of the new code
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: Half-up rounding into smallest kept unit
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      seconds: 5430
++      max_units: 1
++    expected: 2h
++    edge: false
++    note: ''
++  - input:
++      seconds: 5399
++      max_units: 2
++    expected: 1h30m
++    edge: false
++    note: ''
++  - input:
++      seconds: 90
++      max_units: 1
++    expected: 2m
++    edge: false
++    note: ''
++  - input:
++      seconds: 89
++      max_units: 1
++    expected: 1m
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: expected values supplied by the requester in the task statement,
++    hand-computed
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: Carry propagates upward
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      seconds: 86399
++      max_units: 2
++    expected: 1d
++    edge: false
++    note: ''
++  - input:
++      seconds: 86399
++      max_units: 1
++    expected: 1d
++    edge: false
++    note: ''
++  - input:
++      seconds: 3599
++      max_units: 1
++    expected: 1h
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: 86399/2 from the requester; the others hand-derived from 60s=1m,
++    60m=1h, 24h=1d
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-004
++  title: Zero in window uses a position
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      seconds: 3601
++      max_units: 2
++    expected: 1h
++    edge: false
++    note: ''
++  - input:
++      seconds: 7205
++      max_units: 3
++    expected: 2h5s
++    edge: false
++    note: ''
++  - input:
++      seconds: 3661
++      max_units: 2
++    expected: 1h1m
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: 3601/2 from the requester; the others hand-derived from the window
++    rule
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-005
++  title: Zero and wide caps
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      seconds: 0
++      max_units: 1
++    expected: 0s
++    edge: false
++    note: ''
++  - input:
++      seconds: 5400
++      max_units: 4
++    expected: 1h30m
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: 0/1 from the requester; 5400/4 equals the pinned unbounded output
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-006
++  title: Invalid max_units raises
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      seconds: 60
++      max_units: 0
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      seconds: 60
++      max_units: -1
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: error contract stated by the requester
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-007
++  title: Agrees with round-then-format
++  type: property
++  test_ids: []
++  executable_predicate: null
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: property
++  oracle_evidence: rounding is done arithmetically on the integer total, not by walking
++    unit parts, so carry is implicit and cannot be copied from the implementation's
++    loop
++  oracle_independence_waiver: null
++  input_domain: seconds in [0, 200000], max_units in 1..5
++  transformation: round seconds half-up to a multiple of the smallest kept unit's
++    size, then format with no cap
++  expected_relation: format_duration(s, k) == format_duration(r) where r is the rounded
++    seconds
++  preconditions: []
++  observable_output: returned string
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: 39b88b5bc5b5b809ca982b8c4668747b7874097e8d12a18ac5a9271d96022788
++  approved_by: null
++  approved_at: '2026-10-15T18:33:48Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: b721cf2c57c5d4911f213d1b887949097ba91bee2fe997e14e897cbb775f256d
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: b2407d2869a1d28cc50d3315c6ad1b47383388b83c44a3e9ce770d975cf0550b
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: 8d0f502874b94d94bb50aac2e4b16f8f6764528584a4c9514411acc7078bd8bb
++    AC-002: 89eef6fad2621bdf290b65695aaf668b1e78a689c01e9a663513be863c58f056
++    AC-003: 880f5a3d61741e924b8863c5ee07234aa93863a9b927170372e1295aa7410463
++    AC-004: 27e62621571d09d64cd35b1e06d3634858372a26a3c15184ed78711e46c7b4aa
++    AC-005: afdbc1e44c583fb1e0779eec62965ac6cbe7923aa87318aa211639dbe2268479
++    AC-006: 4e75e89072c3a3d21bc707f47f6c34dac47a68867efd8d73086c980fc1c284b1
++    AC-007: 4fc465578149c31ff3937a021ccbe7d8823180c20d09677f1e12949705976ac8
++    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c
++  lane: light
+diff --git a/specs/SPEC-format-duration-max-units.md b/specs/SPEC-format-duration-max-units.md
+new file mode 100644
+index 0000000..e2f7d3a
+--- /dev/null
++++ b/specs/SPEC-format-duration-max-units.md
+@@ -0,0 +1,109 @@
++---
++type: spec
++task_slug: format-duration-max-units
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, duration, formatting]
++test_framework: pytest
++interview_rounds: 1
++lane: light
++summary: "Optional max_units cap with half-up rounding and carry for format_duration"
++---
++
++# SPEC: format_duration `max_units`
++
++## 🎯 Intent
++`format_duration` always prints every non-zero unit, so callers wanting a compact display ("about 2h") must truncate by hand and get rounding and carry wrong. An optional `max_units` parameter gives them a correct, rounded, bounded-length form.
++
++## 🌅 Outcomes
++A caller can pass `max_units=n` (n >= 1) and receive at most n unit positions (d, h, m, s), counted from the largest non-zero unit, rounded half-up into the smallest kept position with carry. Without `max_units` the output is byte-identical to today.
++
++## 📋 In-Scope Scenarios
++
++### S1: Default unchanged
++**Given** any non-negative integer `seconds`
++**When** `format_duration(seconds)` or `format_duration(seconds, max_units=None)` is called
++**Then** the result equals today's output (e.g. 5400 -> "1h30m", 0 -> "0s")
++
++### S2: Truncate with half-up rounding
++**Given** `seconds=5430` (1h30m30s)
++**When** `max_units=1` is passed
++**Then** the result is "2h"
++**And** `90, 1 -> "2m"`, `89, 1 -> "1m"`, `5399, 2 -> "1h30m"`
++
++### S3: Carry propagates upward
++**Given** `seconds=86399` (23h59m59s)
++**When** `max_units=2` is passed
++**Then** the result is "1d" (59s -> 60m -> 24h -> 1d)
++**And** `3599, 1 -> "1h"`
++
++### S4: A zero unit inside the window uses a position
++**Given** `seconds=3601` (1h0m1s)
++**When** `max_units=2` is passed
++**Then** the window is h,m; the 1s rounds down; the result is "1h"
++
++### S5: Zero and over-wide caps
++**Given** `seconds=0`, or `max_units` larger than the number of units present
++**When** `format_duration` is called with `max_units>=1`
++**Then** `0 -> "0s"`, and a wide cap returns the unbounded output unchanged
++
++### S6: Invalid max_units
++**Given** any `seconds`
++**When** `max_units` is 0 or negative
++**Then** `ValueError` is raised
++
++## 🚫 Non-Goals
++- Type validation of `max_units` beyond `< 1` (bool/float behaviour unspecified).
++- Units larger than days, fractional seconds, changes to `parse_duration`, CLI flags.
++- Changing negative-`seconds` handling (still `ValueError`).
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | existing `tests/test_format.py` uses it |
++| Compatibility | `format_duration(seconds)` positional call unchanged | existing callers and tests |
++| Dependencies | none new | stdlib only |
++
++## 🔒 Irreversible Decisions
++none — adds an optional, defaulted keyword parameter; fully backward compatible and cheap to revert.
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| S1 | unit | `test_default_unchanged` |
++| S2 | unit | `test_max_units_rounding` |
++| S3 | unit | `test_max_units_carry` |
++| S4 | unit | `test_max_units_zero_in_window` |
++| S5 | unit | `test_max_units_zero_and_wide` |
++| S6 | unit | `test_max_units_invalid` |
++| S2-S4 (all inputs) | unit (property sweep) | `test_max_units_matches_round_then_format` |
++
++### AC-001: Default output unchanged
++Golden: `(5400,None)->"1h30m"`, `(0,None)->"0s"`, `(90061,None)->"1d1h1m1s"`. Source: the existing test file.
++
++### AC-002: Half-up rounding into smallest kept unit
++Golden table from the requester's examples (5430/1, 5399/2, 90/1, 89/1).
++
++### AC-003: Carry propagates upward
++Golden: 86399/2 -> "1d", 86399/1 -> "1d", 3599/1 -> "1h".
++
++### AC-004: Zero in window uses a position
++Golden: 3601/2 -> "1h", 7205/3 -> "2h5s", 3661/2 -> "1h1m".
++
++### AC-005: Zero and wide caps
++Golden: 0/1 -> "0s", 5400/4 -> "1h30m".
++
++### AC-006: Invalid max_units raises
++`max_units` of 0 and -1 raise `ValueError`.
++
++### AC-007: Agrees with round-then-format
++For all s in [0, 200000] and k in 1..5: let i be the index in (d,h,m,s) of the largest non-zero unit of s, `step = UNITS[unit at min(i+k-1, 3)]`, `r = (s + step//2)//step*step`; then `format_duration(s, k) == format_duration(r)`.
++
++## ❓ Open Questions
++none
++
++## 🔍 Refinement Decisions
++- Step 0: not skipped (new parameter, rounding semantics are not title-obvious). Lane `light`: one file (`timeparse/format.py`) plus tests, one session, no irreversible decision.
++- Round 1 (no question tool available; defaults taken): window is fixed from the input's largest non-zero unit before rounding; a carry may leave a higher unit than the window start, which is simply printed ("86399, 2 -> 1d"). Validation of `max_units` precedes any other work. Bool/float `max_units` left unspecified.
++- Oracles: goldens come from the requester's examples (independent of the code); AC-007 is a property/differential sweep via arithmetic rounding of the input.
++- Step 4.6 spec-validator: not dispatched (light lane, `irreversible_decisions: []`).
+diff --git a/tests/test_format.py b/tests/test_format.py
+index 01cab9d..ce92c29 100644
+--- a/tests/test_format.py
++++ b/tests/test_format.py
+@@ -19,3 +19,73 @@ def test_round_trip() -> None:
+ def test_negative() -> None:
+     with pytest.raises(ValueError):
+         format_duration(-1)
++
++
++@pytest.mark.parametrize(
++    ("seconds", "text"), [(5400, "1h30m"), (0, "0s"), (90061, "1d1h1m1s")]
++)
++def test_default_unchanged(seconds: int, text: str) -> None:
++    assert format_duration(seconds, max_units=None) == text
++    assert format_duration(seconds) == text
++
++
++@pytest.mark.parametrize(
++    ("seconds", "max_units", "text"),
++    [(5430, 1, "2h"), (5399, 2, "1h30m"), (90, 1, "2m"), (89, 1, "1m")],
++)
++def test_max_units_rounding(seconds: int, max_units: int, text: str) -> None:
++    assert format_duration(seconds, max_units=max_units) == text
++
++
++@pytest.mark.parametrize(
++    ("seconds", "max_units", "text"),
++    [(86399, 2, "1d"), (86399, 1, "1d"), (3599, 1, "1h")],
++)
++def test_max_units_carry(seconds: int, max_units: int, text: str) -> None:
++    assert format_duration(seconds, max_units=max_units) == text
++
++
++@pytest.mark.parametrize(
++    ("seconds", "max_units", "text"),
++    [(3601, 2, "1h"), (7205, 3, "2h5s"), (3661, 2, "1h1m")],
++)
++def test_max_units_zero_in_window(seconds: int, max_units: int, text: str) -> None:
++    assert format_duration(seconds, max_units=max_units) == text
++
++
++@pytest.mark.parametrize(
++    ("seconds", "max_units", "text"), [(0, 1, "0s"), (5400, 4, "1h30m")]
++)
++def test_max_units_zero_and_wide(seconds: int, max_units: int, text: str) -> None:
++    assert format_duration(seconds, max_units=max_units) == text
++
++
++@pytest.mark.parametrize("seconds", [-5, 0, 60, 5430])
++@pytest.mark.parametrize("max_units", [0, -1])
++def test_max_units_invalid(seconds: int, max_units: int) -> None:
++    with pytest.raises(ValueError):
++        format_duration(seconds, max_units=max_units)
++
++
++@pytest.mark.parametrize(
++    ("seconds", "max_units", "text"),
++    [
++        (90061, 1, "1d"),
++        (90061, 2, "1d1h"),
++        (90061, 4, "1d1h1m1s"),
++        (129600, 1, "2d"),
++        (150, 1, "3m"),
++    ],
++)
++def test_max_units_day_window_and_ties(seconds: int, max_units: int, text: str) -> None:
++    assert format_duration(seconds, max_units=max_units) == text
++
++
++def test_max_units_matches_round_then_format() -> None:
++    sizes = [86400, 3600, 60, 1]
++    for s in range(200001):
++        first = next((i for i, size in enumerate(sizes) if s >= size), 3)
++        for k in range(1, 6):
++            step = sizes[min(first + k - 1, 3)]
++            rounded = (s + step // 2) // step * step
++            assert format_duration(s, max_units=k) == format_duration(rounded), (s, k)
+diff --git a/timeparse/format.py b/timeparse/format.py
+index 82b5cda..a33cad0 100644
+--- a/timeparse/format.py
++++ b/timeparse/format.py
+@@ -5,15 +5,27 @@ from __future__ import annotations
+ from timeparse.parse import UNITS
+ 
+ 
+-def format_duration(seconds: int) -> str:
++def format_duration(seconds: int, max_units: int | None = None) -> str:
+     """Return the compact form of `seconds`, e.g. 5400 -> '1h30m', 0 -> '0s'.
+ 
+     Zero units are left out. Negative input raises ValueError.
++
++    `max_units` keeps at most that many unit positions, counted from the largest
++    non-zero unit (a zero inside the window still uses a position). The rest is
++    rounded half-up into the smallest kept position, carrying upward:
++    5430 with max_units=1 -> '2h'. Values below 1 raise ValueError.
+     """
++    if max_units is not None and max_units < 1:
++        raise ValueError("max_units must be at least 1")
+     if seconds < 0:
+         raise ValueError("negative duration")
+     if seconds == 0:
+         return "0s"
++    if max_units is not None:
++        sizes = list(UNITS.values())
++        first = next((i for i, size in enumerate(sizes) if seconds >= size), len(sizes) - 1)
++        step = sizes[min(first + max_units - 1, len(sizes) - 1)]
++        seconds = (seconds + step // 2) // step * step
+     parts: list[str] = []
+     remaining = seconds
+     for unit, size in UNITS.items():
+diff --git a/work-docs/PLAN-format-duration-max-units.md b/work-docs/PLAN-format-duration-max-units.md
+new file mode 100644
+index 0000000..58b2f91
+--- /dev/null
++++ b/work-docs/PLAN-format-duration-max-units.md
+@@ -0,0 +1,22 @@
++---
++type: plan
++task_slug: format-duration-max-units
++status: done
++created: 2026-10-15
++spec: "[[SPEC-format-duration-max-units]]"
++adrs: 2
++summary: "Add optional max_units (round half-up with carry) to format_duration"
++spec_need_verdict: change
++spec_need_target: format-duration-max-units
++---
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — max_units in format_duration** — scope: timeparse/format.py, tests/test_format.py · exit: `uv run --with pytest pytest -q` · risk: carry/window off-by-one · rollback: revert the two files
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/parse.py` — parse_duration and UNITS are out of scope per SPEC non-goals
++
++## 📐 Architecture Decision Records
++- ADR-001: Round the integer total to a multiple of the smallest kept unit, then format uncapped, so carry is implicit. **Decided by:** agent
++- ADR-002: AC-007 sweep is an exhaustive pytest loop and golden rows are inlined in the tests; Hypothesis and harness_maker are not project dependencies and adding them is a new external dependency. **Decided by:** agent
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/REVIEW-format-duration-max-units-2026-10-15.md b/work-docs/REVIEW-format-duration-max-units-2026-10-15.md
+new file mode 100644
+index 0000000..06bda6e
+--- /dev/null
++++ b/work-docs/REVIEW-format-duration-max-units-2026-10-15.md
+@@ -0,0 +1,33 @@
++---
++type: review
++task_slug: format-duration-max-units
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, test-reviewer]
++consensus_method: single
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: format-duration-max-units
++  computed_at: 2026-10-15T18:36:47Z
++confirm_pass_ran: true
++---
++
++## Round 1 Summary
++Grade A. Core lenses (design, functionality, robustness, consistency): no findings. Tests lens: two P2 findings, both accepted and fixed (invalid max_units now swept over seconds incl. 0 and negative; day-window and tie goldens added). 49 tests pass.
++
++## Confirmation pass (confirm-1)
++No new P0/P1. One P3 (sweep shares the formula with the implementation; suggests extra multi-position carry goldens), left as is.
++
++## Review Iteration Summary
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|---|---|---|---|---|
++| 1 | A | 2 (tests) | 0 | - |
++
++Final grade: A
++Iterations used: 1 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false
++Security and concurrency lenses were routed away (no I/O, no shared state).

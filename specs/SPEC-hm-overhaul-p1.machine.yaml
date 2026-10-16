@@ -625,7 +625,7 @@ ac:
     the harness commit is regenerated from db19f023, which needs full git history
     (CI fetch-depth 0). Precondition, pinned by the test, is that the rebuilt tree's
     harness files equal the original's harness commit modulo provenance.
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The verdicts were recorded on 2026-10-15 from the eval-3 artifacts
     (results.jsonl, approval-status on each tree, a scoped-scan and pyproject-gate

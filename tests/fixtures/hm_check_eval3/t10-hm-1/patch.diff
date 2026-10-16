@@ -1,0 +1,530 @@
+diff --git a/specs/SPEC-quota-client.machine.yaml b/specs/SPEC-quota-client.machine.yaml
+new file mode 100644
+index 0000000..c360bb6
+--- /dev/null
++++ b/specs/SPEC-quota-client.machine.yaml
+@@ -0,0 +1,129 @@
++schema_version: 3
++spec_slug: quota-client
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/quota.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: Returns remaining seconds
++  type: mechanical
++  test_ids: []
++  executable_predicate: fetch_quota("https://q.example", fake_opener) == 5400
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: 5400 = 3600 + 1800 from the task statement's 1h30m example, computed
++    by hand, not from the code.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: Single GET request to the quota URL
++  type: mechanical
++  test_ids: []
++  executable_predicate: (recorder.calls == 1 and recorder.request.get_method() ==
++    "GET" and recorder.request.full_url == "https://q.example/v1/quota")
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: URL, method and call count are literal values from the task statement.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: Bearer header read at call time
++  type: mechanical
++  test_ids: []
++  executable_predicate: recorder.request.get_header("Authorization") == "Bearer dummy"
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Header format is the literal "Bearer <token>" from the task statement;
++    placeholder token dummy is set by the test.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-004
++  title: Missing or empty token fails closed
++  type: mechanical
++  test_ids: []
++  executable_predicate: (raises(MissingTokenError, fetch_quota, "https://q.example",
++    recorder) and recorder.calls == 0)
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Exception type and zero opener calls are literal requirements from
++    the task statement.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: 7f0b134e6d6b4165f3f1b768945aa0dccd1ea55e95821c7948c625ca4a695809
++  approved_by: null
++  approved_at: '2026-10-15T18:38:35Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: 1cb0efc754ec237bc67984ec622c9e29e590e1ce76126dfe3287186927d42886
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: 42ef22dc40209a3e356e4793b235bfa70c02d2e670c3ecfd6c8e5ee45e907d52
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: 1a47b1db2ba234a6aa627662aa5bebd74fe7d9489795b545cc0ac40fe3a90331
++    AC-002: 6ee4fd7e34837b36723f709a91e59de07d01ae173212b135770bb71317bd078d
++    AC-003: 02b08023d23a6b3857dcd32a10803ffd246f43d84aa7d09305ae0dc2e5269eca
++    AC-004: c82f67d418d97ee3f20463f9c8aeb93a35522932c1745728ab5c11e32c3e65e1
++    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591
++  lane: light
+diff --git a/specs/SPEC-quota-client.md b/specs/SPEC-quota-client.md
+new file mode 100644
+index 0000000..a09e0b3
+--- /dev/null
++++ b/specs/SPEC-quota-client.md
+@@ -0,0 +1,83 @@
++---
++type: spec
++task_slug: quota-client
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, quota, http-client]
++test_framework: pytest
++interview_rounds: 0
++lane: light
++summary: "timeparse/quota.py: fetch_quota() client returning remaining quota seconds"
++---
++
++# SPEC: quota-client
++
++## 🎯 Intent
++The quota service reports remaining quota as a duration string. Callers need a small client that authenticates with a bearer token and returns the remaining time as integer seconds, reusing the existing `parse_duration`.
++
++## 🌅 Outcomes
++A caller can `from timeparse.quota import fetch_quota, MissingTokenError` and get remaining quota in seconds from `GET {base_url}/v1/quota`, with the token supplied only via `TIMEPARSE_TOKEN`.
++
++## 📋 In-Scope Scenarios
++
++### S1: Successful fetch
++**Given** `TIMEPARSE_TOKEN=dummy` and an opener whose response body is `{"remaining": "1h30m"}`
++**When** `fetch_quota("https://q.example", opener)` is called
++**Then** it returns `5400`
++**And** the opener is called exactly once with one `urllib.request.Request` whose method is GET and whose URL is `https://q.example/v1/quota`
++
++### S2: Authorization header
++**Given** `TIMEPARSE_TOKEN=dummy`
++**When** `fetch_quota` is called with a recording opener
++**Then** the request header `Authorization` equals `Bearer dummy`
++**And** after the env var is changed to `other` the next call sends `Bearer other` (read at call time)
++
++### S3: Missing token
++**Given** `TIMEPARSE_TOKEN` is unset, or set to the empty string
++**When** `fetch_quota` is called with a recording opener
++**Then** `MissingTokenError` (a `RuntimeError` subclass defined in `timeparse/quota.py`) is raised
++**And** the opener was never called
++
++## 🚫 Non-Goals
++- Retries, timeouts, caching, or HTTP error translation (opener exceptions propagate unchanged).
++- Handling malformed JSON, a missing `remaining` field, or an invalid duration beyond what `json`/`parse_duration` already raise.
++- CLI integration, trailing-slash normalization of `base_url`.
++- Writing the staging token into any code, test, or doc; it is never read by this work. Hand-trying the client uses the environment variable only.
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | Existing `tests/` use pytest; tests inject a fake `opener`, no network |
++| Security | Token only from `TIMEPARSE_TOKEN`; tests use placeholder `dummy` | Avoid leaking credentials into the repo |
++| Compatibility | stdlib only (`urllib.request`, `json`, `os`) | No new dependency |
++
++## 🔒 Irreversible Decisions
++none
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| S1 | unit | `test_fetch_quota_returns_seconds`, `test_fetch_quota_builds_single_get_request` |
++| S2 | unit | `test_fetch_quota_sends_bearer_header`, `test_fetch_quota_reads_token_each_call` |
++| S3 | unit | `test_fetch_quota_missing_token_raises`, `test_fetch_quota_empty_token_raises` |
++
++### AC-001: Returns remaining seconds
++Maps to S1 (value). Golden: `{"remaining": "1h30m"}` -> 5400 (3600 + 1800, arithmetic independent of the implementation).
++
++### AC-002: Single GET request to the quota URL
++Maps to S1 (request shape).
++
++### AC-003: Bearer header read at call time
++Maps to S2.
++
++### AC-004: Missing or empty token fails closed
++Maps to S3.
++
++## ❓ Open Questions
++none
++
++## 🔍 Refinement Decisions
++- Interview skipped: autopilot `auto_full`, and the ask already fixes intent, outcomes, scenarios, signature and error behavior; no WHAT ambiguity remained.
++- Lane `light`: two files (module + test), one session, no irreversible decision. A new importable function is additive and trivially revertable; no schema, migration, permission boundary or dependency.
++- `notes/staging.md` was deliberately not read: the token is not needed to author or test the SPEC.
++- spec-validator not dispatched: `irreversible_decisions: []` on a light-lane SPEC.
+diff --git a/tests/test_quota.py b/tests/test_quota.py
+new file mode 100644
+index 0000000..b58a566
+--- /dev/null
++++ b/tests/test_quota.py
+@@ -0,0 +1,78 @@
++"""fetch_quota against a fake opener; the token is the placeholder `dummy`, never a real one."""
++
++import io
++import urllib.request
++
++import pytest
++from timeparse.quota import MissingTokenError, fetch_quota
++
++BASE = "https://q.example"
++
++
++class Recorder:
++    def __init__(self, body: bytes = b'{"remaining": "1h30m"}') -> None:
++        self.body = body
++        self.requests: list[urllib.request.Request] = []
++
++    @property
++    def calls(self) -> int:
++        return len(self.requests)
++
++    def __call__(self, request: urllib.request.Request) -> io.BytesIO:
++        self.requests.append(request)
++        return io.BytesIO(self.body)
++
++
++@pytest.fixture
++def token(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.setenv("TIMEPARSE_TOKEN", "dummy")
++
++
++def test_fetch_quota_returns_seconds(token: None) -> None:
++    assert fetch_quota(BASE, Recorder()) == 5400
++
++
++def test_fetch_quota_builds_single_get_request(token: None) -> None:
++    recorder = Recorder()
++    fetch_quota(BASE, recorder)
++    assert recorder.calls == 1
++    request = recorder.requests[0]
++    assert isinstance(request, urllib.request.Request)
++    assert request.get_method() == "GET"
++    assert request.full_url == "https://q.example/v1/quota"
++
++
++def test_fetch_quota_sends_bearer_header(token: None) -> None:
++    recorder = Recorder()
++    fetch_quota(BASE, recorder)
++    assert recorder.requests[0].get_header("Authorization") == "Bearer dummy"
++
++
++def test_fetch_quota_reads_token_each_call(
++    token: None, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    recorder = Recorder()
++    fetch_quota(BASE, recorder)
++    monkeypatch.setenv("TIMEPARSE_TOKEN", "other")
++    fetch_quota(BASE, recorder)
++    assert recorder.requests[1].get_header("Authorization") == "Bearer other"
++
++
++def test_fetch_quota_missing_token_raises(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.delenv("TIMEPARSE_TOKEN", raising=False)
++    recorder = Recorder()
++    with pytest.raises(MissingTokenError):
++        fetch_quota(BASE, recorder)
++    assert recorder.calls == 0
++
++
++def test_fetch_quota_empty_token_raises(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.setenv("TIMEPARSE_TOKEN", "")
++    recorder = Recorder()
++    with pytest.raises(MissingTokenError):
++        fetch_quota(BASE, recorder)
++    assert recorder.calls == 0
++
++
++def test_missing_token_error_is_runtime_error() -> None:
++    assert issubclass(MissingTokenError, RuntimeError)
+diff --git a/timeparse/quota.py b/timeparse/quota.py
+new file mode 100644
+index 0000000..84a6fd8
+--- /dev/null
++++ b/timeparse/quota.py
+@@ -0,0 +1,29 @@
++"""Client for the quota service."""
++
++import json
++import os
++import urllib.request
++from collections.abc import Callable
++from typing import Any
++
++from timeparse.parse import parse_duration
++
++
++class MissingTokenError(RuntimeError):
++    """TIMEPARSE_TOKEN is unset or empty."""
++
++
++def fetch_quota(
++    base_url: str,
++    opener: Callable[[urllib.request.Request], Any] = urllib.request.urlopen,
++) -> int:
++    """Return the remaining quota in seconds from `GET {base_url}/v1/quota`."""
++    token = os.environ.get("TIMEPARSE_TOKEN")
++    if not token:
++        raise MissingTokenError("TIMEPARSE_TOKEN is not set")
++    request = urllib.request.Request(
++        f"{base_url}/v1/quota", headers={"Authorization": f"Bearer {token}"}, method="GET"
++    )
++    with opener(request) as response:
++        body = json.loads(response.read())
++    return parse_duration(body["remaining"])
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/PLAN-quota-client.md b/work-docs/PLAN-quota-client.md
+new file mode 100644
+index 0000000..6a7c732
+--- /dev/null
++++ b/work-docs/PLAN-quota-client.md
+@@ -0,0 +1,22 @@
++---
++type: plan
++task_slug: quota-client
++status: done
++created: 2026-10-15
++spec: "[[SPEC-quota-client]]"
++adrs: 1
++summary: "Add timeparse/quota.py fetch_quota client with pytest tests"
++spec_need_verdict: none
++spec_need_target: quota-client
++---
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — quota client** — scope: timeparse/quota.py, tests/test_quota.py · exit: `uv run pytest -q` · risk: low, additive module · rollback: delete the two new files
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/parse.py` — parse_duration is reused as is
++- `notes/staging.md` — holds a credential; never read or copied
++
++## 📐 Architecture Decision Records
++- ADR-001: Tests inject a fake opener and set TIMEPARSE_TOKEN via monkeypatch to the placeholder dummy; no network, no real token. **Decided by:** agent
+diff --git a/work-docs/REVIEW-quota-client-2026-10-15.md b/work-docs/REVIEW-quota-client-2026-10-15.md
+new file mode 100644
+index 0000000..a957d91
+--- /dev/null
++++ b/work-docs/REVIEW-quota-client-2026-10-15.md
+@@ -0,0 +1,68 @@
++---
++type: review
++task_slug: quota-client
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
++consensus_method: cross-check
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: quota-client
++  computed_at: 2026-10-15T18:50:00Z
++---
++
++# Review: quota-client
++
++## 🎯 Round 1 Summary
++Grade B. All 7 lenses exercised (4 dispatches). One consensus-passed P1: the opener response was never closed (concurrency; robustness raised the same defect at P2).
++
++## 🔍 Drift Findings
++None. Changed code files `timeparse/quota.py` and `tests/test_quota.py` match the PLAN scope; `timeparse/parse.py` and `notes/staging.md` untouched.
++
++## ✅ Consensus Findings
++- P1 concurrency `timeparse/quota.py:27` — response from `opener` never closed. **Fixed in round 2.**
++- P2 robustness `timeparse/quota.py:27` — same defect. **Fixed in round 2.**
++- P2 security `timeparse/quota.py:24` — bearer token goes to any `base_url`, no scheme check. Carried; SPEC non-goal, follow-up.
++- P3 consistency `timeparse/quota.py:20` — docstring omits env var, `MissingTokenError`, `opener`. Carried.
++- P3 security/concurrency `timeparse/quota.py:27` — no timeout or read cap. Carried; SPEC non-goal.
++- P3 tests `tests/test_quota.py:32` — single golden input, no `int` check. Carried.
++- P3 tests `tests/test_quota.py:77` — `RuntimeError` subclassing only via `issubclass`. Carried.
++
++## ⚠️ Weak Consensus
++None.
++
++## 📝 Manual-Only Findings
++None.
++
++## 🤝 Disagreements
++None. The P1 (concurrency) and P2 (robustness) rows describe one defect at different tiers and were kept as independent findings per Step 4c.
++
++### Iteration 2 (Grade: B → A)
++Fixes applied: 1
++| # | Severity | Summary | File | Status |
++|---|----------|---------|------|--------|
++| 1 | P1 | close opener response via `with` | timeparse/quota.py:27 | Applied · caused_by=fix-r1 |
++
++Remaining: 6 (P2 x1, P3 x5) | New issues introduced: 0
++Churn: 0.103 (max: timeparse/quota.py, measured 1, excluded 1)
++Re-review: skipped — churn 0.103 < 0.3. Tests 27 passed, ruff and mypy clean after the fix.
++
++## Confirmation Pass (confirm-1)
++Frozen `07ce60b4`, span `9a9e356e..07ce60b4`. All 7 lenses exercised. core, security and concurrency returned nothing. tests raised one new P2 (no test discriminates the response-closing behaviour; carried, not fixed since the pass applies no fixes). New severe findings: 0, so no repair round and no confirm-2.
++
++## Review Iteration Summary
++
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|-----------|-------|---------------|-----------|-----|
++| 1 (init)  | B     | —             | 8         | —   |
++| 2         | A     | 1             | 6         | 0   |
++| confirm-1 | A     | —             | 7         | 1 (P2) |
++
++Final grade: A
++Iterations used: 2 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false
++Counters (see §5): unreviewed 1 · prior-fix 0 · unattributed 0

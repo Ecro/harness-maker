@@ -1,0 +1,557 @@
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 66d606e..14e9d36 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -14,3 +14,8 @@ def test_invalid_exits_2(capsys: pytest.CaptureFixture[str]) -> None:
+     captured = capsys.readouterr()
+     assert captured.out == ""
+     assert "nope" in captured.err
++
++
++def test_zero_still_accepted(capsys: pytest.CaptureFixture[str]) -> None:
++    assert main(["0s"]) == 0
++    assert capsys.readouterr().out.split() == ["0"]
+diff --git a/tests/test_parse.py b/tests/test_parse.py
+index f6a9db8..3242508 100644
+--- a/tests/test_parse.py
++++ b/tests/test_parse.py
+@@ -16,3 +16,14 @@ def test_valid(text: str, seconds: int) -> None:
+ def test_invalid(text: str) -> None:
+     with pytest.raises(ValueError):
+         parse_duration(text)
++
++
++@pytest.mark.parametrize("text", ["0s", "0h0m", " 0D ", "00s", "0d0h0m0s", "0m0s"])
++def test_zero_total_rejected(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
++
++
++@pytest.mark.parametrize(("text", "seconds"), [("0h1m", 60), ("1h0m", 3600)])
++def test_zero_unit_in_nonzero_accepted(text: str, seconds: int) -> None:
++    assert parse_duration(text) == seconds
+diff --git a/timeparse/cli.py b/timeparse/cli.py
+index e92dd69..74ed2d7 100644
+--- a/timeparse/cli.py
++++ b/timeparse/cli.py
+@@ -5,7 +5,7 @@ from __future__ import annotations
+ import argparse
+ import sys
+ 
+-from timeparse.parse import parse_duration
++from timeparse.parse import parse_seconds
+ 
+ 
+ def _parser() -> argparse.ArgumentParser:
+@@ -20,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
+     results: list[int] = []
+     for text in args.durations:
+         try:
+-            results.append(parse_duration(text))
++            results.append(parse_seconds(text))
+         except ValueError:
+             print(f"error: invalid duration: {text!r}", file=sys.stderr)
+             return 2
+diff --git a/timeparse/parse.py b/timeparse/parse.py
+index 9c1a7fb..0ce287a 100644
+--- a/timeparse/parse.py
++++ b/timeparse/parse.py
+@@ -14,8 +14,17 @@ def parse_duration(text: str) -> int:
+     """Return the number of seconds in `text`, e.g. '1h30m' -> 5400.
+ 
+     Surrounding whitespace is ignored and units are case-insensitive. Each unit may appear
+-    once, largest first. Anything else raises ValueError.
++    once, largest first. Anything else, and any zero total (always a mistake in a timeout),
++    raises ValueError.
+     """
++    total = parse_seconds(text)
++    if total == 0:
++        raise ValueError(f"zero duration: {text!r}")
++    return total
++
++
++def parse_seconds(text: str) -> int:
++    """Like `parse_duration` but a zero total is accepted, e.g. '0s' -> 0."""
+     cleaned = text.strip().lower()
+     if not cleaned:
+         raise ValueError("empty duration")
+diff --git a/timeparse/schedule.py b/timeparse/schedule.py
+index c0748d0..7b65aa1 100644
+--- a/timeparse/schedule.py
++++ b/timeparse/schedule.py
+@@ -3,7 +3,7 @@
+ from __future__ import annotations
+ 
+ from timeparse.format import format_duration
+-from timeparse.parse import parse_duration
++from timeparse.parse import parse_seconds
+ 
+ 
+ def normalize(text: str) -> str:
+@@ -11,7 +11,7 @@ def normalize(text: str) -> str:
+ 
+     normalize("90m") -> "1h30m", normalize(" 2H ") -> "2h", normalize("0m") -> "0s".
+     """
+-    return format_duration(parse_duration(text))
++    return format_duration(parse_seconds(text))
+ 
+ 
+ def total(texts: list[str]) -> str:
+@@ -19,4 +19,4 @@ def total(texts: list[str]) -> str:
+ 
+     total(["1h", "30m"]) -> "1h30m", total([]) -> "0s".
+     """
+-    return format_duration(sum(parse_duration(text) for text in texts))
++    return format_duration(sum(parse_seconds(text) for text in texts))
+diff --git a/specs/SPEC-reject-zero-duration.machine.yaml b/specs/SPEC-reject-zero-duration.machine.yaml
+new file mode 100644
+index 0000000..99a0a32
+--- /dev/null
++++ b/specs/SPEC-reject-zero-duration.machine.yaml
+@@ -0,0 +1,170 @@
++schema_version: 3
++spec_slug: reject-zero-duration
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/parse.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: zero total rejected
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: 0s
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 0h0m
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: ' 0D '
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 00s
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 0d0h0m0s
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 0m0s
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: inputs and expected ValueError are stated verbatim by the requester,
++    not derived from the code
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: zero unit in non-zero total accepted
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: 0h1m
++    expected: 60
++    edge: false
++    note: ''
++  - input:
++      text: 1h0m
++    expected: 3600
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: expected values stated by the requester and checkable by hand (60
++    s, 3600 s)
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: other functions unchanged
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      call: normalize("0m")
++    expected: 0s
++    edge: false
++    note: ''
++  - input:
++      call: total([])
++    expected: 0s
++    edge: false
++    note: ''
++  - input:
++      call: total(["0s"])
++    expected: 0s
++    edge: false
++    note: ''
++  - input:
++      call: total(["0s", "1h"])
++    expected: 1h
++    edge: false
++    note: ''
++  - input:
++      call: main(["0s"])
++    expected: exit code 0, stdout 0
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: 'expected values are pre-change behavior, not computed from new
++    code: normalize and total([]) from the schedule.py docstrings; total(["0s"]),
++    total(["0s","1h"]) and main(["0s"]) by hand arithmetic and the pre-change commit
++    ff25425'
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: 4dec245e6f17a1cc6a58c40aaf91e3eb8dd5788392224da41df19be160c1b60d
++  approved_by: null
++  approved_at: '2026-10-15T18:52:44Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: 4618cd82822dea47b0d932543af5d1ff01c249556359755f570df4a65a3a33a6
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: 883315a76c8190a9b07a1993b43b739b8a21e6cdbad00f661a8e7725d143e1cc
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: 6d3702daa7d8b27dffba163013abd270f5e2c8d2eef01e058f7bcf1b50393950
++    AC-002: 711fb60f8df1ce2e6962052c6bdeb48eb47966e2cb94a8160072d931ca84521b
++    AC-003: 42559b974343751e7bc8cc922bbb82d3496165502921fff4a7b8b4c4eea914d2
++    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d
++  lane: light
+diff --git a/specs/SPEC-reject-zero-duration.md b/specs/SPEC-reject-zero-duration.md
+new file mode 100644
+index 0000000..031c548
+--- /dev/null
++++ b/specs/SPEC-reject-zero-duration.md
+@@ -0,0 +1,83 @@
++---
++type: spec
++task_slug: reject-zero-duration
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, validation, duration]
++test_framework: pytest
++interview_rounds: 1
++lane: light
++summary: "parse_duration rejects a zero total; all other package functions unchanged"
++---
++
++# SPEC: reject-zero-duration
++
++## 🎯 Intent
++A zero duration used as a timeout is always a mistake (it means "expire immediately" or "never", depending on the consumer). `parse_duration` should refuse it so the mistake surfaces at parse time.
++
++## 🌅 Outcomes
++- `parse_duration` raises `ValueError` for any input whose total is zero.
++- Every other function in the package (`normalize`, `total`, `format_duration`, the CLI) behaves exactly as before, including accepting zero.
++
++## 📋 In-Scope Scenarios
++
++### S1: zero total is rejected
++**Given** the strings `"0s"`, `"0h0m"`, `" 0D "`, `"00s"`, `"0d0h0m0s"` and `"0m0s"`
++**When** each is passed to `parse_duration`
++**Then** each raises `ValueError`
++
++### S2: zero unit in a non-zero duration is accepted
++**Given** the strings `"0h1m"` and `"1h0m"`
++**When** each is passed to `parse_duration`
++**Then** they return 60 and 3600 respectively
++
++### S3: other functions behave as before
++**Given** zero-valued input to the callers of the parser
++**When** `normalize("0m")`, `total([])`, `total(["0s"])`, `total(["0s", "1h"])` and `main(["0s"])` run (`main` checked via `capsys`)
++**Then** they return `"0s"`, `"0s"`, `"0s"`, `"1h"` and exit code 0 (printing `0`), as before
++
++## 🚫 Non-Goals
++- No new rejection in `normalize`, `total`, `format_duration` or the CLI.
++- No change to the grammar or to existing error messages for other invalid input.
++- No change to `format_duration(0) == "0s"`.
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | already used in `tests/` |
++| Compatibility | public signature `parse_duration(text: str) -> int` unchanged | exported from `timeparse/__init__.py` |
++| Design implication | `schedule.py` and `cli.py` currently call `parse_duration`, so they must not inherit the new rejection | S3; the implementer chooses the mechanism (e.g. an internal non-rejecting helper) |
++
++## 🔒 Irreversible Decisions
++none
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| S1 | unit | `test_zero_total_rejected` |
++| S2 | unit | `test_zero_unit_in_nonzero_accepted` |
++| S3 | unit | `test_other_functions_accept_zero` |
++
++### AC-001: zero total rejected
++Oracle: golden, the three inputs come verbatim from the requester's ask.
++
++### AC-002: zero unit in non-zero total accepted
++Oracle: golden, values come verbatim from the requester's ask (0h1m = 60 s, 1h0m = 3600 s by unit arithmetic).
++
++### AC-003: other functions unchanged
++Oracle: golden, expected values come from the existing `schedule.py` docstrings and current CLI behavior.
++
++## ❓ Open Questions
++none
++
++## 🔍 Refinement Decisions
++- Round 1 (light): ask is explicit; the only ambiguity was whether `normalize`/`total`/CLI should also reject zero. The third bullet answers it: they must not.
++- Lane `light`: one source file plus a helper, one session, `irreversible_decisions: []`.
++- No question tool was available, so the closing approval question was not asked.
++
++## 🔎 Spec Validation
++Advisory `spec-validator` pass (MAJOR_REVISION, non-gating):
++- Critical, declined: the `parse_duration` public contract change is not listed as irreversible. It is the requested feature, and a revert undoes it. There are no known external consumers in this repo. Kept `irreversible_decisions: []`; the DRI may overrule.
++- Critical, fixed: AC-003 lacked a `main(["0s"])` row; added.
++- Warning, fixed: AC-003 oracle evidence overclaimed docstring backing; corrected.
++- Suggestion, fixed: AC-001 widened to other all-zero spellings.
+diff --git a/tests/test_schedule.py b/tests/test_schedule.py
+new file mode 100644
+index 0000000..48d9154
+--- /dev/null
++++ b/tests/test_schedule.py
+@@ -0,0 +1,14 @@
++"""schedule keeps accepting zero durations, whatever parse_duration does.
++
++Passes before the change on purpose: a regression guard that goes red if the zero rejection
++leaks in; the RED sibling test_parse.py::test_zero_total_rejected forces that rejection to exist.
++"""
++
++from timeparse.schedule import normalize, total
++
++
++def test_other_functions_accept_zero() -> None:
++    assert normalize("0m") == "0s"
++    assert total([]) == "0s"
++    assert total(["0s"]) == "0s"
++    assert total(["0s", "1h"]) == "1h"
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/PLAN-reject-zero-duration.md b/work-docs/PLAN-reject-zero-duration.md
+new file mode 100644
+index 0000000..6b77174
+--- /dev/null
++++ b/work-docs/PLAN-reject-zero-duration.md
+@@ -0,0 +1,21 @@
++---
++type: plan
++task_slug: reject-zero-duration
++status: done
++created: 2026-10-15
++spec: "[[SPEC-reject-zero-duration]]"
++adrs: 1
++summary: "parse_duration rejects a zero total; schedule and CLI keep accepting zero"
++spec_need_verdict: change
++spec_need_target: reject-zero-duration
++---
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — reject zero in parse_duration, shield callers** — scope: timeparse/parse.py, timeparse/schedule.py, timeparse/cli.py, tests/test_parse.py, tests/test_schedule.py, tests/test_cli.py · exit: `uv run pytest -q` · risk: schedule/CLI inherit the new rejection if left on parse_duration · rollback: git checkout the touched files
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/format.py` — format_duration behavior must be unchanged (format_duration(0) == "0s")
++
++## 📐 Architecture Decision Records
++- ADR-001: split the parser into `parse_seconds` (current behavior, accepts zero, used by schedule and CLI) and `parse_duration` (calls it, raises ValueError on zero). **Decided by:** agent
+diff --git a/work-docs/REVIEW-reject-zero-duration-2026-10-15.md b/work-docs/REVIEW-reject-zero-duration-2026-10-15.md
+new file mode 100644
+index 0000000..cf37c9f
+--- /dev/null
++++ b/work-docs/REVIEW-reject-zero-duration-2026-10-15.md
+@@ -0,0 +1,49 @@
++---
++type: review
++task_slug: reject-zero-duration
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
++consensus_method: cross-check
++confirm_pass_ran: false
++human_review_needed: false
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: reject-zero-duration
++  computed_at: 2026-10-15T18:56:00Z
++---
++
++## 🎯 Round 1 Summary
++Grade A. P0 0, P1 0, P2 2, P3 2. All 7 lenses exercised. Lane `light`, no fix applied, confirmation pass skipped (`lane light, unchanged`).
++
++## 🔍 Drift Findings
++None. Every changed file is in the PLAN scope; `timeparse/format.py` untouched.
++
++## ✅ Consensus Findings (non-grading, accepted, not fixed)
++- F1 P2 consistency, `timeparse/parse.py:26` — `parse_seconds` is the internal grammar parser but its docstring is defined relative to the wrapper; document it as internal and grammar-owning.
++- F2 P2 consistency, `tests/test_schedule.py:1` — the SPEC maps S3 to one test name while the `main` case lives in `test_cli.py`; the docstring narrates change history.
++- T-1 P3 tests, `tests/test_parse.py:22` — bare `pytest.raises(ValueError)`; a loose `match="zero"` would be stronger.
++- T-2 P3 tests, `tests/test_schedule.py:10` — S3 is split across two tests; traceability only.
++
++## ⚠️ Weak Consensus
++None.
++
++## 📝 Manual-Only Findings
++None.
++
++## 🤝 Disagreements
++None.
++
++## Review Iteration Summary
++
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|-----------|-------|---------------|-----------|-----|
++| 1 (init)  | A     | —             | 4 (P2/P3) | —   |
++
++Final grade: A
++Iterations used: 1 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false

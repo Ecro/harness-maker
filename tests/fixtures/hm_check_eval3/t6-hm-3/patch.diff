@@ -1,0 +1,446 @@
+diff --git a/tests/test_parse.py b/tests/test_parse.py
+index f6a9db8..fe53279 100644
+--- a/tests/test_parse.py
++++ b/tests/test_parse.py
+@@ -16,3 +16,23 @@ def test_valid(text: str, seconds: int) -> None:
+ def test_invalid(text: str) -> None:
+     with pytest.raises(ValueError):
+         parse_duration(text)
++
++
++@pytest.mark.parametrize("text", ["1h30m5", "1h30m!", "2d junk", "45sx"])
++def test_trailing_text_rejected(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
++
++
++@pytest.mark.parametrize(
++    ("text", "seconds"),
++    [(" 1h30m ", 5400), ("1H30M", 5400), ("0s", 0), ("100000s", 100000)],
++)
++def test_valid_forms_unchanged(text: str, seconds: int) -> None:
++    assert parse_duration(text) == seconds
++
++
++@pytest.mark.parametrize("text", ["x1h", "1h 30m"])
++def test_leading_or_interior_text_rejected(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
+diff --git a/timeparse/parse.py b/timeparse/parse.py
+index 0ffc924..10068a9 100644
+--- a/timeparse/parse.py
++++ b/timeparse/parse.py
+@@ -35,6 +35,6 @@ def parse_duration(text: str) -> int:
+         last_rank = rank
+         total += int(amount) * UNITS[unit]
+         pos = match.end()
+-    if pos == 0:
++    if pos == 0 or pos != len(cleaned):
+         raise ValueError(f"invalid duration: {text!r}")
+     return total
+diff --git a/specs/SPEC-parse-duration-trailing.machine.yaml b/specs/SPEC-parse-duration-trailing.machine.yaml
+new file mode 100644
+index 0000000..32c9d61
+--- /dev/null
++++ b/specs/SPEC-parse-duration-trailing.machine.yaml
+@@ -0,0 +1,151 @@
++schema_version: 3
++spec_slug: parse-duration-trailing
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/parse.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: Trailing text is rejected
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: 1h30m5
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 1h30m!
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 2d junk
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 45sx
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Inputs and ValueError outcome are stated verbatim in the bug report,
++    independent of the implementation.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: Documented valid forms are unchanged
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: ' 1h30m '
++    expected: 5400
++    edge: false
++    note: ''
++  - input:
++      text: 1H30M
++    expected: 5400
++    edge: false
++    note: ''
++  - input:
++      text: 0s
++    expected: 0
++    edge: false
++    note: ''
++  - input:
++      text: 100000s
++    expected: 100000
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Values are the documented pre-fix results given in the bug report.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: Leading and interior junk still rejected
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: x1h
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: 1h 30m
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Inputs and outcome are stated in the bug report as existing behaviour.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: 35865e1af77b2b5ffed3bf44240755f9be61293a29d7b6a7b731ccedb578d3f7
++  approved_by: null
++  approved_at: '2026-10-15T19:32:25Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: 10ebe7065eff73107040a3c15edb60be5ddb47608a82c582862b3e7c60b079f2
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: 883315a76c8190a9b07a1993b43b739b8a21e6cdbad00f661a8e7725d143e1cc
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: f109bf5207b0564eb332050fb0e0fe88ca540f639dcd0412d2295988d6585bce
++    AC-002: 33bd2256d71c44be90da155368a4470070479308c9bdc9b0b3d7aebc63e0974d
++    AC-003: f9cfcaa13d4d634810b9fba8428ef2f31d8cad2a6009cc8f3c8738b9ea2a27c2
++    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d
++  lane: light
+diff --git a/specs/SPEC-parse-duration-trailing.md b/specs/SPEC-parse-duration-trailing.md
+new file mode 100644
+index 0000000..13256a8
+--- /dev/null
++++ b/specs/SPEC-parse-duration-trailing.md
+@@ -0,0 +1,72 @@
++---
++type: spec
++task_slug: parse-duration-trailing
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, bugfix, parsing]
++test_framework: pytest
++interview_rounds: 0
++lane: light
++summary: "parse_duration must reject text after the last unit instead of ignoring it"
++---
++
++# SPEC: parse_duration rejects trailing text
++
++## 🎯 Intent
++
++A user reported that `parse_duration("1h30m5")` returns 5400 instead of raising. Text after the last unit is silently dropped, so malformed input is accepted as valid.
++
++## 🌅 Outcomes
++
++Any input with unparsed text after the last matched unit raises `ValueError`. Every currently valid input keeps its current result.
++
++## 📋 In-Scope Scenarios
++
++### AC-001: Trailing text is rejected
++**Given** a duration string with text after the last unit
++**When** `parse_duration` is called with `"1h30m5"`, `"1h30m!"`, `"2d junk"` or `"45sx"`
++**Then** `ValueError` is raised
++
++### AC-002: Documented valid forms are unchanged
++**Given** a well-formed duration
++**When** `parse_duration` is called with `" 1h30m "`, `"1H30M"`, `"0s"` or `"100000s"`
++**Then** it returns 5400, 5400, 0 and 100000 respectively
++
++### AC-003: Leading and interior junk still rejected
++**Given** text before or between units
++**When** `parse_duration` is called with `"x1h"` or `"1h 30m"`
++**Then** `ValueError` is raised
++
++## 🚫 Non-Goals
++
++- No change to the grammar, unit set, ordering rule or error messages beyond the new rejection.
++- No change to other modules (`format`, CLI).
++
++## ⚠️ Constraints
++
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | Existing `tests/test_parse.py` uses it |
++| Compatibility | Valid inputs return identical values | Documented behaviour must not change |
++
++## 🔒 Irreversible Decisions
++
++none
++
++## ✅ Verification Criteria
++
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| AC-001 | unit | `test_trailing_text_rejected` |
++| AC-002 | unit | `test_valid_forms_unchanged` |
++| AC-003 | unit | `test_leading_or_interior_text_rejected` |
++
++## ❓ Open Questions
++
++None.
++
++## 🔍 Refinement Decisions
++
++- Not skipped: acceptance has edge and regression scenarios beyond the happy path.
++- Lane `light`: one file, one session, no irreversible decision. No interview was run (the ask is fully specified); autopilot `auto_full`, so the DRI was not asked.
++- Spec-validator not dispatched: `irreversible_decisions` is empty, nothing implies one, and the change is a single-file bugfix.
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/PLAN-parse-duration-trailing.md b/work-docs/PLAN-parse-duration-trailing.md
+new file mode 100644
+index 0000000..b545d01
+--- /dev/null
++++ b/work-docs/PLAN-parse-duration-trailing.md
+@@ -0,0 +1,24 @@
++---
++type: plan
++task_slug: parse-duration-trailing
++status: done
++created: 2026-10-15
++spec: "[[SPEC-parse-duration-trailing]]"
++adrs: 1
++summary: "Reject unparsed text after the last unit in parse_duration"
++spec_need_verdict: change
++spec_need_target: parse-duration-trailing
++---
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — Reject trailing text** — scope: timeparse/parse.py, tests/test_parse.py · exit: `python -m pytest tests -q` · risk: valid inputs regress · rollback: revert the two files
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/format.py` — out of scope per SPEC non-goals
++
++## 📐 Architecture Decision Records
++- ADR-001: After the token loop, require pos == len(cleaned), otherwise raise ValueError. **Decided by:** agent
++
++## Phase notes
++- Phase D.5 window: strings with any unparsed tail after valid units, e.g. "1h30m5", "45sx", are now rejected. Entered by `tests/test_parse.py::test_trailing_text_rejected`.
+diff --git a/work-docs/REVIEW-parse-duration-trailing-2026-10-15.md b/work-docs/REVIEW-parse-duration-trailing-2026-10-15.md
+new file mode 100644
+index 0000000..5cc9433
+--- /dev/null
++++ b/work-docs/REVIEW-parse-duration-trailing-2026-10-15.md
+@@ -0,0 +1,50 @@
++---
++type: review
++task_slug: parse-duration-trailing
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
++consensus_method: cross-check
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: parse-duration-trailing
++  computed_at: 2026-10-15T19:34:51Z
++---
++
++## 🎯 Round 1 Summary
++Grade A. Lens coverage complete (7/7). No P0/P1/P2 findings; 5 P3 notes, all accepted and not fixed (non-blocking).
++
++## 🔍 Drift Findings
++None. Changed files timeparse/parse.py and tests/test_parse.py are in PLAN scope; S1-S3 are covered.
++
++## ✅ Consensus Findings (all P3)
++- parse.py:38 consistency: `pos == 0 or` is redundant (pos != len(cleaned) covers it).
++- parse.py:10 robustness: \d matches Unicode digits (pre-existing).
++- parse.py:22 design: optional single match-at-pos loop.
++- parse.py:10 security: unbounded input length; no ReDoS found.
++- test_parse.py:35 tests: some duplicated cases; could add a chained-unit trailing case.
++
++## ⚠️ Weak Consensus
++None.
++
++## 📝 Manual-Only Findings
++None.
++
++## 🤝 Disagreements
++None.
++
++## Review Iteration Summary
++
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|-----------|-------|---------------|-----------|-----|
++| 1 (init)  | A     | —             | 5 (P3)    | —   |
++
++Final grade: A
++Iterations used: 1 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false
++Counters (see §5): unreviewed 0 · prior-fix 0 · unattributed 0
++confirm_pass_ran: false (lane light, unchanged)

@@ -1,0 +1,652 @@
+diff --git a/specs/SPEC-ratelimit.machine.yaml b/specs/SPEC-ratelimit.machine.yaml
+new file mode 100644
+index 0000000..1437299
+--- /dev/null
++++ b/specs/SPEC-ratelimit.machine.yaml
+@@ -0,0 +1,59 @@
++schema_version: 3
++spec_slug: ratelimit
++verification_tier: 1
++irreversible_decisions: []
++mutation_threshold: 85
++paths_to_mutate: [timeparse/ratelimit.py]
++ac:
++  - id: AC-001
++    title: Construction and validation
++    type: parametric
++    golden_table:
++      - {input: {rate: "10/1s", burst: 1}, expected: ok}
++      - {input: {rate: "3/1h30m", burst: 2}, expected: ok}
++      - {input: {rate: "0/1s", burst: 1}, expected: ValueError}
++      - {input: {rate: "5/0s", burst: 1}, expected: ValueError}
++      - {input: {rate: "5/1s", burst: 0}, expected: ValueError}
++    pending_test: true
++    oracle_source: golden
++    oracle_evidence: Cases enumerated from the request text, not from the implementation.
++  - id: AC-002
++    title: Allow and continuous refill
++    type: parametric
++    golden_table:
++      - {input: {t: 0.0}, expected: true}
++      - {input: {t: 0.3}, expected: true}
++      - {input: {t: 1.0}, expected: true}
++    pending_test: true
++    oracle_source: golden
++    oracle_evidence: Sequence 0.0..1.0 and the 0.05 rejection are given in the request.
++  - id: AC-003
++    title: Multi-token takes are all-or-nothing
++    type: property
++    input_domain: any limiter state and any n in 1..burst that exceeds available tokens
++    transformation: call allow(n) and get False
++    expected_relation: later allow and retry_after results equal those of a run without that call
++    observable_output: return values of allow and retry_after
++    pending_test: true
++    oracle_source: property
++    oracle_evidence: Holds for any implementation of take-nothing-on-failure; compares two runs, not code.
++  - id: AC-004
++    title: retry_after
++    type: parametric
++    golden_table:
++      - {input: {rate: "10/1s", drained_at: 0.0, n: 1, t: 0.0}, expected: 0.1}
++      - {input: {rate: "10/1s", drained_at: 0.0, n: 3, t: 0.0}, expected: 0.3}
++      - {input: {rate: "10/1s", full: true, n: 1}, expected: 0.0}
++    pending_test: true
++    oracle_source: golden
++    oracle_evidence: n/rate arithmetic from the stated rate.
++  - id: AC-005
++    title: n bounds
++    type: parametric
++    golden_table:
++      - {input: {burst: 3, n: 0}, expected: ValueError}
++      - {input: {burst: 3, n: 4}, expected: ValueError}
++      - {input: {burst: 3, n: 3}, expected: ok}
++    pending_test: true
++    oracle_source: golden
++    oracle_evidence: Bounds 1..burst are stated in the request.
+diff --git a/specs/SPEC-ratelimit.md b/specs/SPEC-ratelimit.md
+new file mode 100644
+index 0000000..d668163
+--- /dev/null
++++ b/specs/SPEC-ratelimit.md
+@@ -0,0 +1,110 @@
++---
++type: spec
++task_slug: ratelimit
++status: draft
++created: 2026-10-15
++tags: [timeparse, spec, python, rate-limiting, token-bucket]
++test_framework: pytest
++interview_rounds: 0
++lane: light
++summary: "Token-bucket RateLimiter in timeparse/ratelimit.py with allow() and retry_after()"
++---
++
++# SPEC: ratelimit
++
++## 🎯 Intent
++Callers of `timeparse` have a duration parser but no way to throttle work by it. Add a small token-bucket limiter whose rate is written as `"N/DURATION"`, reusing `parse_duration`, so rates read like `"5/1m"`.
++
++## 🌅 Outcomes
++A caller can build `RateLimiter("10/1s", burst=5)`, call `allow()` to gate work, and call `retry_after()` to learn how long to wait. Time is injectable via `clock`, so behavior is deterministic in tests.
++
++## 📋 In-Scope Scenarios
++
++### S1: Construction and validation (AC-001)
++**Given** a `rate` string, a `burst`, and optionally a `clock`
++**When** `RateLimiter(rate, burst, clock)` is called
++**Then** `"10/1s"`, `"5/1m"`, `"3/1h30m"` with burst 1 or more are accepted
++**And** `ValueError` is raised for: no `/` or more than one `/`; `N` not a positive integer (`"0/1s"`, `"-1/1s"`, `"1.5/1s"`, `"/1s"`, non-digit); a `DURATION` that `parse_duration` rejects or that parses to 0 (`"5/0s"`, `"5/xyz"`); a non-string `rate`; a `burst` that is not a positive integer (0, negative, float, bool).
++
++### S2: Allow and continuous refill (AC-002)
++**Given** `rate="10/1s"`, `burst=1`, and a fake clock
++**When** `allow()` is called at clock readings 0.0, 0.1, 0.2, … 1.0
++**Then** every call returns `True`
++**And** a call at 0.05 after the call at 0.0 returns `False` and does not consume a token
++**And** the bucket starts full (`burst` consecutive `allow()` at one instant succeed, the next fails) and never holds more than `burst` tokens after a long idle.
++
++### S3: Multi-token takes are all-or-nothing (AC-003)
++**Given** `rate="1/1s"`, `burst=5`, 3 tokens available
++**When** `allow(4)` is called
++**Then** it returns `False` and the 3 tokens remain
++**And** `allow(3)` then returns `True`.
++
++### S4: retry_after (AC-004)
++**Given** `rate="10/1s"`, `burst=5`, bucket drained at t=0.0
++**When** `retry_after(n)` is called
++**Then** it returns `n/10` seconds at t=0.0, shrinks as the clock advances, and is `0.0` once `n` tokens are due
++**And** it is `0.0` on a full bucket, and calling it never takes tokens.
++
++### S5: n bounds (AC-005)
++**Given** any limiter with `burst=B`
++**When** `allow(n)` or `retry_after(n)` is called with `n < 1`, `n > B`, or a non-integer `n`
++**Then** `ValueError` is raised and no tokens are taken.
++
++## 🚫 Non-Goals
++- Thread safety, async, or blocking/sleeping `wait()` helpers.
++- Per-key limiters, persistence, or shared state across processes.
++- Fractional rates (`N` is an integer) and an upper cap on `burst`; `burst` has no default and is required.
++- CLI exposure of the limiter.
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | Existing `tests/` and `[tool.pytest.ini_options]` in pyproject.toml |
++| Default clock | `time.monotonic`, as in the request's signature | Stated in the request |
++| Dependencies | stdlib + `timeparse.parse.parse_duration` only | No new external dependency |
++| Float tolerance | A token counts as available when `tokens >= n - 1e-9` | S2's 0.1-step sequence: `0.3 - 0.2` is `0.0999…98`, so an exact compare would wrongly reject a token that is due |
++| Clock regression | A reading earlier than the last one adds no tokens (elapsed clamped to 0) | `time.monotonic` never regresses; this keeps a bad injected clock from minting tokens |
++| Compatibility | Python version of `pyproject.toml` | Existing package |
++
++## 🔒 Irreversible Decisions
++none — a new, additive, internal-to-package module; no schema, migration, permission boundary or dependency change. The public signature is new and cheap to revise before any release.
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| S1 | unit | `test_s1_construction_validation` |
++| S2 | unit | `test_s2_allow_refill_sequence` |
++| S3 | unit | `test_s3_multi_token_all_or_nothing` |
++| S4 | unit | `test_s4_retry_after` |
++| S5 | unit | `test_s5_n_bounds` |
++
++### AC-001: Construction and validation
++Oracle: golden. Evidence: valid and invalid cases are enumerated from the user's request, not derived from the implementation.
++
++### AC-002: Allow and continuous refill
++Oracle: golden. Evidence: the 0.0–1.0 sequence and the 0.05 rejection are stated in the request.
++
++### AC-003: Multi-token takes are all-or-nothing
++Oracle: property. Evidence: a rejected `allow(n)` leaves `retry_after` and later `allow` results identical to a run in which it was never called, whatever the implementation.
++
++### AC-004: retry_after
++Oracle: golden. Evidence: `n/10` at t=0 follows from the stated rate; consistency check: advancing the clock by `retry_after(n)` makes `allow(n)` return `True`.
++
++### AC-005: n bounds
++Oracle: golden. Evidence: bounds 1..burst are stated in the request.
++
++## ❓ Open Questions
++- Is `RateLimiter` exported from `timeparse/__init__.py` (public API contract, which may be irreversible) or reachable only as `timeparse.ratelimit.RateLimiter`? Default until answered: not exported; `/hm:execute` Step 0 resolves it. If exported, add an `IRR-001` and re-run as `full`.
++- Whitespace/case handling of `N` and the slash (`"10 / 1s"`): default is strict — only `parse_duration`'s own trimming applies to the DURATION part; `N` must be bare ASCII digits.
++
++## 🔎 Spec Validation
++spec-validator: MAJOR_REVISION (advisory). Findings, one pass:
++- critical: AC-002 golden table has only `True` rows, so an `allow()` that never limits would pass. Execute must author the test from S2 prose as a stateful sequence: 0.05 rejection, burst+1th failure, idle cap, non-consumption.
++- AC-001, AC-004, AC-005 machine tables are thinner than S1/S4/S5. Execute must cover every S1 invalid class (including `"5/1s/2s"`, bool/float `burst`, non-string rate), a mid-drain and exact-due `retry_after`, and `n` of float/bool/str type on both methods with state unchanged.
++- warning: public API contract not listed as irreversible. Recorded above as an open question.
++- Circular oracles: none found.
++
++## 🔍 Refinement Decisions
++- Lane `light`: one new module plus one test file, one session, no irreversible decision. Interview skipped as the request already fixes the contract; autopilot is `auto_full`, so the DRI was not asked.
++- Defaulted (not asked): float tolerance 1e-9, clamp of regressing clocks, rejection of bool/float for `N`, `burst`, `n`, and zero-length durations.
++- Autopilot `auto_full` auto-answered the pending judgment gate (open questions on export location and `N` whitespace). No approval was written; the SPEC stays unaccepted at `status: draft`, with the defaults above standing until `/hm:execute` Step 0 resolves them.
+diff --git a/tests/test_ratelimit.py b/tests/test_ratelimit.py
+new file mode 100644
+index 0000000..dee842e
+--- /dev/null
++++ b/tests/test_ratelimit.py
+@@ -0,0 +1,179 @@
++"""RateLimiter scenarios S1-S5 from specs/SPEC-ratelimit.md."""
++
++import pytest
++from timeparse.ratelimit import RateLimiter
++
++
++class Clock:
++    def __init__(self, now: float = 0.0) -> None:
++        self.now = now
++
++    def __call__(self) -> float:
++        return self.now
++
++
++@pytest.mark.parametrize(
++    ("rate", "burst"), [("10/1s", 1), ("5/1m", 3), ("3/1h30m", 2), ("1/1d", 10)]
++)
++def test_s1_construction_valid(rate: str, burst: int) -> None:
++    RateLimiter(rate, burst, Clock())
++
++
++@pytest.mark.parametrize(
++    "rate",
++    [
++        "10",
++        "",
++        "/1s",
++        "0/1s",
++        "-1/1s",
++        "1.5/1s",
++        "a/1s",
++        "5/0s",
++        "5/xyz",
++        "5/",
++        "5/1s/2s",
++        "5/1x",
++        "5/10",
++        None,
++        5,
++        b"5/1s",
++    ],
++)
++def test_s1_construction_validation_rate(rate: object) -> None:
++    with pytest.raises(ValueError):
++        RateLimiter(rate, 1, Clock())  # type: ignore[arg-type]
++
++
++@pytest.mark.parametrize("burst", [0, -1, 1.0, 2.5, True, "3", None])
++def test_s1_construction_validation_burst(burst: object) -> None:
++    with pytest.raises(ValueError):
++        RateLimiter("10/1s", burst, Clock())  # type: ignore[arg-type]
++
++
++def test_s1_default_clock_is_usable() -> None:
++    limiter = RateLimiter("10/1s", 1)
++    assert limiter.allow() is True
++
++
++def test_s2_allow_refill_sequence() -> None:
++    clock = Clock(0.0)
++    limiter = RateLimiter("10/1s", 1, clock)
++    for reading in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
++        clock.now = reading
++        assert limiter.allow() is True, reading
++
++
++def test_s2_rejects_before_due_and_does_not_consume() -> None:
++    clock = Clock(0.0)
++    limiter = RateLimiter("10/1s", 1, clock)
++    assert limiter.allow() is True
++    clock.now = 0.05
++    assert limiter.allow() is False
++    assert limiter.allow() is False
++    clock.now = 0.1  # still due on schedule: the rejected calls took nothing
++    assert limiter.allow() is True
++
++
++def test_s2_starts_full_and_exhausts() -> None:
++    limiter = RateLimiter("1/1s", 3, Clock(5.0))
++    assert [limiter.allow() for _ in range(4)] == [True, True, True, False]
++
++
++def test_s2_never_exceeds_burst_after_idle() -> None:
++    clock = Clock(0.0)
++    limiter = RateLimiter("10/1s", 3, clock)
++    for _ in range(3):
++        assert limiter.allow()
++    clock.now = 1000.0
++    assert [limiter.allow() for _ in range(4)] == [True, True, True, False]
++
++
++def test_s2_slow_rate_over_minutes() -> None:
++    clock = Clock(0.0)
++    limiter = RateLimiter("5/1m", 5, clock)
++    for _ in range(5):
++        assert limiter.allow()
++    assert limiter.allow() is False
++    clock.now = 12.0  # one token every 12 s
++    assert limiter.allow() is True
++    assert limiter.allow() is False
++
++
++def test_s2_regressing_clock_mints_nothing() -> None:
++    clock = Clock(10.0)
++    limiter = RateLimiter("1/1s", 1, clock)
++    assert limiter.allow() is True
++    clock.now = 5.0
++    assert limiter.allow() is False
++    clock.now = (
++        10.5  # measured from the latest reading seen (10.0), not the regressed 5.0
++    )
++    assert limiter.allow() is False
++    clock.now = 11.0
++    assert limiter.allow() is True
++
++
++def test_s3_multi_token_all_or_nothing() -> None:
++    limiter = RateLimiter("1/1s", 5, Clock(0.0))
++    assert limiter.allow(2) is True  # 3 left
++    assert limiter.allow(4) is False
++    assert limiter.allow(3) is True
++    assert limiter.allow() is False
++
++
++def test_s3_rejected_take_leaves_no_trace() -> None:
++    def run(with_rejection: bool) -> list[object]:
++        clock = Clock(0.0)
++        limiter = RateLimiter("10/1s", 5, clock)
++        limiter.allow(4)
++        out: list[object] = []
++        for reading in [0.0, 0.05, 0.1, 0.35, 0.6]:
++            clock.now = reading
++            if with_rejection:
++                assert limiter.allow(5) is False
++            out += [limiter.retry_after(2), limiter.allow(2)]
++        return out
++
++    assert run(True) == run(False)
++
++
++def test_s4_retry_after() -> None:
++    clock = Clock(0.0)
++    limiter = RateLimiter("10/1s", 5, clock)
++    assert limiter.retry_after() == 0.0
++    assert limiter.retry_after(5) == 0.0
++    assert limiter.allow(5) is True
++    assert limiter.retry_after() == pytest.approx(0.1)
++    assert limiter.retry_after(3) == pytest.approx(0.3)
++    clock.now = 0.1
++    assert limiter.retry_after() == 0.0
++    assert limiter.retry_after(3) == pytest.approx(0.2)
++    clock.now = 0.3
++    assert limiter.retry_after(3) == 0.0
++
++
++def test_s4_retry_after_takes_nothing_and_matches_allow() -> None:
++    clock = Clock(0.0)
++    limiter = RateLimiter("3/1h30m", 4, clock)
++    assert limiter.allow(4) is True
++    wait = limiter.retry_after(2)
++    assert wait == pytest.approx(2 * 5400 / 3)
++    assert limiter.retry_after(2) == wait
++    clock.now = wait
++    assert limiter.allow(2) is True
++    assert limiter.allow() is False
++
++
++@pytest.mark.parametrize("method", ["allow", "retry_after"])
++@pytest.mark.parametrize("n", [0, -1, 4, 100, 1.0, 2.5, True, "1", None])
++def test_s5_n_bounds(method: str, n: object) -> None:
++    limiter = RateLimiter("1/1s", 3, Clock(0.0))
++    with pytest.raises(ValueError):
++        getattr(limiter, method)(n)
++    assert limiter.allow(3) is True  # nothing was taken
++
++
++@pytest.mark.parametrize("method", ["allow", "retry_after"])
++def test_s5_n_equal_to_burst_is_valid(method: str) -> None:
++    getattr(RateLimiter("1/1s", 3, Clock(0.0)), method)(3)
+diff --git a/timeparse/ratelimit.py b/timeparse/ratelimit.py
+new file mode 100644
+index 0000000..9d518c8
+--- /dev/null
++++ b/timeparse/ratelimit.py
+@@ -0,0 +1,78 @@
++"""Token-bucket rate limiter configured with a rate string such as '10/1s'."""
++
++from __future__ import annotations
++
++import time
++from collections.abc import Callable
++
++from timeparse.parse import parse_duration
++
++# A token counts as available when it is due to within this much, so that clock readings
++# such as 0.3 - 0.2 (== 0.0999...98) do not reject a token that is due on schedule.
++_EPSILON = 1e-9
++
++
++def _positive_int(value: object, name: str) -> int:
++    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
++        raise ValueError(f"{name} must be a positive integer, got {value!r}")
++    return value
++
++
++def _parse_rate(rate: object) -> float:
++    """Return tokens per second for an 'N/DURATION' string."""
++    if not isinstance(rate, str):
++        raise ValueError(f"rate must be a string, got {rate!r}")
++    parts = rate.split("/")
++    if len(parts) != 2:
++        raise ValueError(f"rate must look like 'N/DURATION', got {rate!r}")
++    count_text, duration_text = parts
++    if not (count_text.isascii() and count_text.isdigit()) or int(count_text) < 1:
++        raise ValueError(f"rate count must be a positive integer, got {rate!r}")
++    seconds = parse_duration(duration_text)
++    if seconds <= 0:
++        raise ValueError(f"rate duration must be positive, got {rate!r}")
++    return int(count_text) / seconds
++
++
++class RateLimiter:
++    """Token bucket: starts full, refills continuously at `rate`, holds at most `burst`."""
++
++    def __init__(
++        self, rate: str, burst: int, clock: Callable[[], float] = time.monotonic
++    ) -> None:
++        self._rate = _parse_rate(rate)
++        self._burst = _positive_int(burst, "burst")
++        self._clock = clock
++        self._tokens = float(self._burst)
++        self._last = clock()
++
++    def allow(self, n: int = 1) -> bool:
++        """Take `n` tokens and return True if they are available, else take nothing."""
++        self._check(n)
++        self._refill()
++        if self._tokens >= n - _EPSILON:
++            self._tokens = max(0.0, self._tokens - n)
++            return True
++        return False
++
++    def retry_after(self, n: int = 1) -> float:
++        """Seconds until `n` tokens are available; 0.0 if they are now. Takes nothing."""
++        self._check(n)
++        self._refill()
++        if self._tokens >= n - _EPSILON:
++            return 0.0
++        return (n - self._tokens) / self._rate
++
++    def _check(self, n: object) -> None:
++        if not isinstance(n, int) or isinstance(n, bool) or not 1 <= n <= self._burst:
++            raise ValueError(
++                f"n must be an integer between 1 and {self._burst}, got {n!r}"
++            )
++
++    def _refill(self) -> None:
++        now = self._clock()
++        if now > self._last:  # a regressing clock adds nothing and is not remembered
++            self._tokens = min(
++                float(self._burst), self._tokens + (now - self._last) * self._rate
++            )
++            self._last = now
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/PLAN-ratelimit.md b/work-docs/PLAN-ratelimit.md
+new file mode 100644
+index 0000000..5c4a2ad
+--- /dev/null
++++ b/work-docs/PLAN-ratelimit.md
+@@ -0,0 +1,50 @@
++---
++type: plan
++task_slug: ratelimit
++status: done
++created: 2026-10-15
++tags: [timeparse, plan, python, rate-limiting, token-bucket]
++spec: "[[SPEC-ratelimit]]"
++interview_rounds: 0
++adrs: 4
++validator_outcome: NOT_RUN
++summary: "Add token-bucket RateLimiter in timeparse/ratelimit.py, tests first"
++spec_need_verdict: change
++spec_need_target: ratelimit
++---
++
++## 🎯 Executive Summary
++Add `RateLimiter(rate, burst, clock)` with `allow(n)` and `retry_after(n)` as a new module, covering SPEC S1-S5 (AC-001..AC-005). Decisions below are the reversible calls the SPEC left open.
++
++## 📚 Prior Work
++No prior PLANs or SPECs. `parse_duration` in `timeparse/parse.py` returns int seconds and raises `ValueError`; reused for the DURATION part.
++
++## 📐 Architecture Decision Records
++- ADR-001: Track tokens as a float plus the last clock reading; refill lazily on each call as `min(burst, tokens + elapsed * rate_per_sec)`. **Decided by:** agent
++- ADR-002: A token is available when `tokens >= n - 1e-9`; `retry_after` is `max(0.0, (n - tokens) / rate_per_sec)`, and `0.0` when within that tolerance. **Decided by:** user (source: SPEC Constraints, float tolerance and S2 sequence)
++- ADR-003: `RateLimiter` is not exported from `timeparse/__init__.py` (SPEC open question, default). Consumers import `timeparse.ratelimit`. **Decided by:** agent
++- ADR-004: Strict validation: `rate` must be `str` with exactly one `/`; `N` is ASCII digits only and positive; `burst` and `n` are `int` but not `bool`. **Decided by:** agent
++
++## 🏗️ Technical Design
++New `timeparse/ratelimit.py` imports `parse_duration` from `timeparse.parse`. State: `_rate` (tokens/sec), `_burst`, `_clock`, `_tokens` (starts at burst), `_last` (clock reading at construction). A regressing clock gives elapsed 0. Validation of `n` precedes any state change; a failed `allow` mutates nothing except the refill, which is idempotent.
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — tests and RateLimiter** — depends_on: none · parallel_group: none · merge_hazards: none · scope: in `tests/test_ratelimit.py`, `timeparse/ratelimit.py`; out: every other file · exit: `uv run pytest -q` · risk: low · rollback: delete the two new files
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/parse.py` — parse_duration behavior is relied on, not modified
++- `timeparse/__init__.py` — export decision deferred (ADR-003)
++
++## 🧪 Testing Strategy
++pytest unit tests, one per scenario: `test_s1_construction_validation`, `test_s2_allow_refill_sequence`, `test_s3_multi_token_all_or_nothing`, `test_s4_retry_after`, `test_s5_n_bounds`. A fake clock is injected. Hypothesis is not installed here, so the AC-003 property is checked as a two-run comparison over a fixed set of cases.
++
++## ⚠️ Risks & Mitigation
++| Risk | Mitigation |
++|---|---|
++| Float error rejects a due token | ADR-002 tolerance, tested on the 0.1-step sequence |
++| Tests derived from the code | Expected values taken from the SPEC golden tables |
++
++## ✅ Success Criteria
++- [x] S1-S5 tests pass
++- [x] full suite green (`python -m pytest -q`: 78 passed)
+diff --git a/work-docs/REVIEW-ratelimit-2026-10-15.md b/work-docs/REVIEW-ratelimit-2026-10-15.md
+new file mode 100644
+index 0000000..16e40af
+--- /dev/null
++++ b/work-docs/REVIEW-ratelimit-2026-10-15.md
+@@ -0,0 +1,55 @@
++---
++type: review
++task_slug: ratelimit
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
++consensus_method: cross-check
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: ratelimit
++  computed_at: 2026-10-15T19:30:00+00:00
++confirm_pass_ran: false
++---
++
++## 🎯 Round 1 Summary
++Grade **A** (P0 0, P1 0, P2 3, P3 10; 1 duplicate). All 7 lenses exercised, no coverage blocker. `human_review_needed: false`. No fix was applied: auto-fix only runs below the grade threshold, so every finding below is carried. Light lane with round 1 approved and no fix applied, so the confirmation pass was skipped.
++
++## 🔍 Drift Findings
++None. Changed code files are `timeparse/ratelimit.py` and `tests/test_ratelimit.py`, both in PLAN phase 1 scope.
++
++## ✅ Consensus Findings (carried, none affect the grade)
++P2
++- `ratelimit.py:34` huge all-digit `N` or `burst` raises `OverflowError`; a tiny quotient gives rate 0.0 and `ZeroDivisionError` in `retry_after`. This breaks the S1 "anything else raises ValueError" contract. Raised by robustness and security (the security one is recorded as a duplicate).
++- `ratelimit.py:70` one non-finite clock reading (NaN or inf) permanently stalls refill. Also noted at P3 by security (45) and concurrency (72).
++- `tests/test_ratelimit.py:51` no test sits just short of due, so a too-large epsilon passes every test.
++
++P3
++- design: int-not-bool check duplicated in `_positive_int` and `_check`.
++- consistency: `_EPSILON` comment garbled and omits that its unit is tokens.
++- concurrency: docstring does not say the class is not thread-safe (a SPEC Non-Goal).
++- tests: default clock not checked to be `time.monotonic`; `n == burst` test asserts no result; non-ASCII digit, `+5` and spaced-slash rates untested; no-tokens-taken check runs only on a full bucket.
++
++## ⚠️ Weak Consensus
++None.
++
++## 📝 Manual-Only Findings
++None.
++
++## 🤝 Disagreements
++None.
++
++## Review Iteration Summary
++
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|-----------|-------|---------------|-----------|-----|
++| 1 (init)  | A     | —             | 13        | —   |
++
++Final grade: A
++Iterations used: 1 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false
++Counters: unreviewed 0 · prior-fix 0 · unattributed 0

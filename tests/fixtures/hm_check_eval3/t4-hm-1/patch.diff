@@ -1,0 +1,573 @@
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 66d606e..3495fee 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -1,5 +1,7 @@
+ """The CLI prints seconds and exits 2 on bad input."""
+ 
++import io
++
+ import pytest
+ from timeparse.cli import main
+ 
+@@ -14,3 +16,105 @@ def test_invalid_exits_2(capsys: pytest.CaptureFixture[str]) -> None:
+     captured = capsys.readouterr()
+     assert captured.out == ""
+     assert "nope" in captured.err
++
++
++class _Run:
++    def __init__(self, code: int, stdout: str, stderr: str) -> None:
++        self.code = code
++        self.stdout = stdout
++        self.stderr = stderr
++
++
++@pytest.fixture
++def run(
++    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
++):
++    def _run(argv: list[str], stdin: str = "") -> _Run:
++        monkeypatch.setattr("sys.stdin", io.StringIO(stdin))
++        code = main(argv)
++        captured = capsys.readouterr()
++        return _Run(code, captured.out, captured.err)
++
++    return _run
++
++
++def test_ac_001_sum_prints_only_total(run) -> None:
++    result = run(["--sum", "1h", "30m"])
++    assert result.stdout == "5400\n"
++    assert result.code == 0
++
++
++def test_ac_002_dash_reads_stdin_blanks_ignored(run) -> None:
++    result = run(["-", "--sum"], stdin="1m\n\n2m\n")
++    assert result.stdout == "180\n"
++    assert result.code == 0
++
++
++def test_ac_003_every_invalid_reported(run) -> None:
++    result = run(["1h", "x", "2q"])
++    assert result.stderr == (
++        "error: invalid duration: 'x'\nerror: invalid duration: '2q'\n"
++    )
++    assert result.stdout == ""
++    assert result.code == 2
++
++
++def test_ac_003_invalid_from_stdin_with_sum_prints_nothing(run) -> None:
++    result = run(["--sum", "1h", "-"], stdin="  bad \n1m\n")
++    assert result.stderr == "error: invalid duration: 'bad'\n"
++    assert result.stdout == ""
++    assert result.code == 2
++
++
++def test_ac_004_order_and_default_output(run) -> None:
++    result = run(["1h", "-", "1m"], stdin="  30s \n")
++    assert result.stdout == "3600\n30\n60\n"
++    assert result.code == 0
++
++
++def test_ac_004_argv_items_are_stripped(run) -> None:
++    result = run(["  1m ", "x "])
++    assert result.stderr == "error: invalid duration: 'x'\n"
++    assert run([" 1m "]).stdout == "60\n"
++
++
++def test_ac_003_empty_argv_item_is_invalid(run) -> None:
++    result = run(["", "1m"])
++    assert result.stderr == "error: invalid duration: ''\n"
++    assert result.stdout == ""
++    assert result.code == 2
++
++
++def test_ac_002_repeated_dash_reads_stdin_once(run) -> None:
++    assert run(["-", "5s", "-"], stdin="1m\n").stdout == "60\n5\n"
++
++
++def test_ac_002_empty_stdin(run) -> None:
++    assert run(["-", "--sum"], stdin="").stdout == "0\n"
++    assert run(["-"], stdin="\n  \n").stdout == ""
++
++
++def test_ac_001_sum_with_invalid_prints_nothing_on_stdout(run) -> None:
++    result = run(["--sum", "1m", "zz", "-"], stdin="q\n2m\n")
++    assert result.stdout == ""
++    assert result.stderr == (
++        "error: invalid duration: 'zz'\nerror: invalid duration: 'q'\n"
++    )
++    assert result.code == 2
++
++
++def test_help_names_program_and_sum_flag(capsys: pytest.CaptureFixture[str]) -> None:
++    with pytest.raises(SystemExit) as exc:
++        main(["--help"])
++    assert exc.value.code == 0
++    out = capsys.readouterr().out
++    assert out.startswith("usage: timeparse")
++    assert "--sum" in out
++    assert " print only the total seconds" in out
++    assert " durations such as 1h30m; '-' reads them from stdin" in out
++
++
++def test_no_durations_is_a_usage_error() -> None:
++    with pytest.raises(SystemExit) as exc:
++        main([])
++    assert exc.value.code == 2
+diff --git a/timeparse/cli.py b/timeparse/cli.py
+index e92dd69..6d446a9 100644
+--- a/timeparse/cli.py
++++ b/timeparse/cli.py
+@@ -1,4 +1,4 @@
+-"""Command line entry point: print the seconds of each duration argument."""
++"""Command line entry point: print the seconds of each duration, or their total."""
+ 
+ from __future__ import annotations
+ 
+@@ -10,22 +10,43 @@ from timeparse.parse import parse_duration
+ 
+ def _parser() -> argparse.ArgumentParser:
+     parser = argparse.ArgumentParser(prog="timeparse", description=__doc__)
+-    parser.add_argument("durations", nargs="+", help="durations such as 1h30m")
++    parser.add_argument(
++        "durations", nargs="+", help="durations such as 1h30m; '-' reads them from stdin"
++    )
++    parser.add_argument("--sum", action="store_true", help="print only the total seconds")
+     return parser
+ 
+ 
++def _inputs(durations: list[str]) -> list[str]:
++    """Expand '-' into the non-blank stdin lines, in place; strip every input."""
++    texts = []
++    for item in durations:
++        if item == "-":
++            texts.extend(line.strip() for line in sys.stdin if line.strip())
++        else:
++            texts.append(item.strip())
++    return texts
++
++
+ def main(argv: list[str] | None = None) -> int:
+-    """Print one line of seconds per argument; exit 2 on the first invalid one."""
++    """Print seconds per duration (or only their total with --sum); exit 2 if any is invalid."""
+     args = _parser().parse_args(argv)
+-    results: list[int] = []
+-    for text in args.durations:
++    results = []
++    bad = []
++    for text in _inputs(args.durations):
+         try:
+             results.append(parse_duration(text))
+         except ValueError:
+-            print(f"error: invalid duration: {text!r}", file=sys.stderr)
+-            return 2
+-    for value in results:
+-        print(value)
++            bad.append(text)
++    for text in bad:
++        print(f"error: invalid duration: {text!r}", file=sys.stderr)
++    if bad:
++        return 2
++    if args.sum:
++        print(sum(results))
++    else:
++        for value in results:
++            print(value)
+     return 0
+ 
+ 
+diff --git a/specs/SPEC-cli-sum-stdin.machine.yaml b/specs/SPEC-cli-sum-stdin.machine.yaml
+new file mode 100644
+index 0000000..ff31937
+--- /dev/null
++++ b/specs/SPEC-cli-sum-stdin.machine.yaml
+@@ -0,0 +1,128 @@
++schema_version: 3
++spec_slug: cli-sum-stdin
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/cli.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: Sum prints only the total
++  type: mechanical
++  test_ids: []
++  executable_predicate: run(["--sum", "1h", "30m"]).stdout == "5400\n"
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: 1h + 30m = 3600 + 1800 = 5400, computed by hand from the unit table,
++    not from cli.py
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: Dash reads stdin, blanks ignored
++  type: mechanical
++  test_ids: []
++  executable_predicate: run(["-", "--sum"], stdin="1m\n\n2m\n").stdout == "180\n"
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: example given verbatim in the ask; 60 + 120 = 180
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: Every invalid input reported, nothing on stdout
++  type: mechanical
++  test_ids: []
++  executable_predicate: 'run(["1h", "x", "2q"]).stderr == "error: invalid duration:
++    ''x''\nerror: invalid duration: ''2q''\n"'
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: example given verbatim in the ask; error line format fixed by the
++    ask
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-004
++  title: Default output is one line per duration in input order
++  type: mechanical
++  test_ids: []
++  executable_predicate: run(["1h", "-", "1m"], stdin="  30s \n").stdout == "3600\n30\n60\n"
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: 3600, 30, 60 computed by hand from the unit table, independent
++    of cli.py
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: 25bcad49395f4c5fb4c90417760e8d6157a9345cbf68dea42301bc1128b30284
++  approved_by: null
++  approved_at: '2026-10-15T19:13:49Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: edba3808a94e5938ff65bc79feba03a08fae11051295cc5a55eee663683be7a3
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: 672f20ad42180e70a2f2400a4ca38a32e63aa79d2946f5674eaa2afcaddc8ea9
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: c7b67d2ae687d80af3b4356e37154e7a2040775bf6913d7f4b230adc64713880
++    AC-002: 3b943d94487060a6aa0b5d25a44ae8385df486b6298becaaf53343ce3afba9da
++    AC-003: 3e107394c174b6cf722ee0b6870bb0796cda90a9e046b0c25d46317608e50d4a
++    AC-004: e700008344fd1fa0438097b691b0bb72a132ff715b410fd7f51cb7c99b4a92da
++    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591
++  lane: light
+diff --git a/specs/SPEC-cli-sum-stdin.md b/specs/SPEC-cli-sum-stdin.md
+new file mode 100644
+index 0000000..9fb679d
+--- /dev/null
++++ b/specs/SPEC-cli-sum-stdin.md
+@@ -0,0 +1,86 @@
++---
++type: spec
++task_slug: cli-sum-stdin
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, cli, stdin]
++test_framework: pytest
++interview_rounds: 0
++lane: light
++summary: "timeparse CLI gains --sum, '-' stdin input, and all-errors-at-once validation"
++---
++
++# SPEC: cli-sum-stdin
++
++## 🎯 Intent
++`timeparse.cli.main` stops at the first invalid duration and can only take durations from argv. The ask adds a total mode, stdin input, and a complete error report so a caller sees every bad input in one run.
++
++## 🌅 Outcomes
++- `--sum` prints only the total seconds, on one line.
++- `-` as a duration argument reads durations from stdin, mixed in order with other arguments.
++- Every invalid input is reported on stderr in one run; stdout stays empty and the exit code is 2.
++
++## 📋 In-Scope Scenarios
++
++### S1: sum of arguments
++**Given** argv `["--sum", "1h", "30m"]`
++**When** `main` runs
++**Then** stdout is exactly `5400\n` and it returns 0
++
++### S2: stdin mixed with sum
++**Given** stdin `"1m\n\n2m\n"` and argv `["-", "--sum"]`
++**When** `main` runs
++**Then** stdout is exactly `180\n` and it returns 0
++
++### S3: all invalid inputs reported
++**Given** argv `["1h", "x", "2q"]`
++**When** `main` runs
++**Then** stderr is exactly `error: invalid duration: 'x'\nerror: invalid duration: '2q'\n`, stdout is empty, and it returns 2
++
++### S4: default output and input order
++**Given** stdin `"  30s \n"` and argv `["1h", "-", "1m"]` without `--sum`
++**When** `main` runs
++**Then** stdout is `3600\n30\n60\n` and it returns 0
++
++## 🚫 Non-Goals
++- New duration syntax or changes to `parse_duration`.
++- Output formats other than plain integer seconds.
++- Streaming stdin or reading files.
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | existing `tests/test_cli.py` uses it with `capsys` |
++| Compatibility | `main(argv) -> int` signature unchanged | existing callers and tests |
++| Scope | `timeparse/cli.py` only (plus tests) | the ask names that file |
++
++## 🔒 Irreversible Decisions
++none
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| S1 | unit | `test_s1_sum_args` |
++| S2 | unit | `test_s2_stdin_sum` |
++| S3 | unit | `test_s3_all_invalid_reported` |
++| S4 | unit | `test_s4_order_and_default_output` |
++
++### AC-001: Sum prints only the total
++Covers S1. Oracle: golden, `1h + 30m = 3600 + 1800 = 5400`.
++
++### AC-002: Dash reads stdin, blanks ignored
++Covers S2, S4. Oracle: golden, the example in the ask (`1m + 2m = 180`).
++
++### AC-003: Every invalid input reported, nothing on stdout
++Covers S3. Oracle: golden, the example in the ask.
++
++### AC-004: Default output is one line per duration in input order
++Covers S4. Oracle: golden, hand-computed from the unit table.
++
++## ❓ Open Questions
++none
++
++## 🔍 Refinement Decisions
++- Lane `light`: one file, one session, no irreversible decision. The CLI change is additive and fully specified by the ask, so the stage ran no interview round (autopilot `auto_full`, no question asked).
++- Defaults chosen where the ask is silent: argv items are stripped like stdin lines before parsing and reporting; an empty argv string is invalid (text `''`); a repeated `-` reads stdin once and the later `-` contributes nothing; `-` with empty stdin yields no durations, so `--sum` prints `0` and plain mode prints nothing; `--sum` with invalid input prints nothing on stdout.
++- Spec-validator not dispatched: light lane with `irreversible_decisions: []`.
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/PLAN-cli-sum-stdin.md b/work-docs/PLAN-cli-sum-stdin.md
+new file mode 100644
+index 0000000..0c16781
+--- /dev/null
++++ b/work-docs/PLAN-cli-sum-stdin.md
+@@ -0,0 +1,21 @@
++---
++type: plan
++task_slug: cli-sum-stdin
++status: done
++created: 2026-10-15
++spec: "[[SPEC-cli-sum-stdin]]"
++adrs: 1
++summary: "Add --sum, stdin dash input and all-errors reporting to timeparse CLI"
++spec_need_verdict: none
++spec_need_target: cli-sum-stdin
++---
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — CLI sum/stdin/validation** — scope: timeparse/cli.py, tests/test_cli.py · exit: `uv run pytest -q` · risk: changes the error-reporting contract from first-error to all-errors · rollback: `git checkout timeparse/cli.py tests/test_cli.py`
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/parse.py` — the ask limits the change to the CLI; parse_duration semantics stay as they are
++
++## 📐 Architecture Decision Records
++- ADR-001: Collect inputs (argv items, with `-` expanded from stdin in place) into one list, strip each, parse all, then print only if none failed. **Decided by:** agent
+diff --git a/work-docs/REVIEW-cli-sum-stdin-2026-10-15.md b/work-docs/REVIEW-cli-sum-stdin-2026-10-15.md
+new file mode 100644
+index 0000000..855a523
+--- /dev/null
++++ b/work-docs/REVIEW-cli-sum-stdin-2026-10-15.md
+@@ -0,0 +1,49 @@
++---
++type: review
++task_slug: cli-sum-stdin
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
++consensus_method: cross-check
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: cli-sum-stdin
++  computed_at: 2026-10-15T19:18:57Z
++---
++
++## 🎯 Round 1 Summary
++Grade **A** (P0=0, P1=0, P2=1, P3=6). All 7 lenses exercised. No fix applied; confirmation pass skipped (lane light, unchanged). human_review_needed: false.
++
++## 🔍 Drift Findings
++None. Changed code files (timeparse/cli.py, tests/test_cli.py) are in PLAN scope; parse.py untouched.
++
++## ✅ Consensus Findings (single-lens, all accepted and carried)
++- P2 tests: SPEC table test names (test_s1_*) do not match the actual test_ac_00N_* names; machine.yaml test_ids are empty. wrapup records the node ids.
++- P3 tests: no test pins error order across argv and stdin; help-text test is brittle against argparse wrapping.
++- P3 robustness: non-UTF-8 stdin raises UnicodeDecodeError uncaught.
++- P3 consistency/design: _inputs docstring omits repeated-dash behaviour; strip duplicates parse_duration's.
++- P3 security: echoed invalid input and stdin are unbounded (no trust boundary crossed).
++
++## ⚠️ Weak Consensus
++None.
++
++## 📝 Manual-Only Findings
++None.
++
++## 🤝 Disagreements
++None.
++
++## Review Iteration Summary
++
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|-----------|-------|---------------|-----------|-----|
++| 1 (init)  | A     | —             | 7 (P2/P3) | —   |
++
++Final grade: A
++Iterations used: 1 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false
++confirm_pass_ran: false (lane light, unchanged)

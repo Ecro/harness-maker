@@ -1,0 +1,870 @@
+diff --git a/timeparse/__init__.py b/timeparse/__init__.py
+index a21bf76..3d3dd0b 100644
+--- a/timeparse/__init__.py
++++ b/timeparse/__init__.py
+@@ -2,5 +2,12 @@
+ 
+ from timeparse.format import format_duration
+ from timeparse.parse import UNITS, parse_duration
++from timeparse.store import load_durations, save_durations
+ 
+-__all__ = ["UNITS", "format_duration", "parse_duration"]
++__all__ = [
++    "UNITS",
++    "format_duration",
++    "load_durations",
++    "parse_duration",
++    "save_durations",
++]
+diff --git a/specs/SPEC-timeparse-store.machine.yaml b/specs/SPEC-timeparse-store.machine.yaml
+new file mode 100644
+index 0000000..ce78712
+--- /dev/null
++++ b/specs/SPEC-timeparse-store.machine.yaml
+@@ -0,0 +1,97 @@
++schema_version: 3
++spec_slug: timeparse-store
++irreversible_decisions:
++  - id: IRR-001
++    decision: "On-disk format is one JSON object of name to integer seconds"
++    category: schema/file format/storage layout
++    rationale: "Files users have written must keep loading."
++    source: spec
++  - id: IRR-002
++    decision: "Public API save_durations(path, mapping) / load_durations(path) -> dict[str, int] with TypeError / ValueError contract"
++    category: public API/CLI contract
++    rationale: "Callers will depend on the signatures and exception types."
++    source: spec
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: "Tier 1 Python module with branching validation logic."
++last_mutation_run: null
++paths_to_mutate:
++  - timeparse/store.py
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++  - id: AC-001
++    title: "Save writes seconds JSON and load reads it back"
++    type: parametric
++    test_ids: []
++    executable_predicate: null
++    golden_table:
++      - input: {mapping: {tea: "3m", lunch: "1h"}}
++        expected: {tea: 180, lunch: 3600}
++    rubric_id: null
++    pending_test: true
++    oracle_source: golden
++    oracle_evidence: "Seconds computed by hand from the unit table in the request (3*60=180, 1*3600=3600), not read from the implementation."
++    oracle_independence_waiver: null
++  - id: AC-002
++    title: "Non-dict mapping raises TypeError"
++    type: mechanical
++    test_ids: []
++    executable_predicate: "raises_type_error(save_durations, path, bad_mapping) and read_bytes(path) == original_bytes"
++    golden_table: []
++    rubric_id: null
++    pending_test: true
++    oracle_source: golden
++    oracle_evidence: "Exception type fixed by the request text; original_bytes captured before the call, so it is independent of the implementation."
++    oracle_independence_waiver: null
++  - id: AC-003
++    title: "Invalid value raises ValueError naming the key"
++    type: mechanical
++    test_ids: []
++    executable_predicate: "'bad' in str(error_from(save_durations, path, {'tea': '3m', 'bad': '10x'})) and read_bytes(path) == original_bytes and listdir(dir) == [path.name]"
++    golden_table: []
++    rubric_id: null
++    pending_test: true
++    oracle_source: golden
++    oracle_evidence: "'10x' is invalid by the documented parse_duration grammar (unknown unit); expected bytes captured pre-call."
++    oracle_independence_waiver: null
++  - id: AC-004
++    title: "Failed write or replace is atomic"
++    type: mechanical
++    test_ids: []
++    executable_predicate: "raises_os_error(save_durations, path, mapping) and read_bytes(path) == original_bytes and listdir(dir) == listing_before"
++    golden_table: []
++    rubric_id: null
++    pending_test: true
++    oracle_source: golden
++    oracle_evidence: "Failure injected with monkeypatched os.replace / temp write; pre-call bytes and directory listing are the expected values."
++    oracle_independence_waiver: null
++  - id: AC-005
++    title: "Missing file loads as empty"
++    type: mechanical
++    test_ids: []
++    executable_predicate: "load_durations(missing_path) == {}"
++    golden_table: []
++    rubric_id: null
++    pending_test: true
++    oracle_source: golden
++    oracle_evidence: "Literal {} fixed by the request text for a nonexistent path."
++    oracle_independence_waiver: null
++  - id: AC-006
++    title: "Round trip agrees with parse_duration"
++    type: property
++    test_ids: []
++    executable_predicate: null
++    golden_table: []
++    rubric_id: null
++    pending_test: true
++    oracle_source: property
++    oracle_evidence: "load(save(m)) == {k: parse_duration(v)} holds for any valid mapping regardless of how store.py is written; parse_duration is a separate, already-tested module."
++    oracle_independence_waiver: null
++    input_domain: "dicts of str keys to valid duration strings (hypothesis or a seeded generator)"
++    transformation: "save_durations then load_durations"
++    expected_relation: "load_durations(path) == {k: parse_duration(v) for k, v in mapping.items()}"
++    preconditions: ["every value is accepted by parse_duration"]
++    observable_output: "dict[str, int]"
++    generator_hint: null
+diff --git a/specs/SPEC-timeparse-store.md b/specs/SPEC-timeparse-store.md
+new file mode 100644
+index 0000000..b419b3f
+--- /dev/null
++++ b/specs/SPEC-timeparse-store.md
+@@ -0,0 +1,124 @@
++---
++type: spec
++task_slug: timeparse-store
++status: draft
++created: 2026-10-15
++tags: [timeparse, spec, python, persistence, json, atomic-write]
++test_framework: pytest
++interview_rounds: 0
++lane: full
++tier: 1
++summary: "timeparse/store.py: atomic save and load of named durations as a JSON file"
++---
++
++# SPEC: timeparse-store
++
++## 🎯 Intent
++
++`timeparse` parses duration strings but has no way to keep named durations (`tea`, `lunch`) between runs. A small store module saves them as JSON and loads them back, validating every value with `parse_duration` and never leaving a half-written or corrupt file.
++
++## 🌅 Outcomes
++
++A caller can `save_durations(path, {"tea": "3m", "lunch": "1h"})` and later `load_durations(path)` to get `{"tea": 180, "lunch": 3600}`. A bad input or a failed write never changes the existing file and never leaves a temp file behind.
++
++## 📋 In-Scope Scenarios
++
++### S1: Save then load
++**Given** a directory with no store file
++**When** `save_durations(path, {"tea": "3m", "lunch": "1h"})` is called with `path` as `str` or `pathlib.Path`
++**Then** the file holds the JSON object `{"tea": 180, "lunch": 3600}`
++**And** `load_durations(path)` returns `{"tea": 180, "lunch": 3600}`
++
++### S2: Wrong mapping type
++**Given** an existing store file
++**When** `save_durations` is called with a `mapping` that is not a `dict` (list, tuple, None, a non-dict `Mapping`), or a dict with a non-`str` key
++**Then** `TypeError` is raised and the file is byte-for-byte unchanged
++
++### S3: Invalid duration value
++**Given** an existing store file and a mapping `{"tea": "3m", "bad": "10x"}`
++**When** `save_durations` is called
++**Then** `ValueError` is raised whose message contains `bad`
++**And** the file is byte-for-byte unchanged (or still absent), and no temp file exists
++**And** a non-`str` value (e.g. `180`) is treated as invalid and raises the same `ValueError` naming its key
++
++### S4: Write or replace failure
++**Given** an existing store file
++**When** writing the temp file or replacing the target raises `OSError`
++**Then** that `OSError` propagates, the original file is unchanged, and the directory holds no extra files
++
++### S5: Missing file
++**Given** a path that does not exist
++**When** `load_durations(path)` is called
++**Then** it returns `{}`
++
++## 🚫 Non-Goals
++
++- Locking or protection against concurrent writers (atomic replace only).
++- `fsync` / crash-durability guarantees beyond atomic replace.
++- Merging into an existing file, or deleting single names.
++- Accepting numeric seconds as input to `save_durations`.
++- Creating missing parent directories.
++- CLI integration, and format changes to `parse_duration`.
++
++## ⚠️ Constraints
++
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | Already used in `tests/`. |
++| Performance | none | Tiny files. |
++| Security | temp file created in the target's directory via `tempfile` (unpredictable name) | Same-filesystem rename, and no fixed temp name to race on. |
++| Compatibility | Python version of `pyproject.toml`; stdlib only | No new dependency. |
++| Module | new `timeparse/store.py`; export from `timeparse/__init__.py` | Matches `parse` / `format` layout. |
++
++## 🔒 Irreversible Decisions
++
++| Id | Decision | Category | Rationale |
++|---|---|---|---|
++| IRR-001 | On-disk format is one JSON object of name to integer seconds (`{"tea": 180}`) | schema/file format/storage layout | Files written by users must keep loading. |
++| IRR-002 | Public API `save_durations(path, mapping)` and `load_durations(path) -> dict[str, int]` with the error types above | public API/CLI contract | Callers depend on the exceptions. |
++
++## ✅ Verification Criteria
++
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| S1 | unit | `test_save_load_golden`, `test_roundtrip_property` |
++| S2 | unit | `test_save_rejects_non_dict` |
++| S3 | unit | `test_save_invalid_value_leaves_file` |
++| S4 | unit | `test_save_replace_failure_cleans_up` |
++| S5 | unit | `test_load_missing_returns_empty` |
++
++### AC-001: Save writes seconds JSON and load reads it back
++Golden: `{"tea": "3m", "lunch": "1h"}` gives file content `{"tea": 180, "lunch": 3600}` for both `str` and `Path` paths.
++
++### AC-002: Non-dict mapping raises TypeError
++Every non-`dict` mapping and any non-`str` key raises `TypeError`; the existing file is unchanged.
++
++### AC-003: Invalid value raises ValueError naming the key
++The message contains the bad key; the file is unchanged or still absent; nothing is left in the directory.
++
++### AC-004: Failed write or replace is atomic
++With `os.replace` and then the temp write forced to raise `OSError`, the error propagates, the target is byte-identical and the directory listing is unchanged.
++
++### AC-005: Missing file loads as empty
++`load_durations` of a nonexistent path returns `{}`.
++
++### AC-006: Round trip agrees with parse_duration
++For any valid mapping, `load_durations` after `save_durations` equals `{k: parse_duration(v)}`.
++
++## ❓ Open Questions
++
++Raised by spec-validator (advisory, one pass, verdict `MAJOR_REVISION`). For `/hm:execute` Step 0 to resolve as design ADRs:
++
++1. **Critical:** `load_durations` error contract has no scenario or AC. Corrupt JSON or a non-object top level is documented as `ValueError`, but nothing tests it. Decide whether non-int values are validated.
++2. **Critical:** file mode after save is unspecified. `tempfile.mkstemp` creates 0600 and `os.replace` carries that onto the target. Decide the resulting mode (preserve existing, or apply umask) and whether it is an irreversible permission decision.
++3. Warning: AC-002 and AC-003 do not enumerate the S2 bad inputs or the non-`str` value case from S3.
++4. Suggestion: the AC-003 predicate covers only an existing target, not the absent-file case in S3.
++
++## 🔍 Refinement Decisions
++
++- Lane `full`: the on-disk JSON format and public API are irreversible (IRR-001, IRR-002), so the light lane does not apply.
++- The request was fully specified, and the session is on `auto_full` with no question tool call, so no interview round ran (`interview_rounds: 0`). The SPEC is not DRI-approved; `/hm:wrapup` asks again.
++- Defaults taken: a non-`str` value counts as an invalid value (`ValueError` naming the key); a non-`str` key is a `TypeError`; a non-dict `Mapping` is a `TypeError`; an empty dict writes `{}`.
++- `load_durations` on invalid JSON or a top-level value that is not an object raises `ValueError` (`json.JSONDecodeError` is already one); values that are not ints are not checked.
++- A missing parent directory makes `save_durations` raise `FileNotFoundError` and creates nothing.
++- Autopilot (`auto_full`): the spec judgment gate was auto-answered with no approval written. The SPEC stays unaccepted and the land hold covers IRR-001 and IRR-002.
+diff --git a/tests/test_store.py b/tests/test_store.py
+new file mode 100644
+index 0000000..fa7436a
+--- /dev/null
++++ b/tests/test_store.py
+@@ -0,0 +1,290 @@
++"""store.py: atomic save/load of named durations (SPEC-timeparse-store)."""
++
++import json
++import os
++import random
++import stat
++import tempfile
++from pathlib import Path
++
++import pytest
++from timeparse import parse_duration
++from timeparse.store import load_durations, save_durations
++
++_GOLDEN = {"tea": "3m", "lunch": "1h"}
++_GOLDEN_SECONDS = {"tea": 180, "lunch": 3600}
++
++
++def _seed_file(tmp_path: Path) -> tuple[Path, bytes]:
++    path = tmp_path / "store.json"
++    path.write_bytes(b'{"old": 1}')
++    return path, path.read_bytes()
++
++
++@pytest.mark.parametrize("kind", [str, Path])
++def test_ac_001_save_load_golden(tmp_path: Path, kind: type) -> None:
++    path = kind(tmp_path / "store.json")
++    save_durations(path, _GOLDEN)
++    assert json.loads(Path(path).read_text()) == _GOLDEN_SECONDS
++    assert load_durations(path) == _GOLDEN_SECONDS
++
++
++@pytest.mark.parametrize("bad", [[("tea", "3m")], ("tea",), None, "tea", {1: "3m"}])
++def test_ac_002_rejects_bad_mapping(tmp_path: Path, bad: object) -> None:
++    path, original = _seed_file(tmp_path)
++    with pytest.raises(TypeError):
++        save_durations(path, bad)  # type: ignore[arg-type]
++    assert path.read_bytes() == original
++    assert os.listdir(tmp_path) == [path.name]
++
++
++def test_ac_002_rejects_non_dict_mapping_type(tmp_path: Path) -> None:
++    from types import MappingProxyType
++
++    path, original = _seed_file(tmp_path)
++    with pytest.raises(TypeError):
++        save_durations(path, MappingProxyType({"tea": "3m"}))  # type: ignore[arg-type]
++    assert path.read_bytes() == original
++    assert os.listdir(tmp_path) == [path.name]
++
++
++@pytest.mark.parametrize("value", ["10x", "", "1h1h", 180, None])
++def test_ac_003_invalid_value_names_key(tmp_path: Path, value: object) -> None:
++    path, original = _seed_file(tmp_path)
++    with pytest.raises(ValueError, match="bad"):
++        save_durations(path, {"tea": "3m", "bad": value})  # type: ignore[dict-item]
++    assert path.read_bytes() == original
++    assert os.listdir(tmp_path) == [path.name]
++
++
++@pytest.mark.parametrize("value", ["10x", 180])
++def test_ac_003_message_contains_exact_key(tmp_path: Path, value: object) -> None:
++    with pytest.raises(ValueError) as info:
++        save_durations(tmp_path / "store.json", {"tea": "3m", "zq_key": value})  # type: ignore[dict-item]
++    assert "zq_key" in str(info.value)
++    assert "tea" not in str(info.value)
++
++
++def test_ac_003_invalid_value_leaves_absent_file_absent(tmp_path: Path) -> None:
++    path = tmp_path / "store.json"
++    with pytest.raises(ValueError, match="bad"):
++        save_durations(path, {"bad": "10x"})
++    assert os.listdir(tmp_path) == []
++
++
++def test_ac_004_replace_failure_is_atomic(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    path, original = _seed_file(tmp_path)
++
++    def boom(*_args: object, **_kw: object) -> None:
++        raise OSError("replace failed")
++
++    monkeypatch.setattr(os, "replace", boom)
++    with pytest.raises(OSError, match="replace failed"):
++        save_durations(path, _GOLDEN)
++    assert path.read_bytes() == original
++    assert os.listdir(tmp_path) == [path.name]
++
++
++def test_ac_004_write_failure_is_atomic(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    """Fail at the write itself: the temp file exists but its descriptor is read-only."""
++    path, original = _seed_file(tmp_path)
++    created: list[str] = []
++    real_mkstemp = tempfile.mkstemp
++
++    def readonly_mkstemp(*args: object, **kwargs: object) -> tuple[int, str]:
++        fd, name = real_mkstemp(*args, **kwargs)
++        os.close(fd)
++        created.append(name)
++        return os.open(name, os.O_RDONLY), name
++
++    monkeypatch.setattr(tempfile, "mkstemp", readonly_mkstemp)
++    with pytest.raises(OSError):
++        save_durations(path, _GOLDEN)
++    assert created, (
++        "save_durations must write through a temp file made by tempfile.mkstemp"
++    )
++    assert not any(os.path.exists(name) for name in created)
++    assert path.read_bytes() == original
++    assert os.listdir(tmp_path) == [path.name]
++
++
++def test_ac_004_missing_parent_creates_nothing(tmp_path: Path) -> None:
++    with pytest.raises(FileNotFoundError):
++        save_durations(tmp_path / "nope" / "store.json", _GOLDEN)
++    assert os.listdir(tmp_path) == []
++
++
++def test_ac_005_load_missing_returns_empty(tmp_path: Path) -> None:
++    assert load_durations(tmp_path / "missing.json") == {}
++
++
++@pytest.mark.parametrize(
++    "content", ["{", "[]", '"x"', '{"tea": "3m"}', '{"tea": true}', '{"tea": 1.5}']
++)
++def test_load_invalid_content_raises_value_error(tmp_path: Path, content: str) -> None:
++    path = tmp_path / "store.json"
++    path.write_text(content)
++    with pytest.raises(ValueError):
++        load_durations(path)
++
++
++def test_save_empty_mapping_writes_empty_object(tmp_path: Path) -> None:
++    path = tmp_path / "store.json"
++    save_durations(path, {})
++    assert path.read_text() == "{}"
++    assert load_durations(path) == {}
++
++
++def test_save_overwrites_and_preserves_existing_mode(tmp_path: Path) -> None:
++    path, _ = _seed_file(tmp_path)
++    path.chmod(0o640)
++    save_durations(path, _GOLDEN)
++    assert stat.S_IMODE(path.stat().st_mode) == 0o640
++    assert load_durations(path) == _GOLDEN_SECONDS
++
++
++def test_save_new_file_mode_follows_umask(tmp_path: Path) -> None:
++    old = os.umask(0o027)
++    try:
++        path = tmp_path / "store.json"
++        save_durations(path, _GOLDEN)
++    finally:
++        os.umask(old)
++    assert stat.S_IMODE(path.stat().st_mode) == 0o640
++
++
++def test_ac_006_roundtrip_property(tmp_path: Path) -> None:
++    rng = random.Random(20261015)
++    units = [("d", 86400), ("h", 3600), ("m", 60), ("s", 1)]
++    path = tmp_path / "store.json"
++    for _ in range(50):
++        mapping = {}
++        for i in range(rng.randint(0, 6)):
++            chosen = [u for u, _ in units if rng.random() < 0.5] or ["s"]
++            mapping[f"name{i}"] = "".join(f"{rng.randint(0, 99)}{u}" for u in chosen)
++        save_durations(path, mapping)
++        assert load_durations(path) == {
++            k: parse_duration(v) for k, v in mapping.items()
++        }
++
++
++def test_save_new_file_mode_with_zero_umask_is_0666(tmp_path: Path) -> None:
++    old = os.umask(0)
++    try:
++        path = tmp_path / "store.json"
++        save_durations(path, _GOLDEN)
++    finally:
++        os.umask(old)
++    assert stat.S_IMODE(path.stat().st_mode) == 0o666
++
++
++@pytest.mark.parametrize(
++    ("bad", "type_name"), [([("tea", "3m")], "list"), (None, "NoneType")]
++)
++def test_ac_002_message_names_received_type(
++    tmp_path: Path, bad: object, type_name: str
++) -> None:
++    with pytest.raises(TypeError, match=type_name):
++        save_durations(tmp_path / "store.json", bad)  # type: ignore[arg-type]
++
++
++def test_ac_002_non_str_key_message_names_type(tmp_path: Path) -> None:
++    with pytest.raises(TypeError, match="int"):
++        save_durations(tmp_path / "store.json", {1: "3m"})  # type: ignore[dict-item]
++
++
++def test_ac_003_non_str_value_message_names_type(tmp_path: Path) -> None:
++    with pytest.raises(ValueError, match="int"):
++        save_durations(tmp_path / "store.json", {"tea": 180})  # type: ignore[dict-item]
++
++
++@pytest.mark.parametrize(
++    ("content", "expected"),
++    [("[]", "list"), ('"x"', "str"), ('{"tea": 1.5}', "tea"), ('{"tea": 1.5}', "1.5")],
++)
++def test_load_invalid_content_message_is_specific(
++    tmp_path: Path, content: str, expected: str
++) -> None:
++    path = tmp_path / "store.json"
++    path.write_text(content)
++    with pytest.raises(ValueError, match=expected):
++        load_durations(path)
++
++
++def test_ac_004_temp_file_is_in_target_directory(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    seen: list[Path] = []
++    real_replace = os.replace
++
++    def spy(src: str, dst: str) -> None:
++        seen.append(Path(src).parent)
++        real_replace(src, dst)
++
++    monkeypatch.setattr(os, "replace", spy)
++    path = tmp_path / "store.json"
++    save_durations(path, _GOLDEN)
++    assert seen == [tmp_path]
++
++
++def test_messages_are_exact(tmp_path: Path) -> None:
++    path = tmp_path / "store.json"
++    with pytest.raises(TypeError) as info:
++        save_durations(path, [])  # type: ignore[arg-type]
++    assert str(info.value) == "mapping must be a dict, got list"
++    with pytest.raises(TypeError) as info:
++        save_durations(path, {1: "3m"})  # type: ignore[dict-item]
++    assert str(info.value) == "duration names must be str, got int"
++    with pytest.raises(ValueError) as info:
++        save_durations(path, {"tea": 180})  # type: ignore[dict-item]
++    assert str(info.value) == "invalid duration for 'tea': expected str, got int"
++    with pytest.raises(ValueError) as info:
++        save_durations(path, {"bad": "10x"})
++    assert str(info.value).startswith("invalid duration for 'bad': ")
++    assert str(info.value).endswith(" in '10x'")
++
++
++def test_load_messages_are_exact(tmp_path: Path) -> None:
++    path = tmp_path / "store.json"
++    path.write_text("[]")
++    with pytest.raises(ValueError) as info:
++        load_durations(path)
++    assert str(info.value) == f"{path}: expected a JSON object, got list"
++    path.write_text('{"tea": 1.5}')
++    with pytest.raises(ValueError) as info:
++        load_durations(path)
++    assert str(info.value) == f"{path}: duration for 'tea' is not an int: 1.5"
++
++
++def test_ac_004_temp_file_name_is_dotted_tmp_of_target(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    seen: list[str] = []
++    real_replace = os.replace
++
++    def spy(src: str, dst: str) -> None:
++        seen.append(Path(src).name)
++        real_replace(src, dst)
++
++    monkeypatch.setattr(os, "replace", spy)
++    save_durations(tmp_path / "store.json", _GOLDEN)
++    assert len(seen) == 1
++    assert seen[0].startswith(".store.json.")
++    assert seen[0].endswith(".tmp")
++
++
++def test_save_never_touches_process_umask(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    def forbidden(_mask: int) -> int:
++        raise AssertionError("os.umask must not be called")
++
++    monkeypatch.setattr(os, "umask", forbidden)
++    path = tmp_path / "store.json"
++    save_durations(path, _GOLDEN)
++    assert load_durations(path) == _GOLDEN_SECONDS
++    assert os.listdir(tmp_path) == [path.name]
+diff --git a/timeparse/store.py b/timeparse/store.py
+new file mode 100644
+index 0000000..104722f
+--- /dev/null
++++ b/timeparse/store.py
+@@ -0,0 +1,88 @@
++"""Save and load named durations as a JSON file of name -> seconds."""
++
++from __future__ import annotations
++
++import json
++import os
++import stat
++import tempfile
++from pathlib import Path
++
++from timeparse.parse import parse_duration
++
++
++def _file_mode(path: Path, probe: str) -> int:
++    """Mode for the new file: the existing target's, else what the umask allows.
++
++    A new file's mode is found by creating a throwaway file at `probe` and reading back the
++    mode the kernel gave it, so the process-wide umask is never touched.
++    """
++    try:
++        return stat.S_IMODE(path.stat().st_mode)
++    except FileNotFoundError:
++        pass
++    fd = os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
++    try:
++        return stat.S_IMODE(os.fstat(fd).st_mode)
++    finally:
++        os.close(fd)
++        os.unlink(probe)
++
++
++def save_durations(path: str | Path, mapping: dict[str, str]) -> None:
++    """Write `mapping` (name -> duration string) to `path` as JSON seconds, atomically.
++
++    Every value is parsed before the file is touched. A non-dict mapping or a non-str key
++    raises TypeError; an invalid value raises ValueError naming its key. The data goes to a
++    temp file in the target's directory and is then swapped in, so a failure at any point
++    leaves the original file as it was and no temp file behind.
++    """
++    if not isinstance(mapping, dict):
++        raise TypeError(f"mapping must be a dict, got {type(mapping).__name__}")
++    seconds: dict[str, int] = {}
++    for key, text in mapping.items():
++        if not isinstance(key, str):
++            raise TypeError(f"duration names must be str, got {type(key).__name__}")
++        if not isinstance(text, str):
++            raise ValueError(
++                f"invalid duration for {key!r}: expected str, got {type(text).__name__}"
++            )
++        try:
++            seconds[key] = parse_duration(text)
++        except ValueError as exc:
++            raise ValueError(f"invalid duration for {key!r}: {exc}") from exc
++
++    target = Path(path)
++    fd, tmp_name = tempfile.mkstemp(
++        dir=target.parent, prefix=f".{target.name}.", suffix=".tmp"
++    )
++    try:
++        with os.fdopen(fd, "w", encoding="utf-8") as handle:
++            json.dump(seconds, handle)
++        os.chmod(tmp_name, _file_mode(target, tmp_name + ".mode"))
++        os.replace(tmp_name, target)
++    except BaseException:
++        try:
++            os.unlink(tmp_name)
++        except FileNotFoundError:
++            pass
++        raise
++
++
++def load_durations(path: str | Path) -> dict[str, int]:
++    """Return the name -> seconds mapping stored at `path`; a missing file gives {}.
++
++    Invalid JSON, a top-level value that is not an object, or a value that is not an int
++    raises ValueError.
++    """
++    try:
++        with open(path, encoding="utf-8") as handle:
++            data = json.load(handle)
++    except FileNotFoundError:
++        return {}
++    if not isinstance(data, dict):
++        raise ValueError(f"{path}: expected a JSON object, got {type(data).__name__}")
++    for key, value in data.items():
++        if not isinstance(value, int) or isinstance(value, bool):
++            raise ValueError(f"{path}: duration for {key!r} is not an int: {value!r}")
++    return data
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/PLAN-timeparse-store.md b/work-docs/PLAN-timeparse-store.md
+new file mode 100644
+index 0000000..17b40d8
+--- /dev/null
++++ b/work-docs/PLAN-timeparse-store.md
+@@ -0,0 +1,61 @@
++---
++type: plan
++task_slug: timeparse-store
++status: done
++created: 2026-10-15
++tags: [timeparse, plan, python, persistence, atomic-write]
++spec: "[[SPEC-timeparse-store]]"
++interview_rounds: 0
++adrs: 4
++validator_outcome: NOT_RUN
++summary: "Add timeparse/store.py: atomic JSON save/load of named durations"
++spec_need_verdict: add
++spec_need_target: timeparse-store
++---
++
++## 🎯 Executive Summary
++
++Add `timeparse/store.py` with `save_durations` and `load_durations` per SPEC-timeparse-store. Validation happens before any file is touched; the write goes to a same-directory temp file and is swapped in with `os.replace`. The SPEC's two critical open questions are resolved here as ADR-001 and ADR-002.
++
++## 📚 Prior Work
++
++No earlier PLANs or memory entries matched. No RESEARCH doc. `parse_duration` in `timeparse/parse.py` is the only dependency.
++
++## 📐 Architecture Decision Records
++
++- ADR-001: `load_durations` raises `ValueError` for invalid JSON, a non-object top level, or any value that is not an `int` (`bool` excluded). This keeps the `dict[str, int]` return type honest. **Decided by:** agent
++- ADR-002: After save, the file mode is the existing target's mode when it exists, else `0o666 & ~umask`. `mkstemp` creates 0600, so the mode is set explicitly with `os.chmod` on the temp file before the replace. **Decided by:** agent
++- ADR-003: A non-`str` value is an invalid value (`ValueError` naming the key); a non-`str` key or non-`dict` mapping is a `TypeError`. **Decided by:** agent
++- ADR-004: The property test (AC-006) uses a seeded `random.Random` generator, not Hypothesis, because `pyproject.toml` has only `pytest` as a dev dependency and adding one is an irreversible-category decision the SPEC does not make. **Decided by:** agent
++
++## 🏗️ Technical Design
++
++Current state: `timeparse` exports `parse_duration`, `format_duration`, `UNITS`. New module `timeparse/store.py` imports `parse_duration`. Save flow: type checks, parse all values into a new dict (first failure raises `ValueError` naming the key), `mkstemp` in the target's directory, write JSON, chmod, `os.replace`; on any `BaseException` unlink the temp file and re-raise. Load flow: open the path, `FileNotFoundError` returns `{}`, else `json.load` plus the ADR-001 checks. `timeparse/__init__.py` re-exports both functions.
++
++## 📝 Implementation Plan
++
++- [x] 1. **Phase 1 — store module** — depends_on: none · parallel_group: none · merge_hazards: none · scope: in `timeparse/store.py`, `timeparse/__init__.py`, `tests/test_store.py`; out: everything else · exit: `uv run pytest -q` · risk: low · rollback: delete `timeparse/store.py`, `tests/test_store.py` and revert `__init__.py`
++
++## 🚧 Contract Boundaries
++
++### Do not change
++- `timeparse/parse.py` — `parse_duration` grammar is relied on as the oracle
++- `timeparse/format.py` — out of scope
++- `timeparse/cli.py` — CLI integration is a non-goal
++
++## 🧪 Testing Strategy
++
++pytest unit tests in `tests/test_store.py`, one per SPEC scenario and AC, using `tmp_path`. Failure injection with `monkeypatch` on `os.replace` and on the temp write. Round-trip property test with a seeded generator.
++
++## ⚠️ Risks & Mitigation
++
++| Risk | Mitigation |
++|---|---|
++| Temp file left behind on failure | Cleanup in `except BaseException`; tests assert the directory listing |
++| `os.umask` read is process-global | Read-and-restore only when the target is absent; documented in the code |
++
++## ✅ Success Criteria
++
++- [x] All six ACs have a passing test
++- [x] `uv run pytest -q` is green
++- [x] Mutation gate at tier 1 passes or skips
+diff --git a/work-docs/REVIEW-timeparse-store-2026-10-15.md b/work-docs/REVIEW-timeparse-store-2026-10-15.md
+new file mode 100644
+index 0000000..9c7aa38
+--- /dev/null
++++ b/work-docs/REVIEW-timeparse-store-2026-10-15.md
+@@ -0,0 +1,71 @@
++---
++type: review
++task_slug: timeparse-store
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
++consensus_method: cross-check
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: timeparse-store
++  computed_at: 2026-10-15T19:06:00+00:00
++confirm_pass_ran: true
++human_review_needed: false
++---
++
++# REVIEW: timeparse-store
++
++## 🎯 Round 1 Summary
++
++Grade **B**: one consensus-passed P1 (F-001, `os.umask(0)` toggle is process-global, raised by the security and concurrency lenses, and by core at P2). All 7 lenses delivered.
++
++## 🔍 Drift Findings
++
++None. Changed files `timeparse/store.py`, `timeparse/__init__.py` and `tests/test_store.py` are all in PLAN phase 1 scope; all five SPEC scenarios have tests.
++
++## ✅ Consensus Findings
++
++- **F-001 P1 fixed (round 2):** the new-file mode is now read from a probe file the kernel creates, so `os.umask` is never called. Test `test_save_never_touches_process_umask` pins it. Re-review found no P0/P1.
++- Carried, not fixed (P2/P3 do not move the grade at A; all dispositioned `accepted`):
++  - P2 F-004 interrupt or `fdopen` failure between `mkstemp` and the `try` can leak an fd or temp file.
++  - P2 F-005 mode `stat` before replace is a TOCTOU (locking is a SPEC non-goal).
++  - P2 F-006 a symlink target is replaced, not followed.
++  - P2 F-007 `RecursionError` from deeply nested JSON escapes the `ValueError` contract in `load_durations`.
++  - P2 F-008 SPEC text says load does not check int values; code and PLAN ADR-001 validate them.
++  - P2 F-009 tests pin exact messages and temp naming; kept because they carry the mutation score.
++  - P2 F-010 tests compare with `==`, so int and float seconds are not distinguished (IRR-001).
++  - P2 F-014 probe file is not in the outer cleanup; its name is 5 chars longer than the temp name.
++  - P2 F-015 no `fsync` before replace (SPEC non-goal).
++  - P3 F-011, F-012, F-013, F-016 to F-021: test coupling and coverage gaps, validation order, `NAME_MAX`.
++
++## ⚠️ Weak Consensus
++
++None.
++
++## 📝 Manual-Only Findings
++
++None.
++
++## 🤝 Disagreements
++
++None.
++
++## Confirmation Pass
++
++`confirm-1` over `d8e2293..361892b`, all 7 lenses exercised: no new P0/P1 (one P2, eight P3). Status APPROVED.
++
++## Review Iteration Summary
++
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|-----------|-------|---------------|-----------|-----|
++| 1 (init)  | B     | —             | 1 P1      | —   |
++| 2         | A     | F-001         | 0 P1      | 2 P2 |
++
++Final grade: A
++Iterations used: 2 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false
++Counters (see §5): unreviewed 0 · prior-fix 0 · unattributed 0

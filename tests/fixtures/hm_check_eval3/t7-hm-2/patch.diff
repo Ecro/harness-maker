@@ -1,0 +1,517 @@
+diff --git a/README.md b/README.md
+index 45fcaa8..bd84041 100644
+--- a/README.md
++++ b/README.md
+@@ -15,5 +15,5 @@ python -m timeparse.cli 1h30m 45s
+ - `timeparse/cli.py` — command line entry point (`main(argv) -> int`).
+ - `tests/` — run with `python -m pytest`.
+ 
+-Units are `d`, `h`, `m`, `s`, written largest first, each at most once. Errors raise `ValueError`;
++Units are `w`, `d`, `h`, `m`, `s`, written largest first, each at most once. Errors raise `ValueError`;
+ the CLI turns them into exit code 2 with a message on stderr.
+diff --git a/specs/SPEC-timeparse-weeks.machine.yaml b/specs/SPEC-timeparse-weeks.machine.yaml
+new file mode 100644
+index 0000000..070247e
+--- /dev/null
++++ b/specs/SPEC-timeparse-weeks.machine.yaml
+@@ -0,0 +1,165 @@
++schema_version: 3
++spec_slug: timeparse-weeks
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/parse.py
++- timeparse/format.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: Format weeks
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      seconds: 604800
++    expected: 1w
++    edge: false
++    note: ''
++  - input:
++      seconds: 1209600
++    expected: 2w
++    edge: false
++    note: ''
++  - input:
++      seconds: 694861
++    expected: 1w1d1h1m1s
++    edge: false
++    note: ''
++  - input:
++      seconds: 604799
++    expected: 6d23h59m59s
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: expected strings supplied by the requester in the task statement,
++    not derived from the implementation
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: Parse weeks
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: 1w
++    expected: 604800
++    edge: false
++    note: ''
++  - input:
++      text: 2w3d
++    expected: 1468800
++    edge: false
++    note: ''
++  - input:
++      text: 1W
++    expected: 604800
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: expected seconds supplied by the requester in the task statement,
++    not derived from the implementation
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: Week ordering rejected
++  type: mechanical
++  test_ids: []
++  executable_predicate: raises_value_error(parse_duration, '1d1w') and raises_value_error(parse_duration,
++    '1w1w')
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: the two ValueError inputs are named by the requester in the task
++    statement
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-004
++  title: Round trip
++  type: property
++  test_ids: []
++  executable_predicate: null
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: property
++  oracle_evidence: inverse-function identity holds for any correct pair of implementations,
++    so it cannot be satisfied by reading the code
++  oracle_independence_waiver: null
++  input_domain: integers s in 0..10000000, the 13 listed boundaries plus every 7919th
++  transformation: parse_duration(format_duration(s))
++  expected_relation: result == s
++  preconditions: []
++  observable_output: returned int
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: e7e5ef7179b9ff632479a391ab7f41191c1eceb2412e34ecece81e242a8620a0
++  approved_by: null
++  approved_at: '2026-10-15T19:35:45Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: 36b6e24f8adfd30eae422045dc2c00ed2887320bad90ccb2a93b13424607908c
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: c2b02191c6dc2550b9d2d0d99513cd01ea22365eb5b8dee0be10a3742bdf561c
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: 7dc0daf1acf1bcf8a43dc272f9992d372106b75d5f25cc3c8ced4058f68386d5
++    AC-002: 7bf0ce0255014e7af123a00fa831ffadbd3f26516084e3dab75538827e1fe1c3
++    AC-003: 79940a36673f73a24f13c2d442611f0d19f4c73cb47ab496a5ed8ec5f2214648
++    AC-004: 6a2d98e0a8c626d961a2742ae6c72a328f18e4c30ff56c8c5db0975cde678131
++    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591
++  lane: light
+diff --git a/specs/SPEC-timeparse-weeks.md b/specs/SPEC-timeparse-weeks.md
+new file mode 100644
+index 0000000..e888618
+--- /dev/null
++++ b/specs/SPEC-timeparse-weeks.md
+@@ -0,0 +1,94 @@
++---
++type: spec
++task_slug: timeparse-weeks
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, duration, parsing]
++test_framework: pytest
++interview_rounds: 0
++lane: light
++summary: "Add week unit 'w' (604800s) to timeparse parse/format, keeping the round-trip invariant"
++---
++
++# SPEC: timeparse-weeks
++
++## 🎯 Intent
++`timeparse` handles durations up to days only, so 14 days renders as `"14d"`. The task adds `w` (7 days, 604800 seconds) as the largest unit so long durations are compact and parseable.
++
++## 🌅 Outcomes
++- `format_duration` emits weeks for values of one week or more.
++- `parse_duration` accepts `w` under the existing rules (case-insensitive, largest first, each unit at most once).
++- `parse_duration(format_duration(s)) == s` still holds.
++
++## 📋 In-Scope Scenarios
++
++### S1: Format uses weeks as the largest unit
++**Given** a non-negative integer number of seconds
++**When** `format_duration` is called with 604800, 1209600 or 694861
++**Then** it returns `"1w"`, `"2w"` and `"1w1d1h1m1s"` respectively
++**And** `format_duration(604799)` returns `"6d23h59m59s"`
++
++### S2: Parse accepts weeks
++**Given** a duration string containing `w`
++**When** `parse_duration` is called with `"1w"`, `"2w3d"` or `"1W"`
++**Then** it returns 604800, 1468800 and 604800 respectively
++
++### S3: Week ordering is enforced
++**Given** a string where `w` is repeated or follows a smaller unit
++**When** `parse_duration` is called with `"1d1w"` or `"1w1w"`
++**Then** it raises `ValueError`
++
++### S4: Round trip holds
++**Given** any s in {0, 1, 59, 60, 3599, 3600, 86399, 86400, 604799, 604800, 604801, 1209600, 10000000} or any `range(0, 10000001, 7919)` element
++**When** `parse_duration(format_duration(s))` is evaluated
++**Then** the result equals s
++
++## 🚫 Non-Goals
++- Months, years or any unit other than `w`.
++- Changes to CLI behaviour beyond what accepting `w` through `parse_duration` gives.
++- Changes to negative-input or empty-input handling.
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | existing tests under `tests/` use it |
++| Compatibility | Output for values < 604800 is byte-identical to today | stated in the ask |
++| Documentation | README unit list updated to include `w` | README states the unit set |
++
++## 🔒 Irreversible Decisions
++none
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| S1 | unit | `test_format_weeks` |
++| S2 | unit | `test_parse_weeks` |
++| S3 | unit | `test_parse_week_order` |
++| S4 | unit (property) | `test_round_trip_weeks` |
++
++### AC-001: Format weeks
++Oracle: golden, values given verbatim in the ask by the requester.
++
++### AC-002: Parse weeks
++Oracle: golden, values given verbatim in the ask by the requester.
++
++### AC-003: Week ordering rejected
++Oracle: golden, `ValueError` cases given verbatim in the ask by the requester.
++
++### AC-004: Round trip
++Oracle: property, `parse(format(s)) == s` holds regardless of implementation.
++
++## ❓ Open Questions
++none
++
++## 🔍 Refinement Decisions
++- Lane `light`: two source files plus tests and README, one session, no irreversible decision (storage, API contract, migration, permission, dependency all unchanged in kind). Interview skipped: the ask already states every scenario, value and oracle, so no WHAT ambiguity remained; autopilot is `auto_full`, so no question was put to the DRI.
++- Intent layer not filled in: no intent linked.
++
++## 🔎 Spec Validation
++Single advisory pass (spec-validator), assessment `MAJOR_REVISION`; none of it gates this SPEC.
++- **critical, irreversible-decisions:** `format_duration` output changes for every value >= 604800 (`"14d"` becomes `"2w"`), and `parse_duration` and the CLI newly accept `w`. Consumers that persist or string-match formatted output are affected, and strings containing `w` are rejected by older parsers. The SPEC lists no irreversible decision and calls the contract "unchanged in kind". Judgement here: the requester asked for this change explicitly and it is reversible in code, so the list stays empty. The DRI should confirm or add an `IRR-001` entry (which would turn the lane `full`).
++- **warning, circular-oracle:** AC-004 (round trip) cannot catch a consistently wrong week size or a `format_duration` that never emits `w`. Week correctness rests on the AC-001 to AC-003 goldens.
++- **warning, acceptance-criteria:** sub-week byte-identity is covered only by the 604799 case, the README requirement has no AC, `0w` / bare `w` / padded `" 1W "` are unspecified, and the AC-003 predicate uses an undefined helper `raises_value_error` (read it as `pytest.raises(ValueError)`).
++- **suggestion:** the golden values come from the task statement, which is not cited in the SPEC. They are hand-checkable (604800 + 90061 = 694861).
++- **suggestion:** the CLI accepting `w` is an intended side effect, not a non-goal.
+diff --git a/tests/test_format.py b/tests/test_format.py
+index 01cab9d..43e70e5 100644
+--- a/tests/test_format.py
++++ b/tests/test_format.py
+@@ -19,3 +19,30 @@ def test_round_trip() -> None:
+ def test_negative() -> None:
+     with pytest.raises(ValueError):
+         format_duration(-1)
++
++
++@pytest.mark.parametrize(
++    ("seconds", "text"),
++    [(604800, "1w"), (1209600, "2w"), (694861, "1w1d1h1m1s"), (604799, "6d23h59m59s")],
++)
++def test_s1_weeks(seconds: int, text: str) -> None:
++    assert format_duration(seconds) == text
++
++
++def test_s4_round_trip_weeks() -> None:
++    boundaries = (
++        0,
++        1,
++        59,
++        60,
++        3599,
++        3600,
++        86399,
++        86400,
++        604799,
++        604800,
++        604801,
++        1209600,
++    )
++    for seconds in (*boundaries, 10000000, *range(0, 10000001, 7919)):
++        assert parse_duration(format_duration(seconds)) == seconds
+diff --git a/tests/test_parse.py b/tests/test_parse.py
+index f6a9db8..15e5ae2 100644
+--- a/tests/test_parse.py
++++ b/tests/test_parse.py
+@@ -16,3 +16,16 @@ def test_valid(text: str, seconds: int) -> None:
+ def test_invalid(text: str) -> None:
+     with pytest.raises(ValueError):
+         parse_duration(text)
++
++
++@pytest.mark.parametrize(
++    ("text", "seconds"), [("1w", 604800), ("2w3d", 1468800), ("1W", 604800)]
++)
++def test_s2_weeks(text: str, seconds: int) -> None:
++    assert parse_duration(text) == seconds
++
++
++@pytest.mark.parametrize("text", ["1d1w", "1w1w"])
++def test_s3_week_order(text: str) -> None:
++    with pytest.raises(ValueError):
++        parse_duration(text)
+diff --git a/timeparse/parse.py b/timeparse/parse.py
+index 9c1a7fb..6fea9e0 100644
+--- a/timeparse/parse.py
++++ b/timeparse/parse.py
+@@ -5,7 +5,7 @@ from __future__ import annotations
+ import re
+ 
+ # Largest first; the order is also the order units must appear in a string.
+-UNITS: dict[str, int] = {"d": 86400, "h": 3600, "m": 60, "s": 1}
++UNITS: dict[str, int] = {"w": 604800, "d": 86400, "h": 3600, "m": 60, "s": 1}
+ 
+ _TOKEN = re.compile(r"(\d+)([a-z])")
+ 
+diff --git a/work-docs/PLAN-timeparse-weeks.md b/work-docs/PLAN-timeparse-weeks.md
+new file mode 100644
+index 0000000..5800e31
+--- /dev/null
++++ b/work-docs/PLAN-timeparse-weeks.md
+@@ -0,0 +1,21 @@
++---
++type: plan
++task_slug: timeparse-weeks
++status: done
++created: 2026-10-15
++spec: "[[SPEC-timeparse-weeks]]"
++adrs: 1
++summary: "Add week unit w to timeparse UNITS so parse and format support it"
++spec_need_verdict: none
++spec_need_target: timeparse-weeks
++---
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — Add week unit** — scope: timeparse/parse.py, tests/test_parse.py, tests/test_format.py, README.md · exit: `python -m pytest` · risk: sub-week output must stay identical · rollback: revert the diff
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/cli.py` — SPEC non-goal; it picks up `w` through parse_duration only
++
++## 📐 Architecture Decision Records
++- ADR-001: add `"w": 604800` as the first entry of the shared `UNITS` dict; format.py and the parse ordering both derive from it, so no other code changes. **Decided by:** agent
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/REVIEW-timeparse-weeks-2026-10-15.md b/work-docs/REVIEW-timeparse-weeks-2026-10-15.md
+new file mode 100644
+index 0000000..2071456
+--- /dev/null
++++ b/work-docs/REVIEW-timeparse-weeks-2026-10-15.md
+@@ -0,0 +1,48 @@
++---
++type: review
++task_slug: timeparse-weeks
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, test-reviewer]
++consensus_method: cross-check
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: timeparse-weeks
++  computed_at: 2026-10-15T19:40:00Z
++---
++
++## 🎯 Round 1 Summary
++Grade A (P0 0, P1 0, P2 0, P3 4). Lenses exercised: design, functionality, robustness, consistency, tests. Security and concurrency were routed away: the diff is one dictionary entry plus tests, with no external input or shared state. No fixes applied; lane light, so the confirmation pass is skipped.
++
++## 🔍 Drift Findings
++None. Changed files are the PLAN scope plus the SPEC and PLAN artifacts.
++
++## ✅ Consensus Findings
++All four are P3 and accepted without a fix:
++- consistency: test names differ from the SPEC verification table (`test_s1_weeks` vs `test_format_weeks`, and so on).
++- tests: the round-trip loop's assertion does not name the failing value.
++- tests: no format golden for a multi-week value with a remainder (for example `2w3d`).
++- tests: S3 has no case with `h`/`m`/`s` before `w`; ordering uses the unit-list index, so these are rejected as well.
++
++## ⚠️ Weak Consensus
++None.
++
++## 📝 Manual-Only Findings
++None.
++
++## 🤝 Disagreements
++None.
++
++## Review Iteration Summary
++
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|-----------|-------|---------------|-----------|-----|
++| 1 (init)  | A     | —             | 4 (P3)    | —   |
++
++Final grade: A
++Iterations used: 1 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false

@@ -1,0 +1,540 @@
+diff --git a/specs/SPEC-parse-iso-duration.machine.yaml b/specs/SPEC-parse-iso-duration.machine.yaml
+new file mode 100644
+index 0000000..7ac9461
+--- /dev/null
++++ b/specs/SPEC-parse-iso-duration.machine.yaml
+@@ -0,0 +1,189 @@
++schema_version: 3
++spec_slug: parse-iso-duration
++parent_spec: null
++verification_tier: 1
++mutation_threshold: 85
++mutation_threshold_rationale: ''
++last_mutation_run: null
++paths_to_mutate:
++- timeparse/parse.py
++mutation_runner: null
++spec_quality_score: null
++spec_quality_score_at: null
++ac:
++- id: AC-001
++  title: Valid durations return seconds
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: P1D
++    expected: 86400
++    edge: false
++    note: ''
++  - input:
++      text: PT1H30M
++    expected: 5400
++    edge: false
++    note: ''
++  - input:
++      text: P1DT2H
++    expected: 93600
++    edge: false
++    note: ''
++  - input:
++      text: PT0S
++    expected: 0
++    edge: false
++    note: ''
++  - input:
++      text: PT90M
++    expected: 5400
++    edge: false
++    note: ''
++  - input:
++      text: ' P1DT1H1M1S '
++    expected: 90061
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Values given in the ask or computed from 86400/3600/60 unit arithmetic,
++    not read from the implementation.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-002
++  title: Invalid durations raise ValueError
++  type: parametric
++  test_ids: []
++  executable_predicate: null
++  golden_table:
++  - input:
++      text: P
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: PT
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: P1H
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: PT1M1H
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: pt1h
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: PT1.5S
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: P1W
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: P1M
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: -P1D
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: P1DT
++    expected: ValueError
++    edge: false
++    note: ''
++  - input:
++      text: P1D T1H
++    expected: ValueError
++    edge: false
++    note: ''
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: Rejections are listed in the ask's grammar rules and examples;
++    each input violates a stated rule.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++- id: AC-003
++  title: Export and no regression
++  type: mechanical
++  test_ids: []
++  executable_predicate: '"parse_iso_duration" in timeparse.__all__ and parse_duration("1h30m")
++    == 5400'
++  golden_table: []
++  rubric_id: null
++  note: ''
++  pending_test: true
++  oracle_source: golden
++  oracle_evidence: 5400 is the existing documented parse_duration example (its docstring
++    and tests), independent of the new code.
++  oracle_independence_waiver: null
++  input_domain: null
++  transformation: null
++  expected_relation: null
++  preconditions: []
++  observable_output: null
++  generator_hint: null
++  judgment_verdict: null
++  judged_at: null
++  judgment_evidence: null
++  judgment_subject_paths: []
++  judgment_subject_hash: null
++irreversible_decisions: []
++approval:
++  kind: exempt
++  content_hash: ebc792ab0497d5202674c016610ac21f3246164dcbeed2070ebbf2d379713c75
++  approved_by: null
++  approved_at: '2026-10-15T19:05:32Z'
++  field_hashes:
++    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
++    spec_slug: cef6f651eba4a584c32fa5c3eddfca12b85bc6a024449b31d4270ad1edf73524
++    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
++    mutation_threshold: b4944c6ff08dc6f43da2e9c824669b7d927dd1fa976fadc7b456881f51bf5ccc
++    paths_to_mutate: 883315a76c8190a9b07a1993b43b739b8a21e6cdbad00f661a8e7725d143e1cc
++    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
++    AC-001: a99a1da253c1bf2c82550944f29ae0a5f55b4928c17c495ab5e6f385c2129bd6
++    AC-002: 91091922fb5030c1aeed46369908de8911f0840168ce6b25a0c0ad172dc77282
++    AC-003: 2bfa3cc11b72a42672fa279397fdd4804d63f07f08852bf0de94436c21a96078
++    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d
++  lane: light
+diff --git a/specs/SPEC-parse-iso-duration.md b/specs/SPEC-parse-iso-duration.md
+new file mode 100644
+index 0000000..2106d41
+--- /dev/null
++++ b/specs/SPEC-parse-iso-duration.md
+@@ -0,0 +1,74 @@
++---
++type: spec
++task_slug: parse-iso-duration
++status: approved
++created: 2026-10-15
++tags: [timeparse, spec, python, iso-8601, duration-parsing]
++test_framework: pytest
++interview_rounds: 0
++lane: light
++summary: "Add parse_iso_duration: day-and-time ISO-8601 durations to seconds, exported from timeparse"
++---
++
++# SPEC: parse_iso_duration
++
++## 🎯 Intent
++`timeparse.parse_duration` only reads the compact `1h30m` style. Callers receiving ISO-8601 durations
++(`PT1H30M`) have no parser. Add one for the day-and-time subset, leaving `parse_duration` untouched.
++
++## 🌅 Outcomes
++`from timeparse import parse_iso_duration` works, and `parse_iso_duration("P1DT2H")` returns `93600`.
++Anything outside the grammar raises `ValueError`.
++
++## 📋 In-Scope Scenarios
++
++### AC-001: Valid durations return seconds
++**Given** text matching `P[nD][T[nH][nM][nS]]` (n = ASCII digits, upper-case designators, optional surrounding whitespace)
++**When** `parse_iso_duration(text)` is called
++**Then** it returns `86400*D + 3600*H + 60*M + S` as an `int`
++**And** values may exceed the next unit (`PT90M` → 5400); `P1D` → 86400, `PT1H30M` → 5400, `P1DT2H` → 93600, `PT0S` → 0
++
++### AC-002: Invalid durations raise ValueError
++**Given** text with no component (`P`, `PT`, `""`), a `T` with no `H`/`M`/`S` (`P1DT`), out-of-order or repeated components (`PT1M1H`, `PT1H1H`),
++Y / W / month-before-`T` (`P1Y`, `P1W`, `P1M`), fractions (`PT1.5S`), signs (`-P1D`, `PT-1S`), lower case (`pt1h`), a missing `P`, a missing number (`PTH`),
++non-ASCII digits (`P١D`), or internal whitespace (`P1D T1H`)
++**When** `parse_iso_duration(text)` is called
++**Then** it raises `ValueError`
++
++### AC-003: Export and no regression
++**Given** the `timeparse` package
++**When** it is imported
++**Then** `parse_iso_duration` is importable from `timeparse` and listed in `__all__`
++**And** `parse_duration` behaves exactly as before (existing `tests/test_parse.py` passes unchanged)
++
++## 🚫 Non-Goals
++- Years, months, weeks, fractions, signs, lower case, `PnDTnH` alternative/extended formats.
++- Any change to `parse_duration`, `UNITS`, `format_duration` or the CLI.
++- Non-`str` inputs (behaviour unspecified).
++
++## ⚠️ Constraints
++| Constraint | Value | Rationale |
++|---|---|---|
++| Test framework | `pytest` | Existing `tests/test_parse.py` uses it |
++| Implementation | stdlib only, in `timeparse/parse.py` | Ask names the file; no new dependency |
++| Digits | ASCII `0-9` only | `\d` would accept Unicode digits that `int()` converts; the grammar says integers |
++| Compatibility | existing Python range in `pyproject.toml` | No new syntax |
++
++## 🔒 Irreversible Decisions
++none — the name and signature are fixed by the ask; adding a function is cheaply revertible.
++
++## ✅ Verification Criteria
++| Scenario | Verification mode | Test name / manual step |
++|---|---|---|
++| AC-001 | unit | `test_iso_valid` (parametrized golden table) |
++| AC-002 | unit | `test_iso_invalid` (parametrized) |
++| AC-003 | unit | `test_iso_exported`; existing `tests/test_parse.py` |
++
++## ❓ Open Questions
++None.
++
++## 🔍 Refinement Decisions
++- Not skipped by Step 0: new public function (contract change). Lane `light`: 2 source files, one session, no irreversible decision.
++- Interview skipped (0 rounds): the ask fixes grammar, examples and failures; no WHAT ambiguity. Autopilot `auto_full` armed, so no question was put to the DRI.
++- Defaulted: ASCII-only digits, internal whitespace invalid, `P0D` valid (0), surrounding whitespace stripped via `str.strip()`.
++- Oracle: golden for AC-001/002, sourced from the user-supplied examples and ISO-8601 unit arithmetic (1d=86400, 1h=3600, 1m=60); edge inputs in AC-002 are derived from the stated grammar rules.
+diff --git a/tests/test_parse.py b/tests/test_parse.py
+index f6a9db8..be295a2 100644
+--- a/tests/test_parse.py
++++ b/tests/test_parse.py
+@@ -16,3 +16,51 @@ def test_valid(text: str, seconds: int) -> None:
+ def test_invalid(text: str) -> None:
+     with pytest.raises(ValueError):
+         parse_duration(text)
++
++
++# --- parse_iso_duration (SPEC-parse-iso-duration) ---
++# Rows mirror specs/SPEC-parse-iso-duration.machine.yaml (harness_maker is not a test dependency here).
++
++
++@pytest.mark.parametrize(
++    ("text", "seconds"),
++    [
++        ("P1D", 86400),
++        ("PT1H30M", 5400),
++        ("P1DT2H", 93600),
++        ("PT0S", 0),
++        ("PT90M", 5400),
++        (" P1DT1H1M1S ", 90061),
++        ("P0D", 0),
++        ("PT5S", 5),
++        ("P10DT10M", 864600),
++    ],
++)
++def test_ac_001_iso_valid(text: str, seconds: int) -> None:
++    from timeparse import parse_iso_duration
++
++    result = parse_iso_duration(text)
++    assert result == seconds
++    assert type(result) is int
++
++
++@pytest.mark.parametrize(
++    "text",
++    [
++        "", "P", "PT", "P1H", "PT1M1H", "pt1h", "p1d", "PT1.5S", "P1W", "P1M", "P1Y",
++        "-P1D", "PT-1S", "+P1D", "P1DT", "P1D T1H", "PT1H1H", "P1D1D", "PTH", "1D",
++        "PT1", "P1DT1D", "P١D", "PT1H\n30M", "P1,5D", "PT1S2", "PT1M1S1H",
++    ],
++)
++def test_ac_002_iso_invalid(text: str) -> None:
++    from timeparse import parse_iso_duration
++
++    with pytest.raises(ValueError):
++        parse_iso_duration(text)
++
++
++def test_ac_003_iso_exported_and_parse_duration_unchanged() -> None:
++    import timeparse
++
++    assert "parse_iso_duration" in timeparse.__all__
++    assert timeparse.parse_duration("1h30m") == 5400
+diff --git a/timeparse/__init__.py b/timeparse/__init__.py
+index a21bf76..8577de1 100644
+--- a/timeparse/__init__.py
++++ b/timeparse/__init__.py
+@@ -1,6 +1,6 @@
+ """Parse and format human durations."""
+ 
+ from timeparse.format import format_duration
+-from timeparse.parse import UNITS, parse_duration
++from timeparse.parse import UNITS, parse_duration, parse_iso_duration
+ 
+-__all__ = ["UNITS", "format_duration", "parse_duration"]
++__all__ = ["UNITS", "format_duration", "parse_duration", "parse_iso_duration"]
+diff --git a/timeparse/parse.py b/timeparse/parse.py
+index 9c1a7fb..31163d0 100644
+--- a/timeparse/parse.py
++++ b/timeparse/parse.py
+@@ -38,3 +38,24 @@ def parse_duration(text: str) -> int:
+     if pos != len(cleaned):
+         raise ValueError(f"invalid duration: {text!r}")
+     return total
++
++
++_ISO = re.compile(
++    r"P(?:(?P<d>[0-9]+)D)?"
++    r"(?P<t>T(?:(?P<h>[0-9]+)H)?(?:(?P<m>[0-9]+)M)?(?:(?P<s>[0-9]+)S)?)?"
++)
++
++
++def parse_iso_duration(text: str) -> int:
++    """Return the number of seconds in an ISO-8601 duration, e.g. 'PT1H30M' -> 5400.
++
++    Accepts `P[nD][T[nH][nM][nS]]` with upper-case designators and non-negative ASCII integers;
++    surrounding whitespace is ignored. At least one component is required and `T` must be followed
++    by one. Anything else (years, months, weeks, fractions, signs, lower case) raises ValueError.
++    """
++    cleaned = text.strip()
++    match = _ISO.fullmatch(cleaned)
++    if match is None or cleaned == "P" or cleaned.endswith("T"):
++        raise ValueError(f"invalid ISO-8601 duration: {text!r}")
++    days, hours, minutes, seconds = (int(match[k] or 0) for k in "dhms")
++    return days * UNITS["d"] + hours * UNITS["h"] + minutes * UNITS["m"] + seconds * UNITS["s"]
+diff --git a/work-docs/PLAN-parse-iso-duration.md b/work-docs/PLAN-parse-iso-duration.md
+new file mode 100644
+index 0000000..ee09d97
+--- /dev/null
++++ b/work-docs/PLAN-parse-iso-duration.md
+@@ -0,0 +1,22 @@
++---
++type: plan
++task_slug: parse-iso-duration
++status: done
++created: 2026-10-15
++spec: "[[SPEC-parse-iso-duration]]"
++adrs: 1
++summary: "Add parse_iso_duration to timeparse/parse.py and export it"
++spec_need_verdict: none
++spec_need_target: parse-iso-duration
++---
++
++## 📝 Implementation Plan
++- [x] 1. **Phase 1 — parse_iso_duration + export** — scope: timeparse/parse.py, timeparse/__init__.py, tests/test_parse.py · exit: `uv run pytest -q` · risk: regex accepting Unicode digits or trailing newline · rollback: revert the three files
++
++## 🚧 Contract Boundaries
++### Do not change
++- `timeparse/format.py` — formatting is out of scope
++- `timeparse/cli.py` — CLI untouched
++
++## 📐 Architecture Decision Records
++- ADR-001: single fullmatch regex with ASCII `[0-9]+` groups on the stripped text, plus an explicit check that at least one component exists and `T` is followed by a component. **Decided by:** agent
+diff --git a/uv.lock b/uv.lock
+new file mode 100644
+index 0000000..8f0c6de
+--- /dev/null
++++ b/uv.lock
+@@ -0,0 +1,79 @@
++version = 1
++revision = 3
++requires-python = ">=3.11"
++
++[[package]]
++name = "colorama"
++version = "0.4.6"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
++]
++
++[[package]]
++name = "iniconfig"
++version = "2.3.1"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
++]
++
++[[package]]
++name = "packaging"
++version = "26.3"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
++]
++
++[[package]]
++name = "pluggy"
++version = "1.7.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
++]
++
++[[package]]
++name = "pygments"
++version = "2.21.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz", hash = "sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c", size = 5005329, upload-time = "2026-08-17T08:02:48.824Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl", hash = "sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9", size = 1250147, upload-time = "2026-08-17T08:02:44.912Z" },
++]
++
++[[package]]
++name = "pytest"
++version = "9.1.1"
++source = { registry = "https://pypi.org/simple" }
++dependencies = [
++    { name = "colorama", marker = "sys_platform == 'win32'" },
++    { name = "iniconfig" },
++    { name = "packaging" },
++    { name = "pluggy" },
++    { name = "pygments" },
++]
++sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
++]
++
++[[package]]
++name = "timeparse"
++version = "0.3.0"
++source = { virtual = "." }
++
++[package.dev-dependencies]
++dev = [
++    { name = "pytest" },
++]
++
++[package.metadata]
++
++[package.metadata.requires-dev]
++dev = [{ name = "pytest", specifier = ">=8" }]
+diff --git a/work-docs/REVIEW-parse-iso-duration-2026-10-15.md b/work-docs/REVIEW-parse-iso-duration-2026-10-15.md
+new file mode 100644
+index 0000000..85df7ec
+--- /dev/null
++++ b/work-docs/REVIEW-parse-iso-duration-2026-10-15.md
+@@ -0,0 +1,48 @@
++---
++type: review
++task_slug: parse-iso-duration
++status: APPROVED
++created: 2026-10-15
++reviewers_invoked: [code-reviewer, security-reviewer, concurrency-reviewer, test-reviewer]
++consensus_method: cross-check
++drift_verdict:
++  result: clean
++  scope_violations: []
++  scenario_misses: []
++  task_slug: parse-iso-duration
++  computed_at: 2026-10-15T19:07:44Z
++---
++
++## 🎯 Round 1 Summary
++Grade A. All 7 lenses exercised. 0 P0, 0 P1, 1 P2, 4 P3. No fixes applied.
++
++## 🔍 Drift Findings
++None.
++
++## ✅ Consensus Findings
++- P2 security (parse.py:56): no input length/magnitude cap; no ReDoS (linear match), CPython int-digit limit raises ValueError. Carried.
++- P3 tests: non-ASCII digit tested only in the D slot; no whitespace-only or tab/newline rows.
++- P3 consistency: test names and in-function imports differ from the SPEC table and file convention.
++- P3 design: at-least-one-component rule lives in post-checks rather than the regex.
++
++## ⚠️ Weak Consensus
++None.
++
++## 📝 Manual-Only Findings
++None.
++
++## 🤝 Disagreements
++None.
++
++## Review Iteration Summary
++
++| Iteration | Grade | Fixes Applied | Remaining | New |
++|-----------|-------|---------------|-----------|-----|
++| 1 (init)  | A     | —             | 5 (P2/P3) | —   |
++
++Final grade: A
++Iterations used: 1 / 2
++Exit reason: converged
++Status: APPROVED
++human_review_needed: false
++confirm_pass_ran: false (lane light, unchanged)
