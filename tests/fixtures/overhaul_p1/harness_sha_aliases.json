@@ -1,0 +1,9 @@
+[
+  {
+    "source": "a2fe560a401846f8ab161662382d7f994ec5f91c",
+    "target": "8140dd8669518fe9c533668dfbc1d0366487c6cf",
+    "src_tree": "79827bd4edcbeab387ecddb149db5ad7c28760d3",
+    "scripts_tree": "f18284bfc43fb239635cf44311c944887a993438",
+    "why": "Eval run 4 (docs/evals/results.jsonl, 72 rows) ran on PR-S branch commit a2fe560a; PR #36 squash-merged it as 8140dd86, so the source is not reachable from main. Trees recorded from a2fe560a on 2026-10-17 (SPEC-retired-text AC-005)."
+  }
+]

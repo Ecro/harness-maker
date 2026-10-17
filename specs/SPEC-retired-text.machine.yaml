@@ -1,0 +1,260 @@
+schema_version: 3
+spec_slug: retired-text
+parent_spec: SPEC-hm-overhaul-p1
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: Text and test-harness change; every AC is a golden or
+  property check on rendered bytes or git state, so mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Touched renders contain no retired-feature token
+  type: mechanical
+  test_ids:
+  - tests/render/test_retired_text.py::test_ac_001_touched_renders_have_no_retired_token
+  executable_predicate: not any(re.search(r'autoloop|autopilot|executor agent', text,
+    re.I) for preset in ('Side', 'Production') for text in touched_texts(preset))
+  golden_table: []
+  rubric_id: null
+  note: Rendered with --second-opinion-models codex so code-verifier and consensus-arbiter
+    exist.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The token set and the touched-file list are typed from the DRI's
+    2026-10-17 message and a grep of the main 79b16a99 render (.claude, .codex, .agents),
+    recorded in the SPEC Intent before any template changed; the render is the product,
+    not the test's model of it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: The replaced texts say what runs now
+  type: mechanical
+  test_ids:
+  - tests/render/test_retired_text.py::test_ac_002_replaced_texts_say_what_runs_now
+  executable_predicate: all(s in rendered(preset)[path] for preset in ('Side', 'Production')
+    for path, s in REPLACEMENTS) and all(e['statusMessage'] == NEW_STATUS for preset
+    in ('Side', 'Production') for e in flush_session_entries(rendered(preset)))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The replacement strings are fixed in SPEC AC-002 and match what
+    the code does now: execute.md:76 names consensus-arbiter for conflicting severities,
+    flush_session snapshots the progress file and runs on PreCompact (settings templates)
+    and Stop (codex/hooks.json.j2), and `hm intent status` prints approval_valid.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Re-rendering replaces the status message in harness-owned groups, keeps mixed
+    ones
+  type: mechanical
+  test_ids:
+  - tests/render/test_retired_text.py::test_ac_003_rerender_replaces_status_in_owned_groups
+  - tests/render/test_retired_text.py::test_ac_003_rerender_keeps_a_user_extended_group
+  executable_predicate: all(sum('flush_session' in h['command'] for h in g['hooks'])
+    == 1 and all(h.get('statusMessage') == NEW_STATUS for h in g['hooks'] if 'flush_session'
+    in h['command']) for f in after_a for g in flush_groups(f)) and all(user_group(f)
+    == user_group_before for f in after_a) and all(mixed_group(f) == mixed_group_before(f)
+    and USER_CMD in all_commands(f) for f in after_b)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The before state is what main 79b16a99 renders (the shipped 0.64.0
+    bytes, from git) plus one user hook the test adds; the identity rule (render._entry_identity:
+    matcher, commands, type) and the mixed-group keep rule (_strip_shipped_commands)
+    are existing behaviour this SPEC does not change.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Maker grants and runs nothing of autopilot
+  type: mechanical
+  test_ids:
+  - tests/render/test_retired_text.py::test_ac_004_maker_grants_and_runs_nothing_of_autopilot
+  - tests/render/test_render_maker_front_door.py::test_ac007_ask_to_end_stage
+  executable_predicate: allowed_tools(maker) == [t.format(hm=hm) for t in ('Bash({hm}
+    world_model:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(printf:*)')] and 'autopilot'
+    not in maker.lower() and test_ac007_ask_to_end_stage_other_asserts_pass
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The exact grant list is typed into the SPEC (Outcome 3, IRR-001),
+    not read from the template; hm comes from the rendered "`hm` below means" line
+    as the existing front-door test does; the rest of test_ac007 is SPEC-maker-front-door-improvements'
+    approved oracle, kept unchanged.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: A tree-checked squash alias counts toward the ship bar
+  type: mechanical
+  test_ids:
+  - tests/integration/test_overhaul_p1_ship_bar.py::test_ac_005_alias_counts_only_with_matching_trees
+  - tests/integration/test_overhaul_p1_ship_bar.py::test_ac010_scorecard_meets_bar
+  executable_predicate: on_this_harness(ALIAS_SRC) is True and on_this_harness(UNKNOWN_SHA)
+    is False and alias_ok(bad_target_alias) is False and alias_ok(bad_tree_alias)
+    is False and all(rev_parse(e['target'] + ':src') == e['src_tree'] and rev_parse(e['target']
+    + ':scripts') == e['scripts_tree'] for e in ALIASES) and ship_bar_violations(_rows())
+    == []
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: 'Git is the reference: reachability from merge-base --is-ancestor
+    and content from rev-parse tree hashes of the always-present target, recorded
+    from a2fe560a while it was still in this clone (src 79827bd4, scripts f18284bf).
+    8140dd86 is PR #36''s squash commit as GitHub reported on merge; a2fe560a is the
+    harness_sha the runner wrote into all 72 rows.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: The replay digest is independent of the install ref's length
+  type: property
+  test_ids:
+  - tests/integration/test_overhaul_p1_eval3_replay.py::test_ac_006_digest_ignores_install_ref_length
+  - tests/integration/test_overhaul_p1_eval3_replay.py::test_ac_006_manifest_matches_original_provenance
+  - tests/integration/test_overhaul_p1_eval3_replay.py::test_ac006_section_verdicts_match_golden
+  executable_predicate: len({digest(render_frontmatter(ref)) for ref in refs}) ==
+    1 and all(r['digest'] == manifest for r in PROVENANCE['originals']) and len(PROVENANCE['originals'])
+    == 36 and (not ORIGINALS_ON_DISK or all(recompute(r) == r['digest'] for r in PROVENANCE['originals']))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: YAML's emitter folds a plain scalar only at a space, so folded
+    and unfolded frontmatter differ only in whitespace runs; collapsing them is invariant
+    under the fold position whatever the implementation. The manifest side is pinned
+    to the 36 original eval-3 hm runs' harness commits (recorded SHAs and per-run
+    digests), which this change does not produce; a recompute from today's replay
+    render would not match a recorded SHA.
+  oracle_independence_waiver: null
+  input_domain: install refs of 8-200 characters from [A-Za-z0-9/._-], as the Maker
+    frontmatter's `hm` prefix
+  transformation: render Maker's allowed-tools line through PyYAML's dump with each
+    ref, substitute <REF>, then collapse whitespace runs in the YAML frontmatter
+  expected_relation: the normalised text's sha256 is the same for every ref (after
+    <REF> substitution)
+  preconditions: []
+  observable_output: harness_digest(tree)['.claude/skills/maker/SKILL.md']
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Docs describe Maker without the autopilot grant
+  type: mechanical
+  test_ids:
+  - tests/unit/test_retired_text_docs.py::test_ac_007_docs_describe_maker_without_autopilot_grant
+  executable_predicate: not any(re.search(MAKER_NARROW_CLAIM, read(p)) for p in ('CLAUDE.md',
+    'docs/ARCHITECTURE.md', 'README.md', 'README.ko.md')) and 'autopilot narrow:*'
+    not in read('docs/reference/world-model.md')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The doc list and the claims to remove are the ones a grep of main
+    79b16a99 found (CLAUDE.md World model bullets, ARCHITECTURE.md:48, README.md:385
+    and its ko twin, world-model.md:119-133), recorded before the change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Maker's allowed-tools drops Bash(<hm> autopilot narrow:*) and Maker stops
+    narrowing autopilot; reverses SPEC-maker-front-door-improvements IRR-005
+  category: security/permission boundary
+  rationale: Narrows a pre-approved grant for a retired feature and reverses an approved
+    decision; cheap to undo but a permission boundary change, so the DRI decides it.
+  source: spec
+approval:
+  kind: human
+  content_hash: 340d4104157fdc0ac0888aadc717123181519ed0e29e4a7fc90a1f82720e9eea
+  approved_by: Ecro
+  approved_at: '2026-10-17T00:21:19Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 1cb0a9e4c2b9074bfa13c38eafda531c1cc317b8c38c45b2453368f9fe188383
+    parent_spec: 8e80013b9c7d06fd05950be5a39625bcf47422620ebdb47280500ebad12ba858
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    mutation_threshold_rationale: e4f8ae9587e7b0da7dd3ad976da1938dca1a137aaf6effe2b2451bd3c3337440
+    irreversible_decisions: 565e176fb6604aadb222461e615c8127e1e3097134b14d06f8dfc209716b26f3
+    AC-001: 78a63dddf8b8d827b976b836fb4540e64eb6b549b05c843419687f4d8dec5ed0
+    AC-002: 682b7cd4dec1ffec482931657f3496d61253fe17745fc62a4af842f17a1c0070
+    AC-003: 265a24cecf6d8b0c2d42f263cc8105b73b11b14d3a482cb5ea1c93e24343eb6f
+    AC-004: ec96e6aa6cad1ebdcbb875a071c34dfeeb6978f3675c8139db18c17f6a0c40ba
+    AC-005: b64389dde498a1239a7ffc383da4d27645ff7e73a6b74a255c5d336c5f553dd0
+    AC-006: aecf7ae6f926b972e4cb32f2a1e5d4a7fb1fa20f71d2443bfc2ed97cc107ed9f
+    AC-007: 98ab89351815953c200f77fd18aa935161c5ae48224168aca6925cbe0703c0e8
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c
+  lane: full

@@ -45,10 +45,8 @@ status asks to Maker.
 
 Maker briefs from `world_model_digest.py` (`hm world_model digest`): one JSON
 object, ≤ 1,500 bytes, always exit 0, injected at skill load on Claude Code. On
-a start it scopes an armed autopilot session with `hm autopilot narrow --until
-<stage>` (`autopilot.narrow`), which only shrinks the armed pipeline (never
-arms or widens) and saves it in the marker's `restore_pipeline`; the stage
-boundary restores it at the narrowed end. Details:
+a start it names the entry and end stage; it no longer touches autopilot
+(retired in 0.64.0; SPEC-retired-text IRR-001). Details:
 [`docs/reference/world-model.md`](reference/world-model.md).
 
 ### Codex-native setup and independent Claude review

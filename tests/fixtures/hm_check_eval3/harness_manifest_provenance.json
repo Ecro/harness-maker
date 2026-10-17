@@ -1,0 +1,186 @@
+{
+  "normalisation": "digest_text: provenance masked, install ref -> <REF>, newline+indent runs collapsed inside .md YAML frontmatter; digest_sha256 = manifest_sha256(per-run digest)",
+  "originals": [
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t1-hm-1-004902"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t1-hm-2-8afdeb"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t1-hm-3-171dcf"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "7a2e76ff94b80bc64ae3019c66fc861fa2dea399",
+      "run": "t10-hm-1-33a146"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "7a2e76ff94b80bc64ae3019c66fc861fa2dea399",
+      "run": "t10-hm-2-e1463b"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "7a2e76ff94b80bc64ae3019c66fc861fa2dea399",
+      "run": "t10-hm-3-bded89"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "a631fc428ec08621f52c9d1d0907867f756a15b7",
+      "run": "t11-hm-1-1e40d0"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "a631fc428ec08621f52c9d1d0907867f756a15b7",
+      "run": "t11-hm-2-965471"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "a631fc428ec08621f52c9d1d0907867f756a15b7",
+      "run": "t11-hm-3-11093b"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "12c313c90419ef31de545c9423515b94acce0ed3",
+      "run": "t12-hm-1-2b4b09"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "12c313c90419ef31de545c9423515b94acce0ed3",
+      "run": "t12-hm-2-b6f7a4"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "12c313c90419ef31de545c9423515b94acce0ed3",
+      "run": "t12-hm-3-0bf334"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t2-hm-1-8293c7"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t2-hm-2-038224"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t2-hm-3-1e7b55"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t3-hm-1-db9a38"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t3-hm-2-a0487c"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t3-hm-3-8a03fb"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t4-hm-1-9c57f1"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t4-hm-2-dd899e"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t4-hm-3-d7b05d"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t5-hm-1-e13620"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t5-hm-2-566f85"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t5-hm-3-de7d8e"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "fd50cfd44083bbb80c55921125db53bc172a694e",
+      "run": "t6-hm-1-df7bcc"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "fd50cfd44083bbb80c55921125db53bc172a694e",
+      "run": "t6-hm-2-d01555"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "fd50cfd44083bbb80c55921125db53bc172a694e",
+      "run": "t6-hm-3-0dd25a"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t7-hm-1-d583be"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t7-hm-2-c07f55"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t7-hm-3-c738a3"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t8-hm-1-38dd1e"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t8-hm-2-518312"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t8-hm-3-64719b"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t9-hm-1-6e9ab0"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t9-hm-2-1ff497"
+    },
+    {
+      "digest_sha256": "e3f7aee84615c9a54a4299318638f8b5fe826d902a54c31b0e66a0a85ec5cd6b",
+      "harness_commit": "ef0f3700493181c679b7bd337d7b305d356e7103",
+      "run": "t9-hm-3-cf3c88"
+    }
+  ],
+  "source": "/var/tmp/hm-eval-3/runs"
+}

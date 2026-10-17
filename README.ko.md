@@ -338,11 +338,11 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 
 **유일한 입구.** `intent-layer` 와 `project-knowledge` 는 모델이 스스로 호출하지 않는다. `/intent-layer` 나 `/project-knowledge` (Codex 는 `$…`) 를 직접 입력하면 여전히 실행되고, 그 외에는 Maker 가 쓰기 전에 해당 절차를 읽는다. 쓰기 전에 묻는 규칙은 그대로다. `CLAUDE.md` / `AGENTS.md` 에 항상 로드되는 `## World model` 포인터가 목표·지표·사실·현황 요청을 이름을 부르지 않아도, 단계 진행 중에도 Maker 로 보낸다. 일반적인 만들기·고치기 요청은 경로가 바뀌지 않는다. `/hm:` 단계는 여전히 직접 입력하거나 Maker 를 통해 실행된다.
 
-**범위는 요청을 따른다.** "X 리서치해줘" 는 research 에서, "X 스펙 잡자" 는 spec 에서 끝나고, "만들어줘" / "고쳐줘" 는 전체 파이프라인을 돈다. 불분명한 요청은 research 에서 시작한다. autopilot 이 켜져 있으면 Maker 는 매 요청마다 `hm autopilot narrow --until <end>` 를 실행한다 — "X 리서치해줘" 는 research 후 멈추고, 그 경계에서 원래 armed 파이프라인이 복원된다. Maker 는 autopilot 을 켜지 않는다.
+**범위는 요청을 따른다.** "X 리서치해줘" 는 research 에서, "X 스펙 잡자" 는 spec 에서 끝나고, "만들어줘" / "고쳐줘" 는 전체 파이프라인을 돈다. 불분명한 요청은 research 에서 시작한다. Maker 는 시작 stage 와 끝 stage 를 한 줄로 밝히고 시작 stage 에 들어간다. 다음 stage 로 넘어가는 것은 사용자가 정한다.
 
 **단계 진행 중 Maker 에게 말하기.** 곁답은 `Maker —` 로 시작하고 6줄 이내다. 진행 중인 작업에 대한 결정이나 범위 변경은 답하기 전에 그 작업의 가장 하위 산출물 (PLAN, 없으면 SPEC, 없으면 RESEARCH) 에 기록된다. 새 작업은 그 산출물의 `## Queued asks` 에 쌓이고 단계의 STOP 에서 제안된다 — 단계 도중에 시작하지 않는다. 곁답은 `↩ <stage> · <step>` 한 줄로 끝나고 단계는 계속된다.
 
-**Resume** 은 다음 단계에 들어가기 전에 작업의 최신 산출물과 그 시각을 밝히거나, "no artifact recorded" 라고 말하고 작업 파일 목록을 보여준다. 다른 세션이 마지막으로 손댔거나 그 여부를 모르면 먼저 한 번 묻고, 열린 작업이 여럿이면 닫힌 질문 하나로 고르게 한다. autopilot 아래에서는 남은 narrowing 을 먼저 되돌린다.
+**Resume** 은 다음 단계에 들어가기 전에 작업의 최신 산출물과 그 시각을 밝히거나, "no artifact recorded" 라고 말하고 작업 파일 목록을 보여준다. 다른 세션이 마지막으로 손댔거나 그 여부를 모르면 먼저 한 번 묻고, 열린 작업이 여럿이면 닫힌 질문 하나로 고르게 한다.
 
 **Briefing** 은 digest 하나 (`hm world_model digest`) 로, 최대 1.5 KB 이며 프로젝트 상태를 바꾸지 않는다. 보여주는 것:
 

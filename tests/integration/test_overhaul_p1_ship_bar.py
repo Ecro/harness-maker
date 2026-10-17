@@ -47,6 +47,10 @@ class UnknownCommitError(AssertionError):
     """A SHA git does not know: never read as "not an ancestor"."""
 
 
+class BadAliasError(AssertionError):
+    """A squash alias whose target is off this harness or whose trees differ."""
+
+
 def _is_ancestor(sha: str, of: str) -> bool | None:
     """True/False from `merge-base --is-ancestor`; None when git exits otherwise (128: unknown)."""
     proc = subprocess.run(
@@ -58,16 +62,64 @@ def _is_ancestor(sha: str, of: str) -> bool | None:
     return {0: True, 1: False}.get(proc.returncode)
 
 
-@cache
-def on_this_harness(sha: str, ref: str = REF_SHA) -> bool:
-    """Reachable from HEAD and not from the reference. An unknown reference fails the gate: read
-    as "not an ancestor", it would count every HEAD-reachable row. An unknown row SHA (a commit
-    not in this clone) is simply not this harness."""
+ALIASES = REPO_ROOT / "tests" / "fixtures" / "overhaul_p1" / "harness_sha_aliases.json"
+
+
+def load_aliases() -> list[dict[str, str]]:
+    data: list[dict[str, str]] = json.loads(ALIASES.read_text(encoding="utf-8"))
+    return data
+
+
+def _tree(rev: str) -> str | None:
+    proc = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "rev-parse", "--verify", "--quiet", rev],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def _reachable(sha: str, ref: str) -> bool:
     if _is_ancestor(ref, "HEAD") is None:
         raise UnknownCommitError(
             f"reference commit {ref} is unknown to this clone (fetch-depth: 0?)"
         )
     return _is_ancestor(sha, "HEAD") is True and _is_ancestor(sha, ref) is False
+
+
+def alias_problem(entry: dict[str, str], ref: str = REF_SHA) -> str | None:
+    """Why a squash alias cannot stand in for its source, or None. Checked by tree hash, so it
+    holds in a clone that no longer has the squashed source commit."""
+    target = entry["target"]
+    if not _reachable(target, ref):
+        return f"alias target {target} is not on this harness"
+    for rev in (target, entry["source"]):
+        if rev == entry["source"] and _tree(f"{rev}^{{commit}}") is None:
+            continue  # the squashed source is gone from this clone; the target carries the proof
+        for part in ("src", "scripts"):
+            if _tree(f"{rev}:{part}") != entry[f"{part}_tree"]:
+                return f"{rev}:{part} is not the recorded tree {entry[f'{part}_tree']}"
+    return None
+
+
+@cache
+def on_this_harness(sha: str, ref: str = REF_SHA) -> bool:
+    """Reachable from HEAD and not from the reference, directly or through a squash alias. An
+    unknown reference fails the gate: read as "not an ancestor", it would count every
+    HEAD-reachable row. An unknown row SHA (a commit not in this clone, with no alias) is simply
+    not this harness; a broken alias fails the gate."""
+    if _reachable(sha, ref):
+        return True
+    for entry in load_aliases():
+        # Rows record an abbreviated SHA (`harness_sha` is 12 hex digits).
+        if len(sha) >= 7 and entry["source"].startswith(sha):
+            problem = alias_problem(entry, ref)
+            if problem is not None:
+                raise BadAliasError(problem)
+            return True
+    return False
 
 
 def _rows() -> list[dict[str, Any]]:
@@ -226,3 +278,32 @@ def test_ac010_an_unknown_reference_commit_fails() -> None:
     with pytest.raises(UnknownCommitError):
         on_this_harness(head, ref="0" * 40)
     assert on_this_harness(head, ref=REF_SHA) is True
+
+
+#: SPEC-retired-text AC-005: the eval-4 harness commit PR #36's squash left off main.
+SQUASHED_PR_S_HARNESS = "a2fe560a401846f8ab161662382d7f994ec5f91c"
+
+
+def test_ac_005_alias_counts_only_with_matching_trees() -> None:
+    aliases = load_aliases()
+    assert [a["source"] for a in aliases] == [SQUASHED_PR_S_HARNESS]
+    good = aliases[0]
+    assert alias_problem(good) is None
+    assert on_this_harness(SQUASHED_PR_S_HARNESS) is True
+    assert on_this_harness(SQUASHED_PR_S_HARNESS[:12]) is True
+    assert on_this_harness("0" * 40) is False
+    # A target on the reference harness (db19f023 itself) is not this harness.
+    ref_full = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "rev-parse", REF_SHA],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=True,
+    ).stdout.strip()
+    assert alias_problem({**good, "target": ref_full}) is not None
+    assert alias_problem({**good, "src_tree": "0" * 40}) is not None
+    assert alias_problem({**good, "scripts_tree": "0" * 40}) is not None
+    # A source this clone no longer has is skipped; the target's trees carry the proof.
+    assert alias_problem({**good, "source": "0" * 40}) is None
+    # A source git knows must carry the recorded trees too.
+    assert alias_problem({**good, "source": ref_full}) is not None

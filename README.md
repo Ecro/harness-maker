@@ -382,11 +382,11 @@ The world model is what the harness keeps between sessions: **intents** (goals, 
 
 **The only entrance.** `intent-layer` and `project-knowledge` are not model-invocable. Typing `/intent-layer` or `/project-knowledge` (`$…` on Codex) still runs them; otherwise Maker reads their procedure before any write, and their ask-before-write rule is unchanged. An always-loaded `## World model` pointer in `CLAUDE.md` / `AGENTS.md` sends goal, metric, fact and status requests to Maker even when you don't name it, and even mid-stage. Ordinary build and fix requests are not rerouted. `/hm:` stages still run when typed, or via Maker.
 
-**Scope follows the ask.** "research X" ends at research, "spec X" at spec, "build X" / "fix X" runs the full pipeline; an unclear ask starts at research. With autopilot armed, Maker runs `hm autopilot narrow --until <end>` on every ask, so "research X" stops after research and the armed pipeline is restored at that boundary. Maker never arms autopilot.
+**Scope follows the ask.** "research X" ends at research, "spec X" at spec, "build X" / "fix X" runs the full pipeline; an unclear ask starts at research. Maker names the entry and end stage in one route line and enters the start stage; advancing to the next stage is your call.
 
 **Talking to Maker while a stage runs.** An aside opens with `Maker —` and is at most 6 lines. A decision or scope change about an in-flight task is written into its most downstream artifact (PLAN, else SPEC, else RESEARCH) before Maker replies. New work goes under `## Queued asks` in that artifact and is offered at the stage's STOP — never started mid-stage. The aside ends with one `↩ <stage> · <step>` line and the stage continues.
 
-**Resume** names the task's latest artifact and its time before entering the next stage, or says "no artifact recorded" and lists the task's files. If another session touched the task last, or that is unknown, Maker asks once first; with several open tasks it asks one closed question. Under autopilot it first undoes any leftover narrowing.
+**Resume** names the task's latest artifact and its time before entering the next stage, or says "no artifact recorded" and lists the task's files. If another session touched the task last, or that is unknown, Maker asks once first; with several open tasks it asks one closed question.
 
 **The briefing** is one digest (`hm world_model digest`), at most 1.5 KB and read-only on project state. It shows:
 

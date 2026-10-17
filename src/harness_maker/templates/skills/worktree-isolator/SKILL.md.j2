@@ -24,7 +24,6 @@ than the live working tree.
 
 - `/hm:execute` invocation
 - Any `/hm:<stage>` when `harness.yaml.worktree.enabled` is true
-- Autoloop iteration boundaries (each iter gets its own worktree)
 
 ## Behavior
 
@@ -52,7 +51,7 @@ CLI-owned flow, executed deterministically by the orchestrator:
 
 3. **Run workflow inside the worktree.**
    Switch the agent's working directory to `wt`. All Write/Edit/Bash tool calls
-   issued by the executor agent land inside the worktree branch — the base
+   issued in the task worktree land inside the worktree branch — the base
    repo's working copy is untouched until step 4. Reviewer agents may still
    read the base repo (they have read-only permissions per M12 privilege
    separation).

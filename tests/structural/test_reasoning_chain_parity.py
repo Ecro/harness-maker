@@ -51,10 +51,11 @@ def test_arbiter_calls_the_helper_with_its_real_signature() -> None:
     assert "reviewer_scopes)" not in body
 
 
-def test_arbiter_states_that_review_does_not_invoke_it() -> None:
+def test_arbiter_states_when_review_invokes_it() -> None:
     """`scope-exempted` is documented here and absent from review's Step 4d table. Without
-    this note the mismatch reads as a bug in one of the two surfaces."""
-    assert "does not invoke this agent" in _text(_ARBITER)
+    this note the mismatch reads as a bug in one of the two surfaces. SPEC-retired-text:
+    execute's review step does invoke it, but only with second-opinion models on."""
+    assert "invokes this agent only when" in _text(_ARBITER)
 
 
 def test_the_two_deferred_three_step_sites_are_still_the_only_ones() -> None:
