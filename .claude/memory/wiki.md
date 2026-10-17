@@ -1303,4 +1303,39 @@ Phase A.5 test review cannot certify that a refusal-message test discriminates i
 `freeze.resolve_review_base` now treats "merge-base == HEAD" as a valid answer on a named non-base branch. The per-task model commits only at wrapup, so on `hm/<slug>` with no commits of its own the whole task is uncommitted working state on top of HEAD, and HEAD is the right review base. Previously every candidate equal to HEAD was skipped and the chain fell through to `HEAD~1`, which pulled the previously landed task into the review span (`resolve-base-head-parent-empty-branch`, four occurrences). On the base branch itself and on a detached HEAD the old behaviour is kept: nothing distinguishes the task's commits from earlier ones, so HEAD~1 (over-scoping) is the safer error. The classification reads the full `git symbolic-ref --quiet HEAD` (not `--short`) and normalises both sides through `_branch_name`, so `refs/heads/main`, `origin/main` and `main` all compare equal; a non-main base branch is honoured via the same normalisation. Residual risk, carried as a follow-up: the task-branch test is name-based (any non-base branch counts), not a check that the branch really is an `hm/<slug>` task branch. The installed plugin (0.62.0) still has the old rule, so until the next release a zero-commit task branch needs `git update-ref` correction of the stored review_base. Extends `review-exit-on-risk-closure` (the freeze design); do not edit that entry for this.
 ## [wiki:gotcha] symbolic-ref-short-tag-collision | 2026-10-04
 `git symbolic-ref --short HEAD` does not always return the bare branch name: when a tag with the same name as the branch exists, git disambiguates the short form and prints `heads/<name>` (verified in a scratch repo with branch `main` plus tag `main`). Any code that compares the short form against a branch name will then misclassify the branch, e.g. `resolve_review_base` would have decided the base branch was a task branch. Use the full ref (`git symbolic-ref --quiet HEAD` gives `refs/heads/main`) and strip `refs/heads/` yourself, or normalise both sides of the comparison through one helper. The same applies to `git rev-parse --abbrev-ref`. A regression test needs a tag named like the branch; `test_a_tag_named_like_the_base_branch_does_not_make_it_a_task_branch` is the pin.
+## [wiki:architecture] review-effect-ledger | 2026-10-17
+`hm review_effect` (SPEC-review-effect-measurement, 2026-10-17) measures whether the one `code-reviewer` in
+`/hm:execute` Step 6 has an effect. Before it, 0.64.0 had orphaned every machine record of review
+(`review_telemetry`, `stage_agent_ledger` emit, `review-payloads`), and `later_regression_link` was null in
+597/597 second-opinion rows.
+
+**Why accepted findings measure marginal yield directly.** `hm check` is already green before review runs
+(execute.md.j2:52 vs :64). Every accepted P0/P1 is therefore something the deterministic gates missed, by
+construction, with no counterfactual arm needed.
+
+**What it records.** One ledger, `<base>/.claude/observability/review-effect.jsonl` (schema 1), with three
+events:
+- `review`: written by `wrapup_land` after the commit and before the pop. Keyed `(slug, commit)`, best-effort,
+  and it never changes the land. It parses the latest `REVIEW-<slug>-<date>.md` `## Findings` table by
+  header name, so extra columns are fine. Severity is P0–P3; anything else goes to `unrecognized` with a
+  warning. Status is `parsed`, `none`, `absent` or `unparseable`.
+- `escape`: written through `/hm:metrics` Step 1.4. `escape-candidates` lists `fix:`/`Revert` commits since
+  the earliest non-excluded review row. It adds slug hints from `blame --porcelain` at `fix^` (not `-l`,
+  which prints boundary commits as ^ + 39 hex), mapped to the SPEC files those commits touched. A
+  `not-escape` verdict leaves every denominator.
+- `recall`: `seed` plants cmp-flip, boolop-swap or const-off-by-one on the diff's own executable lines in a
+  clean scratch worktree. `score` uses a maximum bipartite match within ±3 lines.
+
+**Reading it.** `report` prints `k/n [lo, hi]` with exact Clopper-Pearson intervals, computed in log space
+with stdlib only; plain `math.comb` × float overflowed at n ≈ 1000.
+
+**Decision rule.** Pre-registered in `docs/reference/review-effect.md`. With ≥ 20 counted reviews: if the
+upper bound of marginal yield is < 25% and the upper bound of seeded recall is < 50%, register a candidate
+task to make review opt-in. If the lower bound of escape miss is > 50%, register a candidate to reconsider
+fan-out. The rule is never reinterpreted after it fires.
+
+**Known limits.**
+- `accepted` is a decision, not a validated defect.
+- Escapes that are never fixed are invisible.
+- Rows only exist after the next release, because the rendered harness runs the released cache.
 <!-- @hm:/user:entries -->

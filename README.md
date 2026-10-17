@@ -519,7 +519,7 @@ After install, the rendered harness exposes commands under `/hm:*`:
 
 | Command | Purpose |
 |---|---|
-| `/hm:metrics` | Reflection metrics, read-only and never a gate: CFR + post-merge churn from local git, **plus token economics** — where a workflow's spend goes, per stage, classified by function (produce / verify / rework / carry) from Claude Code's own session transcripts. Deliberately reports NO cost-per-deliverable ratio: any such ratio makes verification spend look like waste |
+| `/hm:metrics` | Reflection metrics, read-only and never a gate: CFR + post-merge churn from local git, **plus token economics** — where a workflow's spend goes, per stage, classified by function (produce / verify / rework / carry) from Claude Code's own session transcripts. Deliberately reports NO cost-per-deliverable ratio: any such ratio makes verification spend look like waste. Also attributes post-merge fixes to the reviewed task that shipped them (`hm review_effect`, see `docs/reference/review-effect.md`) |
 | `/hm:health` | Two-layer harness audit. Absorbed the former `hm:ai-readiness` (3-layer readiness score + P0/P1/P2 ranked actions), `hm:personalization-audit` (composite Bronze/Silver/Gold/Platinum rubric from telemetry + harness.yaml + ProjectProfile), and `hm:refresh` (anti-rot crawl, manual confirm required) — written without a leading slash because they are no longer commands; see `docs/adr/0006-three-layer-health-audit.md`. Those three names no longer exist as commands. |
 
 ---

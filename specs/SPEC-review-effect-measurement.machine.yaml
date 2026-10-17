@@ -1,0 +1,733 @@
+schema_version: 3
+spec_slug: review-effect-measurement
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: REVIEW findings table parses into severity × disposition counts
+  type: parametric
+  test_ids:
+  - tests/unit/test_review_effect.py::test_ac_001_parse_review_golden
+  executable_predicate: null
+  golden_table:
+  - input:
+      file: '# REVIEW
+
+
+        ## Findings
+
+
+        | id | severity | file:line | finding | disposition | authority |
+
+        |---|---|---|---|---|---|
+
+        | F1 | P1 | a.py:3 | x | accepted | |
+
+        | F2 | P2 | b.py:9 | y | rejected | SPEC AC-002 |
+
+        | F3 | P2 | b.py:9 | y | duplicate | |
+
+        '
+    expected:
+      status: parsed
+      counts:
+        P1:
+          accepted: 1
+        P2:
+          rejected: 1
+          duplicate: 1
+      severe_accepted: 1
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      file: '# REVIEW
+
+
+        ## Findings
+
+
+        | id | severity | file:line | finding | resolution | disposition | authority
+        |
+
+        |---|---|---|---|---|---|---|
+
+        | F1 | **P1** | a.py | x | fixed | accepted | — |
+
+        | F2 | `P3` | b.py:2 | y | n/a | rejected | — |
+
+        '
+    expected:
+      status: parsed
+      counts:
+        P1:
+          accepted: 1
+        P3:
+          rejected: 1
+      severe_accepted: 1
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      file: '# REVIEW
+
+
+        ## Findings
+
+
+        | id | severity | file:line | finding | disposition | authority |
+
+        |---|---|---|---|---|---|
+
+        | F1 | high | a.py:3 | x | accepted | |
+
+        '
+    expected:
+      status: parsed
+      counts:
+        unrecognized:
+          accepted: 1
+      severe_accepted: 0
+      unrecognized_n: 1
+      stderr_warning: true
+    edge: false
+    note: ''
+  - input:
+      file: '# REVIEW
+
+
+        ## Findings
+
+
+        none — checked the parser and the land path
+
+        '
+    expected:
+      status: none
+      counts: {}
+      severe_accepted: 0
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      file: '# REVIEW
+
+
+        ## Verification
+
+
+        | id | severity | file:line | finding | disposition | authority |
+
+        |---|---|---|---|---|---|
+
+        | F1 | P0 | a.py:1 | x | accepted | |
+
+        '
+    expected:
+      status: unparseable
+      counts: {}
+      severe_accepted: 0
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected counts are hand-derived from the table contract at execute.md.j2:76
+    and from real post-0.64 REVIEW shapes (7-column, bold/backticked severity, 'none'
+    with trailing text), not from the parser.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: wrapup_land records one review row per landed task, under --base
+  type: parametric
+  test_ids:
+  - tests/integration/test_review_effect_land.py::test_ac_002_land_records_review_row
+  - tests/integration/test_review_effect_land.py::test_ac_002_unparseable_warns_once
+  executable_predicate: null
+  golden_table:
+  - input:
+      worktree_ne_base: true
+      files:
+      - REVIEW-foo-2026-10-17.md (1 accepted P1)
+    expected:
+      rows_under_base: 1
+      rows_under_worktree: 0
+      status: parsed
+      severe_accepted: 1
+    edge: false
+    note: ''
+  - input:
+      files: []
+    expected:
+      rows_under_base: 1
+      status: absent
+    edge: false
+    note: ''
+  - input:
+      files:
+      - REVIEW-foo-extra-2026-10-17.md (decoy, 1 accepted P0)
+      - REVIEW-foo-2026-10-16.md (none)
+      - REVIEW-foo-2026-10-17.md (1 accepted P2)
+    expected:
+      rows_under_base: 1
+      review_file: REVIEW-foo-2026-10-17.md
+      severe_accepted: 0
+    edge: false
+    note: ''
+  - input:
+      run_twice_via_already_present: true
+    expected:
+      rows_under_base: 1
+    edge: false
+    note: ''
+  rubric_id: null
+  note: Integration test in a tmp git repo with a real worktree.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Files, worktree/base split and rerun are planted by the tmp-repo
+    fixture; the row is read back from <base>'s jsonl, so the expected values are
+    known by construction.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: a ledger failure never changes the land outcome
+  type: property
+  test_ids:
+  - tests/integration/test_review_effect_land.py::test_ac_003_ledger_failure_never_changes_land
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the same land run with a working ledger; the comparison
+    needs no knowledge of the ledger code.
+  oracle_independence_waiver: null
+  input_domain: identical tmp repos; ledger path writable vs made unwritable (or the
+    append forced to raise)
+  transformation: run wrapup_land.run on each
+  expected_relation: rc_a == rc_b and tree(commit_a) == tree(commit_b) and receipt_b.steps.review_effect.status
+    == 'error'
+  preconditions: []
+  observable_output: wrapup_land exit code, landed commit tree, receipt JSON
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: escape-candidates lists post-review remediation commits with slug hints
+  type: parametric
+  test_ids:
+  - tests/integration/test_review_effect_git.py::test_ac_004_escape_candidates
+  - tests/integration/test_review_effect_git.py::test_ac_004_recorded_escape_is_not_listed_again
+  - tests/integration/test_review_effect_git.py::test_ac_004_hint_from_root_commit
+  - tests/integration/test_review_effect_git.py::test_ac_004_unreadable_ts_is_skipped
+  - tests/integration/test_review_effect_git.py::test_ac_004_hint_for_a_path_with_a_space
+  executable_predicate: null
+  golden_table:
+  - input:
+      commits:
+      - c1 adds specs/SPEC-bar.md + bar.py (committer 10:00)
+      - 'c2 fix: off-by-one in bar, modifies bar.py lines from c1 (committer 12:00)'
+      ledger: review row ts 11:00
+    expected:
+      candidates:
+      - c2
+      hint_slugs:
+        c2:
+        - bar
+    edge: false
+    note: ''
+  - input:
+      commits:
+      - 'fix: at 09:00'
+      ledger: review row ts 11:00
+    expected:
+      candidates: []
+    edge: false
+    note: ''
+  - input:
+      commits:
+      - 'fix: adds lines only (12:00)'
+      ledger: review row ts 11:00
+    expected:
+      candidates: 1
+      hint_slugs: []
+    edge: false
+    note: ''
+  - input:
+      ledger: absent
+    expected:
+      exit: 0
+      candidates: []
+      stderr_warning: true
+    edge: false
+    note: ''
+  - input:
+      ledger: earliest review row excluded by .ledger-exclusions.json
+    expected:
+      cutoff: earliest non-excluded ts
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Commits, committer dates, the introducing SPEC path and the ledger
+    rows are planted by the git fixture; candidates and hints are known by construction.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: escape records an attribution row
+  type: parametric
+  test_ids:
+  - tests/unit/test_review_effect.py::test_ac_005_escape_row
+  - tests/unit/test_review_effect.py::test_ac_005_short_sha_resolves_and_dedupes
+  - tests/unit/test_review_effect.py::test_ac_005_unresolvable_short_commit_exits_2
+  executable_predicate: null
+  golden_table:
+  - input:
+      verdict: escape
+      flagged: 'no'
+      reviewable: 'yes'
+    expected:
+      exit: 0
+      rows: 1
+    edge: false
+    note: ''
+  - input:
+      flagged: maybe
+    expected:
+      exit: 2
+      rows: 0
+    edge: false
+    note: ''
+  - input:
+      same_commit_twice: true
+    expected:
+      exit: 1
+      rows: 1
+    edge: false
+    note: ''
+  - input:
+      verdict: not-escape
+    expected:
+      exit: 0
+      rows: 1
+      listed_by_escape_candidates: false
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Allowed values are enumerated in the SPEC text, independent of
+    the implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Clopper-Pearson interval is exact
+  type: parametric
+  test_ids:
+  - tests/unit/test_review_effect.py::test_ac_006_clopper_pearson_golden
+  - tests/unit/test_review_effect.py::test_ac_006_clopper_pearson_brackets_the_point_estimate
+  - tests/unit/test_review_effect.py::test_ac_006_clopper_pearson_large_n_does_not_overflow
+  executable_predicate: null
+  golden_table:
+  - input:
+      k: 0
+      n: 10
+    expected:
+      lo: 0.0
+      hi: 0.3085
+    edge: false
+    note: ''
+  - input:
+      k: 1
+      n: 10
+    expected:
+      lo: 0.0025
+      hi: 0.445
+    edge: false
+    note: ''
+  - input:
+      k: 5
+      n: 10
+    expected:
+      lo: 0.1871
+      hi: 0.8129
+    edge: false
+    note: ''
+  - input:
+      k: 20
+      n: 20
+    expected:
+      lo: 0.8316
+      hi: 1.0
+    edge: false
+    note: ''
+  - input:
+      k: 0
+      n: 0
+    expected:
+      lo: 0.0
+      hi: 1.0
+    edge: false
+    note: ''
+  rubric_id: null
+  note: Plus a property sweep lo <= k/n <= hi for 0 <= k <= n <= 200.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Bounds are published exact binomial 95% values (standard tables
+    / R binom.test), computed outside this code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: report prints counts with intervals and applies exclusions
+  type: parametric
+  test_ids:
+  - tests/unit/test_review_effect.py::test_ac_007_report
+  - tests/unit/test_review_effect.py::test_ac_007_report_recall_status_and_format
+  executable_predicate: null
+  golden_table:
+  - input:
+      ledger: absent
+    expected:
+      exit: 0
+      marginal_yield: 0/0
+    edge: false
+    note: ''
+  - input:
+      ledger: review foo parsed severe=1; review baz none; review qux absent; review
+        zed unparseable; review foo again parsed severe=0 (later); escape verdict=escape
+        slug=baz flagged=no reviewable=yes; escape verdict=not-escape slug=baz; exclusion
+        slug=zed
+    expected:
+      marginal_yield: 0/2
+      escape_miss: 1/1
+    edge: false
+    note: ''
+  - input:
+      ledger: review x parsed severe=1; escape slug=x verdict=escape flagged=no reviewable=yes;
+        exclusion slug=x
+    expected:
+      marginal_yield: 0/0
+      escape_miss: 0/0
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Counts follow from hand-written ledger fixtures; the exclusion
+    file is authored by the test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: seed plants deterministic manifest-described defects inside the diff
+  type: property
+  test_ids:
+  - tests/integration/test_review_effect_git.py::test_ac_008_seed_is_deterministic_and_inside_the_diff
+  - tests/integration/test_review_effect_git.py::test_ac_008_seed_refuses_a_dirty_tree
+  - tests/integration/test_review_effect_git.py::test_ac_008_multiline_compare_is_a_candidate
+  - tests/integration/test_review_effect_git.py::test_ac_008_seed_preserves_file_mode
+  - tests/integration/test_review_effect_git.py::test_ac_008_seed_skips_a_symlinked_py_file
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: git diff --unified=0 between the pre-seed and post-seed trees is
+    an independent account of what changed.
+  oracle_independence_waiver: null
+  input_domain: tmp repo with 1..5 changed .py files between base and HEAD containing
+    Compare/BoolOp/int Constant nodes plus docstrings and unchanged context lines;
+    --count 1..5; --seed 0..50; clean and dirty trees
+  transformation: run seed, then git diff -U0 of the working tree against HEAD
+  expected_relation: dirty tree -> exit 1 and tree unchanged; clean -> set((m.file,
+    m.line) for m in manifest) == changed_lines(git diff -U0) and every (m.file, m.line)
+    is an added/modified line of diff(base, HEAD) and not in a docstring, and the
+    same seed twice yields identical manifests
+  preconditions: []
+  observable_output: manifest JSON and git diff -U0 of the seeded tree
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: score matches findings to seeds within a line window
+  type: parametric
+  test_ids:
+  - tests/unit/test_review_effect.py::test_ac_009_score_golden
+  - tests/unit/test_review_effect.py::test_ac_009_score_record_appends_recall_row
+  - tests/unit/test_review_effect.py::test_ac_009_score_rejects_malformed_manifest
+  executable_predicate: null
+  golden_table:
+  - input:
+      seeds:
+      - src/a.py:10
+      - src/a.py:40
+      - b.py:5
+      findings:
+      - a.py:12
+      - b.py:5
+      - c.py:1
+    expected:
+      hits: 2
+      seeded: 3
+    edge: false
+    note: ''
+  - input:
+      seeds:
+      - a.py:10
+      findings:
+      - a.py:14
+    expected:
+      hits: 0
+      seeded: 1
+    edge: false
+    note: ''
+  - input:
+      seeds:
+      - a.py:10
+      - a.py:11
+      findings:
+      - a.py:10
+    expected:
+      hits: 1
+      seeded: 2
+    edge: false
+    note: ''
+  - input:
+      seeds:
+      - a.py:10
+      - a.py:14
+      findings:
+      - a.py:12
+      - a.py:16
+    expected:
+      hits: 2
+      seeded: 2
+    edge: false
+    note: ''
+  - input:
+      seeds:
+      - a.py:10
+      findings:
+      - a.py:null
+      - xa.py:10
+    expected:
+      hits: 0
+      seeded: 1
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The window, suffix-at-slash and maximum-matching rules are stated
+    in the SPEC; expected hits are counted by hand (the 10/14 vs 12/16 row separates
+    greedy from maximum matching).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: /hm:metrics renders the escape-attribution step
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_effect_surfaces.py::test_ac_010_metrics_renders_escape_step
+  executable_predicate: all('review_effect escape-candidates' in t and 'review_effect
+    escape ' in t for t in rendered_metrics_variants)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The required command names are fixed by IRR-002, independent of
+    the template wording.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: step_sensitivity Step 6 carries a runnable measure_cmd
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_effect_surfaces.py::test_ac_011_step6_measure_cmd_runs
+  executable_predicate: 'entry(''execute'',''Step 6'').remeasure_on == (''model_release'',)
+    and entry(''execute'',''Step 6'').measure_cmd.startswith(''harness-maker: hm review_effect
+    report'') and run(strip_repo_prefix(entry(''execute'',''Step 6'').measure_cmd),
+    root=empty_dir).returncode == 0'
+  golden_table: []
+  rubric_id: null
+  note: Guards the measure-cmd-names-wrong-cli-verb failure by executing the command.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Running the named command is an external check that the measure_cmd
+    is real, not a string match alone.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: reference doc records the audit procedure and the pre-registered rule
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_effect_surfaces.py::test_ac_012_reference_doc_rule
+  executable_predicate: all(s in doc for s in (RULE_1_SENTENCE, RULE_2_SENTENCE, 'This
+    rule is never reinterpreted after it fires.', 'review_effect seed', 'code-reviewer',
+    'review_effect score', '--record', 'scratch worktree'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The two rule sentences are copied verbatim from the SPEC (fixed
+    by the DRI in round 2), so a swapped threshold fails.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: New local ledger <base>/.claude/observability/review-effect.jsonl, schema_version
+    1, events review/escape/recall (fields per SPEC 'Ledger rows')
+  category: schema/file format/storage layout
+  rationale: A reader is committed to the row shape; a later change needs a version
+    bump and a tolerant reader
+  source: spec
+- id: IRR-002
+  decision: New CLI contract hm review_effect {escape-candidates,escape,seed,score,report}
+  category: public API/CLI contract
+  rationale: Named from /hm:metrics prose, docs/reference/review-effect.md and step_sensitivity.measure_cmd
+  source: spec
+approval:
+  kind: human
+  content_hash: 86fb10ce049464dcc2c8f0f6f42bc2f0d9e26c652f024a42cb2114781e27b4bb
+  approved_by: Ecro
+  approved_at: '2026-10-17T03:13:50Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 051859e5308699e6b8407ae2b514e69cbc12335d16cac1060e807f3c1bb94a56
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: d6f4d9adc115ae53afe42b52b9c13bc8809495823a4a881a70fe65470790299e
+    AC-001: c3ec39b93c480ae53727090a332df6e94913d1a547e366b1d5d7bd77e9cefbd3
+    AC-002: d81611f5b854146d9d849d8b22bd7e792d189ffcf4cec8511c99aeec464f8ea4
+    AC-003: 14a82cb07cbd8bd8aa4931409c18fcc4275dc2e0b6ecb60e988c98c15ff8e179
+    AC-004: 2d85b307fc4b95dffa48713d97bcdadd37afb48ccf25ef5e4bed87acf23af9ad
+    AC-005: 18c69de653baf40a65f994be0deed9cc35b82e6ad56bdf5d816e66d524550bbd
+    AC-006: 0f1cff60983af854c371fdba1f0fb1227995e83b03a0f2013b2c0dc8e6ccfbc1
+    AC-007: 92de0be610384f69b6a4a4822138f574106d8a5a7533934bec09db01c71b9b47
+    AC-008: 9e5818573bcf9dae67e62b864fa5c4c71f07144fa08508e5825abf902eec05b4
+    AC-009: 11be56085a70ae439bdeefc8a791ce11fbb29501e188b0361cc52d6769fbf90e
+    AC-010: 5ff3be89b7e143b66e1d64d4a639e9d02884e131f30ea2bf1ea22a8b0b94bf33
+    AC-011: 408cb5ad6ddc3f1559ca2d388028de1bb07ccc6e6600613954303f497f9e61dd
+    AC-012: b08b4d313c167569c9d371d559b19fbe0ef347b44697a00cde62a81479688938
+    ac_order: 5d5b29b5dde25247a09577085a3501bfcfe37764c50920023e8933350c90e2aa

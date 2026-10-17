@@ -60,6 +60,7 @@ _DISPATCHABLE: frozenset[str] = frozenset(
         "review_churn",
         "review_run",
         "review_consensus",
+        "review_effect",
         "review_telemetry",
         "world",
         "intent",

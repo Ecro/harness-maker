@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from harness_maker import command_registry
+from harness_maker import command_registry, review_effect
 from harness_maker import worktree as wt
 from harness_maker.spec_machine import hold_lines, land_states
 
@@ -424,6 +424,15 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             f"{_UNDERSTANDING_WARN} {problem} (warning only — the commit is unaffected)",
             file=sys.stderr,
         )
+
+    # SPEC-review-effect-measurement AC-002/003: after the commit exists (both the created and
+    # the already-present path reach here) and before the pop. Best-effort: a ledger fault is
+    # recorded in the receipt and must never change what lands.
+    try:
+        receipt["steps"]["review_effect"] = review_effect.record_review(worktree, base, args.slug)
+    except Exception as exc:  # noqa: BLE001 — measurement must not fail the land
+        receipt["steps"]["review_effect"] = {"status": "error", "detail": str(exc)[:300]}
+        print(f"review_effect: not recorded ({exc}) — the land is unaffected", file=sys.stderr)
 
     owned = wt._owned_crumb_read(base, args.slug)
     receipt["steps"]["owned_uuids"] = sorted(owned)

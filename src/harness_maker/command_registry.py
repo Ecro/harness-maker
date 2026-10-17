@@ -104,6 +104,9 @@ MODULES: dict[str, ModuleSpec] = {
         "subparser", _s("emit", "persist-payload", "coherence", "reconcile")
     ),
     "delivery_metrics": ModuleSpec("subparser", _s("candidates", "adjudicate", "compute", "trend")),
+    "review_effect": ModuleSpec(
+        "subparser", _s("escape-candidates", "escape", "seed", "score", "report")
+    ),
     "economics": ModuleSpec("subparser", _s("report", "stages", "doctor", "composition")),
     "high_diff": ModuleSpec("subparser", _s("classify")),
     "iter_receipts": ModuleSpec(

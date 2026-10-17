@@ -28,7 +28,7 @@ files:
   body_sha256: 63ddebdb8a90b44830aa62bd7c8a257398665b046e1440b4b08b400deac8c31d
 - path: commands/hm/metrics.md
   template: commands/hm/metrics.md.j2
-  body_sha256: 88c4eb0ed405a4c35b0fd91951bf49de501cf765042f5934967a9c505a5f28cf
+  body_sha256: ae09e93d63af7af5c7c248ae50a865c2c9e642b8018896096392ad248d1e59f6
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 80d4e14700b4005d97ba0e5785338039654d59a8eddfa21a2fd89a5ece4c4a76

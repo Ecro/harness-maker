@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`hm review_effect`: measure what the one review catches and misses** (SPEC-review-effect-measurement).
+  `wrapup_land` records one `review` row per landed task into `<base>/.claude/observability/review-effect.jsonl`,
+  parsed from the REVIEW `## Findings` table. This is best-effort, and a ledger fault never changes the land.
+  The verbs are:
+  - `escape-candidates` / `escape`: attribute post-merge fixes to the task that shipped the defect. Run them
+    from `/hm:metrics` Step 1.4.
+  - `seed` / `score`: a seeded-defect recall audit.
+  - `report`: raw `k/n [lo, hi]` with exact Clopper-Pearson intervals.
+
+  The execute Step 6 registry entry now carries this `measure_cmd` (`remeasure_on: model_release`).
+  `docs/reference/review-effect.md` holds the audit procedure and the pre-registered decision rule.
+
 ## [0.64.0] - 2026-10-16
 
 Overhaul phase 1, PR-S (SPEC-hm-overhaul-p1): seven stages become four.

@@ -198,6 +198,9 @@ REGISTRY: tuple[StepEntry, ...] = (
         knob="reviewers.max_review_rounds",
         source_kind="yaml",
         ordering="le",
+        # SPEC-review-effect-measurement: marginal yield, escape miss and seeded recall.
+        remeasure_on=("model_release",),
+        measure_cmd="harness-maker: hm review_effect report --root .",
     ),
     # ── wrapup ─────────────────────────────────────────────────────────────
     _u("wrapup", "Step 1", "INV", "verify Check 2", note="pre-flight"),

@@ -9,6 +9,7 @@ Read-only and local: change failure rate (rolling {{ config.delivery_metrics.cfr
 1. `hm delivery_metrics candidates --root .` lists fix commits the heuristics cannot classify. Read each with `git show <sha>` and judge it `remediation` (it repairs what the release shipped broken) or `routine`, from the content and not the subject. Record it: `hm delivery_metrics adjudicate --root . --commit <sha> --release <ref> --verdict <remediation|routine> --reason "<line>"`.
 2. `hm delivery_metrics compute --root .`. Exit 3 means candidates are pending: go back to 1. Never pass `--assume-routine` here.
 3. `hm delivery_metrics trend --root . --limit 12`: a table, newest first, with raw counts (`failed/total`, `churned/added`), never a bare percentage, and the delta against the previous snapshot. Churn lags by the maturation window.
+4. `hm review_effect escape-candidates --root .` lists fix commits since the first recorded review, with hint slugs. Judge each from `git show <sha>` and the hinted task's REVIEW: `hm review_effect escape --root . --commit <sha> --verdict <escape|not-escape> --introduced-by <slug|unknown> --flagged <yes|no|not-reviewed|unknown> --reviewable <yes|no|unknown> --reason "<line>"` (flagged: its REVIEW named it; reviewable: its diff and SPEC showed it). Then `hm review_effect report --root .`.
 
 ## Step 2 — Spend
 
