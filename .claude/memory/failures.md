@@ -801,7 +801,7 @@ Rewording a template sentence in wrapup.md.j2 broke an already-landed test that 
 Adding a field to the AcceptanceCriterion model (spec-ac-superseded) and a new spec_machine CLI subparser each tripped an enforced gate that only the full suite exercises: test_spec_approval's _DENY/_REPLACEMENTS/independent-hash list must name the new field (test_ac_002_every_model_field_has_a_mutation), and a CLI subparser needs a command_registry.py entry (test_command_surface_gate). The task's own tests were green. Prevention: when adding a model field or CLI verb, grep tests/ for the sibling field list and the command registry before the full run.
 ## [fail:other] delegate-brief-invented-receipt-schema | 2026-10-04 | count:1
 Wrapup stage-delegate brief was given a receipt schema invented by the main loop (id and evidence fields) instead of the schema in the stage-delegate prompt. `wrapup_receipt` parses under a strict schema where one unrecognised key rejects the whole reply, so the receipt came back unparseable and the delegated work could not be reconciled (exit 2, inline fallback). Fix: never restate or extend the receipt shape in the dispatch instruction; pass the brief verbatim plus the stage's own one-line instruction, and let the delegate's prompt own the schema.
-## [fail:test] offline-gate-blocked-by-bench-pypi | 2026-10-17 | count:1
+## [fail:test] offline-gate-blocked-by-bench-pypi | 2026-10-17 | count:2
 `hm check --slug <s>` cannot reach exit 0 on a machine without PyPI access.
 
 **Symptom.** Its `gates` section runs the CI pytest command with `-x`. `tests/unit/test_bench_light_lane.py`
@@ -822,4 +822,5 @@ on 2026-10-17 in review-effect-measurement.
 - Report the gate as exit 1, never as a pass.
 - Real fix (not filed): mark the bench-arm tests `INTEGRATION=1`, or skip them when PyPI is unreachable, so
   the gate stops depending on network.
+- [2026-10-17] Correction 2026-10-17: not machine-local. GitHub CI on main fails the same test the same way (runs 38995584886/38996311820 for #40/#41: 'tunnel error ... dns error' fetching typer), so the bench hm arm is broken on main in every environment, not only offline ones. Fix the test (or gate it behind INTEGRATION=1) rather than treating the red as environmental.
 <!-- @hm:/user:entries -->
