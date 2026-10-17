@@ -4,7 +4,7 @@ harness_maker_version: 0.65.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: d43160052618815c6fecb0a2f863eb5e3ac670ce9d2807768aa20b1af0012e8d
+content_hash: cd3500cb92760a83880494cd9ef8b8678a720534aacdc2ce686c6014cda38938
 ---
 preset: Production
 locale: ko
@@ -95,46 +95,25 @@ reviewers:
 
   installed:
     - code-reviewer
-    - security-reviewer
-    - security-auditor
-    - performance-reviewer
-    - ux-reviewer
-    - concurrency-reviewer
     - consensus-arbiter
-    - executor
-    - autoloop-coder
-    - test-reviewer
   enabled:
     - code-reviewer
-    - security-reviewer
 
 skills:
   installed:
-    - verify-before-completion
-    - autoloop-driver
     - ai-readiness-rubric
     - agent-quality-rubric
-    - conditional-router
     - worktree-isolator
-    - security-scanner
     - context-linter
-    - refdocs-search
     - second-opinion-gate
     - intent-layer
     - targeted-test-selection
     - project-knowledge
   enabled:
-    - verify-before-completion
-    - autoloop-driver
     - ai-readiness-rubric
     - agent-quality-rubric
-    - conditional-router
-    - relevance-filter
     - worktree-isolator
-    - security-scanner
     - context-linter
-    - research-crawler
-    - refdocs-search
     - second-opinion-gate
     - intent-layer
 
@@ -179,7 +158,7 @@ economics:
   span_max_turns: 400
   span_max_min: 240.0
 delegation:
-  stages: ["wrapup", "verify"]
+  stages: ["wrapup"]
 loop:
   # Retired in 0.64.0: the loop commands no longer render, so this key is inert.
   enabled: false
@@ -193,8 +172,8 @@ autonomy:
   step_cap: 20
   time_cap_min: 300
   extra_deny: []
-  autopilot_persistent: true
+  autopilot_persistent: false
 instrumentation:
   # harness-maker's own development telemetry. false = this project stops emitting
   # stage_agent_ledger rows AND leaves the cross-project denominator.
-  stage_agent_ledger: true
+  stage_agent_ledger: false
