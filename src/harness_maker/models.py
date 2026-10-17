@@ -94,6 +94,12 @@ class AtomicStage(str, Enum):  # noqa: UP042
 #: `tests/structural/test_retired_stage_single_reader.py` fails if a new call site does not.
 RETIRED_STAGES: frozenset[str] = frozenset({"plan"})
 
+#: No longer stages since 0.64.0 (SPEC-hm-overhaul-p1): review runs inside `/hm:execute` and
+#: verification is `hm check` inside `/hm:wrapup`. Still `AtomicStage` members for the retired
+#: autopilot CLI that parses them (synthesize `_ATOMIC_STAGES`), so they cannot join
+#: `RETIRED_STAGES`, but a pipeline drops them the same way.
+FOLDED_STAGES: frozenset[str] = frozenset({"review", "verify"})
+
 
 def drop_retired_stages(raw: list[object]) -> tuple[list[str], list[str]]:
     """Split a raw `autonomy.pipeline` into (surviving names, retired names dropped).
@@ -106,7 +112,7 @@ def drop_retired_stages(raw: list[object]) -> tuple[list[str], list[str]]:
     dropped: list[str] = []
     for item in raw:
         name = item if isinstance(item, str) else str(item)
-        (dropped if name in RETIRED_STAGES else kept).append(name)
+        (dropped if name in RETIRED_STAGES or name in FOLDED_STAGES else kept).append(name)
     return kept, dropped
 
 
@@ -1038,8 +1044,6 @@ class AutonomyConfig(BaseModel):
             AtomicStage.RESEARCH,
             AtomicStage.SPEC,
             AtomicStage.EXECUTE,
-            AtomicStage.REVIEW,
-            AtomicStage.VERIFY,
             AtomicStage.WRAPUP,
         ],
     )

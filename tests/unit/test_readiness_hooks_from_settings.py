@@ -20,7 +20,8 @@ from typing import Any
 
 import pytest
 
-from harness_maker.readiness import _dim_guardrails
+from harness_maker.models import Preset
+from harness_maker.readiness import _dim_guardrails, compute_readiness
 
 _HOOK_SIGNALS = ("hooks_json_present", "hooks_defined", "sessionid_envfile_registered")
 
@@ -41,9 +42,7 @@ def _cmd(mod: str) -> dict[str, str]:
 def _full_hooks() -> dict[str, Any]:
     return {
         "PostToolUse": [{"matcher": "*", "hooks": [_cmd("telemetry")]}],
-        "SessionStart": [
-            {"hooks": [_cmd("hooks.sessionid_envfile"), _cmd("hooks.autopilot_autoarm")]}
-        ],
+        "SessionStart": [{"hooks": [_cmd("hooks.sessionid_envfile")]}],
     }
 
 
@@ -74,17 +73,31 @@ def test_sessionid_signal_fails_when_settings_lost_the_sessionstart_hook(tmp_pat
     assert _sig(tmp_path, "sessionid_envfile_registered").passed is False
 
 
-def test_autoarm_signal_fails_when_persistent_and_settings_lost_the_hook(tmp_path: Path) -> None:
-    """Same, for autopilot_autoarm — gated on `autonomy.autopilot_persistent: true`."""
-    claude = tmp_path / ".claude"
-    claude.mkdir(parents=True, exist_ok=True)
-    (claude / "harness.yaml").write_text(
-        "---\ngenerated_by: harness-maker\n---\nautonomy:\n  autopilot_persistent: true\n"
+def _failing_ids(project_dir: Path, *, persistent: bool) -> set[str]:
+    (project_dir / ".claude" / "harness.yaml").write_text(
+        "---\ngenerated_by: harness-maker\n---\n"
+        f"autonomy:\n  autopilot_persistent: {str(persistent).lower()}\n",
+        encoding="utf-8",
     )
-    hooks = _full_hooks()
-    hooks["SessionStart"] = [{"hooks": [_cmd("hooks.sessionid_envfile")]}]  # autoarm dropped
-    _write_settings(tmp_path, hooks)
-    assert _sig(tmp_path, "autopilot_autoarm_registered").passed is False
+    result = compute_readiness(project_dir, Preset.PRODUCTION)
+    return {s.id for d in result.dimensions.values() for s in d.signals if not s.passed}
+
+
+def test_ac_001_autoarm_signal_is_retired(tmp_path: Path) -> None:
+    """SPEC-retire-autopilot-remnants AC-001: `autopilot_persistent` is inert since 0.64.0.
+
+    The autoarm hook is no longer rendered, so no re-render can satisfy a check for it. The
+    failing-set comparison also catches the same check kept under another id.
+    """
+    _write_settings(tmp_path, _full_hooks())
+    on = _failing_ids(tmp_path, persistent=True)
+    all_ids = {
+        s.id
+        for d in compute_readiness(tmp_path, Preset.PRODUCTION).dimensions.values()
+        for s in d.signals
+    }
+    assert "autopilot_autoarm_registered" not in all_ids
+    assert on == _failing_ids(tmp_path, persistent=False)
 
 
 def test_signals_fail_when_settings_has_no_hooks_key_at_all(tmp_path: Path) -> None:

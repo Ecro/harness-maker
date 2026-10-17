@@ -18,9 +18,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from harness_maker import autopilot
-from harness_maker.models import AutonomyConfig
+from harness_maker.models import AtomicStage
 
 _SESSION = "b2-ask-session"
+# The 0.62 six-stage pipeline the retired autopilot library was built around, written out:
+# `AutonomyConfig().pipeline` is four stages since review / verify folded (0.64.0).
+_PIPELINE = [AtomicStage(s) for s in ("research", "spec", "execute", "review", "verify", "wrapup")]
 
 
 def _yaml(root: Path, level: str) -> None:
@@ -43,7 +46,7 @@ def test_a_marker_answers_the_question(tmp_path: Path) -> None:
     autopilot.write(
         tmp_path,
         level="auto_full",
-        pipeline=list(AutonomyConfig().pipeline),
+        pipeline=_PIPELINE,
         claude_session_id=_SESSION,
     )
     assert autopilot.effective_level(tmp_path, yaml_level="ask", session_id=_SESSION) == "auto_full"
@@ -61,7 +64,7 @@ def test_status_is_armed_once_the_session_answers(tmp_path: Path) -> None:
     autopilot.write(
         tmp_path,
         level="auto_safe",
-        pipeline=list(AutonomyConfig().pipeline),
+        pipeline=_PIPELINE,
         claude_session_id=_SESSION,
     )
     out = autopilot.status(tmp_path, session_id=_SESSION)

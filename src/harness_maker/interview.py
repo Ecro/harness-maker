@@ -1561,11 +1561,14 @@ def _parse_autonomy(value: object) -> AutonomyConfig:
         if dropped:
             logger.warning(
                 "harness.yaml autonomy.pipeline names retired stage(s) %s → dropped. The PLAN "
-                "document is now written by /hm:execute Step 0; re-render via "
+                "document is written by /hm:execute Step 0, review runs inside /hm:execute and "
+                "verification is `hm check` inside /hm:wrapup; re-render via "
                 "/harness-maker:make to persist the new pipeline.",
                 ", ".join(sorted(set(dropped))),
             )
-            value = {**value, "pipeline": kept}
+            # A pipeline that named only retired stages states no surviving intent; an empty
+            # list would persist on re-render as a pipeline of nothing.
+            value = {**value, "pipeline": kept or [s.value for s in AutonomyConfig().pipeline]}
     raw_level = value.get("level")
     if isinstance(raw_level, str) and raw_level in LEGACY_LEVEL_ALIASES:
         # The `--update` advisory. The re-render WRITES the new spelling, so without a line

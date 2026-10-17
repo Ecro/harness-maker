@@ -19,6 +19,7 @@ from pydantic import ValidationError
 
 from harness_maker import autopilot, autopilot_caps, spec_machine
 from harness_maker.models import (
+    AtomicStage,
     AutonomyConfig,
     InterviewAnswers,
     Preset,
@@ -28,7 +29,9 @@ from harness_maker.models import (
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
-_PIPELINE = list(AutonomyConfig().pipeline)
+# The 0.62 six-stage pipeline the retired autopilot library was built around, written out:
+# `AutonomyConfig().pipeline` is four stages since review / verify folded (0.64.0).
+_PIPELINE = [AtomicStage(s) for s in ("research", "spec", "execute", "review", "verify", "wrapup")]
 
 
 def _arm(
@@ -157,7 +160,7 @@ def test_unlimited_run_terminates_within_pipeline_length(
     terminated = False
     for _ in range(len(stages) + 1):
         # `--judgment-gate clear` because this test walks a CLEAN pipeline: B3 made the flag
-        # fail-closed, so an omitted flag halts at plan and review by design, and this loop
+        # fail-closed, so an omitted flag halts at spec and review by design, and this loop
         # is asserting termination-by-pipeline-length, not gate behaviour.
         autopilot_caps.main(
             [

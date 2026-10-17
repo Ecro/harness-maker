@@ -23,9 +23,12 @@ import pytest
 from harness_maker import autopilot, autopilot_ledger
 from harness_maker.hooks.autopilot_autoarm import arm_if_persistent
 from harness_maker.interview import _parse_autonomy
-from harness_maker.models import ARMED_LEVELS, OPERATIONAL_LEVELS, AutonomyConfig
+from harness_maker.models import ARMED_LEVELS, OPERATIONAL_LEVELS, AtomicStage, AutonomyConfig
 
 _SESSION = "b1-matrix-session"
+# The 0.62 six-stage pipeline the retired autopilot library was built around, written out:
+# `AutonomyConfig().pipeline` is four stages since review / verify folded (0.64.0).
+_PIPELINE = [AtomicStage(s) for s in ("research", "spec", "execute", "review", "verify", "wrapup")]
 
 
 def _write_yaml(root: Path, *, level: str, persistent: bool) -> None:
@@ -50,7 +53,7 @@ def test_a_marker_written_by_an_older_version_still_loads(tmp_path: Path) -> Non
     autopilot.write(
         tmp_path,
         level="auto_safe",
-        pipeline=list(AutonomyConfig().pipeline),
+        pipeline=_PIPELINE,
         claude_session_id=_SESSION,
     )
     path = autopilot.marker_path(tmp_path, session_id=_SESSION)

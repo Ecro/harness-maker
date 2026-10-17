@@ -43,7 +43,7 @@ files:
   body_sha256: 3bddfb46474964d5c07476c8b9973148c9586ae58e8c14bf58b3a5b102080ab4
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
-  body_sha256: f295e822ef5766a50608e4ab2d990d9e97ed9f9b79c10116a476895d51c962eb
+  body_sha256: 620dc878ad6f728a05c4ee2ed8a9bb36b3ff4456034b9808971f799b1f92c698
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: 66df0bc5b3506d8f8b4b05c7a60690a6f8651a6493659a0b7545c2322aa7c73f

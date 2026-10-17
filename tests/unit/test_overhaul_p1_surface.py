@@ -570,7 +570,9 @@ _ROWS: list[tuple[tuple[str, ...], str, Callable[[str], bool], str]] = [
     (("opt-ins",), "wrapup", lambda t: "stage-delegate" in t, "delegation block"),
     (("opt-ins",), "execute", lambda t: "hm second_opinion_invoke" in t, "second-opinion block"),
     (tuple(ARMS), "research", lambda t: "optional" in t, "research is optional"),
-    (tuple(ARMS), "*", lambda t: "autopilot" not in t, "no auto-advance"),
+    # The install path is the checkout's, not template text; a worktree named for a task can
+    # contain the word.
+    (tuple(ARMS), "*", lambda t: "autopilot" not in _INSTALL_REF.sub("", t), "no auto-advance"),
 ]
 
 

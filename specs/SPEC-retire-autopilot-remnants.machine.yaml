@@ -1,0 +1,183 @@
+schema_version: 3
+spec_slug: retire-autopilot-remnants
+parent_spec: SPEC-hm-overhaul-p1
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: readiness emits no autopilot_autoarm_registered signal
+  type: mechanical
+  test_ids:
+  - tests/unit/test_readiness_hooks_from_settings.py::test_ac_001_autoarm_signal_is_retired
+  executable_predicate: all(s.id != 'autopilot_autoarm_registered' for s in signals(persistent=True))
+    and failing_ids(persistent=True) == failing_ids(persistent=False)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: SPEC-hm-overhaul-p1 (Constraints Config row and IRR-005) makes
+    autonomy.autopilot_persistent inert and retires the autopilot_autoarm hook; the
+    expected absence comes from that approved document, not from readiness.py.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the default pipeline is the four rendered stages
+  type: mechanical
+  test_ids:
+  - tests/unit/test_autonomy_config.py::test_ac_002_default_and_preset_fallbacks_match_the_rendered_stages
+  executable_predicate: '[s.value for s in AutonomyConfig().pipeline] == synthesize._ATOMIC_STAGES
+    and set(discover_preset_fallbacks(root)) == set(PRESET_FILES) and all(tuple(v)
+    == tuple(synthesize._ATOMIC_STAGES) for v in discover_preset_fallbacks(root).values())'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: synthesize._ATOMIC_STAGES is the render list fixed by SPEC-hm-overhaul-p1
+    AC-004, a separate source from the AutonomyConfig default and the preset templates
+    under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: a legacy pipeline drops plan/review/verify once
+  type: property
+  test_ids:
+  - tests/unit/test_atomic_stage_plan_retirement.py::test_ac_003_legacy_pipeline_drops_retired_names_once
+  executable_predicate: parsed(legacy).pipeline == (removed(legacy) or FOUR) and other_fields(parsed(legacy))
+    == other_fields(legacy) and advisories(first) == 1 and advisories(second) == 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation (order-preserving removal, other fields preserved,
+    default when empty, one advisory then silence) is stated in the SPEC from the
+    plan-retirement precedent and the DRI's round-3 answer; the test computes the
+    expected list with its own filter, not drop_retired_stages.
+  oracle_independence_waiver: null
+  input_domain: any order-preserving subsequence (empty included) of research, spec,
+    execute, wrapup, with a non-empty set of plan, review, verify inserted at arbitrary
+    positions; level in gated, auto_safe, ask; step_cap and time_cap_min positive
+    ints or null; extra_deny a short list of strings
+  transformation: interview._parse_autonomy applied to the legacy block, then again
+    to the migrated result
+  expected_relation: first result's pipeline equals the input with plan/review/verify
+    removed (the four-stage default when that is empty), every other autonomy field
+    equals the input's, exactly one advisory; the second load returns the same config
+    and logs no advisory
+  preconditions: []
+  observable_output: the parsed AutonomyConfig's pipeline and level, and the interview
+    logger's advisory lines on each load
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: the migration persists through a render
+  type: mechanical
+  test_ids:
+  - tests/unit/test_atomic_stage_plan_retirement.py::test_ac_005_migration_persists_through_a_render
+  executable_predicate: all(not ({'plan', 'review', 'verify'} & set(written_pipeline(preset)))
+    and advisories(load(written(preset))) == 0 for preset in ('Side', 'Production'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected on-disk state is fixed by the SPEC's Outcome 3 and
+    IRR-001, and the test reads the bytes the harness-yaml template actually wrote,
+    not the parsed object.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: this repo's CLAUDE.md (and AGENTS.md when present) carries the locale marker
+  type: mechanical
+  test_ids:
+  - tests/structural/test_repo_output_language.py::test_ac_004_repo_root_files_carry_the_output_language_directive
+  executable_predicate: signal(compute_readiness(REPO, Preset.PRODUCTION), 'output_language_present').passed
+    is True and MARKER in (REPO / 'CLAUDE.md').read_text()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Outcome 4 names the readiness signal itself as the observable;
+    the test runs it on the repo's committed CLAUDE.md and AGENTS.md, so a marker
+    or anchor-rule change in readiness is exercised rather than duplicated.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: A re-render rewrites a user's autonomy.pipeline without review / verify
+    (one advisory on the migrating load)
+  category: data migration
+  rationale: Once re-rendered the names are gone and restoring the filter does not
+    bring them back; impact is nil because only the retired autopilot reads pipeline.
+  source: spec
+approval:
+  kind: human
+  content_hash: 69f3a0bc98f91da26b084acb11e03d08c2349affee1d372a3faa4f7e6a22c500
+  approved_by: Ecro
+  approved_at: '2026-10-17T13:14:57Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: e2816a22a6987c43821df206ab51b949a29cce5f2b03fbbe7cb04c263502ed92
+    parent_spec: 8e80013b9c7d06fd05950be5a39625bcf47422620ebdb47280500ebad12ba858
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 5bd962885be9d45577da7775280ab4cbe49c6c3b79ec11d215e941a2b1301af3
+    AC-001: 64ae7b0d3ef179656cb6b11640f6cfacde072b214bc13c27036493c9c864df10
+    AC-002: 60fab01f1d6158ad1ea4fb1cdf8dc2a0b284d1e5b233667b84b6edd26f90e7fc
+    AC-003: 6853d3bc1726585822c6ae0f1977b1833006700e81691f346d3b80bf97edad51
+    AC-005: 7e5edf643547002615c56ac70f3da808bf63f4553312d971da19e9db8541ad0f
+    AC-004: ff62c38b8953bcf124dbd194d11aa5d6ab76f853ce5062414c2f3fd942bdd364
+    ac_order: f2ff767e0f6cdeba0641bafaec4e232622b66961829ce352e38f04030bc1904d
+  lane: full

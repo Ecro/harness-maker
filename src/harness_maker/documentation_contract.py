@@ -116,8 +116,8 @@ def default_source_contract(root: Path) -> SourceContract:
     mechanism_data = json.loads((root / MECHANISM_FIXTURE).read_text(encoding="utf-8"))
     return SourceContract(
         version=versions["pyproject.toml"],
-        # The stages that render (0.64.0), not `AutonomyConfig().pipeline`: that default still
-        # names `review` / `verify` for the retired autopilot library and is inert.
+        # The stages that render (0.64.0). `AutonomyConfig().pipeline` matches them, but it is
+        # inert config; the render list is what a document has to agree with.
         pipeline=tuple(_ATOMIC_STAGES),
         agents=agents,
         skills=skills,

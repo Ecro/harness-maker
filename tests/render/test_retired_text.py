@@ -116,7 +116,10 @@ def test_ac_001_touched_renders_have_no_retired_token(
     for rel in TOUCHED:
         path = root / rel
         assert path.is_file(), f"{rel} not rendered"
-        found = sorted({m.group(0).lower() for m in RETIRED.finditer(path.read_text("utf-8"))})
+        # The rendered install path is the checkout's, and a task worktree's name can
+        # contain a retired token.
+        text = path.read_text("utf-8").replace(str(HEAD_SRC.parent), "")
+        found = sorted({m.group(0).lower() for m in RETIRED.finditer(text)})
         if found:
             hits[rel] = found
     assert hits == {}
@@ -245,4 +248,4 @@ def test_ac_004_maker_grants_and_runs_nothing_of_autopilot(
     frontmatter = text.split("\n---\n", 1)[0]
     if "allowed-tools" in frontmatter or rel.startswith(".claude/"):
         assert _allowed_tools(text) == want
-    assert "autopilot" not in text.lower()
+    assert "autopilot" not in text.replace(str(HEAD_SRC.parent), "").lower()

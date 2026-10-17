@@ -22,14 +22,22 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
 from harness_maker import interview
-from harness_maker.models import AtomicStage, AutonomyConfig
+from harness_maker.interview import answers_from_harness_yaml
+from harness_maker.io_utils import load_harness_yaml
+from harness_maker.models import AtomicStage, AutonomyConfig, ProjectProfile
+from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.synthesize import synthesize
 
-_SURVIVING = ["research", "spec", "execute", "review", "verify", "wrapup"]
+_SURVIVING = ["research", "spec", "execute", "wrapup"]
+#: Folded into execute / wrapup in 0.64.0 but still enum members for the retired autopilot CLI.
+_FOLDED = ["review", "verify"]
 
 
 class _Collect(logging.Handler):
@@ -119,7 +127,7 @@ def test_ac_004_second_load_is_silent(position: int, level: str) -> None:
 
 
 def test_ac_004_atomic_stage_no_longer_admits_plan() -> None:
-    """The enum member is gone and the six survivors are intact.
+    """The enum member is gone and the six members (four stages + two folded) are intact.
 
     Membership and ORDER are asserted separately on purpose. The enum's declaration order
     (`… WRAPUP, VERIFY`) is arbitrary; the pipeline's order (`… verify, wrapup`) is semantic.
@@ -131,11 +139,87 @@ def test_ac_004_atomic_stage_no_longer_admits_plan() -> None:
         f"AtomicStage still admits `plan`: {values}. IRR-001 removes the stage; leaving the "
         "enum member keeps a pipeline entry that renders to nothing."
     )
-    assert set(values) == set(_SURVIVING), f"the surviving stage SET drifted: {values}"
+    assert set(values) == {*_SURVIVING, *_FOLDED}, f"the surviving stage SET drifted: {values}"
     assert not hasattr(AtomicStage, "PLAN"), "AtomicStage.PLAN is still importable"
 
 
 def test_ac_004_default_pipeline_keeps_its_semantic_order() -> None:
-    """The shipped default runs verify before wrapup, and no longer names `plan`."""
+    """The shipped default is the four rendered stages, and names no retired or folded one."""
     default = [s.value for s in AutonomyConfig().pipeline]
     assert default == _SURVIVING, f"the default pipeline order drifted: {default}"
+
+
+_RETIRED_OR_FOLDED = ("plan", *_FOLDED)
+_ADVISORY = "autonomy.pipeline names retired stage"
+
+
+def _advisories(handler: _Collect) -> list[str]:
+    return [m for m in handler.messages if _ADVISORY in m]
+
+
+@st.composite
+def _legacy_autonomy(draw: st.DrawFn) -> dict[str, object]:
+    """A 0.62 block: any subsequence of the live stages with retired names spliced in."""
+    base = [s for s in _SURVIVING if draw(st.booleans())]
+    retired = draw(
+        st.lists(st.sampled_from(_RETIRED_OR_FOLDED), min_size=1, max_size=3, unique=True)
+    )
+    pipeline = list(base)
+    for name in retired:
+        pipeline.insert(draw(st.integers(min_value=0, max_value=len(pipeline))), name)
+    cap = st.one_of(st.none(), st.integers(min_value=1, max_value=500))
+    return {
+        "level": draw(st.sampled_from(["gated", "auto_safe", "ask"])),
+        "pipeline": pipeline,
+        "step_cap": draw(cap),
+        "time_cap_min": draw(cap),
+        "extra_deny": draw(
+            st.lists(st.sampled_from(["Bash(rm -rf:*)", "Bash(terraform destroy:*)"]), unique=True)
+        ),
+        "autopilot_persistent": draw(st.booleans()),
+    }
+
+
+@given(legacy=_legacy_autonomy())
+def test_ac_003_legacy_pipeline_drops_retired_names_once(legacy: dict[str, object]) -> None:
+    """SPEC-retire-autopilot-remnants AC-003: order-preserving removal, nothing else moves."""
+    raw = legacy["pipeline"]
+    assert isinstance(raw, list)
+    removed = [s for s in raw if s not in _RETIRED_OR_FOLDED]
+    with _captured() as first:
+        parsed = interview._parse_autonomy(legacy)
+
+    assert [s.value for s in parsed.pipeline] == (removed or _SURVIVING)
+    dumped = parsed.model_dump(mode="json")
+    for key in ("level", "step_cap", "time_cap_min", "extra_deny", "autopilot_persistent"):
+        assert dumped[key] == legacy[key], key
+    assert len(_advisories(first)) == 1, first.messages
+
+    with _captured() as second:
+        again = interview._parse_autonomy(dumped)
+    assert again == parsed
+    assert _advisories(second) == [], "the migrated pipeline still triggers an advisory"
+
+
+@pytest.mark.parametrize("preset", ["Side", "Production"])
+def test_ac_005_migration_persists_through_a_render(tmp_path: Path, preset: str) -> None:
+    """SPEC-retire-autopilot-remnants AC-005: the written harness.yaml, not the parsed object."""
+    legacy = tmp_path / "legacy.yaml"
+    legacy.write_text(
+        "---\ngenerated_by: harness-maker\n---\n"
+        f"preset: {preset}\nlocale: en\ntargets: [claude-code]\n"
+        "autonomy:\n  level: auto_safe\n"
+        "  pipeline: [research, spec, plan, execute, review, verify, wrapup]\n",
+        encoding="utf-8",
+    )
+    answers = answers_from_harness_yaml(legacy)
+    assert answers is not None
+    out = tmp_path / "out"
+    render(synthesize(ProjectProfile(), answers), out, freeze_time=DEFAULT_FREEZE_TIME)
+    written = out / "harness.yaml"
+
+    pipeline = load_harness_yaml(written)["autonomy"]["pipeline"]
+    assert not set(_RETIRED_OR_FOLDED) & set(pipeline), pipeline
+    with _captured() as handler:
+        assert answers_from_harness_yaml(written) is not None
+    assert _advisories(handler) == []

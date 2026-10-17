@@ -9,12 +9,13 @@ from pathlib import Path
 import pytest
 
 from harness_maker import autopilot, autopilot_caps, autopilot_ledger
-from harness_maker.models import AutonomyConfig
+from harness_maker.models import AtomicStage
 
-# Canonical default order (verify BEFORE wrapup) — one source of truth with the e2e +
-# autonomy_config tests, NOT list(AtomicStage) whose enum order the P1-4 fix declared wrong.
-_PIPELINE = list(AutonomyConfig().pipeline)
-_STAGES = [s.value for s in _PIPELINE]
+# The 0.62 six-stage order (verify BEFORE wrapup) the retired autopilot library was built
+# around, written out: `AutonomyConfig().pipeline` is four stages since 0.64.0, and
+# list(AtomicStage)'s enum order is the one the P1-4 fix declared wrong.
+_STAGES = ["research", "spec", "execute", "review", "verify", "wrapup"]
+_PIPELINE = [AtomicStage(s) for s in _STAGES]
 
 
 def _arm(root: Path, *, created: datetime) -> None:

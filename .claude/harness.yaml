@@ -189,7 +189,7 @@ world_model:
   handle: "maker"
 autonomy:
   level: "auto_safe"
-  pipeline: ["research", "spec", "execute", "review", "verify", "wrapup"]
+  pipeline: ["research", "spec", "execute", "wrapup"]
   step_cap: 20
   time_cap_min: 300
   extra_deny: []

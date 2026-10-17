@@ -1129,8 +1129,8 @@ def resolve_toggle_config(
     if level not in OPERATIONAL_LEVELS:
         raise ValueError(f"invalid --level {level!r} ({'|'.join(OPERATIONAL_LEVELS)})")
     if pipeline is None:
-        # Canonical default (research…review, VERIFY, WRAPUP) — NOT list(AtomicStage), whose
-        # enum order puts WRAPUP before VERIFY. Single source of truth.
+        # Canonical default (research, spec, execute, wrapup) — NOT list(AtomicStage), which
+        # still carries the folded review / verify members. Single source of truth.
         stages = list(AutonomyConfig().pipeline)
     else:
         try:

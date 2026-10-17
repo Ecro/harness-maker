@@ -1,7 +1,8 @@
 """Phase 1 — AutonomyConfig schema + round-trip (PLAN-human-bottleneck-auto-advance).
 
 ADR-002: autonomy.level default ``gated``; absent-case (old yaml without key) -> gated.
-ADR-006: default pipeline = 7 atomic stages incl. verify.
+ADR-006: default pipeline = the atomic stages; since 0.64.0 the four that render (review and
+verify folded into execute / wrapup).
 ADR-003: never-auto baseline is code-fixed, NOT a config field; only ``extra_deny``
 is additive. These tests are the P1 exit criterion: absent / partial / invalid-enum /
 default-preservation, all through the real ``answers_from_harness_yaml`` mapper.
@@ -31,24 +32,23 @@ DEFAULT_PIPELINE = [
     AtomicStage.RESEARCH,
     AtomicStage.SPEC,
     AtomicStage.EXECUTE,
-    AtomicStage.REVIEW,
-    AtomicStage.VERIFY,
     AtomicStage.WRAPUP,
 ]
 
 
-def test_default_pipeline_runs_verify_before_wrapup() -> None:
-    # P1-4 invariant: the canonical default pipeline MUST place verify (the safety check)
-    # strictly before wrapup (the commit/land). The AtomicStage ENUM declares WRAPUP before
-    # VERIFY, so any pipeline built from list(AtomicStage) would be wrong — the config
-    # default must not be.
+def test_default_pipeline_ends_at_wrapup_without_folded_stages() -> None:
+    # P1-4 invariant: wrapup (the commit/land) is last. The AtomicStage ENUM still carries
+    # REVIEW / VERIFY for the retired autopilot CLI, so any pipeline built from
+    # list(AtomicStage) would be wrong — the config default must not be.
     pipe = AutonomyConfig().pipeline
-    assert pipe.index(AtomicStage.VERIFY) < pipe.index(AtomicStage.WRAPUP)
+    assert pipe[-1] == AtomicStage.WRAPUP
+    assert AtomicStage.REVIEW not in pipe
+    assert AtomicStage.VERIFY not in pipe
 
 
 def test_cli_autopilot_on_uses_canonical_pipeline(tmp_path: Path) -> None:
-    # P1-4: `autopilot on` with no --pipeline must write the CANONICAL order (verify before
-    # wrapup), NOT list(AtomicStage). Guards the CLI bare-default regression directly.
+    # P1-4: `autopilot on` with no --pipeline must write the CANONICAL default, NOT
+    # list(AtomicStage). Guards the CLI bare-default regression directly.
     from typer.testing import CliRunner
 
     from harness_maker import autopilot
@@ -61,7 +61,7 @@ def test_cli_autopilot_on_uses_canonical_pipeline(tmp_path: Path) -> None:
     marker = autopilot.active_marker(tmp_path)
     assert marker is not None
     assert marker.pipeline == AutonomyConfig().pipeline
-    assert marker.pipeline.index(AtomicStage.VERIFY) < marker.pipeline.index(AtomicStage.WRAPUP)
+    assert marker.pipeline[-1] == AtomicStage.WRAPUP
 
 
 # --- model defaults / validation -------------------------------------------------
@@ -76,10 +76,20 @@ def test_autonomy_default_is_auto_safe() -> None:
     assert AutonomyConfig().level == "ask"  # ADR-012: the class default now ASKS per session.
 
 
-def test_autonomy_default_pipeline_is_seven_stage_incl_verify() -> None:
-    cfg = AutonomyConfig()
-    assert cfg.pipeline == DEFAULT_PIPELINE
-    assert AtomicStage.VERIFY in cfg.pipeline
+def test_autonomy_default_pipeline_is_the_four_rendered_stages() -> None:
+    assert AutonomyConfig().pipeline == DEFAULT_PIPELINE
+
+
+def test_ac_002_default_and_preset_fallbacks_match_the_rendered_stages() -> None:
+    """SPEC-retire-autopilot-remnants AC-002, against the render list (overhaul-p1 AC-004)."""
+    from harness_maker.documentation_contract import PRESET_FILES, discover_preset_fallbacks
+    from harness_maker.synthesize import _ATOMIC_STAGES
+
+    assert [s.value for s in AutonomyConfig().pipeline] == _ATOMIC_STAGES
+    fallbacks = discover_preset_fallbacks(Path(__file__).resolve().parents[2])
+    assert set(fallbacks) == set(PRESET_FILES), "a preset fallback was not discovered"
+    for path, stages in fallbacks.items():
+        assert list(stages) == _ATOMIC_STAGES, path
 
 
 def test_autonomy_has_caps_and_extra_deny_defaults() -> None:
@@ -143,7 +153,8 @@ def test_reverse_mapper_roundtrips_autonomy(tmp_path: Path) -> None:
 
     Kept in the input on purpose — every harness.yaml rendered before
     SPEC-plan-stage-absorption carries it, so this is the realistic legacy shape. The expected
-    pipeline drops it; `test_atomic_stage_plan_retirement.py` owns the advisory and idempotence.
+    pipeline drops it and the folded `review`; `test_atomic_stage_plan_retirement.py` owns the
+    advisory and idempotence.
     """
     body = (
         "preset: Production\nlocale: en\ntargets: [claude-code]\n"
@@ -161,7 +172,6 @@ def test_reverse_mapper_roundtrips_autonomy(tmp_path: Path) -> None:
     assert answers.autonomy.pipeline == [
         AtomicStage.RESEARCH,
         AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
         AtomicStage.WRAPUP,
     ]
     assert answers.autonomy.step_cap == 12

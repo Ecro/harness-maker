@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from harness_maker import autopilot, autopilot_caps
-from harness_maker.models import AtomicStage, AutonomyConfig
+from harness_maker.models import AtomicStage
 from harness_maker.spec_machine import load_golden_table
 from harness_maker.worktree import _current_session_uuid
 
@@ -23,9 +23,10 @@ _AC009_ROWS = load_golden_table(_SPEC_YAML, "AC-009")
 
 _SID = "11111111-2222-3333-4444-555555555555"
 _FOREIGN_SID = "99999999-8888-7777-6666-555555555555"
-# The default armed pipeline (research..verify, wrapup) — NOT `list(AtomicStage)`, whose
-# declaration order puts wrapup before verify.
-_FULL: list[str] = [s.value for s in AutonomyConfig().pipeline]
+# The 0.62 six-stage pipeline the retired autopilot library was built around, written out:
+# `AutonomyConfig().pipeline` is four stages since review / verify folded (0.64.0), and
+# `list(AtomicStage)`'s declaration order puts wrapup before verify.
+_FULL: list[str] = ["research", "spec", "execute", "review", "verify", "wrapup"]
 # `wrapup` is excluded on purpose: a full pipeline already ends there (narrow is a no-op) and
 # the stage before it halts on `merge_gate` (wrapup is human-gated) — the AC-008 relation
 # "every stage before E proceeds" cannot hold for E=wrapup. The machine.yaml input_domain

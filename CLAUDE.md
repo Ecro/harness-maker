@@ -287,6 +287,15 @@ LLM mock 픽스처 규약, worktree cleanup 정책 (`harness.yaml.worktree.clean
 분기, (6) 양방향 매퍼, (7) 테스트 결정성 + 환경 격리, (8) integration 경계 테스트.
 **다음 fix/feature 시작 전에 반드시 읽고 통과시킬 것.**
 
+## Output Language
+
+> **Output language.** Respond to the user in **ko**
+> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —
+> the live chat output and the start/end summary banners, not only the onboarding
+> interview. Code, identifiers, file paths, and the persisted deliverable documents
+> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.
+<!-- @hm:output_language -->
+
 ## 사용자 voice
 - 직접적 (no preamble, no flattery)
 - 우려 먼저, 동의 나중

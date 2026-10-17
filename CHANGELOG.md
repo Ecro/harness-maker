@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/hm:health` no longer reports a missing `autopilot_autoarm` hook.** The
+  `autopilot_autoarm_registered` signal still read `autonomy.autopilot_persistent`, which `make`
+  already warns is inert. Since 0.64.0 renders no autoarm hook, a re-render could never clear it.
+- **`autonomy.pipeline` stops naming the folded `review` / `verify` stages.** The default and the
+  preset fallback are now `research → spec → execute → wrapup`. An existing `harness.yaml` drops
+  them on load with one advisory, the same way it drops `plan`, and the re-render persists the
+  shorter list. A pipeline that named only retired stages becomes the four-stage default.
+  `AtomicStage` keeps both members for the retired autopilot CLI, but the shared filter means
+  `hm autopilot on --pipeline` now drops `review` / `verify` silently.
+
 ## [0.65.0] - 2026-10-17
 
 Overhaul phase 2, first batch: Maker drives the pipeline, every choice is a card, and execute's REVIEW

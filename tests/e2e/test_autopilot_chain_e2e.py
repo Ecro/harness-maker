@@ -18,12 +18,13 @@ from typing import Any
 import pytest
 
 from harness_maker import autopilot, autopilot_caps, autopilot_ledger, spec_machine
-from harness_maker.models import AutonomyConfig
+from harness_maker.models import AtomicStage
 
-# Use the CANONICAL default pipeline (verify BEFORE wrapup) — NOT list(AtomicStage), whose
-# enum order puts wrapup first and would run verify after the commit (REVIEW P1-4).
-_PIPELINE = list(AutonomyConfig().pipeline)
-_STAGES = [s.value for s in _PIPELINE]
+# The 0.62 six-stage pipeline (verify BEFORE wrapup) the retired autopilot library was built
+# around — NOT `AutonomyConfig().pipeline` (four stages since 0.64.0) nor list(AtomicStage),
+# whose enum order puts wrapup first and would run verify after the commit (REVIEW P1-4).
+_STAGES = ["research", "spec", "execute", "review", "verify", "wrapup"]
+_PIPELINE = [AtomicStage(s) for s in _STAGES]
 
 
 def _boundary(root: Path, current: str, capsys: pytest.CaptureFixture[str]) -> dict[str, Any]:
