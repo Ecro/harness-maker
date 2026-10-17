@@ -81,8 +81,8 @@ Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
 - **`is_git: false`** — not a git repository. Tell the user the harness files are
   not under version control; if they want to track them, they can run `git init`
   and re-run `/hm:make`. Run no git commands. Done.
-- **`decision_needed: true`** — ask, in the user's locale, the two options **as
-  equals** (the order below is not a recommendation):
+- **`decision_needed: true`** — ask with `AskUserQuestion`, in the user's locale, the two
+  options **as equals** (the order below is not a recommendation):
   - **Commit them** — the harness roots are added to git and committed, so anyone
     who clones the repo gets the harness. On this choice run (scopes both the add
     AND the commit to only the existing roots — the `-- $roots` pathspec keeps any
@@ -97,7 +97,7 @@ Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
     uv run --with "$HM" hm cli git-ignore-roots "$(pwd)"
     ```
 - **`offer_stage: true`** — already committing, and new harness files appeared on
-  this re-render. Ask "Stage the new harness files into a commit?"; on yes,
+  this re-render. Ask with `AskUserQuestion`: "Stage the new harness files into a commit?"; on yes,
   `git add` the paths in `untracked_files` then commit **scoped to those paths**:
   `git commit -m "chore: update harness-maker harness" -- <untracked_files>` (the
   `-- <paths>` keeps unrelated staged work out); on no, skip.

@@ -1,0 +1,232 @@
+schema_version: 3
+spec_slug: choice-cards
+parent_spec: SPEC-hm-overhaul-p1
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: Prompt-text change; every AC is a golden check on rendered
+  bytes, so mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Every stage command and Maker carries the Choices rule for its runtime
+  type: mechanical
+  test_ids:
+  - tests/render/test_choice_cards.py::test_ac_001_commands_carry_the_choice_rule
+  executable_predicate: all(text.count(choice_rule(runtime)) == 1 for preset in ('Side',
+    'Production') for runtime, text in stage_and_maker_renders(preset))
+  golden_table: []
+  rubric_id: null
+  note: 'Rule text (amended 2026-10-17): "**Choices.** Ask each choice with <TOOL>;
+    recommendation first, except approvals and equal options. Without the tool: a
+    numbered list, then wait; never choose for the user." Stage renders are .claude/commands/hm/{research,spec,execute,wrapup}.md
+    and .agents/skills/hm-{research,spec,execute,wrapup}/SKILL.md; Maker is .claude/skills/maker/SKILL.md
+    and .agents/skills/maker/SKILL.md.'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The rule text is written into SPEC AC-001 from the DRI's 2026-10-17
+    request (every choice as a card), the tool names the two hosts expose (stages/_hm.md.j2
+    ask() macro) and spec-validator round 1 (no recommendation on approvals or equal
+    options), before any template changed.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Each listed choice site names the question tool after its anchor
+  type: mechanical
+  test_ids:
+  - tests/render/test_choice_cards.py::test_ac_002_choice_sites_name_the_question_tool
+  executable_predicate: all(anchor in text and tool(runtime) in text[text.index(anchor)
+    + len(anchor):][:200].split('\n\n')[0] for preset in ('Side', 'Production') for
+    runtime, text, anchor in site_renders(preset))
+  golden_table:
+  - input:
+      site: a
+      template: stages/execute.md.j2
+    expected: or a missing SPEC, stops
+    edge: false
+    note: ''
+  - input:
+      site: b
+      template: stages/execute.md.j2
+    expected: then stop and ask the DRI
+    edge: false
+    note: ''
+  - input:
+      site: c
+      template: stages/execute.md.j2
+    expected: approval is missing or invalid; ask the DRI
+    edge: false
+    note: ''
+  - input:
+      site: d
+      template: stages/wrapup.md.j2
+    expected: '5: ask the DRI'
+    edge: false
+    note: ''
+  - input:
+      site: e
+      template: stages/wrapup.md.j2
+    expected: 'On `land: hold`, show each `irreversible` decision'
+    edge: false
+    note: ''
+  - input:
+      site: f
+      template: commands/hm/make.md.j2
+    expected: '**`decision_needed: true`** — ask'
+    edge: false
+    note: ''
+  - input:
+      site: g
+      template: commands/hm/make.md.j2
+    expected: '**`offer_stage: true`**'
+    edge: false
+    note: ''
+  - input:
+      site: h1
+      template: skills/world-model/SKILL.md.j2
+    expected: No task → say so, offer **Start**
+    edge: false
+    note: ''
+  - input:
+      site: h2
+      template: skills/world-model/SKILL.md.j2
+    expected: → ask once first
+    edge: false
+    note: ''
+  - input:
+      site: j
+      template: stages/wrapup.md.j2
+    expected: Ask only on `[finalize] stash-pop conflict`
+    edge: false
+    note: ''
+  - input:
+      site: k
+      template: skills/world-model/SKILL.md.j2
+    expected: Two or more → ONE closed question
+    edge: false
+    note: ''
+  - input:
+      site: l
+      template: stages/research.md.j2
+    expected: Offer two ways on
+    edge: false
+    note: ''
+  - input:
+      site: m
+      template: skills/world-model/SKILL.md.j2
+    expected: then 2–4 one-line options
+    edge: false
+    note: ''
+  rubric_id: null
+  note: Sites from the SPEC Intent table; Maker and stages in both runtimes, /hm:make
+    in Claude only. Tool within 200 chars after the anchor, no blank line between.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The site list and anchors come from a grep of the 19c7ee89 render
+    recorded in the SPEC Intent table before any template changed; the render is the
+    product, not the test's model of it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: No render names Cursor's AskQuestion
+  type: mechanical
+  test_ids:
+  - tests/render/test_choice_cards.py::test_ac_003_no_render_names_cursor_askquestion
+  executable_predicate: not any('AskQuestion' in text for preset in ('Side', 'Production')
+    for text in all_renders(preset))
+  golden_table: []
+  rubric_id: null
+  note: Files under .claude/ and .agents/.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Cursor was removed in 0.63.0 (SPEC-hm-overhaul-p1 IRR-001); AskQuestion
+    is Cursor's tool name and has no meaning in a Claude Code or Codex render.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: /hm:spec exempts only at auto_full
+  type: mechanical
+  test_ids:
+  - tests/render/test_choice_cards.py::test_ac_004_spec_exempts_only_at_auto_full
+  executable_predicate: all('and the DRI was not asked (`auto_full`).' in text and
+    'or no question tool' not in text for preset in ('Side', 'Production') for text
+    in spec_stage_renders(preset))
+  golden_table: []
+  rubric_id: null
+  note: Claude and Codex spec stage renders.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The text follows IRR-001, which the DRI decides on a card; the
+    string is fixed in the SPEC before the template changes.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Without a question tool, the DRI's own reply choosing Approve in a numbered
+    list counts as SPEC approval, and /hm:spec Step 5's --exempt branch opens only
+    at auto_full (no longer on "no question tool")
+  category: security/permission boundary
+  rationale: Changes what counts as the human lock-in on a SPEC; cheap to revert in
+    text, but an approval-boundary change, so the DRI decides it.
+  source: spec
+approval:
+  kind: human
+  content_hash: a2ceaddd1486a04b44c006788a9a4b5441d463be3140d9cb1077e180576a96c6
+  approved_by: Ecro
+  approved_at: '2026-10-17T02:35:49Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 30b913b1740fc5cee4759e9d9ae3f9e2534abf25ebc2648141f0384103a92149
+    parent_spec: 8e80013b9c7d06fd05950be5a39625bcf47422620ebdb47280500ebad12ba858
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    mutation_threshold_rationale: 55224e70ee6157428fa0cfd2532637cdaa3e985f5d2e55dc1fa51f0ae66bce41
+    irreversible_decisions: ffe1ed8028eb372d304adab49a44b6a3e1bcf18d39d2c30c0fcade30f85863a9
+    AC-001: 4794c4b8d9e161d481e91b8543697292cc2ace875ea9c9cf6b5ec7971fe5ec5e
+    AC-002: d159457e95b2e9e75d187f281f7e2c90fb41d44cc9054c025108210fa20f3cfa
+    AC-003: 8cd24421f050574ef9ce4ee8c182f326fddc783718849419502b768a45b1528a
+    AC-004: 367d304efb3f59498a8987162547c3e0ea6792626df162486bc0a67cdfb122a1
+    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591
+  lane: full

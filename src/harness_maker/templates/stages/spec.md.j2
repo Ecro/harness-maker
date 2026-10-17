@@ -8,7 +8,9 @@
 
 `/hm:spec <slug>` turns a task into acceptance criteria; it is the only interview, and `/hm:execute` decides how to build. Write files in English; talk to the user in `{{ config.locale }}`.
 
-{{ hm.cli() }}{{ hm.preflight("spec") }}
+{{ hm.cli() }}
+
+{{ hm.choices() }}{{ hm.preflight("spec") }}
 
 ## Step 0 — Skip check
 
@@ -87,6 +89,6 @@ One advisory pass, unless Step 0 skipped the interview with `irreversible_decisi
 
 ## Step 5 — Status and stamp
 
-Set `status: approved` when Open Questions is empty, else `draft`. If the DRI chose "Approve this SPEC and end interview" and Step 4 passed, run `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`. Else stamp `--exempt` only when `irreversible_decisions: []`, Step 4 passed, `status: approved`, and the DRI was not asked (`auto_full`, or no question tool). Else leave it unstamped. `hm spec_machine approval-status --slug <slug>` shows the state.
+Set `status: approved` when Open Questions is empty, else `draft`. If the DRI chose "Approve this SPEC and end interview" and Step 4 passed, run `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`. Else stamp `--exempt` only when `irreversible_decisions: []`, Step 4 passed, `status: approved`, and the DRI was not asked (`auto_full`). Else leave it unstamped. `hm spec_machine approval-status --slug <slug>` shows the state.
 
 Print the SPEC path and its status, then STOP. `/hm:execute <slug>` is the user's call.

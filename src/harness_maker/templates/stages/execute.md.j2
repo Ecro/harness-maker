@@ -4,9 +4,11 @@
 {%- set _wt = '<WT>/' if config.worktree.get('enabled') else '' -%}
 # /hm:execute — tests first, then code, then one review
 
-`/hm:execute <slug>` builds what `specs/SPEC-<slug>.md` asks. It writes the AC tests, shows them RED through `hm check --red`, implements to GREEN, binds the tests to the SPEC and runs one review. It never commits; `/hm:wrapup` does. `--no-tdd` is retired: if passed, print "--no-tdd is retired; give untestable behaviour a judgment AC" and run TDD anyway.
+`/hm:execute <slug>` builds what `specs/SPEC-<slug>.md` asks. It never commits; `/hm:wrapup` does. `--no-tdd` is retired: if passed, print "--no-tdd is retired; give untestable behaviour a judgment AC" and run TDD anyway.
 
 {{ hm.cli() }}
+
+{{ hm.choices() }}
 
 ## Session Context Loading
 
@@ -19,7 +21,7 @@
 
 ## Step 0 — SPEC gate and PLAN
 
-Run `hm spec_machine approval-status --root . --slug <slug>`. `approved` and `exempt` proceed; `missing` proceeds only at `autonomy.level: auto_full`; any other state, or a missing SPEC, stops: ask the DRI to approve with `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`, or point at `/hm:spec`.
+Run `hm spec_machine approval-status --root . --slug <slug>`. `approved` and `exempt` proceed; `missing` proceeds only at `autonomy.level: auto_full`; any other state, or a missing SPEC, stops: ask with {{ hm.ask() }}: approve runs `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`, `/hm:spec` stops.
 
 Write `{{ _wt }}work-docs/PLAN-<slug>.md`, or extend it if it exists (never rewrite one). Frontmatter: `type: plan`, `task_slug`, `status: planning`, `created`, `spec: "[[SPEC-<slug>]]"`, `summary`. Body: one line per phase with `scope:`, `exit:` (a command), `risk:` and `rollback:`; `## 🚧 Contract Boundaries` with a `### Do not change` list of repo-relative paths (or the single bullet `none — this task has no contract boundaries`); and `ADR-NNN: <decision>. **Decided by:** <user (source) | agent>`. The PLAN holds no ACs; it points at the SPEC.
 
@@ -41,13 +43,13 @@ From the SPEC and its machine.yaml, take `test_framework`, the scenarios, and th
 
 Before any code, write a test for every testable AC in the SPEC, across all phases, named `test_ac_NNN_<short>`. Its assertion is the AC's oracle, run against the real code: a mechanical AC asserts its `executable_predicate`; a parametric AC uses `@pytest.mark.parametrize` over `spec_machine.load_golden_table(<yaml>, "AC-NNN")`, with the yaml path relative to the test file; a property AC uses Hypothesis `@given` over `input_domain` and asserts `expected_relation`. No tautology and no mock-only body. Importing a first-party name that does not exist yet is a valid RED; that name must exist by GREEN.
 
-Put each test's node id in its AC's `test_ids` now, keeping `pending_test: true`, and run `hm spec_machine validate --yaml specs/SPEC-<slug>.machine.yaml`.
+Put each test's node id in its AC's `test_ids` now, keeping `pending_test: true`, and run `hm spec_machine validate specs/SPEC-<slug>.machine.yaml`.
 
 **RED**, once, before any code: run `hm check --red --slug <slug>`. It covers every testable AC, so it runs here and nowhere else. Exit 0 means every one has a test that fails for a real reason. On exit 1, fix what it names: a test that already passes, a syntax error, a missing fixture or node id. An AC whose behaviour already exists may be waived with `--green-ok AC-NNN`, and the reason goes to the reviewer. Keep the RED summary for the commit body.
 
 ### Phase C — Implement, phase by phase
 
-Per PLAN phase, make the smallest change that turns its ACs' tests GREEN, within the ADRs and outside `Do not change`, and run the phase's `exit:` command. A choice in an irreversible category (schema/file format/storage layout, public API/CLI contract, data migration, security/permission boundary, new external dependency) that the SPEC's `irreversible_decisions` does not list: append it as `{id: IRR-<next>, decision, category, rationale, source: execute}` (this voids the approval by design), then stop and ask the DRI: approve runs `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`, anything else stops the stage.
+Per PLAN phase, make the smallest change that turns its ACs' tests GREEN, within the ADRs and outside `Do not change`, and run the phase's `exit:` command. A choice in an irreversible category (schema/file format/storage layout, public API/CLI contract, data migration, security/permission boundary, new external dependency) that the SPEC's `irreversible_decisions` does not list: append it as `{id: IRR-<next>, decision, category, rationale, source: execute}` (this voids the approval by design), then stop and ask the DRI with {{ hm.ask() }}: approve runs `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`, anything else stops the stage.
 
 **Bind, then gate**, after the last phase: for each AC run `hm spec_machine mark-tested --yaml specs/SPEC-<slug>.machine.yaml --md specs/SPEC-<slug>.md --ac AC-NNN`, then run `hm check --slug <slug>`{{ hm.long_gate() }}. It prints one JSON line:
 - 0: proceed.
@@ -55,7 +57,7 @@ Per PLAN phase, make the smallest change that turns its ACs' tests GREEN, within
 - 2: fix the call.
 - 3: degraded; report it and never read it as a pass.
 - 4: the tree changed during the run; rerun once. A second 4 stops: report the `tree_changed` paths.
-- 5: approval is missing or invalid; ask the DRI or stop.
+- 5: approval is missing or invalid; ask the DRI with {{ hm.ask() }} (approve / stop).
 
 ## Step 4 — Contract boundaries
 

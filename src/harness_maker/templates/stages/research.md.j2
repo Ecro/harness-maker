@@ -7,6 +7,8 @@
 
 {{ hm.cli() }}
 
+{{ hm.choices() }}
+
 **Memory.** Run `hm memory_retrieve --topic "<topic>"` with the real topic, and use the entries it surfaces.
 {%- if config.second_brain.get('enabled') %}
 
@@ -39,6 +41,6 @@ Write `{{ '<WT>/' if config.worktree.get('enabled') else '' }}work-docs/RESEARCH
 
 ## Phase 4 — Validate
 
-Show the user the topic, the recommendation with its reason, the counts of web, library and internal sources, and the number of open questions. Offer two ways on: `/hm:spec <slug>`, or dig deeper into one approach. Digging deeper re-runs Phase 1 on that approach and rewrites the same file; it never creates a second one.
+Show the user the topic, the recommendation with its reason, the counts of web, library and internal sources, and the number of open questions. Offer two ways on with {{ hm.ask() }}: `/hm:spec <slug>`, or dig deeper into one approach. Digging deeper re-runs Phase 1 on that approach and rewrites the same file; it never creates a second one.
 
 Print the RESEARCH path and the recommendation, then STOP. The next stage is the user's call.
