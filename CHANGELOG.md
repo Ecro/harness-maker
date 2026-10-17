@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.65.1] - 2026-10-18
+
+/hm:health stops raising two findings a re-render can never clear, and `autonomy.pipeline` stops
+naming the stages 0.64.0 folded away.
+
 ### Fixed
 
 - **`/hm:health` no longer reports a missing `autopilot_autoarm` hook.** The
