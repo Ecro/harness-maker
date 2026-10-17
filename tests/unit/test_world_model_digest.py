@@ -326,8 +326,9 @@ def test_ac003_next_stage_from_artifacts(row: Any, tmp_path: Path, cache: Path) 
     assert _task_entry(d, "demo")["next_stage"] == row.expected["next_stage"]
 
 
-def test_ac003_newest_review_decides(tmp_path: Path, cache: Path) -> None:
-    """An older APPROVED review must not count once a newer review is in progress."""
+def test_ac003_newest_review_still_means_wrapup(tmp_path: Path, cache: Path) -> None:
+    """Review was retired in 0.64.0: any REVIEW record means wrapup, whatever its status
+    (SPEC-maker-advance IRR-002)."""
     base = _base(tmp_path)
     wt = _task(base, "demo")
     _make_artifacts(wt, "demo", ["spec_exempt", "plan"], cache)
@@ -338,18 +339,44 @@ def test_ac003_newest_review_decides(tmp_path: Path, cache: Path) -> None:
     (docs / "REVIEW-demo-2026-10-02.md").write_text(
         "---\nstatus: in-progress\n---\n", encoding="utf-8"
     )
-    assert _task_entry(_digest_mod().digest(base), "demo")["next_stage"] == "review"
+    assert _task_entry(_digest_mod().digest(base), "demo")["next_stage"] == "wrapup"
 
 
-def test_ac003_stale_verify_marker_means_verify(tmp_path: Path, cache: Path) -> None:
-    """A marker written before the tree changed does not count as verified."""
+def test_ac003_stale_verify_marker_still_means_wrapup(tmp_path: Path, cache: Path) -> None:
+    """Verify was retired in 0.64.0: a stale marker no longer sends the task back to it."""
     base = _base(tmp_path)
     wt = _task(base, "demo")
     _make_artifacts(wt, "demo", ["spec_exempt", "plan", "review_approved", "verify_marker"], cache)
     assert _task_entry(_digest_mod().digest(base), "demo")["next_stage"] == "wrapup"
     (wt / "app.py").write_text("x = 1\n", encoding="utf-8")
     _git(wt, "add", "app.py")
-    assert _task_entry(_digest_mod().digest(base), "demo")["next_stage"] == "verify"
+    assert _task_entry(_digest_mod().digest(base), "demo")["next_stage"] == "wrapup"
+
+
+_LIVE_STAGES = ("research", "spec", "execute", "wrapup")  # SPEC-hm-overhaul-p1, 0.64.0
+_REVIEW_VARIANTS = [
+    ["spec_approved", "plan", review, *marker]
+    for review in ("review_in_progress", "review_changes_requested", "review_approved")
+    for marker in ([], ["verify_marker"])
+]
+
+
+@pytest.mark.parametrize(
+    "artifacts",
+    [list(r.input["artifacts"]) for r in _AC003] + _REVIEW_VARIANTS,
+    ids=[f"g{i}" for i in range(len(_AC003))] + [f"r{i}" for i in range(len(_REVIEW_VARIANTS))],
+)
+def test_ac006_digest_names_only_live_stages(
+    artifacts: list[str], tmp_path: Path, cache: Path
+) -> None:
+    """SPEC-maker-advance AC-006: a Resume must never be sent to a retired stage."""
+    base = _base(tmp_path)
+    wt = _task(base, "demo")
+    _make_artifacts(wt, "demo", artifacts, cache)
+    stage = _task_entry(_digest_mod().digest(base), "demo")["next_stage"]
+    assert stage in _LIVE_STAGES
+    if any(a.startswith("review_") for a in artifacts):
+        assert stage == "wrapup"
 
 
 def test_ac003_plan_only_means_spec(tmp_path: Path, cache: Path) -> None:

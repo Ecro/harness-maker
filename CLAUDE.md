@@ -220,7 +220,7 @@ plan-validator, fan-out) — `remeasure_on`/`measure_cmd` 필드가 재측정 �
 
 ## Workflow (autoloop CODER 가 알아야 할 점)
 - **Stage**: 4개 (research/spec/execute/wrapup, 0.64.0 SPEC-hm-overhaul-p1). review 는 execute 안에서, 검증은 wrapup 의 `hm check` 로. `/hm:review`·`/hm:verify`·`/hm:configure`·`/hm:loop` 은 은퇴.
-- **Stage 연결** = 사용자가 다음 stage 를 직접 친다. 루프는 호스트의 `/loop`. 융합 명령 축은 0.47.0 에서 제거됨 (PLAN-harness-diet ADR-001/002).
+- **Stage 연결** = 사용자가 다음 stage 를 직접 치거나, Maker 가 Advance 규칙으로 같은 세션에서 이어 들어간다 (사람이 필요한 지점에서 멈춤, push 안 함; SPEC-maker-advance). 루프는 호스트의 `/loop`. 융합 명령 축은 0.47.0 에서 제거됨 (PLAN-harness-diet ADR-001/002).
 - 각 stage 명령은 self-contained — 런타임에 `.claude/stages/`·`.claude/hm/` 를 읽지 않는다.
 
 ## Context discipline

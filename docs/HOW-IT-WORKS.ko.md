@@ -1362,7 +1362,7 @@ digest 를 실행하라고 스킬이 지시한다.
 
 | 필드 | 내용 |
 |---|---|
-| `tasks` | ≤ 5, 최신순: `slug`, `next_stage` (산출물에서 도출: 승인된 SPEC → REVIEW → APPROVED REVIEW → verify 마커), `last_stage`, `last_seen`, `other_session`, `parked`, `latest_artifact {name, at}` |
+| `tasks` | ≤ 5, 최신순: `slug`, `next_stage` (산출물에서 도출: 승인된 SPEC → REVIEW → wrapup), `last_stage`, `last_seen`, `other_session`, `parked`, `latest_artifact {name, at}` |
 | `more` | 다섯 개를 넘는 작업 |
 | `autopilot` | 이 세션의 autopilot 상태 |
 | `intents` | `counts`, `items`, `active[] {id, metric_id, last, target, gap}` — 값은 `hm intent status` 에서, 없으면 `—` |

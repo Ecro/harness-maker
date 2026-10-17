@@ -245,8 +245,10 @@ def _lookup(fm: dict[str, Any], path: str) -> Any:
 
 # ── AC-012 ─────────────────────────────────────────────────────────────────
 
+# The e7dd6648 capture predates 0.64.0; review was retired since, so its rows land on wrapup
+# (SPEC-maker-advance IRR-002).
 DIGEST_EXPECTED = {
-    name: ("wrapup" if i == 0 else DIGEST["cases"][name])
+    name: ("wrapup" if i == 0 or DIGEST["cases"][name] == "review" else DIGEST["cases"][name])
     for i, (name, *_rest) in enumerate(fx.DIGEST_CASES)
 }
 
@@ -255,6 +257,8 @@ DIGEST_EXPECTED = {
 def test_digest_routes_checked_light_task_to_wrapup(
     tmp_path: Path, name: str, lane: str, record: str, fresh: bool
 ) -> None:
+    """Since 0.64.0 any REVIEW record means wrapup, checked or not (SPEC-maker-advance IRR-002);
+    the checked-vs-unchecked distinction lives in the light_lane tests."""
     root = tmp_path / "repo"
     fx.build_digest(root, lane, record, fresh)
     assert world_model_digest.next_stage(root, SLUG, root) == DIGEST_EXPECTED[name]

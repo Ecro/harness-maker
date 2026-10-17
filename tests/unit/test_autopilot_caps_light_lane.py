@@ -229,9 +229,7 @@ def test_computed_at_equal_to_since_skips(tmp_path: Path) -> None:
 def test_probe_b_a_later_failed_run_does_not_skip(tmp_path: Path) -> None:
     """Run 1 passes and writes its record; the code changes; run 2 passes Check 2 (a fresh
     `run` marker for the new tree) but fails security, so it writes no record. The run 1 record
-    must not be read as a pass for the new tree — at the boundary or in the digest."""
-    from harness_maker import world_model_digest
-
+    must not be read as a pass for the new tree at the boundary."""
     root = tmp_path / "repo"
     argv = fx.build(root, fx.Case("light", "passed", "execute", "auto_safe"))
     fx.change_tree(root)
@@ -239,12 +237,8 @@ def test_probe_b_a_later_failed_run_does_not_skip(tmp_path: Path) -> None:
     before = len(_rows(root))
     obs = fx.observe(root, argv)
     _no_skip(obs, obs["rows"][before:])
-
-    digest_root = tmp_path / "digest"
-    fx.build_digest(digest_root, "light", "passed", fresh=True)
-    fx.change_tree(digest_root)
-    fx.mark_fresh(digest_root)
-    assert world_model_digest.next_stage(digest_root, fx.SLUG, digest_root) != "wrapup"
+    # The digest half left with the review stage (SPEC-maker-advance IRR-002): any REVIEW record
+    # now means wrapup, whose `hm check` re-runs the gates on the new tree.
 
 
 def test_a_mark_pass_marker_does_not_skip(tmp_path: Path) -> None:

@@ -1,0 +1,219 @@
+schema_version: 3
+spec_slug: maker-advance
+parent_spec: SPEC-hm-overhaul-p1
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Prompt-text change; every AC is a golden check on rendered
+  bytes, so mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Maker carries the Advance rule
+  type: mechanical
+  test_ids:
+  - tests/render/test_maker_advance.py::test_ac_001_maker_carries_the_advance_rule
+  executable_predicate: all(text.count(advance_rule(runtime)) == 1 for preset in ('Side',
+    'Production') for runtime, text in maker_renders(preset))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Transitions, 'never push' and 'stop when a person is owed' come
+    from the DRI's 2026-10-17 card; the stop list enumerates every early stop in stages/spec.md.j2
+    and stages/execute.md.j2 at e2743fd7 (spec-validator round 1), fixed in SPEC AC-001
+    before any template changed.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Resume no longer reserves wrapup for the operator
+  type: mechanical
+  test_ids:
+  - tests/render/test_maker_advance.py::test_ac_002_resume_does_not_reserve_wrapup
+  executable_predicate: 'all(''`next_stage: wrapup` → ready to land.'' in text and
+    ''the operator runs wrapup'' not in text for preset in (''Side'', ''Production'')
+    for runtime, text in maker_renders(preset))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: From the DRI's card choosing that Maker runs wrapup; the old phrase
+    is quoted from the 03912b3c render in the SPEC Intent.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: hand-offs name the next command and the world model
+  type: mechanical
+  test_ids:
+  - tests/render/test_maker_advance.py::test_ac_003_hand_offs_name_next_command_and_world_model
+  executable_predicate: all(hand_off(runtime, nxt) in stage_text and old_ending(runtime,
+    nxt) not in stage_text for preset in ('Side', 'Production') for runtime, stage,
+    nxt, stage_text in stage_renders(preset)) and all(AGENTS_LINE in agents_md(preset)
+    for preset in ('Side', 'Production'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'SPEC S4: a stage keeps naming the next command and never advances
+    itself; the old ending is quoted from the e2743fd7 render.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Maker's Choices rule follows exactly one blank line
+  type: mechanical
+  test_ids:
+  - tests/render/test_maker_advance.py::test_ac_004_choices_rule_single_blank_line
+  executable_predicate: all('\n\n**Choices.**' in text and '\n\n\n**Choices.**' not
+    in text for preset in ('Side', 'Production') for runtime, text in maker_renders(preset))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Markdown paragraph break; PR #40 review F1 asked for one blank
+    line, and the 03912b3c render shows two.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: a live resumed task lands once, an unapproved one not at all
+  type: mechanical
+  test_ids:
+  - tests/integration/test_maker_advance_live.py::test_ac_005_resumed_task_lands_once_unapproved_never
+  executable_predicate: new_commits(base, run('exempt')) == 1 and new_commits(base,
+    run('unstamped')) == 0 and origin_refs_unchanged()
+  golden_table: []
+  rubric_id: null
+  note: 'Opt-in: HM_MAKER_ADVANCE_LIVE=1, needs the claude CLI; Claude Code only (no
+    Codex CLI in the build container).'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Commit counts on the base branch and the bare origin's refs are
+    read with git after the run; they do not depend on the transcript, the template
+    text or the model's own report.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: the digest names only live stages
+  type: mechanical
+  test_ids:
+  - tests/unit/test_world_model_digest.py::test_ac006_digest_names_only_live_stages
+  executable_predicate: all(next_stage(arts) in ('research', 'spec', 'execute', 'wrapup')
+    for arts in followups_ac003_inputs + review_variants) and all(next_stage(arts)
+    == 'wrapup' for arts in review_variants)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The live stage set is SPEC-hm-overhaul-p1's four stages (0.64.0),
+    fixed outside the digest code; the artifact inputs are SPEC-world-model-followups
+    AC-003's golden rows plus every REVIEW status.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Maker enters /hm:wrapup, which squash-lands the task on the base branch,
+    without the operator typing it; an exempt SPEC lands with no human touch and an
+    approved SPEC with DRI-approved irreversible decisions lands without a further
+    stop; land hold, unapproved irreversible decisions and push stay gated on the
+    DRI
+  category: security/permission boundary
+  rationale: 'Moves who triggers the land from the operator to Maker; reversible in
+    text and the land is local, but an authority change the DRI decides (cards 2026-10-17:
+    ''Maker가 이어감'', exempt land).'
+  source: spec
+- id: IRR-002
+  decision: hm world_model digest next_stage values shrink from six stages to research,
+    spec, execute, wrapup; SPEC-world-model-followups IRR-001 and AC-003 golden rows
+    and SPEC-hm-light-lane-s3a AC-012 golden rows are amended
+  category: public API/CLI contract
+  rationale: A script or skill matching next_stage == 'review' or 'verify' stops matching;
+    those stages no longer exist since 0.64.0, so the old values named commands that
+    cannot run.
+  source: spec
+approval:
+  kind: human
+  content_hash: 838897bf4e4469fb62d824399115a2fb60b4577346fab2b76495e7fc06846037
+  approved_by: Ecro
+  approved_at: '2026-10-17T03:28:25Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: e772f6c7fecd95416a2e188ae19f58364590ef49a2e1cef142a0e66b65e5d273
+    parent_spec: 8e80013b9c7d06fd05950be5a39625bcf47422620ebdb47280500ebad12ba858
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    mutation_threshold_rationale: 55224e70ee6157428fa0cfd2532637cdaa3e985f5d2e55dc1fa51f0ae66bce41
+    irreversible_decisions: 07b7ff270d6ea273d6fe9c7cb5db99f994b7f91d1879e5319d37aa8dd598ce1e
+    AC-001: 095340852aeff8461376358af7361f206da0958a17e3e7b80ffee1cfca7e1478
+    AC-002: 77adfd561fe48708e9cf56a1e47b4cd17acdb3f23009708e1536a346867c23e5
+    AC-003: 2e4bf7baaf365816dcfa84ab4f88dd22057abe62dd9c1cf04aa7c7b4a6ab66bd
+    AC-004: 1e0b2980899855e6fc33e21879135754dc921342661f88d11f45760423eef58f
+    AC-005: c1ae7b8c90751da62ad7b218d44a0684d5d8cd80f4ace2793e30fb298d1d818f
+    AC-006: dcbc7d60e507d48c8717fc101df81d18d36a74ff1ab4c8f48a8142a4dcb1a9d6
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923
+  lane: full

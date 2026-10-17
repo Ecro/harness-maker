@@ -85,8 +85,8 @@ SPEC-world-model-followups IRR-001, extended by front-door IRR-003/004).
   `other_session`, `parked`, `latest_artifact {name, at}`), `more`, `autopilot`, `intents`
   (`counts`, `items`, `active[] {id, metric_id, last, target, gap}` — values mirrored from
   `hm intent status`, `—` when absent), `recent` commits.
-- `next_stage` is derived from artifacts, not spans: approved SPEC → REVIEW → APPROVED REVIEW
-  → verify marker. Past the 5 s artifact budget (`DEADLINE_S`) a task reports `null`.
+- `next_stage` is derived from artifacts, not spans: approved SPEC → REVIEW →
+  wrapup (review and verify retired in 0.64.0). Past the 5 s artifact budget (`DEADLINE_S`) a task reports `null`.
 - Only `hm/<slug>` task worktrees are listed (`worktree.enabled`). Root resolves to the base,
   so the digest reads the base ledger from any worktree.
 - **`parked`**: RESEARCH is the task's only artifact, its frontmatter `created` is older than

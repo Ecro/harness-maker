@@ -122,9 +122,9 @@ ac:
       - review_in_progress
       spans: []
     expected:
-      next_stage: review
+      next_stage: wrapup
     edge: false
-    note: ''
+    note: review/verify retired in 0.64.0 (SPEC-maker-advance IRR-002)
   - input:
       artifacts:
       - spec_approved
@@ -132,9 +132,9 @@ ac:
       - review_changes_requested
       spans: []
     expected:
-      next_stage: review
+      next_stage: wrapup
     edge: false
-    note: ''
+    note: review/verify retired in 0.64.0 (SPEC-maker-advance IRR-002)
   - input:
       artifacts:
       - spec_approved
@@ -144,9 +144,9 @@ ac:
       - - start
         - hm:review
     expected:
-      next_stage: verify
+      next_stage: wrapup
     edge: false
-    note: ''
+    note: review/verify retired in 0.64.0 (SPEC-maker-advance IRR-002)
   - input:
       artifacts:
       - spec_approved
@@ -668,17 +668,17 @@ irreversible_decisions:
 - id: IRR-001
   decision: 'hm world_model digest: flags --root/--session-id, exit-0 contract, JSON
     keys tasks[].{slug,next_stage,last_stage,last_seen,other_session}, more, autopilot,
-    intents, recent, unavailable; next_stage values = the six pipeline stages; lives
-    under world_model, not hm world'
+    intents, recent, unavailable; next_stage values = the pipeline stages (four since
+    0.64.0, SPEC-maker-advance IRR-002); lives under world_model, not hm world'
   category: public API/CLI contract
   rationale: Rendered router skills and user scripts depend on the command, flags
     and keys
   source: spec
 approval:
   kind: human
-  content_hash: 84d1e8433bc698af2ebea1373e0310bd0214ead814e391d78b3a390a1e32e993
+  content_hash: 61d10c7091c3e1452ca559be95281af46e3819116aa8b281b1bb8f1dccee6f04
   approved_by: Ecro
-  approved_at: '2026-10-02T03:59:23Z'
+  approved_at: '2026-10-17T03:08:58Z'
   field_hashes:
     schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
     spec_slug: 0d954059969e5b0a22a60e6984c491a2c5f7a620b24f077549c7fbb0f6592f0a
@@ -686,10 +686,10 @@ approval:
     mutation_threshold: ff5a1ae012afa5d4c889c50ad427aaf545d31a4fac04ffc1c4d03d403ba4250a
     mutation_threshold_rationale: ecf931827adf506d07d5bdc05712f5255306040a2c44389af2e851bafc214af6
     paths_to_mutate: 5efa2a6737e018fb92a708fceabfc965b73b8209a1ba16086a678eb5d89ca72a
-    irreversible_decisions: aa1711bb96855c6e7b60ecefeb21afbd0edb2cd836f1d5b12d28eb5fe4fa4ac0
+    irreversible_decisions: 613fbf977f56c8bed39e83268cf1757aa93144ded8cea25f28447ab61d810c3a
     AC-001: 0ec9a49190bffaaa04f845c873ab01fdc2d8f96b794e96892221df77cab66c40
     AC-002: f852268269c9ca043afea8248739364d47d7e05294afce9ecb45d0b4bd1278d1
-    AC-003: dece1eddefc74ac59246ea0b33caa68e1eea222cf9e610ca1f5a532b3005bebc
+    AC-003: d9065bdef33ffd784778558f9ef5ecc2de50985f4f6238c6fba4455c9d686c22
     AC-004: a86f4b1a686d5e74f7ce40e7053537e5eeac5cd7d9177ed1f637407be55a5cd4
     AC-005: b8c6eda9be7a4249019632b91e0ad4e882274fdd7e051db40ebbf7000b7d6f93
     AC-006: f836cd9a6497b5dd72550609c3aac36599cca424335e520fed6cb29e128ae997

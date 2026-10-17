@@ -4,7 +4,7 @@ file_count: 31
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
-  body_sha256: 76244fd23d0346b1b0bb0e43124b55a1e31557dfd027fddb53e1be8e4d98d407
+  body_sha256: 4110529423a76b743cdd2b7d74ce36450df07b9722c572caa225bbfb14604a49
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
   body_sha256: 75e6e5038df74c2b0f6a3c8321c59b685b36015caeb67ebfcd54000a0e23b564
@@ -16,13 +16,13 @@ files:
   body_sha256: d9fcb231718944500e6048d6502b0fd8da6e90a693ccb85e604430650288e090
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 0f3eea391567ece99c667ffdc74f0c852e455d8bd3d2fa1459c84c746c80e670
+  body_sha256: ea817755b760cbae10c0bf1dfc6c5b4eba7aae9298639b049363f91afd9a01bf
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: f85feb685ee8ee4d2dbd28e05f3089468026bf82a1ce8241db3c3cf7f93ea0dd
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: f4e63715bf7ad1438f37ef580c20d2ed3aeb7a8b81c041476d8a41aeb123eeb7
+  body_sha256: aed4e7104fb37d4ef429a3261e48937d25a80c56b4c88674de09426c4c57f3b6
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 63ddebdb8a90b44830aa62bd7c8a257398665b046e1440b4b08b400deac8c31d
@@ -34,7 +34,7 @@ files:
   body_sha256: c2f8863fc1d4bf516aea1df009ba29a348ba19c4b28b81f0c63e36cfca3f6bfa
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 658c2e56922af4e1e9e8cd0ea9fa5fb2d4727104bda83c3afafd2fd7e497862c
+  body_sha256: b6629afa2d80cfd62e53f39c46d34c3c44cb9c834b8476f8d4210deef63660e1
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: 4de0492567baa79b3ce81951f85e8bd77d9eac545369f0bef860ec0668c6aa80
@@ -88,7 +88,7 @@ files:
   body_sha256: 8bc02a9587278b53fdc82dc35a1cfbe6d0068c8e6b4c4cad5c43b7782a7deeb6
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: 72de6ad0a12c8dd5d8ff4c392b0a087d548a0c91e18a879944c5e1fb6908323c
+  body_sha256: bf80b487d7f45b829a630783051e937eae4fac8899536da683b5e1f924bcbc76
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 12611c8e959f5e774908e01684d63bbac86c253a665a20a34ae47825eeb76315

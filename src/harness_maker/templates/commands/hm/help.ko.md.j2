@@ -34,7 +34,7 @@
   [research] ─► spec ─► execute ─► wrapup
 ```
 
-각 stage 는 끝나면 멈춥니다. 다음 stage 는 직접 입력하세요. `hm check` 가 execute 와 wrapup 이 돌리는 단일 게이트입니다.
+각 stage 는 끝나면 멈춥니다. 다음 stage 는 직접 입력하거나 {{ (config.world_model or {}).get('name', 'Maker') }} 가 Advance 규칙으로 이어 들어갑니다. `hm check` 가 execute 와 wrapup 이 돌리는 단일 게이트입니다.
 
 ## ⚙️ 현재 설정
 

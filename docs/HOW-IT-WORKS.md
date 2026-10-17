@@ -127,7 +127,7 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 
 - **LLM judgment first**: LLM reads context and makes direct judgments rather than using pattern matching
 - **Atomicity**: Each stage can be run independently. Each one ends by naming the next; running
-  it is the user's call
+  it is the user's call, or Maker's under its Advance rule
 - **Worktree isolation**: Implementation changes happen only inside `.worktrees/<name>-<ts>/` — protecting the main branch
 - **Commit only in wrapup**: Even after multiple stages, a commit is created exactly once in wrapup
 - **No external transmission**: All telemetry is 100% local
@@ -1737,7 +1737,7 @@ unverified, so the skill tells the model to run the digest itself when no JSON a
 
 | Field | Content |
 |---|---|
-| `tasks` | ≤ 5, newest first: `slug`, `next_stage` (derived from artifacts: approved SPEC → REVIEW → APPROVED REVIEW → verify marker), `last_stage`, `last_seen`, `other_session`, `parked`, `latest_artifact {name, at}` |
+| `tasks` | ≤ 5, newest first: `slug`, `next_stage` (derived from artifacts: approved SPEC → REVIEW → wrapup), `last_stage`, `last_seen`, `other_session`, `parked`, `latest_artifact {name, at}` |
 | `more` | tasks beyond the five |
 | `autopilot` | this session's autopilot state |
 | `intents` | `counts`, `items`, `active[] {id, metric_id, last, target, gap}` — values from `hm intent status`, `—` when absent |

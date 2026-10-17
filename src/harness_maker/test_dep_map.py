@@ -619,6 +619,9 @@ CONFIG_SUITES: tuple[str, ...] = (
     # Runs `uv run --with <this repo> hm` on the bench fixture, so the hm it runs is built from
     # THIS repo's `pyproject.toml`: a dependency edit there can change its result.
     "tests/integration/test_light_lane_s3d_timeparse.py",
+    # Same: seeds its scratch task with `uv run --with <this repo> hm`, and the live agent's
+    # harness runs that hm too.
+    "tests/integration/test_maker_advance_live.py",
 )
 
 #: Suites the detector flags as touching a routed path but which do NOT read this repository's

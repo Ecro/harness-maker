@@ -382,7 +382,7 @@ The world model is what the harness keeps between sessions: **intents** (goals, 
 
 **The only entrance.** `intent-layer` and `project-knowledge` are not model-invocable. Typing `/intent-layer` or `/project-knowledge` (`$…` on Codex) still runs them; otherwise Maker reads their procedure before any write, and their ask-before-write rule is unchanged. An always-loaded `## World model` pointer in `CLAUDE.md` / `AGENTS.md` sends goal, metric, fact and status requests to Maker even when you don't name it, and even mid-stage. Ordinary build and fix requests are not rerouted. `/hm:` stages still run when typed, or via Maker.
 
-**Scope follows the ask.** "research X" ends at research, "spec X" at spec, "build X" / "fix X" runs the full pipeline; an unclear ask starts at research. Maker names the entry and end stage in one route line and enters the start stage; advancing to the next stage is your call.
+**Scope follows the ask.** "research X" ends at research, "spec X" at spec, "build X" / "fix X" runs the full pipeline; an unclear ask starts at research. Maker names the entry and end stage in one route line and enters the start stage, then the next ones under its Advance rule, stopping where a person is owed and never pushing.
 
 **Talking to Maker while a stage runs.** An aside opens with `Maker —` and is at most 6 lines. A decision or scope change about an in-flight task is written into its most downstream artifact (PLAN, else SPEC, else RESEARCH) before Maker replies. New work goes under `## Queued asks` in that artifact and is offered at the stage's STOP — never started mid-stage. The aside ends with one `↩ <stage> · <step>` line and the stage continues.
 
@@ -511,7 +511,7 @@ After install, the rendered harness exposes commands under `/hm:*`:
 | `/hm:execute` | Implement with TDD, then review (Step 6) — code reviewer, plus lens reviewers when `reviewers.fanout` is on and a second opinion when `second_opinion.models` is set |
 | `/hm:wrapup` | `hm check`, judgment, memory, commit, land |
 
-> **Recommended:** `/hm:research` (when the problem is unclear) → `/hm:spec` → `/hm:execute` → `/hm:wrapup`. Each stage ends by naming the next one; running it is the user's call. Jumping straight to `/hm:execute` forfeits the SPEC gate.
+> **Recommended:** `/hm:research` (when the problem is unclear) → `/hm:spec` → `/hm:execute` → `/hm:wrapup`. Each stage ends by naming the next one; running it is the user's call, or Maker's: after a "build X" or a resume, Maker enters the next stage itself and stops where a person is owed (SPEC-maker-advance). Jumping straight to `/hm:execute` forfeits the SPEC gate.
 
 0.64.0 retired the former `hm:review` and `hm:verify` stages (review is `/hm:execute`'s Step 6; the deterministic gates are `hm check`), the `hm:loop` and `hm:loop-p5-batch` drivers, autopilot auto-advance, and `hm:configure` (edit `.claude/harness.yaml` and re-run `/harness-maker:make`). These are written without a leading slash because they are no longer commands.
 

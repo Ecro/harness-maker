@@ -123,18 +123,6 @@ def last_stage_and_session(
     return last_stage, ts if isinstance(ts, str) else None, other
 
 
-def _review_status(path: Path) -> str | None:
-    from harness_maker.frontmatter import split_frontmatter
-
-    try:
-        split = split_frontmatter(path.read_bytes())
-    except OSError:
-        return None
-    mapping = getattr(split, "mapping", None) or {}
-    status = mapping.get("status") if isinstance(mapping, dict) else None
-    return status if isinstance(status, str) else None
-
-
 def _spec_done(base: Path, slug: str, wt: Path) -> bool:
     from harness_maker import spec_machine
 
@@ -143,16 +131,6 @@ def _spec_done(base: Path, slug: str, wt: Path) -> bool:
     except Exception:  # noqa: BLE001 — a broken SPEC is "not done", never a digest failure
         return False
     return state in ("approved", "exempt")
-
-
-def _verify_done(wt: Path) -> bool:
-    from harness_maker.observability import verification_cache
-
-    try:
-        key = verification_cache.compute_relevant_skip_key(wt)
-        return bool(verification_cache.is_fresh(key))
-    except Exception:  # noqa: BLE001
-        return False
 
 
 def _has(directory: Path, pattern: str) -> bool:
@@ -164,13 +142,6 @@ def _reviews(docs: Path, slug: str) -> list[Path]:
     from harness_maker import light_lane
 
     return light_lane.review_records(docs, slug)
-
-
-def _light_check_passed(base: Path, slug: str, wt: Path) -> bool:
-    from harness_maker import light_lane
-
-    # No `since`: the digest reads no marker. The cache freshness check still applies.
-    return light_lane.light_check_passed(base, slug, checkout=wt)
 
 
 def artifact_files(slug: str, wt: Path) -> list[Path]:
@@ -251,12 +222,7 @@ def next_stage(base: Path, slug: str, wt: Path) -> str:
         return "spec"
     if not reviews:
         return "execute"
-    if _light_check_passed(base, slug, wt):
-        return "wrapup"
-    if _review_status(reviews[-1]) != "APPROVED":
-        return "review"
-    if not _verify_done(wt):
-        return "verify"
+    # Review and verify were retired in 0.64.0 (SPEC-maker-advance IRR-002).
     return "wrapup"
 
 

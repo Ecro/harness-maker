@@ -49,7 +49,7 @@ the prose with one deterministic, capped digest whose next stage comes from the 
 ### S2: Next stage comes from artifacts, not spans
 **Given** a task worktree `hm/<slug>`
 **When** the digest computes `next_stage`
-**Then** it is the first stage whose completion signal is absent, in this order: spec (SPEC approval `approved` or `exempt`), execute (a `REVIEW-<slug>-*.md` exists), review (newest REVIEW `status: APPROVED`), verify (the verification marker matches the current tree), then `wrapup`
+**Then** it is the first stage whose completion signal is absent, in this order: spec (SPEC approval `approved` or `exempt`), execute (a `REVIEW-<slug>-*.md` exists), then `wrapup` (review and verify were retired in 0.64.0; SPEC-maker-advance IRR-002)
 **And** research is optional: `research` is next only when the task has none of RESEARCH, SPEC, PLAN or REVIEW; with a RESEARCH doc and no approved SPEC, `spec` is next
 **And** span rows never advance `next_stage` (a Claude Code turn-end `end` row and a Codex/Cursor task with no `end` rows give the same answer)
 
@@ -142,7 +142,7 @@ the prose with one deterministic, capped digest whose next stage comes from the 
 
 | Id | Decision | Category | Rationale |
 |---|---|---|---|
-| IRR-001 | `hm world_model digest` with flags `--root`, `--session-id`, the exit-0 contract, and JSON keys `tasks[].{slug,next_stage,last_stage,last_seen,other_session}`, `more`, `autopilot`, `intents`, `recent`, `unavailable`; `next_stage` values = the six pipeline stages. Lives under `world_model` (the router's input) rather than `hm world` (the intent layer's read path) | public API/CLI contract | Rendered router skills and user scripts depend on the command, flags and keys |
+| IRR-001 | `hm world_model digest` with flags `--root`, `--session-id`, the exit-0 contract, and JSON keys `tasks[].{slug,next_stage,last_stage,last_seen,other_session}`, `more`, `autopilot`, `intents`, `recent`, `unavailable`; `next_stage` values = the pipeline stages (four since 0.64.0: research, spec, execute, wrapup; SPEC-maker-advance IRR-002). Lives under `world_model` (the router's input) rather than `hm world` (the intent layer's read path) | public API/CLI contract | Rendered router skills and user scripts depend on the command, flags and keys |
 
 ## ✅ Verification Criteria
 
