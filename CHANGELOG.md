@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.65.0] - 2026-10-17
+
+Overhaul phase 2, first batch: Maker drives the pipeline, every choice is a card, and execute's REVIEW
+marks it finished. First release published since 0.62.0 (0.63.0 and 0.64.0 were never tagged).
+
 ### Added
 
 - **`hm review_effect`: measure what the one review catches and misses** (SPEC-review-effect-measurement).
@@ -23,7 +28,21 @@
   marker and no hook. The spec and execute hand-off lines say so, and an exempt SPEC can now land locally
   with no human touch (IRR-001).
 
+- **Every user choice in an hm render goes through the question tool** (SPEC-choice-cards). A choice an hm
+  command or Maker asks is a closed-option card (`AskUserQuestion` / `request_user_input`), recommendation
+  first except for approvals and equal options; without the tool, the same options as a numbered list, and
+  the stage waits. Thirteen prose-only choice sites were converted, stale Cursor `AskQuestion` mentions are
+  gone, and `/hm:spec` exempts only at `auto_full` (IRR-001).
+
 ### Fixed
+
+- **Rendered texts no longer describe retired machinery** (SPEC-retired-text). Agent, skill, command, hook
+  and Maker texts that still named autoloop, autopilot or the executor now say what runs in 0.64.0; Maker's
+  autopilot grant and step are gone (IRR-001).
+
+- **The bench test's decoy proxy no longer breaks CI** (SPEC-bench-decoy-proxy). `test_bench_light_lane`
+  set a dead `HTTPS_PROXY` that the runner's own `uv run --with` probe used to reach pypi, so every CI run
+  on main failed quality-gate; the decoy is now `HTTP_PROXY`, which https traffic ignores.
 
 - **A Resume after an interrupted execute no longer skips the fixes** (SPEC-review-after-fixes). execute now
   writes `work-docs/REVIEW-<slug>-<date>.md` only after its fix loop, listing every round's findings with
