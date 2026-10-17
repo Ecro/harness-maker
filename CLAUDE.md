@@ -254,10 +254,10 @@ Full specification (per-task model, 5-layer defense, loop-marker and per-session
 
 Maker (`templates/skills/world-model/SKILL.md.j2`, rendered at `skills/<handle>/`) is the one front door to the intent layer, project knowledge and task state. Full text: [`docs/reference/world-model.md`](docs/reference/world-model.md). Invariants that break most often:
 - **Only entrance.** `intent-layer` / `project-knowledge` stay `disable-model-invocation: true` (Codex: `openai.yaml` `allow_implicit_invocation: false`); Maker Reads their SKILL.md before any write. Never make them model-invocable again or add another self-triggering entrance.
-- `hm autopilot narrow` **never arms or widens**: it recomputes from `restore_pipeline` and is a no-op at `gated` / no marker / foreign marker. `restore_pipeline` is a marker field — every `.hm-autopilot*` reader must accept it.
 - `hm world_model digest` stays ≤ 1,500 bytes and **always exits 0**. A new field must fit the trim order (`recent` → intents → tasks → timing → `latest_artifact`); `other_session` is never dropped.
+- `restore_pipeline` is an `.hm-autopilot*` marker field — every reader must accept it (the Python module stays; see world-model.md).
 - Always-loaded pointers: `## World model` ≤ 400 chars, `## Project knowledge` ≤ 300 chars per variant; Maker SKILL.md ≤ 4,500 chars.
-- Maker `allowed-tools` stays scoped to `hm world_model:*` + `hm autopilot narrow:*` (plus `tail`/`grep`/`printf`). Never widen to `hm *` or `uv run:*`; the injected chain uses no `{ …; }` group, because a permission matcher that splits on `|`/`||` would see a piece starting with `{` (acceptance of the ungrouped chain is still unverified in a live session).
+- Maker `allowed-tools` stays scoped to `hm world_model:*` (plus `tail`/`grep`/`printf`); its autopilot grant and step left with autopilot (SPEC-retired-text IRR-001). Never widen to `hm *` or `uv run:*`; the injected chain uses no `{ …; }` group, because a permission matcher that splits on `|`/`||` would see a piece starting with `{` (acceptance of the ungrouped chain is still unverified in a live session).
 
 ## Second Brain 승급 파이프라인 (PLAN-second-brain-promotion)
 

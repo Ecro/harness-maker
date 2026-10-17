@@ -1,7 +1,8 @@
 {#- SPEC-world-model-name: the named front door. Rendered at skills/<handle>/ from this one
     template. SPEC-maker-front-door-improvements makes it the only entrance to the intent and
-    knowledge procedures (read on demand, never merged in), lets it narrow autopilot to the asked
-    end stage (IRR-005) and carries the decision-capture and mid-stage aside rules. Literal strings
+    knowledge procedures (read on demand, never merged in) and carries the decision-capture and
+    mid-stage aside rules. SPEC-retired-text IRR-001 removed its autopilot step (0.64.0 retired
+    autopilot), reversing IRR-005. Literal strings
     are the PLAN ADR-008 contract (tests/render/test_render_maker_front_door.py); the rendered
     file stays <= 4,500 chars on every target. -#}
 {#- The description is YAML double-quoted by hand, not `tojson`: tojson escapes astral
@@ -21,7 +22,7 @@
 ---
 name: {{ name }}
 description: "{{ (wm.name ~ " (" ~ inv ~ ") is this project's development front door: briefing, start or resume work, remember a project fact, goals and metrics. Use only when the operator addresses " ~ wm.name ~ " by name or types " ~ inv ~ ", or the World model rule routes a goal, metric, fact or status request here; do not trigger on the bare verbs make, build or fix.") | replace('\\', '\\\\') | replace('"', '\\"') }}"{% if not is_codex %}
-allowed-tools: Bash({{ hm }} world_model:*), Bash({{ hm }} autopilot narrow:*), Bash(tail:*), Bash(grep:*), Bash(printf:*){% endif %}
+allowed-tools: Bash({{ hm }} world_model:*), Bash(tail:*), Bash(grep:*), Bash(printf:*){% endif %}
 ---
 
 # {{ wm.name }}
@@ -60,7 +61,7 @@ No JSON or `unavailable` above? Run `hm world_model digest --root .` once; still
 
 - **tasks** (newest first, ≤ 5; `more` = rest; `parked: true` last): `next_stage` from artifacts;
   `other_session: true` = another session touched it last.
-- **intents.active** (`last`/`target`/`gap`), **autopilot**, **recent** commits.
+- **intents.active** (`last`/`target`/`gap`), **recent** commits.
 - Only `hm/<slug>` worktrees (`worktree.enabled: true`); else or on failure use `work-docs/`, `specs/`.
 
 Answer read-only goal and status questions from the briefing; read a procedure only to change something.
@@ -83,10 +84,6 @@ A decision or scope change on an in-flight task: write it into that task's most 
 
 Otherwise unclear → research. Enter {{ stage("research") }} when the end is research, the area
 is unfamiliar or the ask vague, else {{ stage("spec") }}, topic X. One route line: entry, end, why.
-Autopilot active → on EVERY ask first run
-`hm autopilot narrow --until <end> --root . --session-id "$HM_SESSION_ID"` (full pipeline:
-`wrapup`, undoing a leftover narrow); it stops at `<end>`, then restores.
-Never arm autopilot.
 
 ## Resume
 
@@ -94,8 +91,7 @@ Never arm autopilot.
 2. One → name its latest_artifact and time before entering its `next_stage`
    ({{ stage("<stage>") }} `<slug>`); `latest_artifact` absent or null → say "no artifact
    recorded", list its `work-docs/`/`specs/` files. `other_session` true or absent (unknown, not
-   false) → ask once first. Autopilot active → first run `hm autopilot narrow --until wrapup`
-   (args as in Start). `next_stage: wrapup` → ready to land; the operator runs wrapup.
+   false) → ask once first. `next_stage: wrapup` → ready to land; the operator runs wrapup.
 3. Two or more → ONE closed question: each slug with its `next_stage`.
 
 Then the stage's own gates and STOP rules decide.

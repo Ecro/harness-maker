@@ -19,7 +19,7 @@ files:
   body_sha256: 987808654491cd347d9a484a100a0ed433e49b9b01d18a89b0342c3cb265a2e7
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
-  body_sha256: 77dbd28de20fa4ad9a1f057cd49b59edd70b9b44fa0eba161d5497f436e7312a
+  body_sha256: f47ef5bfa13cdbe810029c27010477fbbb5e5b2252b9059c8b4d781b6d7b0ec9
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
   body_sha256: dbdcb14f83fec81ab18891eb43395c10b2329f5f851ba7d416c082f475bac05d
@@ -70,7 +70,7 @@ files:
   body_sha256: 03a7f5c424652cb4a76e2078092bc0771e655e7760b4009aca7600eeb09dc6b9
 - path: settings.json
   template: settings/Side.json.j2
-  body_sha256: 9e766fe199e75474f7c77441242ed79c36d36d6ebef8c2b9d8158bf9d4346d07
+  body_sha256: 8dadbc60bd1bb2fc9578d7f9400faf99dcc4a8030b6f7113e3209800f7e8c439
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 6859c80cb9e1c7e217c62b4300017c3a7f6afd08422deb19fc720e36596da9e4
@@ -82,16 +82,16 @@ files:
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 - path: skills/intent-layer/SKILL.md
   template: skills/intent-layer/SKILL.md.j2
-  body_sha256: 2f0278455287e88488c21d28c5fa47a1154f3db46398b4fb9ae9055bef162aac
+  body_sha256: 1c08d4f14fb30ad7c115fee68dc3fafeede2e5773c559880ce6841578a07387d
 - path: skills/intent-layer/references/workflow-feedback.md
   template: skills/intent-layer/references/workflow-feedback.md.j2
   body_sha256: 8bc02a9587278b53fdc82dc35a1cfbe6d0068c8e6b4c4cad5c43b7782a7deeb6
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: 0f2c78eac65d6a12510dcedc7aad534405f2a98c9c1df2e2ca83e8c2c4d05c50
+  body_sha256: 3fec5ec24e699c1fe2a564b050c811f6dd03efc5f612d805f1c9829ba6ce81ae
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 12611c8e959f5e774908e01684d63bbac86c253a665a20a34ae47825eeb76315
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
-  body_sha256: be14a423fa70c3c89ec85d4b88729c9e8a61c0b82c3fc08ea8a02da2240bd2dd
+  body_sha256: 7d173efc980b76c0bc92d8e2ed6dfefc1ca4943941b810bb0e0bec3c49a619a3

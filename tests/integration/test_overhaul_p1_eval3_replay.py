@@ -29,6 +29,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from tests._overhaul_p1_ref import HEAD_SRC, REF_SHA, REPO_ROOT, clean_env, normalise, ref_root
 
@@ -70,10 +73,10 @@ def _task(run: str) -> str:
 _INSTALL_REF = re.compile(r"uv run --with (\S+) hm ")
 
 
-def _install_ref(work: Path) -> str:
+def _install_ref(work: Path, commit: str = "HEAD") -> str:
     """The checkout the render was installed from — machine provenance, not harness content."""
     text = subprocess.run(
-        ["git", "show", "HEAD:.claude/commands/hm/execute.md"],
+        ["git", "show", f"{commit}:.claude/commands/hm/execute.md"],
         cwd=work,
         capture_output=True,
         text=True,
@@ -85,21 +88,55 @@ def _install_ref(work: Path) -> str:
     return found.group(1)
 
 
-def harness_digest(work: Path) -> dict[str, str]:
-    """sha256 of every file the "harness" commit (HEAD) adds or changes, provenance masked."""
-    ref = _install_ref(work)
-    names = _git(work, "diff", "--name-only", "HEAD~1", "HEAD").split()
+_FRONTMATTER = re.compile(r"\A---\n.*?\n---\n", re.S)
+
+
+def digest_text(name: str, text: str, ref: str) -> str:
+    """sha256 of one harness file, provenance masked and the install ref replaced.
+
+    YAML folds a long frontmatter scalar at a width that depends on the install ref's length
+    (a temp path): it turns one space into a newline plus indentation. So inside `.md`
+    frontmatter a newline followed by spaces collapses to one space (SPEC-retired-text AC-006);
+    top-level keys, blank lines, bodies and every other file stay byte for byte.
+    """
+    text = normalise(text).replace(ref, "<REF>")
+    if name.endswith(".md"):
+        text = _FRONTMATTER.sub(lambda m: re.sub(r"\n +", " ", m.group(0)), text, count=1)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _commit_digest(work: Path, commit: str) -> dict[str, str]:
+    ref = _install_ref(work, commit)
+    names = _git(work, "diff", "--name-only", f"{commit}~1", commit).split()
     out: dict[str, str] = {}
     for name in names:
         raw = subprocess.run(
-            ["git", "show", f"HEAD:{name}"], cwd=work, capture_output=True, timeout=60, check=True
+            ["git", "show", f"{commit}:{name}"],
+            cwd=work,
+            capture_output=True,
+            timeout=60,
+            check=True,
         ).stdout
         try:
-            text = normalise(raw.decode("utf-8")).replace(ref, "<REF>")
+            out[name] = digest_text(name, raw.decode("utf-8"), ref)
         except UnicodeDecodeError:
-            text = raw.hex()
-        out[name] = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            out[name] = hashlib.sha256(raw.hex().encode("utf-8")).hexdigest()
     return out
+
+
+def manifest_sha256(digest: dict[str, str]) -> str:
+    """One hash for a whole per-file digest, so provenance can record 36 runs compactly."""
+    return hashlib.sha256(json.dumps(digest, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def harness_digest(work: Path) -> dict[str, str]:
+    """Digest of every file the "harness" commit (HEAD) adds or changes."""
+    return _commit_digest(work, "HEAD")
+
+
+def original_harness_digest(work: Path, commit: str) -> dict[str, str]:
+    """The same digest for an original eval-3 run, whose "harness" commit is `commit`."""
+    return _commit_digest(work, commit)
 
 
 def _template(cache: Path, task: str) -> Path:
@@ -310,3 +347,55 @@ def test_ac006_negative_controls(cache: Path, tmp_path: Path) -> None:
         }
     finally:
         shutil.rmtree(tree, ignore_errors=True)
+
+
+# SPEC-retired-text AC-006: the precondition must not depend on the install ref's length.
+_REF_CHARS = st.text(
+    alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-",
+    min_size=8,
+    max_size=200,
+)
+PROVENANCE = FIXTURES / "harness_manifest_provenance.json"
+ORIGINAL_RUNS = Path("/var/tmp/hm-eval-3/runs")
+
+
+def _maker_like(ref: str) -> str:
+    tools = ", ".join(
+        [
+            f"Bash(uv run --with {ref} hm world_model:*)",
+            "Bash(tail:*)",
+            "Bash(grep:*)",
+            "Bash(printf:*)",
+        ]
+    )
+    front = yaml.safe_dump({"name": "maker", "allowed-tools": tools}, sort_keys=False)
+    return f"---\n{front}---\n\nbody `uv run --with {ref} hm` stays byte for byte.\n"
+
+
+@settings(max_examples=60, deadline=None)
+@given(a=_REF_CHARS, b=_REF_CHARS)
+def test_ac_006_digest_ignores_install_ref_length(a: str, b: str) -> None:
+    name = ".claude/skills/maker/SKILL.md"
+    assert digest_text(name, _maker_like(a), a) == digest_text(name, _maker_like(b), b)
+    # Body whitespace and non-Markdown files stay pinned.
+    assert digest_text(name, "---\nx: 1\n---\nA  B\n", "r") != digest_text(
+        name, "---\nx: 1\n---\nA B\n", "r"
+    )
+    assert digest_text("h.yaml", "a:\n  b: 1\n", "r") != digest_text("h.yaml", "a:\n b: 1\n", "r")
+
+
+def test_ac_006_manifest_matches_original_provenance() -> None:
+    data = json.loads(PROVENANCE.read_text("utf-8"))
+    originals = data["originals"]
+    assert len(originals) == 36
+    assert (
+        sorted(o["run"] for o in originals) == sorted(p.name for p in ORIGINAL_RUNS.glob("t*-hm-*"))
+        or not ORIGINAL_RUNS.is_dir()
+    )
+    want = manifest_sha256(_manifest())
+    assert all(o["digest_sha256"] == want for o in originals)
+    if ORIGINAL_RUNS.is_dir():
+        for o in originals:
+            work = ORIGINAL_RUNS / o["run"] / "work"
+            got = original_harness_digest(work, o["harness_commit"])
+            assert manifest_sha256(got) == o["digest_sha256"], o["run"]

@@ -76,7 +76,6 @@ _ALLOWED_TOOLS = (
     # `world_model` has one subcommand, the read-only `digest`; naming the module keeps the
     # grant out of the single-digest classifier (test_ac_007_router_single_digest).
     "Bash({hm} world_model:*)",
-    "Bash({hm} autopilot narrow:*)",
     # tail/grep/printf: the ungrouped `| tail -n 1 | grep '^{.*}$' || printf` fail-soft chain
     # (post-review confirm-2 P2 — a `{ …; }` group matched no prefix rule).
     "Bash(tail:*)",
@@ -385,7 +384,6 @@ def _end_stage_table(text: str) -> list[str]:
 @pytest.mark.parametrize("row", _AC007, ids=[r.input["case"] for r in _AC007])
 def test_ac007_ask_to_end_stage(row: Any, runtime: str, repo: Callable[[str], Path]) -> None:
     text = _maker(repo, "en", runtime)
-    assert _NARROW in text
     table = _end_stage_table(text)
     case = str(row.input["case"])
     expected = str(row.expected["end_stage"])

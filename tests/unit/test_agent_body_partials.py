@@ -85,6 +85,10 @@ def _render_body(name: str) -> str:
 # 5 reviewer entries below are the post-Phase-C hashes; the remaining 7
 # agents keep their pre-refactor hashes.
 _EXPECTED_SHA256: dict[str, str] = {
+    # Re-pinned 2026-10-17 (SPEC-retired-text). FIVE entries: the four lens reviewers include
+    # `_partials/hard_rules.md.j2`, whose "the executor agent applies them" became "the main
+    # session applies them" (no executor agent since 0.64.0), and `consensus-arbiter` lost its
+    # autoloop trigger for the second-opinion severity trigger and its stale reachability note.
     # Re-pinned 2026-10-16 (SPEC-hm-overhaul-p1, 0.64.0). THREE entries: `code-reviewer` became
     # the one reviewer `/hm:execute` Step 6 runs (AC-004 budget <= 3,000 chars, D-1), and
     # `consensus-arbiter` / `spec-validator` lost their references to the retired review and
@@ -134,7 +138,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     # four moved, and only those four, is the check worth making: a fifth would mean the
     # deletion reached past the include.
     "code-reviewer": "3f6ccc632fe1a1563601c10b148bbf6d3264583aef81ac237d00e812b14b958e",
-    "concurrency-reviewer": "ffc8b5f6bcc43dd33fc6353e87797216a5c8eb39494e8b762beaab50f31ff359",
+    "concurrency-reviewer": "145f8e7197dd9e70f8c3ad2fc6c08fa16f915a5cec5598d93461287f982b2563",
     # consensus-arbiter + spec-validator (was plan-validator): hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.
     # Both agents previously had NO frontmatter permissions block; Phase 2
@@ -151,19 +155,19 @@ _EXPECTED_SHA256: dict[str, str] = {
     # reconciled to forbid cross-tier severity resolution, and the user-extension
     # comment reworded to forbid tier bridging. Body change outside the codex
     # conditional, so the disabled-config hash moves. Pre-bump hash in git history.
-    "consensus-arbiter": "92f36c7ef2fe875fe0f168f3af470ffc1caccaae03710879ba2163a9d04263ea",
+    "consensus-arbiter": "2b820f15f2ec14f5c1316193e31777d74b46079cd4a345a7f7bc7633a41d80e5",
     # executor: re-pinned 2026-06-03 (PLAN-techspec-audit F61). The description
     # + body claimed a runtime-enforced "never writes to repo root" boundary that
     # Claude Code does NOT enforce (subagent-frontmatter permissions are not
     # enforced — see CLAUDE.md §보안/권한). Reworded to "by convention, prompt-
     # level guidance, not runtime-enforced". Pre-bump hash in git history.
-    "performance-reviewer": "869fa3131ffa6cae4be84232deca0174df7d9cd973cc203499f13f75977771e6",
+    "performance-reviewer": "ed628f85004ac1e566915f24f40639709e42e02a85eb0a7fecb8b194dcd334b7",
     # spec-validator REPLACES plan-validator (SPEC-plan-stage-absorption ADR-004): relocated
     # to /hm:spec, re-scoped to ACs / circular oracles / implied-but-unlisted irreversible
     # decisions / scope boundary, single-pass and never-blocking. New body, new pin.
     "spec-validator": "6be1f52d52461127170f7c29f0dbc02eeda6f8585b9ff04a90ee94c9be0ddfbd",
     # `return_envelope` include removed — see the code-reviewer note above.
-    "security-reviewer": "aadcaf6606ce6b7483f4994f190c919cfba8e9a32d987a4a046e2d9491d19c0e",
+    "security-reviewer": "538157bb0b544d448080b76dd128d79e7a21e7b2e51a39e6357090ec4193b6be",
     # stuck re-pinned 2026-09-20 (SPEC-plan-stage-absorption): its trigger list and two
     # escalation examples named `/hm:plan` and `plan-validator`, which no longer exist. The
     # trigger is now a `/hm:spec` spec-validator `critical` the DRI cannot resolve, and the
@@ -215,7 +219,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     # observable. It now says they may not FAIL *for that reason* and are still judged
     # against the banned patterns, which the clause never overrides.
     "test-reviewer": "0a3978bcd2cb69680a67bdba70d6ce91b07fe86c3ef17e6df6bf6b7cf3f994df",
-    "ux-reviewer": "b6e31a5a45013208a80f0c17eca4e720add647f6d9a386027ae1a57b5d347ebc",
+    "ux-reviewer": "6de6db674e56999b676cd753b244f5acff90b7b8a1ffe7910b848967e78183b1",
 }
 
 

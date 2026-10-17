@@ -163,10 +163,9 @@ Append every answer to `.claude/observability/health/decisions.jsonl`.
 
 Never auto-apply. Never batch into yes/no over multiple items.
 
-## Autoloop behavior
+## Non-interactive behavior
 
-Stop after writing the dashboard. The structured-question step requires
-interactive mode; autoloop must not synthesize a default answer.
+Stop after writing the dashboard; without a question tool, never synthesize a default answer.
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific /hm:health hooks. Preserved across harness-maker upgrades. -->

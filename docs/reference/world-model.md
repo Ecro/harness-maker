@@ -116,22 +116,21 @@ when the digest fails mid-output (AC-010).
   piece starting with `{` matches no rule, so a grouped fallback would prompt (or fail) on
   every load.
 - **Why `world_model:*`, not `hm *`**: frontmatter `allowed-tools` is
-  `Bash(<hm> world_model:*)`, `Bash(<hm> autopilot narrow:*)`, `Bash(tail:*)`,
-  `Bash(grep:*)`, `Bash(printf:*)`. A bare `Bash(uv run:*)` pre-approved any `uv run`
-  (REVIEW 24451777); `hm *` still pre-approved every `hm` verb (confirm-1). The scope is the
-  two verbs Maker actually runs.
+  `Bash(<hm> world_model:*)`, `Bash(tail:*)`, `Bash(grep:*)`, `Bash(printf:*)`. A bare
+  `Bash(uv run:*)` pre-approved any `uv run` (REVIEW 24451777); `hm *` still pre-approved
+  every `hm` verb (confirm-1). The scope is the one verb Maker actually runs; the
+  autopilot grant left with autopilot (SPEC-retired-text IRR-001).
 - Codex runs the same command as a bash block (no `allowed-tools`). Cursor `!` support is
   unverified; the skill tells the model to run the command itself when no JSON appears.
 
-## Start → scope (`hm autopilot narrow`, IRR-005/007/008)
+## Start → scope (IRR-007/008)
 
 Maker picks the end stage from the ask (research cues → research; spec cues → spec;
 build/만들어/고쳐 → full pipeline; unclear → research) and names entry and end point in one
-route line. A research-only ask enters research, never spec (AC-007). While autopilot is
-active Maker runs `hm autopilot narrow --until <end> --root . --session-id "$HM_SESSION_ID"`
-on every ask (`wrapup` for the full pipeline). Also available as
-`harness-maker autopilot narrow --until <stage>`. IRR-005 reverses PLAN-world-model-name
-ADR-008 ("routes only"): the router now changes autonomy state, so the contract is narrow.
+route line. A research-only ask enters research, never spec (AC-007). Maker routes only:
+SPEC-retired-text IRR-001 (2026-10-17) removed its autopilot step and reversed IRR-005, since
+0.64.0 retired autopilot. The `hm autopilot narrow` command below still exists in Python, but
+Maker no longer runs it.
 
 **`narrow` (`autopilot.narrow`) — invariants:**
 
