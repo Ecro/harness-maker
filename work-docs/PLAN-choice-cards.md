@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: choice-cards
-status: planning
+status: complete
 created: 2026-10-17
 spec: "[[SPEC-choice-cards]]"
 surface_allowance:

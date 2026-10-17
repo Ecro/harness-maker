@@ -235,9 +235,11 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # execute and wrapup re-measured after PR #36 folded PR-S's review-round-1 allowance
     # (BASELINE-DELTA-hm-overhaul-p1-s.md, "Folded into the baseline from main").
     "execute": 8072,
-    "research": 4554,
+    # research and wrapup re-measured after #40 folded SPEC-choice-cards' allowance
+    # (BASELINE-DELTA-choice-cards.md, "Folded into the baseline from main").
+    "research": 4647,
     "spec": 7033,
-    "wrapup": 4568,
+    "wrapup": 4862,
 }
 
 
