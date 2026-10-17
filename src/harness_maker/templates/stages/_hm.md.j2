@@ -6,6 +6,11 @@
 **CLI.** Run every `hm …` below as `uv run --with {{ harness_maker_src_path }} hm …`{% if is_codex %} through the Bash tool{% endif %}, typing the prefix in full.
 {%- endmacro -%}
 
+{#- SPEC-choice-cards AC-001: every user choice is a question-tool card; skills/world-model carries a copy. -#}
+{%- macro choices() -%}
+**Choices.** Ask each choice with {% if is_codex %}`request_user_input` where available{% else %}`AskUserQuestion`{% endif %}; recommendation first, except approvals and equal options. Without the tool: a numbered list, then wait; never choose for the user.
+{%- endmacro -%}
+
 {%- macro wt_on() -%}{{ config.worktree.get('enabled') }}{%- endmacro -%}
 
 {%- macro preflight(stage) -%}

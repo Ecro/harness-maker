@@ -16,31 +16,31 @@ files:
   body_sha256: d9fcb231718944500e6048d6502b0fd8da6e90a693ccb85e604430650288e090
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 5d678ddb0c2edccfdde410bfa1559ee541d8e084183f1441e59a7ae9b8348525
+  body_sha256: 0f3eea391567ece99c667ffdc74f0c852e455d8bd3d2fa1459c84c746c80e670
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
-  body_sha256: f47ef5bfa13cdbe810029c27010477fbbb5e5b2252b9059c8b4d781b6d7b0ec9
+  body_sha256: f85feb685ee8ee4d2dbd28e05f3089468026bf82a1ce8241db3c3cf7f93ea0dd
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
   body_sha256: f4e63715bf7ad1438f37ef580c20d2ed3aeb7a8b81c041476d8a41aeb123eeb7
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
-  body_sha256: 9db136d83b269aa6c0a430c14b4f70de2bf5c1081db67ce275c7e1d1cef0daaf
+  body_sha256: 63ddebdb8a90b44830aa62bd7c8a257398665b046e1440b4b08b400deac8c31d
 - path: commands/hm/metrics.md
   template: commands/hm/metrics.md.j2
   body_sha256: 88c4eb0ed405a4c35b0fd91951bf49de501cf765042f5934967a9c505a5f28cf
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 494ce1e3c1f154a5cdf1b0b1949a40323288ca611de0c16afe7e070260d26340
+  body_sha256: c2f8863fc1d4bf516aea1df009ba29a348ba19c4b28b81f0c63e36cfca3f6bfa
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 5695bef8fdee28f03effeef887f4fb49b119eff39bc617112843db901f2a7147
+  body_sha256: 658c2e56922af4e1e9e8cd0ea9fa5fb2d4727104bda83c3afafd2fd7e497862c
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
-  body_sha256: 86a9b22c2d05bb4c25d11d38a50fb331dda627fe91c0348f95acee03f3be15a1
+  body_sha256: 4de0492567baa79b3ce81951f85e8bd77d9eac545369f0bef860ec0668c6aa80
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: a5dce09f7c728e37fafedd9c2a0dee1f051301e583c88ee10d6a3d8216bc2561
+  body_sha256: 3bddfb46474964d5c07476c8b9973148c9586ae58e8c14bf58b3a5b102080ab4
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
   body_sha256: f295e822ef5766a50608e4ab2d990d9e97ed9f9b79c10116a476895d51c962eb
@@ -88,7 +88,7 @@ files:
   body_sha256: 8bc02a9587278b53fdc82dc35a1cfbe6d0068c8e6b4c4cad5c43b7782a7deeb6
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: 3fec5ec24e699c1fe2a564b050c811f6dd03efc5f612d805f1c9829ba6ce81ae
+  body_sha256: 72de6ad0a12c8dd5d8ff4c392b0a087d548a0c91e18a879944c5e1fb6908323c
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 12611c8e959f5e774908e01684d63bbac86c253a665a20a34ae47825eeb76315

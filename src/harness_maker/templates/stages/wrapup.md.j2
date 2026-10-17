@@ -5,7 +5,9 @@
 {%- set _deleg = 'wrapup' in ((config.get('delegation') or {}).get('stages') or []) -%}
 # /hm:wrapup
 
-{{ hm.cli() }}{{ hm.preflight("wrapup") }}
+{{ hm.cli() }}
+
+{{ hm.choices() }}{{ hm.preflight("wrapup") }}
 {%- if _wt %} `<BASE>` is the repo two levels above `<WT>`.{% endif %}
 {%- if _deleg %}
 
@@ -16,7 +18,7 @@ Run `hm wrapup_brief --root . --slug '<slug>'`. When it is `ok` and you can disp
 
 ## Step 1 — Gate
 
-`hm check --slug <slug>`{{ hm.long_gate(why=false) }}. 0 proceeds; 1: fix, rerun; 3, or 4 twice: report, stop; 5: ask the DRI.
+`hm check --slug <slug>`{{ hm.long_gate(why=false) }}. 0 proceeds; 1: fix, rerun; 3, or 4 twice: report, stop; 5: ask the DRI with {{ hm.ask() }} (approve / stop).
 
 ## Step 3.6 — Judgment
 
@@ -48,9 +50,9 @@ Search first: `hm memory_retrieve --topic "<what changed>"`. Bodies: `mktemp` fi
 
 Message file: `<type>(<scope>): <subject>`, why, RED summary, an `Understanding:` block, ≤5 bullets (`<assumption>: <before> -> <after>`, `unknown: …`, `agent-decided: ADR-…`). `hm proposals summary`: 5+ open warns once (triage: `hm proposals list --open`).
 
-`hm spec_machine approval-status --slug <slug>{% if _wt %} --root <BASE> --checkout <WT>{% endif %}`. On `land: hold`, show each `irreversible` decision; ask once: approve runs `hm spec_machine approve --yaml {{ '<WT>/' if _wt else '' }}<Y>`, keep stops; silence is never approval.
+`hm spec_machine approval-status --slug <slug>{% if _wt %} --root <BASE> --checkout <WT>{% endif %}`. On `land: hold`, show each `irreversible` decision; ask once with {{ hm.ask() }}: approve runs `hm spec_machine approve --yaml {{ '<WT>/' if _wt else '' }}<Y>`, keep stops; silence is never approval.
 
-`hm wrapup_land --worktree {{ _W }} --base {{ _B }} --slug <slug> --message-file <file> --required work-docs/PLAN-<slug>.md --optional .claude/memory/ --optional 'work-docs/REVIEW-<slug>-*.md' --optional work-docs/RESEARCH-<slug>.md --optional specs/SPEC-<slug>.md --optional <Y>`. `index_after` must hold the code. On `legacy_ref_scan: abort`, show `git stash show -p <ref>` before stash advice. Ask only on `[finalize] stash-pop conflict` or `untracked-file collision`; else report verbatim, halt.
+`hm wrapup_land --worktree {{ _W }} --base {{ _B }} --slug <slug> --message-file <file> --required work-docs/PLAN-<slug>.md --optional .claude/memory/ --optional 'work-docs/REVIEW-<slug>-*.md' --optional work-docs/RESEARCH-<slug>.md --optional specs/SPEC-<slug>.md --optional <Y>`. `index_after` must hold the code. On `legacy_ref_scan: abort`, show `git stash show -p <ref>` before stash advice. Ask only on `[finalize] stash-pop conflict` or `untracked-file collision`, with {{ hm.ask() }} and no recommendation; else report verbatim, halt.
 {%- if _wt %}
 
 ## Step 7.7 — Squash-land

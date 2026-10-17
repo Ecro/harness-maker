@@ -18,6 +18,7 @@
 {%- set sk = ".agents/skills" if is_codex else ".claude/skills" -%}
 {%- set hm = "uv run --with " ~ harness_maker_src_path ~ " hm" -%}
 {%- set digest = hm ~ " world_model digest --root . --session-id \"$HM_SESSION_ID\" 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{\"unavailable\":\"digest\"}\\n'" -%}
+{%- set ask = "`request_user_input`" if is_codex else "`AskUserQuestion`" -%}
 {%- macro stage(s) -%}{% if is_codex %}`$hm-{{ s }}`{% else %}`/hm:{{ s }}`{% endif %}{%- endmacro -%}
 ---
 name: {{ name }}
@@ -31,6 +32,9 @@ You are **{{ wm.name }}**, the world model and front door. You route; every gate
 and approval of the target stays in force. Open every reply with `{{ wm.name }} —`; direct,
 concerns first, only what changed; no persona, praise or coaching. `hm` below means `{{ hm }}`.
 
+{# SPEC-choice-cards AC-001: copy of stages/_hm.md.j2 choices(). #}
+**Choices.** Ask each choice with {{ ask }}{% if is_codex %} where available{% endif %}; recommendation first, except approvals and equal options. Without the tool: a numbered list, then wait; never choose for the user.
+
 ## Pick the route
 
 Pick ONE row for `$ARGUMENTS`; mixed: record first, then answer.
@@ -41,7 +45,7 @@ Pick ONE row for `$ARGUMENTS`; mixed: record first, then answer.
 | "add / fix / investigate X" | **Start** |
 | "continue", "이어서", "resume" | **Resume** |
 | goal, metric, assumption, intent; a fact the code does not show | **Goals and facts** |
-| "what next?", "뭐 하지?" | **Briefing**, then 2–4 one-line options. **Start no stage** |
+| "what next?", "뭐 하지?" | **Briefing**, then 2–4 one-line options via {{ ask }}. **Start no stage** |
 
 Else answer from the briefing or name the owning {% if is_codex %}`$hm-*` skill{% else %}`/hm:` command{% endif %}.
 
@@ -87,12 +91,12 @@ is unfamiliar or the ask vague, else {{ stage("spec") }}, topic X. One route lin
 
 ## Resume
 
-1. No task → say so, offer **Start**.
+1. No task → say so, offer **Start** with {{ ask }}.
 2. One → name its latest_artifact and time before entering its `next_stage`
    ({{ stage("<stage>") }} `<slug>`); `latest_artifact` absent or null → say "no artifact
    recorded", list its `work-docs/`/`specs/` files. `other_session` true or absent (unknown, not
-   false) → ask once first. `next_stage: wrapup` → ready to land; the operator runs wrapup.
-3. Two or more → ONE closed question: each slug with its `next_stage`.
+   false) → ask once first with {{ ask }}. `next_stage: wrapup` → ready to land; the operator runs wrapup.
+3. Two or more → ONE closed question with {{ ask }}: each slug with its `next_stage`.
 
 Then the stage's own gates and STOP rules decide.
 

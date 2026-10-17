@@ -225,7 +225,7 @@ evidence. Each reader has its disposition in the AC-011 table. A security reader
 |---|---|
 | `.claude/commands/hm/spec.md` | ≤ 6,500 base; +1,500 when worktree on; +800 at depth `deep` |
 | `.claude/commands/hm/execute.md` | ≤ 7,000; +1,500 when worktree on |
-| `.claude/commands/hm/wrapup.md` | ≤ 3,500; +2,800 when worktree on |
+| `.claude/commands/hm/wrapup.md` | ≤ 3,800 (3,500 until SPEC-choice-cards, DRI card 2026-10-17); +2,800 when worktree on |
 | `.claude/commands/hm/research.md` (D-7) | ≤ 8,000 |
 | `.claude/commands/hm/metrics.md` (D-6) | ≤ 3,000 |
 | `.claude/commands/hm/{make,help,health,uninstall}.md` | ≤ db19f023 size; help lists only rendered commands |
@@ -643,7 +643,8 @@ Every db19f023 registry heading not listed here is **KEPT** in its stage. Dispos
    loading.
 5. The budgets are estimates from scratchpad drafts, not implementations: spec ~5.8k, execute ~4.4k,
    wrapup ~3.0–3.2k at default config. The DRI's targets were 6k, 7k and 3k. Wrapup cannot keep memory
-   capture and judgment binding under 3k, so this SPEC sets 3,500. Spec is set at 6,500 to leave a
+   capture and judgment binding under 3k, so this SPEC sets 3,500; SPEC-choice-cards raised it to
+   3,800 for the Choices rule (DRI card 2026-10-17). Spec is set at 6,500 to leave a
    margin.
 6. In eval 3, all 36 hm runs left every AC unbound (`pending_test: true`), and t6-hm-2 had `ac: []`.
    Under the AC rule, `hm check` fails 36/36 of those trees. That failure is the SDD gap the rule
