@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: maker-advance
-status: planning
+status: complete
 created: 2026-10-17
 spec: "[[SPEC-maker-advance]]"
 surface_allowance:
