@@ -61,3 +61,4 @@
 {"deletes": "src/harness_maker/spec_need.py:604", "gate": "tests/structural/test_strictness_reader_singleton.py::test_exactly_one_strictness_reader", "slug": "dev-mode-removal", "ts": "2026-09-21T00:14:07Z"}
 {"deletes": "src/harness_maker/step_sensitivity.py:55", "gate": "tests/structural/test_dev_mode_retired.py::test_ac_005_snapshot_arms_halve", "slug": "dev-mode-removal", "ts": "2026-09-21T00:14:07Z"}
 {"deletes": "src/harness_maker/documentation_contract.py:26", "gate": "tests/structural/test_documentation_contract.py::test_ac_002_contract_and_mutation_inventories_are_nonempty", "slug": "docs-release-sync", "ts": "2026-09-22T10:27:00Z"}
+{"deletes": "CLAUDE.md:297", "gate": "tests/structural/test_repo_output_language.py::test_ac_004_repo_root_files_carry_the_output_language_directive", "slug": "retire-autopilot-remnants", "ts": "2026-10-17T13:31:36Z"}
