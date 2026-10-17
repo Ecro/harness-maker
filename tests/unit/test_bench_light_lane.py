@@ -236,7 +236,7 @@ def bench_run(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     base = tmp_path_factory.mktemp("bench-run")
     env = {
         "GITHUB_TOKEN": "ghp_decoy", "AWS_SECRET_ACCESS_KEY": "aws_decoy", "CLAUDECODE": "1",
-        "ANTHROPIC_API_KEY": "sk-decoy", "HTTPS_PROXY": "http://proxy.invalid:1",
+        "ANTHROPIC_API_KEY": "sk-decoy", "HTTP_PROXY": "http://proxy.invalid:1",
         "LC_ALL": "C.UTF-8", "HM_BENCH_PASS": "passed-through",
     }  # fmt: skip
     got = _run_bench(base, ["--tasks", "t1", "--runs", "1", "--pass-env", "HM_BENCH_PASS"], env=env)
@@ -349,7 +349,8 @@ def test_agent_gets_an_allowlisted_environment(bench_run: dict[str, Any]) -> Non
         env = json.loads((bench_run["logs"] / f"{arm}-t1.json").read_text())["env"]
         assert not {"GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY", "CLAUDECODE"} & set(env)
         assert env["ANTHROPIC_API_KEY"] == "sk-decoy"
-        assert env["HTTPS_PROXY"] == "http://proxy.invalid:1"
+        # HTTP_PROXY, not HTTPS_PROXY: the runner's own https probe to pypi must not use the decoy.
+        assert env["HTTP_PROXY"] == "http://proxy.invalid:1"
         assert env["LC_ALL"] == "C.UTF-8"
         assert env["HM_BENCH_PASS"] == "passed-through"  # named by --pass-env
         assert "PATH" in env
