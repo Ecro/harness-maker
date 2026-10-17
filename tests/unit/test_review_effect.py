@@ -37,7 +37,7 @@ def test_ac_001_parse_review_golden(row: Any, capsys: pytest.CaptureFixture[str]
 
 
 def _ledger(root: Path) -> Path:
-    return root / ".claude" / "observability" / "review-effect.jsonl"
+    return root / ".claude" / "observability" / "review_effect.jsonl"
 
 
 def _rows(root: Path) -> list[dict[str, Any]]:
@@ -352,3 +352,20 @@ def test_ac_009_score_rejects_malformed_manifest(project: Path, tmp_path: Path) 
     findings.write_text(json.dumps([{"file": "a.py", "line": 1}]), encoding="utf-8")
     argv = ["score", "--root", str(project), "--manifest", str(manifest)]
     assert re_mod.main([*argv, "--findings", str(findings)]) == 2
+
+
+# ── post-land regression: ledger name collided with review-*.jsonl readers ──
+
+
+def test_ledger_name_is_outside_every_review_telemetry_glob() -> None:
+    """`review-effect.jsonl` matched `review-*.jsonl`, so review_telemetry and
+    verifier_discrimination read its rows as telemetry and failed validation (found on base
+    after the first land)."""
+    import fnmatch
+
+    from harness_maker import verifier_discrimination
+
+    name = re_mod.LEDGER_REL.name
+    assert not fnmatch.fnmatch(name, verifier_discrimination.DEFAULT_REVIEW_GLOB)
+    assert not fnmatch.fnmatch(name, "review-*.jsonl")
+    assert not name.startswith("review-")

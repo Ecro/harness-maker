@@ -56,7 +56,7 @@ def _write_ledger(
 ) -> None:
     obs = root / ".claude" / "observability"
     obs.mkdir(parents=True, exist_ok=True)
-    (obs / "review-effect.jsonl").write_text(
+    (obs / "review_effect.jsonl").write_text(
         "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8"
     )
     if exclusions is not None:

@@ -1313,7 +1313,7 @@ Phase A.5 test review cannot certify that a refusal-message test discriminates i
 (execute.md.j2:52 vs :64). Every accepted P0/P1 is therefore something the deterministic gates missed, by
 construction, with no counterfactual arm needed.
 
-**What it records.** One ledger, `<base>/.claude/observability/review-effect.jsonl` (schema 1), with three
+**What it records.** One ledger, `<base>/.claude/observability/review_effect.jsonl` (schema 1), with three
 events:
 - `review`: written by `wrapup_land` after the commit and before the pop. Keyed `(slug, commit)`, best-effort,
   and it never changes the land. It parses the latest `REVIEW-<slug>-<date>.md` `## Findings` table by
@@ -1338,4 +1338,7 @@ fan-out. The rule is never reinterpreted after it fires.
 - `accepted` is a decision, not a validated defect.
 - Escapes that are never fixed are invisible.
 - Rows only exist after the next release, because the rendered harness runs the released cache.
+
+
+**Name.** Not `review-effect.jsonl`: that matched the `review-*.jsonl` telemetry glob and broke `review_telemetry` validation on base. Renamed before push (2026-10-17).
 <!-- @hm:/user:entries -->

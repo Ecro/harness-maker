@@ -23,7 +23,7 @@ from harness_maker import __version__, command_registry, ledger_exclusions
 from harness_maker.delivery_metrics import _REMEDIATION_SUBJECT
 from harness_maker.io_utils import append_atomic_line, atomic_write
 
-LEDGER_REL = Path(".claude") / "observability" / "review-effect.jsonl"
+LEDGER_REL = Path(".claude") / "observability" / "review_effect.jsonl"
 SCHEMA_VERSION = 1
 
 _SEVERE = frozenset({"P0", "P1"})

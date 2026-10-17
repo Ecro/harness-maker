@@ -8,7 +8,7 @@ numbers trigger.
 
 ## What is recorded
 
-All rows go to `<base>/.claude/observability/review-effect.jsonl` (local, gitignored, `schema_version: 1`).
+All rows go to `<base>/.claude/observability/review_effect.jsonl` (local, gitignored, `schema_version: 1`).
 
 | Event | Written by | When |
 |---|---|---|

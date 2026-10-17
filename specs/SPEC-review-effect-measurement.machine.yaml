@@ -697,7 +697,7 @@ ac:
   judgment_subject_hash: null
 irreversible_decisions:
 - id: IRR-001
-  decision: New local ledger <base>/.claude/observability/review-effect.jsonl, schema_version
+  decision: New local ledger <base>/.claude/observability/review_effect.jsonl, schema_version
     1, events review/escape/recall (fields per SPEC 'Ledger rows')
   category: schema/file format/storage layout
   rationale: A reader is committed to the row shape; a later change needs a version
@@ -710,14 +710,14 @@ irreversible_decisions:
   source: spec
 approval:
   kind: human
-  content_hash: 86fb10ce049464dcc2c8f0f6f42bc2f0d9e26c652f024a42cb2114781e27b4bb
+  content_hash: 828afd9dae459a3ed2a4b5c0440ea384b1f6722fe9f6e40ca4cd215f442b8901
   approved_by: Ecro
-  approved_at: '2026-10-17T03:13:50Z'
+  approved_at: '2026-10-17T04:48:18Z'
   field_hashes:
     schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
     spec_slug: 051859e5308699e6b8407ae2b514e69cbc12335d16cac1060e807f3c1bb94a56
     verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
-    irreversible_decisions: d6f4d9adc115ae53afe42b52b9c13bc8809495823a4a881a70fe65470790299e
+    irreversible_decisions: 6f47fce6d6d776685207bd3b0d13b951b758ee5f749e225d642a1cd5d941fdfa
     AC-001: c3ec39b93c480ae53727090a332df6e94913d1a547e366b1d5d7bd77e9cefbd3
     AC-002: d81611f5b854146d9d849d8b22bd7e792d189ffcf4cec8511c99aeec464f8ea4
     AC-003: 14a82cb07cbd8bd8aa4931409c18fcc4275dc2e0b6ecb60e988c98c15ff8e179

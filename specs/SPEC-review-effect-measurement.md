@@ -36,7 +36,7 @@ Intent: none.
 
 ## Outcomes
 
-1. Every `wrapup_land` writes one `review` row per task to `<base>/.claude/observability/review-effect.jsonl`.
+1. Every `wrapup_land` writes one `review` row per task to `<base>/.claude/observability/review_effect.jsonl`.
    The path is under `--base`, never `--worktree`: `task-land` deletes the worktree, and the ledger is
    gitignored, so a worktree copy would vanish. The row counts the task's findings by severity ×
    disposition, or says why it could not: `absent`, `unparseable` or `none`. A ledger failure never changes
@@ -112,7 +112,7 @@ Intent: none.
 
 | id | decision | category | rationale |
 |---|---|---|---|
-| IRR-001 | New local ledger `<base>/.claude/observability/review-effect.jsonl`, `schema_version: 1`, events `review` / `escape` / `recall`. Fields are listed under **Ledger rows** below | schema/file format/storage layout | A reader is committed to this shape. Later changes need a version bump and a migration-tolerant reader |
+| IRR-001 | New local ledger `<base>/.claude/observability/review_effect.jsonl`, `schema_version: 1`, events `review` / `escape` / `recall`. Fields are listed under **Ledger rows** below | schema/file format/storage layout | A reader is committed to this shape. Later changes need a version bump and a migration-tolerant reader |
 | IRR-002 | New CLI contract `hm review_effect {escape-candidates,escape,seed,score,report}` | public API/CLI contract | It is named from `/hm:metrics` prose, the reference doc and `step_sensitivity.measure_cmd` |
 
 **Ledger rows.** Every row carries `schema_version`, `event`, `ts` (UTC ISO-8601), `slug` and
@@ -148,7 +148,7 @@ ignored.
 
 ### AC-002: wrapup_land records one review row per landed task, under --base
 After the land commit exists and **before** the post-commit pop, `wrapup_land` appends one `review` row to
-`<base>/.claude/observability/review-effect.jsonl`.
+`<base>/.claude/observability/review_effect.jsonl`.
 
 - It reads only files whose names match `REVIEW-<slug>-\d{4}-\d{2}-\d{2}\.md` exactly in the worktree's
   `work-docs/`. When there are several, it reads the latest date, because each review overwrites its dated
@@ -305,6 +305,11 @@ none
   - The rule sentences are verbatim.
 
   None was left open.
+- **Post-land correction (IRR-001 path, re-approved by the DRI on 2026-10-17).** The ledger was
+  `review-effect.jsonl`, which matches the `review-*.jsonl` glob that `review_telemetry`,
+  `verifier_discrimination`, `feedback.telemetry_grep` and `verification_cache` read as review telemetry.
+  On base, its rows failed `ReviewTelemetryRecord` validation. It was renamed to `review_effect.jsonl` before
+  any push, and a regression test pins it outside that glob.
 - **Execute-time correction (AC-010 wording only).** Codex never rendered `/hm:metrics`, so "both the Claude
   and Codex variants" was vacuous. The machine predicate, which is over every rendered variant, is unchanged.
 - **Escape attribution is LLM-judged, with deterministic slug hints.** SZZ-style tracing alone loses about

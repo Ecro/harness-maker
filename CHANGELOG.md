@@ -5,7 +5,7 @@
 ### Added
 
 - **`hm review_effect`: measure what the one review catches and misses** (SPEC-review-effect-measurement).
-  `wrapup_land` records one `review` row per landed task into `<base>/.claude/observability/review-effect.jsonl`,
+  `wrapup_land` records one `review` row per landed task into `<base>/.claude/observability/review_effect.jsonl`,
   parsed from the REVIEW `## Findings` table. This is best-effort, and a ledger fault never changes the land.
   The verbs are:
   - `escape-candidates` / `escape`: attribute post-merge fixes to the task that shipped the defect. Run them

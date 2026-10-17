@@ -83,7 +83,7 @@ def _review(severity: str, disposition: str) -> str:
 
 
 def _rows(root: Path) -> list[dict[str, Any]]:
-    p = root / ".claude" / "observability" / "review-effect.jsonl"
+    p = root / ".claude" / "observability" / "review_effect.jsonl"
     if not p.is_file():
         return []
     return [json.loads(x) for x in p.read_text(encoding="utf-8").splitlines() if x.strip()]
