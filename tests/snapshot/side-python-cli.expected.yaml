@@ -16,7 +16,7 @@ files:
   body_sha256: d9fcb231718944500e6048d6502b0fd8da6e90a693ccb85e604430650288e090
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 7c88edc9cb80fead28918591d848315b8bea64a5ad6639ac746c95762972ed0f
+  body_sha256: 050444932886947c659e3a409e5f5a1f4c1b9e9eacb6a955b4b2a68692f3a051
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: f85feb685ee8ee4d2dbd28e05f3089468026bf82a1ce8241db3c3cf7f93ea0dd

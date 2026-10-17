@@ -1,0 +1,82 @@
+schema_version: 3
+spec_slug: review-after-fixes
+parent_spec: SPEC-maker-advance
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: Prompt-text ordering plus one digest golden; mutation
+  testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: execute writes one cumulative REVIEW after its fix loop
+  type: mechanical
+  test_ids:
+  - tests/render/test_review_after_fixes.py::test_ac_001_review_written_after_fix_loop
+  executable_predicate: all(review_after_fix_loop(step6(text)) for text in execute_renders())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The ordering and the cumulative rule come from the DRI's 2026-10-17
+    fix-now choice applied to F5's failure path and spec-validator round 1 (no REVIEW
+    before its fixes, no fixed finding dropped); literals fixed in the SPEC before
+    the template changed.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: an execute re-entered after Bind skips to Step 4
+  type: mechanical
+  test_ids:
+  - tests/render/test_review_after_fixes.py::test_ac_002_resume_after_bind_skips_red
+  executable_predicate: all(resume_after_bind(preamble(text)) for text in execute_renders())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: pending_test false is what hm spec_machine mark-tested writes at
+    Bind (SPEC-hm-overhaul-p1); S2 is the failure path. Neither is read from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: eadb25fecf34b048a945204eabdb919b8d25fbaf9cdbd5eab210f363e57681d3
+  approved_by: Ecro
+  approved_at: '2026-10-17T05:49:42Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 7aa8940157384055f177ad00279a141fab7b80add30fb5dfc511470c70092ad0
+    parent_spec: 1db3b131a5084643bd41c3e2a7769118c39bda124a059d4a5e62dba147c1932d
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    mutation_threshold_rationale: 8f63bfafe74bea06e8677c6c4438114135aa694bb433b9d19f8cc3dea4acf0e6
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: abcda0d43a46a7a670b8c1e47051232e0a2a503058281191d85c50950b5c5518
+    AC-002: 8c094e03eb204f770a0e2836beffd08e1d0071d36f0a651f5f7ca3cd9574ce44
+    ac_order: acedf6abc72ca928b69febf10f5e209a5243efc125aa0e9150bcf4ce39705bd5
+  lane: full
