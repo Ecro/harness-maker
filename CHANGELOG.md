@@ -25,6 +25,13 @@
 
 ### Fixed
 
+- **A Resume after an interrupted execute no longer skips the fixes** (SPEC-review-after-fixes). execute now
+  writes `work-docs/REVIEW-<slug>-<date>.md` only after its fix loop, listing every round's findings with
+  their final dispositions. A REVIEW on disk therefore means execute finished, and the digest's
+  `next_stage: wrapup` is true only then. An execute re-entered after Bind (no REVIEW, every testable AC
+  `pending_test: false`, at least one testable AC) runs Steps 0-2, reruns Bind's gate and goes to Step 4 instead of
+  redoing RED on implemented code.
+
 - **The world-model digest no longer names retired stages** (SPEC-maker-advance AC-006, IRR-002). Any REVIEW
   now means `next_stage: wrapup`; `review` and `verify` were retired in 0.64.0.
 

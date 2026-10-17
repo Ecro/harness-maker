@@ -4,11 +4,13 @@
 {%- set _wt = '<WT>/' if config.worktree.get('enabled') else '' -%}
 # /hm:execute — tests first, then code, then one review
 
-`/hm:execute <slug>` builds what `specs/SPEC-<slug>.md` asks. It never commits; `/hm:wrapup` does. `--no-tdd` is retired: if passed, print "--no-tdd is retired; give untestable behaviour a judgment AC" and run TDD anyway.
+`/hm:execute <slug>` builds what `specs/SPEC-<slug>.md` asks. It never commits; `/hm:wrapup` does. `--no-tdd` is retired: print "--no-tdd is retired; give untestable behaviour a judgment AC" and run TDD anyway.
 
 {{ hm.cli() }}
 
 {{ hm.choices() }}
+
+**Resume.** No REVIEW yet, at least one testable AC, and every testable AC is `pending_test: false`: after Step 2, rerun Bind's gate, then Step 4.
 
 ## Session Context Loading
 
@@ -23,19 +25,19 @@
 
 Run `hm spec_machine approval-status --root . --slug <slug>`. `approved` and `exempt` proceed; `missing` proceeds only at `autonomy.level: auto_full`; any other state, or a missing SPEC, stops: ask with {{ hm.ask() }}: approve runs `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`, `/hm:spec` stops.
 
-Write `{{ _wt }}work-docs/PLAN-<slug>.md`, or extend it if it exists (never rewrite one). Frontmatter: `type: plan`, `task_slug`, `status: planning`, `created`, `spec: "[[SPEC-<slug>]]"`, `summary`. Body: one line per phase with `scope:`, `exit:` (a command), `risk:` and `rollback:`; `## 🚧 Contract Boundaries` with a `### Do not change` list of repo-relative paths (or the single bullet `none — this task has no contract boundaries`); and `ADR-NNN: <decision>. **Decided by:** <user (source) | agent>`. The PLAN holds no ACs; it points at the SPEC.
+Write `{{ _wt }}work-docs/PLAN-<slug>.md`, or extend it if it exists (never rewrite one). Frontmatter: `type: plan`, `task_slug`, `status: planning`, `created`, `spec: "[[SPEC-<slug>]]"`, `summary`. Body: one line per phase with `scope:`, `exit:` (a command), `risk:` and `rollback:`; `## 🚧 Contract Boundaries` with a `### Do not change` list of repo-relative paths (or the single bullet `none — this task has no contract boundaries`); and `ADR-NNN: <decision>. **Decided by:** <user (source) | agent>`.
 
 ## Step 0.3 — Verify the PLAN
 
-Read it back: every phase line carries all four fields, and `### Do not change` exists and is non-empty. Fix once inline; if it is still wrong, report the path and stop.
+Read it back: each phase line has all four fields and `### Do not change` is non-empty. Fix once; if still wrong, report the path and stop.
 
 ## Step 1 — Load the PLAN
 
-Read it fully. The ADRs bind. Restate the `Do not change` list once.
+Read it and any RESEARCH doc it names; ADRs bind. Restate `Do not change` once.
 
 ## Step 2 — Load the SPEC
 
-From the SPEC and its machine.yaml, take `test_framework`, the scenarios, and the testable ACs: every AC that is not superseded and not `type: judgment`. Read the RESEARCH doc when the PLAN names one.
+From the SPEC and its machine.yaml, take `test_framework`, the scenarios, and the testable ACs: every AC that is not superseded and not `type: judgment`.
 
 ## Step 3 — Tests first, then the phases
 
@@ -45,7 +47,7 @@ Before any code, write a test for every testable AC in the SPEC, across all phas
 
 Put each test's node id in its AC's `test_ids` now, keeping `pending_test: true`, and run `hm spec_machine validate specs/SPEC-<slug>.machine.yaml`.
 
-**RED**, once, before any code: run `hm check --red --slug <slug>`. It covers every testable AC, so it runs here and nowhere else. Exit 0 means every one has a test that fails for a real reason. On exit 1, fix what it names: a test that already passes, a syntax error, a missing fixture or node id. An AC whose behaviour already exists may be waived with `--green-ok AC-NNN`, and the reason goes to the reviewer. Keep the RED summary for the commit body.
+**RED**, once, before any code: run `hm check --red --slug <slug>`. Exit 0: every one has a test failing for a real reason. On exit 1, fix what it names: a test that already passes, a syntax error, a missing fixture or node id. An AC whose behaviour already exists may be waived with `--green-ok AC-NNN`, and the reason goes to the reviewer. Keep the RED summary for the commit body.
 
 ### Phase C — Implement, phase by phase
 
@@ -75,6 +77,6 @@ Dispatch {{ hm.dispatch("code-reviewer", "give it the SPEC, the PLAN, the diff a
 **Second opinion** ({{ _so_models | join(', ') }}). For each model, `mktemp` a path, write the diff and SPEC to it with the Write tool, then run `hm second_opinion_invoke --model <model> --prompt-file <path> --slug <slug> --stage review` as its own Bash call{% if not is_codex %} with `dangerouslyDisableSandbox: true`{% endif %}. Its JSON line carries `status` and `findings`; `skipped` or `failed` warns and proceeds. One call per model per review. A finding is accepted when two voters raise it (K=2); a single-voter finding goes to {{ hm.dispatch("code-verifier", "with the finding and the oracle output") }} for accepted, rejected, duplicate or unresolved, and `consensus-arbiter` resolves conflicting severities.
 {%- endif %}
 
-Write `work-docs/REVIEW-<slug>-<YYYY-MM-DD>.md` with a `## Findings` table: `| id | severity | file:line | finding | disposition | authority |`. Every finding gets a disposition: `accepted`, `rejected` (with an authority), `duplicate` or `unresolved`; with no findings write `none`. Note any drift from the PLAN's scope or the SPEC's intent as a finding. Fix the accepted findings (never edit a test file to resolve a finding whose target is not that test), rerun `hm check --slug <slug>` and review again, for at most `reviewers.max_review_rounds` ({{ _rounds }}) rounds. What is still open after that goes to the DRI as `unresolved`.
+Give each finding a disposition: `accepted`, `rejected` (with an authority), `duplicate` or `unresolved`; note drift from the PLAN's scope or the SPEC's intent as a finding. Fix the accepted findings (never edit a test file to resolve a finding whose target is not that test), rerun `hm check --slug <slug>` and review again, for at most `reviewers.max_review_rounds` ({{ _rounds }}) rounds; what stays open goes to the DRI as `unresolved`. Only then write `work-docs/REVIEW-<slug>-<YYYY-MM-DD>.md`, the record that execute finished: a `## Findings` table `| id | severity | file:line | finding | disposition | authority |` of every round's findings (`none` if no round found any).
 
 Print the phases done, the `hm check` result and the REVIEW path, then STOP. `/hm:wrapup <slug>` is the user's call; if the world model began this run, enter it now unless its Advance rule stops.

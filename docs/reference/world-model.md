@@ -86,7 +86,8 @@ SPEC-world-model-followups IRR-001, extended by front-door IRR-003/004).
   (`counts`, `items`, `active[] {id, metric_id, last, target, gap}` — values mirrored from
   `hm intent status`, `—` when absent), `recent` commits.
 - `next_stage` is derived from artifacts, not spans: approved SPEC → REVIEW →
-  wrapup (review and verify retired in 0.64.0). Past the 5 s artifact budget (`DEADLINE_S`) a task reports `null`.
+  wrapup (review and verify retired in 0.64.0). execute writes the REVIEW only after its fix loop
+  (SPEC-review-after-fixes), so an execute interrupted before then resumes in execute. Past the 5 s artifact budget (`DEADLINE_S`) a task reports `null`.
 - Only `hm/<slug>` task worktrees are listed (`worktree.enabled`). Root resolves to the base,
   so the digest reads the base ledger from any worktree.
 - **`parked`**: RESEARCH is the task's only artifact, its frontmatter `created` is older than
