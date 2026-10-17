@@ -77,4 +77,4 @@ Dispatch {{ hm.dispatch("code-reviewer", "give it the SPEC, the PLAN, the diff a
 
 Write `work-docs/REVIEW-<slug>-<YYYY-MM-DD>.md` with a `## Findings` table: `| id | severity | file:line | finding | disposition | authority |`. Every finding gets a disposition: `accepted`, `rejected` (with an authority), `duplicate` or `unresolved`; with no findings write `none`. Note any drift from the PLAN's scope or the SPEC's intent as a finding. Fix the accepted findings (never edit a test file to resolve a finding whose target is not that test), rerun `hm check --slug <slug>` and review again, for at most `reviewers.max_review_rounds` ({{ _rounds }}) rounds. What is still open after that goes to the DRI as `unresolved`.
 
-Print the phases done, the `hm check` result and the REVIEW path, then STOP. `/hm:wrapup <slug>` is the user's call.
+Print the phases done, the `hm check` result and the REVIEW path, then STOP. `/hm:wrapup <slug>` is the user's call; if the world model began this run, enter it now unless its Advance rule stops.

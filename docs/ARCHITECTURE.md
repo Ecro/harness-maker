@@ -248,7 +248,7 @@ The `research` fragment includes a discovery-lens calibration step so broad tren
 
 **Fused workflows were retired in 0.47.0** (`PLAN-harness-diet` ADR-001/002). Until then, user-named stage sequences under `harness.yaml.workflows` were concatenated by `workflow_fuse.py` into a single `/hm:<workflow>` command; that module, the `workflows` / `default_workflow` keys and the five rendered fused commands are all gone. They were 58.6% of the shipped Claude command surface with zero recorded invocations. <!-- @hm:axis-removed -->
 
-Nothing chains the stages any more: each one ends by naming the next, and running it is the user's call. The `hm:loop` / `hm:loop-p5-batch` drivers and autopilot auto-advance were retired in 0.64.0 (in eval 2, 36 of 80 auto-advances were gate-blocked). `io_utils.load_harness_yaml` strips the two retired fused-workflow keys at LOAD time (one advisory per project), so an old config keeps working without a re-render. `loop.enabled` is read and ignored. <!-- @hm:axis-removed -->
+No driver chains the stages any more: each one ends by naming the next, and running it is the user's call, or Maker's under its Advance rule (prompt text in the same session, no marker or hook; SPEC-maker-advance). The `hm:loop` / `hm:loop-p5-batch` drivers and autopilot auto-advance were retired in 0.64.0 (in eval 2, 36 of 80 auto-advances were gate-blocked). `io_utils.load_harness_yaml` strips the two retired fused-workflow keys at LOAD time (one advisory per project), so an old config keeps working without a re-render. `loop.enabled` is read and ignored. <!-- @hm:axis-removed -->
 
 Every rendered Step/Phase/Check heading across the stages is classified in
 `step_sensitivity.py` along two independent axes of "should this shrink": **COMP**

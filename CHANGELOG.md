@@ -16,6 +16,18 @@
   The execute Step 6 registry entry now carries this `measure_cmd` (`remeasure_on: model_release`).
   `docs/reference/review-effect.md` holds the audit procedure and the pre-registered decision rule.
 
+- **Maker advances the pipeline itself** (SPEC-maker-advance). After a full-pipeline Start or Resume,
+  Maker's new Advance rule enters `/hm:execute` after spec and `/hm:wrapup` after execute, same slug, in the
+  same session. It stops and reports when a person is owed: an unanswered ask, a SPEC that is not
+  `approved`, a failing `hm check`, an `unresolved` finding, or queued asks. It never pushes. There is no
+  marker and no hook. The spec and execute hand-off lines say so, and an exempt SPEC can now land locally
+  with no human touch (IRR-001).
+
+### Fixed
+
+- **The world-model digest no longer names retired stages** (SPEC-maker-advance AC-006, IRR-002). Any REVIEW
+  now means `next_stage: wrapup`; `review` and `verify` were retired in 0.64.0.
+
 ## [0.64.0] - 2026-10-16
 
 Overhaul phase 1, PR-S (SPEC-hm-overhaul-p1): seven stages become four.

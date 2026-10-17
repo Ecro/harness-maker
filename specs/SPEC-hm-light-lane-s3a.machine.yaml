@@ -647,14 +647,14 @@ ac:
     note: ''
   - input:
       case: lane full, same artifacts
-    expected: review
+    expected: wrapup
     edge: false
-    note: ''
+    note: review retired in 0.64.0 (SPEC-maker-advance IRR-002)
   - input:
       case: approved light SPEC, PLAN, PASSED record, cache not fresh
-    expected: review
+    expected: wrapup
     edge: false
-    note: ''
+    note: review retired in 0.64.0 (SPEC-maker-advance IRR-002)
   - input:
       case: unapproved light SPEC, PLAN, PASSED record, fresh cache
     expected: spec
@@ -667,9 +667,9 @@ ac:
     note: ''
   - input:
       case: approved light SPEC, newest record a real review with status CHANGES_REQUESTED
-    expected: review
+    expected: wrapup
     edge: false
-    note: ''
+    note: review retired in 0.64.0 (SPEC-maker-advance IRR-002)
   rubric_id: null
   note: ''
   pending_test: true
@@ -943,9 +943,9 @@ irreversible_decisions:
   source: spec
 approval:
   kind: human
-  content_hash: 65819000de07ce326234f6cb22d684d4719f03d3145f232a456b09b9f4b92591
+  content_hash: a29b1fff58546aec2f564825f09dbc5e069135624b27118070484a49062ef798
   approved_by: Ecro
-  approved_at: '2026-10-15T03:57:33Z'
+  approved_at: '2026-10-17T03:28:17Z'
   field_hashes:
     schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
     spec_slug: e984e138fa232c8c3870f72c6305a264ec35b806ea1c0df378e2a0f74bce4b61
@@ -963,7 +963,7 @@ approval:
     AC-009: d849736a27e94a9b88645a75cec96591c9b2e3df6543c0cc67c5f4703c92f17e
     AC-010: c7e1ec687c3794624e78104c81d7b965236db993d64412b5a12961f7a3527a57
     AC-011: 142603a0e1500bfe1fda073f6d76babf5c70fdde687caa990be1399886ae379a
-    AC-012: aef762dc81c4843640e9cf4aa40f85233da2cbe78f0398b07252d88cb721ff15
+    AC-012: dab4c5347867e7606f3bb57ffb14a5e9eafbdf00574b749288156ac8f50f18ff
     AC-013: 975c2b43e1cd4b6af4a6a31d4fb2e703765030f54bf4aa1b5c2977216cd7c0d5
     AC-014: a170bbe3f9048e87d0b37e8b7914968f11526eecedc2cca1a5759606dc917757
     AC-015: 6ed00ee52789373526fa5fbbbf4bd6bcb006382fb81c4446aa651f9225fb1515

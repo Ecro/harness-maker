@@ -4,7 +4,7 @@
 
 ## 워크플로우
 
-stage 는 4개입니다: `/hm:research` (선택), `/hm:spec`, `/hm:execute`, `/hm:wrapup`. 각 stage 는 끝나면 멈추고, 다음 stage 는 직접 입력합니다. 융합 워크플로우 명령은 없습니다. <!-- @hm:axis-removed -->
+stage 는 4개입니다: `/hm:research` (선택), `/hm:spec`, `/hm:execute`, `/hm:wrapup`. 각 stage 는 끝나면 멈추고, 다음 stage 는 직접 입력하거나 {{ (config.world_model or {}).get('name', 'Maker') }} 가 Advance 규칙으로 이어 들어갑니다. 융합 워크플로우 명령은 없습니다. <!-- @hm:axis-removed -->
 
 ## 캐싱
 
