@@ -80,7 +80,7 @@ def test_no_argument_is_an_error_not_a_silent_success(capsys: pytest.CaptureFixt
 def _skill_bodies() -> list[str]:
     """Rendered `.claude/skills/*/SKILL.md` bodies — the surface `render_surface()` omits."""
     from pathlib import Path
-    from tempfile import mkdtemp
+    from tempfile import TemporaryDirectory
 
     from harness_maker.interview import interview
     from harness_maker.models import Preset, ProjectProfile, SecondOpinionConfig
@@ -93,9 +93,12 @@ def _skill_bodies() -> list[str]:
     # see them is the gap this helper exists to close.
     answers.second_opinion = SecondOpinionConfig(models=["codex", "antigravity"])
     bp = synthesize(profile, answers, preset=Preset.PRODUCTION)
-    out = Path(mkdtemp(prefix="hm-entrypoint-skills-"))
-    render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
-    bodies = [p.read_text(encoding="utf-8") for p in (out / "skills").glob("*/SKILL.md")]
+    # Render into <project>/.claude: the renderer writes CLAUDE.md one level up, so a bare temp
+    # dir as the target put it at /tmp/CLAUDE.md, where every session under /tmp loads it.
+    with TemporaryDirectory(prefix="hm-entrypoint-skills-") as tmp:
+        out = Path(tmp) / ".claude"
+        render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
+        bodies = [p.read_text(encoding="utf-8") for p in (out / "skills").glob("*/SKILL.md")]
     # Non-emptiness is the whole guard. A path typo or a render change would silently return
     # [] and the widened scan would go vacuous again — which is precisely how a skill-hosted
     # call site escaped this gate in the first place.

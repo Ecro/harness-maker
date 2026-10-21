@@ -267,21 +267,23 @@ def _rendered_reconcile_line() -> str:
     from harness_maker.render import DEFAULT_FREEZE_TIME, render
     from harness_maker.synthesize import synthesize
 
-    out = Path(tempfile.mkdtemp())
-    render(
-        synthesize(
-            ProjectProfile(),
-            InterviewAnswers(
-                preset=Preset.PRODUCTION,
-                targets=[_Target.CLAUDE_CODE],
-                worktree={"feature_branch_workflow": True},
-                delegation=DelegationConfig(stages=["wrapup"]),
+    # <project>/.claude, not the temp dir itself: CLAUDE.md renders one level above the target.
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / ".claude"
+        render(
+            synthesize(
+                ProjectProfile(),
+                InterviewAnswers(
+                    preset=Preset.PRODUCTION,
+                    targets=[_Target.CLAUDE_CODE],
+                    worktree={"feature_branch_workflow": True},
+                    delegation=DelegationConfig(stages=["wrapup"]),
+                ),
             ),
-        ),
-        out,
-        freeze_time=DEFAULT_FREEZE_TIME,
-    )
-    body = (out / "commands" / "hm" / "wrapup.md").read_text(encoding="utf-8")
+            out,
+            freeze_time=DEFAULT_FREEZE_TIME,
+        )
+        body = (out / "commands" / "hm" / "wrapup.md").read_text(encoding="utf-8")
     lines = [ln for ln in body.splitlines() if "hm wrapup_receipt" in ln]
     assert len(lines) == 1, f"expected exactly one reconcile invocation, got {lines}"
     return lines[0]
