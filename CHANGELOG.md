@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.65.2] - 2026-10-22
+
+Cost phases 2 and 3: `hm check --reuse`, compact `hm check`, golden JSON, SPEC defaults instead of
+Open Questions. Tier-1 cost ratio 14.31 -> 11.36.
+
 Cost phase 3 (SPEC-hm-cost-p3): tier-1 transcript ratio 12.21 -> 11.36, short of the pre-registered
 10.0 bar (recorded; spend per hm run -5%). A reused gate saves test wall time, not tokens: the remaining
 cost is context carried across stages.
