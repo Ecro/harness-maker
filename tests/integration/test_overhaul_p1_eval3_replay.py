@@ -37,7 +37,12 @@ from tests._overhaul_p1_ref import HEAD_SRC, REF_SHA, REPO_ROOT, clean_env, norm
 
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "hm_check_eval3"
 RUNS = sorted(p.name for p in FIXTURES.iterdir() if (p / "patch.diff").is_file())
-_GIT = ["git", "-c", "user.name=hm-bench", "-c", "user.email=bench@localhost"]
+# Auto maintenance detaches after a commit and can hold objects/maintenance.lock while the
+# template is copied (CI run 39617089638), so it is off for every fixture repo.
+_GIT = [
+    "git", "-c", "user.name=hm-bench", "-c", "user.email=bench@localhost",
+    "-c", "maintenance.auto=false", "-c", "gc.auto=0",
+]  # fmt: skip
 _IGNORED = shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.pyc")
 _LOCK = threading.Lock()
 _TEMPLATES: dict[tuple[Path, str], Path] = {}

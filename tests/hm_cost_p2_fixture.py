@@ -72,6 +72,9 @@ def init_project(root: Path, *, level: str = "auto_full") -> Path:
         yaml.safe_dump({"autonomy": {"level": level}}), encoding="utf-8"
     )
     subprocess.run(["git", "init", "-q", str(root)], check=True, timeout=30)
+    # wrapup_land commits here too; CI runners have no global git identity.
+    for key, value in (("user.email", "t@t"), ("user.name", "t")):
+        subprocess.run(["git", "-C", str(root), "config", key, value], check=True, timeout=30)
     subprocess.run(
         ["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t", "commit",
          "-q", "--allow-empty", "-m", "init"],
