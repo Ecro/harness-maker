@@ -286,8 +286,9 @@ SQUASHED_PR_S_HARNESS = "a2fe560a401846f8ab161662382d7f994ec5f91c"
 
 def test_ac_005_alias_counts_only_with_matching_trees() -> None:
     aliases = load_aliases()
-    assert [a["source"] for a in aliases] == [SQUASHED_PR_S_HARNESS]
-    good = aliases[0]
+    # Later re-measures add their own squash aliases (SPEC-hm-cost-p2 AC-009); PR-S's stays.
+    assert SQUASHED_PR_S_HARNESS in [a["source"] for a in aliases]
+    good = next(a for a in aliases if a["source"] == SQUASHED_PR_S_HARNESS)
     assert alias_problem(good) is None
     assert on_this_harness(SQUASHED_PR_S_HARNESS) is True
     assert on_this_harness(SQUASHED_PR_S_HARNESS[:12]) is True

@@ -1,1 +1,14 @@
-{"shas": ["94a6d1f32935"], "aliases": []}
+{
+  "shas": [
+    "94a6d1f32935"
+  ],
+  "aliases": [
+    {
+      "source": "94a6d1f329350a28834c3555b506de5dfb30b02b",
+      "target": "022d6f2ac8097b3fdd93aeab562aead036ac7b08",
+      "src_tree": "089df23303d3c06b11f434694ae4a2d3bb383f75",
+      "scripts_tree": "aa16dcae227e10951a7bb6c924c8bb639299948e",
+      "why": "Tier-1 re-measure for SPEC-hm-cost-p2 AC-009 (docs/evals/results.jsonl, 31 rows) ran on task-branch commit 94a6d1f3; the wrapup squash landed it as 022d6f2a, so the source is not reachable from main. Trees recorded from 94a6d1f3 on 2026-10-21; identical in 022d6f2a."
+    }
+  ]
+}

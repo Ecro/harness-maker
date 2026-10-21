@@ -234,8 +234,9 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # Entry history before the collapse is in git and in work-docs/BASELINE-DELTA-*.md.
     # execute and wrapup re-measured after PR #36 folded PR-S's review-round-1 allowance
     # (BASELINE-DELTA-hm-overhaul-p1-s.md, "Folded into the baseline from main"), and again
-    # after #42 folded SPEC-maker-advance's hand-off line (BASELINE-DELTA-maker-advance.md).
-    "execute": 8256,
+    # after #42 folded SPEC-maker-advance's hand-off line (BASELINE-DELTA-maker-advance.md),
+    # and again after SPEC-hm-cost-p2's allowance folded (BASELINE-DELTA-hm-cost-p2.md).
+    "execute": 8480,
     # research and wrapup re-measured after #40 folded SPEC-choice-cards' allowance
     # (BASELINE-DELTA-choice-cards.md, "Folded into the baseline from main").
     "research": 4647,
