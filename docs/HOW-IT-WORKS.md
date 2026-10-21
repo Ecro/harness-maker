@@ -460,6 +460,9 @@ A stand-in AC whose obligation moved to another approved SPEC is retired with
 `hm spec_machine retire --yaml <f> --ac <id> --by <slug>` (`--clear` re-pends it); retired ACs no
 longer owe a test.
 
+`hm spec_machine export-golden` writes `specs/SPEC-<slug>.golden.json` (the golden tables of the
+machine SPEC, landed by wrapup); `hm spec_machine check` also reports `approval`.
+
 `hm spec_machine approval-status --root . --slug <slug>` reports the state
 (`approved / exempt / missing / invalid / malformed / legacy / no_spec`). Autopilot stops at
 `spec` unless the SPEC is approved or exempt (`auto_full` proceeds without writing a stamp), and

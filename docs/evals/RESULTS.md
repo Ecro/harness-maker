@@ -7,16 +7,16 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 | Setup | Value |
 |---|---|
 | bench_hash | `569e17ef29ab` |
-| harness_sha | `a2fe560a4018` |
-| runner_hash | `a7584f756488` |
+| harness_sha | `94a6d1f32935` |
+| runner_hash | `36158f78b3de` |
 | agent model | `claude-sonnet-5-5` |
 | judge model | `claude-sonnet-5-5` |
 | rubric | `hm-eval-judge-v1` |
 | ruff | `ruff 0.15.12` |
 | mypy | `mypy 1.20.2 (compiled: yes)` |
-| tiers | 1, 2 |
-| runs per cell | tier 1: 3, tier 2: 3 |
-| runs started | 2026-10-16 to 2026-10-16 |
+| tiers | 1 |
+| runs per cell | tier 1: 3 |
+| runs started | 2026-10-21 to 2026-10-21 |
 
 ## What the extra cost buys
 
@@ -24,30 +24,15 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.063 (n=15) | $0.722 (n=15) | 12.97x (CLI 11.49x, transcript 12.97x) | plain |
-| wall time per run | 22s (n=15) | 5m 41s (n=15) | 15.26x | plain |
+| cost ratio (cells: mean CLI $/run) | $0.059 (n=15) | $0.652 (n=15) | 12.21x (CLI 11.04x, transcript 12.21x) | plain |
+| wall time per run | 24s (n=15) | 5m 17s (n=15) | 13.13x | plain |
 | Δ solved runs | 15 (n=15) | 15 (n=15) | +0 | tie |
 | Δ hidden-case pass fraction | 1.00 (n=15) | 1.00 (n=15) | +0.00 | tie |
 | Δ regressions per run | 0.00 (n=15) | 0.00 (n=15) | +0.00 | tie |
-| Δ new lint+type errors per run | 0.47 (n=15) | 0.07 (n=15) | -0.40 | hm |
+| Δ new lint+type errors per run | 0.27 (n=15) | 0.80 (n=15) | +0.53 | plain |
 | traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
-| Δ judge overall | 4.27 (n=15) | 3.87 (n=15) | -0.40 (single-sample scores, judge noise ±0.67; tie band 0.25 over 15 pairs) | plain |
-| cost per solved run | $0.063 (n=15) | $0.722 (n=15) |  | plain |
-| extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
-
-### tier 2: 7 task(s) x 3 run(s) per arm (t10, t11, t12, t6, t7, t8, t9)
-
-| Metric | plain | hm | hm vs plain | Lead |
-|---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.052 (n=21) | $0.627 (n=21) | 13.60x (CLI 11.97x, transcript 13.60x) | plain |
-| wall time per run | 16s (n=21) | 4m 46s (n=21) | 17.46x | plain |
-| Δ solved runs | 21 (n=21) | 21 (n=21) | +0 | tie |
-| Δ hidden-case pass fraction | 1.00 (n=21) | 1.00 (n=21) | +0.00 | tie |
-| Δ regressions per run | 0.00 (n=21) | 0.00 (n=21) | +0.00 | tie |
-| Δ new lint+type errors per run | 0.10 (n=21) | 0.10 (n=21) | +0.00 | tie |
-| traps caught | 9/9 | 9/9 | +0.00 | tie |
-| Δ judge overall | 4.60 (n=21) | 4.16 (n=21) | -0.44 (single-sample scores, judge noise ±0.67; tie band 0.25 over 21 pairs) | plain |
-| cost per solved run | $0.052 (n=21) | $0.627 (n=21) |  | plain |
+| Δ judge overall | 4.22 (n=15) | 3.53 (n=15) | -0.69 (single-sample scores, judge noise ±0.67; tie band 0.25 over 15 pairs) | plain |
+| cost per solved run | $0.059 (n=15) | $0.652 (n=15) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
 ## Quality
@@ -62,35 +47,15 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 | solved | 15 (n=15) | 15 (n=15) | tie |
 | wrong | 0 (n=15) | 0 (n=15) | tie |
 | stalled | 0 (n=15) | 0 (n=15) | tie |
-| ruff_new mean | 0.00 (n=15) | 0.00 (n=15) | tie |
-| mypy_new mean | 0.47 (n=15) | 0.07 (n=15) | hm |
+| ruff_new mean | 0.07 (n=15) | 0.73 (n=15) | plain |
+| mypy_new mean | 0.20 (n=15) | 0.07 (n=15) | hm |
 | regressions mean | 0.00 (n=15) | 0.00 (n=15) | tie |
-| diff_lines mean | 39.80 (n=15) | 136.33 (n=15) | — |
-| tests_touched rate | 0.07 (n=15) | 1.00 (n=15) | — |
-| judge scope | 4.80 (n=15) | 3.80 (n=15) | plain |
-| judge clarity | 4.00 (n=15) | 4.07 (n=15) | tie |
-| judge maintainability | 4.00 (n=15) | 3.73 (n=15) | plain |
-| judge overall | 4.27 (n=15) | 3.87 (n=15) | plain |
-
-### tier 2: 7 task(s) x 3 run(s) per arm (t10, t11, t12, t6, t7, t8, t9)
-
-| Metric | plain | hm | Lead |
-|---|---|---|---|
-| runs | 21 | 21 | — |
-| hidden all-pass | 21 (n=21) | 21 (n=21) | tie |
-| hidden-case pass fraction | 1.00 (n=21) | 1.00 (n=21) | tie |
-| solved | 21 (n=21) | 21 (n=21) | tie |
-| wrong | 0 (n=21) | 0 (n=21) | tie |
-| stalled | 0 (n=21) | 0 (n=21) | tie |
-| ruff_new mean | 0.00 (n=21) | 0.10 (n=21) | plain |
-| mypy_new mean | 0.10 (n=21) | 0.00 (n=21) | hm |
-| regressions mean | 0.00 (n=21) | 0.00 (n=21) | tie |
-| diff_lines mean | 23.33 (n=21) | 70.57 (n=21) | — |
-| tests_touched rate | 0.33 (n=21) | 1.00 (n=21) | — |
-| judge scope | 4.81 (n=21) | 4.05 (n=21) | plain |
-| judge clarity | 4.48 (n=21) | 4.48 (n=21) | tie |
-| judge maintainability | 4.52 (n=21) | 3.95 (n=21) | plain |
-| judge overall | 4.60 (n=21) | 4.16 (n=21) | plain |
+| diff_lines mean | 47.27 (n=15) | 135.73 (n=15) | — |
+| tests_touched rate | 0.13 (n=15) | 1.00 (n=15) | — |
+| judge scope | 4.73 (n=15) | 3.53 (n=15) | plain |
+| judge clarity | 3.93 (n=15) | 3.67 (n=15) | plain |
+| judge maintainability | 4.00 (n=15) | 3.40 (n=15) | plain |
+| judge overall | 4.22 (n=15) | 3.53 (n=15) | plain |
 
 ## Efficiency
 
@@ -98,51 +63,35 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 
 | Metric | plain | hm | hm/plain | Lead |
 |---|---|---|---|---|
-| cost $/run | $0.063 (n=15) | $0.722 (n=15) | 11.49x | plain |
-| input tokens | 7 (n=15) | 86 (n=15) | 11.57x | plain |
-| output tokens | 2135 (n=15) | 28764 (n=15) | 13.47x | plain |
-| cache_read tokens | 60411 (n=15) | 1715760 (n=15) | 28.40x | plain |
-| cache_write tokens | 8863 (n=15) | 72271 (n=15) | 8.15x | plain |
-| turns | 3.9 (n=15) | 20.0 (n=15) | 5.08x | plain |
-| wall s | 22 (n=15) | 341 (n=15) | 15.26x | plain |
+| cost $/run | $0.059 (n=15) | $0.652 (n=15) | 11.04x | plain |
+| input tokens | 7 (n=15) | 72 (n=15) | 10.86x | plain |
+| output tokens | 1874 (n=15) | 26883 (n=15) | 14.35x | plain |
+| cache_read tokens | 53263 (n=15) | 1337944 (n=15) | 25.12x | plain |
+| cache_write tokens | 8751 (n=15) | 69699 (n=15) | 7.96x | plain |
+| turns | 3.7 (n=15) | 20.1 (n=15) | 5.39x | plain |
+| wall s | 24 (n=15) | 317 (n=15) | 13.13x | plain |
 
-Judge cost, kept out of the arm costs: $0.782 total over 30 call(s), 0 unpriced.
+Judge cost, kept out of the arm costs: $0.824 total over 30 call(s), 0 unpriced.
 
-Run flags: plain: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s); hm: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 182 redaction(s) in 15 run(s).
-
-### tier 2: 7 task(s) x 3 run(s) per arm (t10, t11, t12, t6, t7, t8, t9)
-
-| Metric | plain | hm | hm/plain | Lead |
-|---|---|---|---|---|
-| cost $/run | $0.052 (n=21) | $0.627 (n=21) | 11.97x | plain |
-| input tokens | 7 (n=21) | 86 (n=21) | 12.34x | plain |
-| output tokens | 1288 (n=21) | 22895 (n=21) | 17.78x | plain |
-| cache_read tokens | 55414 (n=21) | 1608527 (n=21) | 29.03x | plain |
-| cache_write tokens | 8482 (n=21) | 64659 (n=21) | 7.62x | plain |
-| turns | 4.1 (n=21) | 18.0 (n=21) | 4.38x | plain |
-| wall s | 16 (n=21) | 286 (n=21) | 17.46x | plain |
-
-Judge cost, kept out of the arm costs: $0.988 total over 42 call(s), 0 unpriced.
-
-Run flags: plain: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s); hm: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 167 redaction(s) in 21 run(s).
+Run flags: plain: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 0 redaction(s) in 0 run(s); hm: 0 budget-capped, 0 leak-suspect, 0 judge-truncated, 187 redaction(s) in 15 run(s).
 
 ## Intent metric (tier 1 only)
 
 ```text
-bench hm-light-lane@569e17ef29ab  harness a2fe560a4018  model claude-sonnet-5-5
+bench hm-light-lane@569e17ef29ab  harness 94a6d1f32935  model claude-sonnet-5-5
 task   plain pass  hm pass  plain $/run  hm $/run  plain s   hm s
-t1         3/3      3/3           0.058     0.594       22    300
-t2         3/3      3/3           0.055     0.756       18    336
-t3         3/3      3/3           0.068     0.639       22    286
-t4         3/3      3/3           0.052     0.780       19    370
-t5         3/3      3/3           0.081     0.842       32    411
-all       15/15    15/15          0.063     0.722       22    341
-ratio (CLI cost): 11.49    ratio (transcript price): 12.97
+t1         3/3      3/3           0.055     0.517       21    235
+t2         3/3      3/3           0.056     0.739       21    391
+t3         3/3      3/3           0.058     0.532       24    301
+t4         3/3      3/3           0.049     0.620       28    322
+t5         3/3      3/3           0.077     0.854       27    333
+all       15/15    15/15          0.059     0.652       24    317
+ratio (CLI cost): 11.04    ratio (transcript price): 12.21
 pass rate: plain 15/15 (100%), hm 15/15 (100%)
-verdict: missed — ratio 12.972 > target 5
+verdict: missed — ratio 12.205 > target 5
 record with:
-  uv run hm intent metric record hm_cost_ratio_small --value 12.972 --evidence 'bench hm-light-lane@569e17ef29ab harness a2fe560a4018 model claude-sonnet-5-5: hm $0.722/run vs plain $0.063/run over 5 tasks x 3 runs (CLI-priced ratio 11.49, transcript-priced ratio 12.97); hidden-test pass plain 15/15, hm 15/15; verdict missed'
-hm_cost_ratio_small=12.972
+  uv run hm intent metric record hm_cost_ratio_small --value 12.205 --evidence 'bench hm-light-lane@569e17ef29ab harness 94a6d1f32935 model claude-sonnet-5-5: hm $0.652/run vs plain $0.059/run over 5 tasks x 3 runs (CLI-priced ratio 11.04, transcript-priced ratio 12.21); hidden-test pass plain 15/15, hm 15/15; verdict missed'
+hm_cost_ratio_small=12.205
 ```
 
 ## Tier 3

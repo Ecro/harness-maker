@@ -150,6 +150,7 @@ MODULES: dict[str, ModuleSpec] = {
             "approve",
             "approval-status",
             "retire",
+            "export-golden",
         ),
     ),
     "spec_mutation": ModuleSpec("subparser", _s("gate", "classify")),

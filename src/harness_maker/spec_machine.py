@@ -982,6 +982,60 @@ def load_golden_table(yaml_path: Path, ac_id: str) -> list[GoldenRow]:
     return list(ac.golden_table)
 
 
+def golden_json_path(yaml_path: Path) -> Path:
+    """`SPEC-<slug>.golden.json` beside its machine.yaml (SPEC-hm-cost-p2 IRR-001)."""
+    return yaml_path.with_name(yaml_path.name.removesuffix(".machine.yaml") + ".golden.json")
+
+
+def golden_export(model: SpecMachine) -> dict[str, list[dict[str, Any]]]:
+    """Each live parametric AC's rows projected to `{input, expected}`.
+
+    The projection is the drift contract: `edge`/`note` and extra keys are reviewer metadata, so
+    editing them must not fail `hm check` against a test that only reads input and expected.
+    A value JSON cannot hold raises `GoldenTableError` instead of being stringified, because a
+    stdlib test would then compare the wrong type.
+    """
+    out: dict[str, list[dict[str, Any]]] = {}
+    for ac in model.ac:
+        if ac.type != "parametric" or ac.superseded_by is not None:
+            continue
+        rows = []
+        for i, row in enumerate(ac.golden_table):
+            projected = {"input": row.input, "expected": row.expected}
+            try:
+                text = json.dumps(projected, allow_nan=False, sort_keys=True)
+            except (TypeError, ValueError) as e:
+                raise GoldenTableError(Path(), ac.id, f"row {i} is not JSON: {e}") from e
+            # json.dumps stringifies an int key, so the file would hold a different oracle.
+            if json.loads(text) != projected:
+                raise GoldenTableError(Path(), ac.id, f"row {i} changes in a JSON round trip")
+            rows.append(projected)
+        out[ac.id] = rows
+    return out
+
+
+def golden_json_text(payload: dict[str, list[dict[str, Any]]]) -> str:
+    return json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+
+
+def _run_export_golden(args: argparse.Namespace) -> int:
+    try:
+        payload = golden_export(load(args.yaml_path))
+    except GoldenTableError as e:
+        print(f"export-golden: {e.ac_id}: {e.cause}", file=sys.stderr)
+        return 1
+    except Exception as e:  # noqa: BLE001 — an unloadable yaml is a usage error, not a trace
+        print(f"export-golden: cannot load {args.yaml_path}: {e}", file=sys.stderr)
+        return 1
+    if not payload:
+        print("export-golden: no parametric AC; nothing written")
+        return 0
+    out = golden_json_path(args.yaml_path)
+    atomic_write(out, golden_json_text(payload))
+    print(f"export-golden: wrote {out}")
+    return 0
+
+
 def _ac_convention_prefix(ac_id: str) -> str:
     """The test-function prefix execute Phase A authors for an AC (``AC-001`` → ``test_ac_001``)."""
     return "test_" + ac_id.lower().replace("-", "_")
@@ -1608,6 +1662,20 @@ def _load_error_lines(exc: Exception, yaml_path: Path) -> list[str]:
     return [f"yaml load failed: {type(exc).__name__}: {first}"]
 
 
+def _check_approval(args: argparse.Namespace) -> dict[str, Any]:
+    """The approval verdict, so `/hm:spec` needs no separate `approval-status` call
+    (SPEC-hm-cost-p2 AC-005). Read from the paths given, not a guessed root: the state table
+    is the one `approval-status` ends in, and the slug is bound to the file name there too."""
+    m = re.fullmatch(r"SPEC-(.+)\.machine\.yaml", args.yaml_path.name)
+    slug = m.group(1) if m else args.yaml_path.name
+    try:
+        verdict = approval_state_of(slug, args.yaml_path, args.md_path)
+    except Exception as exc:  # noqa: BLE001 — check's failure line must still print
+        verdict = _state(slug, "malformed", (), detail=_malformed_detail(exc))
+    state = verdict.as_json()
+    return {k: state[k] for k in ("state", "land", "gate")}
+
+
 def _run_check_all(args: argparse.Namespace) -> int:
     """Steps 4 and 4.5 of the spec stage in one call — three round-trips become one.
 
@@ -1689,6 +1757,7 @@ def _run_check_all(args: argparse.Namespace) -> int:
         if quality_weak:
             line["weak_dimensions"] = quality_block["weak_dimensions"]
             line["low_dimensions"] = quality_block["low_dimensions"]
+        line["approval"] = _check_approval(args)
         print(json.dumps(line, ensure_ascii=False))
         return 0
     payload: dict[str, Any] = {
@@ -1697,6 +1766,7 @@ def _run_check_all(args: argparse.Namespace) -> int:
         "validate": {"ok": not validate_errors, "errors": validate_errors},
         "cross_validate": {"ok": not cross_errors, "errors": cross_errors, "by_rule": by_rule},
         "quality": quality_block,
+        "approval": _check_approval(args),
     }
     print(json.dumps(payload, ensure_ascii=False))
     return 1 if failed else 0
@@ -2332,6 +2402,11 @@ def main(argv: list[str] | None = None) -> int:
     p_check.add_argument("--md", dest="md_path", type=Path, required=True)
     p_check.add_argument("--strictness", choices=("block", "warn"), default="warn")
 
+    p_export = sub.add_parser(
+        "export-golden", help="write SPEC-<slug>.golden.json from the parametric golden tables"
+    )
+    p_export.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+
     p_approve = sub.add_parser("approve", help="stamp the SPEC as accepted (content-hash bound)")
     p_approve.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
     p_approve.add_argument(
@@ -2355,6 +2430,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "check":
         return _run_check_all(args)
+
+    if args.cmd == "export-golden":
+        return _run_export_golden(args)
 
     if args.cmd == "waiver-check":
         return _run_waiver_check(args)

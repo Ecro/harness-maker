@@ -29,6 +29,15 @@ Run `hm worktree task-preflight <slug> "$(pwd)" --stage hm:{{ stage }} --claude-
 {%- else %} in the background (`run_in_background: true`, `timeout: 3600000`{% if why %}; a suite outlives the 10-minute foreground cap{% endif %}); no JSON line is never a pass{% endif -%}
 {%- endmacro -%}
 
+{#- SPEC-hm-cost-p2 AC-004: verbatim `spec_machine.IRREVERSIBLE_CATEGORIES`; a paraphrase fails validate. -#}
+{%- macro irr_categories() -%}
+"schema/file format/storage layout", "public API/CLI contract", "data migration", "security/permission boundary", "new external dependency"
+{%- endmacro -%}
+
+{%- macro edit_in_place() -%}
+Change a written SPEC, machine.yaml, PLAN or REVIEW in place ({% if is_codex %}`apply_patch`{% else %}Edit{% endif %}), never by a whole-file rewrite.
+{%- endmacro -%}
+
 {%- macro ask() -%}{% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}{%- endmacro -%}
 
 {%- macro dispatch(agent, brief) -%}

@@ -91,9 +91,12 @@ _DROPPED: tuple[tuple[str, str, str], ...] = (
     ("execute", "spec_need", "*"),
     ("execute", "test_dep_map", "*"),
     ("wrapup", "spec_machine", "mark-tested"),
+    # SPEC-hm-cost-p2 AC-005: spec Step 5 reads approval from `check`/`approve` output.
+    ("spec", "spec_machine", "approval-status"),
 )
 _ADDED: dict[str, set[tuple[str, str]]] = {
-    "execute": {("check", ""), ("spec_machine", "mark-tested")},
+    # SPEC-hm-cost-p2 AC-003 adds `export-golden` for parametric tests.
+    "execute": {("check", ""), ("spec_machine", "mark-tested"), ("spec_machine", "export-golden")},
     "wrapup": {("check", "")},
 }
 
@@ -498,6 +501,13 @@ _CLI_CASES: dict[str, list[str]] = {
 }
 
 
+def _without_approval(stdout: str) -> str:
+    """SPEC-hm-cost-p2 IRR-003 adds `approval` to `spec_machine check`; the rest is unchanged."""
+    payload = json.loads(stdout)
+    payload.pop("approval", None)
+    return json.dumps(payload, ensure_ascii=False) + "\n"
+
+
 @pytest.mark.parametrize("name", list(_CLI_CASES))
 def test_ac009_digest_and_spec_machine_equal_reference(
     hook_fixture: Path, ref_src: Path, tmp_path: Path, name: str
@@ -506,6 +516,8 @@ def test_ac009_digest_and_spec_machine_equal_reference(
     argv = _CLI_CASES[name]
     ref = _run(ref_src, hook_fixture, work, argv, "", {})
     head = _run(HEAD_SRC, hook_fixture, work, argv, "", {})
+    if name == "check-all":
+        head = (head[0], _without_approval(head[1]), head[2])
     assert (head[0], head[1]) == (ref[0], ref[1]), name
     assert head[2] == ref[2], _first_diff(ref[2], head[2])
 

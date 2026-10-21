@@ -14,7 +14,7 @@
 
 ## Step 0 — Skip check
 
-Skip the interview only when all four hold: one file or config; acceptance obvious from the title; no API, IPC, schema or file-format change; reversible within an hour with no user impact. Then write a minimal SPEC (Intent, one Given-When-Then scenario, Verification), the reason under Refinement Decisions, `irreversible_decisions: []`. Only a non-code change may write `ac: []`; a code change gets one testable AC, because the gate fails `ac: []` beside code. Stamp it without asking: `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml --exempt`.
+Skip the interview only when all four hold: one file or config; acceptance obvious from the title; no API, IPC, schema or file-format change; reversible within an hour with no user impact. Then write a minimal SPEC (Intent, one Given-When-Then scenario, Verification), the reason under Refinement Decisions, `irreversible_decisions: []`. Only a non-code change may write `ac: []`; a code change gets one testable AC. Stamp it unasked: `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml --exempt`.
 
 ## Step 0.5 — Intent
 
@@ -29,13 +29,13 @@ Grep `specs/SPEC-*.md` and `work-docs/PLAN-*.md` for key terms; run `hm memory_r
 <!-- @hm:comprehension:brief -->
 **Design brief, before round 1:** what research or a prior SPEC settled, the ACs you can draft now (provisional), and which of the six categories are open, answered or defaulted (with why). One screen.
 {% endif %}
-Ask with {{ hm.ask() }}, batching independent questions; always offer "Other — let me describe". From round 2, one question per round offers **"Approve this SPEC and end interview"**: the DRI's acceptance and the only approval (silence never counts). Interview length is your judgment: stop when every slot below is settled, when the DRI approves, or after `interview.main_loop.max_rounds` ({{ _rounds if _rounds else 'unlimited' }}) rounds.
+Ask with {{ hm.ask() }}, batching independent questions; always offer "Other — let me describe". From round 2, one question per round offers **"Approve this SPEC and end interview"**: the DRI's acceptance and the only approval (silence never counts). Stop when every slot below is settled, the DRI approves, or after `interview.main_loop.max_rounds` ({{ _rounds if _rounds else 'unlimited' }}) rounds.
 
 The six categories, in order, skipping settled ones: 1. **Intent** (why now); 2. **Outcomes** ("done", observably); 3. **In-scope scenarios** (2–4 Given-When-Then: normal, edge, failure); 4. **Non-goals**; 5. **Constraints** (the test framework is mandatory); 6. **Verification** (each scenario → unit, integration or manual).
 
 **Oracle, for every AC.** Ask for `oracle_source` (golden, differential, property, rubric or consensus; a property also needs `input_domain`, `transformation`, `expected_relation`) and `oracle_evidence`: why it is independent of the code. "The test will check it" is circular; reject it.
 
-**Irreversible decisions.** What cannot be cheaply undone: schema/file format/storage layout, public API/CLI contract, data migration, security/permission boundary, new external dependency. Each is `{id: IRR-NNN, decision, category, rationale, source: spec}`; `irreversible_decisions: []` is valid.
+**Irreversible decisions** (not cheaply undone): `category` is exactly one of {{ hm.irr_categories() }}. Each is `{id: IRR-NNN, decision, category, rationale, source: spec}`; `irreversible_decisions: []` is valid.
 
 At most {{ _cap }} open-ended follow-up(s) per turn (closed ones are unlimited), each only when its answer changes the SPEC.
 {% if _depth != 'minimal' %}
@@ -51,7 +51,7 @@ At most {{ _cap }} open-ended follow-up(s) per turn (closed ones are unlimited),
 {% endif %}
 ## Step 3 — Write the SPEC
 
-Write `specs/SPEC-<slug>.md`. Frontmatter: `type: spec`, `task_slug`, `status`, `created`, `tags`, `test_framework`, `interview_rounds`, `intent` (if picked), `summary`. Sections: Intent; Outcomes; In-Scope Scenarios (S1…); Non-Goals; Constraints (table); Irreversible Decisions (table, or "none"); Acceptance Criteria, each `### AC-NNN: <title>`; Verification (scenario, mode, test); Open Questions; Refinement Decisions.
+Write `specs/SPEC-<slug>.md`. Frontmatter: `type: spec`, `task_slug`, `status`, `created`, `tags`, `test_framework`, `interview_rounds`, `intent` (if picked), `summary`. Sections: Intent; Outcomes; In-Scope Scenarios (S1…); Non-Goals; Constraints (table); Irreversible Decisions (table, or "none"); Acceptance Criteria, each `### AC-NNN: <title>`; Verification (scenario, mode, test); Open Questions; Refinement Decisions. {{ hm.edit_in_place() }}
 
 ## Step 3.5 — Write the machine.yaml
 
@@ -73,11 +73,11 @@ ac:
     oracle_evidence: <why it is independent>
 ```
 
-Every non-judgment AC gets a test; `/hm:execute` writes it and binds `test_ids`.
+`/hm:execute` writes and binds each non-judgment AC's test.
 
 ## Step 4 — Check
 
-Run `hm spec_machine check --all --yaml specs/SPEC-<slug>.machine.yaml --md specs/SPEC-<slug>.md --strictness {{ _strict }}`. It validates, cross-validates and scores. On exit 1, fix and rerun once; if it still fails, report and stop.
+Run `hm spec_machine check --all --yaml specs/SPEC-<slug>.machine.yaml --md specs/SPEC-<slug>.md --strictness {{ _strict }}`. On exit 1, fix and rerun once; if it still fails, report and stop.
 
 ## Step 4.5 — Quality score
 
@@ -91,4 +91,4 @@ One advisory pass, unless Step 0 skipped the interview with `irreversible_decisi
 
 Set `status: approved` when Open Questions is empty, else `draft`. If the DRI chose "Approve this SPEC and end interview" and Step 4 passed, run `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`. Else stamp `--exempt` only when `irreversible_decisions: []`, Step 4 passed, `status: approved`, and the DRI was not asked (`auto_full`). Else leave it unstamped.
 
-Print the SPEC path, its status and `hm spec_machine approval-status --slug <slug>`, then STOP. `/hm:execute <slug>` is the user's call; if the world model began this run, enter it now unless its Advance rule stops.
+Print the SPEC path, status and approval (from `approve`, else a `spec_machine check` after the last edit), then STOP. `/hm:execute <slug>` is the user's call; if the world model began this run, enter it now unless its Advance rule stops.

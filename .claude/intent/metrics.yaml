@@ -474,3 +474,14 @@ values:
   evidence: 'auto: measure#82611f0fd3e4 @ 62564cef exit=0 cwd=base'
   definition_hash: 82611f0fd3e4448d805680cc782a7cbf6810396a5dd0f986c0a0ef64f70a8309
   metric_id: dead_rendered_bytes
+- value: 12.205
+  observed_at: '2026-10-21T13:58:10.135198Z'
+  evidence: 'bench hm-light-lane@569e17ef29ab harness 94a6d1f32935 model claude-sonnet-5-5
+    (SPEC-hm-cost-p2 AC-009, --jobs 4): hm $0.652/run vs plain $0.059/run over 5 tasks
+    x 3 runs (CLI-priced ratio 11.04, transcript-priced ratio 12.21); hidden-test
+    pass plain 15/15, hm 15/15; verdict missed against target 5, met the SPEC bar
+    12.5. Pre-change baseline 473ac3f1: 14.31. First re-run 60e5502a8641: ratio 11.14
+    but hm 12/15 (three runs stalled on a Hypothesis IRR in execute; PLAN ADR-008),
+    not counted.'
+  definition_hash: b5a474f039a338e632182729963a57aaf658f1d620d2ff723ea3a140260328c5
+  metric_id: hm_cost_ratio_small

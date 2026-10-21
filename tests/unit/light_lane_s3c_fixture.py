@@ -514,7 +514,20 @@ def run_check(fixture: str, strictness: str, kind: str | None) -> tuple[int, str
                     strictness,
                 ]
             )
-        return rc, buf.getvalue()
+        return rc, _without_approval(buf.getvalue())
+
+
+def _without_approval(out: str) -> str:
+    """Drop SPEC-hm-cost-p2's additive `approval` key (IRR-003): these goldens pin the quiet
+    contract of a7403f2f, which the new key does not change."""
+    try:
+        payload = json.loads(out)
+    except ValueError:
+        return out
+    if not isinstance(payload, dict) or "approval" not in payload:
+        return out
+    payload.pop("approval")
+    return json.dumps(payload, ensure_ascii=False) + "\n"
 
 
 def run_all_checks() -> dict[str, dict[str, Any]]:

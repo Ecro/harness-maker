@@ -1078,6 +1078,77 @@ def harness_section(root: Path) -> Section:
     )
 
 
+# ── golden JSON (SPEC-hm-cost-p2 AC-002) ───────────────────────────────────────
+
+
+def with_golden(section: Section, spec: SpecView) -> Section:
+    """Add the golden-JSON verdict to an `ac` section, in either mode.
+
+    A SPEC with no live parametric AC gets nothing, so its output is unchanged. An absent JSON
+    is not a failure: SPECs and tests from before the file read `load_golden_table`. Drift fails
+    the section even when it already passed, because a parametric test reading a stale JSON
+    passes against rows the SPEC no longer holds.
+    """
+    from harness_maker import spec_machine
+
+    try:
+        want = spec_machine.golden_export(spec.model)
+    except spec_machine.GoldenTableError as e:
+        want, unexportable = {}, f"{e.ac_id}: {e.cause}"
+    else:
+        unexportable = ""
+    if not want and not unexportable:
+        return section
+    path = spec_machine.golden_json_path(spec.yaml_path)
+    fix = f"hm spec_machine export-golden --yaml {spec.yaml_path}"
+    body = dict(section.body)
+    if not path.is_file():
+        body["golden"] = "absent"
+        body["hint"] = (
+            f"{unexportable}; export-golden refuses it, so its test cannot read {path.name}"
+            if unexportable
+            else f"parametric tests read {path.name}; write it with `{fix}`"
+        )
+        return Section(body, section.code)
+    body["golden"] = "present"
+    try:
+        have = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        have = {}
+    if not isinstance(have, dict):
+        have = {}
+    if unexportable:
+        drift = [unexportable]  # `want` is empty here, so a comparison would name every AC
+    else:
+        drift = sorted(a for a in set(want) | set(have) if want.get(a) != have.get(a))
+    if not drift:
+        return Section(body, section.code)
+    body["ok"] = False
+    body["golden_drift"] = {"acs": drift, "fix": fix}
+    return Section(body, EXIT_FAILED if section.code == EXIT_OK else section.code)
+
+
+# ── compact output (SPEC-hm-cost-p2 AC-006) ────────────────────────────────────
+
+#: What a passing section keeps when the output is compacted: the keys that carry a warning or a
+#: value a stage reads (a self-approved SPEC, a skipped lookup, waived RED ACs, golden state, an
+#: unclean CVE scan's new dependencies, the reported-only harness score).
+COMPACT_KEEP: tuple[str, ...] = (
+    "pending", "notice", "skipped", "status", "reason", "waived", "green_before", "golden",
+    "hint", "gating", "degraded", "warning", "added", "out_of_scope", "score", "signals_failed",
+)  # fmt: skip
+
+
+def compact(section: Section) -> dict[str, Any]:
+    """A passing section (exit 0 and `ok` true) reduced to `ok` plus its non-empty keep-set
+    keys. The caller re-reads every byte on each later turn; `--full` restores the rest."""
+    body = section.body
+    if section.code != EXIT_OK or body.get("ok") is not True:
+        return body
+    kept = {k: v for k, v in body.items() if k in COMPACT_KEEP and v not in ("", [], {}, None)}
+    return {"ok": True, **kept}
+
+
 # ── orchestration ──────────────────────────────────────────────────────────────
 
 
@@ -1090,6 +1161,7 @@ class Options:
     mutation: bool = False
     offline: bool = False
     harness: bool = False
+    full: bool = True
 
 
 def run(opts: Options, *, cve_query: QueryFn | None = None) -> dict[str, Any]:
@@ -1120,6 +1192,8 @@ def run(opts: Options, *, cve_query: QueryFn | None = None) -> dict[str, Any]:
             sections["mutation"] = mutation_section(root, spec, state)
         if opts.harness:
             sections["harness"] = harness_section(root)
+    if spec is not None:
+        sections["ac"] = with_golden(sections["ac"], spec)
     tree_changed = tree_delta(before, snapshot(root))
     codes = {s.code for s in sections.values()}
     if tree_changed:
@@ -1128,7 +1202,7 @@ def run(opts: Options, *, cve_query: QueryFn | None = None) -> dict[str, Any]:
     return {
         "exit": exit_code,
         "tree_changed": tree_changed,
-        "sections": {name: s.body for name, s in sections.items()},
+        "sections": {name: s.body if opts.full else compact(s) for name, s in sections.items()},
     }
 
 
@@ -1151,6 +1225,9 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--mutation", action="store_true", help="opt-in mutation gate")
     p.add_argument("--offline", action="store_true", help="skip the CVE lookup and say so")
     p.add_argument("--harness", action="store_true", help="report the harness structure layer")
+    p.add_argument(
+        "--full", action="store_true", help="print passing sections in full, not just ok + notes"
+    )
     return p
 
 
@@ -1167,6 +1244,7 @@ def main(argv: list[str] | None = None) -> int:
             mutation=args.mutation,
             offline=args.offline,
             harness=args.harness,
+            full=args.full,
         )
     )
     sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")

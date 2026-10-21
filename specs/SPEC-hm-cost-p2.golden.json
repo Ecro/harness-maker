@@ -1,0 +1,87 @@
+{
+  "AC-002": [
+    {
+      "expected": {
+        "ac_failed_by_golden": [],
+        "golden": "present",
+        "hint": false
+      },
+      "input": {
+        "json": "matching",
+        "mode": "full"
+      }
+    },
+    {
+      "expected": {
+        "ac_failed_by_golden": [
+          "AC-001"
+        ],
+        "golden": "present",
+        "hint": false
+      },
+      "input": {
+        "json": "row_drift_ac_001",
+        "mode": "full"
+      }
+    },
+    {
+      "expected": {
+        "ac_failed_by_golden": [
+          "AC-001"
+        ],
+        "golden": "present",
+        "hint": false
+      },
+      "input": {
+        "json": "row_drift_ac_001",
+        "mode": "red"
+      }
+    },
+    {
+      "expected": {
+        "ac_failed_by_golden": [
+          "AC-002"
+        ],
+        "golden": "present",
+        "hint": false
+      },
+      "input": {
+        "json": "missing_ac_002",
+        "mode": "red"
+      }
+    },
+    {
+      "expected": {
+        "ac_failed_by_golden": [],
+        "golden": "present",
+        "hint": false
+      },
+      "input": {
+        "json": "note_only_edit",
+        "mode": "full"
+      }
+    },
+    {
+      "expected": {
+        "ac_failed_by_golden": [],
+        "golden": "absent",
+        "hint": true
+      },
+      "input": {
+        "json": "absent",
+        "mode": "full"
+      }
+    },
+    {
+      "expected": {
+        "ac_failed_by_golden": [],
+        "golden": "absent",
+        "hint": true
+      },
+      "input": {
+        "json": "absent",
+        "mode": "red"
+      }
+    }
+  ]
+}

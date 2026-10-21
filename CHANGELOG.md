@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+Cost phase 2 (SPEC-hm-cost-p2): tier-1 carry ratio 14.31 -> 12.21.
+
+### Added
+
+- **`hm spec_machine export-golden`** writes `specs/SPEC-<slug>.golden.json`; wrapup lands it
+  (`--optional`).
+- **`approval` in `hm spec_machine check`.**
+
+### Changed
+
+- **`hm check` prints compact output** (JSON line plus failing gates); `--full` restores the old output.
+- **Stage template rules:** keep the PLAN short, edit documents in place, record IRRs with the
+  verbatim categories, and fall back to a stdlib seeded-random property test when Hypothesis is absent
+  (a missing Hypothesis no longer counts as a new external dependency that voids approval).
+
 ## [0.65.1] - 2026-10-18
 
 /hm:health stops raising two findings a re-render can never clear, and `autonomy.pipeline` stops

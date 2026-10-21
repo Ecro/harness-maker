@@ -1,0 +1,392 @@
+schema_version: 3
+spec_slug: hm-cost-p2
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: export-golden writes the golden tables as JSON
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_spec_machine.py::test_ac_001_export_golden
+  executable_predicate: json.loads(out.read_text()) == EXPECTED_LITERAL and second_run_bytes
+    == first_run_bytes and not out_for_spec_without_parametric.exists() and unserialisable_exit
+    != 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: EXPECTED_LITERAL is a JSON literal written in the test from a fixture
+    machine.yaml (one superseded parametric AC, rows with edge/note fields to be dropped);
+    it is not produced by the exporter.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: hm check compares the JSON with the machine.yaml
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_cost_p2_check.py::test_ac_002_golden_comparison
+  executable_predicate: null
+  golden_table:
+  - input:
+      json: matching
+      mode: full
+    expected:
+      ac_failed_by_golden: []
+      golden: present
+      hint: false
+    edge: false
+    note: ''
+  - input:
+      json: row_drift_ac_001
+      mode: full
+    expected:
+      ac_failed_by_golden:
+      - AC-001
+      golden: present
+      hint: false
+    edge: false
+    note: ''
+  - input:
+      json: row_drift_ac_001
+      mode: red
+    expected:
+      ac_failed_by_golden:
+      - AC-001
+      golden: present
+      hint: false
+    edge: false
+    note: ''
+  - input:
+      json: missing_ac_002
+      mode: red
+    expected:
+      ac_failed_by_golden:
+      - AC-002
+      golden: present
+      hint: false
+    edge: false
+    note: ''
+  - input:
+      json: note_only_edit
+      mode: full
+    expected:
+      ac_failed_by_golden: []
+      golden: present
+      hint: false
+    edge: false
+    note: ''
+  - input:
+      json: absent
+      mode: full
+    expected:
+      ac_failed_by_golden: []
+      golden: absent
+      hint: true
+    edge: false
+    note: ''
+  - input:
+      json: absent
+      mode: red
+    expected:
+      ac_failed_by_golden: []
+      golden: absent
+      hint: true
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each row's expected failure set follows from which fixture JSON
+    was edited by hand; the rows were written from S2 before any code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: execute no longer sends tests to harness_maker
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_003_execute_reads_golden_json
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_003_red_without_harness_maker
+  executable_predicate: all(s not in rendered_execute_second_brain_on for s in ("import
+    harness_maker", "from harness_maker", "load_golden_table")) and "golden.json"
+    in rendered_execute_second_brain_on and "export-golden" in rendered_execute_second_brain_on
+    and red_outcome_without_harness_maker == "failed"
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The literal strings come from this SPEC; the RED outcome is pytest's
+    own verdict in a subprocess whose sys.path excludes harness_maker.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: the stages list the irreversible categories verbatim
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_004_categories_verbatim
+  executable_predicate: all(f'"{c}"' in r for c in IRREVERSIBLE_CATEGORIES for r in
+    (rendered_spec, rendered_execute)) and listed_categories(rendered_spec) == listed_categories(rendered_execute)
+    == set(IRREVERSIBLE_CATEGORIES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The rendered text is compared with the validator's own tuple, a
+    separate artifact the template does not import.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: spec_machine check carries approval
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_spec_machine.py::test_ac_005_check_carries_approval
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_005_spec_step5_no_approval_status
+  executable_predicate: '{k: check_out["approval"][k] for k in ("state", "land", "gate")}
+    == {k: status_out[k] for k in ("state", "land", "gate")} and "approval-status"
+    not in spec_step5'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: approval-status is the existing, unchanged command; the new field
+    is compared against its output on the same SPEC.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: hm check compact output
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_check.py::test_ac_006_compact_output
+  executable_predicate: default_out == compact(full_out, KEEP) and set(KEEP) >= {"pending",
+    "notice", "skipped", "status", "reason", "waived", "green_before", "golden", "hint"}
+    and strip(full_out, ("ac.golden", "ac.hint")) == pre_change_out
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: pre_change_out is captured from the 473ac3f1 check module on the
+    same fixture trees (one self-approved SPEC, one offline CVE skip, one waived RED
+    AC); compact and strip are short test helpers independent of check.py.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: edit in place
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_007_edit_in_place
+  executable_predicate: edit_rule_present(rendered_spec, "Edit") and edit_rule_present(rendered_execute,
+    "Edit") and edit_rule_present(codex_spec, "apply_patch") and edit_rule_present(codex_execute,
+    "apply_patch")
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The required rule names the four documents and the target edit
+    tool, as written in this SPEC.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: short PLAN for a single-phase task
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_008_short_plan
+  executable_predicate: short_plan_rule_present(rendered_execute) and readback_rule_present(rendered_execute)
+    and wrapup_land_accepts(short_plan_fixture)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The short-plan fixture is hand-written to the AC's shape; acceptance
+    is wrapup_land's existing behaviour on it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: the tier-1 re-run meets the bar
+  type: mechanical
+  test_ids:
+  - tests/integration/test_hm_cost_p2_bar.py::test_ac_009_tier1_bar
+  executable_predicate: rows_counted and summary["verdict"] not in ("suspect", "no_data")
+    and round(summary_unrounded_transcript_ratio, 3) <= 12.5 and all(n == 3 for n
+    in tier1_cells.values()) and all(r["model"] == "claude-sonnet-5-5" for r in rows_counted)
+    and hm_pass_rate_capped_as_fail >= plain_pass_rate
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Live bench runs graded by hidden tests the agent never sees; 12.5
+    and the guards were pre-registered before the run; the SHA list is a committed
+    fixture checked by tree hash.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: wrapup lands the golden JSON
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_010_wrapup_lands_golden_json
+  executable_predicate: '"specs/SPEC-<slug>.golden.json" in derive_deliverable_globs("<slug>")
+    and "SPEC-<slug>.golden.json" in rendered_wrapup_optional and "specs/SPEC-s.golden.json"
+    in staged_paths_non_isolated'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The staged path list is git's own index after wrapup_land on a
+    hand-built non-isolated fixture checkout.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: New file specs/SPEC-<slug>.golden.json holding parametric golden rows,
+    read by user tests
+  category: schema/file format/storage layout
+  rationale: user tests will depend on its path and shape
+  source: spec
+- id: IRR-002
+  decision: 'hm check default output collapses passing sections to {"ok": true}; --full
+    restores the full line'
+  category: public API/CLI contract
+  rationale: scripts reading a passing section's detail must add --full
+  source: spec
+- id: IRR-003
+  decision: New verb hm spec_machine export-golden; spec_machine check output gains
+    an approval field
+  category: public API/CLI contract
+  rationale: rendered templates call the verb and read the field
+  source: spec
+approval:
+  kind: human
+  content_hash: 26aa2e1e1338ab507cf5458f9802aec4f83e3bdcf2772db8d04896286bd8187b
+  approved_by: Ecro
+  approved_at: '2026-10-21T03:44:29Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: f25535eb1911d434cff4361039ca86fbe186e423020968b540b23927d733353d
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: b23e9087d8ea13594c1c345f421ecc6f5b23d48e459dcbdae6140ab212bb2947
+    AC-001: 84ae13a4b8f4b1bca4b0457a99035d1761ea97d29d3961dc8ecf3630d6637499
+    AC-002: 3d24984b73f4ac117a4c9db649002b1e64236db6328d108add25c0074b7b3203
+    AC-003: 9eb1a8761e268ef995be35bb65dfd498241bd446392ee8a8d6340b64ae763083
+    AC-004: 1314044669cb14fe6983bf00b23f6cbdeedf81994cbe8a7b4cab574d6e12663d
+    AC-005: 952c4ceec7e6b6224a061e756fbcc0bc6a2060ad058c1355a3bf09f0a591d20f
+    AC-006: e1c790bba9a8f062f554f0e12f7a63c28db7ff1de2425d38a8e260de38d162de
+    AC-007: 255db15d468b02956c28b39b76b305b8a2c429a5763f223981d7949acbf63e6b
+    AC-008: 05242619a521236abc777ec8583c85f1dd11b9b0cdf5adf83503773f049b4179
+    AC-009: 85f95feb60f984377783d40a029dd02f26f99c6152c323829ddd0ce20ffb0139
+    AC-010: c81377955c868d72a6af34f60ddda62a4762af2eb9ee27f5eb40d03489e7acde
+    ac_order: 9197b2c918245ab06ace42d9ff4679ea85b92fa0c38b4938b0bc74e8d2d86aab

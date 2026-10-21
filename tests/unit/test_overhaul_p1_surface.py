@@ -243,7 +243,8 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 # ── budgets ─────────────────────────────────────────────────────────────────
 
 #: (stage, base, + worktree on, + depth deep) from the AC-004 table.
-_STAGE_BUDGET = {"spec": (6500, 1500, 800), "execute": (7000, 1500, 0), "wrapup": (3800, 2800, 0)}
+# execute and wrapup raised by SPEC-hm-cost-p2 (BASELINE-DELTA-hm-cost-p2.md, DRI 2026-10-21).
+_STAGE_BUDGET = {"spec": (6500, 1500, 800), "execute": (7250, 1500, 0), "wrapup": (3850, 2800, 0)}
 _OPT_IN = 1500
 
 
@@ -305,15 +306,16 @@ def test_ac004_budget_negative_control(trees: dict[str, Path], tmp_path: Path) -
     """The measurement sees growth: one more line pushes a file over a budget it met."""
     root = trees["side"]
     size = _size(root, ".claude/commands/hm/wrapup.md")
-    assert size <= 3800
+    budget = _STAGE_BUDGET["wrapup"][0]
+    assert size <= budget
     padded = tmp_path / "p"
     (padded / ".claude/commands/hm").mkdir(parents=True)
     for stage in ("execute", "wrapup"):
         text = (root / f".claude/commands/hm/{stage}.md").read_text(encoding="utf-8")
         if stage == "wrapup":
-            text += "x" * (3801 - size)
+            text += "x" * (budget + 1 - size)
         (padded / f".claude/commands/hm/{stage}.md").write_text(text, encoding="utf-8")
-    assert _size(padded, ".claude/commands/hm/wrapup.md") > 3800
+    assert _size(padded, ".claude/commands/hm/wrapup.md") > budget
 
 
 # ── hooks ───────────────────────────────────────────────────────────────────

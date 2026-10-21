@@ -330,6 +330,8 @@ def derive_deliverable_globs(slug: str, worktree: Path | None = None) -> list[st
         for prefix in DELIVERABLE_PREFIXES
     ]
     globs += [f"specs/SPEC-{slug}.md", f"specs/SPEC-{slug}.machine.yaml"]
+    # SPEC-hm-cost-p2 IRR-001: user tests read it, so a SPEC landed without it fails on a clone.
+    globs.append(f"specs/SPEC-{slug}.golden.json")
     # SPEC-intent-world-model-objective-layer ADR-012: the state files are not slug-keyed —
     # a task edits the shared intent / assumptions / objectives — so they are staged whole.
     globs += [p + "*.yaml" if p.endswith("/") else p for p in DELIVERABLE_STATE_PATHS]

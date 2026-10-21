@@ -221,7 +221,7 @@ def hm_check(tree: Path, slug: str, home: Path) -> dict[str, Any]:
     home.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
         [sys.executable, "-m", "harness_maker.check", "--slug", slug, "--root", str(tree)]
-        + ["--offline"],
+        + ["--offline", "--full"],  # SPEC-hm-cost-p2 IRR-002: it reads passing detail
         cwd=tree,
         env=clean_env(home=home, src=HEAD_SRC),
         stdin=subprocess.DEVNULL,
