@@ -294,7 +294,7 @@ The `hm:loop` driver was retired in 0.64.0. `autoloop_driver.py` stays as a libr
 
 ### M8 — `hm check`
 
-`hm check --slug <slug>` replaces the former `hm:verify` stage and the `verify-before-completion` skill: one exit code over every deterministic gate (tests, lint, `reviewers.mechanical_checks`, the SPEC machine checks). 0 pass, 1 a gate failed, 3 degraded, 4 the tree changed during the run (rerun once), 5 approval needs the DRI. Output is compact by default (one JSON line plus failing gates); `--full` restores the whole pytest/ruff/mypy output.
+`hm check --slug <slug>` replaces the former `hm:verify` stage and the `verify-before-completion` skill: one exit code over every deterministic gate (tests, lint, `reviewers.mechanical_checks`, the SPEC machine checks). 0 pass, 1 a gate failed, 3 degraded, 4 the tree changed during the run (rerun once), 5 approval needs the DRI. Output is compact by default (one JSON line plus failing gates); `--full` restores the whole pytest/ruff/mypy output. `--reuse` (SPEC-hm-cost-p3) reprints the last pass, recorded at `git rev-parse --git-path hm/check-verdict.json`, when the options, HEAD, gate list, harness config, tree snapshot and harness-maker version all match; only an exit-0 run with no unreadable file and an unmoved HEAD writes it, and a failing run removes it. `/hm:wrapup` uses it right after `/hm:execute`'s final check.
 
 ### M9 — Worktree Isolation
 

@@ -18,7 +18,7 @@ Run `hm wrapup_brief --root . --slug '<slug>'`. When it is `ok` and you can disp
 
 ## Step 1 — Gate
 
-`hm check --slug <slug>`{{ hm.long_gate(why=false) }}. 0 proceeds; 1: fix, rerun; 3, or 4 twice: report, stop; 5: ask the DRI with {{ hm.ask() }} (approve / stop).
+`hm check --slug <slug> --reuse`{{ hm.long_gate(why=false) }} (reprints execute's last pass if nothing changed). 0 proceeds; 1: fix, rerun; 3, or 4 twice: report, stop; 5: ask the DRI with {{ hm.ask() }} (approve / stop).
 
 ## Step 3.6 — Judgment
 

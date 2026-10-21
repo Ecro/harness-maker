@@ -10,6 +10,8 @@
 
 {{ hm.choices() }}
 
+Chain independent shell steps with `&&` in one Bash call, except `hm check`, the RED run and any step marked as its own call; a chain stops at its first failure, so report it.
+
 **Resume.** No REVIEW yet, at least one testable AC, and every testable AC is `pending_test: false`: after Step 2, rerun Bind's gate, then Step 4.
 
 ## Session Context Loading
@@ -77,6 +79,6 @@ Dispatch {{ hm.dispatch("code-reviewer", "give it the SPEC, the PLAN, the diff a
 **Second opinion** ({{ _so_models | join(', ') }}). For each model, `mktemp` a path, write the diff and SPEC to it with the Write tool, then run `hm second_opinion_invoke --model <model> --prompt-file <path> --slug <slug> --stage review` as its own Bash call{% if not is_codex %} with `dangerouslyDisableSandbox: true`{% endif %}. Its JSON line carries `status` and `findings`; `skipped` or `failed` warns and proceeds. One call per model per review. A finding is accepted when two voters raise it (K=2); a single-voter finding goes to {{ hm.dispatch("code-verifier", "with the finding and the oracle output") }} for accepted, rejected, duplicate or unresolved, and `consensus-arbiter` resolves conflicting severities.
 {%- endif %}
 
-Give each finding a disposition: `accepted`, `rejected` (with an authority), `duplicate` or `unresolved`; note drift from the PLAN's scope or the SPEC's intent as a finding. Fix the accepted findings (never edit a test file to resolve a finding whose target is not that test), rerun `hm check --slug <slug>` and review again, for at most `reviewers.max_review_rounds` ({{ _rounds }}) rounds; what stays open goes to the DRI as `unresolved`. Only then write `work-docs/REVIEW-<slug>-<YYYY-MM-DD>.md`, the record that execute finished: a `## Findings` table `| id | severity | file:line | finding | disposition | authority |` of every round's findings (`none` if no round found any).
+Give each finding a disposition: `accepted`, `rejected` (with an authority), `duplicate` or `unresolved`; note drift from the PLAN's scope or the SPEC's intent as a finding. Fix the accepted findings (never edit a test file to resolve a finding whose target is not that test) and review again, for at most `reviewers.max_review_rounds` ({{ _rounds }}) rounds; what stays open goes to the DRI as `unresolved`. Then write `work-docs/REVIEW-<slug>-<YYYY-MM-DD>.md`, the record that execute finished: a `## Findings` table `| id | severity | file:line | finding | disposition | authority |` of every round's findings (`none` if no round found any); then always run `hm check --slug <slug>` and act on its exit as at Bind, except that exit 1 on an `unresolved` row goes to the DRI; never change a disposition to pass the gate.
 
 Print the phases done, the `hm check` result and the REVIEW path, then STOP. `/hm:wrapup <slug>` is the user's call; if the world model began this run, enter it now unless its Advance rule stops.

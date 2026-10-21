@@ -40,6 +40,9 @@ def preamble(text: str) -> str:
     return text[: text.index("## Step 0")]
 
 
+_FINAL_CHECK = "then always run `hm check --slug <slug>`"
+
+
 def review_after_fix_loop(step: str) -> bool:
     loop = step.index("review again")
     stop = step.rindex("then STOP")
@@ -49,8 +52,9 @@ def review_after_fix_loop(step: str) -> bool:
         and step.index("reviewers.max_review_rounds") < review
         and "the record that execute finished" in step[loop:]
         and "every round's findings" in step[loop:]
-        # The final print names "the `hm check` result"; only a new invocation is forbidden.
-        and "hm check --" not in step[review:stop]
+        # The final print names "the `hm check` result"; SPEC-hm-cost-p3 AC-003 adds exactly one
+        # post-REVIEW gate, and any other new invocation is still forbidden.
+        and step[review:stop].count("hm check --") == step[review:stop].count(_FINAL_CHECK) == 1
     )
 
 

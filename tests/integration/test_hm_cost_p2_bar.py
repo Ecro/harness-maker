@@ -14,7 +14,8 @@ from typing import Any
 from tests.integration.test_overhaul_p1_ship_bar import _bench, _is_ancestor, _tree
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RESULTS = REPO_ROOT / "docs" / "evals" / "results.jsonl"
+# Frozen when SPEC-hm-cost-p3 replaced docs/evals/results.jsonl with its own rows (its AC-006).
+RESULTS = REPO_ROOT / "docs" / "evals" / "history" / "hm-cost-p2.jsonl"
 PINS = REPO_ROOT / "tests" / "fixtures" / "hm_cost_p2" / "harness_shas.json"
 BASELINE_SHA = "473ac3f1"
 BAR = 12.5
@@ -45,7 +46,7 @@ def counted_shas(pins: dict[str, Any]) -> set[str]:
     return out
 
 
-def bar_violations(rows: list[dict[str, Any]]) -> list[str]:
+def bar_violations(rows: list[dict[str, Any]], *, bar: float = BAR) -> list[str]:
     if not rows:
         return ["no counted eval rows: run the tier-1 bench and pin its harness_sha"]
     bench = _bench()
@@ -58,8 +59,8 @@ def bar_violations(rows: list[dict[str, Any]]) -> list[str]:
         out.append("an arm has no transcript price")
     else:
         ratio = hm["mean_transcript"] / plain["mean_transcript"]
-        if round(ratio, 3) > BAR:
-            out.append(f"tier-1 transcript ratio {ratio:.3f} > {BAR}")
+        if round(ratio, 3) > bar:
+            out.append(f"tier-1 transcript ratio {ratio:.3f} > {bar}")
     tier1 = [r for r in rows if bench.tier_of(r) == 1 and r.get("status") not in bench.UNUSABLE]
     cells: dict[tuple[str, str], int] = {}
     for r in tier1:

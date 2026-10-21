@@ -544,21 +544,21 @@ Other harnesses give everyone the same starting point. harness-maker reads YOUR 
 harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static template gives you a starting point. harness-maker gives you a starting point that knows who it was created for, and can be updated without losing your changes.
 
 <!-- hm:eval:start -->
-**Measured: plain prompt vs `/hm:`** at harness `94a6d1f32935`, same model and budget; n is the number of runs behind each figure. Leads follow the fixed bands in [docs/evals/README.md](docs/evals/README.md); the full scorecard is [docs/evals/RESULTS.md](docs/evals/RESULTS.md).
+**Measured: plain prompt vs `/hm:`** at harness `cdf28dce3b12`, same model and budget; n is the number of runs behind each figure. Leads follow the fixed bands in [docs/evals/README.md](docs/evals/README.md); the full scorecard is [docs/evals/RESULTS.md](docs/evals/RESULTS.md).
 
 **What the extra cost buys, tier 1: 5 task(s) x 3 run(s) per arm (t1, t2, t3, t4, t5)**
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.059 (n=15) | $0.652 (n=15) | 12.21x (CLI 11.04x, transcript 12.21x) | plain |
-| wall time per run | 24s (n=15) | 5m 17s (n=15) | 13.13x | plain |
+| cost ratio (cells: mean CLI $/run) | $0.060 (n=15) | $0.617 (n=15) | 11.36x (CLI 10.27x, transcript 11.36x) | plain |
+| wall time per run | 19s (n=15) | 4m 06s (n=15) | 13.20x | plain |
 | Δ solved runs | 15 (n=15) | 15 (n=15) | +0 | tie |
 | Δ hidden-case pass fraction | 1.00 (n=15) | 1.00 (n=15) | +0.00 | tie |
 | Δ regressions per run | 0.00 (n=15) | 0.00 (n=15) | +0.00 | tie |
-| Δ new lint+type errors per run | 0.27 (n=15) | 0.80 (n=15) | +0.53 | plain |
+| Δ new lint+type errors per run | 0.33 (n=15) | 1.60 (n=15) | +1.27 | plain |
 | traps caught | n/a (n=0) | n/a (n=0) | n/a | n/a |
-| Δ judge overall | 4.22 (n=15) | 3.53 (n=15) | -0.69 (single-sample scores, judge noise ±0.67; tie band 0.25 over 15 pairs) | plain |
-| cost per solved run | $0.059 (n=15) | $0.652 (n=15) |  | plain |
+| Δ judge overall | 4.22 (n=15) | 3.49 (n=15) | -0.73 (single-sample scores, judge noise ±0.67; tie band 0.25 over 15 pairs) | plain |
+| cost per solved run | $0.060 (n=15) | $0.617 (n=15) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
 **Tier 3** (the answer is in the repo or an earlier session, not the prompt): plain solved 23 of 27 pilot runs, so 1 task survived the pre-registered drop rule where 4 are needed; tier 3 is inconclusive and the per-task code-quality claim is withdrawn. A diagnostic on t20 and t21, not a verdict: hm solved t20 2/3 and t21 1/2 at $3.172/run; plain (pilot) 0/3 and 3/3 at $0.145/run; plain-careful 2/3 and 3/3 at $0.203/run; plain-continue 3/3 and 3/3 at $0.108/run ([details](docs/evals/RESULTS.md#tier-3)). Each $ is the CLI cost per run, which excludes subagent spend, so an hm $ understates what the run spent.

@@ -1,0 +1,386 @@
+schema_version: 3
+spec_slug: hm-cost-p3
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: spec stage writes defaults, Open Questions only for the DRI
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p3_templates.py::test_ac_001_spec_defaults
+  executable_predicate: all(all(x in step(r, "4.6") for x in ("under Refinement Decisions
+    as a default", "surface every critical critique", "an irreversible-decision or
+    oracle critique is never a default")) and "Open Questions holds only what you
+    cannot decide" in r and "record the critiques under Open Questions" not in r for
+    r in (rendered_spec_claude, rendered_spec_codex))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The rendered command text is the artefact the agent reads; the
+    four required phrases and the removed phrase are written here, before the template
+    changes.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: hm check --reuse reuses only an identical passing verdict
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_cost_p3_reuse.py::test_ac_002_reuse
+  executable_predicate: null
+  golden_table:
+  - input:
+      record: pass
+      change: none
+      args: reuse
+    expected:
+      gates_ran: false
+      reused: true
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: edit_listed_file
+      args: reuse
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: add_untracked_file
+      args: reuse
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: head_moved_same_tree
+      args: reuse
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: none
+      args: reuse_red
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: none
+      args: reuse_mutation
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: none
+      args: reuse_offline_differs
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: none
+      args: reuse_harness
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: none
+      args: reuse_full_differs
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: none
+      args: reuse_green_ok_differs
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass_other_slug
+      change: none
+      args: reuse
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass_other_version
+      change: none
+      args: reuse
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: written_by_failed_run
+      change: none
+      args: reuse
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 1
+    edge: false
+    note: ''
+  - input:
+      record: fail
+      change: none
+      args: reuse
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: none
+      change: none
+      args: reuse
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      change: none
+      args: plain
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      record: none
+      change: git_dir_unwritable
+      args: plain
+    expected:
+      gates_ran: true
+      reused: false
+      exit: 0
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: A hand-written scenario table; gates_ran is observed from a gate
+    command that appends to a marker file in a temp git repo, not from hm check's
+    own output. written_by_failed_run means the preceding fresh run exited 1 (its
+    gate fails) and the gate is then fixed without touching listed files, so a reused
+    record would wrongly show 0; git_dir_unwritable also asserts a stderr warning
+    and no record.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: wrapup reuses, execute gates after the REVIEW doc
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p3_templates.py::test_ac_003_reuse_wiring
+  executable_predicate: '"hm check --slug <slug> --reuse" in wrapup_step1 and "then
+    always run `hm check --slug <slug>`" in execute_step6 and execute_step6.index("REVIEW-<slug>")
+    < execute_step6.index("then always run `hm check --slug <slug>`") and "never change
+    a disposition to pass the gate" in execute_step6'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fixed phrases and their order, written here before the templates
+    change; "always" pins the post-REVIEW check as unconditional.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: execute batches shell steps
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p3_templates.py::test_ac_004_batching
+  executable_predicate: all("Chain independent shell steps with `&&` in one Bash call"
+    in r and "except `hm check`, the RED run and any step marked as its own call"
+    in r for r in (rendered_execute_claude, rendered_execute_codex))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The rule and its exclusions are written here before the template
+    changes; `&&` stops a chain at the first failure.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: the tier-1 re-run is measured against the 10.0x bar and its result recorded
+  type: mechanical
+  test_ids:
+  - tests/integration/test_hm_cost_p3_bar.py::test_ac_005_tier1_bar_miss_recorded
+  executable_predicate: bar_violations(rows_counted, bar=10.0) == ["tier-1 transcript
+    ratio 11.359 > 10.0"]
+  golden_table: []
+  rubric_id: null
+  note: Missed at 11.36x (CLI 10.27x) on the counted run of 2026-10-22; every guard
+    held. The DRI landed the task with the miss recorded and the 10.0 bar unchanged
+    (2026-10-22).
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Live bench runs graded by hidden tests the agent never sees; 10.0
+    and the guards are pre-registered here before the run; the SHA list is a committed
+    fixture checked by tree hash.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: hm-cost-p2's bar stays green after the rows are replaced
+  type: mechanical
+  test_ids:
+  - tests/integration/test_hm_cost_p3_bar.py::test_ac_006_p2_history
+  executable_predicate: history_bytes == git_show("022d6f2a:docs/evals/results.jsonl")
+    and p2_bar_reads == "docs/evals/history/hm-cost-p2.jsonl" and p2_bar_violations
+    == []
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The reference bytes come from git history at the landed commit,
+    not from the code under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: '`hm check --reuse` flag and a `reused: true` key on a reused line'
+  category: public API/CLI contract
+  rationale: wrapup recipes and any script will call it
+  source: spec
+- id: IRR-002
+  decision: 'verdict record hm/check-verdict.json in the git dir: {slug, options,
+    fingerprint, exit, line, harness_maker_version, at}'
+  category: schema/file format/storage layout
+  rationale: a later reader must parse it
+  source: spec
+- id: IRR-003
+  decision: frozen eval rows per task at docs/evals/history/<slug>.jsonl
+  category: schema/file format/storage layout
+  rationale: bar tests of earlier tasks read them
+  source: spec
+approval:
+  kind: human
+  content_hash: b790522600870b0860c7573ec2ffc886061ac7ea5636ae942845e835b317e518
+  approved_by: Ecro
+  approved_at: '2026-10-21T21:30:23Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: e28a55648529552174582b216bbacc94d497020545a87739e371f46f9deff1d8
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 6423e0f36b1320e0d4d41c16b2b178a0a4b267e043f5e75123082f556116e14c
+    AC-001: 043eb204dd9ecb78e0620e9c60de9bcfd896e02cdb71c738cb99eec7baf2dc1e
+    AC-002: bc84aba77478dace8c227ab012a9c2bcf3fa6b7343051160d5286d9cbe8362ba
+    AC-003: b1edb3ce973815f321e915499625314d94a22453339ea38aa4100ae8db9d306c
+    AC-004: f97ba54e3f943d44864835f8947b632ba28a16d5777065f76bd2ff88ce00e095
+    AC-005: 61517c3ba20945b0ccb1768832aab126bf010d235fa2d49693df12bc98366788
+    AC-006: 741a650532aac6da69b9ba2ff2d0e94891bab2a97fd507723d5b1236967c81df
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923

@@ -798,10 +798,17 @@ def test_ac005_red_mode_table(row: Row, tmp_path: Path) -> None:
 # ── the tree is never written ──────────────────────────────────────────────────
 
 
+#: The one byte-writer SPEC-hm-cost-p3 IRR-002 allows: the passing-verdict record in the git dir.
+_VERDICT_RECORD = ".git/hm/check-verdict.json"
+
+
 def _every_byte(root: Path) -> dict[str, str]:
-    """Every file under the root, .git included: `hm check` writes no byte anywhere here."""
+    """Every file under the root, .git included: `hm check` writes no byte anywhere here except
+    the verdict record `--reuse` reads (SPEC-hm-cost-p3 IRR-002)."""
     out: dict[str, str] = {}
     for path in sorted(root.rglob("*")):
+        if path.relative_to(root).as_posix() == _VERDICT_RECORD:
+            continue
         if path.is_file() and not path.is_symlink():
             out[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
     return out

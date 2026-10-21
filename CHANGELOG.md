@@ -2,15 +2,36 @@
 
 ## [Unreleased]
 
-Cost phase 2 (SPEC-hm-cost-p2): tier-1 carry ratio 14.31 -> 12.21.
+Cost phase 3 (SPEC-hm-cost-p3): tier-1 transcript ratio 12.21 -> 11.36, short of the pre-registered
+10.0 bar (recorded; spend per hm run -5%). A reused gate saves test wall time, not tokens: the remaining
+cost is context carried across stages.
 
 ### Added
+
+- **`hm check --reuse`** reprints the last recorded pass when nothing it depends on changed (options,
+  HEAD, gate list, harness config, tree snapshot, harness-maker version). The record is
+  `$(git rev-parse --git-path hm/check-verdict.json)`, written only after an exit-0 run with no unreadable
+  file and an unmoved HEAD; a failing run removes it. `/hm:wrapup` Step 1 uses it.
+- **`docs/evals/history/<slug>.jsonl`** freezes a task's counted eval rows when a later task replaces
+  `docs/evals/results.jsonl`.
+
+### Changed
+
+- **`/hm:spec`** settles spec-validator critiques as defaults under Refinement Decisions; Open Questions
+  holds only what the DRI owns (WHY/WHAT/scope/trade-off, IRR and oracle critiques), so approval is usually a
+  stamp.
+- **`/hm:execute`** runs `hm check` once, unconditionally, after writing the REVIEW (the per-round rerun is
+  gone), and chains independent shell steps with `&&`.
+
+Cost phase 2 (SPEC-hm-cost-p2): tier-1 carry ratio 14.31 -> 12.21.
+
+### Added (phase 2)
 
 - **`hm spec_machine export-golden`** writes `specs/SPEC-<slug>.golden.json`; wrapup lands it
   (`--optional`).
 - **`approval` in `hm spec_machine check`.**
 
-### Changed
+### Changed (phase 2)
 
 - **`hm check` prints compact output** (JSON line plus failing gates); `--full` restores the old output.
 - **Stage template rules:** keep the PLAN short, edit documents in place, record IRRs with the

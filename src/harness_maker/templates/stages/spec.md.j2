@@ -51,7 +51,7 @@ At most {{ _cap }} open-ended follow-up(s) per turn (closed ones are unlimited),
 {% endif %}
 ## Step 3 — Write the SPEC
 
-Write `specs/SPEC-<slug>.md`. Frontmatter: `type: spec`, `task_slug`, `status`, `created`, `tags`, `test_framework`, `interview_rounds`, `intent` (if picked), `summary`. Sections: Intent; Outcomes; In-Scope Scenarios (S1…); Non-Goals; Constraints (table); Irreversible Decisions (table, or "none"); Acceptance Criteria, each `### AC-NNN: <title>`; Verification (scenario, mode, test); Open Questions; Refinement Decisions. {{ hm.edit_in_place() }}
+Write `specs/SPEC-<slug>.md`. Frontmatter: `type: spec`, `task_slug`, `status`, `created`, `tags`, `test_framework`, `interview_rounds`, `intent` (if picked), `summary`. Sections: Intent; Outcomes; In-Scope Scenarios (S1…); Non-Goals; Constraints (table); Irreversible Decisions (table, or "none"); Acceptance Criteria, each `### AC-NNN: <title>`; Verification (scenario, mode, test); Open Questions; Refinement Decisions. Open Questions holds only what you cannot decide (a WHY, WHAT or trade-off the DRI owns). {{ hm.edit_in_place() }}
 
 ## Step 3.5 — Write the machine.yaml
 
@@ -85,7 +85,7 @@ Read `quality` from that output.{% if _strict == 'block' %} `blocked: true` halt
 
 ## Step 4.6 — spec-validator
 
-One advisory pass, unless Step 0 skipped the interview with `irreversible_decisions: []`. {{ hm.dispatch("spec-validator", "with the SPEC, its machine.yaml and any RESEARCH doc; it returns JSON critiques") }}. It gates nothing: record the critiques under Open Questions, surface the critical ones, continue.
+One advisory pass, unless Step 0 skipped the interview with `irreversible_decisions: []`. {{ hm.dispatch("spec-validator", "with the SPEC, its machine.yaml and any RESEARCH doc; it returns JSON critiques") }}. It gates nothing: put each critique you can settle under Refinement Decisions as a default (the DRI may veto); surface every critical critique before any stamp; an irreversible-decision or oracle critique is never a default, it goes to `irreversible_decisions` or Open Questions, as does any WHY, WHAT, scope or trade-off.
 
 ## Step 5 — Status and stamp
 

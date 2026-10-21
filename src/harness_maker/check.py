@@ -17,7 +17,8 @@ import tempfile
 import tomllib
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -1164,16 +1165,94 @@ class Options:
     full: bool = True
 
 
-def run(opts: Options, *, cve_query: QueryFn | None = None) -> dict[str, Any]:
+# ── verdict reuse (SPEC-hm-cost-p3 AC-002) ─────────────────────────────────────
+
+#: The last passing verdict, kept in the git dir so that recording it never changes the tree.
+VERDICT_RECORD = "hm/check-verdict.json"
+
+
+def verdict_path(root: Path) -> Path | None:
+    out = _git(root, "rev-parse", "--git-path", VERDICT_RECORD)
+    if out is None:
+        return None
+    path = Path(out.strip())
+    return path if path.is_absolute() else root / path
+
+
+def _verdict_key(
+    opts: Options,
+    root: Path,
+    before: dict[str, str],
+    gates: list[str],
+    reason: str | None,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    """What a reused verdict must match: every `Options` field but `root` (a narrower set let a
+    `--mutation` run reuse a pass that never ran the mutation gate), HEAD (changed paths and RED
+    read it), the gate list, the harness config (approval and review read it, and it may be
+    ignored by git) and the tree."""
+    from harness_maker import __version__
+
+    options = {
+        k: sorted(v) if isinstance(v, set) else v for k, v in asdict(opts).items() if k != "root"
+    }
+    tree = {"gates": gates, "reason": reason, "config": config, "files": sorted(before.items())}
+    return {
+        "slug": opts.slug,
+        "options": options,
+        "head": (_git(root, "rev-parse", "HEAD") or "").strip(),
+        "fingerprint": hashlib.sha256(
+            json.dumps(tree, sort_keys=True, default=str).encode()
+        ).hexdigest(),
+        "harness_maker_version": __version__,
+    }
+
+
+def _reused(path: Path | None, key: dict[str, Any]) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(record, dict) or record.get("exit") != EXIT_OK:
+        return None
+    if any(record.get(k) != v for k, v in key.items()):
+        return None
+    line = record.get("line")
+    if not isinstance(line, dict) or line.get("exit") != EXIT_OK:
+        return None
+    return {**line, "reused": True}
+
+
+def _record(path: Path | None, key: dict[str, Any], result: dict[str, Any]) -> None:
+    """Keep a passing verdict for `--reuse`. Losing it costs one rerun, so a failed write warns
+    and never changes the verdict."""
+    from harness_maker.io_utils import atomic_write
+
+    if path is None:
+        return
+    record = {**key, "exit": result["exit"], "line": result, "at": datetime.now(UTC).isoformat()}
+    try:
+        atomic_write(path, json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        sys.stderr.write(f"hm check: verdict not recorded ({type(exc).__name__}: {exc})\n")
+
+
+def run(opts: Options, *, reuse: bool = False, cve_query: QueryFn | None = None) -> dict[str, Any]:
     root = opts.root.resolve()
     before = snapshot(root)
     config = _harness_config(root)
+    commands, reason, _source = gate_commands(root, config)
+    path = verdict_path(root)
+    key = _verdict_key(opts, root, before, commands, reason, config)
+    if reuse and (hit := _reused(path, key)) is not None:
+        return hit
     sections: dict[str, Section] = {}
     approval = approval_section(root, opts.slug, config)
     sections["approval"] = approval
     spec = load_spec(root, opts.slug)
     changed = changed_paths(root)
-    commands, _reason, _source = gate_commands(root, config)
     runner = pytest_runner(root, commands)
     skipped = Section({"ok": True, "skipped": "--red"})
     state = str(approval.body["state"])
@@ -1199,11 +1278,21 @@ def run(opts: Options, *, cve_query: QueryFn | None = None) -> dict[str, Any]:
     if tree_changed:
         codes.add(EXIT_TREE_CHANGED)
     exit_code = next((c for c in _PRECEDENCE if c in codes), EXIT_OK)
-    return {
+    result = {
         "exit": exit_code,
         "tree_changed": tree_changed,
         "sections": {name: s.body if opts.full else compact(s) for name, s in sections.items()},
     }
+    unhashable = any(d.startswith("unreadable:") for d in before.values())
+    head_now = (_git(root, "rev-parse", "HEAD") or "").strip()
+    if exit_code == EXIT_OK and not unhashable and head_now == key["head"]:
+        _record(path, key, result)
+    elif path is not None:
+        # A pass recorded earlier on this same tree must not outlive a fresh failure: a gate can
+        # fail on what the fingerprint cannot see (a service, an ignored file).
+        with contextlib.suppress(OSError):
+            path.unlink(missing_ok=True)
+    return result
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -1228,6 +1317,12 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--full", action="store_true", help="print passing sections in full, not just ok + notes"
     )
+    p.add_argument(
+        "--reuse",
+        action="store_true",
+        help="print the last passing verdict for this exact tree, HEAD, config and options instead "
+        "of rerunning the gates (marked reused: true); a reused line repeats its CVE lookup result",
+    )
     return p
 
 
@@ -1245,7 +1340,8 @@ def main(argv: list[str] | None = None) -> int:
             offline=args.offline,
             harness=args.harness,
             full=args.full,
-        )
+        ),
+        reuse=args.reuse,
     )
     sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")
     return int(result["exit"])
