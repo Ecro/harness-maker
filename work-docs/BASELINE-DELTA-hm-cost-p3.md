@@ -40,3 +40,14 @@ Per ADR-010 the task that moved the surface owns its attribution, and writing it
 allowance and the later re-freeze is what keeps this out of `ratchet-rebaselined-by-its-own-subject`.
 The surface **rose** (+1.4% claude, +2.3% codex) in a task whose purpose is to cut cost: the rules
 added remove a gate rerun and the approval-turn rewrite, which cost far more per run than the prose.
+
+## Folded into the baseline from main
+
+After the squash (277405a9) the allowance expired with the PLAN, so the growth was folded on main:
+`tests/structural/surface_baseline.json` re-frozen by the generator at 277405a9e6c5 (claude 48 737,
+codex 30 192, the after column above; `render_sha` and `payload_digest` moved mechanically with the
+re-freeze), and `_ATOMIC_RATCHET` execute 8 480 → 8 797, spec 7 033 → 7 400, wrapup 4 862 → 4 961 (the
+measured atomic renders). The AC-005 rows' harness SHA cdf28dce is not reachable from main after the
+squash, so both `tests/fixtures/hm_cost_p3/harness_shas.json` and
+`tests/fixtures/overhaul_p1/harness_sha_aliases.json` gained a squash alias, checked by tree hash
+(`src` and `scripts` are identical in cdf28dce and 277405a9).

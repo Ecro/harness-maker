@@ -12,5 +12,12 @@
     "src_tree": "089df23303d3c06b11f434694ae4a2d3bb383f75",
     "scripts_tree": "aa16dcae227e10951a7bb6c924c8bb639299948e",
     "why": "Tier-1 re-measure for SPEC-hm-cost-p2 AC-009 (docs/evals/results.jsonl, 31 rows) ran on task-branch commit 94a6d1f3; the wrapup squash landed it as 022d6f2a, so the source is not reachable from main. Trees recorded from 94a6d1f3 on 2026-10-21; identical in 022d6f2a."
+  },
+  {
+    "source": "cdf28dce3b12065a9fe56c5596c8cd8c12a63767",
+    "target": "277405a9e6c5ed38ece235542c977ff568aa7edf",
+    "src_tree": "de05f0eb78132d7e970500139d3e7661b63dd656",
+    "scripts_tree": "aa16dcae227e10951a7bb6c924c8bb639299948e",
+    "why": "Tier-1 re-measure for SPEC-hm-cost-p3 AC-005 (docs/evals/results.jsonl, 30 rows) ran on task-branch commit cdf28dce; the wrapup squash landed it as 277405a9, so the source is not reachable from main. Trees recorded from cdf28dce on 2026-10-22; identical in 277405a9."
   }
 ]
