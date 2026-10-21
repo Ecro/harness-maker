@@ -111,10 +111,10 @@ metrics:
   description: '작은 단일 세션 과제 벤치에서 /hm: 팔 평균 비용 / 일반 작업 팔 평균 비용 (배수)'
   target: 5
   higher_is_better: false
-  how_measured: '벤치 러너로 과제·팔당 3회, 헤드리스. 값 = /hm: 팔 평균 비용 / plain 팔 평균 비용. baseline 22
-    (2026-10-14, timeparse 5과제, claude-sonnet-5-5, Side preset — work-docs/RESEARCH-hm-light-lane.md).
-    반대 신호: /hm: 팔의 숨은 테스트 통과율이 plain 팔보다 낮으면 배수가 목표 안이어도 통과가 아니다. 벤치 러너가 repo 에
-    들어오기 전에는 측정하지 않는다.'
+  how_measured: '벤치 러너로 과제·팔당 3회, 헤드리스. 값 = /hm: 팔 평균 비용 / plain 팔 평균 비용. baseline
+    22 (2026-10-14, timeparse 5과제, claude-sonnet-5-5, Side preset — work-docs/RESEARCH-hm-light-lane.md).
+    반대 신호: /hm: 팔의 숨은 테스트 통과율이 plain 팔보다 낮으면 배수가 목표 안이어도 통과가 아니다. 벤치 러너가 repo 에 들어오기
+    전에는 측정하지 않는다.'
 rules:
 - 품질 하한(결정적 검증·리뷰 게이트)은 크기나 속도를 줄이는 대가로 낮추지 않는다
 - TUNE 값은 재측정 없이 새 모델로 이전하지 않는다
@@ -274,5 +274,18 @@ open_questions:
       spoton, neuroTerm and edgelog also show 0. This bears on a future Approach B
       (core simplification) decision.'
     observed_at: '2026-10-04T04:37:47.304600Z'
+    relation: confirms
+  history: []
+- id: q_hm_cost_carry_dominates
+  claim: '작은 과제에서 /hm: 비용의 남은 대부분은 단계 간 누적 컨텍스트(carry)를 매 호출 다시 읽는 비용이다 — 도구 출력이나
+    게이트 재실행을 없애는 것으론 거의 줄지 않고, 호출 수를 줄이거나 단계를 새 세션으로 나눠야 줄어든다'
+  status: open
+  evidence:
+  - text: 'hm-cost-p3 (2026-10-22): hm check --reuse 가 15회 중 14회 적중했지만 wrapup 비용은
+      -9% 에 그쳤다 (게이트 출력은 JSON 한 줄, wrapup 비용은 54-57k 컨텍스트를 ~5회 다시 읽는 것). 승인 턴 -25%
+      는 일부가 spec 단계로 옮겨 갔고, && 묶기 규칙은 execute 호출 수를 줄이지 못했다 (13.7 -> 14.3). 총 -5%,
+      cache read 1.31M token/run 이 그대로 남음. RESEARCH-hm-cost-p3 "Measured after the
+      change".'
+    observed_at: '2026-10-21T21:52:48Z'
     relation: confirms
   history: []

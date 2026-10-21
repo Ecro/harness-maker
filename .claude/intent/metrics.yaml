@@ -485,3 +485,12 @@ values:
     not counted.'
   definition_hash: b5a474f039a338e632182729963a57aaf658f1d620d2ff723ea3a140260328c5
   metric_id: hm_cost_ratio_small
+- value: 11.359
+  observed_at: '2026-10-21T21:52:41Z'
+  evidence: 'SPEC-hm-cost-p3 counted tier-1 run 2026-10-22 (harness cdf28dce3b12,
+    claude-sonnet-5-5, 5 tasks x 3 runs per arm, archive ~/hm-eval-archive/hm-eval-t1-p3-2026-10-22.tgz):
+    transcript ratio 11.359 (CLI 10.27), hidden pass 15/15 vs 15/15. Pre-registered
+    bar 10.0 missed. docs/evals/results.jsonl; work-docs/RESEARCH-hm-cost-p3.md "Measured
+    after the change".'
+  definition_hash: b5a474f039a338e632182729963a57aaf658f1d620d2ff723ea3a140260328c5
+  metric_id: hm_cost_ratio_small
