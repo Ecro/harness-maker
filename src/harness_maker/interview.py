@@ -46,6 +46,7 @@ from harness_maker.models import (
     AgentModelSpec,
     AutonomyConfig,
     AutonomyLevel,
+    CheckConfig,
     CodexAgentSpec,
     Confidence,
     DelegationConfig,
@@ -719,6 +720,7 @@ def _build_answers(
     loop: LoopConfig | None = None,
     comprehension_depth: str | None = None,
     world_model: WorldModelConfig | None = None,
+    check: CheckConfig | None = None,
     schema_version: int = 6,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
@@ -746,6 +748,7 @@ def _build_answers(
         toolchains=list(toolchains) if toolchains else [],
         loop=loop if loop is not None else LoopConfig(),
         world_model=world_model if world_model is not None else WorldModelConfig(),
+        check=check if check is not None else CheckConfig(),
         reviewers={
             "installed": list(_ALL_REVIEWERS),
             "enabled": list(_SIDE_ENABLED_REVIEWERS if is_side else _PROD_ENABLED_REVIEWERS),
@@ -987,6 +990,8 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         "loop": LoopConfig(enabled=parse_loop(data.get("loop", _ABSENT))),
         # SPEC-world-model-name: absent → default; malformed or reserved RAISES (ADR-001).
         "world_model": parse_world_model(data.get("world_model", _ABSENT)),
+        # SPEC-hm-check-docs-only-reuse ADR-006: absent → no declaration; malformed RAISES.
+        "check": parse_check(data.get("check", _ABSENT)),
         "sibling_repos": sibling_repos,
         "wrapup_docs": wrapup_docs,
         # SPEC-hm-overhaul-p1 IRR-006: a re-render keeps each value. `installed` is also the
@@ -1461,6 +1466,10 @@ def parse_loop(value: object) -> bool:
     return enabled
 
 
+class CheckConfigError(ValueError):
+    """A present `check` block that CheckConfig rejects (SPEC-hm-check-docs-only-reuse)."""
+
+
 class WorldModelConfigError(ValueError):
     """A present `world_model` block that WorldModelConfig rejects (SPEC-world-model-name)."""
 
@@ -1479,6 +1488,21 @@ def parse_world_model(value: object) -> WorldModelConfig:
         return WorldModelConfig.model_validate(value)
     except ValueError as e:
         raise WorldModelConfigError(f"harness.yaml `world_model` is invalid: {e}") from e
+
+
+def parse_check(value: object) -> CheckConfig:
+    """Existing-file meaning of `check`: absent → no declaration; anything invalid raises.
+
+    A silent fallback would re-render harness.yaml without the DRI's inert declaration.
+    """
+    if value is _ABSENT or value is None:
+        return CheckConfig()
+    if not isinstance(value, dict):
+        raise CheckConfigError(f"harness.yaml `check` must be a mapping, got {value!r}")
+    try:
+        return CheckConfig.model_validate(value)
+    except ValueError as e:
+        raise CheckConfigError(f"harness.yaml `check` is invalid: {e}") from e
 
 
 def _parse_instrumentation(value: object) -> InstrumentationConfig:

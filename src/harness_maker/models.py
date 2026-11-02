@@ -981,6 +981,18 @@ class LoopConfig(BaseModel):
     enabled: bool = False
 
 
+class CheckConfig(BaseModel):
+    """`hm check` options (SPEC-hm-check-docs-only-reuse IRR-001).
+
+    ``reuse_inert`` lists DRI-declared globs the gate cannot depend on; a delta inside them
+    reuses the gate under ``--reuse``. Empty (the absent-key value) keeps 0.65.2's rule.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    reuse_inert: list[str] = Field(default_factory=list)
+
+
 class AutonomyConfig(BaseModel):
     """Pipeline auto-advance policy (PLAN-human-bottleneck-auto-advance).
 
@@ -1310,6 +1322,8 @@ class HarnessConfig(BaseModel):
     loop: LoopConfig = Field(default_factory=LoopConfig)
     # SPEC-world-model-name: absent key = the default Maker/maker (S3).
     world_model: WorldModelConfig = Field(default_factory=WorldModelConfig)
+    # SPEC-hm-check-docs-only-reuse IRR-001: absent key = no declaration (0.65.2 reuse).
+    check: CheckConfig = Field(default_factory=CheckConfig)
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. PLAN-second-opinion-multi-model ADR-001: bumped 2 → 3 for the
     # codex_second_opinion → second_opinion rename (silent migration in interview.py).
@@ -1532,6 +1546,8 @@ class InterviewAnswers(BaseModel):
     loop: LoopConfig = Field(default_factory=LoopConfig)
     # Mirror of HarnessConfig.world_model (SPEC-world-model-name).
     world_model: WorldModelConfig = Field(default_factory=WorldModelConfig)
+    # Mirror of HarnessConfig.check — `--update` must keep the DRI's inert declaration.
+    check: CheckConfig = Field(default_factory=CheckConfig)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

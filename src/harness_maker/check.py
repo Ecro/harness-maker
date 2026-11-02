@@ -75,6 +75,78 @@ def pytest_runtest_makereport(item, call):
 """
 _PLUGIN_NAME = "hm_check_outcomes"
 
+#: Records the in-repo paths every pytest process opens in-process (PEP 578 `open` events), one
+#: JSON file per process, so `--reuse` can void a declared-inert path a test actually read
+#: (SPEC-hm-check-docs-only-reuse ADR-004). The controller lists the xdist workers it saw go
+#: down; the parent refuses the set when any of them left no file.
+_READSET_PLUGIN = """\
+import json
+import os
+import sys
+import threading
+
+import pytest
+
+_DIR = os.environ.get("HM_CHECK_READSET_DIR")
+_ROOT = os.path.realpath(os.environ.get("HM_CHECK_READSET_ROOT") or os.getcwd())
+_SEEN = set()
+_LOCAL = threading.local()
+_WORKERS = set()
+
+
+def _hook(event, args):
+    if event != "open" or getattr(_LOCAL, "busy", False) or not args:
+        return
+    if isinstance(args[0], int):
+        return
+    _LOCAL.busy = True
+    try:
+        rel = os.path.relpath(os.path.realpath(os.fsdecode(args[0])), _ROOT)
+        outside = rel == os.pardir or rel.startswith(os.pardir + os.sep) or os.path.isabs(rel)
+        if not outside:
+            _SEEN.add(rel.replace(os.sep, "/"))
+    except Exception:
+        pass
+    finally:
+        _LOCAL.busy = False
+
+
+if _DIR:
+    sys.addaudithook(_hook)
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_testnodedown(node, error):
+    _WORKERS.add(str(node.gateway.id))
+
+
+def _write(config):
+    if not _DIR:
+        return
+    _LOCAL.busy = True
+    try:
+        worker = getattr(config, "workerinput", {}).get("workerid")
+        data = {"role": "worker" if worker else "main", "id": worker,
+                "workers": sorted(_WORKERS), "paths": sorted(_SEEN)}
+        with open(os.path.join(_DIR, f"{os.getpid()}.json"), "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+    finally:
+        _LOCAL.busy = False
+
+
+def pytest_sessionfinish(session, exitstatus):
+    _write(session.config)
+
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_unconfigure(config):
+    # Outermost wrapper: rewrites the file after every plugin's unconfigure (and the terminal
+    # summary before it) has run, so their reads are in the set too.
+    yield
+    _write(config)
+"""
+_READSET_NAME = "hm_check_readset"
+
 
 # ── process plumbing ──────────────────────────────────────────────────────────
 
@@ -330,21 +402,80 @@ def gate_commands(root: Path, config: dict[str, Any]) -> tuple[list[str], str | 
 
 
 def gates_section(root: Path, config: dict[str, Any]) -> Section:
+    return gates_with_read_set(root, config)[0]
+
+
+def _merge_read_set(run_dir: Path) -> set[str] | None:
+    """One pytest command's read-set, or None when any process it started left no record."""
+    mains: list[dict[str, Any]] = []
+    workers: dict[str, set[str]] = {}
+    for f in sorted(run_dir.glob("*.json")):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(data, dict) or not isinstance(data.get("paths"), list):
+            return None
+        if data.get("role") == "worker":
+            workers[str(data.get("id"))] = set(map(str, data["paths"]))
+        else:
+            mains.append(data)
+    if len(mains) != 1:
+        return None
+    expected = set(map(str, mains[0].get("workers") or []))
+    if not expected <= set(workers):
+        return None
+    paths = set(map(str, mains[0]["paths"]))
+    for w in expected:
+        paths |= workers[w]
+    return paths
+
+
+def gates_with_read_set(root: Path, config: dict[str, Any]) -> tuple[Section, list[str] | None]:
+    """The gate section, plus the union of in-repo paths its pytest gates opened in-process
+    (None when no pytest gate ran or any read-set is incomplete)."""
     commands, reason, source = gate_commands(root, config)
     if reason is not None:
-        return Section({"ok": False, "degraded": True, "reason": reason}, EXIT_DEGRADED)
+        return Section({"ok": False, "degraded": True, "reason": reason}, EXIT_DEGRADED), None
     results: list[dict[str, Any]] = []
-    for cmd in commands:
-        argv = shlex.split(cmd)
-        if _is_pytest(argv):
-            argv += ["-p", "no:cacheprovider"]
-        code, out = _run(argv, root, gate_env())
-        row: dict[str, Any] = {"cmd": cmd, "exit": code}
-        if code != 0:
-            row["tail"] = _tail(out)
-        results.append(row)
+    union: set[str] | None = None
+    complete = True
+    with tempfile.TemporaryDirectory(prefix="hm-check-readset-") as tmp:
+        (Path(tmp) / f"{_READSET_NAME}.py").write_text(_READSET_PLUGIN, encoding="utf-8")
+        for i, cmd in enumerate(commands):
+            argv = shlex.split(cmd)
+            env = gate_env()
+            run_dir: Path | None = None
+            if _is_pytest(argv):
+                run_dir = Path(tmp) / f"run-{i}"
+                run_dir.mkdir()
+                argv += ["-p", "no:cacheprovider", "-p", _READSET_NAME]
+                pythonpath = os.pathsep.join(
+                    p for p in (tmp, os.environ.get("PYTHONPATH", "")) if p
+                )
+                env = gate_env(
+                    {
+                        "PYTHONPATH": pythonpath,
+                        "HM_CHECK_READSET_DIR": str(run_dir),
+                        "HM_CHECK_READSET_ROOT": str(root),
+                    }
+                )
+            code, out = _run(argv, root, env)
+            row: dict[str, Any] = {"cmd": cmd, "exit": code}
+            if code != 0:
+                row["tail"] = _tail(out)
+            results.append(row)
+            if run_dir is not None:
+                paths = _merge_read_set(run_dir)
+                if paths is None:
+                    complete = False
+                else:
+                    union = (union or set()) | paths
     ok = all(r["exit"] == 0 for r in results)
-    return Section({"ok": ok, "source": source, "results": results}, EXIT_OK if ok else EXIT_FAILED)
+    section = Section(
+        {"ok": ok, "source": source, "results": results}, EXIT_OK if ok else EXIT_FAILED
+    )
+    return section, (sorted(union) if complete and union is not None else None)
 
 
 # ── pytest outcomes from junit (ADR-004) ──────────────────────────────────────
@@ -1182,72 +1313,96 @@ def verdict_path(root: Path) -> Path | None:
 def _verdict_key(
     opts: Options,
     root: Path,
-    before: dict[str, str],
     gates: list[str],
     reason: str | None,
     config: dict[str, Any],
 ) -> dict[str, Any]:
-    """What a reused verdict must match: every `Options` field but `root` (a narrower set let a
-    `--mutation` run reuse a pass that never ran the mutation gate), HEAD (changed paths and RED
-    read it), the gate list, the harness config (approval and review read it, and it may be
-    ignored by git) and the tree."""
+    """What a reused gate result must match: every `Options` field but `root` (a narrower set let
+    a `--mutation` run reuse a pass that never ran the mutation gate), the gate list and the
+    harness config (it may be ignored by git). HEAD and the per-path tree are compared by
+    `check_reuse.decide`, which may accept a declared-inert difference in either."""
     from harness_maker import __version__
 
     options = {
         k: sorted(v) if isinstance(v, set) else v for k, v in asdict(opts).items() if k != "root"
     }
-    tree = {"gates": gates, "reason": reason, "config": config, "files": sorted(before.items())}
+    gate_inputs = {"gates": gates, "reason": reason, "config": config}
     return {
         "slug": opts.slug,
         "options": options,
         "head": (_git(root, "rev-parse", "HEAD") or "").strip(),
         "fingerprint": hashlib.sha256(
-            json.dumps(tree, sort_keys=True, default=str).encode()
+            json.dumps(gate_inputs, sort_keys=True, default=str).encode()
         ).hexdigest(),
         "harness_maker_version": __version__,
     }
 
 
-def _reused(path: Path | None, key: dict[str, Any]) -> dict[str, Any] | None:
+def _load_record(path: Path | None) -> object:
     if path is None:
         return None
     try:
-        record = json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    if not isinstance(record, dict) or record.get("exit") != EXIT_OK:
-        return None
-    if any(record.get(k) != v for k, v in key.items()):
-        return None
-    line = record.get("line")
-    if not isinstance(line, dict) or line.get("exit") != EXIT_OK:
-        return None
-    return {**line, "reused": True}
 
 
-def _record(path: Path | None, key: dict[str, Any], result: dict[str, Any]) -> None:
-    """Keep a passing verdict for `--reuse`. Losing it costs one rerun, so a failed write warns
-    and never changes the verdict."""
+def _record(path: Path | None, record: dict[str, Any]) -> None:
+    """Keep a passing gate result for `--reuse`. Losing it costs one rerun, so a failed write
+    warns and never changes the verdict."""
     from harness_maker.io_utils import atomic_write
 
     if path is None:
         return
-    record = {**key, "exit": result["exit"], "line": result, "at": datetime.now(UTC).isoformat()}
     try:
         atomic_write(path, json.dumps(record, ensure_ascii=False) + "\n")
     except OSError as exc:
         sys.stderr.write(f"hm check: verdict not recorded ({type(exc).__name__}: {exc})\n")
 
 
+def _reuse_line(record: dict[str, Any], decision: Any, commands: list[str]) -> dict[str, Any]:
+    unobserved = [c for c in commands if not _is_pytest(shlex.split(c))]
+    read_set = record.get("read_set")
+    state = "absent" if not isinstance(read_set, list) else "partial" if unobserved else "checked"
+    return {
+        "rule": decision.rule,
+        "delta": decision.delta,
+        "inert": decision.inert,
+        "read_set": state,
+        "unobserved": unobserved,
+    }
+
+
 def run(opts: Options, *, reuse: bool = False, cve_query: QueryFn | None = None) -> dict[str, Any]:
+    from harness_maker import check_reuse
+
     root = opts.root.resolve()
     before = snapshot(root)
     config = _harness_config(root)
     commands, reason, _source = gate_commands(root, config)
     path = verdict_path(root)
-    key = _verdict_key(opts, root, before, commands, reason, config)
-    if reuse and (hit := _reused(path, key)) is not None:
-        return hit
+    key = _verdict_key(opts, root, commands, reason, config)
+    reused_gates: Section | None = None
+    reuse_info: dict[str, Any] | None = None
+    reuse_miss: dict[str, Any] | None = None
+    if reuse and not opts.red:
+        record = _load_record(path)
+        decision = check_reuse.decide(
+            record,
+            key=key,
+            files=before,
+            declaration=check_reuse.parse_declaration(config),
+            head=key["head"],
+            has_pytest_gate=any(_is_pytest(shlex.split(c)) for c in commands),
+        )
+        if decision.reuse and isinstance(record, dict):
+            reuse_info = _reuse_line(record, decision, commands)
+            line = record.get("line")
+            if decision.rule == "identical" and isinstance(line, dict) and line.get("exit") == 0:
+                return {**line, "reused": True, "reuse": reuse_info}
+            reused_gates = Section(dict(record["gates"]))
+        else:
+            reuse_miss = {"reason": decision.reason, "paths": decision.paths}
     sections: dict[str, Section] = {}
     approval = approval_section(root, opts.slug, config)
     sections["approval"] = approval
@@ -1256,13 +1411,17 @@ def run(opts: Options, *, reuse: bool = False, cve_query: QueryFn | None = None)
     runner = pytest_runner(root, commands)
     skipped = Section({"ok": True, "skipped": "--red"})
     state = str(approval.body["state"])
+    read_set: list[str] | None = None
     if opts.red:
         sections["gates"] = skipped
         sections["ac"] = red_section(root, spec, runner, opts.green_ok, state)
         for name in ("review", "security", "cve"):
             sections[name] = skipped
     else:
-        sections["gates"] = gates_section(root, config)
+        if reused_gates is not None:
+            sections["gates"] = reused_gates
+        else:
+            sections["gates"], read_set = gates_with_read_set(root, config)
         sections["ac"] = ac_section(root, spec, state, changed, runner)
         sections["review"] = review_section(root, opts.slug, config)
         sections["security"] = security_section(root, changed)
@@ -1278,18 +1437,40 @@ def run(opts: Options, *, reuse: bool = False, cve_query: QueryFn | None = None)
     if tree_changed:
         codes.add(EXIT_TREE_CHANGED)
     exit_code = next((c for c in _PRECEDENCE if c in codes), EXIT_OK)
-    result = {
+    result: dict[str, Any] = {
         "exit": exit_code,
         "tree_changed": tree_changed,
         "sections": {name: s.body if opts.full else compact(s) for name, s in sections.items()},
     }
+    if reuse_info is not None:
+        result.update(reused=True, reuse=reuse_info)
+    elif reuse_miss is not None:
+        result["reuse_miss"] = reuse_miss
+    if opts.red or reused_gates is not None:
+        if tree_changed and path is not None:
+            with contextlib.suppress(OSError):
+                path.unlink(missing_ok=True)
+        return result
+    gates = sections["gates"]
     unhashable = any(d.startswith("unreadable:") for d in before.values())
     head_now = (_git(root, "rev-parse", "HEAD") or "").strip()
-    if exit_code == EXIT_OK and not unhashable and head_now == key["head"]:
-        _record(path, key, result)
-    elif path is not None:
-        # A pass recorded earlier on this same tree must not outlive a fresh failure: a gate can
-        # fail on what the fingerprint cannot see (a service, an ignored file).
+    if gates.code == EXIT_OK and not tree_changed and not unhashable and head_now == key["head"]:
+        kept = sorted(set(read_set) & set(before)) if read_set is not None else None
+        line = {k: v for k, v in result.items() if k not in ("reused", "reuse", "reuse_miss")}
+        _record(
+            path,
+            {
+                **key,
+                "files": before,
+                "read_set": kept,
+                "gates": gates.body,
+                "line": line if exit_code == EXIT_OK else None,
+                "at": datetime.now(UTC).isoformat(),
+            },
+        )
+    elif path is not None and (gates.code != EXIT_OK or tree_changed):
+        # A pass recorded earlier must not outlive a fresh gate failure: a gate can fail on what
+        # the record cannot see (a service, an ignored file).
         with contextlib.suppress(OSError):
             path.unlink(missing_ok=True)
     return result

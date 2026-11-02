@@ -1,0 +1,764 @@
+schema_version: 3
+spec_slug: hm-check-docs-only-reuse
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: a non-identical reuse hit reuses only the gate section
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_001_section_split
+  executable_predicate: null
+  golden_table:
+  - input:
+      decl:
+      - work-docs/**
+      change: REVIEW row -> unresolved
+    expected:
+      gates_ran: false
+      review_ok: false
+      exit_nonzero: true
+      record_kept: true
+    edge: false
+    note: ''
+  - input:
+      decl:
+      - work-docs/**
+      change: REVIEW row -> unresolved, then fixed
+    expected:
+      gates_ran: false
+      review_ok: true
+      exit: 0
+    edge: false
+    note: ''
+  - input:
+      decl: []
+      change: REVIEW row -> unresolved
+    expected:
+      gates_ran: true
+    edge: false
+    note: ''
+  - input:
+      decl:
+      - work-docs/**
+      - specs/**
+      change: remove the SPEC approval stamp
+    expected:
+      gates_ran: false
+      approval_ok: false
+      exit_nonzero: true
+    edge: false
+    note: ''
+  - input:
+      decl: []
+      change: none
+      gate_fails_on_fresh_run: true
+    expected:
+      gates_ran: true
+      record_kept: false
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rows are derived from the SPEC's Constraints table (record lifetime,
+    section split) before check.py changes; each expected value is what a reader of
+    the rule predicts, not an output captured from the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: inert-delta reuse follows the rule table
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_002_rule_table
+  executable_predicate: null
+  golden_table:
+  - input:
+      record: pass
+      decl: []
+      change: none
+      head: same
+    expected:
+      gates_ran: false
+      rule: identical
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl: []
+      change: modify CHANGELOG.md
+      head: same
+    expected:
+      gates_ran: true
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: modify CHANGELOG.md
+      head: same
+    expected:
+      gates_ran: false
+      rule: inert
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: modify work-docs/PLAN-x.md
+      head: same
+    expected:
+      gates_ran: false
+      rule: inert
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: modify README.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: undeclared
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: modify src/a.py
+      head: same
+    expected:
+      gates_ran: true
+      miss: code
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: modify work-docs/tool.py
+      head: same
+    expected:
+      gates_ran: true
+      miss: code
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: add work-docs/NEW.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: added-removed
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: remove CHANGELOG.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: added-removed
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: none
+      head: moved
+    expected:
+      gates_ran: false
+      rule: inert
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: modify CHANGELOG.md
+      head: moved
+    expected:
+      gates_ran: false
+      rule: inert
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl: []
+      change: none
+      head: moved
+    expected:
+      gates_ran: true
+      miss: head
+    edge: false
+    note: ''
+  - input:
+      record: none
+      decl:
+      - CHANGELOG.md
+      change: modify CHANGELOG.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: no-record
+    edge: false
+    note: ''
+  - input:
+      record: legacy (no files field)
+      decl:
+      - CHANGELOG.md
+      change: modify CHANGELOG.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: legacy-record
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl: declaration added after the pass
+      change: modify CHANGELOG.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: key
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: plain rm CHANGELOG.md (still in index, digest absent)
+      head: same
+    expected:
+      gates_ran: true
+      miss: added-removed
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: work-docs/a.md replaced by symlink to src/a.py
+      head: same
+    expected:
+      gates_ran: true
+      miss: added-removed
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: modify work-docs/tests/fixture.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: code
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - '**'
+      change: modify pyproject.toml
+      head: same
+    expected:
+      gates_ran: true
+      miss: code
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - '*.md'
+      change: modify docs/nested.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: undeclared
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - '*.md'
+      change: modify NOTES.md
+      head: same
+    expected:
+      gates_ran: false
+      rule: inert
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - changelog.md
+      change: modify CHANGELOG.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: undeclared
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl: work-docs/** (bare string, not a list)
+      change: modify work-docs/PLAN-x.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: bad-declaration
+    edge: false
+    note: ''
+  - input:
+      record: pass
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: modify src/a.py and README.md
+      head: same
+    expected:
+      gates_ran: true
+      miss: code
+    edge: false
+    note: ''
+  - input:
+      record: 'none written: a file was unreadable during the pass'
+      decl:
+      - CHANGELOG.md
+      - work-docs/**
+      change: none
+      head: same
+    expected:
+      gates_ran: true
+      miss: no-record
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The table is the SPEC's rule (Constraints rows code suffixes, delta
+    kinds, HEAD, config in key, absent declaration) written out by hand per case before
+    implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: a reuse never accepts an unsafe delta
+  type: property
+  test_ids:
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_003_never_unsafe
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_003_run_routes_through_decide
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation is the SPEC's safety rule stated independently of
+    the decision function; the generator draws deltas the implementation never chose.
+  oracle_independence_waiver: null
+  input_domain: 'recorded snapshot (path -> digest incl. absent/link:/unreadable:
+    sentinels) x declaration (glob list, possibly empty) x delta (modify/add/remove/sentinel
+    over code, tests/, runner-config and doc paths) x head_moved bool x read_set (subset
+    of paths, or null) x has_pytest_gate bool'
+  transformation: the pure reuse decision over (record, current snapshot, declaration,
+    head, read_set)
+  expected_relation: reused implies (key identical and head same and delta empty)
+    or (declaration non-empty and every delta path is sha->sha modified, matches a
+    declared glob, is not never-inert, is not in read_set, and read_set is non-null
+    when has_pytest_gate)
+  preconditions: []
+  observable_output: the decision's (reused, rule, miss reason) triple for each generated
+    case
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: a declared path read in-process voids the declaration
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_004_voided
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_004_late_and_dotdot_reads_are_recorded
+  executable_predicate: null
+  golden_table:
+  - input:
+      gate: pytest
+      test_opens: work-docs/data.md
+      decl:
+      - work-docs/**
+      change: modify work-docs/data.md
+    expected:
+      gates_ran: true
+      miss: voided
+      paths:
+      - work-docs/data.md
+    edge: false
+    note: ''
+  - input:
+      gate: pytest
+      test_opens: work-docs/data.md
+      decl:
+      - work-docs/**
+      change: modify work-docs/other.md
+    expected:
+      gates_ran: false
+      rule: inert
+      read_set: checked
+    edge: false
+    note: ''
+  - input:
+      gate: pytest
+      read_set_missing: true
+      decl:
+      - work-docs/**
+      change: modify work-docs/other.md
+    expected:
+      gates_ran: true
+      miss: no-read-set
+    edge: false
+    note: ''
+  - input:
+      gate: non-pytest only
+      decl:
+      - work-docs/**
+      change: modify work-docs/other.md
+    expected:
+      gates_ran: false
+      rule: inert
+      read_set: absent
+    edge: false
+    note: ''
+  - input:
+      gate: pytest
+      test_opens: relative Path('work-docs/data.md')
+      decl:
+      - work-docs/**
+      change: modify work-docs/data.md
+    expected:
+      gates_ran: true
+      miss: voided
+      paths:
+      - work-docs/data.md
+    edge: false
+    note: ''
+  - input:
+      gate: pytest
+      test_opens: chdir work-docs/sub then ../data.md
+      decl:
+      - work-docs/**
+      change: modify work-docs/data.md
+    expected:
+      gates_ran: true
+      miss: voided
+      paths:
+      - work-docs/data.md
+    edge: false
+    note: ''
+  - input:
+      gate: pytest
+      test_opens: link.md -> work-docs/data.md
+      decl:
+      - work-docs/**
+      change: modify work-docs/data.md
+    expected:
+      gates_ran: true
+      miss: voided
+      paths:
+      - work-docs/data.md
+    edge: false
+    note: ''
+  - input:
+      gate: pytest -n 2
+      test_opens: work-docs/data.md (in a worker)
+      decl:
+      - work-docs/**
+      change: modify work-docs/data.md
+    expected:
+      gates_ran: true
+      miss: voided
+      paths:
+      - work-docs/data.md
+    edge: false
+    note: ''
+  - input:
+      gate: pytest + a non-pytest command
+      decl:
+      - work-docs/**
+      change: modify work-docs/other.md
+    expected:
+      gates_ran: false
+      rule: inert
+      read_set: partial
+      unobserved:
+      - <the non-pytest command>
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The temp repo's test file opens a known path; which path must appear
+    is fixed by the fixture, not by the plugin's output.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: the line names the rule
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_005_receipt
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_005_identical_reprint_carries_no_reuse_miss
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: inert hit
+      decl:
+      - CHANGELOG.md
+      change: modify CHANGELOG.md
+    expected:
+      reused: true
+      reuse:
+        rule: inert
+        delta:
+        - CHANGELOG.md
+        inert:
+        - CHANGELOG.md
+        read_set: checked
+    edge: false
+    note: ''
+  - input:
+      case: identical hit
+      decl: []
+      change: none
+      gate: pytest only
+    expected:
+      reused: true
+      reuse:
+        rule: identical
+        delta: []
+        inert: []
+        read_set: checked
+    edge: false
+    note: ''
+  - input:
+      case: miss under --reuse
+      decl:
+      - CHANGELOG.md
+      change: modify src/a.py
+    expected:
+      reuse_miss:
+        reason: code
+        paths:
+        - src/a.py
+    edge: false
+    note: ''
+  - input:
+      case: fresh run without --reuse
+      change: modify src/a.py
+    expected:
+      has_reuse_miss: false
+    edge: false
+    note: ''
+  - input:
+      case: identical hit, pytest gate, read-set null
+      decl: []
+      change: none
+    expected:
+      reused: true
+      reuse:
+        rule: identical
+        read_set: absent
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The key names and the reason vocabulary are fixed in the SPEC (IRR-003)
+    before implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: check.reuse_inert is a typed, preserved config key
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_006_config
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_006_default_render_has_no_check_key
+  - tests/unit/test_hm_check_inert_reuse.py::test_ac_006_preset_switch_keeps_check
+  executable_predicate: null
+  golden_table:
+  - input:
+      yaml: no check key
+    expected:
+      reuse_inert: []
+    edge: false
+    note: ''
+  - input:
+      yaml: 'check: {reuse_inert: [CHANGELOG.md, work-docs/**]}'
+    expected:
+      reuse_inert:
+      - CHANGELOG.md
+      - work-docs/**
+      round_trip_equal: true
+    edge: false
+    note: ''
+  - input:
+      yaml: 'check: {reuse_inert: CHANGELOG.md}'
+    expected:
+      rejected: true
+    edge: false
+    note: ''
+  - input:
+      yaml: 'check: {reuse_inert: [1]}'
+    expected:
+      rejected: true
+    edge: false
+    note: ''
+  - input:
+      yaml: 'check: {reuse_inert: [CHANGELOG.md]}'
+      path: /hm:make update (InterviewAnswers)
+    expected:
+      reuse_inert:
+      - CHANGELOG.md
+      rejected: false
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Accept/reject cases follow the IRR-001 type (list[str]) and the
+    absent-case rule in Constraints, written before the model field exists.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: 'harness.yaml gains check: {reuse_inert: list[str]} as a HarnessConfig
+    field with an InterviewAnswers mirror; globs: own translator, case-sensitive,
+    root-anchored, * and ? never cross /, ** spans any depth'
+  category: schema/file format/storage layout
+  rationale: users write it and /hm:make must preserve it; a <=0.65.2 harness-maker
+    (extra=forbid) rejects a harness.yaml carrying check:, so a declaration requires
+    >=0.66 wherever that file is read
+  source: spec
+- id: IRR-002
+  decision: verdict record hm/check-verdict.json becomes {slug, options, head, fingerprint,
+    harness_maker_version, files, read_set, gates, line, at}; fingerprint covers gate
+    list, degraded reason and config only; files = path->digest; read_set = list or
+    null; gates = gate section body; line = the whole verdict line when it exited
+    0, else null; the record means the gate section passed; harness_maker_version
+    stays in the key so a <=0.65.2 record (no files) is a legacy-record miss
+  category: schema/file format/storage layout
+  rationale: later versions must parse it
+  source: spec
+- id: IRR-003
+  decision: '--reuse output: reused: true under rule identical with a recorded exit-0
+    line reprints the whole 0.65.2 line; any other hit means the gate section was
+    reused and every other section ran fresh; reuse: {rule, delta, inert, read_set
+    (checked|partial|absent), unobserved}; a fresh run under --reuse carries reuse_miss:
+    {reason, paths}; reasons by precedence no-record, legacy-record, bad-declaration,
+    key, code, added-removed, undeclared, head, voided, no-read-set'
+  category: public API/CLI contract
+  rationale: 'wrapup and scripts read it; changes the meaning of hm-cost-p3''s reused:
+    true'
+  source: spec
+approval:
+  kind: human
+  content_hash: 627a29b47f8179b0e3532d0442dab109065690fb024dc4251d05e72d17a84c62
+  approved_by: Ecro
+  approved_at: '2026-11-02T08:56:37Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 0d2b6de3f90a71d815ac079a0da62cda1cfc09a6a992b074297c14ad121f1711
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4cc29d58b813ae65f0935d6e370746acd88f5c42b07ef1e9f3a104901cd30ccc
+    AC-001: 37480b3a39a0d39434ec307692d779a54ac9f2e4e68b237d6ff66b7dfa4133c0
+    AC-002: 37d513e33e4a15d6ac0c57a0ae43cf9cc17f13d2926364929898e50c3e4b6720
+    AC-003: fe217303394dabe2585fb9a0d4e9e27789e4fcd8b7de8fa4f9e14517e0fc4abf
+    AC-004: 0192ad78b022152d47c115eb584bd0e76ae9eae34b875352d0b654c589f8a8dd
+    AC-005: 1f5b14531b73ffb66ffc809f75171f0e9c415571994f9792e5f2bac95da2c1ac
+    AC-006: cd493558e1226b6c5da71c7b6331ba3fc202a9f8a280a40091ff8a3c0748d058
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923

@@ -1,0 +1,698 @@
+{
+  "AC-001": [
+    {
+      "expected": {
+        "exit_nonzero": true,
+        "gates_ran": false,
+        "record_kept": true,
+        "review_ok": false
+      },
+      "input": {
+        "change": "REVIEW row -> unresolved",
+        "decl": [
+          "work-docs/**"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "exit": 0,
+        "gates_ran": false,
+        "review_ok": true
+      },
+      "input": {
+        "change": "REVIEW row -> unresolved, then fixed",
+        "decl": [
+          "work-docs/**"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true
+      },
+      "input": {
+        "change": "REVIEW row -> unresolved",
+        "decl": []
+      }
+    },
+    {
+      "expected": {
+        "approval_ok": false,
+        "exit_nonzero": true,
+        "gates_ran": false
+      },
+      "input": {
+        "change": "remove the SPEC approval stamp",
+        "decl": [
+          "work-docs/**",
+          "specs/**"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "record_kept": false
+      },
+      "input": {
+        "change": "none",
+        "decl": [],
+        "gate_fails_on_fresh_run": true
+      }
+    }
+  ],
+  "AC-002": [
+    {
+      "expected": {
+        "gates_ran": false,
+        "rule": "identical"
+      },
+      "input": {
+        "change": "none",
+        "decl": [],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true
+      },
+      "input": {
+        "change": "modify CHANGELOG.md",
+        "decl": [],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": false,
+        "rule": "inert"
+      },
+      "input": {
+        "change": "modify CHANGELOG.md",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": false,
+        "rule": "inert"
+      },
+      "input": {
+        "change": "modify work-docs/PLAN-x.md",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "undeclared"
+      },
+      "input": {
+        "change": "modify README.md",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "code"
+      },
+      "input": {
+        "change": "modify src/a.py",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "code"
+      },
+      "input": {
+        "change": "modify work-docs/tool.py",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "added-removed"
+      },
+      "input": {
+        "change": "add work-docs/NEW.md",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "added-removed"
+      },
+      "input": {
+        "change": "remove CHANGELOG.md",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": false,
+        "rule": "inert"
+      },
+      "input": {
+        "change": "none",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "moved",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": false,
+        "rule": "inert"
+      },
+      "input": {
+        "change": "modify CHANGELOG.md",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "moved",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "head"
+      },
+      "input": {
+        "change": "none",
+        "decl": [],
+        "head": "moved",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "no-record"
+      },
+      "input": {
+        "change": "modify CHANGELOG.md",
+        "decl": [
+          "CHANGELOG.md"
+        ],
+        "head": "same",
+        "record": "none"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "legacy-record"
+      },
+      "input": {
+        "change": "modify CHANGELOG.md",
+        "decl": [
+          "CHANGELOG.md"
+        ],
+        "head": "same",
+        "record": "legacy (no files field)"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "key"
+      },
+      "input": {
+        "change": "modify CHANGELOG.md",
+        "decl": "declaration added after the pass",
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "added-removed"
+      },
+      "input": {
+        "change": "plain rm CHANGELOG.md (still in index, digest absent)",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "added-removed"
+      },
+      "input": {
+        "change": "work-docs/a.md replaced by symlink to src/a.py",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "code"
+      },
+      "input": {
+        "change": "modify work-docs/tests/fixture.md",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "code"
+      },
+      "input": {
+        "change": "modify pyproject.toml",
+        "decl": [
+          "**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "undeclared"
+      },
+      "input": {
+        "change": "modify docs/nested.md",
+        "decl": [
+          "*.md"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": false,
+        "rule": "inert"
+      },
+      "input": {
+        "change": "modify NOTES.md",
+        "decl": [
+          "*.md"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "undeclared"
+      },
+      "input": {
+        "change": "modify CHANGELOG.md",
+        "decl": [
+          "changelog.md"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "bad-declaration"
+      },
+      "input": {
+        "change": "modify work-docs/PLAN-x.md",
+        "decl": "work-docs/** (bare string, not a list)",
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "code"
+      },
+      "input": {
+        "change": "modify src/a.py and README.md",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "pass"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "no-record"
+      },
+      "input": {
+        "change": "none",
+        "decl": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "head": "same",
+        "record": "none written: a file was unreadable during the pass"
+      }
+    }
+  ],
+  "AC-004": [
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "voided",
+        "paths": [
+          "work-docs/data.md"
+        ]
+      },
+      "input": {
+        "change": "modify work-docs/data.md",
+        "decl": [
+          "work-docs/**"
+        ],
+        "gate": "pytest",
+        "test_opens": "work-docs/data.md"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": false,
+        "read_set": "checked",
+        "rule": "inert"
+      },
+      "input": {
+        "change": "modify work-docs/other.md",
+        "decl": [
+          "work-docs/**"
+        ],
+        "gate": "pytest",
+        "test_opens": "work-docs/data.md"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "no-read-set"
+      },
+      "input": {
+        "change": "modify work-docs/other.md",
+        "decl": [
+          "work-docs/**"
+        ],
+        "gate": "pytest",
+        "read_set_missing": true
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": false,
+        "read_set": "absent",
+        "rule": "inert"
+      },
+      "input": {
+        "change": "modify work-docs/other.md",
+        "decl": [
+          "work-docs/**"
+        ],
+        "gate": "non-pytest only"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "voided",
+        "paths": [
+          "work-docs/data.md"
+        ]
+      },
+      "input": {
+        "change": "modify work-docs/data.md",
+        "decl": [
+          "work-docs/**"
+        ],
+        "gate": "pytest",
+        "test_opens": "relative Path('work-docs/data.md')"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "voided",
+        "paths": [
+          "work-docs/data.md"
+        ]
+      },
+      "input": {
+        "change": "modify work-docs/data.md",
+        "decl": [
+          "work-docs/**"
+        ],
+        "gate": "pytest",
+        "test_opens": "chdir work-docs/sub then ../data.md"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "voided",
+        "paths": [
+          "work-docs/data.md"
+        ]
+      },
+      "input": {
+        "change": "modify work-docs/data.md",
+        "decl": [
+          "work-docs/**"
+        ],
+        "gate": "pytest",
+        "test_opens": "link.md -> work-docs/data.md"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": true,
+        "miss": "voided",
+        "paths": [
+          "work-docs/data.md"
+        ]
+      },
+      "input": {
+        "change": "modify work-docs/data.md",
+        "decl": [
+          "work-docs/**"
+        ],
+        "gate": "pytest -n 2",
+        "test_opens": "work-docs/data.md (in a worker)"
+      }
+    },
+    {
+      "expected": {
+        "gates_ran": false,
+        "read_set": "partial",
+        "rule": "inert",
+        "unobserved": [
+          "<the non-pytest command>"
+        ]
+      },
+      "input": {
+        "change": "modify work-docs/other.md",
+        "decl": [
+          "work-docs/**"
+        ],
+        "gate": "pytest + a non-pytest command"
+      }
+    }
+  ],
+  "AC-005": [
+    {
+      "expected": {
+        "reuse": {
+          "delta": [
+            "CHANGELOG.md"
+          ],
+          "inert": [
+            "CHANGELOG.md"
+          ],
+          "read_set": "checked",
+          "rule": "inert"
+        },
+        "reused": true
+      },
+      "input": {
+        "case": "inert hit",
+        "change": "modify CHANGELOG.md",
+        "decl": [
+          "CHANGELOG.md"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "reuse": {
+          "delta": [],
+          "inert": [],
+          "read_set": "checked",
+          "rule": "identical"
+        },
+        "reused": true
+      },
+      "input": {
+        "case": "identical hit",
+        "change": "none",
+        "decl": [],
+        "gate": "pytest only"
+      }
+    },
+    {
+      "expected": {
+        "reuse_miss": {
+          "paths": [
+            "src/a.py"
+          ],
+          "reason": "code"
+        }
+      },
+      "input": {
+        "case": "miss under --reuse",
+        "change": "modify src/a.py",
+        "decl": [
+          "CHANGELOG.md"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "has_reuse_miss": false
+      },
+      "input": {
+        "case": "fresh run without --reuse",
+        "change": "modify src/a.py"
+      }
+    },
+    {
+      "expected": {
+        "reuse": {
+          "read_set": "absent",
+          "rule": "identical"
+        },
+        "reused": true
+      },
+      "input": {
+        "case": "identical hit, pytest gate, read-set null",
+        "change": "none",
+        "decl": []
+      }
+    }
+  ],
+  "AC-006": [
+    {
+      "expected": {
+        "reuse_inert": []
+      },
+      "input": {
+        "yaml": "no check key"
+      }
+    },
+    {
+      "expected": {
+        "reuse_inert": [
+          "CHANGELOG.md",
+          "work-docs/**"
+        ],
+        "round_trip_equal": true
+      },
+      "input": {
+        "yaml": "check: {reuse_inert: [CHANGELOG.md, work-docs/**]}"
+      }
+    },
+    {
+      "expected": {
+        "rejected": true
+      },
+      "input": {
+        "yaml": "check: {reuse_inert: CHANGELOG.md}"
+      }
+    },
+    {
+      "expected": {
+        "rejected": true
+      },
+      "input": {
+        "yaml": "check: {reuse_inert: [1]}"
+      }
+    },
+    {
+      "expected": {
+        "rejected": false,
+        "reuse_inert": [
+          "CHANGELOG.md"
+        ]
+      },
+      "input": {
+        "path": "/hm:make update (InterviewAnswers)",
+        "yaml": "check: {reuse_inert: [CHANGELOG.md]}"
+      }
+    }
+  ]
+}

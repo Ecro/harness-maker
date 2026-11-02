@@ -163,3 +163,7 @@ instrumentation:
   # harness-maker's own development telemetry. false = this project stops emitting
   # stage_agent_ledger rows AND leaves the cross-project denominator.
   stage_agent_ledger: {{ (config.instrumentation.stage_agent_ledger if config.instrumentation else true) | tojson }}
+{% if config.check and config.check.reuse_inert %}check:
+  # Paths the gate cannot depend on: a change only inside them reuses the gate (hm check --reuse).
+  reuse_inert: {{ config.check.reuse_inert | tojson }}
+{% endif %}

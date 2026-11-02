@@ -69,6 +69,9 @@ _INTERNAL_AXES: frozenset[str] = frozenset(
         "anti_rot",
         "autoloop",
         "caching",
+        # SPEC-hm-check-docs-only-reuse: empty by default (0.65.2 reuse); a DRI declares it
+        # after learning which paths the gate cannot read, never at onboarding.
+        "check",
         "consensus",
         "context_lint",
         "dashboard",

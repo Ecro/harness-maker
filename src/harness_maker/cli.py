@@ -19,12 +19,14 @@ from harness_maker.add_domain import AddDomainError, add_domain, validate_domain
 from harness_maker.block_merge import MergeReport
 from harness_maker.codex_user_config import bootstrap_user_codex_profiles
 from harness_maker.interview import (
+    CheckConfigError,
     LoopConfigError,
     WorldModelConfigError,
     _input_or_empty,
     _parse_autonomy,
     answers_from_harness_yaml,
     interview,
+    parse_check,
     parse_loop,
     parse_world_model,
 )
@@ -1640,6 +1642,9 @@ def _apply_dimension_overrides(
                 # `world_model=` likewise: a reset would rename the router to the default
                 # and the orphan sweep would delete the user's named one.
                 world_model=answers.world_model,
+                # `check=` likewise: a reset would drop the DRI's inert declaration
+                # (SPEC-hm-check-docs-only-reuse IRR-001).
+                check=answers.check,
                 # `comprehension_depth=` is NOT optional here, for the same reason
                 # `autonomy=` and `toolchains=` are not: this rebuild takes a field
                 # allowlist, so `interview` is otherwise reset to the new preset's default
@@ -2020,7 +2025,15 @@ def _check_existing_world_model_or_exit(existing_yaml: Path) -> None:
         data = load_harness_yaml(existing_yaml)
     except Exception:  # noqa: BLE001 — unreadable files are the reuse path's concern
         return
-    if not isinstance(data, dict) or "world_model" not in data:
+    if not isinstance(data, dict):
+        return
+    if "check" in data:
+        try:
+            parse_check(data["check"])
+        except CheckConfigError as e:
+            typer.echo(f"ERROR: {e}. Fix or remove the `check` block in {existing_yaml}.", err=True)
+            raise typer.Exit(code=1) from e
+    if "world_model" not in data:
         return
     try:
         parse_world_model(data["world_model"])

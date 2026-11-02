@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`hm check --reuse` inert rule** (SPEC-hm-check-docs-only-reuse): a DRI-declared `harness.yaml`
+  `check.reuse_inert` glob list lets a pass be reused across a change to files no test reads. The delta must
+  be sha->sha modified, non-code (`is_code_or_test`, `pyproject.toml`, `pytest.ini`, `setup.cfg`, `tox.ini`
+  are never inert), match a declared glob, and be absent from the in-process read-set recorded by a PEP 578
+  audit-hook pytest plugin. HEAD may move only under a non-empty declaration. The record is now gate-only v2
+  (adds `files`, `read_set`, `gates`); a non-gate section failure keeps it, a gate failure or tree change
+  removes it. Note: harness-maker <= 0.65.2 rejects a `check:` key (extra=forbid), so declare it only once
+  this ships.
+
 ## [0.65.2] - 2026-10-22
 
 Cost phases 2 and 3: `hm check --reuse`, compact `hm check`, golden JSON, SPEC defaults instead of

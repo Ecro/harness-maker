@@ -1062,6 +1062,8 @@ def synthesize(
         loop=answers.loop,
         # SPEC-world-model-name: without this every render writes the default Maker/maker.
         world_model=answers.world_model,
+        # SPEC-hm-check-docs-only-reuse: without this every render drops `check.reuse_inert`.
+        check=answers.check,
     )
     if answers.strictness is not None:
         # Written, not derived, so an explicit choice survives a later `--preset` switch.
