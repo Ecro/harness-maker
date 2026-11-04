@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.65.3] - 2026-11-04
+
+`hm check --reuse` reuses the gate across DRI-declared inert changes (docs, PLANs, REVIEW fixes,
+a docs-only rebase), checked against an in-process read-set.
+
 ### Added
 
 - **`hm check --reuse` inert rule** (SPEC-hm-check-docs-only-reuse): a DRI-declared `harness.yaml`
@@ -11,7 +16,7 @@
   audit-hook pytest plugin. HEAD may move only under a non-empty declaration. The record is now gate-only v2
   (adds `files`, `read_set`, `gates`); a non-gate section failure keeps it, a gate failure or tree change
   removes it. Note: harness-maker <= 0.65.2 rejects a `check:` key (extra=forbid), so declare it only once
-  this ships.
+  0.65.3 is installed wherever the file is read.
 
 ## [0.65.2] - 2026-10-22
 

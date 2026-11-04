@@ -48,7 +48,7 @@ observe.
   declaration covering it, when that file is edited, then the full gate runs and the line
   carries `reuse_miss.reason: voided` with the path.
 - **S5 (failure, unsafe delta):** a code-suffix path, an added or removed path, an undeclared
-  path, a config change, a missing or pre-0.66 record, or a pytest gate with no read-set: each
+  path, a config change, a missing or pre-0.65.3 record, or a pytest gate with no read-set: each
   runs the full gate.
 
 ## Non-Goals
@@ -85,8 +85,8 @@ observe.
 
 | id | decision | category | rationale |
 |---|---|---|---|
-| IRR-001 | `harness.yaml` gains `check: {reuse_inert: list[str]}` as a `HarnessConfig` field with an `InterviewAnswers` mirror; its globs use the dialect in Constraints | schema/file format/storage layout | users write it, and `/hm:make` must preserve it. A ≤0.65.2 harness-maker (`extra="forbid"`) rejects a harness.yaml carrying `check:`, so a declaration requires ≥0.66 everywhere that file is read |
-| IRR-002 | verdict record `hm/check-verdict.json` becomes `{slug, options, head, fingerprint, harness_maker_version, files, read_set, gates, at}`. `fingerprint` hashes the gate list, degraded reason and config, no longer the files. `files` is path → digest, `read_set` is a list or null (`partial` noted by an `unobserved` list), `gates` is the gate section body, `line` is the whole verdict line when it exited 0 (else null). The record means "the gate section passed", not "the verdict passed". `harness_maker_version` stays in the key, so a ≤0.65.2 record (no `files`) is a `legacy-record` miss and a 0.66 record is never honoured by 0.65.2 | schema/file format/storage layout | later versions must parse it; cross-version misreads are prevented by the version key |
+| IRR-001 | `harness.yaml` gains `check: {reuse_inert: list[str]}` as a `HarnessConfig` field with an `InterviewAnswers` mirror; its globs use the dialect in Constraints | schema/file format/storage layout | users write it, and `/hm:make` must preserve it. A ≤0.65.2 harness-maker (`extra="forbid"`) rejects a harness.yaml carrying `check:`, so a declaration requires ≥0.65.3 everywhere that file is read |
+| IRR-002 | verdict record `hm/check-verdict.json` becomes `{slug, options, head, fingerprint, harness_maker_version, files, read_set, gates, at}`. `fingerprint` hashes the gate list, degraded reason and config, no longer the files. `files` is path → digest, `read_set` is a list or null (`partial` noted by an `unobserved` list), `gates` is the gate section body, `line` is the whole verdict line when it exited 0 (else null). The record means "the gate section passed", not "the verdict passed". `harness_maker_version` stays in the key, so a ≤0.65.2 record (no `files`) is a `legacy-record` miss and a 0.65.3 record is never honoured by 0.65.2 | schema/file format/storage layout | later versions must parse it; cross-version misreads are prevented by the version key |
 | IRR-003 | `--reuse` output. A reused line carries `reused: true`. Under `rule: identical` (same key, HEAD and tree, and a recorded exit-0 `line`) the whole 0.65.2 line is reprinted. Otherwise, including `rule: inert` and an identical key whose recorded verdict did not pass, `reused: true` means *the gate section was reused and every other section ran fresh*. Either way the line carries `reuse: {rule, delta, inert, read_set, unobserved}` with `read_set` ∈ `checked \| partial \| absent` and `unobserved` = the gate commands not observed. A fresh run under `--reuse` carries `reuse_miss: {reason, paths}`. Reasons, by precedence: `no-record`, `legacy-record`, `bad-declaration`, `key`, `code`, `added-removed`, `undeclared`, `head`, `voided`, `no-read-set` | public API/CLI contract | wrapup and scripts read it; changes the meaning of p3's `reused: true` |
 
 ## Acceptance Criteria
