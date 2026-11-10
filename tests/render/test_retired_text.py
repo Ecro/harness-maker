@@ -48,8 +48,8 @@ TOUCHED = (
 REPLACEMENTS = (
     (
         ".claude/agents/consensus-arbiter.md",
-        "Invoked by the review step of `/hm:execute` when second-opinion voters disagree on "
-        "a finding's severity",
+        # SPEC-hm-cost-p4 AC-007: the trigger no longer promises a severity resolution.
+        "Invoked by the review step of `/hm:execute` to merge the second-opinion voters' findings",
     ),
     (
         ".claude/agents/code-verifier.md",

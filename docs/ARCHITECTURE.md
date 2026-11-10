@@ -135,11 +135,9 @@ the final replacement.
         │  harness.yaml          ◀── single source of truth   │
         │  settings.json         ◀── permissions               │
         │  commands/hm/                                       │
-        │    research|spec|execute|review|verify|wrapup       │
-        │      ◀── M3 atomic stages                           │
-        │    loop.md          ◀── M7 autoloop driver          │
-        │    ai-readiness.md  ◀── M5 scored readiness report   │
-        │    refresh.md       ◀── M4 anti-rot, manual confirm │
+        │    research|spec|execute|wrapup                     │
+        │      ◀── the four stages (0.64.0)                   │
+        │    health|metrics|help ◀── audit, delivery metrics  │
         │  second_brain       ◀── typed Obsidian R/W memory    │
         │                          with project namespaces     │
         │  skills/            ◀── including verify-before,    │

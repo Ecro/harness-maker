@@ -494,6 +494,26 @@ def _id_parts(test_id: str) -> tuple[str, str, str]:
     return file, _dotted(file), parts[0] if parts else ""
 
 
+def _static_test_names(source: str) -> list[str]:
+    """Only function definitions: a `test_cases = [...]` assignment is not a test to run."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    fn = (ast.FunctionDef, ast.AsyncFunctionDef)
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, fn) and node.name.startswith("test"):
+            names.add(node.name)
+        elif isinstance(node, ast.ClassDef):
+            names.update(
+                f"{node.name}::{i.name}"
+                for i in node.body
+                if isinstance(i, fn) and i.name.startswith("test")
+            )
+    return sorted(names)
+
+
 def _top_level_names(source: str) -> set[str] | None:
     try:
         tree = ast.parse(source)
@@ -894,6 +914,61 @@ def ac_section(
     return Section(body, EXIT_OK if not failed else EXIT_FAILED)
 
 
+def _is_test_file(rel: str) -> bool:
+    name = Path(rel).name
+    return name.endswith(".py") and (name.startswith("test_") or name.endswith("_test.py"))
+
+
+def red_discovery(root: Path, spec: SpecView, runner: list[str]) -> dict[str, list[str]]:
+    """Tests the name convention gives each AC with empty `test_ids` (SPEC-hm-cost-p4 IRR-001).
+
+    Read-only, and scoped to changed test files: Phase A's tests are new, and collecting a
+    whole suite would cost the minutes the RED run is meant to save. A file that fails to
+    collect is Phase A's usual RED (a module-level import of a name that does not exist yet),
+    so it binds by its static function names instead of binding nothing.
+    """
+    from harness_maker import spec_machine
+
+    testable = spec.testable()
+    empty = [ac for ac in testable if not ac.test_ids]
+    if not empty:
+        return {}
+    files = sorted(p for p in changed_paths(root) if _is_test_file(p) and (root / p).is_file())
+    if not files:
+        return {}
+    argv = [*runner, "-p", "no:cacheprovider", "-o", "addopts=", "--collect-only", "-q",
+            "--no-header", "--continue-on-collection-errors", "--", *files]  # fmt: skip
+    _code, out = _run(argv, root, gate_env())
+    # `-q --collect-only` prints one node id per line; a case id may hold spaces.
+    nodeids = [
+        ln.strip()
+        for ln in out.splitlines()
+        if ".py::" in ln and not ln.startswith(("ERROR ", "FAILED "))
+    ]
+    collected = {n.partition("::")[0] for n in nodeids}
+    golden = spec.yaml_path.name.removesuffix(".machine.yaml") + ".golden.json"
+    golden_tests: list[str] = []
+    for rel in files:
+        if rel in collected:
+            continue
+        try:
+            text = (root / rel).read_text(encoding="utf-8")
+        except OSError:
+            continue
+        names = _static_test_names(text)
+        nodeids += [f"{rel}::{n}" for n in names]
+        if golden in text:  # the recipe's literal file name; a computed path is not detected
+            golden_tests += [f"{rel}::{n}" for n in names]
+    found: dict[str, list[str]] = {}
+    for ac in empty:
+        ids = spec_machine.ac_tests_for(ac.id, nodeids)
+        if not ids and ac.type == "parametric":
+            ids = golden_tests
+        if ids:
+            found[ac.id] = ids
+    return found
+
+
 def red_section(
     root: Path,
     spec: SpecView | None,
@@ -908,18 +983,20 @@ def red_section(
         return Section({"ok": False, "degraded": True, "reason": "no testable AC"}, EXIT_DEGRADED)
     if runner is None:
         return Section({"ok": False, "degraded": True, "reason": "no pytest runner"}, EXIT_DEGRADED)
-    ids = sorted({t for ac in testable for t in ac.test_ids})
+    discovered = red_discovery(root, spec, runner)
+    bound = {ac.id: list(ac.test_ids) or discovered.get(ac.id, []) for ac in testable}
+    ids = sorted({t for ts in bound.values() for t in ts})
     outcomes = run_tests(root, runner, ids) if ids else {}
     not_red: dict[str, Any] = {}
     green_before: list[str] = []
     waived: list[str] = []
     red_by_import: list[dict[str, Any]] = []
     for ac in testable:
-        if not ac.test_ids:
+        if not bound[ac.id]:
             not_red[ac.id] = "no test_ids"
             continue
         is_red = False
-        for tid in ac.test_ids:
+        for tid in bound[ac.id]:
             oc = outcomes[tid]
             if oc.outcome not in ("failed", "error"):
                 continue
@@ -934,7 +1011,7 @@ def red_section(
                 )
         if is_red:
             continue
-        seen = {tid: outcomes[tid].outcome for tid in ac.test_ids}
+        seen = {tid: outcomes[tid].outcome for tid in bound[ac.id]}
         if all(o == "passed" for o in seen.values()):
             green_before.append(ac.id)
             if ac.id in green_ok:

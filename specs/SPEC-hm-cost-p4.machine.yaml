@@ -1,0 +1,460 @@
+schema_version: 3
+spec_slug: hm-cost-p4
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: spec_machine collects with hm check's pytest runner
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p4_binding.py::test_ac_001_collect_with_gate_runner
+  executable_predicate: 'path_pytest_collect_fails(project) and venv_runner_collect_ok(project)
+    and mark_tested(yaml, md, {"AC-001": []}) == [] and recorded(yaml, "AC-001") ==
+    ["tests/test_pkg.py::test_ac_001_x"]'
+  golden_table: []
+  rubric_id: null
+  note: project = a tmp dir with pkg/ at the root, tests/ importing pkg, a .venv/bin/python
+    and no pythonpath config
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is check.pytest_runner's own choice of runner, already
+    proven by hm check's tests; the tmp project is built so PATH pytest and the venv
+    runner disagree, which the diagnostic run reproduced in two bench fixtures before
+    any change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: mark-tested records tests found by name
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_cost_p4_binding.py::test_mark_tested_binding
+  executable_predicate: null
+  golden_table:
+  - input:
+      acs:
+      - AC-001
+      tests:
+      - tests/test_a.py::test_ac_001_sum
+    expected:
+      errors: 0
+      recorded:
+        AC-001:
+        - tests/test_a.py::test_ac_001_sum
+    edge: false
+    note: ''
+  - input:
+      acs:
+      - AC-001
+      tests:
+      - tests/test_a.py::test_ac_001
+    expected:
+      errors: 0
+      recorded:
+        AC-001:
+        - tests/test_a.py::test_ac_001
+    edge: false
+    note: ''
+  - input:
+      acs:
+      - AC-001
+      - AC-002
+      tests:
+      - tests/test_g.py::test_golden[AC-001-0]
+      - tests/test_g.py::test_golden[AC-001-1]
+      - tests/test_g.py::test_golden[AC-002-0]
+    expected:
+      errors: 0
+      recorded:
+        AC-001:
+        - tests/test_g.py::test_golden[AC-001-0]
+        - tests/test_g.py::test_golden[AC-001-1]
+        AC-002:
+        - tests/test_g.py::test_golden[AC-002-0]
+    edge: false
+    note: ''
+  - input:
+      acs:
+      - AC-001
+      tests:
+      - tests/test_g.py::test_golden[AC-001]
+    expected:
+      errors: 0
+      recorded:
+        AC-001:
+        - tests/test_g.py::test_golden[AC-001]
+    edge: false
+    note: ''
+  - input:
+      acs:
+      - AC-001
+      tests:
+      - tests/test_a.py::test_ac_0012_x
+      - tests/test_g.py::test_golden[AC-0012-0]
+    expected:
+      errors: 1
+      error_mentions:
+      - AC-001
+      - test_ac_001
+      - AC-001-
+      recorded:
+        AC-001: []
+    edge: false
+    note: ''
+  - input:
+      acs:
+      - AC-003
+      tests:
+      - tests/test_a.py::test_ac_001_sum
+    expected:
+      errors: 1
+      error_mentions:
+      - AC-003
+      - test_ac_003
+      - AC-003-
+      recorded:
+        AC-003: []
+    edge: false
+    note: ''
+  - input:
+      acs:
+      - AC-001
+      - AC-002
+      tests:
+      - tests/test_g.py::test_ac_001_golden[AC-001-0]
+      - tests/test_g.py::test_ac_001_golden[AC-002-0]
+    expected:
+      errors: 0
+      recorded:
+        AC-001:
+        - tests/test_g.py::test_ac_001_golden[AC-001-0]
+        AC-002:
+        - tests/test_g.py::test_ac_001_golden[AC-002-0]
+    edge: false
+    note: ''
+  - input:
+      acs: []
+      find_unbound: true
+      pending:
+      - AC-002
+      tests:
+      - tests/test_g.py::test_golden[AC-002-0]
+    expected:
+      errors: 0
+      unbound:
+      - AC-002
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The rows are written from the convention stated in the SPEC (function
+    test_ac_NNN[_*], case id AC-NNN or AC-NNN-*) before the code exists; the AC-0012
+    row is the existing boundary rule of _collectable_ac_tests.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: hm check --red binds empty test_ids by name, read-only
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_cost_p4_binding.py::test_red_binding
+  executable_predicate: null
+  golden_table:
+  - input:
+      mode: red
+      tests:
+      - tests/test_g.py::test_golden[AC-001-0]
+      - tests/test_g.py::test_golden[AC-002-0]
+      code: absent_in_body
+    expected:
+      exit: 0
+      not_red: []
+      yaml_unchanged: true
+    edge: false
+    note: ''
+  - input:
+      mode: red
+      tests:
+      - tests/test_g.py::test_golden[AC-001-0]
+      code: absent_in_body
+    expected:
+      exit: 1
+      not_red:
+      - AC-002
+      yaml_unchanged: true
+    edge: false
+    note: ''
+  - input:
+      mode: red
+      tests:
+      - tests/test_a.py::test_ac_001_x
+      - tests/test_g.py::test_golden reading SPEC-<slug>.golden.json
+      code: module_level_import_of_absent_name
+    expected:
+      exit: 0
+      not_red: []
+      yaml_unchanged: true
+    edge: false
+    note: ''
+  - input:
+      mode: full
+      pending_test: true
+      tests:
+      - tests/test_a.py::test_ac_001_x
+      - tests/test_a.py::test_ac_002_y
+      code: present
+    expected:
+      exit: 1
+      failed:
+        AC-001: pending_test is true
+        AC-002: pending_test is true
+      yaml_unchanged: true
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected exits follow hm check's existing contract (exit 1 names
+    an AC with no failing test; RED exit 0 when every AC has one); the rows fix only
+    which tests count as an AC's, written before the change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: execute's Phase A names tests instead of editing test_ids, and has no pasted
+    implementations
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p4_templates.py::test_ac_004_phase_a_names_tests
+  executable_predicate: all(all(x in r for x in ("AC-NNN-<i>", "never copy the implementation"))
+    and "Put each test's node id in its AC's `test_ids`" not in r and "spec_machine
+    validate" not in r for r in (rendered_execute_claude, rendered_execute_codex))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The rendered command text is what the agent reads; the required
+    and removed phrases are fixed here before the template changes.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: execute reads the PLAN and SPEC only when it did not just write them
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p4_templates.py::test_ac_005_no_same_session_reread
+  executable_predicate: all("Read it back" not in r and "Read it and any RESEARCH
+    doc it names" not in r and "only on Resume or when this session did not write
+    them" in step(r, "1") for r in (rendered_execute_claude, rendered_execute_codex))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrases fixed in the SPEC before the template changes.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: the spec stage writes unchanged behaviour as rows from the unchanged code
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p4_templates.py::test_ac_006_unchanged_rows_from_unchanged_code
+  executable_predicate: all("computed at spec time by running the unchanged code"
+    in s and "never regenerated" in s for s in (rendered_spec_claude, rendered_spec_codex))
+    and all("never regenerate" in e for e in (rendered_execute_claude, rendered_execute_codex))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrase fixed in the SPEC before the template changes.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: three stale texts are fixed
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p4_templates.py::test_ac_007_stale_texts
+  executable_predicate: '"/hm:loop" not in advisory_text and "autopilot" not in advisory_text
+    and "research|spec|execute|wrapup" in architecture_md and "loop.md" not in architecture_md
+    and "resolves conflicting severities" not in rendered_execute_with_second_opinion
+    and "disagree on a finding''s severity" not in rendered_consensus_arbiter and
+    "severity resolution" not in rendered_consensus_arbiter'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The stale phrases were found verbatim on main 579e719 (io_utils.py:260,
+    docs/ARCHITECTURE.md:138-140, execute.md.j2:79, consensus-arbiter_body.md.j2:9).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: the bench has an hm-novalidator arm
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p4_bench.py::test_ac_008_novalidator_arm
+  executable_predicate: '"hm-novalidator" in arms_accepted and "spec-validator" not
+    in novalidator_template_spec_command and all(novalidator_template[f] == hm_template[f]
+    for f in hm_template if f != spec_command_path) and session_prompts("hm-novalidator",
+    task) == session_prompts("hm", task)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The hm arm's own prepared template is the reference; the only allowed
+    difference is the spec command file.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: the tier-1 re-run is measured against the 10.0x bar and its result recorded
+  type: mechanical
+  test_ids:
+  - tests/integration/test_hm_cost_p4_bar.py::test_ac_009_tier1_bar_recorded
+  executable_predicate: counted == first_complete(batches) and runs_per_cell(counted)
+    == 3 and all(r.model == "claude-sonnet-5-5" for r in counted.rows) and "hm-novalidator"
+    in counted.arms and spec_recorded_result == ("met" if round(ratio(counted, "hm"),
+    3) <= 10.0 and pass_rate(counted, "hm") >= pass_rate(counted, "plain") else "missed")
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The bar was pre-registered by the DRI (card, 2026-11-10) before
+    any code; the rows are produced by the bench runner, not by the code under test;
+    the first complete batch counts, so a rerun cannot replace a miss.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: hm check --red resolves an AC with empty test_ids by the name convention,
+    and mark-tested --ac records the discovered ids instead of refusing
+  category: public API/CLI contract
+  rationale: Phase A stops editing the yaml by hand; a script that relied on "no test_ids"
+    for an AC with a convention-named test now sees that test bound
+  source: spec
+- id: IRR-002
+  decision: the name convention gains parametrize ids — a case id AC-NNN or AC-NNN-<suffix>
+    binds to AC-NNN
+  category: public API/CLI contract
+  rationale: one parametrized test can carry several ACs; existing test_ac_NNN names
+    keep working
+  source: spec
+approval:
+  kind: human
+  content_hash: 317c09a3421443d5813e349bbc9ed13f3d06064d78fd231699303812795a0fb9
+  approved_by: Ecro
+  approved_at: '2026-11-10T09:44:10Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: b7dfa332ae5976a13d707efac28ef66918df00c205e4f8623331ddfda0c66b79
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 8686c526e06571276bf0b4a8c9cd06cec0aaf465bf3bbeed848c97eab2bfb43b
+    AC-001: 2f1334cb6d8cd89b520808c9625f68582c092a6caa139604e85862105b6f9771
+    AC-002: c61892fdfcf5619ec80988a486950ffa8acfef580e3346dfafd4b150990a2c73
+    AC-003: 5f53a25978b5d1265f182250eb8701e2aedbcce7140bfab7871a0d8ff3b3693b
+    AC-004: d93777e7d1b4e86de367608e5852600df114b6ee315486529509a3f991287ee4
+    AC-005: a3f2cd5ebbd5137fa939ae9269de8123944e238c1d49b38bc582da1fa3b002c3
+    AC-006: bda04e0128fbd8bb90e34153fe7734231b7b677b199b12580f4f0ca9b14d0128
+    AC-007: 9f47967306b99ce39294ac310b0ae5b70225960ea03b503faa7d3b6032295d5d
+    AC-008: 494a74337f13227f8224ad201fc7864571287e674deed981f6a4bce104f5d1fd
+    AC-009: fda4b8ef61485ebf5aab639d9f9cdca21a0b5659b60b0df2d076f16333c9c5e8
+    ac_order: 164396d6c2494dc69325356de9d2f12b5629b3c0c73cb6ef656e4acf0aad5ff4

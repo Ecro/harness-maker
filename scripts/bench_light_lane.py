@@ -106,7 +106,10 @@ TIER3 = "tier3"
 TIER3_SIGNOFF_FILE = BENCH_DIR / "tier3-signoff.json"  # the DRI's {tier3_hash, signed_by, ...}
 # Plain controls (SPEC-hm-eval-tier3 S8): their own arms, never part of the plain-vs-hm scorecard.
 CONTROL_ARMS = ("plain-careful", "plain-continue")
-ALL_ARMS = (*ARMS, *CONTROL_ARMS)
+#: hm with one step removed, for a TUNE re-measure (SPEC-hm-cost-p4 AC-008): spec-validator off.
+VARIANT_ARMS = ("hm-novalidator",)
+HM_ARMS = ("hm", *VARIANT_ARMS)
+ALL_ARMS = (*ARMS, *CONTROL_ARMS, *VARIANT_ARMS)
 # Arms whose sessions after the first resume the conversation, so the CLI's total_cost_usd is a
 # running total for the run and a session's own cost is the difference (as in the DRI path).
 RESUMED_ARMS = ("plain-continue",)
@@ -1504,7 +1507,7 @@ def build_template(
     _git(dest, "init", "-q")
     _git(dest, "add", "-A")
     _git(dest, "commit", "-q", "-m", "fixture")
-    if arm == "hm":
+    if arm in HM_ARMS:
         subprocess.run(
             harness_argv(dest),
             cwd=dest,
@@ -1514,8 +1517,31 @@ def build_template(
             timeout=SETUP_TIMEOUT_S,
             check=True,
         )
+        if arm == "hm-novalidator":
+            drop_spec_validator(dest)
         _git(dest, "add", "-A")
         _git(dest, "commit", "-q", "-m", "harness")
+
+
+#: Where the rendered spec stage lives per target; the variant edits only these.
+SPEC_COMMANDS = (".claude/commands/hm/spec.md", ".agents/skills/hm-spec/SKILL.md")
+
+
+def drop_spec_validator(root: Path) -> list[str]:
+    """Remove the `## Step 4.6` section (the spec-validator pass) from every rendered spec stage."""
+    changed: list[str] = []
+    for rel in SPEC_COMMANDS:
+        path = root / rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        cut = re.sub(r"(?ms)^## Step 4\.6 .*?(?=^## )", "", text)
+        if cut != text:
+            atomic_write(path, cut)
+            changed.append(rel)
+    if not changed:
+        raise ValueError("no rendered spec stage had a Step 4.6 to remove")
+    return changed
 
 
 class CliProvenanceError(Exception):
@@ -1590,8 +1616,13 @@ def prepare_work(work: Path, template: Path) -> None:
 
 def template_key(task: Task, arm: str) -> str:
     """The template an arm's cell copies; the plain controls start from the plain one."""
-    start = "hm" if arm == "hm" else "plain"
+    start = arm if arm in HM_ARMS else "plain"
     return start if task.seed_dir is None and task.base_dir is None else f"{start}-{task.id}"
+
+
+def uses_dri(task: Task, arm: str) -> bool:
+    """The hm arms play the scripted DRI on the single-session tiers."""
+    return arm in HM_ARMS and task.tier in DRI_TIERS and not task.sessions
 
 
 def prompt_for(task: Task, arm: str, session: int = 0) -> str:
@@ -1600,7 +1631,7 @@ def prompt_for(task: Task, arm: str, session: int = 0) -> str:
     prompt = task.session_prompts[session]
     if arm == "plain-careful":
         return f"{prompt}\n\n{CAREFUL_SENTENCE}"
-    return HM_PREFIX + prompt if arm == "hm" else prompt
+    return HM_PREFIX + prompt if arm in HM_ARMS else prompt
 
 
 def session_argv(task: Task, arm: str, session: int, opts: Options) -> list[str]:
@@ -1773,7 +1804,7 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
         row["tier3_hash"] = opts.tier3_hash
     if STOP.is_set():
         return {**row, "status": "interrupted"}
-    if arm == "hm" and task.tier in DRI_TIERS and not task.sessions:
+    if uses_dri(task, arm):
         return _run_dri(row, task, opts, run_dir, work)
     ran: list[tuple[str, str, int | None, float]] = []
     clobbered: list[str] = []
@@ -1927,8 +1958,8 @@ def _run_dri(
     """The hm cell of a one-session task as the DRI drives it: the fixed turns of DRI_ORDER in
     one resumed session, stopping early on a failed turn, a missing SPEC, the run budget or a
     lost session, then one row graded once on the final tree."""
-    template = opts.templates.get(template_key(task, "hm"))
-    first = session_argv(task, "hm", 0, opts)
+    template = opts.templates.get(template_key(task, row["arm"]))
+    first = session_argv(task, row["arm"], 0, opts)
     ran: list[tuple[str, str, int | None, float]] = []
     kinds: list[str] = []
     session: str | None = None
@@ -3553,7 +3584,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         cells = pending_cells(rows, list(tasks), arms, args.runs)
         (out / "runs").mkdir(exist_ok=True, mode=0o700)
         templates: dict[str, Path] = {}
-        needed = {template_key(tasks[t], a): (tasks[t], "hm" if a == "hm" else "plain")
+        needed = {template_key(tasks[t], a): (tasks[t], a if a in HM_ARMS else "plain")
                   for t, a, _ in cells}  # fmt: skip
         for key, (task, arm) in sorted(needed.items()):
             templates[key] = out / ".templates" / key
@@ -3566,10 +3597,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
             except (OSError, shutil.Error, subprocess.SubprocessError) as exc:
                 print(f"cannot build the {key} template: {failure_text(exc)}", file=sys.stderr)
                 return 2
-        hm_templates = [templates[k] for k, (_, arm) in sorted(needed.items()) if arm == "hm"]
-        if hm_templates:
+        hm_templates = [templates[k] for k, (_, arm) in sorted(needed.items()) if arm in HM_ARMS]
+        for hm_template in hm_templates:
             try:
-                check_cli_fresh(hm_templates[0], opts.pass_env)
+                check_cli_fresh(hm_template, opts.pass_env)
             except (CliProvenanceError, OSError, subprocess.SubprocessError) as exc:
                 print(f"refusing to run: {exc}", file=sys.stderr)
                 return 2

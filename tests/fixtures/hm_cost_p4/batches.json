@@ -1,0 +1,21 @@
+{
+  "batches": [
+    {
+      "complete": true,
+      "run": "2026-11-10",
+      "shas": [
+        "3063ad338e06"
+      ],
+      "aliases": [
+        {
+          "source": "3063ad338e0695585499664223990bae79ffc560",
+          "target": "d4b43e6c8a62d2f9d2a450cbab253fe229d9f050",
+          "src_tree": "011def4da216c87db848a93836e4b7227154a5e5",
+          "scripts_tree": "cbc5a86764e3934f722b3256e72241d1e2642803",
+          "why": "The AC-009 batch ran on task-branch commit 3063ad33; the wrapup squash landed it on the PR branch as this target, so the source is not reachable from it. Trees recorded from 3063ad33 on 2026-11-10; identical in the target. A GitHub squash-merge makes a new SHA: retarget this alias in the fold commit on main."
+        }
+      ],
+      "note": "Tier-1 re-measure for SPEC-hm-cost-p4 AC-009: plain, hm and hm-novalidator x t1-t5 x 3 runs, claude-sonnet-5-5, 45 rows in docs/evals/results.jsonl. The only batch run; no run was repeated."
+    }
+  ]
+}

@@ -633,6 +633,8 @@ TESTS_NOT_CONFIG_AFFECTING: tuple[str, ...] = (
     "tests/unit/test_overhaul_p1_hm_check.py",
     # Same: sandbox projects for `hm check --reuse` (SPEC-hm-check-docs-only-reuse).
     "tests/unit/test_hm_check_inert_reuse.py",
+    # Same: sandbox projects for name discovery (SPEC-hm-cost-p4).
+    "tests/unit/test_hm_cost_p4_binding.py",
     # Reads the db19f023 bench fixture's pyproject.toml (git archive), never the repo's.
     "tests/integration/test_overhaul_p1_eval3_replay.py",
     # Writes a synthetic pyproject.toml into a sandbox copy.

@@ -20,7 +20,7 @@ import re
 import shlex
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
@@ -632,7 +632,7 @@ def _check_pytest_collect(test_ids: list[str], cwd: Path) -> list[str]:
         # rule-3 — only caught once mark_tested exercised it with real pytest).
         # ``--`` fences the file args as positional so none is parsed as an option.
         result = subprocess.run(
-            ["pytest", "--collect-only", "-q", "--no-header", "--", *file_args],
+            [*collect_runner(cwd), "--collect-only", "-q", "--no-header", "--", *file_args],
             cwd=str(cwd),
             capture_output=True,
             text=True,
@@ -777,8 +777,24 @@ def mark_tested(
     content. Nothing is torn — the read-modify-write is still serialized — but a caller
     cannot assume every returned error is about its own change.
     """
+    # Discovery is a repo-wide collect (up to 120s), so it runs before the lock: the lock's budget
+    # is sized against one file-scoped probe, and a healthy holder must not time its peer out.
+    discovered: list[str] | None = None
+    collect_error = ""
+    if any(not ids for ids in ac_test_ids.values()):
+        nodeids, ran = _pytest_collect_nodeids(md_path.parent.parent)
+        discovered = nodeids if ran else None
+        if not ran:
+            runner = " ".join(collect_runner(md_path.parent.parent))
+            collect_error = (
+                f"pytest could not collect the suite (run `{runner} --collect-only -q` to see why)"
+            )
     with _spec_write_lock(yaml_path):
-        errors = _mark_tested_locked(yaml_path, md_path, ac_test_ids, validate_after=validate_after)
+        errors = _mark_tested_locked(
+            yaml_path, md_path, ac_test_ids, validate_after=validate_after, discovered=discovered
+        )
+    if collect_error:
+        errors = [f"{e}; {collect_error}" if "no test named" in e else e for e in errors]
     if errors or not validate_after:
         return errors
     return cross_validate(md_path, yaml_path)
@@ -790,6 +806,7 @@ def _mark_tested_locked(
     ac_test_ids: dict[str, list[str]],
     *,
     validate_after: bool = True,
+    discovered: list[str] | None = None,
 ) -> list[str]:
     """Flip ``pending_test→false`` + record test_ids for the named ACs, then cross_validate.
 
@@ -827,10 +844,20 @@ def _mark_tested_locked(
             continue
         merged_by_ac[ac.id] = list(dict.fromkeys([*ac.test_ids, *ac_test_ids[ac.id]]))
 
+    # An AC with nothing recorded binds to its convention-named tests (SPEC-hm-cost-p4 IRR-001).
+    # Only an AC with nothing recorded: a non-empty `test_ids` keeps precedence over discovery.
+    for ac_id, ids in merged_by_ac.items():
+        if not ids and discovered:
+            merged_by_ac[ac_id] = ac_tests_for(ac_id, discovered)
+
     # Refuse to flip an AC to non-pending with no test to back it (REVIEW C-P2d).
     empty = sorted(ac_id for ac_id, ids in merged_by_ac.items() if not ids)
     if empty:
-        return [f"mark-tested: cannot mark {ac_id} tested with no test_ids" for ac_id in empty]
+        return [
+            f"mark-tested: cannot mark {ac_id} tested: no test_ids and no test named "
+            f"{ac_search_hint(ac_id)}"
+            for ac_id in empty
+        ]
 
     # Pre-check resolution so a flip is never persisted against an unresolved test.
     if validate_after:
@@ -1041,6 +1068,53 @@ def _ac_convention_prefix(ac_id: str) -> str:
     return "test_" + ac_id.lower().replace("-", "_")
 
 
+_AC_CASE_ID = re.compile(r"\[(AC-\d+)(?:-[^\]]*)?\]$")
+
+
+def ac_tests_for(ac_id: str, nodeids: Iterable[str]) -> list[str]:
+    """The node ids the name convention gives an AC (SPEC-hm-cost-p4 IRR-002).
+
+    One matcher for mark-tested, `hm check --red` and find-unbound, so they cannot disagree.
+    A case id names its AC outright, so it wins over the function name: in a shared
+    `test_ac_001_golden[AC-002-0]` the case belongs to AC-002, not AC-001. The AC id must lead
+    the case id (`[AC-001-0]`); `[x-AC-001-0]` from stacked parametrize falls to the function name.
+    """
+    prefix = _ac_convention_prefix(ac_id)
+    out: list[str] = []
+    for nid in nodeids:
+        m = _AC_CASE_ID.search(nid)
+        if m is not None:
+            if m.group(1) == ac_id:
+                out.append(nid)
+            continue
+        fn = nid.split("::")[-1].split("[", 1)[0]
+        if fn == prefix or fn.startswith(prefix + "_"):
+            out.append(nid)
+    return out
+
+
+def ac_search_hint(ac_id: str) -> str:
+    prefix = _ac_convention_prefix(ac_id)
+    return f"function {prefix} or {prefix}_*, or case id [{ac_id}] / [{ac_id}-*]"
+
+
+def collect_runner(root: Path) -> list[str]:
+    """The pytest `hm check` runs here, so a binding fails only where the gate would too.
+
+    PATH `pytest` does not put the project root on `sys.path`, while the gate's
+    `.venv/bin/python -m pytest` does; using PATH `pytest` failed rule-3 in both
+    hm-cost-p4 diagnostic runs on tests the gate ran fine.
+    """
+    from harness_maker import check
+
+    try:
+        commands, _reason, _source = check.gate_commands(root, check._harness_config(root))
+        runner = check.pytest_runner(root, commands)
+    except Exception:  # noqa: BLE001 — an unreadable plan falls back to today's behaviour
+        runner = None
+    return runner or ["pytest"]
+
+
 class BindingGateUnavailableError(Exception):
     """pytest could not adjudicate the binding state — fail-closed signal (ADR-005).
 
@@ -1078,7 +1152,7 @@ def _pytest_collect_nodeids(cwd: Path) -> tuple[list[str], bool]:
     """
     try:
         result = subprocess.run(
-            ["pytest", "-o", "addopts=", "--collect-only", "-q", "--no-header"],
+            [*collect_runner(cwd), "-o", "addopts=", "--collect-only", "-q", "--no-header"],
             cwd=str(cwd),
             capture_output=True,
             text=True,
@@ -1111,17 +1185,12 @@ def _collectable_ac_tests(model: SpecMachine, cwd: Path) -> tuple[set[str], bool
     if not ran:
         return set(), False
     canonical = {nid.split("[", 1)[0] for nid in nodeids} | set(nodeids)
-    func_names = {nid.split("::")[-1].split("[", 1)[0] for nid in nodeids}
     collectable: set[str] = set()
     for ac in model.ac:
         recorded_hit = any(
             tid in canonical or tid.split("[", 1)[0] in canonical for tid in ac.test_ids
         )
-        prefix = _ac_convention_prefix(ac.id)
-        # Boundary match: `test_ac_001` matches itself and `test_ac_001_adder`,
-        # NOT `test_ac_0012` (mixed-width AC ids — AC-001 vs AC-0012 collision).
-        convention_hit = any(fn == prefix or fn.startswith(prefix + "_") for fn in func_names)
-        if recorded_hit or convention_hit:
+        if recorded_hit or ac_tests_for(ac.id, nodeids):
             collectable.add(ac.id)
     return collectable, True
 
