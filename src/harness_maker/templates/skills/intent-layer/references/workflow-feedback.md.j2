@@ -10,9 +10,9 @@ costs no record or prompt.
 1. Name the observation, its source locator/time, the affected question or metric ID, and the
    task/intent link. For code-absent facts, use project-knowledge. Never create a competing
    state store.
-2. Reuse existing authorization only for the same operation and agreed scope. Workflow writes
-   are consented once, as a batch, at wrapup Step 5.7. If consent is pending or declined, write
-   nothing and mark the update pending or declined. A question or proposal is not a recorded
+2. Reuse existing authorization only for the same operation and agreed scope. Records follow the
+   write rule. If consent is pending or declined, write nothing and mark the update
+   pending or declined. A question or proposal is not a recorded
    update; never treat silence as consent or missing evidence as success.
 3. After an authorized write, read back status; use that readback in the next decision.
    For missing, stale or conflicting evidence, diagnose within scope before the dependent decision.

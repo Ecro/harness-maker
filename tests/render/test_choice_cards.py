@@ -16,14 +16,18 @@ TOOL = {"claude": "AskUserQuestion", "codex": "request_user_input"}
 _ARGS = ("--autoloop", "--targets", "claude-code,codex", "--locale", "en")
 _SPEC = Path(__file__).resolve().parents[2] / "specs" / "SPEC-choice-cards.machine.yaml"
 
-_RULE_TAIL = (
-    "; recommendation first, except approvals and equal options. Without the tool: a numbered "
-    "list, then wait; never choose for the user."
+#: SPEC-ask-less rule R, which supersedes this SPEC's AC-001 text (SPEC-ask-less Constraints).
+_RULE_HEAD = (
+    "**Choices.** The DRI decides the goal, scope, overall design, a main feature, a "
+    "costly-to-undo decision and every approval, plus any question this command names: ask with "
 )
-#: SPEC AC-001, verbatim.
+_RULE_TAIL = (
+    ", recommendation first, except approvals and equal options; without the tool, a numbered "
+    "list, then wait. Decide the rest yourself and report it."
+)
 CHOICE_RULE = {
-    "claude": "**Choices.** Ask each choice with `AskUserQuestion`" + _RULE_TAIL,
-    "codex": "**Choices.** Ask each choice with `request_user_input` where available" + _RULE_TAIL,
+    "claude": _RULE_HEAD + "`AskUserQuestion`" + _RULE_TAIL,
+    "codex": _RULE_HEAD + "`request_user_input` where available" + _RULE_TAIL,
 }
 
 

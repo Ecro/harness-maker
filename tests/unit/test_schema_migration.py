@@ -140,7 +140,8 @@ def test_stage_template_reads_config_not_hardcoded(tmp_path: Path) -> None:
     # questions only under `--deep`); stage bodies render into `commands/hm/` directly.
     out = _render_preset(tmp_path, Preset.SIDE)
     spec = (out / "commands" / "hm" / "spec.md").read_text(encoding="utf-8")
-    assert "(closed ones are unlimited)" in spec
+    # SPEC-ask-less AC-003 removed "(closed ones are unlimited)"; at most 3 questions per round.
+    assert "at most 3 questions per round" in spec
     cap = interview_deep_gate_defaults()["open_ended_cap_by_locale"]
     expected = cap.get("en", cap["default"])
     assert f"At most {expected} open-ended follow-up(s) per turn" in spec

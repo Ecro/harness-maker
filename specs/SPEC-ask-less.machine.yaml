@@ -1,0 +1,316 @@
+schema_version: 3
+spec_slug: ask-less
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Every stage and Maker carries rule R once, and the old rule is gone
+  type: mechanical
+  test_ids:
+  - tests/render/test_ask_less.py::test_ac_001_one_rule_everywhere[Side]
+  - tests/render/test_ask_less.py::test_ac_001_one_rule_everywhere[Production]
+  executable_predicate: all(text.count(rule_r(runtime)) == 1 for preset in ('Side',
+    'Production') for runtime, text in stage_and_maker_renders(preset)) and not any('never
+    choose for the user' in text for preset in ('Side', 'Production') for text in
+    all_renders(preset))
+  golden_table: []
+  rubric_id: null
+  note: 'Rule R: **Choices.** The DRI decides the goal, scope, overall design, a main
+    feature, a costly-to-undo decision and every approval, plus any question this
+    command names: ask with <TOOL>, recommendation first, except approvals and equal
+    options; without the tool, a numbered list, then wait. Decide the rest yourself
+    and report it. <TOOL> is `AskUserQuestion` for Claude Code and `request_user_input`
+    where available for Codex.'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rule R is written into this SPEC from the DRI's 2026-11-10 message
+    and CLAUDE.md's first goal (human owns WHY, WHAT and trade-offs), before any template
+    changes.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: /hm:spec Step 0.5 picks the intent without asking
+  type: mechanical
+  test_ids:
+  - tests/render/test_ask_less.py::test_ac_002_intent_link_is_picked[claude]
+  - tests/render/test_ask_less.py::test_ac_002_intent_link_is_picked[codex]
+  executable_predicate: 'all(ask_tool(runtime) not in step(text, ''Step 0.5'') and
+    ''pick the one this task plainly serves, else none, without asking'' in step(text,
+    ''Step 0.5'') and ''Step 3 writes `intent: <id>` and lists the pick under Refinement
+    Decisions'' in step(text, ''Step 0.5'') for preset in (''Side'', ''Production'')
+    for runtime, text in spec_renders(preset))'
+  golden_table: []
+  rubric_id: null
+  note: 'step(text, name): from the `## <name>` heading to the next `## ` heading.
+    ask_tool(runtime): what hm.ask() renders.'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Scenario S3 of this SPEC, from the DRI's complaint that intent
+    questions come too often; the literals are fixed here before the template changes.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: The interview asks only DRI-owned slots
+  type: mechanical
+  test_ids:
+  - tests/render/test_ask_less.py::test_ac_003_interview_asks_dri_slots_only[claude]
+  - tests/render/test_ask_less.py::test_ac_003_interview_asks_dri_slots_only[codex]
+  executable_predicate: 'all(all(lit in step(text, ''Step 2'') for lit in (''Ask only
+    what the DRI owns: categories 1–4 and each irreversible decision'', ''at most
+    3 questions per round'', ''Settle categories 5–6 and every oracle yourself'',
+    ''Once nothing the DRI owns is open (round 1 included), one question per round
+    offers'', ''Approve this SPEC and end interview'', ''Approve after spec-validator''))
+    and not any(lit in step(text, ''Step 2'') for lit in (''Ask for `oracle_source`'',
+    ''closed ones are unlimited'', ''From round 2'')) and text.count(''Approve this
+    SPEC and end interview'') >= 2 for preset in (''Side'', ''Production'') for runtime,
+    text in spec_renders(preset))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Scenarios S1 and S2 of this SPEC; the removed literals are the
+    0.65.3 template's and hm-cost-p5's, read at spec time; the approval label is pinned
+    independently by test_overhaul_p1_surface.py and AC-008 adds a count taken from
+    the base render.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Choices made for the DRI are written down and shown at approval
+  type: mechanical
+  test_ids:
+  - tests/render/test_ask_less.py::test_ac_004_decisions_listed_and_shown[claude-minimal]
+  - tests/render/test_ask_less.py::test_ac_004_decisions_listed_and_shown[claude-standard]
+  - tests/render/test_ask_less.py::test_ac_004_decisions_listed_and_shown[claude-deep]
+  - tests/render/test_ask_less.py::test_ac_004_decisions_listed_and_shown[codex-minimal]
+  - tests/render/test_ask_less.py::test_ac_004_decisions_listed_and_shown[codex-standard]
+  - tests/render/test_ask_less.py::test_ac_004_decisions_listed_and_shown[codex-deep]
+  executable_predicate: 'all(''Refinement Decisions lists each choice you made for
+    the DRI: what, why and the cost to undo'' in step(text, ''Step 3'') and ''Show
+    your Refinement Decisions with the approval question'' in step(text, ''Step 2'')
+    for preset in (''Side'', ''Production'') for runtime, text in spec_renders(preset))'
+  golden_table: []
+  rubric_id: null
+  note: The Step 2 sentence must sit outside every comprehension-depth conditional,
+    so it renders at depth minimal too.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Outcome O4 and scenario S1 of this SPEC: the DRI must be able
+    to see and overturn what was decided for them at every comprehension depth; the
+    phrases are fixed here before the template changes.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: /hm:wrapup writes plain records unasked, under an approved SPEC only
+  type: mechanical
+  test_ids:
+  - tests/render/test_ask_less.py::test_ac_005_wrapup_records_plain_writes[claude]
+  - tests/render/test_ask_less.py::test_ac_005_wrapup_records_plain_writes[codex]
+  executable_predicate: 'all(all(lit in intent_block(text) for lit in (''Under an
+    approved SPEC (not `--exempt`), write without asking'', ''--status open'', ''--relation
+    <confirms|contradicts>'', ''metric measure'', ''`metric record` with an `--evidence-file`
+    from this task'', ''Anything else, and every write under an exempt SPEC: ask once
+    with '' + ask_tool(runtime))) and intent_block(text).count(ask_tool(runtime))
+    == 1 and ''then each intent write of Step 5'' in step(text, ''Step 8'') and ''ask
+    the DRI once ('' not in text for preset in (''Side'', ''Production'') for runtime,
+    text in wrapup_renders(preset))'
+  golden_table: []
+  rubric_id: null
+  note: 'intent_block(text): from ''An intent in use'' to the next `## ` heading.'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Scenarios S4, S5 and S6 and IRR-001 of this SPEC; the removed literal
+    is the 0.65.3 template's.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: The intent-layer skill and its reference separate records from decisions
+  type: mechanical
+  test_ids:
+  - tests/render/test_ask_less.py::test_ac_006_intent_skill_splits_records_from_decisions[claude]
+  - tests/render/test_ask_less.py::test_ac_006_intent_skill_splits_records_from_decisions[codex]
+  executable_predicate: all(all(lit in skill for lit in ('question add --status open',
+    'question observe --relation confirms|contradicts', 'metric measure', '`metric
+    record` with an `--evidence-file` from this task', 'without asking', 'question
+    add --status confirmed|wrong', 'question observe --relation supersedes', 'question
+    resolve', 'showing the exact arguments', 'on any other answer or no answer — write
+    nothing', 'ask about all candidates in one multi-select question', 'an unticked
+    candidate is declined; no answer writes nothing and records no decline', 'answer
+    every candidate before the first write')) and not any(lit in skill + reference
+    for lit in ('Ask before writes', 'Mutation verbs write only after consent', 'Workflow
+    writes are consented once', 'ask about each candidate in turn')) for preset in
+    ('Side', 'Production') for runtime, skill, reference in intent_skill_renders(preset))
+  golden_table: []
+  rubric_id: null
+  note: 'skill: the rendered intent-layer SKILL.md; reference: its references/workflow-feedback.md.'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: IRR-001 and outcome O6 of this SPEC name the unasked and the asked
+    forms; the CLI's verbs and flags were read with `hm intent --help` and the skill's
+    verb table at spec time.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Apart from R, nothing gets longer
+  type: mechanical
+  test_ids:
+  - tests/render/test_ask_less.py::test_ac_007_nothing_else_grows[claude-Side]
+  - tests/render/test_ask_less.py::test_ac_007_nothing_else_grows[claude-Production]
+  - tests/render/test_ask_less.py::test_ac_007_nothing_else_grows[codex-Side]
+  - tests/render/test_ask_less.py::test_ac_007_nothing_else_grows[codex-Production]
+  executable_predicate: all(sum(size(after, rel) for rel in measured(runtime)) - sum(size(base,
+    rel) for rel in measured(runtime)) <= 5 * (len(rule_r(runtime)) - len(old_rule(runtime)))
+    for preset in ('Side', 'Production') for runtime in ('claude', 'codex'))
+  golden_table: []
+  rubric_id: null
+  note: 'measured(runtime): the four stage renders, Maker, the intent-layer skill
+    and its workflow-feedback reference. base: main''s tip once hm-cost-p5 and the
+    pipeline-env-fixes fold are on it, pinned as a constant.'
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The base sizes come from rendering a pinned base commit inside
+    the test (tests/_overhaul_p1_ref.py ref_root, git archive), not from numbers typed
+    into the test or the SPEC.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: The number of places that name the question tool goes down
+  type: mechanical
+  test_ids:
+  - tests/render/test_ask_less.py::test_ac_008_fewer_tool_mentions[claude]
+  - tests/render/test_ask_less.py::test_ac_008_fewer_tool_mentions[codex]
+  executable_predicate: all(tools(after, spec) == tools(base, spec) - 1 and tools(after,
+    wrapup) == tools(base, wrapup) and all(tools(after, rel) == tools(base, rel) for
+    rel in (research, execute, maker)) and tools(after, intent_skill) <= tools(base,
+    intent_skill) for preset in ('Side', 'Production') for runtime in ('claude', 'codex'))
+  golden_table: []
+  rubric_id: null
+  note: 'tools(tree, rel): occurrences of ask_tool(runtime) in that render.'
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: 'The counts are taken from the pinned base render, not from this
+    SPEC''s literals, so rewording cannot satisfy them: only removing the Step 0.5
+    question does.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: 'Under a SPEC the DRI approved (not --exempt), these intent writes need
+    no per-write yes: question add --status open, question observe --relation confirms
+    or contradicts, metric measure, and metric record with an --evidence-file taken
+    from this task''s artifacts. Every other intent write still needs one (question
+    add --status confirmed or wrong, question observe --relation supersedes, question
+    resolve, new, approve, activate, drop, reopen, close), as does every intent write
+    under an exempt SPEC.'
+  category: security/permission boundary
+  rationale: The DRI asked for it on 2026-11-10. A plain record adds an observation
+    and changes no verdict, and the DRI saw the intent link when approving the SPEC.
+    A verdict, a superseded claim or a lifecycle step changes what the project believes
+    or is trying to do. Rendered harnesses in the field change behaviour on upgrade.
+  source: spec
+approval:
+  kind: human
+  content_hash: 25f6fd049611d124c015f1316c53cac51d7966d07385a6b9e0e3b66bcba2a3f7
+  approved_by: Claude
+  approved_at: '2026-11-10T16:05:42Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 0ac24f8a7cc44d4dc52322221a5b6707f73fbd26b33e9aed586d48d07d9881ae
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: e2ddf1e62f6474b13fe4e3e70d8753da9163f809975ceaa2d3eb9b9385b10f17
+    AC-001: 1cfa3211d876effd18bd0c77e824c1bf383d70610feb97c4013f03f4b2f8f30b
+    AC-002: 581997757eaa4b43edba1f8679b487c9f084ce615cf4835ba4ced674a061cc52
+    AC-003: 7a4da6134ae12cb0f1613a7b246a29c26075574c531c25fdcc5430e0c8f37634
+    AC-004: 8df99a4a2a849dde3ebab9caee637c2a4f4ed3cd2397965163a09cdc1f710a18
+    AC-005: 054f951e90e2d76ff03689f998a187774c86f8de80ef4701aba19384c3da1a46
+    AC-006: 1093de37442ed36a0f02c7d0fb65ec444b884e4228c79d53dd81ffeb199398c2
+    AC-007: ef0d3dd30fe7e3fe26f2dc20843440403c2adf5715ef1c050e781c3fa739a004
+    AC-008: 08bf84f6fd680cb065e8478053233ce9761f6176a9e0f00226831042ff4855ae
+    ac_order: b62ad8faf895c4ebdf45f3fce97982d2bcc0a3fa6daa1e45993897fb730655c6

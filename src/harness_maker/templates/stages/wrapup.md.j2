@@ -40,11 +40,12 @@ Search first: `hm memory_retrieve --topic "<what changed>"`. Bodies: `mktemp` fi
 {%- if config.second_brain.get('enabled') %}
 - **Second Brain.** Promote only what is durable across projects (a failure, decision, preference or project note): `hm second_brain promote --type <type> --source-slug '<slug>' --title '<title>' --body-file <path>`. Promoting nothing is a valid result. End with one line, `promotion evaluated: <N> candidates, <M> promoted`, where N counts this step's promotable entries and is not 0 when you wrote one.
 {%- endif %}
-- An intent in use (`hm intent status --json`): ask the DRI once ({{ hm.ask() }}, multi-select); run only the selected writes; no answer runs none:
-  - `hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file <f> [--claim-file <f>]`
-  - `hm intent question add <id> … --claim-file <f> [--text-file <f>]`
-  - `hm intent metric record|measure …`
-  - `hm intent close <id> --observed <met|missed|no_data> --note-file <f>`
+- An intent in use (`hm intent status --json`; `approval-status`). Under an approved SPEC (not `--exempt`), write without asking:
+  - `hm intent question add <id> … --status open` with `--claim-file <f>` [`--text-file <f>`]
+  - `hm intent question observe <id> --relation <confirms|contradicts> --text-file <f>` [`--claim-file <f>`]
+  - `hm intent metric measure`, and `metric record` with an `--evidence-file` from this task.
+
+  Anything else, and every write under an exempt SPEC: ask once with {{ hm.ask() }} (multi-select); run only what is ticked, such as `hm intent close <id> … --note-file <f>`.
 
 ## Steps 6 → 7.6 — Commit
 
@@ -62,4 +63,4 @@ Only on an `hm/<slug>` branch. From `<BASE>`, run `hm worktree task-land <slug> 
 
 ## Step 8 — Close
 
-Print the receipt's `steps.understanding_block` verbatim (its warning if `steps.understanding.status` is not `ok`/`none`). Never push unasked.
+Print the receipt's `steps.understanding_block` verbatim (its warning if `steps.understanding.status` is not `ok`/`none`), then each intent write of Step 5. Never push unasked.

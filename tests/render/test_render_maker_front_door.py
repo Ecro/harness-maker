@@ -33,7 +33,7 @@ _STAGES = ("research", "spec", "execute", "wrapup")  # four since 0.64.0
 _KNOWLEDGE_SKILLS = ("intent-layer", "project-knowledge")
 # 4 500 + 39: `--no-project ` at Maker's three harness-maker invocations
 # (SPEC-pipeline-env-fixes IRR-001, BASELINE-DELTA-pipeline-env-fixes.md).
-_MAKER_CAP = 4539
+_MAKER_CAP = 4689  # SPEC-ask-less: +150, rule R
 _POINTER_CAP = 400
 _PK_POINTER_CAP = 300
 _TRIGGER_PHRASES = ("invoke when", "use when", "use this when")
@@ -316,7 +316,7 @@ def test_ac004_help_rows_typed_only(
 
 
 # ---------------------------------------------------------------------------
-# AC-005 — Maker reads the procedures on demand, every target, ≤ 4,539 chars
+# AC-005 — Maker reads the procedures on demand, every target, ≤ 4,689 chars
 # ---------------------------------------------------------------------------
 
 _MAKER_ARMS = [

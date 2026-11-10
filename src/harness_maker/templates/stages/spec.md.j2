@@ -18,7 +18,7 @@ Skip the interview only when all four hold: one file or config; acceptance obvio
 
 ## Step 0.5 — Intent
 
-Run `hm intent status --json`. With no `active` or `proposed` intent, print `[intent] none`; otherwise ask with {{ hm.ask() }} which one this task serves (each id and title, plus "none"). Step 3 writes `intent: <id>`.
+Run `hm intent status --json`. With no `active` or `proposed` intent, print `[intent] none`; otherwise pick the one this task plainly serves, else none, without asking. Step 3 writes `intent: <id>` and lists the pick under Refinement Decisions.
 
 ## Step 1 — Prior work
 
@@ -27,20 +27,19 @@ Grep `specs/SPEC-*.md` and `work-docs/PLAN-*.md` for key terms; run `hm memory_r
 ## Step 2 — Interview
 {% if _depth != 'minimal' %}
 <!-- @hm:comprehension:brief -->
-**Design brief, before round 1:** what research or a prior SPEC settled, the ACs you can draft now (provisional), and which of the six categories are open, answered or defaulted (with why). One screen.
+**Design brief, before round 1:** what research or a prior SPEC settled, the draft ACs, and which categories are open or defaulted (with why). One screen.
 {% endif %}
-Ask with {{ hm.ask() }}, batching independent questions; always offer "Other — let me describe". From round 2, one question per round offers **"Approve this SPEC and end interview"** and "Approve after spec-validator": the DRI's only approval (silence never counts). Stop when every slot below is settled, the DRI approves, or after `interview.main_loop.max_rounds` ({{ _rounds if _rounds else 'unlimited' }}) rounds.
+Ask only what the DRI owns: categories 1–4 and each irreversible decision, with {{ hm.ask() }}, at most 3 questions per round; always offer "Other — let me describe". At most {{ _cap }} open-ended follow-up(s) per turn. Settle categories 5–6 and every oracle yourself. Once nothing the DRI owns is open (round 1 included), one question per round offers **"Approve this SPEC and end interview"** and "Approve after spec-validator": the DRI's only approval (silence never counts). Show your Refinement Decisions with the approval question. Stop when the DRI approves or after `interview.main_loop.max_rounds` ({{ _rounds if _rounds else 'unlimited' }}) rounds.
 
-The six categories, in order, skipping settled ones: 1. **Intent** (why now); 2. **Outcomes** ("done", observably); 3. **In-scope scenarios** (2–4 Given-When-Then: normal, edge, failure); 4. **Non-goals**; 5. **Constraints** (the test framework is mandatory); 6. **Verification** (each scenario → unit, integration or manual).
+Categories: 1. **Intent** (why now); 2. **Outcomes** ("done", observably); 3. **In-scope scenarios** (2–4 Given-When-Then: normal, edge, failure); 4. **Non-goals**; 5. **Constraints** (the test framework is mandatory); 6. **Verification** (each scenario → unit, integration or manual).
 
-**Oracle, for every AC.** Ask for `oracle_source` (golden, differential, property, rubric or consensus; a property also needs `input_domain`, `transformation`, `expected_relation`) and `oracle_evidence`: why it is independent of the code. "The test will check it" is circular; reject it.
+**Oracle, for every AC.** Choose `oracle_source` (golden, differential, property, rubric or consensus; a property also needs `input_domain`, `transformation`, `expected_relation`) and write `oracle_evidence`: why it is independent of the code. "The test will check it" is circular.
 
 **Irreversible decisions** (not cheaply undone): `category` is exactly one of {{ hm.irr_categories() }}. Each is `{id: IRR-NNN, decision, category, rationale, source: spec}`; `irreversible_decisions: []` is valid.
 
-At most {{ _cap }} open-ended follow-up(s) per turn (closed ones are unlimited), each only when its answer changes the SPEC.
 {% if _depth != 'minimal' %}
 <!-- @hm:comprehension:round_state -->
-**Round state.** Open each round after the first with `## Interview Round {N}`, the decisions locked so far, the delta since the last round ("no change since last round" when none), and the one ambiguity this round resolves and why.
+**Round state.** Open each round after the first with `## Interview Round {N}`, the decisions locked so far, the delta since the last round, and what this round resolves.
 {% endif %}
 {%- if _depth == 'deep' %}
 <!-- @hm:comprehension:decision_depth -->
@@ -51,7 +50,7 @@ At most {{ _cap }} open-ended follow-up(s) per turn (closed ones are unlimited),
 {% endif %}
 ## Step 3 — Write the SPEC
 
-Write `specs/SPEC-<slug>.md`. Frontmatter: `type: spec`, `task_slug`, `status`, `created`, `tags`, `test_framework`, `interview_rounds`, `intent` (if picked), `summary`. Sections: Intent; Outcomes; In-Scope Scenarios (S1…); Non-Goals; Constraints (table); Irreversible Decisions (table, or "none"); Acceptance Criteria, each `### AC-NNN: <title>`; Verification (scenario, mode, test); Open Questions; Refinement Decisions. Open Questions holds only what you cannot decide (a WHY, WHAT or trade-off the DRI owns). {{ hm.edit_in_place() }}
+Write `specs/SPEC-<slug>.md`. Frontmatter: `type: spec`, `task_slug`, `status`, `created`, `tags`, `test_framework`, `interview_rounds`, `intent` (if picked), `summary`. Sections: Intent; Outcomes; In-Scope Scenarios (S1…); Non-Goals; Constraints (table); Irreversible Decisions (table, or "none"); Acceptance Criteria, each `### AC-NNN: <title>`; Verification (scenario, mode, test); Open Questions; Refinement Decisions. Open Questions holds only what the DRI must decide. Refinement Decisions lists each choice you made for the DRI: what, why and the cost to undo. {{ hm.edit_in_place() }}
 
 ## Step 3.5 — Write the machine.yaml
 
@@ -85,7 +84,7 @@ Read its `quality`.{% if _strict == 'block' %} `blocked: true` halts: give each 
 
 ## Step 4.6 — spec-validator
 
-One advisory pass, only on Step 4's `"validator": "run"` or "Approve after spec-validator": {{ hm.dispatch("spec-validator", "with the SPEC, its yaml and any RESEARCH doc") }}. Settle each critique you can under Refinement Decisions as a default (the DRI may veto); surface every critical critique before any stamp; an irreversible-decision or oracle critique is never a default, it goes to `irreversible_decisions` or Open Questions, as does any WHY, WHAT, scope or trade-off.
+One advisory pass, only on Step 4's `"validator": "run"` or "Approve after spec-validator": {{ hm.dispatch("spec-validator", "with the SPEC, its yaml and any RESEARCH doc") }}. Settle what you can under Refinement Decisions as a default; surface every critical critique before any stamp; an irreversible-decision critique is never a default, it goes to `irreversible_decisions`; Open Questions takes an oracle with no independent source and any WHY, WHAT, scope or trade-off.
 
 ## Step 5 — Status and stamp
 
