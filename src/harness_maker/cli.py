@@ -230,13 +230,16 @@ def make(
         None,
         "--autonomy-level",
         help=(
-            "Autopilot auto-advance level: gated | auto_safe | full. Setting this alone "
-            "enables autopilot (persistence defaults off). Omitted → leave existing value."
+            "Autonomy level: ask | gated | auto_safe | auto_full. Only auto_full lets the "
+            "spec stage stamp a SPEC, and execute and `hm check` proceed on an unstamped one, "
+            "without asking. Omitted → leave existing value."
         ),
     ),
     autonomy_persistent_override: bool | None = typer.Option(
         None,
         "--autonomy-persistent/--no-autonomy-persistent",
+        # Retired with autopilot in 0.64.0 (SPEC-hide-retired-cli); still accepted.
+        hidden=True,
         help=(
             "Re-arm the autopilot marker each session (persist across sessions). "
             "Omitted → leave existing value."
@@ -2519,7 +2522,7 @@ def detect_tools_cmd(
     typer.echo(f"note: 'yes' means {INSTALLED_MEANS}.")
 
 
-@app.command("verify")
+@app.command("verify", hidden=True)
 def verify_stage_cmd(
     target: Path = typer.Argument(  # noqa: B008
         default_factory=Path.cwd,
@@ -2546,7 +2549,7 @@ def verify_stage_cmd(
         help="Required when --force is set. Logged in the JSONL record.",
     ),
 ) -> None:
-    """CI/automation wrapper for the verify stage.
+    """Retired in 0.64.0; use `hm check`. CI/automation wrapper for the old verify stage.
 
     Runs the **machine-checkable subset** of the 5-check protocol — Check 3
     (structural delta). Checks 1, 2, 4, 5 are prompt-driven and are emitted
@@ -2876,7 +2879,7 @@ def _version() -> None:
 health = health_cmd
 
 
-@app.command("autopilot")
+@app.command("autopilot", hidden=True)
 def autopilot_cmd(
     action: str = typer.Argument(
         ...,
@@ -2920,7 +2923,7 @@ def autopilot_cmd(
         ),
     ),
 ) -> None:
-    """Toggle the per-session `.hm-autopilot` marker (PLAN-human-bottleneck-auto-advance).
+    """Retired in 0.64.0; no rendered stage uses it. Toggles the per-session `.hm-autopilot` marker.
 
     Flag-driven only (CLAUDE.md checkpoint 4): the slash command collects intent and
     dispatches here. Writes/clears the session-scoped marker; the marker is gitignored
