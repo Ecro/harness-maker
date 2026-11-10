@@ -8,7 +8,7 @@ scope:
 - 'execute Step 0 ADR 에 decided_by: user|agent, agent 가 결정한 ADR 을 요약에 한 줄로 노출'
 - preset 무관 기본 렌더, 새 설정 키·새 파일 없음
 - 출하 후 이 repo 를 재렌더한 뒤의 wrapup 10건을 사용자가 git log 로 일괄 판정
-state: active
+state: closed
 created_at: '2026-09-26T14:12:17Z'
 schema_version: 1
 rejected: []
@@ -19,9 +19,13 @@ approval:
   approved_at: '2026-09-26T14:26:37Z'
   approved_target: 80
 revisit_when: null
-observed: null
-note: null
-closed_at: null
+observed: met
+note: 'met: 8/10 = 80% (target 80), judged by the DRI on 2026-11-10 inside the pre-registered
+  60-day window (ends 2026-11-26). Per the pre-registered rule, the README slogan
+  "Automate the work. Elevate the engineer." becomes a separate task. Limit: the PR
+  squash-merge path (#17-#45) carries no Understanding block; only direct /hm:wrapup
+  lands were sampled.'
+closed_at: '2026-11-10T22:06:33Z'
 statement: '모든 렌더 하네스의 /hm:wrapup 이 최대 5줄의 이해 변화 요약(바뀐 가정·불변조건·경계의 이전→이후, 남은 미지, agent
   가 결정한 ADR)을 터미널 출력과 커밋 본문에 남기고, PLAN ADR 에 decided_by: user|agent 를 기록하면, 사용자는 diff
   를 읽지 않고 변경을 설명할 수 있고 모르는 사이 내려진 범위 밖 결정이 없어져 understanding_handoff_rate 가 미측정 →
