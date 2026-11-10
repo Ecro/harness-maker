@@ -4,7 +4,7 @@
 
 > **Audience**: developers who use harness-maker and want to know what each stage does, what it
 > writes, and where it stops for a person.
-> **Version**: 0.65.3
+> **Version**: 0.65.4
 >
 > This guide describes the current release only. What changed between releases is in
 > [CHANGELOG.md](../CHANGELOG.md); the design record is in [ARCHITECTURE.md](ARCHITECTURE.md).

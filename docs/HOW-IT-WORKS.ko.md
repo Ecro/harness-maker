@@ -4,7 +4,7 @@
 
 > **대상 독자**: harness-maker 를 쓰면서 각 stage 가 무엇을 하고, 무엇을 쓰고, 어디서 사람을
 > 기다리는지 알고 싶은 개발자.
-> **Version**: 0.65.3
+> **Version**: 0.65.4
 >
 > 이 문서는 현재 릴리스만 설명한다. 릴리스 간 변경은 [CHANGELOG.md](../CHANGELOG.md), 설계
 > 기록은 [ARCHITECTURE.md](ARCHITECTURE.md) 에 있다.

@@ -26,8 +26,10 @@ _INTEGRATION_ENABLED = os.environ.get("INTEGRATION") == "1"
 _REQUIRED_TEMPLATE_PATHS = (
     "harness_maker/templates/agents/code-reviewer.md.j2",
     "harness_maker/templates/rubrics/agent_prompt.yaml.j2",
-    "harness_maker/templates/skills/verify-before-completion/SKILL.md.j2",
-    "harness_maker/templates/commands/hm/configure.md.j2",
+    # Live templates (the 0.64.0 overhaul retired verify-before-completion and hm:configure).
+    "harness_maker/templates/skills/world-model/SKILL.md.j2",
+    "harness_maker/templates/commands/hm/make.md.j2",
+    "harness_maker/templates/stages/execute.md.j2",
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
