@@ -2,6 +2,57 @@
 
 ## [Unreleased]
 
+## [0.65.4] - 2026-11-10
+
+Overhaul phase 2 and the non-token improvements: wrapup requires a REVIEW, hm asks only what the DRI
+owns, retired wiring and about 7.1k lines of unreachable modules are gone, and HOW-IT-WORKS describes
+the four-stage workflow.
+
+### Changed
+
+- **`/hm:wrapup` requires a REVIEW for a code change** (SPEC-wrapup-gate). `hm check --require-review`
+  (wrapup only) exits 1 when a non-exempt task changes a non-doc path and no REVIEW exists; prompt
+  markdown (agents, commands, skills, CLAUDE.md, AGENTS.md) counts as code. A new `contract` section
+  checks the PLAN's `### Do not change` list and fails on a changed path it names; `/hm:execute` stops
+  on `contract.crossed`. A qualified entry ("only the X function") is reported as `advisory`.
+- **hm asks the DRI only what the DRI owns** (SPEC-ask-less). The DRI decides the goal, scope, overall
+  design, main features, costly-to-undo decisions and every approval; the agent decides the rest and
+  reports it. `/hm:spec` picks the intent link itself, asks only intent, outcomes, scenarios,
+  non-goals and irreversible decisions (at most 3 questions a round), settles constraints,
+  verification and oracles, and shows its choices with the approval question. Under an approved
+  SPEC, `/hm:wrapup` writes routine intent records (open questions, observations, measurements)
+  without asking; closing, approving or dropping an intent is still asked.
+- **The AC and RED gates say they are pytest-only.** README states the limit; a project without a
+  pytest runner gets a named reason and the judgment-AC alternative instead of a bare exit 3.
+- **Retired wiring no longer ships** (SPEC-retired-wiring). The `hooks.loop_gate` Stop hook leaves
+  Claude settings and `.codex/hooks.json` (a re-render strips it and keeps your hooks); `make` no
+  longer writes `[profiles.cheap]`/`[profiles.deep]` into `~/.codex/config.toml`; six unused partials
+  are gone.
+- **`harness-maker --help` hides `autopilot`, `verify` and `make --autonomy-persistent`**
+  (SPEC-hide-retired-cli). They still run; their own `--help` says "Retired in 0.64.0" and what
+  replaces it. `--autonomy-level` help lists `ask | gated | auto_safe | auto_full`.
+- **README carries the slogan "Automate the work. Elevate the engineer."**, pre-registered for
+  UNDERSTANDING-HANDOFF, which closed as met (8 of the first 10 wrapups explainable from their
+  `Understanding:` block alone).
+
+### Removed
+
+- **Modules no shipped entry point reaches** (SPEC-dead-modules), about 7.1k lines, among them
+  `foreign_config`, `provenance`, `review_consensus`, `lens_coverage`, `plan_verify` and
+  `spec_inventory/`. `tests/structural/test_dead_modules.py` keeps a standing static reachability
+  check: a new module that nothing ships must join its kept list with a reason.
+
+### Docs
+
+- **HOW-IT-WORKS (en/ko) rewritten** for the four-stage workflow, about 3,000 → 370 lines
+  (SPEC-docs-rewrite). ARCHITECTURE, CONTRIBUTING and README no longer present deleted modules or
+  autopilot as live.
+
+### Fixed
+
+- The `test_land_hold` `[unreadable]` row passes as root, so `hm check`'s `-x` gate no longer stops
+  in root containers.
+
 ### Fixed
 
 - **`hm spec_machine mark-tested --ac` no longer binds other SPECs' tests** (SPEC-mark-tested-scope).
