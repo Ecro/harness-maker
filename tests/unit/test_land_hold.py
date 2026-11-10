@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -454,11 +455,23 @@ def test_ac_011_the_subject_hash_refuses_an_oversized_subject(
         with pytest.raises(SubjectHashError):
             compute_subject_hash(["s/f0.txt", "s/f1.txt", "s/f2.txt"], tmp_path)
     elif case == "unreadable":
-        bad = tmp_path / "s" / "bad.txt"
+        # Resolved: compute_subject_hash reads the resolved path, so the patch below must match it.
+        bad = (tmp_path / "s" / "bad.txt").resolve()
         bad.write_text("x")
         bad.chmod(0o000)
+        if os.access(bad, os.R_OK):
+            # Root reads a mode-000 file, so the permission alone cannot make it unreadable;
+            # the read of this one path fails as it would for any other user.
+            real_read = Path.read_bytes
+
+            def read_bytes(self: Path) -> bytes:
+                if self == bad:
+                    raise PermissionError(13, "Permission denied", str(self))
+                return real_read(self)
+
+            monkeypatch.setattr(Path, "read_bytes", read_bytes)
         try:
-            with pytest.raises(SubjectHashError):
+            with pytest.raises(SubjectHashError, match="bad.txt"):
                 compute_subject_hash(["s/bad.txt"], tmp_path)
         finally:
             bad.chmod(0o644)

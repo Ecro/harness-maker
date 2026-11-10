@@ -1,0 +1,52 @@
+schema_version: 3
+spec_slug: root-unreadable-test
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: The unreadable row holds as root and as a normal user
+  type: mechanical
+  test_ids:
+  - tests/unit/test_land_hold.py::test_ac_011_the_subject_hash_refuses_an_oversized_subject[unreadable]
+  executable_predicate: all(raises_subject_hash_error(['s/bad.txt'], root, readable_by_process=r)
+    for r in (True, False))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected SubjectHashError comes from SPEC-ai-native-sdlc-vs-intent-world
+    AC-011's unreadable row, written before this change; root's ability to read mode-000
+    files is POSIX behaviour, not this code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: e3a12219c160ca888ebe61ba93183c7cfe0b57debe4e51a08245c2ffd2c47ec1
+  approved_by: null
+  approved_at: '2026-11-10T14:12:02Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 7ba2a90dc2cf6d6566b2bdc00ab82f1ec5d3d8be327a3bdac1c237d1e5d4fb92
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 2a3f50abd06b5dc7f536ea256767479bcf42388d273391053a582b29dc5bbcd2
+    ac_order: a1557fcfe162c5ca92cb543b3703219d932e86a98fd3ef7e4d7722599eb526d0
