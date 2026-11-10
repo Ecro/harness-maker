@@ -743,7 +743,10 @@ def test_mark_tested_refuses_zero_test_ids(tmp_path: Path) -> None:
     """C-P2d: flipping an AC with no test_ids (e.g. bare --ac) is rejected, not persisted."""
     from harness_maker.spec_machine import load, mark_tested
 
-    md, yp = _write_md_yaml_pair(tmp_path)  # AC-001 has empty test_ids
+    # Discovery searches the SPEC dir's parent, so keep that parent this test's own: beside
+    # tmp_path it is pytest's shared basetemp, where sibling tests leave test_ac_001_* files.
+    (tmp_path / "specs").mkdir()
+    md, yp = _write_md_yaml_pair(tmp_path / "specs")  # AC-001 has empty test_ids
     errors = mark_tested(yp, md, {"AC-001": []})
     assert any("no test_ids" in e for e in errors)
     assert load(yp).ac[0].pending_test is True  # untouched
