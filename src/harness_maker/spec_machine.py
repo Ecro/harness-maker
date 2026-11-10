@@ -795,24 +795,25 @@ def mark_tested(
     content. Nothing is torn — the read-modify-write is still serialized — but a caller
     cannot assume every returned error is about its own change.
     """
-    # Discovery is a repo-wide collect (up to 120s), so it runs before the lock: the lock's budget
-    # is sized against one file-scoped probe, and a healthy holder must not time its peer out.
-    discovered: list[str] | None = None
-    collect_error = ""
+    # Discovery runs a collect subprocess, so it stays outside the lock: the lock's budget is sized
+    # against one file-scoped probe, and a healthy holder must not time its peer out. It is the RED
+    # gate's own scope, the task's changed test files (SPEC-mark-tested-scope IRR-001): a repo-wide
+    # collect bound every SPEC's same-numbered tests to this SPEC's ACs.
+    discovered: dict[str, list[str]] | None = None
     if any(not ids for ids in ac_test_ids.values()):
-        nodeids, ran = _pytest_collect_nodeids(md_path.parent.parent)
-        discovered = nodeids if ran else None
-        if not ran:
-            runner = " ".join(collect_runner(md_path.parent.parent))
-            collect_error = (
-                f"pytest could not collect the suite (run `{runner} --collect-only -q` to see why)"
-            )
+        from harness_maker import check
+
+        root = md_path.parent.parent
+        try:
+            spec = check.SpecView(load(yaml_path), yaml_path)
+        except Exception:  # noqa: BLE001 — the locked load reports an unreadable yaml
+            spec = None
+        if spec is not None:
+            discovered = check.red_discovery(root, spec, collect_runner(root))
     with _spec_write_lock(yaml_path):
         errors = _mark_tested_locked(
             yaml_path, md_path, ac_test_ids, validate_after=validate_after, discovered=discovered
         )
-    if collect_error:
-        errors = [f"{e}; {collect_error}" if "no test named" in e else e for e in errors]
     if errors or not validate_after:
         return errors
     return cross_validate(md_path, yaml_path)
@@ -824,7 +825,7 @@ def _mark_tested_locked(
     ac_test_ids: dict[str, list[str]],
     *,
     validate_after: bool = True,
-    discovered: list[str] | None = None,
+    discovered: dict[str, list[str]] | None = None,
 ) -> list[str]:
     """Flip ``pending_test→false`` + record test_ids for the named ACs, then cross_validate.
 
@@ -866,14 +867,15 @@ def _mark_tested_locked(
     # Only an AC with nothing recorded: a non-empty `test_ids` keeps precedence over discovery.
     for ac_id, ids in merged_by_ac.items():
         if not ids and discovered:
-            merged_by_ac[ac_id] = ac_tests_for(ac_id, discovered)
+            merged_by_ac[ac_id] = list(discovered.get(ac_id, []))
 
     # Refuse to flip an AC to non-pending with no test to back it (REVIEW C-P2d).
     empty = sorted(ac_id for ac_id, ids in merged_by_ac.items() if not ids)
     if empty:
         return [
             f"mark-tested: cannot mark {ac_id} tested: no test_ids and no test named "
-            f"{ac_search_hint(ac_id)}"
+            f"{ac_search_hint(ac_id)} in the changed test files; pass "
+            f"--test-id {ac_id}=<node id> for a test already committed"
             for ac_id in empty
         ]
 

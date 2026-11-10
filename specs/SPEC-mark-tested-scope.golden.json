@@ -1,0 +1,129 @@
+{
+  "AC-001": [
+    {
+      "expected": {
+        "bound": [
+          "tests/test_new.py::test_ac_001_new"
+        ]
+      },
+      "input": {
+        "committed": [
+          "tests/test_old.py::test_ac_001_old"
+        ],
+        "git": true,
+        "untracked": [
+          "tests/test_new.py::test_ac_001_new"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "refused": true
+      },
+      "input": {
+        "committed": [
+          "tests/test_old.py::test_ac_001_old"
+        ],
+        "git": true
+      }
+    },
+    {
+      "expected": {
+        "bound": [
+          "tests/test_mine.py::test_ac_001_x"
+        ]
+      },
+      "input": {
+        "committed": [
+          "tests/test_old.py::test_ac_001_old",
+          "tests/test_mine.py::test_other"
+        ],
+        "git": true,
+        "modified": [
+          "tests/test_mine.py::test_ac_001_x"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "bound": [
+          "tests/test_mine.py::test_ac_001_x"
+        ]
+      },
+      "input": {
+        "committed": [
+          "tests/test_old.py::test_ac_001_old",
+          "tests/test_mine.py::test_other"
+        ],
+        "git": true,
+        "staged": [
+          "tests/test_mine.py::test_ac_001_x"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "bound": [
+          "tests/test_old.py::test_ac_001_old"
+        ]
+      },
+      "input": {
+        "committed": [
+          "tests/test_old.py::test_ac_001_old"
+        ],
+        "git": true,
+        "test_ids": [
+          "tests/test_old.py::test_ac_001_old"
+        ],
+        "untracked": [
+          "tests/test_new.py::test_ac_001_new"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "bound": [
+          "tests/test_a.py::test_ac_001_a",
+          "tests/test_b.py::test_ac_001_b"
+        ]
+      },
+      "input": {
+        "git": false,
+        "untracked": [
+          "tests/test_a.py::test_ac_001_a",
+          "tests/test_b.py::test_ac_001_b"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "refused": true
+      },
+      "input": {
+        "committed": [
+          "tests/test_old.py::test_ac_001_old"
+        ],
+        "git": true,
+        "parametric": true,
+        "reads_golden": "tests/test_g.py",
+        "untracked": [
+          "tests/test_g.py::test_rows"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "refused": true
+      },
+      "input": {
+        "committed": [
+          "tests/test_old.py::test_ac_001_old"
+        ],
+        "git": true,
+        "untracked": [
+          "tests/test_new.py::test_ac_0012_x"
+        ]
+      }
+    }
+  ]
+}

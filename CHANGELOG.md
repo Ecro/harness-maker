@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`hm spec_machine mark-tested --ac` no longer binds other SPECs' tests** (SPEC-mark-tested-scope).
+  An AC with no `test_ids` used to bind every `test_ac_NNN*` in the repository (102 ids for 15 on
+  hm-cost-p5, 866 on a 10-AC SPEC). It now searches only the task's changed test files, the same
+  scope as `hm check --red`, so bind and RED agree. Contract change: after the tests are committed,
+  `--ac` alone refuses and the message names `--test-id AC-NNN=<node id>`.
+
 Cost phase 5 (SPEC-hm-cost-p5): spec-validator is skipped by default on a SPEC of at most 8 live ACs, and
 the HM-LIGHT-LANE cost target is 8x (was 5x). Tier-1 transcript ratio 10.24 -> 7.56 against the pre-registered
 8.0 bar (met); hidden tests 15/15 in both arms.
