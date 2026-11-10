@@ -403,6 +403,7 @@ Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`). Claude Co
 | Dependency | Notes |
 |---|---|
 | **Python 3.12+** and **[`uv`](https://docs.astral.sh/uv/)** | Required wherever Claude Code runs against your project — even if your project's primary language is Rust, Node, or Go. Hooks invoke `uv run python -m harness_maker.gates.*`; without `uv` they are silent no-ops. |
+| **pytest** (for testable ACs) | The RED and AC gates of `hm check` run **pytest only**. On a project with no Python test setup (Node, Rust, Go, …), a testable AC cannot pass and `hm check` says so; write such criteria as judgment ACs. Stack detection and the review step do not depend on pytest. |
 | **Claude Code CLI** (plugin + hook support) | Optional for plugin mode (`claude --plugin-dir /path/to/harness-maker`). Not required — the `harness-maker` CLI can generate harnesses independently. |
 | **OpenAI Codex CLI** | Optional. When `targets` includes `codex`, harness-maker renders Codex-native `.codex/` config, `AGENTS.md`, and `.agents/skills/` assets from the same workflow definitions. |
 | **Git** | Required for worktree isolation (`/hm:spec` → `/hm:wrapup` with `worktree.enabled: true`). |
@@ -416,7 +417,7 @@ Grouped by what they do for your project, not by component.
 ### 🎯 Personalization — *fits your project*
 
 - **Project-shaped harness.** Profiler + 10-dimension interview produce **structurally different** harnesses for Side experiments vs Production services. Reviewer count, workflow stages, security gate depth, mechanical-check enforcement — all derived from your answers.
-- **12+ stack detection.** Python · Node · Rust · Java · Kotlin · Swift · Dart · Ruby · PHP · C# · Elixir · Scala · C/C++ · Zig · Haskell. Framework + package-manager + CI provider parsed from manifests, not keyword-guessed. 24h cache ceiling on manifest mtime.
+- **12+ stack detection.** Python · Node · Rust · Java · Kotlin · Swift · Dart · Ruby · PHP · C# · Elixir · Scala · C/C++ · Zig · Haskell. Framework + package-manager + CI provider parsed from manifests, not keyword-guessed. 24h cache ceiling on manifest mtime. Detection is not test support: the TDD gates run pytest only (see Requirements).
 - **Confidence-bucketed defaults.** Every detection declares HIGH/MEDIUM/LOW confidence. HIGH → silent default with `# detected:` provenance. MEDIUM → explicit interview prompt. LOW → skipped (you decide). Regression test guards against surprise silent-default changes between minor versions.
 - **Adaptive personalization tier.** `/hm:health` scores three layers (detection→recommendation conversion, override stability, audit cadence) and reports Bronze → Silver → Gold → Platinum tier. Auto-proposes default changes when one axis has been overridden 5+ times. 100% local telemetry; nothing leaves the project.
 - **Domain packs.** `--add-domain python` inlines stack-specific standards into the 5 reviewer agents. `python` is the only pre-filled sample; other domain names scaffold blank user-side stubs that teams fill in without forking harness-maker.

@@ -1,0 +1,78 @@
+schema_version: 3
+spec_slug: pytest-only
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the no-runner reason names the pytest-only limit
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pytest_only.py::test_ac_001_hm_check_reports_it_degraded
+  - tests/unit/test_pytest_only.py::test_ac_001_non_python_root_names_the_limit[Cargo.toml]
+  - tests/unit/test_pytest_only.py::test_ac_001_non_python_root_names_the_limit[None]
+  - tests/unit/test_pytest_only.py::test_ac_001_non_python_root_names_the_limit[go.mod]
+  - tests/unit/test_pytest_only.py::test_ac_001_non_python_root_names_the_limit[package.json]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[Pipfile-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[Pipfile-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[conftest.py-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[conftest.py-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[poetry.lock-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[poetry.lock-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[pyproject.toml-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[pyproject.toml-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[pytest.ini-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[pytest.ini-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[requirements-dev.txt-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[requirements-dev.txt-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[requirements.txt-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[requirements.txt-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[setup.cfg-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[setup.cfg-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[setup.py-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[setup.py-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[tox.ini-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[tox.ini-backend/]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[uv.lock-]
+  - tests/unit/test_pytest_only.py::test_ac_001_python_root_keeps_its_reason[uv.lock-backend/]
+  executable_predicate: '''the RED and AC gates run pytest only'' in no_runner_reason(non_python_root)
+    and ''the RED and AC gates run pytest only'' not in no_runner_reason(python_root)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: RESEARCH-hm-non-token-improvements F6 reproduced the bare "no pytest
+    runner" on a Node project; the required phrase is fixed here, before the code
+    changes.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: d9b267039185221e710045420e547a897f91adef5b4f4ec46d27013be6f90049
+  approved_by: null
+  approved_at: '2026-11-10T16:41:10Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 8e38583bf6d3c69fc19e42246dd046b6087d61ee252362f11eb24f70807cfca4
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: a7cf56edb0f04658bef96013c5e45e63b5eb1919c98fc7587be81999943e20d6
+    ac_order: a1557fcfe162c5ca92cb543b3703219d932e86a98fd3ef7e4d7722599eb526d0

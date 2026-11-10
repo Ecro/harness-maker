@@ -666,6 +666,19 @@ def pytest_runner(root: Path, commands: Iterable[str]) -> list[str] | None:
     return None
 
 
+#: Files that mark a Python test setup, at the root or one directory down (a monorepo's
+#: `backend/`). Without any of them, installing pytest is not the fix: the RED and AC gates
+#: cannot run this project's tests at all (SPEC-pytest-only).
+_PY_MARKERS = (
+    "pyproject.toml", "setup.py", "setup.cfg", "tox.ini", "pytest.ini", "conftest.py",
+    "Pipfile", "poetry.lock", "uv.lock", "requirements*.txt",
+)  # fmt: skip
+
+
+def _python_project(root: Path) -> bool:
+    return any(next(root.glob(p), None) or next(root.glob(f"*/{p}"), None) for p in _PY_MARKERS)
+
+
 def no_runner_reason(root: Path) -> str:
     """Why `pytest_runner` found nothing, in words the DRI can act on."""
     py, why = project_python(root)
@@ -674,7 +687,15 @@ def no_runner_reason(root: Path) -> str:
             f"{py} has no pytest and no gate command runs pytest; install pytest there "
             "(uv: add it to a dependency group; if uv.lock is not yours, `git rm uv.lock`)"
         )
-    return why if why is not None and _lock_tracked(root) else "no pytest runner"
+    if why is not None and _lock_tracked(root):
+        return why
+    if not _python_project(root):
+        return (
+            "the RED and AC gates run pytest only, and no Python test setup was found at the "
+            "project root or one level down; a testable AC cannot pass here, so make it a "
+            "judgment AC"
+        )
+    return "no pytest runner"
 
 
 def _exception_line(text: str) -> str:
