@@ -176,7 +176,7 @@ the final replacement.
 The diagram above covers the original render pipeline. Three flows added in 0.12.0 run alongside it:
 
 1. **Detection cache flow (M15)**: `profile.profile()` calls `detection_cache.load_or_run()`, which checks cache freshness against manifest-mtime with a 24h ceiling (per `detection_cache.CACHED_MANIFESTS`). On cache miss, the full detection runs and `detection_cache.write()` persists the result to `~/.cache/harness-maker/profile-<repo-hash>.json`. The cached `ProjectProfile` is what feeds the Interviewer + M16 recommendation registry.
-2. **Foreign config import flow (M17)**: `foreign_config.detect()` scans the project root for 6 known foreign-AI-tool configs (cursor rules, claude.md, agents.md, continue, aider, copilot). `foreign_config.llm_map()` calls Anthropic with a sha256-keyed 24h cache and proposes a mapping to harness.yaml axes. The slash command UI in `interview.py` confirms with the user before `foreign_config.apply()` returns a `ChangeSet`. The caller writes via `atomic_write`. Re-renders use `@hm:harness:*` inverted block markers so user content outside the harness-managed region is preserved byte-for-byte (see `docs/reference/block-merge-spec.md`).
+2. **Foreign config import flow (M17)**: retired; `foreign_config.py` was deleted (SPEC-dead-modules).
 3. **Adaptive telemetry flow (M18 + M19)**: `harness_yaml_override` events are captured at two sites — (a) `harness-maker make --update` exit (primary; computes pre/post yaml diff via `telemetry.compute_yaml_diff()` so uncommitted edits are caught), and (b) the SessionStart drift hook (secondary; git diff since the last recorded `ts`). Both call `telemetry.emit_override()`, which deduplicates on `(ts, axis_path, after)` and appends to `.claude/observability/adaptive/overrides.jsonl`. `/hm:health`'s personalization layer reads that file plus the current harness.yaml plus the ProjectProfile cache and runs `personalization_audit.run_audit()`, which returns a composite-score `PersonalizationPlan` with ranked `PersonalizationActionItem` list (per ADR-011 rubric).
 
 ### Worktree artifact janitor
@@ -263,7 +263,7 @@ The Claude Code ecosystem moves weekly. Skills, agents, and best practices that 
 Three stages:
 
 1. **Crawl** (weekly): four sources — Anthropic blog/changelog, GitHub releases (`anthropics/claude-code` by default), arxiv (cs.SE / cs.CL / cs.CR), OSV.dev. Implemented under `src/harness_maker/crawler/`. Raw output to `observability/refresh/raw-<date>.jsonl`.
-2. **Filter** (`relevance.py`): LLM scores each item for project-relevance. Threshold starts at 0.7 and adapts ±0.05 based on the recent accept/reject ratio.
+2. **Filter** (formerly `relevance.py`, deleted): an LLM scored each item for project-relevance, with a threshold that adapted around 0.7.
 3. **Propose**: this step no longer exists. ADR-0007 deleted the crawl, the relevance filter, and `refresh.md.j2` after a production run rejected 11 of 12 surfaced items. The manual-confirm rule it enforced is preserved wherever proposals still reach a user (`/hm:health`'s action items).
 
 This means harness-maker stays current without ever silently changing the user's runtime.
@@ -278,7 +278,7 @@ Three metrics are computed and surfaced in the `/hm:health` report:
 
 A **SessionStart drift reminder** hook (`hooks/sessionstart_drift.py`) fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — alerting users to re-render after a plugin update (0.5.6+).
 
-The detector (`relevance.detect_version_drift`) compares `harness.yaml.harness_maker_version` (the **stamped** version, formerly named `installed` — renamed in 0.6.2 REVIEW M2 to remove a semantic inversion) against `relevance.latest_installed_version()`, which scans `~/.claude/plugins/cache/harness-maker-local/harness-maker/<v>/` for the highest semver-parseable directory name. **Why scan the cache instead of using the imported `__version__`** (0.6.2 P6): a rendered slash command runs with `uv run --no-project --with /path/to/<render-time-version>`, pinning its in-process `__version__` to the version that *rendered* it. The SessionStart hook runs against the live plugin so its `__version__` is current. The two import paths therefore see different `__version__` values; calling the same `detect_version_drift` would return different verdicts. Routing both through `latest_installed_version()` (an external truth source) makes them agree. The function is `@functools.cache`-decorated for sub-100ms session-start latency, with a top-K cap (10) on the cache scan to bound worst-case syscalls on long-lived installs.
+The detector (`hooks.sessionstart_drift.detect_version_drift`) compares `harness.yaml.harness_maker_version` (the **stamped** version, formerly named `installed` — renamed in 0.6.2 REVIEW M2 to remove a semantic inversion) against `latest_installed_version()` (same module), which scans `~/.claude/plugins/cache/harness-maker-local/harness-maker/<v>/` for the highest semver-parseable directory name. **Why scan the cache instead of using the imported `__version__`** (0.6.2 P6): a rendered slash command runs with `uv run --no-project --with /path/to/<render-time-version>`, pinning its in-process `__version__` to the version that *rendered* it. The SessionStart hook runs against the live plugin so its `__version__` is current. The two import paths therefore see different `__version__` values; calling the same `detect_version_drift` would return different verdicts. Routing both through `latest_installed_version()` (an external truth source) makes them agree. The function is `@functools.cache`-decorated for sub-100ms session-start latency, with a top-K cap (10) on the cache scan to bound worst-case syscalls on long-lived installs.
 
 All telemetry stays local — `metrics-YYYY-MM-DD.jsonl` is never transmitted. 0.7.1 (ADR-107) added a `tool_input` whitelist for the persisted entries: only `path`, `file_path`, `command`, `target`, `database`, `url`, `query` survive; values are scanned for known-secret prefixes (`sk-`, `ghp_`, `AKIA`, `Bearer …`) and redacted *before* a 256-char cap to ensure a partial-token tail cannot survive truncation. The cwd resolution chain is env-var-first (`CLAUDE_PROJECT_DIR` → `CURSOR_PROJECT_DIR` → typed `workspace.current_dir` → `os.getcwd()`); the bare stdin `cwd` field is intentionally NOT consulted, since prior to 0.7.1 a poisoned PostToolUse payload could redirect metrics writes via that field (ADR-102).
 
@@ -456,18 +456,11 @@ Cross-IDE payload equivalence is asserted (validator N1: the same `Recommendatio
 
 **Key files**: `src/harness_maker/recommendation.py`, `src/harness_maker/interview.py`, `src/harness_maker/models.py` (`Confidence`, `Recommendation`, `RecommendationEvidence`, `AdaptiveConfig`).
 
-### M17 — Foreign AI Config Migration (Track D)
+### M17 — Foreign AI Config Migration (retired)
 
-`harness_maker.foreign_config` detects 6 known foreign-AI-tool configs in the project, LLM-maps their content to harness.yaml axes (Anthropic call, sha256-keyed 24h cache), and applies single-source re-renders with `@hm:harness:*` inverted block markers (ADR-003 + ADR-009).
-
-`MarkerStyle` dispatch routes by file extension:
-- `HTML_COMMENT` for `.md` / `.mdc`
-- `HASH_COMMENT` for `.yml` / `.yaml`
-- `JSON_KEY` (`_hm_harness` top-level key) for `.json`
-
-0.11.x files (frontmatter `generated_by: harness-maker` + zero `@hm:harness:*` markers in body) are upgraded on first encounter post-0.12.0 — the whole file is rewritten with the new marker family; the second render is a no-op (idempotent). See `docs/reference/block-merge-spec.md` for the marker syntax + reconcile decision tree.
-
-**Key files**: `src/harness_maker/foreign_config.py`, `src/harness_maker/block_merge.py`, `src/harness_maker/templates/foreign-configs/*.j2`.
+`foreign_config.py` and its `templates/foreign-configs/` were deleted in 0.65.x
+(SPEC-dead-modules): no shipped entry point called them. The `@hm:harness:*` marker family it
+introduced stays in `block_merge.py`; see `docs/reference/block-merge-spec.md`.
 
 ### M18 — Adaptive Telemetry (Track B start)
 

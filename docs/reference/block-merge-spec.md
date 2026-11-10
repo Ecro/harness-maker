@@ -149,7 +149,7 @@ is_pre_0_12_0_render =
 1. On first encounter, the file is treated as wholly harness-owned — the whole file is rewritten with the new `@hm:harness:*` marker family. User edits made under the old (frontmatter-only) ownership model are not preserved at this step. (Rationale: the 0.11.x foreign-config render was never meant to be user-editable; the marker family makes user editing explicit going forward.)
 2. The rewrite is idempotent — a second render against the now-marked file is a no-op.
 
-**Test guard**: `test_apply_0_11_x_migration` in `tests/unit/test_foreign_config.py` verifies (a) the first render rewrites and (b) the second render is byte-identical to the first.
+**Test guard**: `test_apply_0_11_x_migration` in `tests/unit/test_foreign_config.py` verified (a) the first render rewrites and (b) the second render is byte-identical to the first. Both were deleted with `foreign_config.py` (SPEC-dead-modules); no live code path performs this upgrade any more.
 
 If a user wants to preserve 0.11.x edits across this upgrade, they must back the file up before the first 0.12.0 render. The former `hm:configure` exit prompt (retired in 0.64.0) warned about this on the upgrade path.
 
@@ -191,4 +191,4 @@ Planned additions in v1.5:
 - JSON/YAML markers (key-level merge) — **Closed in 0.12.0** (via `MarkerStyle.JSON_KEY` for `@hm:harness:*` on `.json` files, and `HASH_COMMENT` for `.yml`/`.yaml`). The `@hm:user:*` family still ships `.md`-only; cross-format support there remains deferred.
 - Partial auto-update within `user:` blocks (e.g., domain standard patches) — **deferred**
 - 3-way merge with `git merge-file` (for preserving user edits inside `block:` regions) — **deferred**
-- Foreign AI config migration (`.cursor/rules/`, `CLAUDE.md`, `AGENTS.md`, `.continue/`, `.aider.conf.yml`, copilot-instructions) — **Closed in 0.12.0** via the new `@hm:harness:*` inverted marker family + M17 in `src/harness_maker/foreign_config.py`.
+- Foreign AI config migration (`.cursor/rules/`, `CLAUDE.md`, `AGENTS.md`, `.continue/`, `.aider.conf.yml`, copilot-instructions) — closed in 0.12.0 via the `@hm:harness:*` inverted marker family and M17 (`foreign_config.py`), which was later deleted (SPEC-dead-modules); the marker family remains in `block_merge.py`.

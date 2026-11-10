@@ -24,14 +24,11 @@ harness-maker/
 │   ├── secscan/              # hallucination + prod_name_guard gate implementations
 │   ├── drift_monitor.py      # SPEC↔current trajectory drift (ADR-108 fenced LLM judge)
 │   ├── context_lint.py       # M11: render-time context lint
-│   ├── provenance.py         # M13: frontmatter (hash, generated_by, ...)
 │   ├── readiness.py          # M5: Health (0-100, 6 dimensions)
 │   ├── agent_quality.py      # M5: Platinum/Gold/Silver/Bronze rubric
 │   ├── crawler/              # M4: 4-source anti-rot crawl
-│   ├── relevance.py          # M4: LLM scoring + adaptive threshold
 │   ├── recommendation.py     # M16: Confidence-bucketed recommendation registry (Phase 1/4/8 of PLAN-personalization-depth-2026-05)
 │   ├── detection_cache.py    # M15: profile cache with manifest-mtime + 24h ceiling invalidation
-│   ├── foreign_config.py     # M17: foreign AI config detection + LLM mapping + apply with @hm:harness:* markers
 │   ├── personalization_audit.py # M19: /hm:health personalization-layer rubric runner per ADR-011
 │   ├── rubrics/
 │   │   └── personalization.yaml # locked v0 rubric (L1/L2/L3 formulas + tier boundaries)
@@ -43,8 +40,6 @@ harness-maker/
 │   ├── stages/<stage>.md.j2  # per-stage fragments composed into /hm: commands
 │   ├── harness-yaml/<Preset>.yaml.j2
 │   ├── settings/<Preset>.json.j2
-│   ├── cursor/               # M14: Cursor-only assets (rules/*.mdc, mcp.json)
-│   ├── foreign-configs/      # M17: 6 foreign-AI-config templates (cursor_rules / claude_md / agents_md / continue_config / aider_conf / copilot_instructions)
 │   └── hooks/                # telemetry hooks
 ├── commands/make.md          # /harness-maker:make plugin entry
 ├── .claude-plugin/plugin.json  # Claude Code marketplace manifest

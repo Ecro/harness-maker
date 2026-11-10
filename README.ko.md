@@ -96,7 +96,7 @@ action items).
 |--|---|---|
 | 🎯 | **개인화 (Personalized)** | 프로파일러가 12개 이상의 스택/프레임워크/CI 신호를 읽음. 인터뷰가 10개 이상의 차원을 lock. `Side` 실험과 `Production` 서비스는 **구조적으로 다른** 하네스를 받음 — 다른 reviewer 셋, 다른 워크플로 stage, 다른 보안 게이트. 범용 default가 조용히 깔리는 일 없음. |
 | 🛡️ | **신뢰 (Trusted)** | 모든 `/hm:execute`는 fresh worktree + TDD 루프. `/hm:execute`의 리뷰 단계는 보고만 하지 않음 — 모든 finding에 disposition을 매기고, accepted는 고친 뒤 `max_review_rounds` 이내로 재리뷰. `hm check` (test, lint, `mechanical_checks`)가 전후로 게이트. |
-| 🧭 | **사람이 소유 (Human-owned)** | *어떻게*는 AI 가 최대한 가져가고, *왜*·*무엇을*·트레이드오프는 당신이 소유. `/hm:spec` 이 코드 이전에 의도·범위·`irreversible_decisions` 를 당신과 함께 lock 하고, autopilot 은 사람의 결정이 필요한 stage 에서 멈추며, intent 기록은 당신의 동의로만 바뀜. **아직 출하 전:** 시스템의 가정이 어떻게 바뀌었는지 wrapup 이 요약해, diff 를 읽지 않고도 변경을 설명할 수 있게 하는 기능. |
+| 🧭 | **사람이 소유 (Human-owned)** | *어떻게*는 AI 가 최대한 가져가고, *왜*·*무엇을*·트레이드오프는 당신이 소유. `/hm:spec` 이 코드 이전에 의도·범위·`irreversible_decisions` 를 당신과 함께 lock 하고, 각 stage 는 사람의 결정이 필요한 지점에서 멈추며, intent 기록은 당신의 동의로만 바뀜. **아직 출하 전:** 시스템의 가정이 어떻게 바뀌었는지 wrapup 이 요약해, diff 를 읽지 않고도 변경을 설명할 수 있게 하는 기능. |
 | 🌱 | **자기진화 (Self-evolving)** | agent, skill, CLAUDE.md 어디든 손편집 — block-merge 마커가 `--update` 너머에서도 보존. 메모리가 프로젝트 고유 패턴을 축적; 반복되는 실패는 새 가드레일을 자동 제안. |
 | 🌀 | **무방부패 (Anti-rot)** | 4개 소스 주간 크롤 (Anthropic, GitHub releases, arXiv, OSV CVE). 사용자 accept/reject 이력으로 적응형 relevance filter. 항상 수동 확인 — silent auto-apply 경로는 존재하지 않음. |
 | 🎛️ | **다중 IDE (Multi-IDE)** | Claude Code + Codex. 한 개의 `harness.yaml`, 두 개의 target-native 렌더. 기존 Cursor rules / Aider 설정 / Copilot instructions는 첫 실행에서 흡수 — 수동 포팅 0. |
@@ -348,7 +348,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 
 - 작업 최대 5개, 최신순: 다음 단계 (산출물에서 도출), 마지막 단계, 최신 산출물, 다른 세션이 마지막으로 손댔는지, `parked` (7일 넘은 RESEARCH 하나뿐이고 커밋 없음; 맨 뒤로 정렬);
 - 활성 intent 와 그 지표의 `last` / `target` / `gap`;
-- autopilot 상태와 최근 커밋.
+- 최근 커밋.
 
 `hm/<slug>` 작업 worktree 만 나열된다 (`worktree.enabled: true`). Claude Code 는 Maker 가 로드될 때 digest 를 주입하고, Codex 나 digest 가 보이지 않는 곳에서는 Maker 가 명령을 직접 실행한다. briefing 마다 `.claude/observability/world-model.jsonl` 에 `maker_load` 한 줄 (타임스탬프와 session id, 요청 본문 없음) 이 추가된다.
 

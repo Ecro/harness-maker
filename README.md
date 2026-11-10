@@ -116,7 +116,7 @@ Most AI coding setups start from a generic template and drift from day one — s
 |--|---|---|
 | 🎯 | **Personalized** | Profiler reads 12+ stack/framework/CI signals. Interview locks 10+ dimensions. A `Side` experiment and a `Production` service get **structurally different** harnesses — different reviewer sets, different workflow stages, different security gates. No generic defaults silently shipped. |
 | 🛡️ | **Trusted** | With `worktree.enabled: true` (the Production default) every `/hm:` stage for a task runs in one **persistent** worktree — `.worktrees/<slug>/` on branch `hm/<slug>`, **shared** by spec/execute and squash-landed by `/hm:wrapup` — and the TDD loop runs there. With `worktree.enabled: false` (the Side default) **no worktree** is created and every stage runs in the current tree. `/hm:execute`'s review step doesn't just report — every finding gets a disposition, and accepted ones are fixed and re-reviewed for at most `max_review_rounds`. `hm check` (tests, lint, `mechanical_checks`) runs before and after. |
-| 🧭 | **Human-owned** | AI takes as much of the *how* as it can; you keep the *why*, the *what* and the trade-offs. `/hm:spec` locks intent, scope and `irreversible_decisions` with you before any code, autopilot stops at stages that need a human decision, and intent records change only with your consent. **Not shipped yet:** a wrapup summary of how the system's assumptions changed, so you can explain a change without reading the diff. |
+| 🧭 | **Human-owned** | AI takes as much of the *how* as it can; you keep the *why*, the *what* and the trade-offs. `/hm:spec` locks intent, scope and `irreversible_decisions` with you before any code, each stage stops where it needs a human decision, and intent records change only with your consent. **Not shipped yet:** a wrapup summary of how the system's assumptions changed, so you can explain a change without reading the diff. |
 | 🌱 | **Self-evolving** | Hand-edit any agent, skill, CLAUDE.md — block-merge markers preserve your edits across `--update`. Memory accumulates project-specific patterns; recurring failures auto-propose new guardrails. |
 | 🎛️ | **Multi-IDE** | Claude Code + Codex. One `harness.yaml`, two target-native renders. Existing Cursor rules / Aider config / Copilot instructions get absorbed on first run — no manual port. |
 
@@ -142,7 +142,6 @@ The profiler scans concrete signals **before** asking you anything. Every detect
 | **Frameworks** | React / Vue / FastAPI / Django / Tauri / Zephyr / Next.js / Tailwind / Pydantic … (dependency-parsed, not keyword-guessed) |
 | **Package manager** | uv · poetry · pnpm · yarn · cargo · go mod · gradle · maven |
 | **CI provider** | GitHub Actions · GitLab CI · CircleCI · Bitbucket Pipelines |
-| **Foreign AI config** | Pre-existing `.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/`, `.aider.conf.yml`, `.github/copilot-instructions.md` |
 
 > **Result:** A 24-hour cached `ProjectProfile` you can inspect with `harness-maker profile . --json` before any interview runs.
 
@@ -183,7 +182,6 @@ One source tree, two IDE-native renders, all from a single `harness.yaml`:
 Layered on top of the base render:
 
 - **Domain packs** — `--add-domain python` inlines a stack-specific standards block into the 5 reviewer agents (code, security, performance, concurrency, ux). `python` is the only sample that ships pre-filled; `--add-domain <other>` scaffolds a blank user-side stub at `.claude/agents/_standards/<name>.md` for teams to fill in without forking harness-maker.
-- **Foreign config absorption** — pre-existing Cursor rules, Aider config, Copilot instructions get LLM-translated into `harness.yaml` axes. `@hm:harness:*` inverted markers keep them synced on re-renders.
 - **Sibling repos** — frontend + backend + library share one harness session via relative-path bindings in `harness.yaml`. Cross-machine portable.
 - **Ref folders + Second Brain** — registered project docs + Obsidian vault notes become searchable from any stage.
 
@@ -392,7 +390,7 @@ The world model is what the harness keeps between sessions: **intents** (goals, 
 
 - up to 5 tasks, newest first: next stage (derived from the task's artifacts), last stage, latest artifact, whether another session touched it last, and `parked` (only a RESEARCH older than 7 days, no commits; sorted last);
 - active intents with their metric's `last` / `target` / `gap`;
-- autopilot state and recent commits.
+- recent commits.
 
 Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`). Claude Code injects the digest when Maker loads; on Codex, and wherever no digest appears, Maker runs the command itself. Each briefing appends one `maker_load` line (timestamp and session id, no request text) to `.claude/observability/world-model.jsonl`.
 
@@ -453,7 +451,6 @@ Grouped by what they do for your project, not by component.
 ### 🎛️ Multi-IDE — *one source, every IDE*
 
 - **Two targets from one harness.** Claude Code + Codex CLI. Single `.claude/` source tree; Codex reads `.codex/`, `AGENTS.md`, and `.agents/skills/`. All rendered from one `harness.yaml`.
-- **Foreign AI config migration.** Detects 6 known foreign configs (`.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`, `.aider.conf.yml`, `.github/copilot-instructions.md`). LLM-translates them into harness.yaml axes. `@hm:harness:*` inverted markers keep them synced across re-renders.
 - **Sibling repos.** Frontend + backend + library bind into one harness session via relative paths in harness.yaml. Cross-machine portable (relative paths survive `git clone`).
 
 ### 🔁 Workflow primitives — *the rest of the toolchain*
@@ -539,7 +536,7 @@ Other harnesses give everyone the same starting point. harness-maker reads YOUR 
 |---|---|
 | **Project-tailored synthesis** | Profiler reads 12+ stack/framework/CI signals before any prompt. A 10-dimension interview locks the rest. A `Side` experiment and a `Production` service get *structurally different* harnesses (reviewer counts, workflow stages, security gates) — not the same set of files with different flags. |
 | **Edit-preserving upgrades** | Hand-edit any agent, skill, or CLAUDE.md. Block-merge markers (`@hm:user:*`) carry your edits across `--update`. No "your customisations will be overwritten" warning at the top of every file. |
-| **Multi-IDE single source** | One `harness.yaml` renders Claude Code and Codex CLI native assets. Foreign configs (`.cursor/rules/`, `AGENTS.md`, `.aider.conf.yml`, `.continue/`, `.github/copilot-instructions.md`) are absorbed on first run — no manual port. |
+| **Multi-IDE single source** | One `harness.yaml` renders Claude Code and Codex CLI native assets. |
 | **Privilege-separated reviewers** | Reviewer agents (`code`, `security`, `performance`, `concurrency`, `UX`) have read-only permissions — no `Write`, no `Edit`, no shell interpreters. The stage orchestrator applies fixes, preserving the boundary. Mechanical checks (lint/tests) gate the LLM reviewer before any token is spent. |
 
 harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static template gives you a starting point. harness-maker gives you a starting point that knows who it was created for, and can be updated without losing your changes.
@@ -601,8 +598,8 @@ sibling_repos:
   - ../backend
 
 reviewers:
-  enabled: [code, security, performance, ux, concurrency]
-  routing: conditional       # conditional | always-all
+  max_review_rounds: 3       # execute's review/fix loop cap
+  fanout: false              # true = also run the lens reviewers listed in `installed`
   mechanical_checks:         # pre-LLM stop-on-first gate (optional)
     - ruff check .
     - uv run pytest tests/unit -x -q
@@ -613,11 +610,11 @@ worktree:
                  # .worktrees/<slug>/ on hm/<slug>, squash-landed by /hm:wrapup.
                  # OFF = no stage creates a worktree.
 
-autonomy:                    # autopilot / pipeline auto-advance — see the Autopilot section
-  level: auto_safe           # gated | auto_safe | full (auto_safe is the 0.47.0+ default)
-  autopilot_persistent: true   # SessionStart re-arms the marker each session
-  step_cap: 20               # positive int | null = unlimited (mandatory gates are the real bound)
-  time_cap_min: 300          # positive int | null = unlimited
+autonomy:
+  level: ask                 # ask | gated | auto_safe | auto_full; only auto_full stamps a SPEC
+                             # and proceeds on an unstamped one without asking
+  # autopilot_persistent, pipeline, step_cap, time_cap_min: kept for old files, read by nothing
+  # since autopilot retired in 0.64.0
 
 permissions:
   deny_dangerous: false      # true → restore the destructive-pattern deny baseline (rm, curl|sh, /etc, ~/.ssh)
@@ -742,7 +739,7 @@ rm .claude/harness.yaml
 # (previous .claude/ is auto-backed up to .backup-<ISO>/)
 ```
 
-**`@hm:harness:*` inverted markers (0.12.0)** — for foreign-AI-config files we generate post-import (`.cursor/rules/*.mdc`, `AGENTS.md`, `CLAUDE.md`, etc.), content INSIDE `@hm:harness:<id>` markers is harness-owned (replaced on every render); content OUTSIDE is user-owned (byte-for-byte preserved). The block-merge parser dispatches per file extension: HTML comments for `.md`/`.mdc`, `# @hm:harness:` for `.yml`/`.yaml`, top-level `_hm_harness` JSON key for `.json`. 0.11.x files (frontmatter `generated_by: harness-maker` + zero `@hm:harness:*` markers) are treated as wholly harness-owned on first encounter post-upgrade and re-rendered into the new marker family (ADR-009 amendment).
+**`@hm:harness:*` inverted markers (0.12.0)** — for files harness-maker owns only in part (originally the foreign-AI-config import, since deleted), content INSIDE `@hm:harness:<id>` markers is harness-owned (replaced on every render); content OUTSIDE is user-owned (byte-for-byte preserved). The block-merge parser dispatches per file extension: HTML comments for `.md`/`.mdc`, `# @hm:harness:` for `.yml`/`.yaml`, top-level `_hm_harness` JSON key for `.json`. 0.11.x files (frontmatter `generated_by: harness-maker` + zero `@hm:harness:*` markers) are treated as wholly harness-owned on first encounter post-upgrade and re-rendered into the new marker family (ADR-009 amendment).
 
 ---
 
@@ -853,14 +850,6 @@ harness-maker 0.12.0 introduces three tracks of personalization depth:
   framework. Cache at `~/.cache/harness-maker/profile-<repo-hash>.json`
   (manifest-mtime invalidation + 24h TTL).
 
-- **Foreign AI Config Migration (Track D)** — `/harness-maker:make` detects
-  `.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`,
-  `.aider.conf.yml`, and `.github/copilot-instructions.md`. With user
-  confirmation, harness-maker imports the foreign config's intent into
-  `harness.yaml` and *re-generates the foreign file as part of the
-  harness on every render*. The `@hm:harness:*` block markers protect
-  user customizations outside the marked regions.
-
 - **Adaptive (Track B start)** —
   `harness.yaml.adaptive.disable_telemetry: false` (opt-out per
   ADR-005) enables override telemetry. The personalization-audit layer
@@ -880,7 +869,7 @@ All adaptive features run **100% locally** — no network calls
 
 **Done (0.12.0–0.12.1):**
 - Track A (Detection Depth): 12+ stacks/frameworks/pkg-mgr/CI
-- Track D (Foreign AI Config Migration): 6 config types, single-source re-render, `@hm:harness:*` markers, 0.11.x migration
+- Track D (Foreign AI Config Migration): 6 config types, `@hm:harness:*` markers, 0.11.x migration (the importer was later deleted; the markers remain)
 - Track B-start (Adaptive): override telemetry, the personalization-audit rubric, SessionStart drift surface
 
 **Next (0.13.0 — Track B completion):**
