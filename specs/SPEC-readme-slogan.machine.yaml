@@ -1,0 +1,52 @@
+schema_version: 3
+spec_slug: readme-slogan
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: both READMEs carry the slogan and no stale not-shipped line
+  type: mechanical
+  test_ids:
+  - tests/unit/test_readme_slogan.py::test_ac_001_readme_has_slogan_and_no_stale_line[README.md]
+  - tests/unit/test_readme_slogan.py::test_ac_001_readme_has_slogan_and_no_stale_line[README.ko.md]
+  executable_predicate: all(slogan_before_version(readme) and not stale_line(readme)
+    for readme in readmes)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The slogan text is fixed by intent/UNDERSTANDING-HANDOFF.md's pre-registered
+    rule (2026-09-26), written before this change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: d7d6e6d93f9dddf48d4d54235c353501ba0e540b5dac3745918ab4aa64948eff
+  approved_by: null
+  approved_at: '2026-11-10T22:26:13Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 999a38136f9ce3ec2f75419b8ac2cfc16acb5f75e478b61408d4ab294a09e7ca
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 59bc4044762ded94ded7f7d37cb604fa1a8dc5d80bc261d1a7599a1fd74517fc
+    ac_order: a1557fcfe162c5ca92cb543b3703219d932e86a98fd3ef7e4d7722599eb526d0

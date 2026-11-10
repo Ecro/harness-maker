@@ -12,6 +12,8 @@
 **English** · [한국어](https://github.com/Ecro/harness-maker/blob/main/README.ko.md)
 
 > **A different harness for every project — built from yours, never generic.**
+>
+> *Automate the work. Elevate the engineer.*
 
 > **Version**: 0.65.3
 >
@@ -116,7 +118,7 @@ Most AI coding setups start from a generic template and drift from day one — s
 |--|---|---|
 | 🎯 | **Personalized** | Profiler reads 12+ stack/framework/CI signals. Interview locks 10+ dimensions. A `Side` experiment and a `Production` service get **structurally different** harnesses — different reviewer sets, different workflow stages, different security gates. No generic defaults silently shipped. |
 | 🛡️ | **Trusted** | With `worktree.enabled: true` (the Production default) every `/hm:` stage for a task runs in one **persistent** worktree — `.worktrees/<slug>/` on branch `hm/<slug>`, **shared** by spec/execute and squash-landed by `/hm:wrapup` — and the TDD loop runs there. With `worktree.enabled: false` (the Side default) **no worktree** is created and every stage runs in the current tree. `/hm:execute`'s review step doesn't just report — every finding gets a disposition, and accepted ones are fixed and re-reviewed for at most `max_review_rounds`. `hm check` (tests, lint, `mechanical_checks`) runs before and after. |
-| 🧭 | **Human-owned** | AI takes as much of the *how* as it can; you keep the *why*, the *what* and the trade-offs. `/hm:spec` locks intent, scope and `irreversible_decisions` with you before any code, each stage stops where it needs a human decision, and intent records change only with your consent. **Not shipped yet:** a wrapup summary of how the system's assumptions changed, so you can explain a change without reading the diff. |
+| 🧭 | **Human-owned** | AI takes as much of the *how* as it can; you keep the *why*, the *what* and the trade-offs. `/hm:spec` locks intent, scope and `irreversible_decisions` with you before any code, each stage stops where it needs a human decision, and intent records change only with your consent. Each wrapup commit ends with an `Understanding:` block (which assumption changed, before → after, and which ADRs the agent decided), so you can explain a change without reading the diff; on its first 10 wrapups the DRI judged 8 explainable from the block alone (UNDERSTANDING-HANDOFF, met). |
 | 🌱 | **Self-evolving** | Hand-edit any agent, skill, CLAUDE.md — block-merge markers preserve your edits across `--update`. Memory accumulates project-specific patterns; recurring failures auto-propose new guardrails. |
 | 🎛️ | **Multi-IDE** | Claude Code + Codex. One `harness.yaml`, two target-native renders. Existing Cursor rules / Aider config / Copilot instructions get absorbed on first run — no manual port. |
 
