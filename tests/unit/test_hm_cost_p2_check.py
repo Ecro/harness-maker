@@ -189,7 +189,11 @@ def test_ac_006_compact_output(tmp_path: Path, fixture: Any) -> None:
     assert keep >= REQUIRED_KEEP
     assert default_out == compact(full_out, keep)
     added = ("ac.golden", "ac.hint", "gates.reason")
-    assert strip(full_out, added) == strip(pre_change_out, ("gates.reason",))
+    # SPEC-wrapup-gate AC-003 adds the `contract` section; every other section is unchanged.
+    no_contract = {k: v for k, v in full_out["sections"].items() if k != "contract"}
+    assert strip({**full_out, "sections": no_contract}, added) == strip(
+        pre_change_out, ("gates.reason",)
+    )
     # `gates.reason` may differ only in its last clause, which SPEC-pipeline-env-fixes reworded
     # to name the root and the lock-file rule.
     was = pre_change_out["sections"]["gates"].get("reason")

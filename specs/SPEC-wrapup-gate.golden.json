@@ -1,0 +1,454 @@
+{
+  "AC-001": [
+    {
+      "expected": {
+        "exit": 1,
+        "reason": "no REVIEW record for a non-doc change",
+        "review_ok": false
+      },
+      "input": {
+        "approval": "approved",
+        "changed": [
+          "src/app.py"
+        ],
+        "require_review": true,
+        "review_doc": false
+      }
+    },
+    {
+      "expected": {
+        "exit": 1,
+        "reason": "no REVIEW record for a non-doc change",
+        "review_ok": false
+      },
+      "input": {
+        "approval": "approved",
+        "changed": [
+          "templates/x.md.j2"
+        ],
+        "require_review": true,
+        "review_doc": false
+      }
+    },
+    {
+      "expected": {
+        "exit": 0,
+        "reason": "no REVIEW record",
+        "review_ok": true
+      },
+      "input": {
+        "approval": "approved",
+        "changed": [
+          "README.md",
+          "work-docs/PLAN-s.md",
+          "specs/SPEC-s.machine.yaml",
+          ".claude/memory/n.md"
+        ],
+        "require_review": true,
+        "review_doc": false
+      }
+    },
+    {
+      "expected": {
+        "exit": 0,
+        "reason": "no REVIEW record",
+        "review_ok": true
+      },
+      "input": {
+        "approval": "exempt",
+        "changed": [
+          "src/app.py"
+        ],
+        "require_review": true,
+        "review_doc": false
+      }
+    },
+    {
+      "expected": {
+        "exit": 1,
+        "reason": "no REVIEW record for a non-doc change",
+        "review_ok": false
+      },
+      "input": {
+        "approval": "missing_auto_full",
+        "changed": [
+          "src/app.py"
+        ],
+        "require_review": true,
+        "review_doc": false
+      }
+    },
+    {
+      "expected": {
+        "exit": 0,
+        "reason": null,
+        "review_ok": true
+      },
+      "input": {
+        "approval": "approved",
+        "changed": [
+          "src/app.py"
+        ],
+        "require_review": true,
+        "review_doc": true
+      }
+    },
+    {
+      "expected": {
+        "exit": 1,
+        "reason": "no REVIEW record for a non-doc change",
+        "review_ok": false
+      },
+      "input": {
+        "approval": "approved",
+        "changed": [
+          "agents/code-reviewer.md"
+        ],
+        "require_review": true,
+        "review_doc": false
+      }
+    },
+    {
+      "expected": {
+        "exit": 1,
+        "reason": "no REVIEW record for a non-doc change",
+        "review_ok": false
+      },
+      "input": {
+        "approval": "approved",
+        "changed": [
+          "CLAUDE.md"
+        ],
+        "require_review": true,
+        "review_doc": false
+      }
+    },
+    {
+      "expected": {
+        "exit": 0,
+        "reason": "no REVIEW record",
+        "review_ok": true
+      },
+      "input": {
+        "approval": "approved",
+        "changed": [
+          ".claude/observability/review_effect.jsonl"
+        ],
+        "require_review": true,
+        "review_doc": false
+      }
+    },
+    {
+      "expected": {
+        "exit": 1,
+        "reason": "no REVIEW record for a non-doc change",
+        "review_ok": false
+      },
+      "input": {
+        "approval": "legacy",
+        "changed": [
+          "src/app.py"
+        ],
+        "require_review": true,
+        "review_doc": false
+      }
+    },
+    {
+      "expected": {
+        "exit": 0,
+        "reason": "no REVIEW record",
+        "review_ok": true
+      },
+      "input": {
+        "approval": "approved",
+        "changed": [
+          "src/app.py"
+        ],
+        "require_review": false,
+        "review_doc": false
+      }
+    }
+  ],
+  "AC-003": [
+    {
+      "expected": {
+        "allowed": [],
+        "crossed": [
+          "src/a.py"
+        ],
+        "ok": false
+      },
+      "input": {
+        "adr": [],
+        "changed": [
+          "src/a.py",
+          "src/b.py"
+        ],
+        "dnc": [
+          "- `src/a.py`"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "advisory": [],
+        "allowed": [],
+        "crossed": [
+          "src/api/v1/x.py"
+        ],
+        "ok": false
+      },
+      "input": {
+        "adr": [],
+        "changed": [
+          "src/api/v1/x.py"
+        ],
+        "dnc": [
+          "- `src/api/**`"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "advisory": [
+          "src/a.py"
+        ],
+        "allowed": [],
+        "crossed": [],
+        "ok": true
+      },
+      "input": {
+        "adr": [],
+        "changed": [
+          "src/a.py"
+        ],
+        "dnc": [
+          "- `src/a.py` full-mode semantics"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "advisory": [],
+        "allowed": [],
+        "crossed": [
+          "src/a.py"
+        ],
+        "ok": false
+      },
+      "input": {
+        "adr": [
+          "ADR-003: rename it; allows: `src/a.py`. **Decided by:** agent"
+        ],
+        "changed": [
+          "src/a.py"
+        ],
+        "dnc": [
+          "- `src/a.py`"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "advisory": [],
+        "allowed": [
+          "src/a.py"
+        ],
+        "crossed": [],
+        "ok": true
+      },
+      "input": {
+        "adr": [
+          "### ADR-004: allows: src/a.py. **Decided by:** user (2026-11-10)"
+        ],
+        "changed": [
+          "src/a.py"
+        ],
+        "dnc": [
+          "- `src/a.py`"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "allowed": [],
+        "crossed": [
+          "docs/y.md"
+        ],
+        "ok": false
+      },
+      "input": {
+        "adr": [],
+        "changed": [
+          "docs/y.md"
+        ],
+        "dnc": [
+          "- docs/"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "allowed": [],
+        "crossed": [
+          "src/a.py"
+        ],
+        "ok": false
+      },
+      "input": {
+        "adr": [],
+        "changed": [],
+        "dnc": [
+          "- `src/a.py`"
+        ],
+        "untracked": [
+          "src/a.py"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "allowed": [
+          "src/a.py"
+        ],
+        "crossed": [],
+        "ok": true
+      },
+      "input": {
+        "adr": [
+          "ADR-002: keep v1 working; allows: `src/a.py`. **Decided by:** user"
+        ],
+        "changed": [
+          "src/a.py"
+        ],
+        "dnc": [
+          "- `src/a.py`",
+          "- `src/c.py`"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "allowed": [],
+        "crossed": [],
+        "ok": true
+      },
+      "input": {
+        "adr": [],
+        "changed": [
+          "src/a.py"
+        ],
+        "dnc": [
+          "- none — this task has no contract boundaries"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "ok": true,
+        "reason": "no PLAN"
+      },
+      "input": {
+        "changed": [
+          "src/a.py"
+        ],
+        "plan": false
+      }
+    },
+    {
+      "expected": {
+        "advisory": [],
+        "allowed": [],
+        "crossed": [],
+        "ok": true
+      },
+      "input": {
+        "adr": [],
+        "changed": [
+          "src/ab.py"
+        ],
+        "dnc": [
+          "- `src/a.py` — public entry point"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "advisory": [],
+        "allowed": [],
+        "crossed": [
+          "src/api/v1.py"
+        ],
+        "ok": false
+      },
+      "input": {
+        "adr": [],
+        "changed": [
+          "src/api/v1.py"
+        ],
+        "dnc": [
+          "- src/api"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "advisory": [],
+        "allowed": [],
+        "crossed": [
+          "src/a.py"
+        ],
+        "ok": false
+      },
+      "input": {
+        "adr": [],
+        "changed": [
+          "src/a.py"
+        ],
+        "dnc": [
+          "- src/a.py."
+        ]
+      }
+    },
+    {
+      "expected": {
+        "advisory": [],
+        "allowed": [],
+        "crossed": [
+          "nonessential/x.py"
+        ],
+        "ok": false
+      },
+      "input": {
+        "adr": [],
+        "changed": [
+          "nonessential/x.py"
+        ],
+        "dnc": [
+          "- nonessential/"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "advisory": [],
+        "allowed": [
+          "src/a.py"
+        ],
+        "crossed": [],
+        "ok": true
+      },
+      "input": {
+        "adr": [
+          "- **ADR-005**: allows: src/a.py. **Decided by:** DRI (confirmed 2026-11-10)"
+        ],
+        "changed": [
+          "src/a.py"
+        ],
+        "dnc": [
+          "- `src/a.py`"
+        ]
+      }
+    }
+  ]
+}

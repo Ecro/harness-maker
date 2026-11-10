@@ -605,7 +605,16 @@ def test_ac005_main_prints_one_json_line(tmp_path: Path) -> None:
     doc = json.loads(lines[0])
     assert code == doc["exit"] == 0
     assert set(doc) == {"exit", "tree_changed", "sections"}
-    assert set(doc["sections"]) == {"approval", "gates", "ac", "review", "security", "cve"}
+    # SPEC-wrapup-gate AC-003 adds `contract`.
+    assert set(doc["sections"]) == {
+        "approval",
+        "gates",
+        "ac",
+        "review",
+        "contract",
+        "security",
+        "cve",
+    }
     assert doc["sections"]["cve"]["status"] == "skipped"
 
 
