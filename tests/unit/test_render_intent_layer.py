@@ -153,7 +153,7 @@ GAP_SKILL_PHRASES_BOTH = (
     "hm intent status --json",
     "at most three",
     "overlaps-with",
-    "ask about each candidate in turn",
+    "ask about all candidates in one multi-select question",  # SPEC-ask-less AC-006
     "answer every candidate before the first write",
 )
 GAP_SKILL_PHRASES_CLAUDE = (
@@ -192,7 +192,7 @@ def test_ac_004_skill_renders_gap_situation_and_candidate_rules(target: Target, 
     assert _in_order(
         body,
         (
-            "ask about each candidate in turn",
+            "ask about all candidates in one multi-select question",  # SPEC-ask-less AC-006
             "answer every candidate before the first write",
             "--from-proposal --candidates",
             "never runs `approve`",

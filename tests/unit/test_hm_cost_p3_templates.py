@@ -35,10 +35,10 @@ def test_ac_001_spec_defaults() -> None:
         for phrase in (
             "under Refinement Decisions as a default",
             "surface every critical critique",
-            "an irreversible-decision or oracle critique is never a default",
+            "an irreversible-decision critique is never a default",
         ):
             assert phrase in step, (is_codex, phrase)
-        assert "Open Questions holds only what you cannot decide" in _step(text, "3")
+        assert "Open Questions holds only what the DRI must decide" in _step(text, "3")
         assert "record the critiques under Open Questions" not in text
 
 

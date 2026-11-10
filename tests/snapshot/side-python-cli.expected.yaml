@@ -16,7 +16,7 @@ files:
   body_sha256: c62a21e82754d5606f3beae02e5dcf47cce846662e3763708b901442a83abb9a
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 80176d92dce76d57b686cbdefc56beb6e8258dc65bf2cecce83d5d841c65e0a8
+  body_sha256: 5f99b20a5b614ccef473a20acef5183dee0d2d952d4913721d469cc6aad8d32a
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 7a0eb0965046757c8720bdabc17656ec1ba96bace0c29141730b4f0e6fda2e8a
@@ -31,16 +31,16 @@ files:
   body_sha256: 104a8626874bba215ce9d2ce4b9979ac1ff6f9c22d6a20a21c3048ee6adb8409
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: e527b73c0b324f06208f649c10a63d56341a3edb373b8a1559fb522ade30473c
+  body_sha256: c1c942d4c8ec48ea693f6374f42895d0e630cf84e4300d320055e48b434986dc
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: c15ee724964f4728a950170ed66d8850e53d5331d2c1dff9bc944a1418a45c89
+  body_sha256: e16e2bd7a5b534c954c1aa9950fce774401f616e483b46ee0203b61c1e930db0
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: c4364aa3896fdafbf4dc60b60eac7b06481f9e9ef15a87cfbbf685904d365b62
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 563ed4adcc93a3ce7a231cf6c9408334f244562ac5e8120eabcc77f66250312c
+  body_sha256: c1d8b4d1d484361a314a2c28835970c62f4fa49254d94a8ab6686e0e05a4b697
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: b8874bedd75846cbb12e9484b955b47810f0f231a5d66c2d4db7d6b6c473dc2e
@@ -82,13 +82,13 @@ files:
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 - path: skills/intent-layer/SKILL.md
   template: skills/intent-layer/SKILL.md.j2
-  body_sha256: 6c114e5fad308cb9bc864c296a14d5dbfba5026ceafe9c4da37394349846e269
+  body_sha256: f6253c911604f9b5c6159e4c2a472d80361d7454300fed4b98b2c553ba8a07ae
 - path: skills/intent-layer/references/workflow-feedback.md
   template: skills/intent-layer/references/workflow-feedback.md.j2
-  body_sha256: 8bc02a9587278b53fdc82dc35a1cfbe6d0068c8e6b4c4cad5c43b7782a7deeb6
+  body_sha256: 3bcd7dd2162a896dd7a2a725d89784844eb81ba7b9ea3344c9aef3426593e578
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: 776897121403c122ff2d2e77d8e3e5ec5d91f73420a353dad87ef31c24183f29
+  body_sha256: 4d4c2c459abf3484570487250e9bd5840ada77e159d66581b27c48939efddd4b
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 98b6a525112f3a8d649f3390263ea5b2905f4da1e11260eab6aab59648546eef

@@ -73,7 +73,9 @@ def test_ac_003_stage_states_the_rule_and_does_not_grow(is_codex: bool) -> None:
     step5 = _step(text, "5")
     assert "or the validator one with no critical critique" in step5
     assert step5.index("no critical critique") < step5.index("spec_machine approve")
-    assert len(text) <= len(_stage(_at_base(STAGE), is_codex=is_codex))
+    # SPEC-ask-less (rule R, DRI-only interview) grows the stage by 34 chars, within its PLAN's
+    # surface allowance.
+    assert len(text) <= len(_stage(_at_base(STAGE), is_codex=is_codex)) + 34
 
 
 def test_ac_003_agent_triggers_state_the_rule_and_do_not_grow() -> None:

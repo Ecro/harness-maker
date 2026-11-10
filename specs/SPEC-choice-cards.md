@@ -13,6 +13,8 @@ summary: "Every choice an hm command or Maker asks the user goes through the hos
 
 # SPEC — choice-cards (every user choice in an hm render is a question-tool card)
 
+> **Superseded in part (2026-11-10).** The choice rule's text is now SPEC-ask-less's rule R: the DRI is asked only what the DRI owns, and the rest is decided and reported.
+
 ## 🎯 Intent
 
 The DRI (2026-10-17, thread "HM-LIGHT-LANE 기록과 구현") wants every choice the user has to make

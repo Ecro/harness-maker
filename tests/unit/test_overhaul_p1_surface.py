@@ -250,7 +250,9 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 # All three raised by their measured growth in SPEC-pipeline-env-fixes: `--no-project ` in the CLI
 # prefix (+13), and wrapup's exit-2 rule and full `observe` example (+60)
 # (BASELINE-DELTA-pipeline-env-fixes.md, PLAN ADR-009, DRI card 2026-11-10).
-_STAGE_BUDGET = {"spec": (6963, 1500, 800), "execute": (7623, 1500, 0), "wrapup": (3973, 2800, 0)}
+# All three raised by their measured growth in SPEC-ask-less: rule R (+150 each), plus spec's
+# interview rules (+27) and wrapup's split of intent writes (+61) (BASELINE-DELTA-ask-less.md).
+_STAGE_BUDGET = {"spec": (7140, 1500, 800), "execute": (7773, 1500, 0), "wrapup": (4285, 2800, 0)}
 _OPT_IN = 1500
 
 

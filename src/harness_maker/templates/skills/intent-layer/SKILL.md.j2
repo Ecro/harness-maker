@@ -1,21 +1,19 @@
 ---
 name: {{ name }}
-description: Deep-interview the creator before creating intents; improve intent quality, record what was observed, close/approve/drop, or report where things stand, what to do next and gaps. Ask before writes.
+description: Deep-interview the creator before creating intents; improve intent quality, record what was observed, close/approve/drop, or report where things stand, what to do next and gaps.
 ---
 
 # {{ name }}
 
 Translate matching prose into one `hm intent` verb; creation requires the deep interview and quality review below.
-Workflow observations are proposed once, at wrapup Step 5.7, in one consent batch; intent changes still require consent.
 
-**Read freely, write only on an answer.** `hm intent status --json` is read-only, LLM-free and
-free to run whenever the operator asks where things stand. Mutation verbs write only after consent.
+**Read freely; write per the rule below.** `hm intent status --json` is read-only and LLM-free.
 
 Distinct nonblank `owners` roles trigger an advisory at approval, never a block. `approved_by` is
-an unverified git config string; real separation requires CODEOWNERS + branch protection. Empty or identical roles stay silent.
+an unverified git config string; real separation requires CODEOWNERS + branch protection.
 
 One intent may serve multiple SPECs (1:N); the record is `intent/<ID>.md`.
-`hm intent migrate --json` preserves record body bytes, approvals and historical clocks; Run it before the first canonical write. Reads accept legacy files without rewriting them.
+`hm intent migrate --json` preserves record body bytes, approvals and historical clocks; Run it before the first canonical write; reads leave legacy files as they are.
 
 **Fact or question.** A claim that bears on an intent's metric or decision is an intent question (`hm intent question`, open → confirmed or wrong); any other domain fact is a `[wiki:fact]`. Record each claim in one place only and link to it from the other. Other facts belong to the project-knowledge skill; cite one with `--locator .claude/memory/wiki.md:<A-B>`.
 
@@ -35,20 +33,22 @@ hm intent close <id> --observed <met|missed|no_data> --note-file
 hm intent show <id> --json
 ```
 
-Prefix each with `uv run --no-project --with {{ harness_maker_src_path }}` as every other mandated call
-in this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp and defaults to now; `supersedes`
-needs `--claim-file`; `close` needs both `--observed` and `--note-file`. Each `-file` flag takes a path (list flags: one item per line); `-` reads stdin, for scripted callers only — agents always write free text to a file.
+Prefix each with `uv run --no-project --with {{ harness_maker_src_path }}`.
+`--observed-at` is a timezone-aware ISO-8601 timestamp and defaults to now; `supersedes`
+needs `--claim-file`; `close` needs both `--observed` and `--note-file`. Each `-file` flag takes a path (list flags: one item per line; `-` is stdin, for scripts).
 `--locator <path:A-B>` cites at most 40 lines of this checkout by content; `status --json` then
 reports `stale_evidence` when that text changed (approval checks never read cited files).
 
 ## The rule for every write
 
 1. Work out the verb and its arguments from what the operator said; read `status` first when
-   an id is ambiguous.
-2. Ask with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}, showing the exact arguments
-   you are about to pass; write every free-text value with the Write tool to its own path from `mktemp -t hm-intent.XXXXXXXX` (outside the repo) and pass the path — never text inline or in a heredoc.
-3. On an affirmative answer, run the write once with those arguments and show the CLI's
-   `changed:` line.
+   an id is ambiguous. Write every free-text value with the Write tool to its own path from `mktemp -t hm-intent.XXXXXXXX` (outside the repo) and pass the path — never text inline or in a heredoc.
+2. Records (`question add --status open`, `question observe --relation confirms|contradicts`,
+   `metric measure`, `metric record` with an `--evidence-file` from this task) are
+   written without asking under an approved SPEC.
+3. Ask for the rest (`question add --status confirmed|wrong`, `question observe --relation supersedes`,
+   `question resolve`, `new`, `approve`, `activate`, `drop`, `reopen`, `close`; any write without an
+   approved SPEC) with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}, showing the exact arguments; on an affirmative answer, run the write once and show its `changed:` line.
 4. Otherwise — on any other answer or no answer — write nothing. Do not retry, rephrase or infer consent.
 
 ## Creation: mandatory deep interview and quality review
@@ -58,8 +58,8 @@ Interview the intent creator before `new`; a one-line request or candidate selec
 Reuse explicit answers from this conversation; ask the creator to correct the synthesis and probe remaining gaps.
 {% if is_codex %}Use `request_user_input_async` when available, or ask in chat and wait; use `request_user_input` only where allowed.{% else %}Use `AskUserQuestion`, or ask in chat and wait when it is unavailable.{% endif %}
 Ask one to three adaptive multiple-choice questions per round, with concrete, distinct proposals.
-Put the recommended option first, label it, and briefly explain why; always offer a final free-text Other path.
-Use the question tool's built-in Other input when present; otherwise add Other explicitly. Do not lead with free-text-only questions.
+Put the labelled recommendation first, with why; always offer a free-text Other.
+Do not lead with free-text-only questions.
 Cover: problem and affected users; desired observable change and why now; evidence and assumptions;
 success measure, baseline, target and measurement method; scope, exclusions and tradeoffs;
 decision owner, feedback timing and what happens on success, failure or missing data.
@@ -78,10 +78,10 @@ Flag proxy metrics that can pass without the intended outcome; require complemen
 Material gaps prevent creation until answered; implementation details may remain explicitly deferred.
 Obtain the creator's confirmation of this concrete draft under the write rule, then create it as `proposed`.
 Populate the Markdown body's Problem, Proposed outcome, Affected users and systems, Constraints and Open questions
-from the confirmed draft, preserving the CLI-owned frontmatter; do not leave unexplained empty sections.
+from the confirmed draft, keeping the CLI-owned frontmatter; explain any empty section.
 Read back the record and status, check references and consistency with the confirmed draft, and report any error.
-On quality-review requests or substantive revisions, apply this critique without waiting to be asked about each gap;
-reuse existing answers and interview only for changed or missing decisions. Never reopen or alter terminal records.
+On quality-review requests or substantive revisions, apply this critique unprompted;
+interview only for changed or missing decisions. Never reopen or alter terminal records.
 
 ## Proposing intents (only when the operator asks what to do next / where the gaps are)
 
@@ -91,15 +91,15 @@ reuse existing answers and interview only for changed or missing decisions. Neve
    `stale_definition`, with its `how_measured` — those are gaps in evidence, not in the code.
    For the ones with `measure: true`, run `hm intent metric measure --all --dry-run` and show
    the table; the record call is `hm intent metric measure --all`, gated by
-   "The rule for every write" above (ask once, run once on yes, otherwise write nothing).
+   "The rule for every write" above.
 3. Read the codebase against the measured metrics' `gap` and propose **at most three**
    candidates, unranked, each with `title / statement / scope / out_of_scope / metric / evidence /
    overlaps-with`. A candidate for an unmeasured metric carries
    `evidence: none — statement only`. `overlaps-with` names any intent (any state,
    especially `closed` + `observed:
    missed`) or any `rejected[]` entry the candidate resembles — never silently re-propose it.
-4. Then ask about each candidate in turn with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (yes / no), and
-   answer every candidate before the first write: the declined titles go into every accepted
+4. Then ask about all candidates in one multi-select question with {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}, and
+   answer every candidate before the first write: an unticked candidate is declined; no answer writes nothing and records no decline. The declined titles go into every accepted
    record's `rejected[]`.
 5. Then, once per accepted candidate, show the exact arguments and run
    `hm intent new <ID> … --from-proposal --candidates <N> [--declined-file <path>]`

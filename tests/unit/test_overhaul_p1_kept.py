@@ -669,8 +669,9 @@ def test_wrapup_prints_the_understanding_block_and_gates_intent_writes(
     assert "`steps.understanding.status`" in text[close - 300 : close + 300]
     ask = "`request_user_input`" if codex else "`AskUserQuestion`"
     intents = text[text.index("hm intent status --json") :]
-    assert f"ask the DRI once ({ask}, multi-select)" in intents
-    assert "run only the selected writes; no answer runs none" in intents
+    # SPEC-ask-less AC-005 moves these pins: plain records unasked under an approved SPEC.
+    assert "Under an approved SPEC (not `--exempt`), write without asking" in intents
+    assert f"every write under an exempt SPEC: ask once with {ask} (multi-select)" in intents
 
 
 @pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
@@ -819,14 +820,16 @@ def test_intent_skill_and_wrapup_call_the_intent_verbs(tmp_path: Path, codex: bo
     root = _render_rules(tmp_path, codex=codex)
     wrapup = _rule_stage(root, "wrapup", codex=codex)
     intents = wrapup[wrapup.index("hm intent status --json") :]
-    assert "`hm intent metric record|measure …`" in intents
+    # SPEC-ask-less AC-005: `measure` is a plain record; `record` needs task evidence.
+    assert "`hm intent metric measure`" in intents
+    assert "`metric record` with an `--evidence-file` from this task" in intents
     # SPEC-pipeline-env-fixes AC-007: the example names `--relation`, which the parser requires.
-    assert (
-        "`hm intent question observe <id> --relation <confirms|supersedes|contradicts> "
-        "--text-file <f> [--claim-file <f>]`"
-    ) in intents
-    assert "`hm intent question add <id> … --claim-file <f> [--text-file <f>]`" in intents
-    assert "`hm intent close <id> --observed <met|missed|no_data> --note-file <f>`" in intents
+    # SPEC-ask-less AC-005 narrows wrapup's unasked forms; `supersedes` and `close` are asked, and
+    # their full forms live in the skill's verb list.
+    unasked = "`hm intent question observe <id> --relation <confirms|contradicts> --text-file <f>`"
+    assert unasked in intents
+    assert "`hm intent question add <id> … --status open`" in intents
+    assert "`hm intent close <id> … --note-file <f>`" in intents
     skill_dir = root / (".agents/skills" if codex else ".claude/skills") / "intent-layer"
     skill = _flat_rule(skill_dir / "SKILL.md")
     assert "hm intent metric measure --all" in skill
