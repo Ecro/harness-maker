@@ -36,3 +36,19 @@ Measured with the committed generator (`tests/structural/_surface_baseline.py`,
 | codex | `hm-execute` | 9 235 | 9 381 | same |
 | codex | `hm-research` | 4 949 | 5 099 | same |
 | codex | `hm-wrapup` | 6 455 | 6 775 | same |
+
+Per ADR-010 the task that moved the surface owns its attribution. Writing it next to the
+allowance and the later re-freeze keeps this out of `ratchet-rebaselined-by-its-own-subject`.
+The surface rose (+1.6% claude, +2.6% codex) because of rule R in every stage, the DRI-only
+interview rules in spec, and wrapup's split of intent writes. No other prose changed.
+
+## Folded into the baseline from main
+
+PR #54 squash-merged the task as 756261b2. The PLAN was then marked complete, which expires its
+allowance, so the growth was folded on main. The generator re-froze
+`tests/structural/surface_baseline.json` at 756261b223d1: claude 50 059, codex 31 329.
+SPEC-wrapup-gate (PR #53) landed in the same window and is netted in (execute −4, wrapup −14).
+`render_sha` and `payload_digest` moved mechanically with the re-freeze. `_ATOMIC_RATCHET` is
+re-measured for research (4 647 -> 4 810), spec (7 531 -> 7 728) and wrapup (4 961 -> 5 354),
+which left its ±2% band; execute stays inside it. No bench measurement ran on the
+task branch, so no `bench_hash` alias is needed.
