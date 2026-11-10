@@ -47,9 +47,15 @@ def test_ac_002_project_without_a_tracked_lock_stays_clean_and_lands(
     base = tmp_path / "proj"
     base.mkdir()
     _git(base, "init", "-q", "-b", "main")
+    # `hm worktree task-land` commits by itself, so the identity lives in the repository.
+    _git(base, "config", "user.name", "T")
+    _git(base, "config", "user.email", "t@e.com")
     (base / "pyproject.toml").write_text('[project]\nname = "demo"\nversion = "0.1.0"\n')
     (base / ".gitignore").write_text(".venv/\n.worktrees/\n")
-    monkeypatch.setattr(synthesize, "_compute_install_ref", lambda: str(REPO_ROOT))
+    # As a real render does it: a checkout under the home directory is written as `$HOME/…`
+    # (CI runs under /home/runner), and the calls below expand it the way a shell would.
+    ref = synthesize._portablize_ref(str(REPO_ROOT))
+    monkeypatch.setattr(synthesize, "_compute_install_ref", lambda: ref)
     answers = _build_answers(locale="en", targets=[Target.CLAUDE_CODE], preset=Preset.SIDE)
     render(synthesize.synthesize(ProjectProfile(), answers, preset=Preset.SIDE), base / ".claude")
     _git(base, "add", "-A")

@@ -465,11 +465,18 @@ def bench() -> ModuleType:
     return module
 
 
-def test_ac_009_bench_guard_and_fixture(tmp_path: Path, bench: ModuleType) -> None:
+def test_ac_009_bench_guard_and_fixture(
+    tmp_path: Path, bench: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A reference that exists nowhere, so the outcome does not depend on where this checkout
+    # or the home directory is.
+    monkeypatch.setattr(synthesize, "_compute_install_ref", lambda: "/opt/hm-dev")
     rendered = _render_project(tmp_path / "rendered")
     assert NEW in (rendered / ".claude" / "commands" / "hm" / "spec.md").read_text()
     # The guard read the reference out of the new prefix: it got as far as hashing that path.
-    with pytest.raises(bench.CliProvenanceError, match="is not a package directory"):
+    with pytest.raises(
+        bench.CliProvenanceError, match="/opt/hm-dev/src/harness_maker is not a package directory"
+    ):
         bench.check_cli_fresh(rendered)
 
     stale = tmp_path / "stale"
