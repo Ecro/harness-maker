@@ -19,5 +19,12 @@
     "src_tree": "de05f0eb78132d7e970500139d3e7661b63dd656",
     "scripts_tree": "aa16dcae227e10951a7bb6c924c8bb639299948e",
     "why": "Tier-1 re-measure for SPEC-hm-cost-p3 AC-005 (docs/evals/results.jsonl, 30 rows) ran on task-branch commit cdf28dce; the wrapup squash landed it as 277405a9, so the source is not reachable from main. Trees recorded from cdf28dce on 2026-10-22; identical in 277405a9."
+  },
+  {
+    "source": "3063ad338e0695585499664223990bae79ffc560",
+    "target": "d4b43e6c8a62d2f9d2a450cbab253fe229d9f050",
+    "src_tree": "011def4da216c87db848a93836e4b7227154a5e5",
+    "scripts_tree": "cbc5a86764e3934f722b3256e72241d1e2642803",
+    "why": "Tier-1 re-measure for SPEC-hm-cost-p4 AC-009 (docs/evals/results.jsonl, 45 rows) ran on task-branch commit 3063ad33; the wrapup squash landed it on the PR branch as this target. Trees recorded from 3063ad33 on 2026-11-10; identical in the target. Retarget in the fold commit once the PR is squash-merged to main."
   }
 ]
