@@ -1,0 +1,221 @@
+schema_version: 3
+spec_slug: mark-tested-scope
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: binding is scoped to the changed test files
+  type: parametric
+  test_ids:
+  - tests/unit/test_mark_tested_scope.py::test_ac_001_binding_scope[AC-001-0]
+  - tests/unit/test_mark_tested_scope.py::test_ac_001_binding_scope[AC-001-1]
+  - tests/unit/test_mark_tested_scope.py::test_ac_001_binding_scope[AC-001-2]
+  - tests/unit/test_mark_tested_scope.py::test_ac_001_binding_scope[AC-001-3]
+  - tests/unit/test_mark_tested_scope.py::test_ac_001_binding_scope[AC-001-4]
+  - tests/unit/test_mark_tested_scope.py::test_ac_001_binding_scope[AC-001-5]
+  - tests/unit/test_mark_tested_scope.py::test_ac_001_binding_scope[AC-001-6]
+  - tests/unit/test_mark_tested_scope.py::test_ac_001_binding_scope[AC-001-7]
+  executable_predicate: null
+  golden_table:
+  - input:
+      git: true
+      committed:
+      - tests/test_old.py::test_ac_001_old
+      untracked:
+      - tests/test_new.py::test_ac_001_new
+    expected:
+      bound:
+      - tests/test_new.py::test_ac_001_new
+    edge: false
+    note: S1
+  - input:
+      git: true
+      committed:
+      - tests/test_old.py::test_ac_001_old
+    expected:
+      refused: true
+    edge: true
+    note: 'S2: nothing changed'
+  - input:
+      git: true
+      committed:
+      - tests/test_old.py::test_ac_001_old
+      - tests/test_mine.py::test_other
+      modified:
+      - tests/test_mine.py::test_ac_001_x
+    expected:
+      bound:
+      - tests/test_mine.py::test_ac_001_x
+    edge: false
+    note: S3 unstaged
+  - input:
+      git: true
+      committed:
+      - tests/test_old.py::test_ac_001_old
+      - tests/test_mine.py::test_other
+      staged:
+      - tests/test_mine.py::test_ac_001_x
+    expected:
+      bound:
+      - tests/test_mine.py::test_ac_001_x
+    edge: false
+    note: S3 staged
+  - input:
+      git: true
+      committed:
+      - tests/test_old.py::test_ac_001_old
+      untracked:
+      - tests/test_new.py::test_ac_001_new
+      test_ids:
+      - tests/test_old.py::test_ac_001_old
+    expected:
+      bound:
+      - tests/test_old.py::test_ac_001_old
+    edge: false
+    note: 'S4: --test-id keeps precedence'
+  - input:
+      git: false
+      untracked:
+      - tests/test_a.py::test_ac_001_a
+      - tests/test_b.py::test_ac_001_b
+    expected:
+      bound:
+      - tests/test_a.py::test_ac_001_a
+      - tests/test_b.py::test_ac_001_b
+    edge: true
+    note: 'S5: no HEAD, every listed file counts'
+  - input:
+      git: true
+      committed:
+      - tests/test_old.py::test_ac_001_old
+      untracked:
+      - tests/test_g.py::test_rows
+      parametric: true
+      reads_golden: tests/test_g.py
+    expected:
+      refused: true
+    edge: true
+    note: 'S6: a collecting golden reader with no convention name binds nothing, in
+      RED too'
+  - input:
+      git: true
+      committed:
+      - tests/test_old.py::test_ac_001_old
+      untracked:
+      - tests/test_new.py::test_ac_0012_x
+    expected:
+      refused: true
+    edge: true
+    note: AC-0012 is not AC-001
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Each row is the scenario''s expected binding written from the
+    SPEC''s scope rule (changed test files only; --test-id first; no HEAD = every
+    listed file; a collecting golden reader is not a convention name) before the code
+    changes; the over-binding it removes was reproduced in this repository (proposals-log
+    NT-008: 102 ids for 15 on hm-cost-p5).'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: binding and RED discover the same tests
+  type: mechanical
+  test_ids:
+  - tests/unit/test_mark_tested_scope.py::test_ac_002_bind_equals_red_discovery[row-0]
+  - tests/unit/test_mark_tested_scope.py::test_ac_002_bind_equals_red_discovery[row-1]
+  - tests/unit/test_mark_tested_scope.py::test_ac_002_bind_equals_red_discovery[row-2]
+  - tests/unit/test_mark_tested_scope.py::test_ac_002_bind_equals_red_discovery[row-3]
+  - tests/unit/test_mark_tested_scope.py::test_ac_002_bind_equals_red_discovery[row-5]
+  - tests/unit/test_mark_tested_scope.py::test_ac_002_bind_equals_red_discovery[row-6]
+  - tests/unit/test_mark_tested_scope.py::test_ac_002_bind_equals_red_discovery[row-7]
+  executable_predicate: all(bound(r)['AC-001'] == check.red_discovery(root(r), check.SpecView(load(yaml(r)),
+    yaml(r)), collect_runner(root(r))).get('AC-001', []) for r in binding_rows if
+    not r['input'].get('test_ids'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: check.red_discovery is existing code this task does not change
+    (SPEC non-goal); it is the scope the RED gate already ran these tests under.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the bind path runs no repo-wide collect and the refusal names --test-id
+  type: mechanical
+  test_ids:
+  - tests/unit/test_mark_tested_scope.py::test_ac_003_no_repo_wide_collect
+  executable_predicate: with_patched(spec_machine._pytest_collect_nodeids, raises)
+    and bound(S1) == [NEW] and len(errors(S2)) == 1 and all(t in errors(S2)[0] for
+    t in ('AC-001', 'test_ac_001', 'changed test files', '--test-id')) and yaml_bytes_after(S2)
+    == yaml_bytes_before(S2)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The required words are the SPEC''s: where discovery looked and
+    the flag that replaces it; byte-identical on refusal is the existing REVIEW C-P2c
+    contract.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: mark-tested discovery for an AC with no test_ids narrows from the whole
+    repository to the task's changed test files (check.red_discovery)
+  category: public API/CLI contract
+  rationale: narrows SPEC-hm-cost-p4 IRR-001; a caller that ran --ac after committing
+    its tests now gets an error and must pass --test-id
+  source: spec
+approval:
+  kind: human
+  content_hash: a5793083da1f34ac8dd65390a9d6bba0986c02376a06ca803ede795c4bf4647c
+  approved_by: Ecro
+  approved_at: '2026-11-10T14:46:04Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: fa80b0984a1f33203d8b314f19e9b47a28ad7e5ae39554162b27d9b15e85729a
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 5c825503406c50c35d41ba6825b2e41aed886fea79ccef341970505962c780c4
+    AC-001: cfd6f104a1725a8f9bd205a76478c3e07d1022d29b170186f48a53c0fab0c954
+    AC-002: bd5263db94a2a30a493fddabd9fe84ca4580d24031d7439e07e47debdeb609a6
+    AC-003: c92555a2ea1586be4a361365ae4371652a59185208457ed2c1af99d5fb8fddc8
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d
