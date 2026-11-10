@@ -162,6 +162,9 @@ def test_ac_001_plugin_root_and_gate_remedy(
 def test_ac_003_runner_rows(tmp_path: Path, row: dict[str, Any]) -> None:
     root = tmp_path / "proj"
     root.mkdir()
+    # The rows describe a Python project; SPEC-pytest-only gives a root with no Python marker
+    # its own reason.
+    (root / "pyproject.toml").write_text("", encoding="utf-8")
     venv = row["input"]["venv"]
     if venv != "none":
         _fake_venv(root, pytest_ok=venv == "with_pytest")
