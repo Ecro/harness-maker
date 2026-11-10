@@ -239,11 +239,11 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # again with spec and wrapup after SPEC-hm-cost-p3's (BASELINE-DELTA-hm-cost-p3.md), and
     # again with spec after #46 folded SPEC-hm-cost-p4's (BASELINE-DELTA-hm-cost-p4.md).
     "execute": 8894,
-    # research and wrapup re-measured after #40 folded SPEC-choice-cards' allowance
-    # (BASELINE-DELTA-choice-cards.md, "Folded into the baseline from main").
-    "research": 4647,
-    "spec": 7531,
-    "wrapup": 4961,
+    # research, spec and wrapup re-measured after #54 folded SPEC-ask-less' allowance
+    # (BASELINE-DELTA-ask-less.md, "Folded into the baseline from main").
+    "research": 4810,
+    "spec": 7728,
+    "wrapup": 5354,
 }
 
 

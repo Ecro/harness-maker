@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: ask-less
-status: planning
+status: complete
 created: 2026-11-10
 spec: "[[SPEC-ask-less]]"
 summary: One choice rule (R) in every stage and Maker; spec picks the intent and asks only DRI-owned slots; wrapup and the intent-layer skill write plain intent records unasked under an approved SPEC.
