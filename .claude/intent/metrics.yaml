@@ -510,3 +510,12 @@ values:
     met; SPEC-hm-cost-p5 AC-006; rows docs/evals/results.jsonl'
   definition_hash: 2f33cdbce23708d4578a909638e53011114411aba263fc8a454e27b97699bbd8
   metric_id: hm_cost_ratio_small
+- value: 80
+  observed_at: '2026-11-10T22:06:32.827017Z'
+  evidence: 'DRI judgment 2026-11-10 (thread "토큰 외 hm 개선점 구현"): 8 of the 10 pre-registered
+    wrapups (first 10 after re-render 45bccf9e, 2026-09-27) answered yes on both Q1
+    (explainable from the Understanding block alone, no diff) and Q2 (no out-of-scope
+    WHY/WHAT decision taken unnoticed). Sheet: /mnt/project-files/hm-improve-research/UNDERSTANDING-HANDOFF-judgment-sheet.md.
+    8/10 = 80%.'
+  definition_hash: 3ee5d0ec70df97487ec9b52a93e742e86180d861fe15228e843c3d4984d8f6a4
+  metric_id: understanding_handoff_rate
