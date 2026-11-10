@@ -2859,7 +2859,9 @@ ADRs record `Context / Decision / Consequences / Rejected Alternatives`. `/hm:ex
 #### spec-validator Advisory
 
 After the SPEC and machine companion are drafted, `spec-validator` performs one conditional,
-read-only critique. Its `APPROVED`, `NEEDS_REVISION`, or `MAJOR_REVISION` result is evidence for
+read-only critique: it runs when `hm spec_machine check --all` prints `"validator": "run"` (a SPEC of
+more than 8 live ACs) or when the DRI picks "Approve after spec-validator" on the approval question;
+a smaller SPEC skips it by default. Its `APPROVED`, `NEEDS_REVISION`, or `MAJOR_REVISION` result is evidence for
 the DRI, not an automatic gate, and it is never re-run in the same SPEC stage.
 
 #### "No Unresolved Decisions" Rule

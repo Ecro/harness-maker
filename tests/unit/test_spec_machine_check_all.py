@@ -149,6 +149,7 @@ def test_a_clean_pass_prints_one_short_line(
     payload = json.loads(out)
     assert out.count("\n") == 1
     assert set(payload.pop("approval")) == {"state", "land", "gate"}  # SPEC-hm-cost-p2 AC-005
+    assert payload.pop("validator") == "skip"  # SPEC-hm-cost-p5 AC-002: a small fixture
     if compact:
         # strictness comes from the quality result, as in the full payload.
         assert payload == {"ok": True, "overall": overall, "strictness": "block"}

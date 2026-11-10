@@ -1,0 +1,108 @@
+{
+ "valid_3ac": {
+  "exit": 0,
+  "payload": {
+   "ok": true,
+   "overall": 79,
+   "strictness": "warn",
+   "weak_dimensions": [
+    "completeness"
+   ],
+   "low_dimensions": {
+    "completeness": 30,
+    "scope_boundary": 50
+   }
+  },
+  "lines": 1
+ },
+ "valid_9ac": {
+  "exit": 0,
+  "payload": {
+   "ok": true,
+   "overall": 79,
+   "strictness": "warn",
+   "weak_dimensions": [
+    "completeness"
+   ],
+   "low_dimensions": {
+    "completeness": 30,
+    "scope_boundary": 50
+   }
+  },
+  "lines": 1
+ },
+ "failing_gate_9ac": {
+  "exit": 1,
+  "payload": {
+   "ok": false,
+   "strictness": "warn",
+   "validate": {
+    "ok": true,
+    "errors": []
+   },
+   "cross_validate": {
+    "ok": false,
+    "errors": [
+     "rule-2: ac AC-001 title mismatch (ratio=0.18 < 0.85): .yaml='behaviour 1 holds', .md='a different title'"
+    ],
+    "by_rule": {
+     "rule-2": 1
+    }
+   },
+   "quality": {
+    "overall": 79,
+    "weak_dimensions": [
+     "completeness"
+    ],
+    "low_dimensions": {
+     "completeness": 30,
+     "scope_boundary": 50
+    },
+    "blocked": false,
+    "strictness": "warn"
+   }
+  },
+  "lines": 1
+ },
+ "unloadable": {
+  "exit": 1,
+  "payload": {
+   "ok": false,
+   "strictness": "warn",
+   "validate": {
+    "ok": false,
+    "errors": [
+     "yaml load failed: YAMLError: expected ',' or ']', but got '<stream end>' (line 2, column 1)"
+    ]
+   },
+   "cross_validate": {
+    "ok": false,
+    "errors": [
+     "yaml load failed (see validate.errors)"
+    ],
+    "by_rule": {
+     "unattributed": 1
+    }
+   },
+   "quality": {
+    "overall": 47,
+    "weak_dimensions": [
+     "completeness",
+     "machine_verifiability",
+     "mutation_coverage_set",
+     "non_python_intent_alignment"
+    ],
+    "low_dimensions": {
+     "completeness": 30,
+     "scope_boundary": 50,
+     "machine_verifiability": 0,
+     "mutation_coverage_set": 0,
+     "non_python_intent_alignment": 0
+    },
+    "blocked": false,
+    "strictness": "warn"
+   }
+  },
+  "lines": 1
+ }
+}

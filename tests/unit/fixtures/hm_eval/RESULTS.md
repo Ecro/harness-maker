@@ -135,7 +135,7 @@ t1         3/3      3/3           0.100     0.400       20     80
 all        3/3      3/3           0.100     0.400       20     80
 ratio (CLI cost): 4.0    ratio (transcript price): 4.0
 pass rate: plain 3/3 (100%), hm 3/3 (100%)
-verdict: met — ratio 4.000 <= target 5 and hm pass rate >= plain
+verdict: met — ratio 4.000 <= target 8 and hm pass rate >= plain
 record with:
   uv run hm intent metric record hm_cost_ratio_small --value 4.000 --evidence 'bench hm-light-lane@bh0001 harness hs0001 model model-a: hm $0.400/run vs plain $0.100/run over 1 tasks x 3 runs (CLI-priced ratio 4.0, transcript-priced ratio 4.0); hidden-test pass plain 3/3, hm 3/3; verdict met'
 hm_cost_ratio_small=4.000

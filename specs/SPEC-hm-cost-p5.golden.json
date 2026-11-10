@@ -1,0 +1,141 @@
+{
+  "AC-001": [
+    {
+      "expected": "skip",
+      "input": {
+        "irreversible": 0,
+        "live": 0,
+        "superseded": 0
+      }
+    },
+    {
+      "expected": "skip",
+      "input": {
+        "irreversible": 0,
+        "live": 1,
+        "superseded": 0
+      }
+    },
+    {
+      "expected": "skip",
+      "input": {
+        "irreversible": 0,
+        "live": 3,
+        "superseded": 0
+      }
+    },
+    {
+      "expected": "skip",
+      "input": {
+        "irreversible": 0,
+        "live": 8,
+        "superseded": 0
+      }
+    },
+    {
+      "expected": "run",
+      "input": {
+        "irreversible": 0,
+        "live": 9,
+        "superseded": 0
+      }
+    },
+    {
+      "expected": "run",
+      "input": {
+        "irreversible": 0,
+        "live": 20,
+        "superseded": 0
+      }
+    },
+    {
+      "expected": "skip",
+      "input": {
+        "irreversible": 0,
+        "live": 8,
+        "superseded": 3
+      }
+    },
+    {
+      "expected": "run",
+      "input": {
+        "irreversible": 0,
+        "live": 9,
+        "superseded": 3
+      }
+    },
+    {
+      "expected": "skip",
+      "input": {
+        "irreversible": 2,
+        "live": 5,
+        "superseded": 0
+      }
+    },
+    {
+      "expected": "run",
+      "input": {
+        "irreversible": 2,
+        "live": 9,
+        "superseded": 0
+      }
+    }
+  ],
+  "AC-005": [
+    {
+      "expected": {
+        "ratio": 7.999,
+        "verdict": "met"
+      },
+      "input": {
+        "hm": 7.999,
+        "hm_pass_below_plain": false,
+        "plain": 1.0
+      }
+    },
+    {
+      "expected": {
+        "ratio": 8.0,
+        "verdict": "met"
+      },
+      "input": {
+        "hm": 8.0,
+        "hm_pass_below_plain": false,
+        "plain": 1.0
+      }
+    },
+    {
+      "expected": {
+        "ratio": 8.004,
+        "verdict": "missed"
+      },
+      "input": {
+        "hm": 8.004,
+        "hm_pass_below_plain": false,
+        "plain": 1.0
+      }
+    },
+    {
+      "expected": {
+        "ratio": 5.4,
+        "verdict": "met"
+      },
+      "input": {
+        "hm": 5.4,
+        "hm_pass_below_plain": false,
+        "plain": 1.0
+      }
+    },
+    {
+      "expected": {
+        "ratio": 6.0,
+        "verdict": "missed"
+      },
+      "input": {
+        "hm": 6.0,
+        "hm_pass_below_plain": true,
+        "plain": 1.0
+      }
+    }
+  ]
+}

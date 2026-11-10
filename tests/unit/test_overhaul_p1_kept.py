@@ -508,6 +508,7 @@ def _without_approval(stdout: str) -> str:
     """SPEC-hm-cost-p2 IRR-003 adds `approval` to `spec_machine check`; the rest is unchanged."""
     payload = json.loads(stdout)
     payload.pop("approval", None)
+    payload.pop("validator", None)  # SPEC-hm-cost-p5 IRR-001, additive as well
     return json.dumps(payload, ensure_ascii=False) + "\n"
 
 

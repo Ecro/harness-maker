@@ -1,0 +1,376 @@
+schema_version: 3
+spec_slug: hm-cost-p5
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the validator verdict follows the live AC count
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_cost_p5_validator.py::test_validator_verdict
+  executable_predicate: null
+  golden_table:
+  - input:
+      live: 0
+      superseded: 0
+      irreversible: 0
+    expected: skip
+    edge: true
+    note: 'ac: [] SPEC'
+  - input:
+      live: 1
+      superseded: 0
+      irreversible: 0
+    expected: skip
+    edge: false
+    note: Step 0 SPEC
+  - input:
+      live: 3
+      superseded: 0
+      irreversible: 0
+    expected: skip
+    edge: false
+    note: ''
+  - input:
+      live: 8
+      superseded: 0
+      irreversible: 0
+    expected: skip
+    edge: true
+    note: boundary
+  - input:
+      live: 9
+      superseded: 0
+      irreversible: 0
+    expected: run
+    edge: true
+    note: boundary
+  - input:
+      live: 20
+      superseded: 0
+      irreversible: 0
+    expected: run
+    edge: false
+    note: ''
+  - input:
+      live: 8
+      superseded: 3
+      irreversible: 0
+    expected: skip
+    edge: true
+    note: 11 ACs, 8 in force
+  - input:
+      live: 9
+      superseded: 3
+      irreversible: 0
+    expected: run
+    edge: true
+    note: ''
+  - input:
+      live: 5
+      superseded: 0
+      irreversible: 2
+    expected: skip
+    edge: false
+    note: irreversible decisions do not change it
+  - input:
+      live: 9
+      superseded: 0
+      irreversible: 2
+    expected: run
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The rows are the criterion the DRI chose (DRI card 2026-11-10:
+    at most 8 ACs, irreversible decisions do not matter), written here before the
+    function exists; the boundary 8/9 comes from the measured range (36 bench SPECs
+    of 2-8 ACs), not from the code.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: check --all prints the verdict
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p5_validator.py::test_ac_002_check_prints_the_verdict
+  executable_predicate: one_line(out(valid_3ac)) and keys(out(valid_3ac)) == before_keys(valid_3ac)
+    | {"validator"} and json(out(valid_3ac))["validator"] == "skip" and json(out(valid_9ac))["validator"]
+    == "run" and keys(out(failing_gate_9ac)) == before_keys(failing_gate_9ac) | {"validator"}
+    and json(out(failing_gate_9ac))["validator"] == "run" and keys(out(unloadable))
+    == before_keys(unloadable) and all(without_validator(out(f)) == before(f) and
+    exit(f) == before_exit(f) for f in (valid_3ac, valid_9ac, failing_gate_9ac, unloadable))
+  golden_table: []
+  rubric_id: null
+  note: failing_gate_9ac loads but fails cross-validate, so it prints the long form
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The expected verdict per fixture is AC-001's golden table applied
+    by hand to the fixture's AC count. before(f) is the output of the unchanged code
+    on the same fixture, captured at spec time and stored with the test, so everything
+    except the new key is compared with a reference the changed code did not produce.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the stage and the agent state the new rule and the stage does not grow
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p5_templates.py::test_ac_003_stage_states_the_rule_and_does_not_grow
+  - tests/unit/test_hm_cost_p5_templates.py::test_ac_003_agent_triggers_state_the_rule_and_do_not_grow
+  executable_predicate: 'all("Approve this SPEC and end interview" in step_2(r) and
+    "Approve after spec-validator" in step_2(r) and ''"validator": "run"'' in body_4_6(r)
+    and "Approve after spec-validator" in body_4_6(r) and "Step 0" not in body_4_6(r)
+    and "irreversible_decisions: []" not in body_4_6(r) and len(r) <= len(stage_at_fe6fada6(target))
+    and "Approve after spec-validator" in triggers(agent(target)) and "validator"
+    in triggers(agent(target)) and "run" in triggers(agent(target)) and "declares
+    or implies an irreversible decision" not in agent(target) and len(agent(target))
+    <= len(agent_at_fe6fada6(target)) for target, r in rendered_spec_stage(("claude-code",
+    "codex")))'
+  golden_table: []
+  rubric_id: null
+  note: body_4_6 excludes the heading line, which already contains 'spec-validator'
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The size references are the same renders from the templates at
+    main fe6fada6, read from git by the test, not numbers produced by the changed
+    templates. The required tokens are the CLI's printed field (AC-002) and the label
+    the DRI chose on the card.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: the sensitivity registry carries the measurement and the same threshold
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p5_templates.py::test_ac_004_registry_carries_the_measurement_and_the_threshold
+  executable_predicate: entry("spec", "Step 4.6").cls == "TUNE" and "n=" in entry("spec",
+    "Step 4.6").evidence and "Side-preset only" in entry("spec", "Step 4.6").evidence
+    and f"≤ {spec_machine.VALIDATOR_SKIP_MAX_ACS} live ACs" in entry("spec", "Step
+    4.6").note and "conditional on irreversible decisions" not in entry("spec", "Step
+    4.6").note and "hm-novalidator" in entry("spec", "Step 4.6").measure_cmd and spec_machine.VALIDATOR_SKIP_MAX_ACS
+    == 8
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The threshold 8 is the DRI's (DRI card 2026-11-10); the n and preset
+    wording is the registry's existing convention for TUNE numbers (CLAUDE.md, Step
+    sensitivity classes); the measure command is the one that produced the A/B rows
+    in docs/evals.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: the bench judges against target 8
+  type: parametric
+  test_ids:
+  - tests/unit/test_hm_cost_p5_target.py::test_summarize_judges_against_target_8
+  - tests/unit/test_hm_cost_p5_target.py::test_ac_005_target_is_8_everywhere_it_is_mirrored
+  - tests/unit/test_hm_cost_p5_target.py::test_ac_005_report_pin_moved_by_the_substitution_only
+  executable_predicate: null
+  golden_table:
+  - input:
+      plain: 1.0
+      hm: 7.999
+      hm_pass_below_plain: false
+    expected:
+      verdict: met
+      ratio: 7.999
+    edge: false
+    note: ''
+  - input:
+      plain: 1.0
+      hm: 8.0
+      hm_pass_below_plain: false
+    expected:
+      verdict: met
+      ratio: 8.0
+    edge: true
+    note: inclusive boundary
+  - input:
+      plain: 1.0
+      hm: 8.004
+      hm_pass_below_plain: false
+    expected:
+      verdict: missed
+      ratio: 8.004
+    edge: true
+    note: 3 places, not rounded to 8.0
+  - input:
+      plain: 1.0
+      hm: 5.4
+      hm_pass_below_plain: false
+    expected:
+      verdict: met
+      ratio: 5.4
+    edge: false
+    note: missed under target 5
+  - input:
+      plain: 1.0
+      hm: 6.0
+      hm_pass_below_plain: true
+    expected:
+      verdict: missed
+      ratio: 6.0
+    edge: true
+    note: the guard still decides
+  rubric_id: null
+  note: 'also asserted, outside the table: TARGET == intent target == 8; each pinned
+    report text under tests/unit/fixtures/hm_eval == git show fe6fada6:<path> with
+    ''target 5'' replaced by ''target 8''; committed RESULTS.md / README block ==
+    publish(committed rows)'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Target 8 is the DRI's (DRI card 2026-11-10); each row's verdict
+    is the intent's rule (ratio <= target and hm pass rate >= plain) worked by hand.
+    The pinned report texts are checked against the base commit's content with one
+    substitution, read from git, so a regenerated fixture cannot pass by agreeing
+    with itself.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: the tier-1 re-run is measured against the 8.0x bar and its result recorded
+  type: mechanical
+  test_ids:
+  - tests/integration/test_hm_cost_p5_bar.py::test_ac_006_tier1_result_recorded
+  executable_predicate: all(b.complete == mechanically_complete(b.rows) for b in batches)
+    and counted == first(b for b in batches if mechanically_complete(b.rows)) and
+    arms(counted) == {"plain", "hm"} and all(r.model == "claude-sonnet-5-5" for r
+    in counted.rows) and spec_recorded == (summarize(counted)["verdict"], summarize(counted).get("ratio"))
+    and p4_bar_test_reads(history / 'hm-cost-p4.jsonl')
+  golden_table: []
+  rubric_id: null
+  note: 'mechanically_complete(rows): every (tier-1 task, arm) cell has exactly 3
+    rows, none with an unusable status'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The bar was pre-registered by the DRI (DRI card 2026-11-10) before
+    any code; the rows come from the bench runner, not from the code under test; the
+    first complete batch counts, so a rerun cannot replace a miss. Completeness is
+    recomputed from the rows (3 usable rows per task and arm), so the fixture's own
+    flag cannot set a batch aside.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: the HM-LIGHT-LANE objective states target 8 and its approval is valid
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p5_target.py::test_ac_007_objective_states_target_8_and_is_approved
+  executable_predicate: all(t in doc for t in ("22 → 8 이하", "8배 이하", "배수 ≤ 8", "배수
+    > 8")) and not any(t in doc for t in ("5 이하", "5배", "≤ 5", "> 5", "light 에서도 돈다"))
+    and "AC 8개 이하 SPEC 은 기본 생략, 승인 때 DRI 가 고르면 실행" in doc and frontmatter(doc)["approval"]["approved_target"]
+    == 8 and derive(world, "HM-LIGHT-LANE").approval_valid is True
+  golden_table: []
+  rubric_id: null
+  note: doc = intent/HM-LIGHT-LANE.md as committed
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: 'Validity is world.derive''s own check (approval hash against the
+    metric''s current target), existing code this task does not change; the texts
+    are the DRI''s target (DRI card 2026-11-10) written out. The re-stamp is the DRI''s:
+    hm intent approve HM-LIGHT-LANE.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: hm spec_machine check --all output gains a validator field with values
+    skip and run
+  category: public API/CLI contract
+  rationale: the spec stage reads it; additive, but a consumer that pins the exact
+    one-line output sees a new key
+  source: spec
+approval:
+  kind: human
+  content_hash: 6bff637274931839fb0540a656ca7f8a07785f23617ab99493df0c78cc2d023c
+  approved_by: Ecro
+  approved_at: '2026-11-10T12:57:49Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 1156347449cf1e328dbace1f969a45c61326f71aadde34a766cf9b2c91bac361
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: f5155f37b72efc5106023dcfbef8642c78aee4d1ad2b62be92f2ab87b3ee57c3
+    AC-001: 8c3a9eb1a21ee555604f7da2eca010dee6d6559ec9424425fac07a3bb5e84f1d
+    AC-002: d417d060623419fced6ddabb6502045718b13a60b6908c2dfb8d3c86e9dd7a49
+    AC-003: 1e449f09876a51e8b15e0c1a9e30226f08d25920c2607adb11540d0fd4306fa5
+    AC-004: 0475da42c1c4f3b6ad5520409683ebad2dfdd84f5af079810a693015878f0b03
+    AC-005: e0eacc4e427f8cfa8f280108e9d27e57e7024660c93421b558585d5b7f35f6bd
+    AC-006: 9337cce40c17b4f7c6a809fdab5d1ecd4ebd26a49fe48732971c68af5afcddb4
+    AC-007: 459f64aa4a6382b261de1037a2ae794d121e2ed0902c6f4841275a3a481b2de2
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c

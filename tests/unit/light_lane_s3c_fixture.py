@@ -518,15 +518,17 @@ def run_check(fixture: str, strictness: str, kind: str | None) -> tuple[int, str
 
 
 def _without_approval(out: str) -> str:
-    """Drop SPEC-hm-cost-p2's additive `approval` key (IRR-003): these goldens pin the quiet
-    contract of a7403f2f, which the new key does not change."""
+    """Drop the additive keys later SPECs gave the output (`approval`: hm-cost-p2 IRR-003;
+    `validator`: hm-cost-p5 IRR-001): these goldens pin the quiet contract of a7403f2f, which
+    neither key changes."""
     try:
         payload = json.loads(out)
     except ValueError:
         return out
-    if not isinstance(payload, dict) or "approval" not in payload:
+    if not isinstance(payload, dict) or not {"approval", "validator"} & set(payload):
         return out
-    payload.pop("approval")
+    payload.pop("approval", None)
+    payload.pop("validator", None)
     return json.dumps(payload, ensure_ascii=False) + "\n"
 
 

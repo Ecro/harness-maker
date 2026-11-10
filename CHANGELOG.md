@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+Cost phase 5 (SPEC-hm-cost-p5): spec-validator is skipped by default on a SPEC of at most 8 live ACs, and
+the HM-LIGHT-LANE cost target is 8x (was 5x). Tier-1 transcript ratio 10.24 -> 7.56 against the pre-registered
+8.0 bar (met); hidden tests 15/15 in both arms.
+
+### Changed
+
+- **`hm spec_machine check --all` prints `"validator": "skip"` or `"run"`** (additive key; absent when
+  the yaml does not load). `skip` at 8 live ACs or fewer. `/hm:spec` Step 4.6 runs spec-validator on
+  `run`, or when the DRI picks the new approval choice **"Approve after spec-validator"**. Measured on
+  36 bench SPECs of 2-8 ACs: the step cost 1.8-2.6x of a plain run with no difference in hidden tests
+  or judge score; the bench cannot show what it catches, and on two real SPECs in this repository it
+  changed the SPEC both times, which is why the choice stays one tap away.
+- **Cost target 8x.** `.claude/intent.yaml` `hm_cost_ratio_small.target`, the bench's `TARGET`, the
+  report verdict text and the HM-LIGHT-LANE objective (re-approved) all say 8.
+
 Cost phase 4 (SPEC-hm-cost-p4): tier-1 transcript ratio 11.36 -> 10.24, short of the pre-registered 10.0
 bar (recorded). New lint and type errors per hm run 1.60 -> 0.73.
 

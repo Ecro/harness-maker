@@ -560,7 +560,9 @@ def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType, tmp_path: Path
     there when #30 added wall time to the headline). The runner_hash pins moved on purpose with
     SPEC-hm-eval-scripted-dri: the hm arm's turn script is a new runner setting (S8). The report
     and scorecard pins read the eval-3 rows as committed in db19f023, so publishing a new run
-    does not move them; only a change to the report code does."""
+    does not move them; only a change to the report code does. SPEC-hm-cost-p5 moved the report
+    pin from a082ce5d4abd734b by one substitution, "target 5" -> "target 8" (asserted in
+    test_hm_cost_p5_target.py); the scorecard carries no target and did not move."""
     assert bench.bench_hash() == "569e17ef29ab"
     assert bench.tier2_hash() == "1cf707c57e12"
     tools = {"ruff": "r", "mypy": "m"}
@@ -583,7 +585,7 @@ def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType, tmp_path: Path
     (tmp_path / "results.jsonl").write_text(eval3, encoding="utf-8")
     rows = bench.read_rows(tmp_path)
     report = hashlib.sha256(bench.report_text(rows).encode()).hexdigest()[:16]
-    assert report == "a082ce5d4abd734b"
+    assert report == "f9f464ebaeba81c1"
     card = json.dumps(bench.scorecard(rows), sort_keys=True)
     assert hashlib.sha256(card.encode()).hexdigest()[:16] == "4a9d0dc59df6770c"
 

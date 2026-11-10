@@ -355,6 +355,24 @@ def load(path: Path) -> SpecMachine:
     return SpecMachine.model_validate(data)
 
 
+#: The largest SPEC the advisory critic's A/B covered (36 bench SPECs of 2-8 ACs,
+#: SPEC-hm-cost-p5). Nothing above it was measured, so nothing above it is skipped.
+#: `step_sensitivity` names it.
+VALIDATOR_SKIP_MAX_ACS = 8
+
+
+def validator_verdict(model: SpecMachine) -> Literal["skip", "run"]:
+    """Whether `/hm:spec` runs its advisory critic by default (SPEC-hm-cost-p5 AC-001).
+
+    Computed here so the stage reads one printed field: a rule left in the stage's prose is
+    the kind the model was measured not to apply. Live ACs only, so a long-lived SPEC is
+    judged by what is in force. The DRI can still ask for the pass on a `skip`. This decides
+    a dispatch, never an approval: `approve` takes no input from the critic.
+    """
+    live = sum(1 for ac in model.ac if not ac.superseded_by)
+    return "skip" if live <= VALIDATOR_SKIP_MAX_ACS else "run"
+
+
 #: AST node types that make a predicate "assertable" — an oracle, not a label.
 #: A bare Name ("retries") or Constant ("True") is a tautology, never an oracle.
 _ASSERTABLE_PREDICATE_NODES = (ast.Compare, ast.BoolOp, ast.Call, ast.UnaryOp)
@@ -1758,12 +1776,14 @@ def _run_check_all(args: argparse.Namespace) -> int:
 
     loaded = True
     validate_errors: list[str]
+    verdict: dict[str, str] = {}
     try:
         model = load(args.yaml_path)
     except Exception as e:  # noqa: BLE001 — an unloadable yaml is a reportable verdict
         loaded = False
         validate_errors = _load_error_lines(e, args.yaml_path)
     else:
+        verdict = {"validator": validator_verdict(model)}
         # Separate from the load: a validator exception is not a load failure, and must not
         # replace cross-validate's own errors with the load placeholder below.
         try:
@@ -1826,6 +1846,7 @@ def _run_check_all(args: argparse.Namespace) -> int:
         if quality_weak:
             line["weak_dimensions"] = quality_block["weak_dimensions"]
             line["low_dimensions"] = quality_block["low_dimensions"]
+        line.update(verdict)
         line["approval"] = _check_approval(args)
         print(json.dumps(line, ensure_ascii=False))
         return 0
@@ -1835,6 +1856,7 @@ def _run_check_all(args: argparse.Namespace) -> int:
         "validate": {"ok": not validate_errors, "errors": validate_errors},
         "cross_validate": {"ok": not cross_errors, "errors": cross_errors, "by_rule": by_rule},
         "quality": quality_block,
+        **verdict,
         "approval": _check_approval(args),
     }
     print(json.dumps(payload, ensure_ascii=False))

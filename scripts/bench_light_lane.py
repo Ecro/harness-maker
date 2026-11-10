@@ -58,7 +58,7 @@ BENCH_ID = "hm-light-lane"
 METRIC_ID = "hm_cost_ratio_small"
 # Mirrors `.claude/intent.yaml` metric `hm_cost_ratio_small` (target, lower is better);
 # test_target_matches_the_intent_metric keeps the two equal.
-TARGET = 5.0
+TARGET = 8.0
 TARGET_EPS = 1e-9  # float noise in a mean of means must not flip an inclusive `<=`
 SUSPECT_GAP = 0.2  # CLI and transcript ratios further apart than this are not trusted
 ARMS = ("plain", "hm")
