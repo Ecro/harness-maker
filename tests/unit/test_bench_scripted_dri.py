@@ -584,7 +584,7 @@ def test_runner_hash_covers_the_turn_script(
             patch.setattr(bench, name, changed)
             assert _base_hash(bench) != base, name
     assert _base_hash(bench) == base
-    assert bench.bench_hash() == "569e17ef29ab"
+    assert bench.bench_hash() == "92672094f80e"
     assert bench.tier2_hash() == "1cf707c57e12"
 
 

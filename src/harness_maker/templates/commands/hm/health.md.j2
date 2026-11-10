@@ -18,7 +18,7 @@ evidence showed 91% noise on a representative run.
 ## Run
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm cli health . --session-id "$HM_SESSION_ID" --json-output .claude/observability/.health.tmp.json
+!uv run --no-project --with {{ harness_maker_src_path }} hm cli health . --session-id "$HM_SESSION_ID" --json-output .claude/observability/.health.tmp.json
 ```
 
 Then read `.claude/observability/dashboard.md` to inspect the two sections.
@@ -32,11 +32,11 @@ and never deletes unmerged work — preserved branches surface as a count only.
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm worktree drain .")
+Bash("uv run --no-project --with {{ harness_maker_src_path }} hm worktree drain .")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm worktree drain .
+!uv run --no-project --with {{ harness_maker_src_path }} hm worktree drain .
 ```
 {% endif %}
 
@@ -69,7 +69,7 @@ the Step 4 filter cannot consume). The `reason` field names which.
 ### {{ model }}
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --model {{ model }} --smoke --slug health-smoke --stage health
+!uv run --no-project --with {{ harness_maker_src_path }} hm second_opinion_invoke --model {{ model }} --smoke --slug health-smoke --stage health
 ```
 {% endfor %}
 > **Relay the budget advisory verbatim; never judge latency yourself.** If stderr has a
@@ -100,7 +100,7 @@ lifetime. This is the inverse check. It must probe at RUN time — a render-time
 freeze at install and go stale the moment a CLI is added.
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm cli detect-tools --json
+!uv run --no-project --with {{ harness_maker_src_path }} hm cli detect-tools --json
 ```
 
 If the command is missing, exits non-zero, or its output does not parse: print nothing and
@@ -119,7 +119,7 @@ looks exactly like "this project has no history". Measures the INSTRUMENT, never
 — it must never carry a cost threshold, and it feeds no readiness dimension.
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm economics doctor --root .
+!uv run --no-project --with {{ harness_maker_src_path }} hm economics doctor --root .
 ```
 
 Report the JSON as a Layer 1 ActionItem:
@@ -137,7 +137,7 @@ Report the JSON as a Layer 1 ActionItem:
 ## Delivery-metrics narrative (1-2 lines, no score impact)
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm delivery_metrics trend --root . --limit 1
+!uv run --no-project --with {{ harness_maker_src_path }} hm delivery_metrics trend --root . --limit 1
 ```
 
 Surface ONE narrative line from the newest snapshot: CFR as raw `failed/total`

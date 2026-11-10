@@ -225,7 +225,12 @@ def test_ac_003_rerender_keeps_a_user_extended_group(
     _rerender(project, tmp_path / "home")
     for rel in HOOK_FILES:
         groups = _hooks(project / rel)[FLUSH_EVENT[rel]]
-        assert before[rel] in groups, (rel, groups)
+        # Kept as the user left it, except that a harness-maker command in it now carries
+        # `--no-project` (SPEC-pipeline-env-fixes AC-008).
+        kept = json.loads(
+            json.dumps(before[rel]).replace("uv run --with ", "uv run --no-project --with ")
+        )
+        assert kept in groups, (rel, groups)
 
 
 def _allowed_tools(text: str) -> list[str]:

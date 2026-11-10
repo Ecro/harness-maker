@@ -1,0 +1,244 @@
+{
+  "AC-003": [
+    {
+      "expected": {
+        "reason": null,
+        "runner": [
+          "<root>/.venv/bin/python",
+          "-m",
+          "pytest"
+        ]
+      },
+      "input": {
+        "commands": [
+          "uv run pytest -q"
+        ],
+        "venv": "with_pytest"
+      }
+    },
+    {
+      "expected": {
+        "reason": null,
+        "runner": [
+          "uv",
+          "run",
+          "pytest"
+        ]
+      },
+      "input": {
+        "commands": [
+          "uv run pytest -q"
+        ],
+        "venv": "without_pytest"
+      }
+    },
+    {
+      "expected": {
+        "reason": null,
+        "runner": [
+          "uv",
+          "run",
+          "--with",
+          "pytest",
+          "pytest"
+        ]
+      },
+      "input": {
+        "commands": [
+          "uv run --with pytest pytest -q tests"
+        ],
+        "venv": "none"
+      }
+    },
+    {
+      "expected": {
+        "reason": null,
+        "runner": [
+          "python",
+          "-m",
+          "pytest"
+        ]
+      },
+      "input": {
+        "commands": [
+          "python -m pytest -q"
+        ],
+        "venv": "none"
+      }
+    },
+    {
+      "expected": {
+        "reason": null,
+        "runner": [
+          "uv",
+          "run",
+          "--with-editable",
+          ".",
+          "--group",
+          "pytest",
+          "pytest"
+        ]
+      },
+      "input": {
+        "commands": [
+          "uv run --with-editable . --group pytest pytest -x"
+        ],
+        "venv": "none"
+      }
+    },
+    {
+      "expected": {
+        "reason": "<root>/.venv/bin/python has no pytest and no gate command runs pytest; install pytest there (uv: add it to a dependency group; if uv.lock is not yours, `git rm uv.lock`)",
+        "runner": null
+      },
+      "input": {
+        "commands": [
+          "ruff check ."
+        ],
+        "venv": "without_pytest"
+      }
+    },
+    {
+      "expected": {
+        "reason": "no pytest runner",
+        "runner": null
+      },
+      "input": {
+        "commands": [],
+        "venv": "none"
+      }
+    }
+  ],
+  "AC-004": [
+    {
+      "expected": {
+        "python": "<root>/.venv/bin/python",
+        "reason": null,
+        "uv_calls": [
+          [
+            "uv",
+            "sync",
+            "--frozen",
+            "--inexact"
+          ]
+        ]
+      },
+      "input": {
+        "lock": "tracked",
+        "uv_on_path": true,
+        "venv": false
+      }
+    },
+    {
+      "expected": {
+        "python": "<root>/.venv/bin/python",
+        "reason": null,
+        "uv_calls": [
+          [
+            "uv",
+            "sync",
+            "--frozen",
+            "--inexact"
+          ]
+        ]
+      },
+      "input": {
+        "lock": "tracked",
+        "uv_on_path": true,
+        "venv": true
+      }
+    },
+    {
+      "expected": {
+        "python": null,
+        "reason": "no .venv/bin/python in <root> (a worktree does not share the main checkout's .venv); hm creates one only for a tracked uv.lock",
+        "uv_calls": []
+      },
+      "input": {
+        "lock": "untracked",
+        "uv_on_path": true,
+        "venv": false
+      }
+    },
+    {
+      "expected": {
+        "python": null,
+        "reason": "no .venv/bin/python in <root> (a worktree does not share the main checkout's .venv); hm creates one only for a tracked uv.lock",
+        "uv_calls": []
+      },
+      "input": {
+        "lock": "absent",
+        "uv_on_path": true,
+        "venv": false
+      }
+    },
+    {
+      "expected": {
+        "python": "<root>/.venv/bin/python",
+        "reason": null,
+        "uv_calls": []
+      },
+      "input": {
+        "lock": "absent",
+        "uv_on_path": true,
+        "venv": true
+      }
+    },
+    {
+      "expected": {
+        "python": null,
+        "reason": "no .venv/bin/python in <root>; uv.lock is tracked but uv is not on PATH",
+        "uv_calls": []
+      },
+      "input": {
+        "lock": "tracked",
+        "uv_on_path": false,
+        "venv": false
+      }
+    },
+    {
+      "expected": {
+        "python": "<root>/.venv/bin/python",
+        "reason": null,
+        "uv_calls": []
+      },
+      "input": {
+        "lock": "tracked",
+        "uv_on_path": false,
+        "venv": true
+      }
+    },
+    {
+      "expected": {
+        "python": null,
+        "reason": "no .venv/bin/python in <root> (a worktree does not share the main checkout's .venv); hm creates one only for a tracked uv.lock",
+        "uv_calls": []
+      },
+      "input": {
+        "lock": "present_outside_git",
+        "uv_on_path": true,
+        "venv": false
+      }
+    },
+    {
+      "expected": {
+        "python": null,
+        "reason": "uv sync --frozen failed in <root>: <last output line>",
+        "uv_calls": [
+          [
+            "uv",
+            "sync",
+            "--frozen",
+            "--inexact"
+          ]
+        ]
+      },
+      "input": {
+        "lock": "tracked",
+        "uv_exit": 2,
+        "uv_on_path": true,
+        "venv": false
+      }
+    }
+  ]
+}

@@ -35,7 +35,7 @@ hm intent close <id> --observed <met|missed|no_data> --note-file
 hm intent show <id> --json
 ```
 
-Prefix each with `uv run --with {{ harness_maker_src_path }}` as every other mandated call
+Prefix each with `uv run --no-project --with {{ harness_maker_src_path }}` as every other mandated call
 in this harness does. `--observed-at` is a timezone-aware ISO-8601 timestamp and defaults to now; `supersedes`
 needs `--claim-file`; `close` needs both `--observed` and `--note-file`. Each `-file` flag takes a path (list flags: one item per line); `-` reads stdin, for scripted callers only — agents always write free text to a file.
 `--locator <path:A-B>` cites at most 40 lines of this checkout by content; `status --json` then

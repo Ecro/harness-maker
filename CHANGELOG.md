@@ -24,8 +24,27 @@ bar (recorded). New lint and type errors per hm run 1.60 -> 0.73.
   raised ImportError on projects without `pythonpath` and reported every test as unresolved. A failed
   collect is now reported as such instead of "no test named ...".
 
+- **harness-maker no longer creates `.venv` or `uv.lock` in your project** (SPEC-pipeline-env-fixes).
+  Every rendered invocation — the stage `hm` prefix, hooks, skills, commands — is now
+  `uv run --no-project --with <plugin> …`. In a Python project that is not uv-managed the old spelling
+  left an untracked `uv.lock` that made `hm worktree task-land` refuse forever, and a pytest-less `.venv`
+  that `hm check` then picked. Re-render (`/hm:make --update`): hooks move to the new spelling, including
+  ones kept inside your own hook groups, and the old-spelling `permissions.allow` grants are pruned.
+- **`hm check` picks an interpreter that can run pytest, or says why not.** One rule decides the project
+  interpreter: `.venv/bin/python` in the checked directory; a project that tracks `uv.lock` gets
+  `uv sync --frozen --inexact` first. A `.venv` without pytest is skipped in favour of a gate command
+  that runs pytest; a runner that never wrote a JUnit report is `error` with its last output, not
+  `deselected`; `uv run --with pytest pytest` is no longer cut at the option value. A worktree does not
+  borrow the main checkout's `.venv`. Gate subprocesses get `<root>/.venv/bin` first on `PATH`.
+- **`hm worktree task-preflight` and `task-refresh` work from inside the task worktree**: a linked
+  worktree given as the base resolves to its main checkout instead of nesting a second worktree.
+- `/hm:wrapup` names what to do on `hm check` exit 2, and its `hm intent question observe` example
+  includes the required `--relation`.
+
 ### Internal
 
+- The bench fixture commits a `uv.lock`, so the hm arm keeps getting a `.venv` under the new prefix.
+  `bench_hash` moves `569e17ef29ab` → `92672094f80e`; the task bytes are unchanged.
 - Bench arm `hm-novalidator` (hm with the spec command's spec-validator step removed) for A/B runs; it
   measured 7.67x on tier 1 with the same pass rate. The p3 rows moved to `docs/evals/history/hm-cost-p3.jsonl`.
 

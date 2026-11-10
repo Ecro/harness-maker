@@ -1,0 +1,551 @@
+schema_version: 3
+spec_slug: pipeline-env-fixes
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: every harness-maker invocation hm emits carries --no-project
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_001_rendered_invocations_carry_no_project[Side]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_001_rendered_invocations_carry_no_project[Production]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_001_plugin_root_and_gate_remedy
+  executable_predicate: all("uv run --with" not in text and count(text, "uv run --no-project
+    --with") == count_harness_invocations(text) for text in rendered_files(arm) +
+    plugin_root_files() for arm in ARMS) and "uv run --no-project --with" in worktree_gate_remedy()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected spelling is uv's documented flag (`uv run --help`
+    lists `--no-project`); the test scans rendered bytes, the committed plugin-root
+    files and the gate's printed remedy, and never calls the code that builds the
+    prefix.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: hm calls leave a project without a tracked uv.lock clean and landable
+  type: mechanical
+  test_ids:
+  - tests/integration/test_pipeline_env_fixes_uv.py::test_ac_002_project_without_a_tracked_lock_stays_clean_and_lands
+  executable_predicate: 'all(path.startswith(".claude/") for path in porcelain(base))
+    and porcelain(worktree) == [] and not exists(base / ".venv") and not exists(worktree
+    / ".venv") and "tracked uv.lock" in check_reason and outcome_with_worktree_venv
+    == "failed" and task_land_exit == 0 and head_subject(base) == "feat: demo"'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is git itself (`git status --porcelain`, `git log`)
+    on a real temp project driven through the real uv binary and the prefix read from
+    a rendered stage; on 0.65.3 the same walk shows `?? uv.lock` and task-land exits
+    1, which was reproduced by hand before any change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: pytest_runner picks a runner that can run pytest
+  type: parametric
+  test_ids:
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_003_runner_rows[AC-003-0]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_003_runner_rows[AC-003-1]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_003_runner_rows[AC-003-2]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_003_runner_rows[AC-003-3]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_003_runner_rows[AC-003-4]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_003_runner_rows[AC-003-5]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_003_runner_rows[AC-003-6]
+  executable_predicate: null
+  golden_table:
+  - input:
+      venv: with_pytest
+      commands:
+      - uv run pytest -q
+    expected:
+      runner:
+      - <root>/.venv/bin/python
+      - -m
+      - pytest
+      reason: null
+    edge: false
+    note: ''
+  - input:
+      venv: without_pytest
+      commands:
+      - uv run pytest -q
+    expected:
+      runner:
+      - uv
+      - run
+      - pytest
+      reason: null
+    edge: false
+    note: ''
+  - input:
+      venv: none
+      commands:
+      - uv run --with pytest pytest -q tests
+    expected:
+      runner:
+      - uv
+      - run
+      - --with
+      - pytest
+      - pytest
+      reason: null
+    edge: false
+    note: ''
+  - input:
+      venv: none
+      commands:
+      - python -m pytest -q
+    expected:
+      runner:
+      - python
+      - -m
+      - pytest
+      reason: null
+    edge: false
+    note: ''
+  - input:
+      venv: none
+      commands:
+      - uv run --with-editable . --group pytest pytest -x
+    expected:
+      runner:
+      - uv
+      - run
+      - --with-editable
+      - .
+      - --group
+      - pytest
+      - pytest
+      reason: null
+    edge: false
+    note: ''
+  - input:
+      venv: without_pytest
+      commands:
+      - ruff check .
+    expected:
+      runner: null
+      reason: '<root>/.venv/bin/python has no pytest and no gate command runs pytest;
+        install pytest there (uv: add it to a dependency group; if uv.lock is not
+        yours, `git rm uv.lock`)'
+    edge: true
+    note: ''
+  - input:
+      venv: none
+      commands: []
+    expected:
+      runner: null
+      reason: no pytest runner
+    edge: true
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each row is worked by hand from the command lines' own grammar
+    (uv's value-taking options, `python -m`), not from pytest_runner's output; the
+    third row is the mis-parse recorded in project memory on 2026-10-17, and the venv
+    states are real directories whose interpreter does or does not import pytest.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: one owner decides the interpreter, and uv runs only for a tracked uv.lock
+  type: parametric
+  test_ids:
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_interpreter_rows[AC-004-0]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_interpreter_rows[AC-004-1]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_interpreter_rows[AC-004-2]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_interpreter_rows[AC-004-3]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_interpreter_rows[AC-004-4]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_interpreter_rows[AC-004-5]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_interpreter_rows[AC-004-6]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_interpreter_rows[AC-004-7]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_interpreter_rows[AC-004-8]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_004_failed_sync_is_the_reason_on_the_ac_path
+  executable_predicate: null
+  golden_table:
+  - input:
+      lock: tracked
+      uv_on_path: true
+      venv: false
+    expected:
+      uv_calls:
+      - - uv
+        - sync
+        - --frozen
+        - --inexact
+      python: <root>/.venv/bin/python
+      reason: null
+    edge: false
+    note: ''
+  - input:
+      lock: tracked
+      uv_on_path: true
+      venv: true
+    expected:
+      uv_calls:
+      - - uv
+        - sync
+        - --frozen
+        - --inexact
+      python: <root>/.venv/bin/python
+      reason: null
+    edge: false
+    note: ''
+  - input:
+      lock: untracked
+      uv_on_path: true
+      venv: false
+    expected:
+      uv_calls: []
+      python: null
+      reason: no .venv/bin/python in <root> (a worktree does not share the main checkout's
+        .venv); hm creates one only for a tracked uv.lock
+    edge: false
+    note: ''
+  - input:
+      lock: absent
+      uv_on_path: true
+      venv: false
+    expected:
+      uv_calls: []
+      python: null
+      reason: no .venv/bin/python in <root> (a worktree does not share the main checkout's
+        .venv); hm creates one only for a tracked uv.lock
+    edge: false
+    note: ''
+  - input:
+      lock: absent
+      uv_on_path: true
+      venv: true
+    expected:
+      uv_calls: []
+      python: <root>/.venv/bin/python
+      reason: null
+    edge: false
+    note: ''
+  - input:
+      lock: tracked
+      uv_on_path: false
+      venv: false
+    expected:
+      uv_calls: []
+      python: null
+      reason: no .venv/bin/python in <root>; uv.lock is tracked but uv is not on PATH
+    edge: true
+    note: ''
+  - input:
+      lock: tracked
+      uv_on_path: false
+      venv: true
+    expected:
+      uv_calls: []
+      python: <root>/.venv/bin/python
+      reason: null
+    edge: true
+    note: ''
+  - input:
+      lock: present_outside_git
+      uv_on_path: true
+      venv: false
+    expected:
+      uv_calls: []
+      python: null
+      reason: no .venv/bin/python in <root> (a worktree does not share the main checkout's
+        .venv); hm creates one only for a tracked uv.lock
+    edge: true
+    note: ''
+  - input:
+      lock: tracked
+      uv_on_path: true
+      venv: false
+      uv_exit: 2
+    expected:
+      uv_calls:
+      - - uv
+        - sync
+        - --frozen
+        - --inexact
+      python: null
+      reason: 'uv sync --frozen failed in <root>: <last output line>'
+    edge: true
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The rows restate the DRI's round-2 decision as a truth table over
+    three observable facts in a real temp git repo; the test reads the uv argv and
+    cwd from a recorder on PATH, and separately asserts that gate_commands, pytest_runner
+    and verification_cache return the row's interpreter or reason.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: a runner that wrote no JUnit file reports error with the cause
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_005_runner_without_junit_is_error
+  executable_predicate: run_tests(root, pytestless_runner, [tid])[tid].outcome ==
+    "error" and "No module named pytest" in run_tests(root, pytestless_runner, [tid])[tid].detail
+    and run_tests(root, working_runner_with_deselect, [tid])[tid].outcome == "deselected"
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected text is CPython's own message for `python -m pytest`
+    without the package, produced by a real interpreter started without site-packages;
+    the deselected leg uses pytest's own `--deselect` on a test that exists in its
+    file.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: preflight and refresh work from inside a task worktree
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_006_preflight_and_refresh_from_inside_the_worktree
+  executable_predicate: exit_code == 0 and stdout_path == git_worktree_path("hm/"
+    + slug) and porcelain(worktree) == [] and session_registered_under(main_checkout)
+    and refresh_base == main_checkout
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is `git worktree list --porcelain` and `git status
+    --porcelain` in a real temp repo; on 0.65.3 the same call exits 1 with a nested
+    `git worktree add`, reproduced by hand before any change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: wrapup's text covers exit 2 and its observe example parses
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_007_wrapup_exit_2_and_observe_example[False]
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_007_wrapup_exit_2_and_observe_example[True]
+  executable_predicate: exit_clause(wrapup, 2) == exit_clause(execute, 2) and all(required_options(observe_parser)
+    <= options_in(example) for example in observe_examples(rendered_stages))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The references are execute's own rendered exit-2 clause and the
+    real argparse parser of `hm intent question observe` (its required options), both
+    independent of the wrapup template under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: a 0.65.3 harness upgrades without duplicates or stale grants
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_008_upgrade_from_0653
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_008_prunes_the_current_refs_old_grant
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_008_rewrites_only_harness_calls_in_a_chained_command
+  executable_predicate: 'hook_counts(after) == {module: 1 for module in harness_hooks}
+    and all("uv run --no-project --with" in cmd for cmd in harness_commands(after))
+    and old_prefix_harness_grants(after) == [] and user_hooks <= commands(after) and
+    "Bash(uv run --with requests pytest:*)" in allow(after) and old_literal_for(current_ref_without_name)
+    not in allow(after)'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fixture is the settings.json and .codex/hooks.json that the
+    released 0.65.3 actually rendered (captured from main 579e719 before any change),
+    so the starting state is not produced by the code under test; the mixed group
+    and the user grant are added by hand.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: the bench still gets an interpreter and its provenance guard accepts the
+    new prefix
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_009_bench_guard_and_fixture
+  executable_predicate: cli_ref(render_with_new_prefix) == checkout_path and raises(CliProvenanceError,
+    check_provenance, stale_render) and "uv.lock" in git_ls_files(built_template("plain"))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is the stage text the renderer emits and `git ls-files`
+    in a template the bench builds; the guard is exercised on real rendered bytes
+    and on a hand-written stale line, as the existing provenance tests do.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: gate subprocesses find the project's own tools first
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_010_gate_subprocess_path
+  - tests/unit/test_pipeline_env_fixes.py::test_ac_010_mutation_gate_gets_the_project_path
+  executable_predicate: path_entries(gate_subprocess_env(root_with_venv))[0] == str(root
+    / ".venv" / "bin") and gate_subprocess_env(root_without_venv)["PATH"] == os.environ["PATH"]
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected PATH is read back by a real child process (`python
+    -c "print(os.environ['PATH'])"`) that the gate starts, not from the function that
+    builds the environment.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Every rendered harness-maker invocation (stage hm prefix, hooks, skills,
+    commands, plugin-root commands/skills/hooks) is spelled `uv run --no-project --with
+    <ref> …`
+  category: public API/CLI contract
+  rationale: The prefix is typed by the model and matched by user permission rules;
+    changing it again costs every user a re-render.
+  source: spec
+- id: IRR-002
+  decision: The rendered permissions.allow grants move to the new prefix and the old-prefix
+    harness grants are pruned on re-render
+  category: security/permission boundary
+  rationale: A grant is a permission boundary; pruning must match only what harness-maker
+    itself rendered.
+  source: spec
+- id: IRR-003
+  decision: task-preflight and task-refresh accept a linked worktree as their base
+    argument and act on its main checkout
+  category: public API/CLI contract
+  rationale: Stage text and user scripts may come to rely on calling them from the
+    worktree.
+  source: spec
+approval:
+  kind: human
+  content_hash: d0106382cc25941e05202652cc4815ce561933a477df16560ae2100ff634ca05
+  approved_by: Claude
+  approved_at: '2026-11-10T12:23:17Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: c35ed5277d7a8586746395023127ed19d748044f74ebc7fe025d9242e0bf8ef9
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 541e4a20895c8f6c97436bac28373485853392bae825a97e4ca031e90c2e8111
+    AC-001: 7447f07c8fd47aeb29c135aedbc92f79ba3988c2417b6903e1345869c56c2e5a
+    AC-002: c3960b626dc3a4f610f52fcb5efd39226b1dddce41e1624e7f2bb9600142ec72
+    AC-003: 02c3ba2e769da5ed2f0a252d783ddf62114754fb76c1819596d7be2d14fa5502
+    AC-004: e20cb40a6dc865d5e2bc23cafe9fd4758fd64bd73df01d14f35c2563c33592e3
+    AC-005: bf08fc82a582a23f4a97f4c6361d10fb53ba85db939133f5a029de82bcf99a4f
+    AC-006: e0e8d665f57d38d8407ecaf828b6333507f8c03bacef24d90cf25777bfd2cded
+    AC-007: 79206fd15b62399f19551d90fc47cd365cdecc2817fc374d3a541039ac5cc6d7
+    AC-008: 735a5c26d2715393d0e2814672bf46dc5c96b54bfcc7f76141011602937f778c
+    AC-009: f0f960d359345f30e2875d8fae7ff33dc3294ddb3bd04683e9d2157bc93711ba
+    AC-010: 69da6a5d04cc38d7ae9d6729aa264aabaede302d78a66c19feaae013407b38b7
+    ac_order: 9197b2c918245ab06ace42d9ff4679ea85b92fa0c38b4938b0bc74e8d2d86aab

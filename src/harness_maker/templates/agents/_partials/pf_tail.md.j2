@@ -6,11 +6,11 @@
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm worktree task-refresh <slug> \"$(pwd)\"")
+Bash("uv run --no-project --with {{ harness_maker_src_path }} hm worktree task-refresh <slug> \"$(pwd)\"")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm worktree task-refresh <slug> "$(pwd)"
+!uv run --no-project --with {{ harness_maker_src_path }} hm worktree task-refresh <slug> "$(pwd)"
 ```
 {% endif %}
 

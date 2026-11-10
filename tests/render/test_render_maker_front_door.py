@@ -31,7 +31,9 @@ _SPEC_YAML = _REPO / "specs/SPEC-maker-front-door-improvements.machine.yaml"
 
 _STAGES = ("research", "spec", "execute", "wrapup")  # four since 0.64.0
 _KNOWLEDGE_SKILLS = ("intent-layer", "project-knowledge")
-_MAKER_CAP = 4500
+# 4 500 + 39: `--no-project ` at Maker's three harness-maker invocations
+# (SPEC-pipeline-env-fixes IRR-001, BASELINE-DELTA-pipeline-env-fixes.md).
+_MAKER_CAP = 4539
 _POINTER_CAP = 400
 _PK_POINTER_CAP = 300
 _TRIGGER_PHRASES = ("invoke when", "use when", "use this when")
@@ -314,7 +316,7 @@ def test_ac004_help_rows_typed_only(
 
 
 # ---------------------------------------------------------------------------
-# AC-005 — Maker reads the procedures on demand, every target, ≤ 4,500 chars
+# AC-005 — Maker reads the procedures on demand, every target, ≤ 4,539 chars
 # ---------------------------------------------------------------------------
 
 _MAKER_ARMS = [
@@ -484,7 +486,7 @@ def test_ac010_injected_command_fail_soft(
         listed = " ".join(tools) if isinstance(tools, list) else str(tools)
         hm = _HM_MEANS.search(text)
         assert hm is not None, "Maker never says what `hm` expands to"
-        assert hm.group(1).startswith("uv run --with "), hm.group(1)
+        assert hm.group(1).startswith("uv run --no-project --with "), hm.group(1)
         assert hm.group(1).endswith(" hm"), hm.group(1)
         for pattern in _ALLOWED_TOOLS:
             assert pattern.format(hm=hm.group(1)) in listed, (pattern, tools)

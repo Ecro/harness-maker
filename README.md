@@ -834,6 +834,9 @@ Run `/harness-maker:make` → choose **Update**. For files where your hash match
 **Q: What are `mechanical_checks` and when should I use them?**
 Shell commands listed under `reviewers.mechanical_checks` in `harness.yaml` run as part of `hm check`, which `/hm:execute` runs before its review step and `/hm:wrapup` runs as its gate — before any LLM reviewer spawns. A non-zero exit fails the check. Use them for fast, deterministic gates (lint, type-check, unit test) that shouldn't waste LLM tokens when the basics are broken. The list is user-managed; harness-maker never populates it automatically. They are a hard gate, not part of the fix loop.
 
+**Q: Which Python does `hm check` run my tests with?**
+The project's own `.venv/bin/python`, in the directory the check runs in — with per-task worktrees that is `.worktrees/<slug>/`, which does not share the main checkout's `.venv`. harness-maker's own calls are spelled `uv run --no-project --with <plugin> …`, so they never create a `.venv` or a `uv.lock` in your project. The one exception is a project that tracks a `uv.lock` in git: there `hm check` runs `uv sync --frozen --inexact` first, which creates or updates `.venv` and never rewrites the lock. In any other project, give the worktree its own gitignored `.venv` with pytest (or a CI gate command that runs pytest); without one `hm check` stops as degraded and says what is missing. Gate commands get that `.venv/bin` first on `PATH`.
+
 **Q: Why doesn't harness-maker rewrite prompts to be model-agnostic?**
 The prompts are tuned for `opus` — `<thinking>` blocks, role framing, chain-of-thought structure. Rewriting for model-neutrality would degrade quality on the recommended model for hypothetical gains on others. Override `recommended_model` in `harness.yaml` if you want a different model; the prompts remain as-is.
 

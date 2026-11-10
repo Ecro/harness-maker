@@ -56,7 +56,7 @@ Finally run the invoker as its **own** Bash call. It owns argv construction, bas
 config resolution, prompt delivery, status classification, adaptation, and the ledger row:
 
 ```bash
-uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --model codex --prompt-file <the literal path printed above> --slug "<slug>" --stage {{ _stage }}
+uv run --no-project --with {{ harness_maker_src_path }} hm second_opinion_invoke --model codex --prompt-file <the literal path printed above> --slug "<slug>" --stage {{ _stage }}
 ```
 
 > **Why this is not a raw `codex exec` line any more.** It was, and that shape produced four

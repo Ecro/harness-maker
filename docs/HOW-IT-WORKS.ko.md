@@ -1356,7 +1356,8 @@ fail-soft 체인을 통해 주입한다 —
 JSON 한 줄이 정확히 하나 도착한다 (`{ …; }` 그룹 없음: permission matcher 는 `|`/`||` 로 나누고,
 `{` 로 시작하는 조각은 어떤 규칙에도 맞지 않는다). 스킬의 `allowed-tools` 는
 `Bash(<hm> world_model:*)`, `Bash(<hm> autopilot narrow:*)`, `Bash(tail:*)`, `Bash(grep:*)`,
-`Bash(printf:*)` 만 사전 승인하며, `<hm>` 은 `uv run --with <plugin path> hm` 이다. Codex 는 같은
+`Bash(printf:*)` 만 사전 승인하며, `<hm>` 은 `uv run --no-project --with <plugin path> hm` 이다
+(`--no-project` 는 uv 가 프로젝트에 `.venv`·`uv.lock` 을 만들지 않게 한다). Codex 는 같은
 명령을 bash 블록으로 실행한다. Cursor 의 `!` 지원은 미검증이라, JSON 이 보이지 않으면 모델이 직접
 digest 를 실행하라고 스킬이 지시한다.
 

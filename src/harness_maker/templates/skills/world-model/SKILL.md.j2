@@ -4,7 +4,7 @@
     mid-stage aside rules. SPEC-retired-text IRR-001 removed its autopilot step (0.64.0 retired
     autopilot), reversing IRR-005. Literal strings
     are the PLAN ADR-008 contract (tests/render/test_render_maker_front_door.py); the rendered
-    file stays <= 4,500 chars on every target. -#}
+    file stays <= 4,539 chars on every target. -#}
 {#- The description is YAML double-quoted by hand, not `tojson`: tojson escapes astral
     characters as surrogate pairs that YAML decodes into lone surrogates (REVIEW 8a53a1be). -#}
 {#- `allowed-tools` pre-approves the injected briefing outside auto mode, scoped to the two `hm`
@@ -16,7 +16,7 @@
 {%- set wm = config.world_model if (config is defined and config.world_model is defined and config.world_model) else {"name": "Maker", "handle": "maker"} -%}
 {%- set inv = ("$" if is_codex else "/") ~ wm.handle -%}
 {%- set sk = ".agents/skills" if is_codex else ".claude/skills" -%}
-{%- set hm = "uv run --with " ~ harness_maker_src_path ~ " hm" -%}
+{%- set hm = "uv run --no-project --with " ~ harness_maker_src_path ~ " hm" -%}
 {%- set digest = hm ~ " world_model digest --root . --session-id \"$HM_SESSION_ID\" 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{\"unavailable\":\"digest\"}\\n'" -%}
 {%- set ask = "`request_user_input`" if is_codex else "`AskUserQuestion`" -%}
 {%- macro stage(s) -%}{% if is_codex %}`$hm-{{ s }}`{% else %}`/hm:{{ s }}`{% endif %}{%- endmacro -%}
