@@ -34,5 +34,19 @@ AC-004 stage budgets (`tests/unit/test_overhaul_p1_surface.py`): spec 6 850 → 
 7 610. The growth is held as PLAN-hm-cost-p4's `surface_allowance` until the task lands; the baseline is
 then re-frozen from main and `_ATOMIC_RATCHET` re-measured in a fold commit.
 
-The prose grew in a task whose purpose is to cut cost: the rules replace a hand-edited `test_ids` step
-that failed and retried in the diagnostic runs, and a same-session re-read of the PLAN and SPEC.
+Per ADR-010 the task that moved the surface owns its attribution, and writing it next to the
+allowance and the later re-freeze is what keeps this out of `ratchet-rebaselined-by-its-own-subject`.
+The surface **rose** (+0.5% claude, +0.8% codex) in a task whose purpose is to cut cost: the rules
+replace a hand-edited `test_ids` step that failed and retried in the diagnostic runs, and a
+same-session re-read of the PLAN and SPEC, which cost far more per run than the prose.
+
+## Folded into the baseline from main
+
+After PR #46 squash-merged the task as 1ba64acc the PLAN was marked complete, which expires its
+allowance, so the growth was folded on main: `tests/structural/surface_baseline.json` re-frozen by the
+generator at 1ba64acc6f0a (claude 48 965, codex 30 420, the after column above; `render_sha` and
+`payload_digest` moved mechanically with the re-freeze), and `_ATOMIC_RATCHET` execute 8 797 → 8 894,
+spec 7 400 → 7 531 (the measured atomic renders). The AC-009 rows' harness SHA 3063ad33 is not reachable
+from main after the squash, so both `tests/fixtures/hm_cost_p4/batches.json` and
+`tests/fixtures/overhaul_p1/harness_sha_aliases.json` carry a squash alias, checked by tree hash (`src`
+and `scripts` are identical in 3063ad33 and 1ba64acc).

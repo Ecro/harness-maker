@@ -236,12 +236,13 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # (BASELINE-DELTA-hm-overhaul-p1-s.md, "Folded into the baseline from main"), and again
     # after #42 folded SPEC-maker-advance's hand-off line (BASELINE-DELTA-maker-advance.md),
     # and again after SPEC-hm-cost-p2's allowance folded (BASELINE-DELTA-hm-cost-p2.md), and
-    # again with spec and wrapup after SPEC-hm-cost-p3's (BASELINE-DELTA-hm-cost-p3.md).
-    "execute": 8797,
+    # again with spec and wrapup after SPEC-hm-cost-p3's (BASELINE-DELTA-hm-cost-p3.md), and
+    # again with spec after #46 folded SPEC-hm-cost-p4's (BASELINE-DELTA-hm-cost-p4.md).
+    "execute": 8894,
     # research and wrapup re-measured after #40 folded SPEC-choice-cards' allowance
     # (BASELINE-DELTA-choice-cards.md, "Folded into the baseline from main").
     "research": 4647,
-    "spec": 7400,
+    "spec": 7531,
     "wrapup": 4961,
 }
 
