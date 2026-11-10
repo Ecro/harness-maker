@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: pipeline-env-fixes
-status: planning
+status: complete
 created: 2026-11-10
 spec: "[[SPEC-pipeline-env-fixes]]"
 summary: Add --no-project to every harness-maker invocation, give check.py one interpreter owner, and let preflight resolve the main checkout.
