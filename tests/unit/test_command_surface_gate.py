@@ -101,12 +101,7 @@ _GUARDED = sorted(k for k, s in cr.MODULES.items() if s.guarded)
 
 
 def _entry(key: str):  # type: ignore[no-untyped-def]
-    import_path = (
-        "harness_maker.spec_inventory.__main__"
-        if key == "spec_inventory"
-        else f"harness_maker.{key}"
-    )
-    mod = importlib.import_module(import_path)
+    mod = importlib.import_module(f"harness_maker.{key}")
     return getattr(mod, cr.MODULES[key].entry)
 
 
@@ -153,17 +148,13 @@ def _add_parser_choices(rel: str) -> set[str]:
 def test_tc2_subparser_registry_matches_source_bidirectionally() -> None:
     # BIDIRECTIONAL parity (review P1/P2): the registry must equal the module's real
     # add_parser set — catching BOTH phantoms (registered, not in code) AND omissions
-    # (in code, not registered, e.g. spec_inventory generate-all). AST-based, so it needs
+    # (in code, not registered). AST-based, so it needs
     # no invocation and no fragile dest-name introspection (validator R2-C2).
     mismatches: dict[str, dict[str, list[str]]] = {}
     for key, spec in cr.MODULES.items():
         if spec.shape != "subparser":
             continue
-        rel = (
-            "spec_inventory/__main__.py"
-            if key == "spec_inventory"
-            else f"{key.replace('.', '/')}.py"
-        )
+        rel = f"{key.replace('.', '/')}.py"
         actual = _add_parser_choices(rel)
         if actual != set(spec.subcommands):
             mismatches[key] = {
@@ -174,9 +165,7 @@ def test_tc2_subparser_registry_matches_source_bidirectionally() -> None:
 
 
 def _rel_for(key: str) -> str:
-    return (
-        "spec_inventory/__main__.py" if key == "spec_inventory" else f"{key.replace('.', '/')}.py"
-    )
+    return f"{key.replace('.', '/')}.py"
 
 
 def _is_dispatch_operand(node: object) -> bool:

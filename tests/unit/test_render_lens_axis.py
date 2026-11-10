@@ -23,7 +23,6 @@ from harness_maker.conditional_router import (
     routable_lenses,
 )
 from harness_maker.interview import interview
-from harness_maker.lens_coverage import coverage_verdict
 from harness_maker.models import Preset, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
@@ -144,44 +143,4 @@ def _write_results(d: Path, lenses: object, run: str = "run-a") -> None:
         )
 
 
-@pytest.mark.parametrize("missing", ["consistency", "security"])
-def test_missing_new_mandatory_lens_blocks_approval(tmp_path: Path, missing: str) -> None:
-    """A new core lens blocks exactly as a legacy domain lens does.
-
-    `security` is the differential arm: it has blocked approval since the coverage gate
-    shipped, so the oracle for `consistency` is already-shipped behaviour rather than an
-    expectation authored alongside this change.
-    """
-    _write_results(tmp_path, [x for x in ALL_LENSES if x != missing])
-    verdict = coverage_verdict(tmp_path, "run-a")
-    assert verdict["blocks_approval"] is True
-    assert verdict["missing"] == [missing]
-
-
-def test_a_side_review_is_not_blocked_by_an_unrouted_domain_lens(tmp_path: Path) -> None:
-    """The preset split is only real if the CLI honours it.
-
-    Side requires the core set only; demanding the domain lenses too would make every Side
-    review permanently unapprovable, which is the failure the preset argument exists to prevent.
-    """
-    _write_results(tmp_path, CORE_LENSES)
-    assert coverage_verdict(tmp_path, "run-a", "Side")["blocks_approval"] is False
-    assert coverage_verdict(tmp_path, "run-a", "Production")["blocks_approval"] is True
-
-
 # ── AC-017: the two brief clauses survive the axis rewrite ────────────────────
-
-
-def test_a_routed_in_domain_lens_is_reported_as_exercised_on_side(tmp_path: Path) -> None:
-    """The preset scopes what is REQUIRED, never what counts as a real result.
-
-    Side's router may pull `security` in. Scoping the exercised set to the mandatory six would
-    discard that lens's result file — `exercised` would under-report and
-    `review_telemetry.lenses_exercised` would lose a lens that actually ran.
-    """
-    _write_results(tmp_path, [*CORE_LENSES, "security"])
-    verdict = coverage_verdict(tmp_path, "run-a", "Side")
-    assert verdict["blocks_approval"] is False
-    exercised = verdict["exercised"]
-    assert isinstance(exercised, list)
-    assert "security" in exercised

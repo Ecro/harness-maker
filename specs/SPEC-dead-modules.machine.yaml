@@ -1,0 +1,131 @@
+schema_version: 3
+spec_slug: dead-modules
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the unreachable modules are deleted and unregistered
+  type: mechanical
+  test_ids:
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[codex_user_config]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[common_ground]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[eig]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[foreign_config]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[high_diff]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[inequality_gate]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[lens_coverage]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[mutation_receipt]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[plan_rounds]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[plan_verify]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[provenance]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[review_consensus]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[review_run]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[review_telemetry]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[test_dep_map]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[tool_cascade]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[spec_inventory]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[observability.coverage_classifier]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[observability.intent_miss]
+  - tests/structural/test_dead_modules.py::test_ac_001_module_is_gone_and_unregistered[observability.spec_drift]
+  - tests/structural/test_dead_modules.py::test_ac_001_foreign_config_templates_are_gone
+  executable_predicate: all(name not in modules and name not in hm_dispatchable and
+    name not in registry for name in DELETED)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The list is the static closure measured before any deletion (scratch
+    reach script run on 2c4a7a97), minus the look-alikes kept for a written reason;
+    it does not come from the code under change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the kept look-alikes stay
+  type: mechanical
+  test_ids:
+  - tests/structural/test_dead_modules.py::test_ac_002_kept_module_still_imports[permission_syntax]
+  - tests/structural/test_dead_modules.py::test_ac_002_kept_module_still_imports[release_identity]
+  - tests/structural/test_dead_modules.py::test_ac_002_kept_module_still_imports[documentation_contract]
+  - tests/structural/test_dead_modules.py::test_ac_002_kept_module_still_imports[test_runners]
+  - tests/structural/test_dead_modules.py::test_ac_002_kept_module_still_imports[step_sensitivity]
+  - tests/structural/test_dead_modules.py::test_ac_002_kept_module_still_imports[surface_allowance]
+  executable_predicate: all(name in modules and importable(name) for name in KEPT)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each kept module has an outside consumer named in the SPEC (release.yml,
+    ci.yml, the prune tests, CLAUDE.md), checked by grep before the change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the shipped roots reach no deleted module
+  type: mechanical
+  test_ids:
+  - tests/structural/test_dead_modules.py::test_ac_003_the_shipped_roots_reach_everything_else
+  executable_predicate: not (reached & DELETED) and modules - reached - KEPT - packages
+    == set()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The roots are the console scripts in pyproject.toml and the shipped
+    directories, which the deletion does not edit.
+  oracle_independence_waiver: null
+  input_domain: every module under src/harness_maker after the change
+  transformation: static import and module-string closure from the shipped roots
+  expected_relation: every module is reached, kept for a written reason, or a package
+    init
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: 2d39d638f9cf3b92dc558e3b9616e4f264d94b6e20b31dcf983b9230954b1dd1
+  approved_by: null
+  approved_at: '2026-11-10T18:41:18Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 7289630df5c8ef119e265588f74c4531a50298cc0921da0975d52703ece194eb
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 89c2cbfcaffa2ae558cbf098f09e2ef1e7317647781459e896c9aba6bc340b23
+    AC-002: ecb20864c2656b8974e11c74daee4068069e495aaf4e0c0dfea75a92f26aa9f0
+    AC-003: 5df7b5298aac9de1002891660cf508b90a5e9a891dc166cb3c8b03e0e3b42ce9
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d

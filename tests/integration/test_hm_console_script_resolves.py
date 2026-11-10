@@ -62,22 +62,13 @@ def test_the_hm_console_script_resolves_under_uv_run_with() -> None:
 def test_a_dispatched_module_actually_runs_through_the_console_script() -> None:
     """`--help` alone would pass against a stub that never dispatches.
 
-    `test_dep_map` is chosen because it succeeds with no repo state and prints parseable
-    JSON, so a real dispatch is distinguishable from a no-op exit 0.
+    `test_runners plan` is chosen because it succeeds with no repo state and prints parseable
+    JSON, so a real dispatch is distinguishable from a no-op exit 0. (`test_dep_map` stood
+    here until SPEC-dead-modules deleted it.)
     """
-    proc = _uv_run(
-        "hm",
-        "test_dep_map",
-        "--root",
-        str(_REPO_ROOT),
-        # A source module no test maps to. The lockfile used to stand here; ADR-006 of
-        # PLAN-self-induced-regression-gate moved the packaging shapes to `CLASS_CONFIG`, so
-        # they select a bounded set instead of forcing FULL and no longer exercise this arm.
-        "--changed-file",
-        "src/harness_maker/deleted_module.py",
-    )
+    proc = _uv_run("hm", "test_runners", "plan")
     assert proc.returncode == 0, proc.stderr[-2000:]
-    assert '"mode": "full"' in proc.stdout, proc.stdout[:400]
+    assert '"workers":' in proc.stdout, proc.stdout[:400]
 
 
 def test_an_unknown_module_is_refused_through_the_console_script() -> None:

@@ -47,9 +47,9 @@ def test_hm_and_python_dash_m_agree_on_exit_code_and_stderr(module: str) -> None
 
 
 def test_hm_propagates_a_successful_exit_code() -> None:
-    direct = _run(["-m", "harness_maker.hm", "test_dep_map", "--root", str(_REPO_ROOT)])
+    direct = _run(["-m", "harness_maker.hm", "test_runners", "plan"])
     assert direct.returncode == 0, direct.stderr[-800:]
-    assert '"mode"' in direct.stdout
+    assert '"runner"' in direct.stdout
 
 
 # ── the dispatcher refuses what it does not know ──────────────────────────────

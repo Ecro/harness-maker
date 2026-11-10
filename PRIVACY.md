@@ -10,8 +10,6 @@ harness-maker writes four kinds of JSONL files under your project's `.claude/obs
 |---|---|---|
 | `metrics-{YYYY-MM-DD}.jsonl` | [`telemetry.py`](src/harness_maker/telemetry.py) `_build_entry` | Per-tool-use + per-stop hook output. Powers cache-diagnostics, cost dashboards, and the ai-readiness rubric's "cadence" layer. Daily rotation. |
 | `adaptive/overrides.jsonl` | [`telemetry.py`](src/harness_maker/telemetry.py) `OverrideRecord` | One row per axis-level edit to `harness.yaml` (manual override of an interview default). Feeds `/hm:personalization-audit`. |
-| `review-{YYYY-MM-DD}.jsonl` | [`review_telemetry.py`](src/harness_maker/review_telemetry.py) `ReviewTelemetryRecord` | One row per `/hm:review` iteration. Records reviewer counts, verifier drop rate, grade transitions. Daily rotation. |
-| `silent-intent-miss-{slug}.jsonl` | [`observability/intent_miss.py`](src/harness_maker/observability/intent_miss.py) `IntentMissEvent` | One row when the inequality gate's LLM-inference common-ground answer is later contradicted (slot was wrongly skipped). |
 
 ## Where it's stored
 
@@ -77,58 +75,6 @@ All paths are inside your project root (or `CLAUDE_PROJECT_DIR` / `CURSOR_PROJEC
 | `source` | string | One of `configure-exit`, `session-start`, `git-fallback` (`OverrideSource` Literal in `telemetry.py`) |
 | `reason` | string | Free-form note (default empty string) |
 
-### `review-{YYYY-MM-DD}.jsonl` — `ReviewTelemetryRecord`
-
-| Field | Type | Description |
-|---|---|---|
-| `ts` | string | ISO-8601 UTC timestamp (CLI auto-stamps if omitted) |
-| `slug` | string | Task slug (max 200 chars) |
-| `round` | int | Review iteration number (≥ 1) |
-| `pass1_n` | int | Total findings from Pass 1 (redacted-context review) |
-| `verifier_kept_n` | int \| null | Pass 1.5 verifier KEEPs. **null** since ADR-001 removed the dispatch — null means the verifier did not run, which is a different fact from "ran and kept nothing". Rows written before the removal keep their integers. |
-| `verifier_dropped_n` | int \| null | Pass 1.5 verifier DROPs. Same nullability, and both fields are both-or-neither. |
-| `verifier_false_drop_n` | int \| null | Labeled-fixture only — verifier dropped a real bug |
-| `verifier_false_keep_n` | int \| null | Labeled-fixture only — verifier kept a false positive |
-| `fixture_label` | string \| null | Labeled-fixture identifier (null on real runs) |
-| `pass2_kept_n` | int | Findings surviving Pass 2 (full-context review) |
-| `consensus_passed_n` | int | Findings surviving consensus filter |
-| `wall_time_ms` | int \| null | Wall-clock time of the review round; `null`/omitted when not measured — never `0` in its place |
-| `build_break_count` | int | How many auto-fixes broke the build |
-| `auto_fix_reverted_n` | int | How many auto-fixes were reverted because of build break |
-| `fallback` | string \| null | Set only when the verifier model was unavailable and a fallback path ran |
-
-<!-- @hm:privacy:review-telemetry-measure-c -->
-
-Measure C (PLAN-review-round-inflation). These four are `null` rather than `0` when unmeasured, so a row written by a harness version that predates them stays distinguishable from one that measured zero:
-
-| Field | Type | Description |
-|---|---|---|
-| `terminal` | bool \| null | Discriminator: `null` = never measured, `false` = a non-terminal round, `true` = the single end-of-review row that carries the three counters below |
-| `unreviewed_fix_count` | int \| null | Fixes applied in the terminal round, which the loop never re-reviewed |
-| `regression_attributed_n` | int \| null | Distinct findings attributed to a previous round's fix |
-| `attribution_unknown_n` | int \| null | Distinct findings whose origin could not be attributed either way |
-| `lenses_exercised` | list[str] \| null | Which mandatory review lenses delivered a result this round. Lens **ids** only (`design`, `functionality`, `robustness`, `consistency`, `security`, `concurrency`, `tests`) — never finding text. `[]` means every dispatch failed; `null` means a harness version that predates the field |
-| `confirm_pass_ran` | bool \| null | Whether a confirmation pass ran over the frozen diff |
-| `confirm_pass_new_severe_n` | int \| null | Count of new severe findings the confirmation pass surfaced. Present only when `confirm_pass_ran` is true |
-| `churn_ratio` | float \| null | How much of the most-churned file this repair round rewrote, 0–1. `null` = no file was measurable (all binary/deleted), or a harness version that predates the field |
-| `churn_max_path` | str \| null | Repo-**relative** path of the file that ratio came from — a path, never file content. Stays on disk with the rest of the row |
-| `churn_measured_n` | int \| null | How many touched files contributed to the ratio |
-| `churn_excluded_n` | int \| null | How many were excluded (binary, deleted, empty post-tree) |
-| `disposition_counts` | dict[str, int] \| null | How many findings this round landed on each of the four dispositions (`accepted`, `rejected`, `duplicate`, `unresolved`). **Counts keyed by a closed vocabulary — never a finding, a file path, a summary or an authority citation.** `{}` = a round with no findings; `null` = a harness version that predates the field |
-
-<!-- @hm:/privacy:review-telemetry-measure-c -->
-
-### `silent-intent-miss-{slug}.jsonl` — `IntentMissEvent`
-
-| Field | Type | Description |
-|---|---|---|
-| `slot` | string | The interview slot identifier that was wrongly skipped |
-| `trigger` | string | What surfaced the miss: `review-mismatch`, `session-reopen` (`Trigger` Literal in `observability/intent_miss.py`) |
-| `original_mark_source` | string | Where the original "common-ground" mark came from (e.g., `llm-inference:0.97`) |
-| `original_mark_confidence` | float | The confidence value the inference recorded |
-| `detected_at` | string | ISO-8601 UTC timestamp |
-| `notes` | string | Free-form context (default empty) |
-
 <!-- @hm:privacy:feedback-module -->
 ## Optional feedback module (opt-in, default off)
 
@@ -191,7 +137,7 @@ You can verify this with:
 
 ```bash
 # Search the source for any HTTP POST / PUT / send that includes telemetry data:
-rg -n "post|put|requests\.send|httpx\.send|aiohttp" src/harness_maker/telemetry.py src/harness_maker/review_telemetry.py src/harness_maker/observability/
+rg -n "post|put|requests\.send|httpx\.send|aiohttp" src/harness_maker/telemetry.py src/harness_maker/observability/
 # Expect: no matches.
 ```
 

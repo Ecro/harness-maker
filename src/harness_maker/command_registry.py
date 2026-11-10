@@ -99,7 +99,6 @@ MODULES: dict[str, ModuleSpec] = {
     "autopilot_ledger": ModuleSpec("subparser", _s("smoke", "rollup")),
     "codex_ledger": ModuleSpec("subparser", _s("emit")),
     "delegation_ledger": ModuleSpec("subparser", _s("record")),
-    "mutation_receipt": ModuleSpec("subparser", _s("record")),
     "stage_agent_ledger": ModuleSpec(
         "subparser", _s("emit", "persist-payload", "coherence", "reconcile")
     ),
@@ -108,7 +107,6 @@ MODULES: dict[str, ModuleSpec] = {
         "subparser", _s("escape-candidates", "escape", "seed", "score", "report")
     ),
     "economics": ModuleSpec("subparser", _s("report", "stages", "doctor", "composition")),
-    "high_diff": ModuleSpec("subparser", _s("classify")),
     "iter_receipts": ModuleSpec(
         "subparser",
         _s("write", "set-iter-marker", "patch-runtime", "read", "list", "verify"),
@@ -129,13 +127,9 @@ MODULES: dict[str, ModuleSpec] = {
     "second_opinion_invoke": ModuleSpec("flagonly"),
     # SPEC-hm-overhaul-p1 AC-005: one exit code for every deterministic gate.
     "check": ModuleSpec("flagonly"),
-    "test_dep_map": ModuleSpec("flagonly"),
     "wrapup_brief": ModuleSpec("flagonly"),
     "wrapup_land": ModuleSpec("flagonly"),
     "wrapup_receipt": ModuleSpec("flagonly"),
-    "spec_inventory": ModuleSpec(
-        "subparser", _s("reverse-map", "verify-inventory", "sample-for-review", "generate-all")
-    ),
     "spec_machine": ModuleSpec(
         "subparser",
         _s(
@@ -198,10 +192,6 @@ MODULES: dict[str, ModuleSpec] = {
     # Flag-only (no subcommand): it owns the path filtering that keeps external-model output
     # off a pre-approved argv, so it must be reachable but has nothing to dispatch on.
     "second_opinion_oracle": ModuleSpec("flagonly"),
-    "review_telemetry": ModuleSpec("manual-dispatch", _s("emit")),
-    "lens_coverage": ModuleSpec("manual-dispatch", _s("check")),
-    "review_consensus": ModuleSpec("manual-dispatch", _s("finalize", "plan")),
-    "plan_rounds": ModuleSpec("manual-dispatch", _s("plan", "outcome")),
     "proposals": ModuleSpec("subparser", _s("list", "count", "summary")),
     "world_model": ModuleSpec("subparser", _s("digest")),
     "test_runners": ModuleSpec("manual-dispatch", _s("plan", "list")),
@@ -209,7 +199,6 @@ MODULES: dict[str, ModuleSpec] = {
         "manual-dispatch",
         _s("measure", "pin", "oscillation", "complexity", "attribute", "fix-defect-rate"),
     ),
-    "review_run": ModuleSpec("manual-dispatch", _s("open", "status", "close")),
     "verifier_discrimination": ModuleSpec("manual-dispatch", _s("report", "rounds", "agents")),
     "freeze": ModuleSpec("manual-dispatch", _s("resolve-base", "commit", "read-base", "reap")),
     "spec_quality": ModuleSpec("manual-dispatch", _s("eval")),

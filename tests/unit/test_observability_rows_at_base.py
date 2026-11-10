@@ -9,13 +9,12 @@ The third gate covers the opposite drift: files git still TRACKS under the ignor
 
 from __future__ import annotations
 
-import json
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from harness_maker import readiness, review_telemetry, spec_need
+from harness_maker import readiness, spec_need
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -51,34 +50,6 @@ _ROW = {
     "build_break_count": 0,
     "auto_fix_reverted_n": 0,
 }
-
-
-def test_review_emit_from_a_worktree_files_at_base(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    base, wt = _repo_with_worktree(tmp_path)
-    src = tmp_path / "row.json"
-    src.write_text(json.dumps(_ROW), encoding="utf-8")
-    monkeypatch.chdir(wt)
-
-    assert review_telemetry.main(["emit", "--file", str(src)]) == 0
-
-    written = Path(capsys.readouterr().out.strip()).resolve()
-    assert written.is_relative_to(base.resolve() / ".claude" / "observability")
-    assert not written.is_relative_to(wt.resolve())
-    assert not (wt / ".claude" / "observability").exists()
-
-
-def test_review_emit_outside_git_keeps_the_cwd_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Git-less = cwd, unchanged: every existing cwd-based test of `emit` still holds."""
-    src = tmp_path / "row.json"
-    src.write_text(json.dumps(_ROW), encoding="utf-8")
-    monkeypatch.chdir(tmp_path)
-    assert review_telemetry.main(["emit", "--file", str(src)]) == 0
-    written = Path(capsys.readouterr().out.strip()).resolve()
-    assert written.is_relative_to(tmp_path.resolve() / ".claude" / "observability")
 
 
 def test_spec_need_record_from_a_worktree_root_files_at_base(tmp_path: Path) -> None:

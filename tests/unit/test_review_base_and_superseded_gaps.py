@@ -11,7 +11,6 @@ import pytest
 import yaml
 
 from harness_maker import spec_machine
-from harness_maker.observability import spec_drift
 from harness_maker.spec_machine import approve, mark_judged
 
 REPO = Path(__file__).resolve().parents[2]
@@ -67,46 +66,6 @@ def _write_spec(specs_dir: Path, slug: str, acs: list[dict[str, Any]]) -> Path:
 
 
 # ── AC-005 ──────────────────────────────────────────────────────────────────────────────
-
-
-def test_ac005_spec_drift_keeps_oracle_advisory_for_superseded(
-    specs: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    approve(_write_spec(specs, "target", [_ac("AC-001")]))
-    _write_spec(
-        specs,
-        "fixture",
-        [
-            _ac(
-                "AC-001",
-                pending_test=False,
-                superseded_by="target",
-                oracle_source="legacy-unspecified",
-            ),
-            _ac(
-                "AC-002",
-                pending_test=True,
-                test_ids=["tests/unit/test_x.py::test_resolves"],
-                superseded_by="target",
-            ),
-            # Live controls: the advisory and resolved-but-pending still fire for a live AC.
-            _ac("AC-003", pending_test=False, oracle_source="legacy-unspecified"),
-            _ac("AC-004", pending_test=True, test_ids=["tests/unit/test_x.py::test_live"]),
-        ],
-    )
-    # Every candidate id resolves, so only the superseded skip can keep AC-002 out.
-    monkeypatch.setattr(spec_drift, "unresolved_test_ids", lambda ids, root: [])
-    monkeypatch.setattr(
-        "harness_maker.observability.spec_drift.shutil.which", lambda name: "/usr/bin/pytest"
-    )
-
-    report = spec_drift.scan(specs)
-
-    assert "fixture::AC-001" in report.missing_oracle_source
-    assert "fixture::AC-003" in report.missing_oracle_source
-    assert not {"fixture::AC-001", "fixture::AC-002"} & set(report.coverage_gaps)
-    assert "fixture::AC-002" not in report.resolved_but_pending
-    assert "fixture::AC-004" in report.resolved_but_pending
 
 
 # ── AC-006 ──────────────────────────────────────────────────────────────────────────────
