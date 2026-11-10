@@ -82,8 +82,8 @@ def test_codex_hooks_json_has_stop_with_flush_session() -> None:
     assert "flush_session" in stop_commands, "Stop event must include flush_session (ADR-004)"
 
 
-def test_codex_hooks_json_has_stop_with_loop_gate() -> None:
-    """Codex Stop event must hard-block active hm-loop sessions."""
+def test_codex_hooks_json_stop_has_no_loop_gate() -> None:
+    """/hm:loop left in 0.64.0; its Codex Stop gate is retired (SPEC-retired-wiring AC-001)."""
     env = _make_env()
     tpl = env.get_template("codex/hooks.json.j2")
     rendered = tpl.render(
@@ -96,7 +96,8 @@ def test_codex_hooks_json_has_stop_with_loop_gate() -> None:
     stop_commands = " ".join(
         h.get("command", "") for entry in stop_hooks for h in entry.get("hooks", [])
     )
-    assert "harness_maker.hooks.loop_gate --mode stop-hook" in stop_commands
+    assert "loop_gate" not in stop_commands
+    assert "harness_maker.hooks.flush_session" in stop_commands
 
 
 def test_codex_hooks_json_no_worktree_gate() -> None:

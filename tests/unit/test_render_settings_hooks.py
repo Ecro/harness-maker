@@ -47,16 +47,11 @@ STAGE1_MODULES = frozenset(
     }
 )
 
-# ADR-006 Stage 2 — control-flow (Phase 2), **Stop event only**. `loop_gate` is what
-# lets /hm:loop reach iteration 2. Stop-blocking cannot block a tool call and is
-# bounded by each module's stop_hook_active guard — worst case is one extra turn.
-# `autopilot_guard` was RETIRED here (PLAN-hook-inventory-efficiency-audit ADR-002):
-# it is no longer rendered on any event — see `_HARNESS_RETIRED_HOOK_INVOCATIONS`.
-STAGE2_MODULES = frozenset(
-    {
-        "harness_maker.hooks.loop_gate",
-    }
-)
+# ADR-006 Stage 2 — control-flow (Phase 2), **Stop event only**. It held `loop_gate`
+# (/hm:loop's iteration gate) and `autopilot_guard`; both are RETIRED through
+# `_HARNESS_RETIRED_HOOK_INVOCATIONS` (autopilot_guard: PLAN-hook-inventory-efficiency-audit
+# ADR-002; loop_gate: SPEC-retired-wiring, after /hm:loop left in 0.64.0).
+STAGE2_MODULES: frozenset[str] = frozenset()
 
 # ADR-006 Stage 3 — the PreToolUse BLOCKING gates, now WIRED (Phase 3 redo). Present in
 # BOTH dev_modes. (`autopilot_guard`'s former PreToolUse copies were retired per
@@ -202,21 +197,18 @@ def test_settings_permission_gate_is_subordinate(template: str) -> None:
 
 
 @pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
-def test_settings_stop_hook_carries_loop_gate_only(template: str) -> None:
-    """Stage 2's point: a Stop hook is what lets `/hm:loop` reach iteration 2.
-
-    `autopilot_guard`'s Stop copy was RETIRED (PLAN-hook-inventory-efficiency-audit
-    ADR-002 — the Stop-block was the user's friction), so `loop_gate` is now the sole
-    Stop hook. It must still pass `--mode stop-hook` (the module dispatches on it).
+def test_settings_stop_hook_carries_span_end_only(template: str) -> None:
+    """Both Stop-blocking hooks are retired: `autopilot_guard` (PLAN-hook-inventory-
+    efficiency-audit ADR-002) and `loop_gate` (SPEC-retired-wiring AC-001). The Stop
+    event keeps one group, the stage-span close.
     """
     stop = _render(template)["hooks"].get("Stop")
-    assert stop, f"{template}: no Stop hook — loop_gate cannot block"
+    assert stop, f"{template}: no Stop hook — the stage span never closes"
     assert len(stop) == 1, f"{template}: Stop must be ONE group, got {len(stop)}"
     cmds = [h["command"] for e in stop for h in e["hooks"]]
-    loop = [c for c in cmds if "harness_maker.hooks.loop_gate" in c]
-    assert loop, f"{template}: Stop is missing loop_gate"
-    assert all("--mode stop-hook" in c for c in loop), (
-        f"{template}: loop_gate on Stop must pass --mode stop-hook; got {loop}"
+    assert any("harness_maker.worktree span-end" in c for c in cmds), cmds
+    assert not any("loop_gate" in c for c in cmds), (
+        f"{template}: loop_gate must be RETIRED from Stop; got {cmds}"
     )
     assert not any("autopilot_guard" in c for c in cmds), (
         f"{template}: autopilot_guard must be RETIRED from Stop; got {cmds}"
@@ -493,7 +485,7 @@ def test_merge_retires_autopilot_guard_when_template_drops_it() -> None:
 def test_merge_retires_autopilot_guard_stop_mode() -> None:
     """The Stop-mode invocation (`--mode stop-hook`) is a DISTINCT retired entry — its
     normalized identity carries the trailing arg, so it needs its own set member."""
-    loop = "uv run --no-project --with /p python -m harness_maker.hooks.loop_gate --mode stop-hook"
+    loop = "uv run --no-project --with /p python -m harness_maker.worktree span-end"
     guard = (
         "uv run --no-project --with /p python -m harness_maker.hooks.autopilot_guard "
         "--mode stop-hook"
@@ -503,7 +495,7 @@ def test_merge_retires_autopilot_guard_stop_mode() -> None:
     merged = _merge_hooks_json(on_disk, new)
     cmds = [h["command"] for e in merged["hooks"]["Stop"] for h in e["hooks"]]
     assert guard not in cmds, "retired autopilot_guard (stop-hook) survived the merge"
-    assert cmds.count(loop) == 1, "still-shipped loop_gate must remain exactly once"
+    assert cmds.count(loop) == 1, "still-shipped span-end must remain exactly once"
 
 
 def test_merge_retirement_preserves_a_users_appended_command() -> None:

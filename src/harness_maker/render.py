@@ -940,6 +940,8 @@ _HARNESS_RETIRED_HOOK_INVOCATIONS: frozenset[str] = frozenset(
         "<HM>:harness_maker.telemetry",
         "<HM>:harness_maker.hooks.post_write_reminder",
         "<HM>:harness_maker.hooks.autopilot_autoarm",
+        # SPEC-retired-wiring: the retired loop's and autopilot's Stop guard.
+        "<HM>:harness_maker.hooks.loop_gate --mode stop-hook",
     }
 )
 

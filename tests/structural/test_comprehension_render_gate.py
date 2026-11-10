@@ -108,28 +108,6 @@ def test_minimal_renders_nothing_and_costs_zero_bytes(
             assert not _markers(text), f"{variant}/{name}: minimal emitted {_markers(text)}"
 
 
-def test_the_partial_emits_the_empty_string_at_minimal() -> None:
-    """AC-003's real content, checked where the bytes are produced.
-
-    Marker-absence alone would pass a partial that emitted a bare newline — the exact hazard
-    the original SHA comparison existed to catch. Rendering the partial standalone at
-    `minimal` and requiring `""` catches it directly, and cannot be broken by an edit
-    elsewhere in `plan.md.j2`.
-    """
-    from harness_maker.render import _make_env
-
-    env = _make_env()
-    tmpl = env.get_template("agents/_partials/comprehension_block.md.j2")
-    config = {"interview": {"comprehension": {"depth": "minimal"}}, "locale": "en"}
-    for stage in _STAGES:
-        for block in ("brief", "round_state", "decision_depth", "teach_back"):
-            out = tmpl.render(config=config, block=block, stage=stage)
-            assert out == "", (
-                f"{stage}/{block}: the comprehension partial emits bytes at depth=minimal, "
-                f"so the opt-out is not free: {out!r}"
-            )
-
-
 def test_the_non_minimal_levels_actually_grow_the_render(
     rendered: dict[str, dict[str, dict[str, str]]],
 ) -> None:

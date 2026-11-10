@@ -812,9 +812,9 @@ def _codex_target_files(
     `_codex_agent_files` for per-agent `model_reasoning_effort`. The
     `[profiles.cheap]` / `[profiles.deep]` shortcuts (`codex -p cheap` /
     `codex -p deep`) used to live in this project-local config but Codex
-    CLI v0.130+ rejects them at the project layer — they now install at
-    USER level via `codex_user_config.bootstrap_user_codex_profiles`,
-    invoked from `cli.make` when codex is in targets.
+    CLI v0.130+ rejects them at the project layer. They were per-loop
+    profiles, and SPEC-retired-wiring stopped `make` from writing them into
+    the user's `~/.codex/config.toml`.
     """
     from harness_maker.render import _make_env  # local import: avoid cycle
 

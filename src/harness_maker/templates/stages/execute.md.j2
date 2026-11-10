@@ -16,7 +16,7 @@ Chain independent shell steps with `&&` in one Bash call, except `hm check`, the
 
 ## Session Context Loading
 
-1. **Hot tier (compaction checkpoint only)** — Read `.claude/memory/session/<today>.md` if it exists, but inspect **only** the `checkpoint:compaction` entry — it means the prior session was interrupted mid-stage, so check `.claude-progress.json` for partial state and resume from the last in-progress phase. Ignore any historical `[decision:*]` blocks: they are legacy and no longer maintained.
+1. **Hot tier (compaction checkpoint only)** — Read `.claude/memory/session/<today>.md` if it exists, but inspect **only** the `checkpoint:compaction` entry — it means the prior session was interrupted mid-stage, so resume from the last in-progress phase of the PLAN. Ignore any historical `[decision:*]` blocks: they are legacy and no longer maintained.
 2. **Warm tier** — `hm memory_retrieve --topic "<topic>"`, the topic being the slug plus this phase's files and operation, never the placeholder.
 {%- if config.second_brain.get('enabled') %}
 

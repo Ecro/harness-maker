@@ -16,7 +16,7 @@ files:
   body_sha256: c62a21e82754d5606f3beae02e5dcf47cce846662e3763708b901442a83abb9a
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 5f99b20a5b614ccef473a20acef5183dee0d2d952d4913721d469cc6aad8d32a
+  body_sha256: dc2f19fba011e2fc16b81a17871c3dbe08c63e5e813a914c23ae2282e0977076
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 7a0eb0965046757c8720bdabc17656ec1ba96bace0c29141730b4f0e6fda2e8a
@@ -70,7 +70,7 @@ files:
   body_sha256: 03a7f5c424652cb4a76e2078092bc0771e655e7760b4009aca7600eeb09dc6b9
 - path: settings.json
   template: settings/Side.json.j2
-  body_sha256: 847df5858cba67285afc0a74001f287b98cc82e9540103600102208b6d4eb887
+  body_sha256: 6ed40815b92e7647010612909ed3524a1b999b61bf8d466b2f6eb6300a5feaeb
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 359bd8cf20f3fcdb4e46b586733100d1643d88739bef799262438b9e4af68f8a

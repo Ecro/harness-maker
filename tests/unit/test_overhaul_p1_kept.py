@@ -213,9 +213,15 @@ def test_ac009_spec_gate_keyed_on_strictness(
 def test_ac009_compaction_checkpoint_resume(stage_renders: dict[tuple[str, str], Path]) -> None:
     ref = _stage_text(stage_renders[("ref", "warn")], "execute").splitlines()
     head = _stage_text(stage_renders[("head", "warn")], "execute")
-    sentences = [ln for ln in ref if "checkpoint:compaction" in ln or ".claude-progress.json" in ln]
+    # SPEC-retired-wiring AC-004 drops the dead `.claude-progress.json` pointer; the rest stays.
+    old = (
+        "check `.claude-progress.json` for partial state and resume from the last in-progress phase"
+    )
+    new = "resume from the last in-progress phase of the PLAN"
+    sentences = [ln.replace(old, new) for ln in ref if "checkpoint:compaction" in ln]
     assert sentences
     assert [s for s in sentences if s not in head] == []
+    assert ".claude-progress.json" not in head
 
 
 # ── bench contract ──────────────────────────────────────────────────────────

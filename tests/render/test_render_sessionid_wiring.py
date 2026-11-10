@@ -59,42 +59,9 @@ def test_session_id_is_quoted_in_every_template_that_passes_it() -> None:
     assert not offenders, f"unquoted session id interpolation: {offenders}"
 
 
-_STAGE_END = _TEMPLATES / "agents" / "_partials" / "stage_end_summary.md.j2"
-_STEP_MANIFEST = _TEMPLATES / "agents" / "_partials" / "step_manifest.md.j2"
-
-
-@pytest.mark.parametrize("subcommand", ["boundary", "gate-blocked"])
-def test_every_autopilot_caps_call_passes_the_session_id(subcommand: str) -> None:
-    """ADR-005 atomicity, enforced at CI.
-
-    This partial renders into all seven stages, so one un-wired line here is fourteen
-    un-wired call sites — and every one of them reads an id-bearing marker as foreign,
-    which is `kill_switch`, which is autopilot off. The writer and the readers must land
-    together; this is the check that says whether they did.
-    """
-    body = _read(_STAGE_END)
-    lines = [ln for ln in body.splitlines() if f"autopilot_caps {subcommand}" in ln]
-    assert lines, f"autopilot_caps {subcommand} invocation moved — re-point this guard"
-    for line in lines:
-        assert '--session-id "$HM_SESSION_ID"' in _unescaped(line), (
-            f"un-wired `autopilot_caps {subcommand}`: {line.strip()}"
-        )
-
-
-@pytest.mark.parametrize("subcommand", ["autopilot status", "autopilot on"])
-def test_the_picker_passes_the_session_id(subcommand: str) -> None:
-    """The picker writes the marker. If it stamps an id the readers cannot match, it is
-    the writer half of the same split — the one that turns autopilot off."""
-    body = _read(_STEP_MANIFEST)
-    lines = [ln for ln in body.splitlines() if f"hm {subcommand}" in ln]
-    assert lines, f"`hm {subcommand}` invocation moved — re-point this guard"
-    for line in lines:
-        assert '--session-id "$HM_SESSION_ID"' in _unescaped(line), (
-            f"un-wired picker: {line.strip()}"
-        )
-
-
-_PREFLIGHT = _TEMPLATES / "agents" / "_partials" / "worktree_preflight.md.j2"
+# The dead `worktree_preflight` partial was deleted (SPEC-retired-wiring); the live
+# preflight line every stage renders is in `stages/_hm.md.j2`.
+_PREFLIGHT = _TEMPLATES / "stages" / "_hm.md.j2"
 
 
 def test_task_preflight_carries_the_span_session_id() -> None:

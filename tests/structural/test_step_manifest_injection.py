@@ -27,26 +27,6 @@ WRAPPERS = (
 )
 
 
-def test_partial_exists_with_suppression_and_intended_framing() -> None:
-    assert PARTIAL.is_file(), f"missing step-manifest partial: {PARTIAL}"
-    body = PARTIAL.read_text(encoding="utf-8")
-    assert ".hm-loop-active" in body, (
-        "manifest must reference the loop-suppression marker (ADR-003)"
-    )
-    assert "intended" in body.lower(), (
-        "manifest must frame steps as INTENDED/conditional, not committed — "
-        "else it collides with skip-heuristics and early-FAIL stops"
-    )
-    # P1 (REVIEW round 2): the suppression check must tell the LLM how to resolve
-    # the project root from inside a worktree — a naive "at the project root"
-    # check misses the marker when cwd is in .worktrees/<name>/.
-    assert ".worktrees" in body, (
-        "manifest suppression must explain project-root resolution from a "
-        "worktree (cwd may be inside .worktrees/<name>/), not just say "
-        "'at the project root'"
-    )
-
-
 def test_skills_do_not_include_step_manifest() -> None:
     offenders = [
         str(p.relative_to(TPL))
