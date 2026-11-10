@@ -217,7 +217,7 @@ def test_settings_hooks_cover_the_modules_we_expect() -> None:
     modules = {c[0] for c in SETTINGS_HOOKS}
     assert "harness_maker.telemetry" not in modules  # retired in 0.64.0 (IRR-005)
     assert "harness_maker.hooks.flush_session" in modules
-    assert "harness_maker.hooks.loop_gate" in modules
+    assert "harness_maker.hooks.loop_gate" not in modules  # retired (SPEC-retired-wiring)
     assert "harness_maker.worktree" in modules
 
 

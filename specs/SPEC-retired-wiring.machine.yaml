@@ -1,0 +1,135 @@
+schema_version: 3
+spec_slug: retired-wiring
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: no render ships the loop_gate hook, and a re-render retires it
+  type: mechanical
+  test_ids:
+  - tests/unit/test_retired_wiring.py::test_ac_001_fresh_render_has_no_loop_gate[Production]
+  - tests/unit/test_retired_wiring.py::test_ac_001_fresh_render_has_no_loop_gate[Side]
+  - tests/unit/test_retired_wiring.py::test_ac_001_loop_gate_is_retired
+  - tests/unit/test_retired_wiring.py::test_ac_001_rerender_retires_the_old_stop_group[Production]
+  - tests/unit/test_retired_wiring.py::test_ac_001_rerender_retires_the_old_stop_group[Side]
+  - tests/unit/test_retired_wiring.py::test_ac_001_rerender_retires_the_old_codex_stop_group
+  executable_predicate: '''loop_gate'' not in settings and ''loop_gate'' not in codex_hooks
+    and RETIRED_LOOP_GATE in render._HARNESS_RETIRED_HOOK_INVOCATIONS and rerender_keeps_user_hook_and_one_span_end'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: RESEARCH-hm-non-token-improvements F7 found the hook in every render;
+    the upgrade case is the 0.65 settings file written by hand from the current template,
+    before the change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: make writes nothing to the user's Codex config
+  type: mechanical
+  test_ids:
+  - tests/unit/test_retired_wiring.py::test_ac_002_make_leaves_the_home_codex_config_alone
+  executable_predicate: not (home / '.codex' / 'config.toml').exists()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: F7 observed `make` writing `[profiles.cheap|deep]` into ~/.codex/config.toml;
+    the absence is checked on the filesystem with a temporary HOME.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the six unreferenced partials are deleted
+  type: mechanical
+  test_ids:
+  - tests/unit/test_retired_wiring.py::test_ac_003_partials_are_gone
+  executable_predicate: not any(templates.rglob(f'{name}.md.j2') for name in PARTIALS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The six names come from F7's include analysis, fixed here before
+    deleting.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: execute no longer points at .claude-progress.json
+  type: mechanical
+  test_ids:
+  - tests/unit/test_retired_wiring.py::test_ac_004_no_progress_file_pointer[Production]
+  - tests/unit/test_retired_wiring.py::test_ac_004_no_progress_file_pointer[Side]
+  executable_predicate: all('.claude-progress.json' not in text for text in rendered_markdown)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: HR-015 and F7 name the dead path; nothing in src writes that file.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: a1cfcf29f65a1498121bf8b3d96cdd6531307c4e7295a1f7997ac1e0b1576a51
+  approved_by: null
+  approved_at: '2026-11-10T16:58:01Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: b9f5a20422678a1123a999aa876307fa7184c8c992cbed66ca0ae00a8651c959
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 886c16ee0f95342cdc3ba5bb5870c270b6792ab381931766088f96bf80040b68
+    AC-002: f06c3b35a426d4256c4288fd832dc99ddba63b236fe44601f5821b1e66a0453b
+    AC-003: 0e7adf02a064b6be79244c2edfe01d58982ff8cc525590bfba97cd44aef6823a
+    AC-004: af284a47b0bf179f432fb19472a90b3474dee2e68bfdc0c12adb2802f33dcd96
+    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591

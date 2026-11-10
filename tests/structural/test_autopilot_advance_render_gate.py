@@ -26,42 +26,6 @@ def _read(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
 
-def test_picker_branches_on_status_not_file_existence() -> None:
-    """ADR-002 — the dominant failure path. With no command to ask, the model checks
-    whether the marker FILE exists; a stale marker then suppresses arming indefinitely."""
-    manifest = _read(TEMPLATES / "agents" / "_partials" / "step_manifest.md.j2")
-    assert "hm autopilot status" in manifest
-    assert "never decide this from" in manifest
-
-
-def test_picker_defers_the_takeover_decision_to_the_user() -> None:
-    """ADR-010 / validator CR2, as revised by round 4.
-
-    `status` returns active:false for a foreign marker, so a picker branching on the
-    boolean ALONE offers arming and clobbers a live peer. The first fix was a flat "do NOT
-    arm", which then wedged the project for the full TTL whenever the owning session had
-    simply ended — nothing clears the marker at session end. Neither a blanket refusal nor
-    a "probably yours, --force it" guess is right, because the prompt genuinely cannot
-    distinguish the two states.
-
-    So the contract this gate pins is: name both reasons, state `idle_minutes` as a fact,
-    refuse to guess, and put the one question that settles it to the user — who is the only
-    party that knows whether another session is open. None of this is detectable on disk by
-    any other means.
-    """
-    manifest = _read(TEMPLATES / "agents" / "_partials" / "step_manifest.md.j2")
-    # Collapse the markdown line wrapping — the prose is hard-wrapped inside a blockquote,
-    # so a phrase spanning a line break is interrupted by the `>` marker on disk while
-    # still being one instruction to the model reading it. Strip the markers, then flatten.
-    flat = " ".join(" ".join(ln.lstrip().removeprefix(">").split()) for ln in manifest.splitlines())
-    assert '`reason: "foreign"`' in flat
-    assert '"degraded-idless"' in flat
-    assert "idle_minutes" in flat
-    assert "do not guess" in flat
-    assert "is another Claude session open in this project?" in flat
-    assert "--force" in flat
-
-
 def test_no_template_invokes_the_deleted_autopilot_guard() -> None:
     """The module was deleted in 539f05a9. An invocation of a non-existent module is worse
     than no invocation — it looks like a wired safety net."""

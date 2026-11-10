@@ -7,7 +7,8 @@
     ADR-006 staging (PLAN-permission-deny-and-hooks-wiring):
       Stage 1 (Phase 1) — non-blocking: telemetry, post_write_reminder,
         sessionid_envfile, autopilot_autoarm, flush_session.
-      Stage 2 (Phase 2) — control-flow, **Stop event only**: loop_gate, passing
+      Stage 2 (Phase 2) — control-flow, **Stop event only**: loop_gate (retired by
+        SPEC-retired-wiring with /hm:loop; the notes below are its history), passing
         `--mode stop-hook` (the module dispatches on it). loop_gate on Stop is what
         lets /hm:loop reach iteration 2. Stop-blocking
         is a materially lower risk class than tool-call blocking: it cannot block a
@@ -84,7 +85,6 @@
     "Stop": [
       {
         "hooks": [
-          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10},
           {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
         ]
       }

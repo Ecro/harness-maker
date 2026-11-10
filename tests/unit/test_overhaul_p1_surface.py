@@ -366,7 +366,6 @@ def test_ac004_hook_commands_per_file(trees: dict[str, Path], name: str) -> None
         ("PreCompact", "auto", "worktree span-end"),
         ("PreCompact", "manual", "hooks.flush_session"),
         ("PreCompact", "manual", "worktree span-end"),
-        ("Stop", "", "hooks.loop_gate --mode stop-hook"),
         ("Stop", "", "worktree span-end"),
         ("SessionStart", "", "hooks.sessionid_envfile"),
     } | ({("PreToolUse", edit, "gates.spec_gate")} if block else set())
@@ -377,7 +376,6 @@ def test_ac004_hook_commands_per_file(trees: dict[str, Path], name: str) -> None
             ("PreToolUse", "Bash", "gates.permission_gate"),
             ("SessionStart", "", "hooks.sessionstart_drift"),
             ("SessionStart", "", "hooks.sessionid_envfile"),
-            ("Stop", "", "hooks.loop_gate --mode stop-hook"),
             ("Stop", "", "hooks.flush_session"),
         } | ({("PreToolUse", "apply_patch", "gates.spec_gate")} if block else set())
         assert _hook_rows(root / ".codex" / "hooks.json") == codex
@@ -517,7 +515,7 @@ _ROWS: list[tuple[tuple[str, ...], str, Callable[[str], bool], str]] = [
     (
         tuple(ARMS),
         "execute",
-        lambda t: "checkpoint:compaction" in t and ".claude-progress.json" in t,
+        lambda t: "checkpoint:compaction" in t and ".claude-progress.json" not in t,
         "the hot tier",
     ),
     (

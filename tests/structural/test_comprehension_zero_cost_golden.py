@@ -17,7 +17,6 @@ the same durability defect that forces Phase 3b to exist, inverted.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -27,7 +26,6 @@ from harness_maker.models import DEFAULT_COMPREHENSION_DEPTH
 from ._comprehension_golden import (
     GOLDEN_PATH,
     TRACKED_COMMANDS,
-    build_golden,
     digest,
     load_golden,
 )
@@ -123,22 +121,6 @@ def test_the_golden_is_never_regenerated_by_this_task(golden: dict[str, object])
     )
 
 
-def test_the_golden_matches_a_pre_change_render_while_the_partial_is_absent() -> None:
-    """While the templates are untouched, a fresh render must reproduce the golden exactly.
-
-    This arm retires itself once Phase 2 lands: from then on the default render is
-    `standard`, and AC-003's minimal comparison lives in the render gate instead.
-    """
-    partial = (
-        Path(__file__).resolve().parents[2]
-        / "src/harness_maker/templates/agents/_partials/comprehension_block.md.j2"
-    )
-    if partial.exists():
-        pytest.skip("templates have changed — AC-003 now owns the comparison, at depth=minimal")
-    fresh = build_golden()
-    assert fresh["digests"] == load_golden()["digests"]
-
-
 def test_digest_is_content_addressed_not_length_addressed() -> None:
     """Character count does not prove byte identity; the golden must not regress to it."""
     assert digest("ab") != digest("ba")
@@ -183,12 +165,7 @@ def test_the_depth_override_lever_actually_moves_the_render() -> None:
     obvious ways out of that position are exactly the two things this file exists to
     forbid: editing the stage templates early, or re-capturing the golden.
     """
-    partial = (
-        Path(__file__).resolve().parents[2]
-        / "src/harness_maker/templates/agents/_partials/comprehension_block.md.j2"
-    )
-    if not partial.exists():
-        pytest.skip("Phase 2 has not landed — no rendered command reads depth yet")
+    # Phase 2 landed; the depth branch now lives inline in `stages/spec.md.j2`.
     plain = render_surface()
     # The contrast depth is DERIVED from the repo's own configured depth, never hardcoded. An
     # earlier version pinned "deep", which held only while this repo's harness.yaml sat at
@@ -215,12 +192,7 @@ def test_minimal_reproduces_the_golden_once_the_partial_exists() -> None:
     """AC-003 proper. Inert until Phase 2, and deliberately so — before the partial, an
     un-branched template renders the same bytes at every depth, so this would pass for
     every implementation including one that ignores `depth` entirely."""
-    partial = (
-        Path(__file__).resolve().parents[2]
-        / "src/harness_maker/templates/agents/_partials/comprehension_block.md.j2"
-    )
-    if not partial.exists():
-        pytest.skip("Phase 2 has not landed — the depth branch does not exist yet")
+    # Phase 2 landed; the depth branch now lives inline in `stages/spec.md.j2`.
     minimal = render_surface(depth_override="minimal")
     recorded = load_golden()["digests"]
     assert isinstance(recorded, dict)

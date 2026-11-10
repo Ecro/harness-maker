@@ -222,8 +222,8 @@ def test_span_end_is_wired_into_settings_json_not_the_dead_hooks_json(
 
     stop_cmds = _cmds("Stop")
     assert any("worktree span-end" in c for c in stop_cmds), stop_cmds
-    # the pre-existing loop gate must survive alongside it
-    assert any("loop_gate" in c for c in stop_cmds), stop_cmds
+    # the loop gate that used to share this group is retired (SPEC-retired-wiring)
+    assert not any("loop_gate" in c for c in stop_cmds), stop_cmds
 
     # PreCompact is the OTHER half of ADR-003's session-end closure, and the one that
     # matters most: compaction is listed as a boundary class that produces

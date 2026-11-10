@@ -142,6 +142,6 @@ def test_codex_config_toml_does_not_render_profile_blocks() -> None:
     non_comment_body = "\n".join(non_comment_lines)
     assert 'model_reasoning_effort = "minimal"' not in non_comment_body
     assert 'model_reasoning_effort = "high"' not in non_comment_body
-    # Sanity: the reference comment pointing the user to ~/.codex/ should
-    # be present so anyone wondering "where did profiles go?" finds it.
-    assert "~/.codex/config.toml" in rendered
+    # SPEC-retired-wiring AC-002: make no longer installs per-loop profiles into
+    # ~/.codex/config.toml, so the rendered file no longer points there.
+    assert "~/.codex/config.toml" not in rendered
