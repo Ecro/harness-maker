@@ -43,7 +43,8 @@ def _modules_constructing_an_environment() -> list[Path]:
 def test_the_discovery_is_not_vacuous() -> None:
     """A broken scan would silently pass every arm below."""
     modules = _modules_constructing_an_environment()
-    assert len(modules) >= 3, f"expected several Environment call sites, found {modules}"
+    # Two since SPEC-dead-modules deleted foreign_config, the third site.
+    assert len(modules) >= 2, f"expected several Environment call sites, found {modules}"
 
 
 @pytest.mark.parametrize("path", _modules_constructing_an_environment(), ids=lambda p: p.stem)

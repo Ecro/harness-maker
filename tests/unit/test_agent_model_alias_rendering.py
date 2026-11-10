@@ -70,31 +70,3 @@ def test_agent_frontmatter_renders_alias_not_concrete(tmp_path: Path, preset: Pr
 def test_default_model_floor_is_alias() -> None:
     """Floor fallback is version-agnostic (ADR-002)."""
     assert HarnessConfig().default_model == "opus"
-
-
-@pytest.mark.parametrize("ftype", ["aider", "continue"])
-def test_foreign_config_renders_concrete_model(ftype: str) -> None:
-    """ADR-006: aider/Continue hit the Anthropic API and require a CONCRETE id.
-
-    With the floor now an alias (`opus`), the foreign-config render boundary
-    must resolve it to a concrete Anthropic model id — `opus` would be an
-    unusable model string for those external tools.
-    """
-    from harness_maker.foreign_config import (
-        AxisMapping,
-        ForeignConfig,
-        _build_render_context,
-    )
-    from harness_maker.models import Confidence
-
-    fc = ForeignConfig(path=".aider.conf.yml", type=ftype, size=10, confidence=Confidence.HIGH)
-    cfg = HarnessConfig(default_model="opus")
-    ctx = _build_render_context(fc, cfg, AxisMapping())
-    rendered_model = ctx["default_model"]
-    assert rendered_model not in _ALIASES, (
-        f"{ftype}: foreign config received bare alias {rendered_model!r} — "
-        "Anthropic API needs a concrete id"
-    )
-    assert _CONCRETE_RE.match(rendered_model), (
-        f"{ftype}: expected a concrete claude-* id, got {rendered_model!r}"
-    )

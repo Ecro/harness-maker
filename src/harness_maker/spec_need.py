@@ -136,7 +136,6 @@ def record_spec_need(
 ) -> None:
     """Append a SpecNeedEvent to the verdict ledger (no-raise contract).
 
-    Mirrors observability/intent_miss.record_intent_miss.
     Writes to <base>/.claude/observability/spec-need-{target}.jsonl, where <base> is the
     main worktree resolved from ``root``. ``root`` is the stage's `<WT>`, and a worktree's
     `.claude/observability/` is gitignored and deleted at `task-land` — spoton had four

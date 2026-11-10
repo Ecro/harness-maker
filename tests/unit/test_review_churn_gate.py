@@ -11,100 +11,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from harness_maker.readiness import churn_gate_signal
-from harness_maker.review_churn import resolve_churn_threshold
-from harness_maker.review_consensus import exit_record, rereview_plan, rereview_reason
-from harness_maker.spec_machine import GoldenRow, load_golden_table
+from harness_maker.spec_machine import load_golden_table
 from tests.stage_surface import stage_text
 
 _SPEC = Path(__file__).parents[2] / "specs" / "SPEC-review-loop-empirics.machine.yaml"
 _ROWS = load_golden_table(_SPEC, "AC-010")
 
 
-@pytest.mark.parametrize(
-    "row", _ROWS, ids=[f"{r.input['churn_ratio']}-vs-{r.input['threshold']}" for r in _ROWS]
-)
-def test_below_threshold_churn_skips_rereview(row: GoldenRow) -> None:
-    """Both halves: the dispatch count AND the recorded reason.
-
-    Counting dispatches alone accepts a gate that skips silently — and a skip whose
-    reason is not recorded is indistinguishable, later, from a round where no reviewer
-    was scoped in the first place.
-    """
-    ratio = float(row.input["churn_ratio"])
-    threshold = float(row.input["threshold"])
-    plan = rereview_plan(ratio, threshold)
-    assert len(plan) == row.expected["dispatches"]
-
-    reason = rereview_reason(ratio, threshold)
-    assert row.expected["reason_contains"] in reason
-    for dispatch in plan:
-        assert dispatch.reason == reason
-
-
-def test_above_threshold_dispatches_one_structured_reviewer() -> None:
-    """One, and it carries a lens — "some reviewer" is not a structured dispatch."""
-    plan = rereview_plan(churn_ratio=0.35, threshold=resolve_churn_threshold({}))
-    assert len(plan) == 1
-    assert plan[0].agent
-    assert plan[0].lens
-
-
-def test_below_threshold_churn_skips_rereview_at_the_configured_threshold_not_the_default() -> None:
-    """A gate hardcoding 0.20 passes every default-config test and ignores the key.
-
-    `rereview_churn_ratio: 0.5` is the configured statement "half a file is where
-    re-review starts"; a 0.35 round must skip under it and dispatch under the default.
-    """
-    configured = resolve_churn_threshold({"rereview_churn_ratio": 0.5})
-    assert rereview_plan(0.35, configured) == []
-    assert len(rereview_plan(0.35, resolve_churn_threshold({}))) == 1
-
-
 # ── AC-014 — the stalled loop ────────────────────────────────────────────────
-
-
-def test_no_progress_records_churn_ratio() -> None:
-    record = exit_record(transitions=0, churn_ratio=0.0)
-    assert record["exit_reason"] == "no-progress"
-    assert record["churn_ratio"] == 0.0
-
-
-def test_no_progress_records_churn_ratio_even_when_nothing_was_measurable() -> None:
-    """The key is always present; absent-vs-zero is the distinction it carries."""
-    record = exit_record(transitions=0, churn_ratio=None)
-    assert record["exit_reason"] == "no-progress"
-    assert record["churn_ratio"] is None
-
-
-def test_no_progress_records_churn_ratio_without_disturbing_exit_precedence() -> None:
-    """The pre-change assignment for the same inputs, unchanged (AC-014's oracle).
-
-    Each row names a stop that is ALSO no-progress by the raw transition count; the
-    label that wins is the shipped one. `cap-exhausted` in particular must never be
-    reported for a stop the no-progress invariant made.
-    """
-    assert exit_record(transitions=0, churn_ratio=0.1, approved=True)["exit_reason"] == "converged"
-    assert (
-        exit_record(transitions=0, churn_ratio=0.1, auto_fix=False)["exit_reason"]
-        == "auto-fix-disabled"
-    )
-    assert (
-        exit_record(transitions=0, churn_ratio=0.1, rounds_used=3, max_rounds=3)["exit_reason"]
-        == "no-progress"
-    )
-    assert (
-        exit_record(transitions=2, churn_ratio=0.1, rounds_used=3, max_rounds=3)["exit_reason"]
-        == "cap-exhausted"
-    )
-
-
-def test_exit_record_refuses_to_label_a_round_that_has_not_stopped() -> None:
-    """A fallthrough label would be written into an append-only record as a real exit."""
-    with pytest.raises(ValueError, match="has not stopped"):
-        exit_record(transitions=2, churn_ratio=0.1, rounds_used=1, max_rounds=3)
 
 
 # ── AC-019 — /hm:health on a disabled gate ───────────────────────────────────

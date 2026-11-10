@@ -14,8 +14,6 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from harness_maker import spec_machine
-from harness_maker.observability import spec_drift
-from harness_maker.spec_inventory import batch_refiner
 from harness_maker.spec_machine import (
     approval_content_hash,
     approval_state_of,
@@ -457,51 +455,6 @@ def test_ac005_judgment_readers_skip_superseded(specs: Path) -> None:
     yaml_path = _mixed(specs, specs.parent)
     assert find_unjudged(yaml_path, specs.parent) == ["AC-006", "AC-007"]
     assert stale_judgment_verdicts(yaml_path, specs.parent) == ["AC-007"]
-
-
-def test_ac005_spec_drift_skips_superseded(specs: Path) -> None:
-    _approved(specs, "target")
-    _write_spec(
-        specs,
-        "drift",
-        [
-            _ac("AC-001", pending_test=False, superseded_by="target"),
-            _ac("AC-002", pending_test=False),  # live gap control
-        ],
-    )
-    report = spec_drift.scan(specs)
-    assert "drift::AC-001" not in report.coverage_gaps
-    assert "drift::AC-002" in report.coverage_gaps
-
-
-def test_ac005_batch_refiner_leaves_superseded_untouched(
-    specs: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _approved(specs, "target")
-    yaml_path = _write_spec(
-        specs,
-        "refine",
-        [
-            _ac("AC-001", test_ids=["t.py::test_live"], pending_test=True),
-            _ac(
-                "AC-002",
-                test_ids=["tests/gone.py::test_g"],
-                pending_test=False,
-                superseded_by="target",
-            ),
-        ],
-    )
-    # Unresolvable ids are dropped from live ACs; a superseded AC's history must survive that.
-    monkeypatch.setattr(
-        batch_refiner, "_resolve_test_ids", lambda ids, root: {i for i in ids if "gone" not in i}
-    )
-    batch_refiner.refine_spec("refine", specs.parent, specs)
-    raw = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    sup = next(a for a in raw["ac"] if a["id"] == "AC-002")
-    live = next(a for a in raw["ac"] if a["id"] == "AC-001")
-    assert sup["test_ids"] == ["tests/gone.py::test_g"]
-    assert sup["superseded_by"] == "target"
-    assert live["pending_test"] is False  # live control: refined as before
 
 
 # ── AC-006 ──────────────────────────────────────────────────────────────────────────────
