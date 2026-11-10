@@ -31,23 +31,23 @@ Write `{{ _wt }}work-docs/PLAN-<slug>.md`, or extend it if it exists. Frontmatte
 
 ## Step 0.3 — Verify the PLAN
 
-Read it back: each phase line has all four fields and `### Do not change` is non-empty; fix once, else report the path and stop.
+Confirm each phase line has all four fields and `### Do not change` is non-empty; fix once, else report the path and stop.
 
 ## Step 1 — Load the PLAN
 
-Read it and any RESEARCH doc it names; ADRs bind. Restate `Do not change` once.
+Read the PLAN, its RESEARCH doc and the SPEC only on Resume or when this session did not write them; ADRs bind. Restate `Do not change` once.
 
 ## Step 2 — Load the SPEC
 
-Take `test_framework`, the scenarios and the testable ACs (not superseded, not `type: judgment`) from the SPEC and machine.yaml.
+Take `test_framework`, the scenarios and the testable ACs (not superseded, not `type: judgment`).
 
 ## Step 3 — Tests first, then the phases
 
 ### Phase A — Write every AC test
 
-Before any code, write a test for every testable AC in the SPEC, across all phases, named `test_ac_NNN_<short>`. Its assertion is the AC's oracle on the real code: a mechanical AC asserts its `executable_predicate`; a parametric AC runs `hm spec_machine export-golden --yaml specs/SPEC-<slug>.machine.yaml`, then parametrizes over its rows, read with stdlib `json` from the `SPEC-<slug>.golden.json` it writes; a property AC uses Hypothesis `@given` over `input_domain` (no Hypothesis: a seeded stdlib `random` loop; never add it) and asserts `expected_relation`. No tautology and no mock-only body. Importing a first-party name that does not exist yet is a valid RED; that name must exist by GREEN.
+Before any code, write a test for every testable AC in the SPEC, across all phases, named `test_ac_NNN_<short>`; ACs sharing a call shape share one parametrized test with ids `AC-NNN-<i>`. Its assertion is the AC's oracle on the real code: a mechanical AC asserts its `executable_predicate`; a parametric AC runs `hm spec_machine export-golden --yaml specs/SPEC-<slug>.machine.yaml`, then parametrizes over its rows, read with stdlib `json` from the `SPEC-<slug>.golden.json` it writes; a property AC uses Hypothesis `@given` over `input_domain` (no Hypothesis: a seeded stdlib `random` loop; never add it) and asserts `expected_relation`. No tautology, no mock-only body; never copy the implementation into a test; never regenerate golden rows. Importing a first-party name that does not exist yet is a valid RED; that name must exist by GREEN.
 
-Put each test's node id in its AC's `test_ids` now, keeping `pending_test: true`, and run `hm spec_machine validate specs/SPEC-<slug>.machine.yaml`.
+Tests bind by these names; leave `test_ids` alone.
 
 **RED**, once, before any code: run `hm check --red --slug <slug>`. Exit 0: every one has a test failing for a real reason. On exit 1, fix what it names: a test already passing, a syntax error, a missing fixture or node id. An AC whose behaviour already exists may be waived with `--green-ok AC-NNN`; the reason goes to the reviewer. Keep the RED summary for the commit body.
 
@@ -76,7 +76,7 @@ Dispatch {{ hm.dispatch("code-reviewer", "give it the SPEC, the PLAN, the diff a
 {%- endif %}
 {%- if _so_models %}
 
-**Second opinion** ({{ _so_models | join(', ') }}). For each model, `mktemp` a path, write the diff and SPEC to it with the Write tool, then run `hm second_opinion_invoke --model <model> --prompt-file <path> --slug <slug> --stage review` as its own Bash call{% if not is_codex %} with `dangerouslyDisableSandbox: true`{% endif %}. Its JSON line carries `status` and `findings`; `skipped` or `failed` warns and proceeds. One call per model per review. A finding is accepted when two voters raise it (K=2); a single-voter finding goes to {{ hm.dispatch("code-verifier", "with the finding and the oracle output") }} for accepted, rejected, duplicate or unresolved, and `consensus-arbiter` resolves conflicting severities.
+**Second opinion** ({{ _so_models | join(', ') }}). For each model, `mktemp` a path, write the diff and SPEC to it with the Write tool, then run `hm second_opinion_invoke --model <model> --prompt-file <path> --slug <slug> --stage review` as its own Bash call{% if not is_codex %} with `dangerouslyDisableSandbox: true`{% endif %}. Its JSON line carries `status` and `findings`; `skipped` or `failed` warns and proceeds. One call per model per review. A finding is accepted when two voters raise it (K=2); a single-voter finding goes to {{ hm.dispatch("code-verifier", "with the finding and the oracle output") }} for accepted, rejected, duplicate or unresolved, and `consensus-arbiter` merges the voters' findings without changing a severity.
 {%- endif %}
 
 Give each finding a disposition: `accepted`, `rejected` (with an authority), `duplicate` or `unresolved`; note drift from the PLAN's scope or the SPEC's intent as a finding. Fix the accepted findings (never edit a test file to resolve a finding whose target is not that test) and review again, for at most `reviewers.max_review_rounds` ({{ _rounds }}) rounds; what stays open goes to the DRI as `unresolved`. Then write `work-docs/REVIEW-<slug>-<YYYY-MM-DD>.md`, the record that execute finished: a `## Findings` table `| id | severity | file:line | finding | disposition | authority |` of every round's findings (`none` if no round found any); then always run `hm check --slug <slug>` and act on its exit as at Bind, except that exit 1 on an `unresolved` row goes to the DRI; never change a disposition to pass the gate.

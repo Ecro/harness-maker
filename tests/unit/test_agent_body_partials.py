@@ -155,7 +155,9 @@ _EXPECTED_SHA256: dict[str, str] = {
     # reconciled to forbid cross-tier severity resolution, and the user-extension
     # comment reworded to forbid tier bridging. Body change outside the codex
     # conditional, so the disabled-config hash moves. Pre-bump hash in git history.
-    "consensus-arbiter": "2b820f15f2ec14f5c1316193e31777d74b46079cd4a345a7f7bc7633a41d80e5",
+    # Re-pinned again 2026-11-10 (SPEC-hm-cost-p4 AC-007): the description and trigger say it
+    # merges the voters' findings and never changes a severity, matching the body.
+    "consensus-arbiter": "c3d22959d2bd0fe03c479e98dcdcc94cc62eac52d4bbd380efd72ce597d47247",
     # executor: re-pinned 2026-06-03 (PLAN-techspec-audit F61). The description
     # + body claimed a runtime-enforced "never writes to repo root" boundary that
     # Claude Code does NOT enforce (subagent-frontmatter permissions are not

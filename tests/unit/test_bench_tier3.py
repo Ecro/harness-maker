@@ -699,7 +699,11 @@ def test_control_rows_stay_out_of_the_main_scorecard(bench: ModuleType) -> None:
     assert bench.summarize(rows + controls)["arms"] == bench.summarize(rows)["arms"]
     cells = bench.pending_cells([], ["t19"], ["plain-careful", "plain"], 1)
     assert cells == [("t19", "plain-careful", 1), ("t19", "plain", 1)]
-    assert set(bench.ALL_ARMS) == {"plain", "hm", "plain-careful", "plain-continue"}
+    variants = [_row(t, "hm-novalidator", r, solved=True) for t in ("t13", "t16") for r in (1, 2)]
+    assert bench.scorecard(rows + variants) == bench.scorecard(rows)
+    assert set(bench.ALL_ARMS) == {
+        "plain", "hm", "plain-careful", "plain-continue", "hm-novalidator"
+    }  # fmt: skip
 
 
 # --- AC-009: the tier-3 report ----------------------------------------------------------------

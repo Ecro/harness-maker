@@ -1,0 +1,234 @@
+{
+  "AC-002": [
+    {
+      "expected": {
+        "errors": 0,
+        "recorded": {
+          "AC-001": [
+            "tests/test_a.py::test_ac_001_sum"
+          ]
+        }
+      },
+      "input": {
+        "acs": [
+          "AC-001"
+        ],
+        "tests": [
+          "tests/test_a.py::test_ac_001_sum"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "errors": 0,
+        "recorded": {
+          "AC-001": [
+            "tests/test_a.py::test_ac_001"
+          ]
+        }
+      },
+      "input": {
+        "acs": [
+          "AC-001"
+        ],
+        "tests": [
+          "tests/test_a.py::test_ac_001"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "errors": 0,
+        "recorded": {
+          "AC-001": [
+            "tests/test_g.py::test_golden[AC-001-0]",
+            "tests/test_g.py::test_golden[AC-001-1]"
+          ],
+          "AC-002": [
+            "tests/test_g.py::test_golden[AC-002-0]"
+          ]
+        }
+      },
+      "input": {
+        "acs": [
+          "AC-001",
+          "AC-002"
+        ],
+        "tests": [
+          "tests/test_g.py::test_golden[AC-001-0]",
+          "tests/test_g.py::test_golden[AC-001-1]",
+          "tests/test_g.py::test_golden[AC-002-0]"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "errors": 0,
+        "recorded": {
+          "AC-001": [
+            "tests/test_g.py::test_golden[AC-001]"
+          ]
+        }
+      },
+      "input": {
+        "acs": [
+          "AC-001"
+        ],
+        "tests": [
+          "tests/test_g.py::test_golden[AC-001]"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "error_mentions": [
+          "AC-001",
+          "test_ac_001",
+          "AC-001-"
+        ],
+        "errors": 1,
+        "recorded": {
+          "AC-001": []
+        }
+      },
+      "input": {
+        "acs": [
+          "AC-001"
+        ],
+        "tests": [
+          "tests/test_a.py::test_ac_0012_x",
+          "tests/test_g.py::test_golden[AC-0012-0]"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "error_mentions": [
+          "AC-003",
+          "test_ac_003",
+          "AC-003-"
+        ],
+        "errors": 1,
+        "recorded": {
+          "AC-003": []
+        }
+      },
+      "input": {
+        "acs": [
+          "AC-003"
+        ],
+        "tests": [
+          "tests/test_a.py::test_ac_001_sum"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "errors": 0,
+        "recorded": {
+          "AC-001": [
+            "tests/test_g.py::test_ac_001_golden[AC-001-0]"
+          ],
+          "AC-002": [
+            "tests/test_g.py::test_ac_001_golden[AC-002-0]"
+          ]
+        }
+      },
+      "input": {
+        "acs": [
+          "AC-001",
+          "AC-002"
+        ],
+        "tests": [
+          "tests/test_g.py::test_ac_001_golden[AC-001-0]",
+          "tests/test_g.py::test_ac_001_golden[AC-002-0]"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "errors": 0,
+        "unbound": [
+          "AC-002"
+        ]
+      },
+      "input": {
+        "acs": [],
+        "find_unbound": true,
+        "pending": [
+          "AC-002"
+        ],
+        "tests": [
+          "tests/test_g.py::test_golden[AC-002-0]"
+        ]
+      }
+    }
+  ],
+  "AC-003": [
+    {
+      "expected": {
+        "exit": 0,
+        "not_red": [],
+        "yaml_unchanged": true
+      },
+      "input": {
+        "code": "absent_in_body",
+        "mode": "red",
+        "tests": [
+          "tests/test_g.py::test_golden[AC-001-0]",
+          "tests/test_g.py::test_golden[AC-002-0]"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "exit": 1,
+        "not_red": [
+          "AC-002"
+        ],
+        "yaml_unchanged": true
+      },
+      "input": {
+        "code": "absent_in_body",
+        "mode": "red",
+        "tests": [
+          "tests/test_g.py::test_golden[AC-001-0]"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "exit": 0,
+        "not_red": [],
+        "yaml_unchanged": true
+      },
+      "input": {
+        "code": "module_level_import_of_absent_name",
+        "mode": "red",
+        "tests": [
+          "tests/test_a.py::test_ac_001_x",
+          "tests/test_g.py::test_golden reading SPEC-<slug>.golden.json"
+        ]
+      }
+    },
+    {
+      "expected": {
+        "exit": 1,
+        "failed": {
+          "AC-001": "pending_test is true",
+          "AC-002": "pending_test is true"
+        },
+        "yaml_unchanged": true
+      },
+      "input": {
+        "code": "present",
+        "mode": "full",
+        "pending_test": true,
+        "tests": [
+          "tests/test_a.py::test_ac_001_x",
+          "tests/test_a.py::test_ac_002_y"
+        ]
+      }
+    }
+  ]
+}

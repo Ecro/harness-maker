@@ -93,6 +93,9 @@ _DROPPED: tuple[tuple[str, str, str], ...] = (
     ("wrapup", "spec_machine", "mark-tested"),
     # SPEC-hm-cost-p2 AC-005: spec Step 5 reads approval from `check`/`approve` output.
     ("spec", "spec_machine", "approval-status"),
+    # SPEC-hm-cost-p4 AC-004: tests bind by name, so execute no longer edits the yaml it
+    # used to re-validate; `check --red` and `mark-tested` still load and validate it.
+    ("execute", "spec_machine", "validate"),
 )
 _ADDED: dict[str, set[tuple[str, str]]] = {
     # SPEC-hm-cost-p2 AC-003 adds `export-golden` for parametric tests.

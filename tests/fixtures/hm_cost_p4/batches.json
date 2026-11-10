@@ -1,0 +1,13 @@
+{
+  "batches": [
+    {
+      "complete": true,
+      "run": "2026-11-10",
+      "shas": [
+        "3063ad338e06"
+      ],
+      "aliases": [],
+      "note": "Tier-1 re-measure for SPEC-hm-cost-p4 AC-009: plain, hm and hm-novalidator x t1-t5 x 3 runs, claude-sonnet-5-5, 45 rows in docs/evals/results.jsonl. The only batch run; no run was repeated."
+    }
+  ]
+}

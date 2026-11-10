@@ -244,7 +244,8 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 
 #: (stage, base, + worktree on, + depth deep) from the AC-004 table.
 # execute and wrapup raised by SPEC-hm-cost-p2 (BASELINE-DELTA-hm-cost-p2.md, DRI 2026-10-21).
-_STAGE_BUDGET = {"spec": (6850, 1500, 800), "execute": (7550, 1500, 0), "wrapup": (3900, 2800, 0)}
+# spec and execute raised by SPEC-hm-cost-p4 (BASELINE-DELTA-hm-cost-p4.md, PLAN ADR-004).
+_STAGE_BUDGET = {"spec": (6950, 1500, 800), "execute": (7610, 1500, 0), "wrapup": (3900, 2800, 0)}
 _OPT_IN = 1500
 
 

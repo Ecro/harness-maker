@@ -257,7 +257,7 @@ def strip_retired_keys(data: dict[str, Any], *, source: Path | None = None) -> d
         logger.warning(
             "harness.yaml carries retired key(s) %s — the fused-workflow axis was removed in "
             "0.47.0; they are ignored. Re-render via /harness-maker:make to drop them from "
-            "disk. Chain stages with `/hm:loop --per-iter-stages` or autopilot instead.",
+            "disk. Run each /hm: stage directly, or let Maker advance them.",
             ", ".join(present),
         )
     return {k: v for k, v in data.items() if k not in RETIRED_TOP_LEVEL_KEYS}

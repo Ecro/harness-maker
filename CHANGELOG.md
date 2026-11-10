@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+Cost phase 4 (SPEC-hm-cost-p4): tier-1 transcript ratio 11.36 -> 10.24, short of the pre-registered 10.0
+bar (recorded). New lint and type errors per hm run 1.60 -> 0.73.
+
+### Changed
+
+- **AC tests bind by name.** `hm spec_machine mark-tested` records the tests it finds for an AC whose
+  `test_ids` is empty, and `hm check --red` binds them read-only: a parametrize case id `[AC-NNN]` or
+  `[AC-NNN-<suffix>]` wins, otherwise a function named `test_ac_NNN` or `test_ac_NNN_*`. Recorded
+  `test_ids` keep precedence. `/hm:execute` no longer edits `test_ids` or re-validates the yaml in Phase A.
+- **`/hm:execute`** reads the PLAN, RESEARCH doc and SPEC only on Resume or when the session did not write
+  them, shares one parametrized test across ACs with the same call shape, and never copies the
+  implementation into a test or regenerates golden rows. **`/hm:spec`**: a behaviour-unchanged AC is
+  parametric, its golden rows computed at spec time from the unchanged code.
+- `consensus-arbiter`'s description and trigger say it merges the voters' findings and never changes a
+  severity; the stage advisory and `docs/ARCHITECTURE.md` name the four stages.
+
+### Fixed
+
+- **`mark-tested` and `find-unbound` collect with the gate's pytest runner**, not PATH `pytest`, which
+  raised ImportError on projects without `pythonpath` and reported every test as unresolved. A failed
+  collect is now reported as such instead of "no test named ...".
+
+### Internal
+
+- Bench arm `hm-novalidator` (hm with the spec command's spec-validator step removed) for A/B runs; it
+  measured 7.67x on tier 1 with the same pass rate. The p3 rows moved to `docs/evals/history/hm-cost-p3.jsonl`.
+
 ## [0.65.3] - 2026-11-04
 
 `hm check --reuse` reuses the gate across DRI-declared inert changes (docs, PLANs, REVIEW fixes,

@@ -11,7 +11,8 @@ from pathlib import Path
 from tests.integration import test_hm_cost_p2_bar as p2
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RESULTS = REPO_ROOT / "docs" / "evals" / "results.jsonl"
+# SPEC-hm-cost-p4 replaced docs/evals/results.jsonl with its own rows; p3's moved here unchanged.
+RESULTS = REPO_ROOT / "docs" / "evals" / "history" / "hm-cost-p3.jsonl"
 PINS = REPO_ROOT / "tests" / "fixtures" / "hm_cost_p3" / "harness_shas.json"
 P2_HISTORY = REPO_ROOT / "docs" / "evals" / "history" / "hm-cost-p2.jsonl"
 P2_LANDED = "022d6f2a"
