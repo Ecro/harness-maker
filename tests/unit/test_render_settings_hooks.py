@@ -267,7 +267,9 @@ def test_merge_preserves_user_authored_hook() -> None:
     existing = {"hooks": {"PostToolUse": [_nested("*", "/usr/local/bin/my-own-hook.sh")]}}
     new = {
         "hooks": {
-            "PostToolUse": [_nested("*", "uv run --with /p python -m harness_maker.telemetry")]
+            "PostToolUse": [
+                _nested("*", "uv run --no-project --with /p python -m harness_maker.telemetry")
+            ]
         }
     }
     merged = _merge_hooks_json(existing, new)
@@ -287,7 +289,7 @@ def test_merge_never_deletes_a_hook_in_our_namespace_that_we_do_not_ship() -> No
     Preservation is the invariant. Re-pin this ONLY alongside positive provenance
     (a prior-render manifest), never a command-prefix inference.
     """
-    hand_wired = "uv run --with /p python -m harness_maker.gates.spec_gate"
+    hand_wired = "uv run --no-project --with /p python -m harness_maker.gates.spec_gate"
     existing = {"hooks": {"PreToolUse": [_nested("Write|Edit", hand_wired)]}}
     new: dict[str, Any] = {"hooks": {"PreToolUse": []}}
     merged = _merge_hooks_json(existing, new)
@@ -300,14 +302,18 @@ def test_merge_dedups_harness_hook_across_plugin_path_change() -> None:
     existing = {
         "hooks": {
             "PostToolUse": [
-                _nested("*", "uv run --with /old/0.38.0 python -m harness_maker.telemetry")
+                _nested(
+                    "*", "uv run --no-project --with /old/0.38.0 python -m harness_maker.telemetry"
+                )
             ]
         }
     }
     new = {
         "hooks": {
             "PostToolUse": [
-                _nested("*", "uv run --with /new/0.39.0 python -m harness_maker.telemetry")
+                _nested(
+                    "*", "uv run --no-project --with /new/0.39.0 python -m harness_maker.telemetry"
+                )
             ]
         }
     }
@@ -319,7 +325,9 @@ def test_merge_preserves_user_added_event() -> None:
     existing = {"hooks": {"Notification": [_nested("*", "/usr/local/bin/notify.sh")]}}
     new = {
         "hooks": {
-            "PostToolUse": [_nested("*", "uv run --with /p python -m harness_maker.telemetry")]
+            "PostToolUse": [
+                _nested("*", "uv run --no-project --with /p python -m harness_maker.telemetry")
+            ]
         }
     }
     merged = _merge_hooks_json(existing, new)
@@ -333,7 +341,7 @@ def test_merge_no_duplication_when_target_template_ships_the_same_command() -> N
     template that does not must preserve it (never delete — see
     `test_merge_never_deletes_a_hook_in_our_namespace_that_we_do_not_ship`).
     """
-    cmd = "uv run --with /p python -m harness_maker.gates.permission_gate"
+    cmd = "uv run --no-project --with /p python -m harness_maker.gates.permission_gate"
     on_disk = {"hooks": {"PreToolUse": [_nested("Bash", cmd)]}}
 
     ships = _merge_hooks_json(on_disk, {"hooks": {"PreToolUse": [_nested("Bash", cmd)]}})
@@ -360,7 +368,7 @@ def test_merge_entry_identity_covers_all_commands_in_group() -> None:
     `<HM>:telemetry` on both sides, classifies the on-disk group as "already
     shipped", and drops it — taking the user's command with it (CLAUDE.md §1).
     """
-    hm_cmd = "uv run --with /p python -m harness_maker.telemetry"
+    hm_cmd = "uv run --no-project --with /p python -m harness_maker.telemetry"
     existing = {"hooks": {"PostToolUse": [_nested("*", hm_cmd, "/usr/local/bin/user-extra.sh")]}}
     new = {"hooks": {"PostToolUse": [_nested("*", hm_cmd)]}}
 
@@ -386,8 +394,8 @@ def test_merge_preserves_both_all_harness_and_mixed_groups_when_template_is_sile
     # Both must be modules the template genuinely does NOT ship, or the docstring's
     # claim is false: `autopilot_guard` is shipped on Stop as of Phase 2, so it cannot
     # stand in for "an all-harness group the template does not ship" (code-reviewer P2).
-    gate = "uv run --with /p python -m harness_maker.gates.spec_gate"
-    guard = "uv run --with /p python -m harness_maker.gates.worktree_gate"
+    gate = "uv run --no-project --with /p python -m harness_maker.gates.spec_gate"
+    guard = "uv run --no-project --with /p python -m harness_maker.gates.worktree_gate"
     existing = {
         "hooks": {
             "PreToolUse": [
@@ -418,9 +426,9 @@ def test_merge_group_growth_neither_duplicates_nor_loses() -> None:
     `_normalize_hm_managed_command` keys identity on module **plus trailing args**, so
     `gate` carries `--subordinate-to-deny-dangerous` to model what the template ships.
     """
-    grown = "uv run --with /p python -m harness_maker.gates.worktree_gate"
+    grown = "uv run --no-project --with /p python -m harness_maker.gates.worktree_gate"
     gate = (
-        "uv run --with /p python -m harness_maker.gates.permission_gate "
+        "uv run --no-project --with /p python -m harness_maker.gates.permission_gate "
         "--subordinate-to-deny-dangerous"
     )
 
@@ -442,8 +450,8 @@ def test_merge_group_growth_keeps_a_user_command_in_the_grown_group() -> None:
     added their own PreToolUse/Bash command must keep it when the template grows the
     group — and must not collect a duplicate of the still-shipped hook either.
     """
-    grown = "uv run --with /p python -m harness_maker.gates.worktree_gate"
-    gate = "uv run --with /p python -m harness_maker.gates.permission_gate"
+    grown = "uv run --no-project --with /p python -m harness_maker.gates.worktree_gate"
+    gate = "uv run --no-project --with /p python -m harness_maker.gates.permission_gate"
     mine = "/usr/local/bin/my-audit.sh"
 
     on_disk = {"hooks": {"PreToolUse": [_nested("Bash", grown, mine)]}}
@@ -470,10 +478,10 @@ def test_merge_retires_autopilot_guard_when_template_drops_it() -> None:
     is the whole point of the mechanism (every existing harness self-cleans on re-render).
     """
     gate = (
-        "uv run --with /p python -m harness_maker.gates.permission_gate "
+        "uv run --no-project --with /p python -m harness_maker.gates.permission_gate "
         "--subordinate-to-deny-dangerous"
     )
-    guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard"
+    guard = "uv run --no-project --with /p python -m harness_maker.hooks.autopilot_guard"
     on_disk = {"hooks": {"PreToolUse": [_nested("Bash", gate, guard)]}}
     new = {"hooks": {"PreToolUse": [_nested("Bash", gate)]}}  # template no longer ships guard
     merged = _merge_hooks_json(on_disk, new)
@@ -485,8 +493,11 @@ def test_merge_retires_autopilot_guard_when_template_drops_it() -> None:
 def test_merge_retires_autopilot_guard_stop_mode() -> None:
     """The Stop-mode invocation (`--mode stop-hook`) is a DISTINCT retired entry — its
     normalized identity carries the trailing arg, so it needs its own set member."""
-    loop = "uv run --with /p python -m harness_maker.hooks.loop_gate --mode stop-hook"
-    guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard --mode stop-hook"
+    loop = "uv run --no-project --with /p python -m harness_maker.hooks.loop_gate --mode stop-hook"
+    guard = (
+        "uv run --no-project --with /p python -m harness_maker.hooks.autopilot_guard "
+        "--mode stop-hook"
+    )
     on_disk = {"hooks": {"Stop": [_nested("", loop, guard)]}}
     new = {"hooks": {"Stop": [_nested("", loop)]}}
     merged = _merge_hooks_json(on_disk, new)
@@ -500,8 +511,8 @@ def test_merge_retirement_preserves_a_users_appended_command() -> None:
 
     `[permission_gate, autopilot_guard, user.sh]` → `[permission_gate, user.sh]`.
     """
-    gate = "uv run --with /p python -m harness_maker.gates.permission_gate"
-    guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard"
+    gate = "uv run --no-project --with /p python -m harness_maker.gates.permission_gate"
+    guard = "uv run --no-project --with /p python -m harness_maker.hooks.autopilot_guard"
     mine = "/usr/local/bin/my-audit.sh"
     on_disk = {"hooks": {"PreToolUse": [_nested("Bash", gate, guard, mine)]}}
     new = {"hooks": {"PreToolUse": [_nested("Bash", gate)]}}
@@ -548,7 +559,7 @@ def test_merge_prunes_stale_preset_key_for_codex() -> None:
     enough — top-level merge is existing-survives-when-template-is-silent, so the
     stale key on the user's disk would outlive the template fix forever.
     """
-    hm = "uv run --with /p python -m harness_maker.telemetry"
+    hm = "uv run --no-project --with /p python -m harness_maker.telemetry"
     existing = {
         "preset": "Side",
         "hooks": {"PostToolUse": [_nested("*", hm), _nested("*", "/usr/local/bin/mine.sh")]},
@@ -637,8 +648,8 @@ def test_render_settings_merges_hooks_and_preserves_foreign_keys(tmp_path: Path)
 # previous release's matcher.
 # ---------------------------------------------------------------------------
 
-_GATE = "uv run --with /p python -m harness_maker.gates.spec_gate"
-_PERM = "uv run --with /p python -m harness_maker.gates.permission_gate"
+_GATE = "uv run --no-project --with /p python -m harness_maker.gates.spec_gate"
+_PERM = "uv run --no-project --with /p python -m harness_maker.gates.permission_gate"
 _USER = "/usr/local/bin/my-own-check.sh"
 
 
@@ -754,17 +765,21 @@ def test_a_users_own_command_is_never_removed() -> None:
 # ADR-008 (suppression is matcher-aware, and abstains when ambiguous).
 #
 # Round 1 reproduced two defects in what Phase 2 shipped:
-#   * a preserved mixed group kept its BAKED `uv run --with <path>` while the
+#   * a preserved mixed group kept its BAKED `uv run --no-project --with <path>` while the
 #     template's fresh-path copy was deleted, so a pruned plugin-cache dir froze a
 #     dead blocking gate that no re-render could repair;
 #   * `user_scoped` was a flat per-event set applied to EVERY template entry, so
 #     scoping PreCompact's `auto` emptied the untouched `manual` entry.
 # ---------------------------------------------------------------------------
 
-_STALE = 'uv run --with "$HOME/.cache/hm/0.43.3" python -m harness_maker.gates.spec_gate'
-_FRESH = 'uv run --with "$HOME/.cache/hm/0.51.3" python -m harness_maker.gates.spec_gate'
-_FLUSH = "uv run --with /p python -m harness_maker.hooks.flush_session"
-_SPAN = "uv run --with /p python -m harness_maker.worktree span-end"
+_STALE = (
+    'uv run --no-project --with "$HOME/.cache/hm/0.43.3" python -m harness_maker.gates.spec_gate'
+)
+_FRESH = (
+    'uv run --no-project --with "$HOME/.cache/hm/0.51.3" python -m harness_maker.gates.spec_gate'
+)
+_FLUSH = "uv run --no-project --with /p python -m harness_maker.hooks.flush_session"
+_SPAN = "uv run --no-project --with /p python -m harness_maker.worktree span-end"
 
 
 def test_a_preserved_command_is_refreshed_to_the_templates_text() -> None:
@@ -940,10 +955,11 @@ def test_the_merge_converges_after_one_render() -> None:
 
 _PREFIX = 'CLAUDE_PROJECT_DIR="$X" PATH="$HOME/.local/bin:$PATH" '
 _SCOPED = (
-    _PREFIX + 'uv run --with "/old" python -m harness_maker.gates.spec_gate --exempt projects/'
+    _PREFIX
+    + 'uv run --no-project --with "/old" python -m harness_maker.gates.spec_gate --exempt projects/'
 )
-_BARE = 'uv run --with "/new" python -m harness_maker.gates.spec_gate'
-_PERM_NEW = 'uv run --with "/new" python -m harness_maker.gates.permission_gate'
+_BARE = 'uv run --no-project --with "/new" python -m harness_maker.gates.spec_gate'
+_PERM_NEW = 'uv run --no-project --with "/new" python -m harness_maker.gates.permission_gate'
 
 
 def test_an_argument_scoped_wrapper_suppresses_the_templates_bare_copy() -> None:

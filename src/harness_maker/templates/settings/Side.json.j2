@@ -8,33 +8,33 @@
     `sessionstart_drift` is excluded because the plugin bundle already fires it (ADR-010).
 -#}
 {
-  "permissions": {"allow": ["Read", "Bash(uv run --with {{ harness_maker_src_path }} python -m harness_maker.*)", "Bash(uv run --with {{ harness_maker_src_path }} hm *)", "Bash(uv run pytest:*)", "Bash(uv run ruff:*)", "Bash(uv run mypy:*)", "Bash(pytest:*)"{% if config.second_opinion and config.second_opinion.models %}, "Bash(uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke:*)"{% endif %}{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --sandbox --print:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]{% else %}[]{% endif %}},
+  "permissions": {"allow": ["Read", "Bash(uv run --no-project --with {{ harness_maker_src_path }} python -m harness_maker.*)", "Bash(uv run --no-project --with {{ harness_maker_src_path }} hm *)", "Bash(uv run pytest:*)", "Bash(uv run ruff:*)", "Bash(uv run mypy:*)", "Bash(pytest:*)"{% if config.second_opinion and config.second_opinion.models %}, "Bash(uv run --no-project --with {{ harness_maker_src_path }} hm second_opinion_invoke:*)"{% endif %}{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --sandbox --print:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]{% else %}[]{% endif %}},
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.permission_gate --subordinate-to-deny-dangerous", "timeout": 10}
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.permission_gate --subordinate-to-deny-dangerous", "timeout": 10}
         ]
       },
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.worktree_gate", "timeout": 10}
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.worktree_gate", "timeout": 10}
         ]
       }{% if strictness_of(config) == "block" %},
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.spec_gate", "timeout": 10}
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.spec_gate", "timeout": 10}
         ]
       }{% endif %}
     ],
     "Stop": [
       {
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10},
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10},
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
         ]
       }
     ],
@@ -42,22 +42,22 @@
       {
         "matcher": "auto",
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting session progress..."},
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting session progress..."},
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
         ]
       },
       {
         "matcher": "manual",
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting session progress..."},
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting session progress..."},
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
         ]
       }
     ],
     "SessionStart": [
       {
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.sessionid_envfile"}
+          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.sessionid_envfile"}
         ]
       }
     ]

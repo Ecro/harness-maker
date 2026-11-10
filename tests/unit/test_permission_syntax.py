@@ -184,5 +184,5 @@ def test_every_rendered_harness_self_call_is_actually_allowed() -> None:
     for tpl in SETTINGS_TEMPLATES:
         allow = _render_permissions(tpl, False)["allow"]
         for inv in invocations:
-            cmd = f"uv run --with {_SRC} {inv} some-sub --flag v"
+            cmd = f"uv run --no-project --with {_SRC} {inv} some-sub --flag v"
             assert command_allowed_by(cmd, allow), f"{tpl} does not allow {inv}"

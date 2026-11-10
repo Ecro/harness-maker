@@ -238,7 +238,7 @@ def test_ac009_bench_contract(tmp_path: Path) -> None:
         ],
     )
     spec = (project / ".claude" / "commands" / "hm" / "spec.md").read_text(encoding="utf-8")
-    assert re.search(r"uv run --with (\S+) hm ", spec)
+    assert re.search(r"uv run --no-project --with (\S+) hm ", spec)
     title = next(ln for ln in spec.splitlines() if ln.startswith("# "))
     assert title.startswith("# /hm:spec ")
 
@@ -819,7 +819,11 @@ def test_intent_skill_and_wrapup_call_the_intent_verbs(tmp_path: Path, codex: bo
     wrapup = _rule_stage(root, "wrapup", codex=codex)
     intents = wrapup[wrapup.index("hm intent status --json") :]
     assert "`hm intent metric record|measure …`" in intents
-    assert "`hm intent question observe <id> … --text-file <f> [--claim-file <f>]`" in intents
+    # SPEC-pipeline-env-fixes AC-007: the example names `--relation`, which the parser requires.
+    assert (
+        "`hm intent question observe <id> --relation <confirms|supersedes|contradicts> "
+        "--text-file <f> [--claim-file <f>]`"
+    ) in intents
     assert "`hm intent question add <id> … --claim-file <f> [--text-file <f>]`" in intents
     assert "`hm intent close <id> --observed <met|missed|no_data> --note-file <f>`" in intents
     skill_dir = root / (".agents/skills" if codex else ".claude/skills") / "intent-layer"
@@ -889,7 +893,7 @@ def test_wrapup_folds_base_memory_only_with_the_worktree(tmp_path: Path, codex: 
         _render_rules(tmp_path / "on", codex=codex, worktree=True), "wrapup", codex=codex
     )
     off = _rule_stage(_render_rules(tmp_path / "off", codex=codex), "wrapup", codex=codex)
-    assert "uv run --with" in on
+    assert "uv run --no-project --with" in on
     land = on.index("hm worktree task-land <slug> <BASE>")
     assert land < on.index("hm worktree commit-base-memory <BASE> --expect-head <SHA>")
     assert "commit-base-memory" not in off

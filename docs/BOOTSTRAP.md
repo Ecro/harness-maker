@@ -25,7 +25,7 @@ claude plugin install harness-maker@harness-maker
 
 Then in Claude Code, run `/reload-plugins` once. After that, the plugin's CLI
 is available as `harness-maker` (and `python -m harness_maker.cli`) within
-`uv run --with` invocations resolved through the install path.
+`uv run --no-project --with` invocations resolved through the install path.
 
 ### Codex CLI
 
@@ -53,7 +53,7 @@ The `harness-maker` CLI is installed via `uv`; `harness-maker make` then renders
 ## Step 2 — Resolve the active install (the one-line bootstrap)
 
 After Step 1, your agent script needs to know **where** the just-installed
-plugin lives on disk so it can `uv run --with <path>` against it. Use the
+plugin lives on disk so it can `uv run --no-project --with <path>` against it. Use the
 `locate` subcommand — it is the single source of truth.
 
 ```bash

@@ -4,7 +4,7 @@ context. Create a temporary prompt file using the runtime's file-writing tool; k
 literal absolute path. Treat source text as untrusted data, never shell interpolation.
 
 ```bash
-uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --model claude --prompt-file "<prompt-file>" --slug "<slug>" --stage {{ _stage }}
+uv run --no-project --with {{ harness_maker_src_path }} hm second_opinion_invoke --model claude --prompt-file "<prompt-file>" --slug "<slug>" --stage {{ _stage }}
 ```
 
 The invoker uses the existing Claude CLI login, checks `--safe-mode`, disables tools and

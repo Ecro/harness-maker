@@ -306,7 +306,7 @@ def main() -> int:
         f"work it is about to commit.\n"
         f"Write to your own worktree or to the base repo instead. If that worktree is "
         f"abandoned, claim it first:\n"
-        f"  uv run --with <plugin_path> python -m harness_maker.worktree "
+        f"  uv run --no-project --with <plugin_path> python -m harness_maker.worktree "
         f"task-preflight <slug> <base> --claude-session-id <your-session-id>\n"
         f"That claims the task for you. Do NOT add --allow-shared-slug to force it: that "
         f"flag skips the live-peer check entirely, and if the owner is still working you "

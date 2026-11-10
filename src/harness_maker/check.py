@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -184,9 +185,18 @@ def _git_bytes(root: Path, *args: str) -> bytes | None:
     return proc.stdout if proc.returncode == 0 else None
 
 
-def gate_env(extra: dict[str, str] | None = None) -> dict[str, str]:
-    """The environment every gate subprocess runs in: no bytecode, nothing else changed."""
-    return {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", **(extra or {})}
+def gate_env(extra: dict[str, str] | None = None, *, root: Path | None = None) -> dict[str, str]:
+    """The environment every gate subprocess runs in: no bytecode, and the project's own
+    `.venv/bin` first on PATH.
+
+    hm runs under `uv run --no-project`, which no longer puts the project environment on PATH,
+    so a bare `pytest -q` or `ruff check .` gate would otherwise find hm's tools, or none.
+    """
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", **(extra or {})}
+    bin_dir = root / ".venv" / "bin" if root is not None else None
+    if bin_dir is not None and bin_dir.is_dir():
+        env["PATH"] = os.pathsep.join(p for p in (str(bin_dir), env.get("PATH", "")) if p)
+    return env
 
 
 def _run(argv: list[str], root: Path, env: dict[str, str]) -> tuple[int, str]:
@@ -382,9 +392,9 @@ def gate_commands(root: Path, config: dict[str, Any]) -> tuple[list[str], str | 
     commands: list[str]
     source: str
     if plan.degraded and plan.ci_absent:
-        py = root / ".venv" / "bin" / "python"
-        if not py.is_file():
-            return [], f"{plan.reason}; and no .venv/bin/python in the project", "none"
+        py, why = project_python(root)
+        if py is None:
+            return [], f"{plan.reason}; and {why}", "none"
         derived = spec_plan(root, shlex.quote(str(py)))
         if isinstance(derived, str):
             return [], derived, "none"
@@ -444,7 +454,7 @@ def gates_with_read_set(root: Path, config: dict[str, Any]) -> tuple[Section, li
         (Path(tmp) / f"{_READSET_NAME}.py").write_text(_READSET_PLUGIN, encoding="utf-8")
         for i, cmd in enumerate(commands):
             argv = shlex.split(cmd)
-            env = gate_env()
+            env = gate_env(root=root)
             run_dir: Path | None = None
             if _is_pytest(argv):
                 run_dir = Path(tmp) / f"run-{i}"
@@ -458,7 +468,8 @@ def gates_with_read_set(root: Path, config: dict[str, Any]) -> tuple[Section, li
                         "PYTHONPATH": pythonpath,
                         "HM_CHECK_READSET_DIR": str(run_dir),
                         "HM_CHECK_READSET_ROOT": str(root),
-                    }
+                    },
+                    root=root,
                 )
             code, out = _run(argv, root, env)
             row: dict[str, Any] = {"cmd": cmd, "exit": code}
@@ -555,16 +566,115 @@ def _statically_present(root: Path, test_id: str) -> bool | None:
     return re.sub(r"\[.*\]$", "", rest) in names
 
 
-def pytest_runner(root: Path, commands: Iterable[str]) -> list[str] | None:
+def _last_line(text: str) -> str:
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    return lines[-1] if lines else ""
+
+
+_PROJECT_PYTHON: dict[tuple[str, int, bool, str | None], tuple[Path | None, str | None]] = {}
+
+
+def _lock_tracked(root: Path) -> bool:
+    return (root / "uv.lock").is_file() and (
+        _git_bytes(root, "ls-files", "--error-unmatch", "uv.lock") is not None
+    )
+
+
+def project_python(root: Path) -> tuple[Path | None, str | None]:
+    """The project's interpreter, or why there is none: the one place that decides it.
+
+    hm's own calls run with `--no-project`, so `.venv` is no longer a side effect of running
+    hm. uv is asked for one only when the project says it is uv-managed by tracking `uv.lock`;
+    `--frozen` never rewrites that lock and `--inexact` keeps what the user installed by hand.
+    The main checkout's `.venv` is never borrowed from a worktree: an editable install there
+    imports the main checkout's code, and the gate would judge the wrong tree.
+    """
     py = root / ".venv" / "bin" / "python"
+    tracked = _lock_tracked(root)
+    uv = shutil.which("uv") if tracked else None
+    # One answer per state of the project: a failed sync is not retried by the next reader.
+    key = (str(root), (root / "uv.lock").stat().st_mtime_ns if tracked else 0, py.is_file(), uv)
+    if key not in _PROJECT_PYTHON:
+        found = _resolve_project_python(root, py, tracked=tracked, uv=uv)
+        # Also under the state the sync left behind, so the `.venv` it created is not synced again.
+        _PROJECT_PYTHON[key] = _PROJECT_PYTHON[(*key[:2], py.is_file(), uv)] = found
+    return _PROJECT_PYTHON[key]
+
+
+def _resolve_project_python(
+    root: Path, py: Path, *, tracked: bool, uv: str | None
+) -> tuple[Path | None, str | None]:
+    if tracked:
+        if uv is not None:
+            code, out = _run([uv, "sync", "--frozen", "--inexact"], root, gate_env())
+            if code != 0:
+                return None, f"uv sync --frozen failed in {root}: {_last_line(out)}"
+        elif not py.is_file():
+            return None, f"no .venv/bin/python in {root}; uv.lock is tracked but uv is not on PATH"
     if py.is_file():
+        return py, None
+    return None, (
+        f"no .venv/bin/python in {root} (a worktree does not share the main checkout's .venv); "
+        "hm creates one only for a tracked uv.lock"
+    )
+
+
+def _imports_pytest(py: Path) -> bool:
+    try:
+        proc = subprocess.run(
+            [str(py), "-c", "import pytest"], capture_output=True, timeout=60, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
+
+
+# uv options that take the next token as their value; `uv run --with pytest pytest` names
+# pytest twice and only the second one runs it.
+_VALUE_OPTIONS = frozenset(
+    {
+        "--with", "--with-editable", "--with-requirements", "--group", "--only-group",
+        "--no-group", "--extra", "--python", "-p", "--project", "--directory", "--env-file",
+        "--package", "--index", "--upgrade-package", "-P", "--reinstall-package",
+        "--no-install-package", "--refresh-package",
+    }
+)  # fmt: skip
+
+
+def _pytest_prefix(argv: list[str]) -> list[str] | None:
+    skip = False
+    for i, tok in enumerate(argv):
+        if skip:
+            skip = False
+        elif tok in _VALUE_OPTIONS:
+            skip = True
+        elif Path(tok).name in ("pytest", "py.test"):
+            return argv[: i + 1]
+    return None
+
+
+def pytest_runner(root: Path, commands: Iterable[str]) -> list[str] | None:
+    """The project interpreter when it can import pytest, else the first gate command that
+    runs pytest. A `.venv` without pytest reported every test as `deselected`."""
+    py, _why = project_python(root)
+    if py is not None and _imports_pytest(py):
         return [str(py), "-m", "pytest"]
     for cmd in commands:
-        argv = shlex.split(cmd)
-        for i, tok in enumerate(argv):
-            if Path(tok).name in ("pytest", "py.test"):
-                return argv[: i + 1]
+        prefix = _pytest_prefix(shlex.split(cmd))
+        if prefix is not None:
+            return prefix
     return None
+
+
+def no_runner_reason(root: Path) -> str:
+    """Why `pytest_runner` found nothing, in words the DRI can act on."""
+    py, why = project_python(root)
+    if py is not None:
+        return (
+            f"{py} has no pytest and no gate command runs pytest; install pytest there "
+            "(uv: add it to a dependency group; if uv.lock is not yours, `git rm uv.lock`)"
+        )
+    return why if why is not None and _lock_tracked(root) else "no pytest runner"
 
 
 def _exception_line(text: str) -> str:
@@ -617,8 +727,15 @@ def run_tests(root: Path, runner: list[str], test_ids: list[str]) -> dict[str, O
             *files,
         ]
         pythonpath = os.pathsep.join(p for p in (tmp, os.environ.get("PYTHONPATH", "")) if p)
-        code, out = _run(argv, root, gate_env({"PYTHONPATH": pythonpath}))
+        code, out = _run(argv, root, gate_env({"PYTHONPATH": pythonpath}, root=root))
+        wrote_junit = junit.is_file()
         cases = _junit_cases(junit)
+    if not wrote_junit:
+        # The runner never got as far as pytest's report (no pytest in that interpreter, a
+        # command that does not exist): that is an error with a cause, never `deselected`.
+        for tid in runnable:
+            outcomes[tid] = Outcome("error", _tail(out))
+        return outcomes
     module_errors = {name: oc for (cls, name), oc in cases.items() if cls == ""}
     for tid in runnable:
         file, cls, name = _id_parts(tid)
@@ -869,7 +986,7 @@ def ac_section(
 
     if to_run and runner is None:
         return Section(
-            {"ok": False, "degraded": True, "reason": "no pytest runner", "failed": failed},
+            {"ok": False, "degraded": True, "reason": no_runner_reason(root), "failed": failed},
             EXIT_DEGRADED,
         )
     ids = sorted({t for ts in to_run.values() for t in ts})
@@ -938,7 +1055,7 @@ def red_discovery(root: Path, spec: SpecView, runner: list[str]) -> dict[str, li
         return {}
     argv = [*runner, "-p", "no:cacheprovider", "-o", "addopts=", "--collect-only", "-q",
             "--no-header", "--continue-on-collection-errors", "--", *files]  # fmt: skip
-    _code, out = _run(argv, root, gate_env())
+    _code, out = _run(argv, root, gate_env(root=root))
     # `-q --collect-only` prints one node id per line; a case id may hold spaces.
     nodeids = [
         ln.strip()
@@ -982,7 +1099,9 @@ def red_section(
     if not testable:
         return Section({"ok": False, "degraded": True, "reason": "no testable AC"}, EXIT_DEGRADED)
     if runner is None:
-        return Section({"ok": False, "degraded": True, "reason": "no pytest runner"}, EXIT_DEGRADED)
+        return Section(
+            {"ok": False, "degraded": True, "reason": no_runner_reason(root)}, EXIT_DEGRADED
+        )
     discovered = red_discovery(root, spec, runner)
     bound = {ac.id: list(ac.test_ids) or discovered.get(ac.id, []) for ac in testable}
     ids = sorted({t for ts in bound.values() for t in ts})
@@ -1261,7 +1380,7 @@ def mutation_section(root: Path, spec: SpecView | None, approval_state: str = ""
         "--tier",
         tier,
     ]
-    code, out = _run(argv, root, gate_env())
+    code, out = _run(argv, root, gate_env(root=root))
     ok = code == 0
     return Section({"ok": ok, "exit": code, "tail": _tail(out)}, EXIT_OK if ok else EXIT_FAILED)
 

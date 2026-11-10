@@ -6017,6 +6017,23 @@ def _cli_span_end(args: list[str]) -> int:
     return 0
 
 
+def _main_checkout(path: Path) -> Path:
+    """The main checkout when `path` is inside a linked worktree, else `path`.
+
+    A chained stage leaves the shell in `.worktrees/<slug>/`, and `"$(pwd)"` then names the
+    task worktree as the base: preflight tried to nest a second worktree inside it.
+    """
+    try:
+        git_dir = _run(["git", "rev-parse", "--git-dir"], cwd=path).stdout.strip()
+        common = _run(["git", "rev-parse", "--git-common-dir"], cwd=path).stdout.strip()
+    except (RuntimeError, OSError):
+        return path
+    git_path, common_path = (path / git_dir).resolve(), (path / common).resolve()
+    if git_path == common_path or common_path.name != ".git":
+        return path
+    return common_path.parent
+
+
 def _cli_task_preflight(args: list[str]) -> int:
     """`python -m harness_maker.worktree task-preflight <slug> [base_dir] [--stage <s>]`.
 
@@ -6034,7 +6051,7 @@ def _cli_task_preflight(args: list[str]) -> int:
         print("usage: task-preflight <slug> [base_dir] [--stage <stage>]", file=sys.stderr)
         return 2
     slug = rest[0]
-    base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
+    base = _main_checkout(Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd())
     allow_shared = "--allow-shared-slug" in args
     try:
         wt, warnings = task_preflight(
@@ -6069,7 +6086,7 @@ def _cli_task_refresh(args: list[str]) -> int:
         print("usage: task-refresh <slug> [base_dir]", file=sys.stderr)
         return 2
     slug = rest[0]
-    base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
+    base = _main_checkout(Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd())
     return task_refresh(base, slug)
 
 

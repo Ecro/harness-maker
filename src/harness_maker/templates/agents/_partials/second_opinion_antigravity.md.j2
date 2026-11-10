@@ -69,7 +69,7 @@ config resolution, prompt truncation, the output contract, status classification
 and the ledger row:
 
 ```bash
-uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --model antigravity --prompt-file <the literal path printed above> --slug "<slug>" --stage {{ _stage }}
+uv run --no-project --with {{ harness_maker_src_path }} hm second_opinion_invoke --model antigravity --prompt-file <the literal path printed above> --slug "<slug>" --stage {{ _stage }}
 ```
 
 > **Why this is not a raw `agy` line any more.** It was — `agy --print --sandbox … < prompt_file`

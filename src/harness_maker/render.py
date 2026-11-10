@@ -337,6 +337,13 @@ _HARNESS_SHIPPED_ALLOW_LITERALS: dict[str, str] = {
 # `python -m harness_maker_evil` pre-approved by the stale one while a fresh install
 # denied it. That is the very "fix reaches new installs only" gap this whole change
 # exists to close, reintroduced one layer down.
+_IN_PROJECT_PREFIX = "uv run --with "
+_NO_PROJECT_PREFIX = "uv run --no-project --with "
+_IN_PROJECT_REASON = (
+    "in-project spelling — without `--no-project`, uv created `.venv` and `uv.lock` in "
+    "the project; replaced by the `uv run --no-project --with` form"
+)
+
 _HARNESS_SHIPPED_ALLOW_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         # The 0.43.0 spelling. Two things keep this off user content:
@@ -367,7 +374,31 @@ _HARNESS_SHIPPED_ALLOW_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         "long-form module invocation — replaced by the `hm second_opinion_invoke:*` "
         "form when the `hm` console script landed",
     ),
+    (
+        # The three shapes rendered up to 0.65.3, before every invocation gained
+        # `--no-project` (SPEC-pipeline-env-fixes IRR-002). Same must-name-harness-maker
+        # guard: a user's `uv run --with requests …` rule is never pruned.
+        re.compile(
+            r"^Bash\(uv run --with [^ ]*harness[-_]maker[^ ]* "
+            r"(?:python -m harness_maker\.\*|hm \*|hm second_opinion_invoke:\*)\)$"
+        ),
+        _IN_PROJECT_REASON,
+    ),
 )
+
+
+def _old_prefix_twins(new_allow: list[Any]) -> frozenset[str]:
+    """The in-project spelling of each grant this render ships.
+
+    The pattern above needs the ref to name harness-maker; a dev install under another
+    directory name does not. These are exact literals built from the current ref, so they
+    can only match what an older render of this same install wrote.
+    """
+    return frozenset(
+        item.replace(_NO_PROJECT_PREFIX, _IN_PROJECT_PREFIX, 1)
+        for item in new_allow
+        if isinstance(item, str) and _NO_PROJECT_PREFIX in item
+    )
 
 
 def _retired_allow_reason(item: str) -> str | None:
@@ -423,7 +454,9 @@ def _announce_allow_prune(pruned: list[str], *, dry_run: bool) -> None:
         err=True,
     )
     for literal in pruned:
-        typer.echo(f"  - {literal} — {_retired_allow_reason(literal)}", err=True)
+        typer.echo(
+            f"  - {literal} — {_retired_allow_reason(literal) or _IN_PROJECT_REASON}", err=True
+        )
     typer.echo(
         "  Re-adding one of these to settings.json will NOT stick — the next re-render "
         "drops it again. If you need the access, add a SCOPED rule instead "
@@ -476,16 +509,18 @@ def _merge_permissions(
         # non-string guard; a near-miss like "Bash(rm:*) # my note" is the user's
         # content, not our history.
         if key in ("allow", "deny"):
+            twins = _old_prefix_twins(new_list) if key == "allow" else frozenset()
+            ours = [
+                i
+                for i in existing_list
+                if _is_harness_shipped(key, i) or (isinstance(i, str) and i in twins)
+            ]
             # Only rules the current template does NOT re-add actually disappear;
             # report those, so the notice never names a rule that is still there.
             # dict.fromkeys keeps on-disk order while collapsing a repeated entry,
             # which would otherwise inflate the count and print the same line twice.
-            dropped = list(
-                dict.fromkeys(
-                    i for i in existing_list if _is_harness_shipped(key, i) and i not in new_list
-                )
-            )
-            existing_list = [i for i in existing_list if not _is_harness_shipped(key, i)]
+            dropped = list(dict.fromkeys(i for i in ours if i not in new_list))
+            existing_list = [i for i in existing_list if i not in ours]
             if dropped and key == "allow":
                 _announce_allow_prune(dropped, dry_run=dry_run)
         seen: set[str] = set()
@@ -1033,6 +1068,37 @@ def _refresh_ref(cmd: str, shipped_refs: dict[str, str]) -> str:
     return _splice_install_ref(cmd, token) if token else cmd
 
 
+# The old prefix, only where the command it starts is harness-maker's own module (after any
+# further `--with <ref>` pairs).
+_REF_TOKEN = r'(?:"[^"]*"|\S+)'
+_IN_PROJECT_HM_RE = re.compile(
+    re.escape(_IN_PROJECT_PREFIX)
+    + rf"(?={_REF_TOKEN}(?: --with {_REF_TOKEN})* python -m harness_maker\.)"
+)
+
+
+def _no_project_entry(entry: Any) -> Any:  # noqa: ANN401 — heterogeneous JSON
+    """Give every harness-managed command in a preserved entry the `--no-project` flag.
+
+    A preserved entry keeps its own text: a harness command inside the user's group, or one
+    the current template does not ship. Without the flag that hook goes on creating `.venv`
+    and `uv.lock` in the project on every tool call, and identity dedup sees nothing to fix
+    (SPEC-pipeline-env-fixes IRR-001). Only `harness_maker.*` commands are touched.
+    """
+    hooks_list = entry.get("hooks") if isinstance(entry, dict) else None
+    if not isinstance(hooks_list, list):
+        return entry
+
+    def fixed(hook: Any) -> Any:  # noqa: ANN401
+        cmd = hook.get("command") if isinstance(hook, dict) else None
+        if not isinstance(cmd, str) or _HM_MANAGED_CMD_RE.search(cmd) is None:
+            return hook
+        return {**hook, "command": _IN_PROJECT_HM_RE.sub(_NO_PROJECT_PREFIX, cmd)}
+
+    updated = [fixed(h) for h in hooks_list]
+    return entry if updated == hooks_list else {**entry, "hooks": updated}
+
+
 def _splice_install_ref(cmd: str, ref_token: str) -> str:
     """Swap the `--with <value>` token, preserving everything else in the command.
 
@@ -1377,7 +1443,7 @@ def _merge_hooks_json(
             # user's commands and drop only the ones the template already ships.
             trimmed = _strip_shipped_commands(e, shipped_cmds, shipped_refs=shipped_refs)
             if trimmed is not None:
-                user_entries.append(trimmed)
+                user_entries.append(_no_project_entry(trimmed))
 
         # ADR-004. Whatever a preserved user group still carries of ours must NOT also
         # ship from the template: Claude Code runs EVERY matching hook, so it would
