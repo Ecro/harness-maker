@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: hm-cost-p4
-status: planning
+status: complete
 created: 2026-11-10
 spec: "[[SPEC-hm-cost-p4]]"
 surface_allowance:
