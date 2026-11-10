@@ -78,7 +78,6 @@ else:
 | Touched module | Reviewers routed |
 |---|---|
 | `src/harness_maker/recommendation.py` | `code-reviewer` |
-| `src/harness_maker/foreign_config.py` | `code-reviewer` + `security-reviewer` (LLM input handling — adversarial foreign content) |
 | `src/harness_maker/personalization_audit.py` | `code-reviewer` (no security surface — local-only diagnostic) |
 | `src/harness_maker/hooks/sessionstart_drift.py` | `code-reviewer` + `concurrency-reviewer` (hook timing + git-diff race window) |
 
