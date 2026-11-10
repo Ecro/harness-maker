@@ -45,14 +45,14 @@ You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can
 
 {% if is_codex %}
 ```
-Bash("if [ -f \"{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --with {{ harness_maker_src_path }} hm iter_receipts write --iter \"$ITER\" --stage {{ gate0_stage }} --verdict <verdict> --root \"{{ g0_root }}\"; fi; fi")
+Bash("if [ -f \"{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --no-project --with {{ harness_maker_src_path }} hm iter_receipts write --iter \"$ITER\" --stage {{ gate0_stage }} --verdict <verdict> --root \"{{ g0_root }}\"; fi; fi")
 ```
 {% else %}
 ```bash
 !if [ -f "{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with {{ harness_maker_src_path }} hm iter_receipts write \
+     uv run --no-project --with {{ harness_maker_src_path }} hm iter_receipts write \
        --iter "$ITER" --stage {{ gate0_stage }} --verdict <verdict> --root "{{ g0_root }}"; \
    fi; \
  fi

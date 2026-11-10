@@ -35,11 +35,11 @@ written under its consent rule — this skill never writes one.
    or `$` in it would be run by the shell before any harness check sees it.
 {% if is_codex %}
    ```
-   Bash("uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic '<search words>' --k 6 --pre-k 30")
+   Bash("uv run --no-project --with {{ harness_maker_src_path }} hm memory_retrieve --topic '<search words>' --k 6 --pre-k 30")
    ```
 {% else %}
    ```bash
-   !uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic '<search words>' --k 6 --pre-k 30
+   !uv run --no-project --with {{ harness_maker_src_path }} hm memory_retrieve --topic '<search words>' --k 6 --pre-k 30
    ```
 {% endif %}
 3. **Pick the slug — reuse only a [wiki:fact] slug.** If a `[wiki:fact]` entry covers the same
@@ -65,11 +65,11 @@ written under its consent rule — this skill never writes one.
 5. **Run the write once:**
 {% if is_codex %}
    ```
-   Bash("uv run --with {{ harness_maker_src_path }} hm memory_md upsert-wiki --root . --category fact --slug '<slug>' --body-file <tmpfile>")
+   Bash("uv run --no-project --with {{ harness_maker_src_path }} hm memory_md upsert-wiki --root . --category fact --slug '<slug>' --body-file <tmpfile>")
    ```
 {% else %}
    ```bash
-   !uv run --with {{ harness_maker_src_path }} hm memory_md upsert-wiki --root . --category fact --slug '<slug>' --body-file <tmpfile>
+   !uv run --no-project --with {{ harness_maker_src_path }} hm memory_md upsert-wiki --root . --category fact --slug '<slug>' --body-file <tmpfile>
    ```
 {% endif %}
 6. **On a non-zero exit, surface the stderr** to the DRI verbatim and stop. Do not save the fact

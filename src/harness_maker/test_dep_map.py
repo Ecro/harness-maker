@@ -622,6 +622,8 @@ CONFIG_SUITES: tuple[str, ...] = (
     # Same: seeds its scratch task with `uv run --with <this repo> hm`, and the live agent's
     # harness runs that hm too.
     "tests/integration/test_maker_advance_live.py",
+    # Same: walks a scratch project with `uv run --no-project --with <this repo> hm`.
+    "tests/integration/test_pipeline_env_fixes_uv.py",
 )
 
 #: Suites the detector flags as touching a routed path but which do NOT read this repository's
@@ -656,6 +658,9 @@ TESTS_NOT_CONFIG_AFFECTING: tuple[str, ...] = (
     # Writes a synthetic pyproject.toml into a bench work dir to prove the eval's quality
     # checks ignore the agent's config; THIS repo's pyproject.toml is never read.
     "tests/unit/test_bench_light_lane.py",
+    # Writes a synthetic pyproject.toml and uv.lock into each sandbox project `hm check` and
+    # `project_python` run on (SPEC-pipeline-env-fixes).
+    "tests/unit/test_pipeline_env_fixes.py",
 )
 
 #: Markdown is inert only in these locations. A blanket "`.md` is inert" would make

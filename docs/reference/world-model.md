@@ -33,7 +33,8 @@ re-instructed).
   `$maker` (Codex), or addressing it by name ("maker야 …").
 - Rename removes the pristine old router skill and keeps an edited one (AC-005). Modular add
   of the world-model skill is refused, so no second router can appear
-  (SPEC-world-model-followups AC-011). Rendered size ≤ 4,500 chars on every target.
+  (SPEC-world-model-followups AC-011). Rendered size ≤ 4,539 chars on every target
+  (4,500 plus `--no-project ` at its three harness-maker invocations, SPEC-pipeline-env-fixes).
 
 ## The only entrance (SPEC-maker-front-door-improvements IRR-001/002)
 
@@ -110,7 +111,7 @@ Claude Code injects the briefing at skill load with `!`:
 <hm> world_model digest --root . --session-id "$HM_SESSION_ID" 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{"unavailable":"digest"}\n'
 ```
 
-where `<hm>` = `uv run --with <plugin path> hm`. The chain yields exactly one JSON line even
+where `<hm>` = `uv run --no-project --with <plugin path> hm`. The chain yields exactly one JSON line even
 when the digest fails mid-output (AC-010).
 
 - **Why no `{ …; }` group**: a permission matcher splits the command on `|` / `||`, and a

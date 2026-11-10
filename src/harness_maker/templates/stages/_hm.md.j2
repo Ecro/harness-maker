@@ -3,7 +3,7 @@
     caller's. Everything here is inlined at render time: a stage file reads nothing at run time. -#}
 
 {%- macro cli() -%}
-**CLI.** Run every `hm …` below as `uv run --with {{ harness_maker_src_path }} hm …`{% if is_codex %} through the Bash tool{% endif %}, typing the prefix in full.
+**CLI.** Run every `hm …` below as `uv run --no-project --with {{ harness_maker_src_path }} hm …`{% if is_codex %} through the Bash tool{% endif %}, typing the prefix in full.
 {%- endmacro -%}
 
 {#- SPEC-choice-cards AC-001: every user choice is a question-tool card; skills/world-model carries a copy. -#}

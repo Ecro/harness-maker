@@ -611,10 +611,12 @@ def _spec_commands(root: Path, slug: str) -> list[str] | str:
     module = _SPEC_FRAMEWORKS.get(framework) if isinstance(framework, str) else None
     if module is None:
         return "the SPEC's test_framework is not exactly 'pytest'"
+    from harness_maker.check import project_python
+
     venv = root / ".venv"
-    py = venv / "bin" / "python"
-    if not py.is_file():
-        return "no .venv/bin/python in the project (no other interpreter is used)"
+    py, why = project_python(root)
+    if py is None:
+        return why or "no project interpreter"
     if not (venv / "pyvenv.cfg").is_file():
         return "no .venv/pyvenv.cfg: .venv is not a virtual environment (no other is used)"
     return spec_plan(root, shlex.quote(str(py)), module)

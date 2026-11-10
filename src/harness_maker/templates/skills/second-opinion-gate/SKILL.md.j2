@@ -23,7 +23,7 @@ hand-derived id changes between rounds and the round-2 merge matches nothing. Pi
 findings through the stamper:
 
 ```bash
-uv run --with {{ harness_maker_src_path }} hm codex_adapter stamp-ids < <the temp path you wrote>
+uv run --no-project --with {{ harness_maker_src_path }} hm codex_adapter stamp-ids < <the temp path you wrote>
 ```
 
 **`Write` the payload to a file; never embed it in argv.** A single apostrophe in any finding
@@ -59,7 +59,7 @@ never refute anything. This step is independent of that key.
 call the gatherer, which owns every rule below:
 
 ```bash
-cd <the task worktree> && uv run --with {{ harness_maker_src_path }} hm second_opinion_oracle --findings-file <path> --root .
+cd <the task worktree> && uv run --no-project --with {{ harness_maker_src_path }} hm second_opinion_oracle --findings-file <path> --root .
 ```
 
 The `cd` is load-bearing: `--root .` resolved at the base repo gives an empty
@@ -158,7 +158,7 @@ argv-embedded (shell quoting, `ARG_MAX`, and finding text must not be shell-expa
 one call:
 
 ```bash
-cd <the task worktree> && uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --record-disposition --disposition-file <the literal temp path> --slug "<slug>" --stage review
+cd <the task worktree> && uv run --no-project --with {{ harness_maker_src_path }} hm second_opinion_invoke --record-disposition --disposition-file <the literal temp path> --slug "<slug>" --stage review
 ```
 
 - The invoker resolves the **base** repo root, so rows survive `task-land`. A row written

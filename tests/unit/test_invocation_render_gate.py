@@ -1,5 +1,5 @@
 """ADR-002 — producer gate: every executable harness_maker invocation must use the
-full self-contained launcher `uv run --with {{ harness_maker_src_path }} python -m
+full self-contained launcher `uv run --no-project --with {{ harness_maker_src_path }} python -m
 harness_maker…`.
 
 Two broken forms fail on consumer plugin-cache installs: bare `python -m
@@ -24,7 +24,7 @@ from harness_maker.synthesize import synthesize
 
 _PY_INVOKE = re.compile(r"python -m harness_maker")
 # the src_path renders to a slash path with no spaces, so \S+ is safe
-_FULL_LAUNCHER = re.compile(r"uv run --with \S+ python -m harness_maker")
+_FULL_LAUNCHER = re.compile(r"uv run --no-project --with \S+ python -m harness_maker")
 # console form: `harness-maker <subcmd>` — the path `harness-maker/harness-maker/…`
 # never has a space after `harness-maker`, so a word-boundary subcmd can't false-match
 _CONSOLE = re.compile(
@@ -107,8 +107,8 @@ def test_no_broken_invocation_in_rendered_output(rendered: Path) -> None:
             offenders[str(f.relative_to(rendered))] = bad
     assert not offenders, (
         "executable harness_maker invocations must use the full "
-        "`uv run --with {{ harness_maker_src_path }} python -m harness_maker` launcher:\n"
-        + "\n".join(f"  {k}: {v}" for k, v in offenders.items())
+        "`uv run --no-project --with {{ harness_maker_src_path }} python -m harness_maker` "
+        "launcher:\n" + "\n".join(f"  {k}: {v}" for k, v in offenders.items())
     )
 
 
@@ -172,7 +172,7 @@ def test_no_broken_invocation_in_cursor_codex_targets(rendered_cursor_codex: Pat
         "```bash\nuv run python -m harness_maker.spec_machine mark-tested \\\n  --yaml x\n```",
         "> `harness-maker autopilot on --level auto_safe`",  # console form
         # compound line: a valid launcher MASKING a trailing bare invocation (#6a)
-        "!uv run --with /c python -m harness_maker.a && python -m harness_maker.b",
+        "!uv run --no-project --with /c python -m harness_maker.a && python -m harness_maker.b",
         # multi-line Bash(...) — invocation line alone carries no `Bash(` (#6b)
         'Bash(\n    "python -m harness_maker.codex_adapter adapt"\n)',
     ],
@@ -188,7 +188,7 @@ def test_gate_trips_on_broken_fixture(fixture: str) -> None:
 
 def test_gate_passes_canonical_and_prose() -> None:
     good = (
-        "!uv run --with /cache/0.33.0 python -m harness_maker.autopilot_caps boundary\n"
+        "!uv run --no-project --with /c/0.33.0 python -m harness_maker.autopilot_caps boundary\n"
         "the contract `python -m harness_maker.spec_machine validate` enforces\n"
         "| a. schema | `python -m harness_maker.spec_machine validate {y}` | exit 0 |\n"
     )

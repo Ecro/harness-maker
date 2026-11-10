@@ -38,7 +38,7 @@ def _template(tmp_path: Path, src_root: Path) -> Path:
     template = tmp_path / "template"
     command = template / ".claude" / "commands" / "hm" / "spec.md"
     command.parent.mkdir(parents=True)
-    command.write_text(f"!uv run --with {src_root} hm spec_machine approve --yaml x\n")
+    command.write_text(f"!uv run --no-project --with {src_root} hm spec_machine approve --yaml x\n")
     return template
 
 
@@ -164,7 +164,7 @@ def test_a_missing_source_tree_is_not_a_digest(bench: ModuleType, tmp_path: Path
 def test_a_non_path_install_is_named_as_such(bench: ModuleType, tmp_path: Path) -> None:
     template = _template(tmp_path, tmp_path)
     (template / ".claude" / "commands" / "hm" / "spec.md").write_text(
-        "!uv run --with harness-maker==0.62.0 hm spec_machine approve\n"
+        "!uv run --no-project --with harness-maker==0.62.0 hm spec_machine approve\n"
     )
     with pytest.raises(bench.CliProvenanceError, match="not a checkout path"):
         bench.check_cli_fresh(template)
@@ -173,7 +173,7 @@ def test_a_non_path_install_is_named_as_such(bench: ModuleType, tmp_path: Path) 
 def test_a_command_without_the_prefix_is_refused(bench: ModuleType, tmp_path: Path) -> None:
     template = _template(tmp_path, tmp_path / "checkout")
     (template / ".claude" / "commands" / "hm" / "spec.md").write_text("no prefix here\n")
-    with pytest.raises(bench.CliProvenanceError, match="uv run --with"):
+    with pytest.raises(bench.CliProvenanceError, match="uv run --no-project --with"):
         bench.check_cli_fresh(template)
 
 

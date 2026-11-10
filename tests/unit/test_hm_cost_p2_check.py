@@ -136,9 +136,10 @@ def compact(out: dict[str, Any], keep: set[str]) -> dict[str, Any]:
 
 
 def strip(out: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any]:
-    sections = dict(out["sections"])
-    ac = {k: v for k, v in sections.get("ac", {}).items() if f"ac.{k}" not in keys}
-    sections["ac"] = ac
+    sections = {
+        name: {k: v for k, v in body.items() if f"{name}.{k}" not in keys}
+        for name, body in out["sections"].items()
+    }
     return {**out, "sections": sections}
 
 
@@ -187,7 +188,16 @@ def test_ac_006_compact_output(tmp_path: Path, fixture: Any) -> None:
     keep = set(check.COMPACT_KEEP)
     assert keep >= REQUIRED_KEEP
     assert default_out == compact(full_out, keep)
-    assert strip(full_out, ("ac.golden", "ac.hint")) == pre_change_out
+    added = ("ac.golden", "ac.hint", "gates.reason")
+    assert strip(full_out, added) == strip(pre_change_out, ("gates.reason",))
+    # `gates.reason` may differ only in its last clause, which SPEC-pipeline-env-fixes reworded
+    # to name the root and the lock-file rule.
+    was = pre_change_out["sections"]["gates"].get("reason")
+    now = full_out["sections"]["gates"].get("reason")
+    if now != was:
+        head, _, old_clause = was.rpartition("; and ")
+        assert old_clause == "no .venv/bin/python in the project"
+        assert now.startswith(f"{head}; and no .venv/bin/python in {root} ")
     # The fixtures exist to prove these survive compaction.
     sections = default_out["sections"]
     if "--red" in args:

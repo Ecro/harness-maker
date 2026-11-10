@@ -1,0 +1,69 @@
+{
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.gates.permission_gate",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.gates.permission_gate",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.gates.spec_gate",
+            "type": "command"
+          }
+        ],
+        "matcher": "apply_patch"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.hooks.sessionstart_drift",
+            "type": "command"
+          },
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.hooks.sessionid_envfile",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.hooks.loop_gate --mode stop-hook",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.hooks.flush_session",
+            "statusMessage": "Snapshotting session progress...",
+            "timeout": 30,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

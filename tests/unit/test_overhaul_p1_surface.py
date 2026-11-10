@@ -54,7 +54,9 @@ COMMANDS = (
 )
 STAGES = ("research", "spec", "execute", "wrapup")
 REMOVED_COMMAND = re.compile(r"(?:/hm:|\$hm-)(?:review|verify|configure|loop)\b")
-_INSTALL_REF = re.compile(r"uv run --with (\S+) hm ")
+# The reference render (db19f023) predates `--no-project` (SPEC-pipeline-env-fixes IRR-001).
+_INSTALL_REF = re.compile(r"uv run (?:--no-project )?--with (\S+) hm ")
+_NO_PROJECT_CALL = "uv run --no-project --with"
 
 
 @dataclass(frozen=True)
@@ -245,7 +247,10 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 #: (stage, base, + worktree on, + depth deep) from the AC-004 table.
 # execute and wrapup raised by SPEC-hm-cost-p2 (BASELINE-DELTA-hm-cost-p2.md, DRI 2026-10-21).
 # spec and execute raised by SPEC-hm-cost-p4 (BASELINE-DELTA-hm-cost-p4.md, PLAN ADR-004).
-_STAGE_BUDGET = {"spec": (6950, 1500, 800), "execute": (7610, 1500, 0), "wrapup": (3900, 2800, 0)}
+# All three raised by their measured growth in SPEC-pipeline-env-fixes: `--no-project ` in the CLI
+# prefix (+13), and wrapup's exit-2 rule and full `observe` example (+60)
+# (BASELINE-DELTA-pipeline-env-fixes.md, PLAN ADR-009, DRI card 2026-11-10).
+_STAGE_BUDGET = {"spec": (6963, 1500, 800), "execute": (7623, 1500, 0), "wrapup": (3973, 2800, 0)}
 _OPT_IN = 1500
 
 
@@ -294,7 +299,10 @@ def test_ac004_char_budgets(trees: dict[str, Path], ref_trees: dict[str, Path], 
                 if (root / f".claude/agents/{n}.md").is_file()
             ),
         ):
-            check(rel, _size(ref, rel))
+            # The one growth these rows allow: `--no-project ` at each harness-maker call the
+            # reference already made, so an added call still counts against the budget.
+            calls = (ref / rel).read_text(encoding="utf-8").count("uv run --with")
+            check(rel, _size(ref, rel) + calls * len("--no-project "))
         if "codex" in arm.targets:
             check(
                 ".agents/skills/hm-help/SKILL.md",
@@ -381,7 +389,9 @@ def test_ac004_plugin_hooks_unchanged() -> None:
         text=True,
         timeout=30,
     ).stdout
-    assert (REPO_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8") == ref
+    # Unchanged but for the flag that keeps uv out of the user's project (IRR-001).
+    want = ref.replace("uv run --with", _NO_PROJECT_CALL)
+    assert (REPO_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8") == want
 
 
 # ── stage content ───────────────────────────────────────────────────────────
@@ -408,8 +418,8 @@ _ROWS: list[tuple[tuple[str, ...], str, Callable[[str], bool], str]] = [
     (
         tuple(ARMS),
         "*",
-        lambda t: bool(re.search(r"uv run --with \S+ hm ", t)),
-        "the `uv run --with <path> hm` prefix",
+        lambda t: bool(re.search(r"uv run --no-project --with \S+ hm ", t)),
+        "the `uv run --no-project --with <path> hm` prefix",
     ),
     (tuple(ARMS), "*", lambda t: "@hm:user:extensions" in t, "the user extensions block"),
     (

@@ -1548,7 +1548,7 @@ class CliProvenanceError(Exception):
     """The hm arm would run a different harness_maker than the checkout holds."""
 
 
-_CLI_PREFIX = re.compile(r"uv run --with (\S+) hm ")
+_CLI_PREFIX = re.compile(r"uv run --no-project --with (\S+) hm ")
 
 
 _VAR = re.compile(r"\$(?:\{(\w+)\}|(\w+))")
@@ -1588,7 +1588,9 @@ def check_cli_fresh(template: Path, pass_env: tuple[str, ...] = ()) -> None:
     command = template / ".claude" / "commands" / "hm" / "spec.md"
     match = _CLI_PREFIX.search(command.read_text(encoding="utf-8"))
     if match is None:
-        raise CliProvenanceError(f"{command} carries no `uv run --with <path> hm` prefix")
+        raise CliProvenanceError(
+            f"{command} carries no `uv run --no-project --with <path> hm` prefix"
+        )
     env = agent_env(pass_env)
     # The renderer writes `$HOME/...` for a checkout under home; the agent's shell expands it.
     src = _VAR.sub(lambda m: env.get(m.group(1) or m.group(2), m.group(0)), match.group(1))

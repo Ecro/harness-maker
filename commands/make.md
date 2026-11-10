@@ -94,7 +94,7 @@ then check whether the project already has a harness.
 !cache_bootstrap=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | while read -r p; do printf '%s %s\n' "${p##*/}" "$p"; done | sort -V | tail -1 | cut -d' ' -f2-)
 plugin_dir=""
 if [ -n "$cache_bootstrap" ]; then
-    plugin_dir=$(uv run --with "$cache_bootstrap" python -m harness_maker.cli locate --plain 2>/dev/null || true)
+    plugin_dir=$(uv run --no-project --with "$cache_bootstrap" python -m harness_maker.cli locate --plain 2>/dev/null || true)
     if [ -z "$plugin_dir" ]; then
         plugin_dir="$cache_bootstrap"
     fi

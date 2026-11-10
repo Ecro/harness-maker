@@ -560,10 +560,13 @@ def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType, tmp_path: Path
     there when #30 added wall time to the headline). The runner_hash pins moved on purpose with
     SPEC-hm-eval-scripted-dri: the hm arm's turn script is a new runner setting (S8). The report
     and scorecard pins read the eval-3 rows as committed in db19f023, so publishing a new run
-    does not move them; only a change to the report code does. SPEC-hm-cost-p5 moved the report
-    pin from a082ce5d4abd734b by one substitution, "target 5" -> "target 8" (asserted in
-    test_hm_cost_p5_target.py); the scorecard carries no target and did not move."""
-    assert bench.bench_hash() == "569e17ef29ab"
+    does not move them; only a change to the report code does. bench_hash moved on purpose with
+    SPEC-pipeline-env-fixes: the fixture now commits its uv lock file, which `hm check` needs to
+    build the project's `.venv` (earlier rows carry `569e17ef29ab`; the task bytes are the same).
+    SPEC-hm-cost-p5 moved the report pin from a082ce5d4abd734b by one substitution, "target 5" ->
+    "target 8" (asserted in test_hm_cost_p5_target.py); the scorecard carries no target and did
+    not move."""
+    assert bench.bench_hash() == "92672094f80e"
     assert bench.tier2_hash() == "1cf707c57e12"
     tools = {"ruff": "r", "mypy": "m"}
     assert bench.runner_hash("model-x", 400, 1800, 5.0, (), "fake 1.0", quality_tools=tools) == (

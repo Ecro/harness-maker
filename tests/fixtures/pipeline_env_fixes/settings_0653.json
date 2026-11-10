@@ -1,0 +1,112 @@
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.hooks.flush_session",
+            "statusMessage": "Snapshotting session progress...",
+            "timeout": 30,
+            "type": "command"
+          },
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.worktree span-end",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "auto"
+      },
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.hooks.flush_session",
+            "statusMessage": "Snapshotting session progress...",
+            "timeout": 30,
+            "type": "command"
+          },
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.worktree span-end",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "manual"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.gates.permission_gate --subordinate-to-deny-dangerous",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.gates.worktree_gate",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
+      },
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.gates.spec_gate",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.hooks.sessionid_envfile",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.hooks.loop_gate --mode stop-hook",
+            "timeout": 10,
+            "type": "command"
+          },
+          {
+            "command": "uv run --with \"/home/user/harness-maker\" python -m harness_maker.worktree span-end",
+            "timeout": 10,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Bash(uv run --with /home/user/harness-maker python -m harness_maker.*)",
+      "Bash(uv run --with /home/user/harness-maker hm *)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(uv run mypy:*)",
+      "Bash(pytest:*)",
+      "Bash(git:*)",
+      "Bash(uv run --with /home/user/harness-maker hm second_opinion_invoke:*)",
+      "Bash(codex exec:*)"
+    ],
+    "deny": []
+  },
+  "preset": "Production"
+}

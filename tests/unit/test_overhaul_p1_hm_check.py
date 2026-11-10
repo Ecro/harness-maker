@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -570,6 +571,13 @@ def test_ac005_exit_table(row: Row, tmp_path: Path, monkeypatch: pytest.MonkeyPa
     if row.name == "mutation-no-mutmut":
         # mutmut ships in this repo's dev group; the row is about a project without it.
         monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    if row.setup is _lock_added:
+        # The lock here is a stand-in for the CVE scan, not one uv can sync; without uv on PATH
+        # the stub interpreter is used as it is (SPEC-pipeline-env-fixes AC-004).
+        real = shutil.which
+        monkeypatch.setattr(
+            shutil, "which", lambda name, *a, **k: None if name == "uv" else real(name, *a, **k)
+        )
     p = make_project(tmp_path)
     row.setup(p)
     finish(p)

@@ -101,7 +101,7 @@ def test_both_allow_rules_present_when_both_models_enabled(tmp_path: Path) -> No
 
 # ── scoped invoker grant (REVIEW-2026-07-25 F6) ──────────────────────────────
 
-_INVOKER_PREFIX = "Bash(uv run --with "
+_INVOKER_PREFIX = "Bash(uv run --no-project --with "
 _INVOKER_SUFFIX = " hm second_opinion_invoke:*)"
 
 

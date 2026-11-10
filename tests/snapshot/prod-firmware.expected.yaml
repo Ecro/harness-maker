@@ -16,31 +16,31 @@ files:
   body_sha256: c62a21e82754d5606f3beae02e5dcf47cce846662e3763708b901442a83abb9a
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 4ff6a79200dab7de300fe88cab670435dbae047bd05c6bb5bc3d3f8e50ac72d0
+  body_sha256: 0720a3ae86e704b8a38f4cd2d16815de905b1fac5ba43feddb14f56c82221edc
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
-  body_sha256: f85feb685ee8ee4d2dbd28e05f3089468026bf82a1ce8241db3c3cf7f93ea0dd
+  body_sha256: 7a0eb0965046757c8720bdabc17656ec1ba96bace0c29141730b4f0e6fda2e8a
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
   body_sha256: aed4e7104fb37d4ef429a3261e48937d25a80c56b4c88674de09426c4c57f3b6
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
-  body_sha256: 63ddebdb8a90b44830aa62bd7c8a257398665b046e1440b4b08b400deac8c31d
+  body_sha256: 79b966be1214ebe8752c0efe08116659c9c62d4189b3b06544953af2502e8b73
 - path: commands/hm/metrics.md
   template: commands/hm/metrics.md.j2
-  body_sha256: ae09e93d63af7af5c7c248ae50a865c2c9e642b8018896096392ad248d1e59f6
+  body_sha256: 104a8626874bba215ce9d2ce4b9979ac1ff6f9c22d6a20a21c3048ee6adb8409
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: c2f8863fc1d4bf516aea1df009ba29a348ba19c4b28b81f0c63e36cfca3f6bfa
+  body_sha256: a522c8a00990b870eee1f786d780e31888ffe3b7301c3dc95ba58b1f5b831d6c
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 73f8b9fbc8530fa6b00f1dbc3d3d8bb4c8dae13d78f9f68f108b5ee0e748b5f4
+  body_sha256: 1cf734246f06111dad60e18c945cc9b265ab3c55aafdeae59691a5aacd271569
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
-  body_sha256: 4de0492567baa79b3ce81951f85e8bd77d9eac545369f0bef860ec0668c6aa80
+  body_sha256: c4364aa3896fdafbf4dc60b60eac7b06481f9e9ef15a87cfbbf685904d365b62
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 851cb3264a288223baedd728c2e395043d3833009fc176e56ce6b88ed6320b74
+  body_sha256: 5f64701e009e41e4b949353f85e724eedca6a2b552b02125d3b28b38028471a3
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
   body_sha256: 620dc878ad6f728a05c4ee2ed8a9bb36b3ff4456034b9808971f799b1f92c698
@@ -70,10 +70,10 @@ files:
   body_sha256: 03a7f5c424652cb4a76e2078092bc0771e655e7760b4009aca7600eeb09dc6b9
 - path: settings.json
   template: settings/Production.json.j2
-  body_sha256: 146278b665a4a94c74f493374ab13db88f45aec6a008b0fd3f4bed967882c084
+  body_sha256: cf4670cb09368d6dd4cc9e37f524ba806a37fe436c34f6c67942fa7a73d7d343
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
-  body_sha256: 6859c80cb9e1c7e217c62b4300017c3a7f6afd08422deb19fc720e36596da9e4
+  body_sha256: 359bd8cf20f3fcdb4e46b586733100d1643d88739bef799262438b9e4af68f8a
 - path: skills/ai-readiness-rubric/SKILL.md
   template: skills/ai-readiness-rubric/SKILL.md.j2
   body_sha256: 8c041401142d7ca2e1927bbb74ec3f59aa7aee5c074b38f4ff53fcd56c4eac04
@@ -82,16 +82,16 @@ files:
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 - path: skills/intent-layer/SKILL.md
   template: skills/intent-layer/SKILL.md.j2
-  body_sha256: 1c08d4f14fb30ad7c115fee68dc3fafeede2e5773c559880ce6841578a07387d
+  body_sha256: 6c114e5fad308cb9bc864c296a14d5dbfba5026ceafe9c4da37394349846e269
 - path: skills/intent-layer/references/workflow-feedback.md
   template: skills/intent-layer/references/workflow-feedback.md.j2
   body_sha256: 8bc02a9587278b53fdc82dc35a1cfbe6d0068c8e6b4c4cad5c43b7782a7deeb6
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: bf80b487d7f45b829a630783051e937eae4fac8899536da683b5e1f924bcbc76
+  body_sha256: 776897121403c122ff2d2e77d8e3e5ec5d91f73420a353dad87ef31c24183f29
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
-  body_sha256: 12611c8e959f5e774908e01684d63bbac86c253a665a20a34ae47825eeb76315
+  body_sha256: 98b6a525112f3a8d649f3390263ea5b2905f4da1e11260eab6aab59648546eef
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
-  body_sha256: 7d173efc980b76c0bc92d8e2ed6dfefc1ca4943941b810bb0e0bec3c49a619a3
+  body_sha256: 05bf4ff209f91b13adc762b3338e1b46721ee393ef3cc756693e8b392cb35367

@@ -1735,7 +1735,8 @@ with `!` through a fail-soft chain —
 group: a permission matcher splits on `|`/`||`, and a piece starting with `{` matches no rule).
 The skill's `allowed-tools` pre-approves only `Bash(<hm> world_model:*)`,
 `Bash(<hm> autopilot narrow:*)`, `Bash(tail:*)`, `Bash(grep:*)` and `Bash(printf:*)`, where `<hm>`
-is `uv run --with <plugin path> hm`. Codex runs the same command as a bash block; Cursor's `!` support is
+is `uv run --no-project --with <plugin path> hm`
+(`--no-project` keeps uv from creating `.venv` and `uv.lock` in your project). Codex runs the same command as a bash block; Cursor's `!` support is
 unverified, so the skill tells the model to run the digest itself when no JSON appears.
 
 | Field | Content |
