@@ -15,7 +15,7 @@ scope:
 - 레버 3 — 서브에이전트 결과를 메인에 덜 싣는다 (렌즈·validator 결과 전문 대신 판정과 경로)
 - 레버 4 — hm spec_machine check --all 은 통과하면 한 줄만 출력한다
 - '레버 5 — 내부용 스킬·명령을 자동 호출 목록에서 숨겨 /hm: 를 안 쓸 때의 고정 비용을 줄인다'
-- spec-validator 는 light 에서도 돈다 (사용자 기본값 2026-10-14)
+- 'spec-validator: AC 8개 이하 SPEC 은 기본 생략, 승인 때 DRI 가 고르면 실행 (DRI 2026-11-10)'
 - 'step_sensitivity: A.5 근거에 벤치 ground-truth 팔을 반영'
 - 벤치 러너(픽스처 + 숨은 테스트 + plain/hm 팔)를 repo 로 올려 지표를 다시 잰다
 state: proposed
@@ -24,10 +24,10 @@ schema_version: 1
 rejected: []
 depends_on: []
 approval:
-  content_hash: 57c786cc5a83148ce0afdaf0828915b8289462503ad397272d2a02325f95cfba
+  content_hash: 62fa6fceb992f04eef4d988e3ee5049df1383826285417d8f3c2ff1972098596
   approved_by: Ecro
-  approved_at: '2026-10-14T13:31:56Z'
-  approved_target: 5
+  approved_at: '2026-11-10T13:04:09Z'
+  approved_target: 8
 revisit_when: null
 observed: null
 note: null
@@ -35,7 +35,7 @@ closed_at: null
 statement: '/hm: 실행 비용의 약 75% 는 단계 프롬프트와 도구 출력이 메인 컨텍스트에 쌓여 매 호출 다시 읽히는 데서 나온다. spec
   Step 0 이 작은 작업(약 5개 파일 이하, 한 세션, 되돌리기 어려운 결정 없음)을 light lane 으로 보내 A.5 와 반복 리뷰를
   빼고, 단계를 새 컨텍스트로 위임하고, 단계 본문과 도구 출력을 줄이면, 벤치의 숨은 테스트 통과율을 plain 아래로 낮추지 않으면서 hm_cost_ratio_small
-  이 22 → 5 이하로 내려간다'
+  이 22 → 8 이하로 내려간다'
 metric_id: hm_cost_ratio_small
 out_of_scope:
 - 크거나 여러 세션에 걸친 작업의 게이트 변경 (full 경로의 단계는 그대로, 그 가치는 미측정). 레버 2·4·5 의 크기 절감은 full 에도
@@ -61,12 +61,12 @@ spec 15, verify 15), 서브에이전트가 약 15%(A.5 6, 리뷰 렌즈 11, spec
 ## Proposed outcome
 
 작은 작업은 가벼운 경로를 타고 큰 작업은 지금처럼 전체 파이프라인을 탄다. 성공 예: 같은 벤치를 다시 돌렸을 때 /hm: 팔의
-비용이 plain 의 5배 이하이고 숨은 테스트 통과율이 plain 이상이다. 성공이 아닌 반례: 비용은 내려갔지만 통과율이 plain 아래로
+비용이 plain 의 8배 이하이고 숨은 테스트 통과율이 plain 이상이다. 성공이 아닌 반례: 비용은 내려갔지만 통과율이 plain 아래로
 떨어진 경우, 또는 Step 0 이 여러 세션짜리 작업을 small 로 보낸 경우.
 
 판정 규칙 (사전 등록):
-- 배수 ≤ 5 이고 /hm: 통과율 ≥ plain → `met`.
-- 배수 > 5 → `missed`. 비용이 제거한 단계가 아니라 다른 곳(서브에이전트 수, 항상 로드되는 컨텍스트)에 있다는 뜻이다.
+- 배수 ≤ 8 이고 /hm: 통과율 ≥ plain → `met`.
+- 배수 > 8 → `missed`. 비용이 제거한 단계가 아니라 다른 곳(서브에이전트 수, 항상 로드되는 컨텍스트)에 있다는 뜻이다.
 - /hm: 통과율 < plain → `missed`. 제거한 단계가 무언가를 잡고 있었다는 뜻이니 해당 단계를 되돌린다.
 - 벤치 러너가 repo 에 들어오지 않아 다시 잴 수 없으면 → `no_data`.
 

@@ -582,12 +582,12 @@ _VERDICT_CASES = [
     (_rows("plain", {"t1": 0.1, "t2": 0.3}) + _rows("hm", {"t1": 0.2, "t2": 1.0}), 3.0, "met"),
     # Mean of per-task ratios would be (10 + 1.11) / 2 = 5.56 and miss; ratio of means is 2.0.
     (_rows("plain", {"t1": 0.1, "t2": 0.9}) + _rows("hm", {"t1": 1.0, "t2": 1.0}), 2.0, "met"),
-    # 5.004 is above the target and is what gets recorded (3 places), not a rounded 5.0.
-    (_rows("plain", 1.0) + _rows("hm", 5.004), 5.004, "missed"),
+    # 8.004 is above the target and is what gets recorded (3 places), not a rounded 8.0.
+    (_rows("plain", 1.0) + _rows("hm", 8.004), 8.004, "missed"),
     # The CLI ratio is 4.0 and the larger transcript ratio 4.8 is within 20%: the judged (and
-    # recorded) number is 4.8; at 5.4 it is over the target.
+    # recorded) number is 4.8; at 7.0 against 8.2 it is the 8.2 that is over the target.
     (_rows("plain", 0.10) + _rows("hm", 0.40, transcript=0.48), 4.8, "met"),
-    (_rows("plain", 0.10) + _rows("hm", 0.46, transcript=0.54), 5.4, "missed"),
+    (_rows("plain", 0.10) + _rows("hm", 0.70, transcript=0.82), 8.2, "missed"),
     # CLI and transcript disagree by more than 20%: the number is not trusted, nothing to record.
     (_rows("plain", 0.10) + _rows("hm", 0.40, transcript=1.20), None, "suspect"),
     # A met that rests on a budget-capped or possibly leaking run is not trusted either.
@@ -650,13 +650,13 @@ def test_record_command_parses(bench: ModuleType) -> None:
 
 
 def test_the_recorded_value_is_the_number_the_verdict_used(bench: ModuleType) -> None:
-    rows = _rows("plain", 0.10) + _rows("hm", 0.46, transcript=0.54)
+    rows = _rows("plain", 0.10) + _rows("hm", 0.70, transcript=0.82)
     summary = bench.summarize(rows)
     assert summary["verdict"] == "missed"
     lines = bench.render_report(summary).splitlines()
     tokens = shlex.split(next(line for line in lines if "intent metric record" in line))
-    assert tokens[tokens.index("--value") + 1] == "5.400"
-    assert lines[-1] == "hm_cost_ratio_small=5.400"
+    assert tokens[tokens.index("--value") + 1] == "8.200"
+    assert lines[-1] == "hm_cost_ratio_small=8.200"
 
 
 @pytest.mark.parametrize(

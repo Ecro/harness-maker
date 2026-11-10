@@ -1,0 +1,13 @@
+{
+ "batches": [
+  {
+   "complete": true,
+   "run": "2026-11-10",
+   "rows": "docs/evals/results.jsonl",
+   "shas": [
+    "9bba5174cd88"
+   ],
+   "note": "Tier-1 re-measure for SPEC-hm-cost-p5 AC-006: plain and hm x t1-t5 x 3 runs, claude-sonnet-5-5, 30 rows. The only batch run for this task; nothing was discarded or rerun."
+  }
+ ]
+}

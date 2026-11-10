@@ -21,10 +21,9 @@ is possible: specific, cited, and falsifiable.
 
 - Invoked by `/hm:spec` **once**, after the SPEC and its `.machine.yaml` pass `spec_machine
   check --all` and **before** the DRI's acceptance is stamped.
-- Runs only when the SPEC **declares or implies an irreversible decision**, or is not a Step-0
-  skip-path SPEC. A trivial SPEC — single file, no contract change, reversible in under an hour
-  — is not worth a critic, and running on one re-imposes exactly the ceremony a light SPEC
-  exists to avoid.
+- Runs only when `spec_machine check --all` printed `"validator": "run"` or the DRI
+  chose "Approve after spec-validator". On a smaller SPEC the measured cost
+  outweighed the measured gain, so the default is to skip and the choice is the DRI's.
 - Receives the SPEC body, its `.machine.yaml`, and the RESEARCH document when one exists.
 - Does NOT run on an already-approved SPEC. A stamped SPEC is re-critiqued only if it is edited,
   which invalidates the stamp and brings it back through `/hm:spec`.
