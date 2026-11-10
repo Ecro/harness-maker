@@ -48,3 +48,18 @@ AC-004 stage budgets (`tests/unit/test_overhaul_p1_surface.py`): spec 6 950 → 
 13 chars per harness-maker invocation they carry. The Maker skill's cap (`_MAKER_CAP`, CLAUDE.md, `docs/reference/world-model.md`) rises
 4 500 → 4 539 for its three invocations; no wording was trimmed. The growth is held as this PLAN's
 `surface_allowance` until the task lands; the baseline is then re-frozen from main in a fold commit.
+
+Per ADR-010 the task that moved the surface owns its attribution, and writing it next to the
+allowance and the later re-freeze is what keeps this out of `ratchet-rebaselined-by-its-own-subject`.
+The surface rose (+0.6% claude, +0.4% codex) only by the `--no-project ` flag at each harness-maker
+call plus wrapup's exit-2 rule and `observe --relation` example; nothing else in the prose changed.
+
+## Folded into the baseline from main
+
+After PR #48 squash-merged the task as 636e9f49 the PLAN was marked complete, which expires its
+allowance, so the growth was folded on main: `tests/structural/surface_baseline.json` re-frozen by the
+generator at 636e9f498813 (claude 49 259, codex 30 532, the after column above; `render_sha` and
+`payload_digest` moved mechanically with the re-freeze). `_ATOMIC_RATCHET` is unchanged: the atomic
+renders grew by 13 (execute, spec) and 73 (wrapup) chars, inside its ±2% band. The bench rows
+measured before this task keep `bench_hash` 569e17ef29ab and need no alias: no measurement ran on the
+task branch.
