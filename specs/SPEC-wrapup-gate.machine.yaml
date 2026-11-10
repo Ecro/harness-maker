@@ -1,0 +1,513 @@
+schema_version: 3
+spec_slug: wrapup-gate
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: --require-review fails an unreviewed non-doc change
+  type: parametric
+  test_ids:
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-0]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-1]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-2]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-3]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-4]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-5]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-6]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-7]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-8]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-9]
+  - tests/unit/test_wrapup_gate.py::test_ac_001_require_review[AC-001-10]
+  executable_predicate: null
+  golden_table:
+  - input:
+      require_review: true
+      review_doc: false
+      changed:
+      - src/app.py
+      approval: approved
+    expected:
+      review_ok: false
+      exit: 1
+      reason: no REVIEW record for a non-doc change
+    edge: false
+    note: ''
+  - input:
+      require_review: true
+      review_doc: false
+      changed:
+      - templates/x.md.j2
+      approval: approved
+    expected:
+      review_ok: false
+      exit: 1
+      reason: no REVIEW record for a non-doc change
+    edge: false
+    note: ''
+  - input:
+      require_review: true
+      review_doc: false
+      changed:
+      - README.md
+      - work-docs/PLAN-s.md
+      - specs/SPEC-s.machine.yaml
+      - .claude/memory/n.md
+      approval: approved
+    expected:
+      review_ok: true
+      exit: 0
+      reason: no REVIEW record
+    edge: false
+    note: ''
+  - input:
+      require_review: true
+      review_doc: false
+      changed:
+      - src/app.py
+      approval: exempt
+    expected:
+      review_ok: true
+      exit: 0
+      reason: no REVIEW record
+    edge: false
+    note: ''
+  - input:
+      require_review: true
+      review_doc: false
+      changed:
+      - src/app.py
+      approval: missing_auto_full
+    expected:
+      review_ok: false
+      exit: 1
+      reason: no REVIEW record for a non-doc change
+    edge: false
+    note: ''
+  - input:
+      require_review: true
+      review_doc: true
+      changed:
+      - src/app.py
+      approval: approved
+    expected:
+      review_ok: true
+      exit: 0
+      reason: null
+    edge: false
+    note: ''
+  - input:
+      require_review: true
+      review_doc: false
+      changed:
+      - agents/code-reviewer.md
+      approval: approved
+    expected:
+      review_ok: false
+      exit: 1
+      reason: no REVIEW record for a non-doc change
+    edge: false
+    note: ''
+  - input:
+      require_review: true
+      review_doc: false
+      changed:
+      - CLAUDE.md
+      approval: approved
+    expected:
+      review_ok: false
+      exit: 1
+      reason: no REVIEW record for a non-doc change
+    edge: false
+    note: ''
+  - input:
+      require_review: true
+      review_doc: false
+      changed:
+      - .claude/observability/review_effect.jsonl
+      approval: approved
+    expected:
+      review_ok: true
+      exit: 0
+      reason: no REVIEW record
+    edge: false
+    note: ''
+  - input:
+      require_review: true
+      review_doc: false
+      changed:
+      - src/app.py
+      approval: legacy
+    expected:
+      review_ok: false
+      exit: 1
+      reason: no REVIEW record for a non-doc change
+    edge: false
+    note: ''
+  - input:
+      require_review: false
+      review_doc: false
+      changed:
+      - src/app.py
+      approval: approved
+    expected:
+      review_ok: true
+      exit: 0
+      reason: no REVIEW record
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rows restate the DRI's card-B rule (block a code change with no
+    review record, the exempt path excepted) and the constraint table, written before
+    the code; the flag-off row is today's reproduced output (RESEARCH F4).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: an identical reprint does not carry wrapup past the review requirement
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_gate.py::test_ac_002_identical_reprint_still_requires_review
+  - tests/unit/test_wrapup_gate.py::test_ac_002_cli_flag_reaches_the_gate
+  executable_predicate: reprint_after_flagless_pass(require_review=True).exit == 1
+    and not gate_commands_ran
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected outcome is S2 of this SPEC; the reprint behaviour
+    it must not bypass is SPEC-hm-check-docs-only-reuse IRR-003, an independent earlier
+    contract.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the contract section follows the Do not change list and its ADR allowances
+  type: parametric
+  test_ids:
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-0]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-1]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-2]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-3]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-4]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-5]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-6]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-7]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-8]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-9]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-10]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_red_skips_contract
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-11]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-12]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-13]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_contract_section[AC-003-14]
+  - tests/unit/test_wrapup_gate.py::test_ac_003_identical_reprint_recomputes_contract
+  executable_predicate: null
+  golden_table:
+  - input:
+      dnc:
+      - '- `src/a.py`'
+      adr: []
+      changed:
+      - src/a.py
+      - src/b.py
+    expected:
+      ok: false
+      crossed:
+      - src/a.py
+      allowed: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- `src/api/**`'
+      adr: []
+      changed:
+      - src/api/v1/x.py
+    expected:
+      ok: false
+      crossed:
+      - src/api/v1/x.py
+      allowed: []
+      advisory: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- `src/a.py` full-mode semantics'
+      adr: []
+      changed:
+      - src/a.py
+    expected:
+      ok: true
+      crossed: []
+      allowed: []
+      advisory:
+      - src/a.py
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- `src/a.py`'
+      adr:
+      - 'ADR-003: rename it; allows: `src/a.py`. **Decided by:** agent'
+      changed:
+      - src/a.py
+    expected:
+      ok: false
+      crossed:
+      - src/a.py
+      allowed: []
+      advisory: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- `src/a.py`'
+      adr:
+      - '### ADR-004: allows: src/a.py. **Decided by:** user (2026-11-10)'
+      changed:
+      - src/a.py
+    expected:
+      ok: true
+      crossed: []
+      allowed:
+      - src/a.py
+      advisory: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- docs/'
+      adr: []
+      changed:
+      - docs/y.md
+    expected:
+      ok: false
+      crossed:
+      - docs/y.md
+      allowed: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- `src/a.py`'
+      adr: []
+      changed: []
+      untracked:
+      - src/a.py
+    expected:
+      ok: false
+      crossed:
+      - src/a.py
+      allowed: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- `src/a.py`'
+      - '- `src/c.py`'
+      adr:
+      - 'ADR-002: keep v1 working; allows: `src/a.py`. **Decided by:** user'
+      changed:
+      - src/a.py
+    expected:
+      ok: true
+      crossed: []
+      allowed:
+      - src/a.py
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- none — this task has no contract boundaries'
+      adr: []
+      changed:
+      - src/a.py
+    expected:
+      ok: true
+      crossed: []
+      allowed: []
+    edge: false
+    note: ''
+  - input:
+      plan: false
+      changed:
+      - src/a.py
+    expected:
+      ok: true
+      reason: no PLAN
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- `src/a.py` — public entry point'
+      adr: []
+      changed:
+      - src/ab.py
+    expected:
+      ok: true
+      crossed: []
+      allowed: []
+      advisory: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- src/api'
+      adr: []
+      changed:
+      - src/api/v1.py
+    expected:
+      ok: false
+      crossed:
+      - src/api/v1.py
+      allowed: []
+      advisory: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- src/a.py.'
+      adr: []
+      changed:
+      - src/a.py
+    expected:
+      ok: false
+      crossed:
+      - src/a.py
+      allowed: []
+      advisory: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- nonessential/'
+      adr: []
+      changed:
+      - nonessential/x.py
+    expected:
+      ok: false
+      crossed:
+      - nonessential/x.py
+      allowed: []
+      advisory: []
+    edge: false
+    note: ''
+  - input:
+      dnc:
+      - '- `src/a.py`'
+      adr:
+      - '- **ADR-005**: allows: src/a.py. **Decided by:** DRI (confirmed 2026-11-10)'
+      changed:
+      - src/a.py
+    expected:
+      ok: true
+      crossed: []
+      allowed:
+      - src/a.py
+      advisory: []
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rows are hand-written from HR-020's proposal and execute Step 0's
+    PLAN format (which predates this change); glob semantics come from the existing
+    check_reuse dialect, not from the new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: the stage text hands the comparison and the requirement to hm check
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_gate.py::test_ac_004_stage_text[claude]
+  - tests/unit/test_wrapup_gate.py::test_ac_004_stage_text[codex]
+  executable_predicate: 'all(''hm check --slug <slug> --reuse --require-review'' in
+    wrapup(r) and ''Compare `git diff --name-only HEAD`'' not in execute(r) and ''`contract.crossed`''
+    in step(execute(r), ''Step 4'') and ''allows: <path>'' in step(execute(r), ''Step
+    0'') for r in (''claude'', ''codex''))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The literals are this SPEC's Outcomes; the removed sentence is
+    quoted from the 0.65.3 execute template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: hm check gains --require-review and a contract section ({ok, crossed,
+    allowed, advisory} or {ok, reason}), and exits 1 on an unauthorised Do not change
+    crossing or, with the flag, on an unreviewed non-doc change; a bare-path Do not
+    change bullet becomes path-matched; user-decided PLAN ADR lines gain the parsed
+    form allows <path>
+  category: public API/CLI contract
+  rationale: rendered stage commands, users' scripts and existing PLANs depend on
+    the exit contract and the PLAN format
+  source: spec
+approval:
+  kind: human
+  content_hash: 97613d88ddb2c3c75bc95e59d8976c49559402f4535cc6852287ed05c78f699c
+  approved_by: Claude
+  approved_at: '2026-11-10T14:41:22Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: f88a9ae342d9b8b65a32b0aa944fb727cd946dc558b3dd7b23b7a4c0d8b22075
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f7d8793ce9e11e659f0c5e24357b6e5913f28818729a09bb7cf7ecddaa3db65
+    AC-001: da4a1219c0a67ae6ec1c0ed12cd6bb45f445dc9099f3ed80c0d369f5e336777c
+    AC-002: e72e2733c940864064a5c8f7d39315ac7cc4757b33c30ba36d063c26388c59ae
+    AC-003: 7c71b7aa2adc535ef4b7ae097297d90fe2d9b867ffbfcac95b75b5099c07ced9
+    AC-004: f8b230871797ccefb00c66500e8fb7c85e714b5118853a2db4c0f1d949b6a582
+    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591

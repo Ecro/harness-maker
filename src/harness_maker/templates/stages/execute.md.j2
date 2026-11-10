@@ -27,7 +27,7 @@ Chain independent shell steps with `&&` in one Bash call, except `hm check`, the
 
 Run `hm spec_machine approval-status --root . --slug <slug>`. `approved` and `exempt` proceed; `missing` proceeds only at `autonomy.level: auto_full`; any other state, or a missing SPEC, stops: ask with {{ hm.ask() }}: approve runs `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`, `/hm:spec` stops.
 
-Write `{{ _wt }}work-docs/PLAN-<slug>.md`, or extend it if it exists. Frontmatter: `type: plan`, `task_slug`, `status: planning`, `created`, `spec: "[[SPEC-<slug>]]"`, `summary`. Body: one line per phase with `scope:`, `exit:` (a command), `risk:` and `rollback:`; `## 🚧 Contract Boundaries` with a `### Do not change` list of repo-relative paths (or the single bullet `none — this task has no contract boundaries`); and `ADR-NNN: <decision>. **Decided by:** <user (source) | agent>`. If one phase is enough, say why in one line; a short PLAN is frontmatter, that phase line, `Do not change` and decided ADRs. {{ hm.edit_in_place() }}
+Write `{{ _wt }}work-docs/PLAN-<slug>.md`, or extend it if it exists. Frontmatter: `type: plan`, `task_slug`, `status: planning`, `created`, `spec: "[[SPEC-<slug>]]"`, `summary`. Body: one line per phase with `scope:`, `exit:` (a command), `risk:` and `rollback:`; `## 🚧 Contract Boundaries` with a `### Do not change` list of repo-relative paths (or the single bullet `none — this task has no contract boundaries`); and `ADR-NNN: <decision>. **Decided by:** <user (source) | agent>`. A bare path is enforced; a user ADR may say `allows: <path>`. If one phase is enough, say why in one line; a short PLAN is frontmatter, that phase line, `Do not change` and decided ADRs. {{ hm.edit_in_place() }}
 
 ## Step 0.3 — Verify the PLAN
 
@@ -65,7 +65,7 @@ Per PLAN phase, make the smallest change that turns its ACs' tests GREEN, within
 
 ## Step 4 — Contract boundaries
 
-Compare `git diff --name-only HEAD` plus untracked files with `Do not change`; a crossing no ADR authorises stops the stage: report it.
+A path in `hm check`'s `contract.crossed` stops the stage: report it.
 
 ## Step 6 — Review
 

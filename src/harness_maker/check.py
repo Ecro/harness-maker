@@ -1160,14 +1160,55 @@ def _cells(line: str) -> list[str]:
     return [c.strip().strip("`").strip() for c in line.strip().strip("|").split("|")]
 
 
-def review_section(root: Path, slug: str, config: dict[str, Any]) -> Section:
-    work_docs = _dig(config, "work_docs", "dir") or "work-docs/"
+_DOC_SUFFIXES = frozenset({".md", ".rst", ".txt"})
+#: Markdown that steers an agent is behaviour, not documentation.
+_PROMPT_DIRS = frozenset({"agents", "commands", "skills"})
+_PROMPT_FILES = frozenset({"CLAUDE.md", "AGENTS.md", "SKILL.md"})
+
+
+def _work_docs(config: dict[str, Any]) -> str:
+    return str(_dig(config, "work_docs", "dir") or "work-docs/").strip("/") + "/"
+
+
+def needs_review(path: str, slug: str, config: dict[str, Any]) -> bool:
+    """A changed path the reviewer must have seen: anything but docs and the task's own records.
+    Wider than `is_code_or_test` on purpose: templates, configs and locks deserve review too."""
+    if path.startswith((_work_docs(config), ".claude/memory/", ".claude/observability/")):
+        return False
+    if path.startswith(f"specs/SPEC-{slug}."):
+        return False
+    pure = Path(path)
+    if pure.name in _PROMPT_FILES or _PROMPT_DIRS & set(pure.parts[:-1]):
+        return True
+    return pure.suffix.lower() not in _DOC_SUFFIXES
+
+
+def review_section(
+    root: Path,
+    slug: str,
+    config: dict[str, Any],
+    *,
+    changed: list[str] | None = None,
+    state: str = "",
+    require: bool = False,
+) -> Section:
+    work_docs = _work_docs(config)
     # Anchored: `REVIEW-auth-*.md` would also match another task's `REVIEW-auth-refresh-…`.
     name = re.compile(rf"REVIEW-{re.escape(slug)}-\d{{4}}-\d{{2}}-\d{{2}}\.md")
     docs = sorted(
-        p for p in (root / str(work_docs)).glob(f"REVIEW-{slug}-*.md") if name.fullmatch(p.name)
+        p for p in (root / work_docs).glob(f"REVIEW-{slug}-*.md") if name.fullmatch(p.name)
     )
     if not docs:
+        unreviewed = [p for p in changed or [] if needs_review(p, slug, config)]
+        if require and state != "exempt" and unreviewed:
+            return Section(
+                {
+                    "ok": False,
+                    "reason": "no REVIEW record for a non-doc change",
+                    "paths": unreviewed[:10],
+                },
+                EXIT_FAILED,
+            )
         return Section({"ok": True, "gating": False, "reason": "no REVIEW record"})
     doc = docs[-1]
     rel = doc.relative_to(root).as_posix()
@@ -1213,6 +1254,87 @@ def review_section(root: Path, slug: str, config: dict[str, Any]) -> Section:
     return Section(
         {"ok": ok, "doc": rel, "findings": count, "without_disposition": missing, "open": open_},
         EXIT_OK if ok else EXIT_FAILED,
+    )
+
+
+# ── contract boundaries (SPEC-wrapup-gate AC-003) ──────────────────────────────
+
+_DNC_HEADING = re.compile(r"^###\s+Do not change\s*$", re.M)
+_ADR_LINE = re.compile(r"^[\s#*|>-]*ADR-\d+")
+_USER_DECIDED = re.compile(r"Decided by:\**\s*(?:user|DRI)\b", re.I)
+_ALLOWS = re.compile(r"\ballows:\s*(?:`([^`]+)`|([^\s,;`]+))")
+
+
+def _dnc_entry(bullet: str) -> tuple[list[str], bool] | None:
+    """(patterns, qualified). A qualified bullet (text after the path) protects a behaviour, not
+    the whole file, so it is advisory: only a model can judge it. A bare name with no glob
+    character also covers the directory of that name, so `src/api` cannot fail open."""
+    text = bullet.strip()[1:].strip()
+    if not text or re.match(r"none\b", text, re.I):
+        return None
+    tick = re.match(r"\**`([^`]+)`\**", text)
+    if tick:
+        entry, rest = tick.group(1), text[tick.end() :]
+    else:
+        entry, _, rest = text.partition(" ")
+        entry = entry.rstrip(".,;:").strip("*").rstrip(".,;:")
+    entry = entry.strip().removeprefix("./")
+    if not entry:
+        return None
+    if entry.endswith("/"):
+        patterns = [f"{entry}**"]
+    elif any(c in entry for c in "*?["):
+        patterns = [entry]
+    else:
+        patterns = [entry, f"{entry}/**"]
+    return patterns, bool(rest.strip(" .;,:"))
+
+
+def _plan_boundaries(text: str) -> tuple[list[tuple[list[str], bool]], list[str]] | None:
+    """(Do-not-change entries, user-decided ADR `allows:` patterns), or None when the PLAN has
+    no list. An agent-decided `allows:` does not count: the model that crosses a boundary must
+    not authorise the crossing itself."""
+    m = _DNC_HEADING.search(text)
+    if m is None:
+        return None
+    entries: list[tuple[list[str], bool]] = []
+    for line in text[m.end() :].splitlines():
+        if line.startswith("#"):
+            break
+        if line.strip().startswith(("- ", "* ")):
+            entry = _dnc_entry(line)
+            if entry:
+                entries.append(entry)
+    allows = [
+        (ticked or bare.rstrip(".")).removeprefix("./")
+        for line in text.splitlines()
+        if _ADR_LINE.match(line) and _USER_DECIDED.search(line)
+        for ticked, bare in _ALLOWS.findall(line)
+    ]
+    return entries, allows
+
+
+def contract_section(root: Path, slug: str, config: dict[str, Any], changed: list[str]) -> Section:
+    """The PLAN's `Do not change` list against the task diff, so the model that did the work does
+    not judge its own scope (HR-020)."""
+    from harness_maker.check_reuse import glob_match
+
+    plan = root / _work_docs(config) / f"PLAN-{slug}.md"
+    if not plan.is_file():
+        return Section({"ok": True, "gating": False, "reason": "no PLAN"})
+    parsed = _plan_boundaries(plan.read_text(encoding="utf-8", errors="replace"))
+    if parsed is None:
+        return Section({"ok": True, "gating": False, "reason": "no Do not change list"})
+    entries, allows = parsed
+    strict = [g for globs, qualified in entries if not qualified for g in globs]
+    loose = [g for globs, qualified in entries if qualified for g in globs]
+    hits = [p for p in changed if any(glob_match(e, p) for e in strict)]
+    allowed = [p for p in hits if any(glob_match(a, p) for a in allows)]
+    crossed = [p for p in hits if p not in allowed]
+    advisory = [p for p in changed if p not in hits and any(glob_match(e, p) for e in loose)]
+    return Section(
+        {"ok": not crossed, "crossed": crossed, "allowed": allowed, "advisory": advisory},
+        EXIT_FAILED if crossed else EXIT_OK,
     )
 
 
@@ -1490,6 +1612,8 @@ class Options:
     offline: bool = False
     harness: bool = False
     full: bool = True
+    #: Wrapup's call (SPEC-wrapup-gate AC-001): a non-doc change needs a REVIEW record.
+    require_review: bool = False
 
 
 # ── verdict reuse (SPEC-hm-cost-p3 AC-002) ─────────────────────────────────────
@@ -1506,6 +1630,12 @@ def verdict_path(root: Path) -> Path | None:
     return path if path.is_absolute() else root / path
 
 
+#: Options that cannot change a gate result. `require_review` is only read by the review section,
+#: which an identical reprint recomputes (SPEC-wrapup-gate AC-002); keying on it would cost
+#: wrapup the reuse of execute's pass.
+_UNKEYED_OPTIONS = frozenset({"root", "require_review"})
+
+
 def _verdict_key(
     opts: Options,
     root: Path,
@@ -1513,14 +1643,16 @@ def _verdict_key(
     reason: str | None,
     config: dict[str, Any],
 ) -> dict[str, Any]:
-    """What a reused gate result must match: every `Options` field but `root` (a narrower set let
-    a `--mutation` run reuse a pass that never ran the mutation gate), the gate list and the
-    harness config (it may be ignored by git). HEAD and the per-path tree are compared by
-    `check_reuse.decide`, which may accept a declared-inert difference in either."""
+    """What a reused gate result must match: every `Options` field but `_UNKEYED_OPTIONS` (a
+    narrower set let a `--mutation` run reuse a pass that never ran the mutation gate), the gate
+    list and the harness config (it may be ignored by git). HEAD and the per-path tree are
+    compared by `check_reuse.decide`, which may accept a declared-inert difference in either."""
     from harness_maker import __version__
 
     options = {
-        k: sorted(v) if isinstance(v, set) else v for k, v in asdict(opts).items() if k != "root"
+        k: sorted(v) if isinstance(v, set) else v
+        for k, v in asdict(opts).items()
+        if k not in _UNKEYED_OPTIONS
     }
     gate_inputs = {"gates": gates, "reason": reason, "config": config}
     return {
@@ -1569,6 +1701,28 @@ def _reuse_line(record: dict[str, Any], decision: Any, commands: list[str]) -> d
     }
 
 
+def _reprint(
+    line: dict[str, Any], opts: Options, root: Path, config: dict[str, Any]
+) -> dict[str, Any]:
+    """An identical exit-0 line, with review and contract recomputed: execute's pass predates
+    its REVIEW and must not carry wrapup past it (SPEC-wrapup-gate AC-002), and a gitignored
+    PLAN edit is invisible to the tree snapshot."""
+    changed = changed_paths(root)
+    state = str(approval_section(root, opts.slug, config).body["state"])
+    fresh = {
+        "review": review_section(
+            root, opts.slug, config, changed=changed, state=state, require=opts.require_review
+        ),
+        "contract": contract_section(root, opts.slug, config, changed),
+    }
+    failed = {name: s for name, s in fresh.items() if s.code != EXIT_OK}
+    if not failed:
+        return dict(line)
+    sections = dict(line.get("sections") or {})
+    sections.update({name: s.body for name, s in failed.items()})
+    return {**line, "exit": EXIT_FAILED, "sections": sections}
+
+
 def run(opts: Options, *, reuse: bool = False, cve_query: QueryFn | None = None) -> dict[str, Any]:
     from harness_maker import check_reuse
 
@@ -1595,7 +1749,7 @@ def run(opts: Options, *, reuse: bool = False, cve_query: QueryFn | None = None)
             reuse_info = _reuse_line(record, decision, commands)
             line = record.get("line")
             if decision.rule == "identical" and isinstance(line, dict) and line.get("exit") == 0:
-                return {**line, "reused": True, "reuse": reuse_info}
+                return _reprint(line, opts, root, config) | {"reused": True, "reuse": reuse_info}
             reused_gates = Section(dict(record["gates"]))
         else:
             reuse_miss = {"reason": decision.reason, "paths": decision.paths}
@@ -1611,7 +1765,7 @@ def run(opts: Options, *, reuse: bool = False, cve_query: QueryFn | None = None)
     if opts.red:
         sections["gates"] = skipped
         sections["ac"] = red_section(root, spec, runner, opts.green_ok, state)
-        for name in ("review", "security", "cve"):
+        for name in ("review", "contract", "security", "cve"):
             sections[name] = skipped
     else:
         if reused_gates is not None:
@@ -1619,7 +1773,10 @@ def run(opts: Options, *, reuse: bool = False, cve_query: QueryFn | None = None)
         else:
             sections["gates"], read_set = gates_with_read_set(root, config)
         sections["ac"] = ac_section(root, spec, state, changed, runner)
-        sections["review"] = review_section(root, opts.slug, config)
+        sections["review"] = review_section(
+            root, opts.slug, config, changed=changed, state=state, require=opts.require_review
+        )
+        sections["contract"] = contract_section(root, opts.slug, config, changed)
         sections["security"] = security_section(root, changed)
         sections["cve"] = cve_section(root, offline=opts.offline, query=cve_query)
         if opts.mutation:
@@ -1692,6 +1849,12 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--offline", action="store_true", help="skip the CVE lookup and say so")
     p.add_argument("--harness", action="store_true", help="report the harness structure layer")
     p.add_argument(
+        "--require-review",
+        action="store_true",
+        help="wrapup's call: fail a non-doc change that has no REVIEW record, unless the SPEC is "
+        "exempt",
+    )
+    p.add_argument(
         "--full", action="store_true", help="print passing sections in full, not just ok + notes"
     )
     p.add_argument(
@@ -1717,6 +1880,7 @@ def main(argv: list[str] | None = None) -> int:
             offline=args.offline,
             harness=args.harness,
             full=args.full,
+            require_review=args.require_review,
         ),
         reuse=args.reuse,
     )
