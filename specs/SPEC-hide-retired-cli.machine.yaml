@@ -1,0 +1,57 @@
+schema_version: 3
+spec_slug: hide-retired-cli
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: retired commands and the persistence flag leave help, keep working, and say
+    they are retired
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hide_retired_cli.py::test_ac_001_top_help_hides_the_retired_commands
+  - tests/unit/test_hide_retired_cli.py::test_ac_001_make_help_hides_the_persistence_flag
+  - tests/unit/test_hide_retired_cli.py::test_ac_001_autonomy_level_help_names_what_it_controls
+  - tests/unit/test_hide_retired_cli.py::test_ac_001_hidden_commands_still_run_and_say_they_are_retired
+  executable_predicate: '''autopilot'' not in top_help and ''verify'' not in top_help
+    and ''--autonomy-persistent'' not in make_help and verify_help_rc == 0 and autopilot_help_rc
+    == 0 and ''Retired in 0.64.0'' in verify_help and ''Retired in 0.64.0'' in autopilot_help
+    and ''auto_full'' in make_help'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected help is the 0.64.0 retirement list in SPEC-hm-overhaul-p1
+    (verify, autopilot), which predates this change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: 57b827bcdedd10efab4c400417b750069c21dcda4d596574ff60285a8b2daaab
+  approved_by: null
+  approved_at: '2026-11-10T19:45:21Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 70de1d5efee0d94f66b475a22c736e1aad43896ab569f0ee4b7d72bfa9d0a19e
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: e05db0d34caf9dda91c05b42bfe6931ada79826b593194b44cb297a67dcdaa5b
+    ac_order: a1557fcfe162c5ca92cb543b3703219d932e86a98fd3ef7e4d7722599eb526d0
