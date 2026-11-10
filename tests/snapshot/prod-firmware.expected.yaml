@@ -13,7 +13,7 @@ files:
   body_sha256: 9216a2c84e6d4365e76a45a3c2ee71fbf3717506fc171aa82dedce289f8d0985
 - path: agents/spec-validator.md
   template: agents/spec-validator.md.j2
-  body_sha256: d9fcb231718944500e6048d6502b0fd8da6e90a693ccb85e604430650288e090
+  body_sha256: c62a21e82754d5606f3beae02e5dcf47cce846662e3763708b901442a83abb9a
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 0720a3ae86e704b8a38f4cd2d16815de905b1fac5ba43feddb14f56c82221edc
@@ -34,7 +34,7 @@ files:
   body_sha256: a522c8a00990b870eee1f786d780e31888ffe3b7301c3dc95ba58b1f5b831d6c
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 602b63560d80f16e7b1a0b23e2d9cfbeee6efab4a6f8bae594e18ae614ff94ea
+  body_sha256: 1cf734246f06111dad60e18c945cc9b265ab3c55aafdeae59691a5aacd271569
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: c4364aa3896fdafbf4dc60b60eac7b06481f9e9ef15a87cfbbf685904d365b62

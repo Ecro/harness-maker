@@ -1,0 +1,21 @@
+"""Capture `check --all` on the SPEC-hm-cost-p5 fixtures with the UNCHANGED code (main fe6fada6).
+
+Run once, at spec time, before `validator_verdict` existed:
+    uv run python tests/fixtures/hm_cost_p5/capture_check_before.py.txt
+Never rerun after the change: the file it writes is AC-002's reference.
+"""
+
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from tests.unit import hm_cost_p5_fixture as fx  # noqa: E402
+
+out = {}
+with tempfile.TemporaryDirectory() as td:
+    for name in fx.CASES:
+        rc, payload, raw = fx.run_case(Path(td), name)
+        out[name] = {"exit": rc, "payload": payload, "lines": raw.count("\n")}
+fx.BEFORE.write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")

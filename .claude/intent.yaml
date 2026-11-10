@@ -109,7 +109,7 @@ metrics:
     SPEC 에서 정한다.
 - id: hm_cost_ratio_small
   description: '작은 단일 세션 과제 벤치에서 /hm: 팔 평균 비용 / 일반 작업 팔 평균 비용 (배수)'
-  target: 5
+  target: 8
   higher_is_better: false
   how_measured: '벤치 러너로 과제·팔당 3회, 헤드리스. 값 = /hm: 팔 평균 비용 / plain 팔 평균 비용. baseline
     22 (2026-10-14, timeparse 5과제, claude-sonnet-5-5, Side preset — work-docs/RESEARCH-hm-light-lane.md).

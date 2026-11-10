@@ -42,9 +42,12 @@ def test_ac_008_novalidator_arm(templates: tuple[dict[str, bytes], dict[str, byt
     changed = sorted(f for f in hm if hm[f] != nv[f])
     assert changed
     assert set(changed) <= set(SPEC_COMMANDS), changed
+    # The removed step is Step 4.6 and its dispatch. SPEC-hm-cost-p5 put the approval label
+    # "Approve after spec-validator" in Step 2, so the name alone no longer marks the step.
     for f in changed:
-        assert b"spec-validator" in hm[f]
-        assert b"spec-validator" not in nv[f]
+        for marker in (b"## Step 4.6", b'="spec-validator"'):
+            assert marker in hm[f]
+            assert marker not in nv[f]
     task = next(t for t in bench.load_tasks() if t.tier == 1)
     for s in range(len(task.session_prompts)):
         assert bench.prompt_for(task, "hm-novalidator", s) == bench.prompt_for(task, "hm", s)

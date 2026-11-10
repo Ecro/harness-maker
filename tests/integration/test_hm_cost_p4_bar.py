@@ -12,7 +12,8 @@ from typing import Any
 from tests.integration import test_hm_cost_p2_bar as p2
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RESULTS = REPO_ROOT / "docs" / "evals" / "results.jsonl"
+# SPEC-hm-cost-p5 moved these rows aside when its own batch became the published one.
+RESULTS = REPO_ROOT / "docs" / "evals" / "history" / "hm-cost-p4.jsonl"
 BATCHES = REPO_ROOT / "tests" / "fixtures" / "hm_cost_p4" / "batches.json"
 SPEC_MD = REPO_ROOT / "specs" / "SPEC-hm-cost-p4.md"
 BAR = 10.0

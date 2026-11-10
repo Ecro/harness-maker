@@ -26,5 +26,12 @@
     "src_tree": "011def4da216c87db848a93836e4b7227154a5e5",
     "scripts_tree": "cbc5a86764e3934f722b3256e72241d1e2642803",
     "why": "Tier-1 re-measure for SPEC-hm-cost-p4 AC-009 (docs/evals/results.jsonl, 45 rows) ran on task-branch commit 3063ad33; PR #46 squash-merged the task as 1ba64acc, so the source is not reachable from main. Trees recorded from 3063ad33 on 2026-11-10; identical in 1ba64acc."
+  },
+  {
+    "source": "9bba5174cd8875f0cb017103eb64c05195e6db6f",
+    "target": "48996b93984190ea051e6d686be5bfaf61d5fa2a",
+    "src_tree": "5385dc4fd1ea42d0d593637b994561ae51dadfaa",
+    "scripts_tree": "ab7f89941e4e02d7f9d473bca422906d139e9ad4",
+    "why": "SPEC-hm-cost-p5 AC-006's tier-1 batch (docs/evals/results.jsonl, 30 rows) ran on task-branch commit 9bba5174; /hm:wrapup squash-landed the task as the target, so the source is not reachable. Trees recorded from 9bba5174 on 2026-11-10; identical in the target."
   }
 ]

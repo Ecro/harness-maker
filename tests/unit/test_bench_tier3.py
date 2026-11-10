@@ -562,7 +562,10 @@ def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType, tmp_path: Path
     and scorecard pins read the eval-3 rows as committed in db19f023, so publishing a new run
     does not move them; only a change to the report code does. bench_hash moved on purpose with
     SPEC-pipeline-env-fixes: the fixture now commits its uv lock file, which `hm check` needs to
-    build the project's `.venv` (earlier rows carry `569e17ef29ab`; the task bytes are the same)."""
+    build the project's `.venv` (earlier rows carry `569e17ef29ab`; the task bytes are the same).
+    SPEC-hm-cost-p5 moved the report pin from a082ce5d4abd734b by one substitution, "target 5" ->
+    "target 8" (asserted in test_hm_cost_p5_target.py); the scorecard carries no target and did
+    not move."""
     assert bench.bench_hash() == "92672094f80e"
     assert bench.tier2_hash() == "1cf707c57e12"
     tools = {"ruff": "r", "mypy": "m"}
@@ -585,7 +588,7 @@ def test_tier_one_and_two_hashes_are_unchanged(bench: ModuleType, tmp_path: Path
     (tmp_path / "results.jsonl").write_text(eval3, encoding="utf-8")
     rows = bench.read_rows(tmp_path)
     report = hashlib.sha256(bench.report_text(rows).encode()).hexdigest()[:16]
-    assert report == "a082ce5d4abd734b"
+    assert report == "f9f464ebaeba81c1"
     card = json.dumps(bench.scorecard(rows), sort_keys=True)
     assert hashlib.sha256(card.encode()).hexdigest()[:16] == "4a9d0dc59df6770c"
 

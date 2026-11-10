@@ -2408,7 +2408,9 @@ ADR 에는 `Context / Decision / Consequences / Rejected Alternatives` 가 기�
 #### spec-validator advisory
 
 SPEC과 machine companion 초안이 작성되면 `spec-validator`가 조건부로 읽기 전용 비판을
-한 번 수행한다. `APPROVED`, `NEEDS_REVISION`, `MAJOR_REVISION`은 DRI가 판단할 근거이며
+한 번 수행한다. 조건은 `hm spec_machine check --all` 이 `"validator": "run"` 을 출력했거나(살아 있는 AC 가
+8개 초과) DRI 가 승인 질문에서 "Approve after spec-validator" 를 고른 경우다. 더 작은 SPEC 은 기본으로
+건너뛴다. `APPROVED`, `NEEDS_REVISION`, `MAJOR_REVISION`은 DRI가 판단할 근거이며
 자동 게이트가 아니다. 같은 SPEC 단계에서 재검증하지 않는다.
 
 #### "미결 결정 없음" 규칙

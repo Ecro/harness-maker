@@ -68,6 +68,11 @@ _BENCH = "harness-bench: bench run --exp review_convergence --model <name>"
 _LEDGER = (
     "harness-maker: hm verifier_discrimination agents --observability-dir .claude/observability"
 )
+#: The run that produced the spec-validator A/B rows (SPEC-hm-cost-p4 AC-008, SPEC-hm-cost-p5).
+_BENCH_VALIDATOR_AB = (
+    "harness-maker: INTEGRATION=1 uv run python scripts/bench_light_lane.py run "
+    "--tier all --arms plain,hm,hm-novalidator --runs 3 --out <dir>"
+)
 
 
 @dataclass(frozen=True)
@@ -154,10 +159,16 @@ REGISTRY: tuple[StepEntry, ...] = (
         "*",
         "SPEC-plan-stage-absorption ADR-004; predecessor `plan-validator` returned APPROVED "
         "0/54 — discrimination UNMEASURED, which is why the relocated critic is single-pass "
-        "and never blocks. Re-measure before tightening either.",
+        "and never blocks. SPEC-hm-cost-p5 A/B (Side-preset only, claude-sonnet-5-5): with the "
+        "step 10.24x plain on tier 1 (n=15) and tier 2 (n=21), without it 7.67x and 8.42x; "
+        "hidden tests 100% and the blind judge tied in both arms, on SPECs of 2-8 ACs. Both "
+        "tiers are saturated, so this prices the step and does not show what it catches: on "
+        "two real SPECs in this repository (n=2, 9 and 6 ACs) it raised 11 and 9 critiques "
+        "that changed the SPEC. Re-measure before moving the threshold or making it block.",
         remeasure_on=("model_release",),
-        measure_cmd=_LEDGER,
-        note="spec-validator dispatch; conditional on irreversible decisions",
+        measure_cmd=_BENCH_VALIDATOR_AB,
+        note="spec-validator dispatch; default skip at ≤ 8 live ACs "
+        "(`spec_machine.VALIDATOR_SKIP_MAX_ACS`), the DRI can pick it at approval",
     ),
     _u("spec", "Step 5", "INV", "spec Step 3", note="status write"),
     # ── execute ────────────────────────────────────────────────────────────

@@ -167,7 +167,9 @@ _EXPECTED_SHA256: dict[str, str] = {
     # spec-validator REPLACES plan-validator (SPEC-plan-stage-absorption ADR-004): relocated
     # to /hm:spec, re-scoped to ACs / circular oracles / implied-but-unlisted irreversible
     # decisions / scope boundary, single-pass and never-blocking. New body, new pin.
-    "spec-validator": "6be1f52d52461127170f7c29f0dbc02eeda6f8585b9ff04a90ee94c9be0ddfbd",
+    # Re-pinned by SPEC-hm-cost-p5: Triggers name the spec check's `validator` field and the
+    # DRI's "Approve after spec-validator" instead of the irreversible-decision rule.
+    "spec-validator": "f74b896a6014b50daa338e3defa7214633393bf339d41b6a85be9f66ac3d7f6b",
     # `return_envelope` include removed — see the code-reviewer note above.
     "security-reviewer": "538157bb0b544d448080b76dd128d79e7a21e7b2e51a39e6357090ec4193b6be",
     # stuck re-pinned 2026-09-20 (SPEC-plan-stage-absorption): its trigger list and two
