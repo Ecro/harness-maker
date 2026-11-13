@@ -103,6 +103,11 @@ git tag -a "v${VERSION}" -m "v${VERSION}"
 git push origin "v${VERSION}"
 ```
 
+Without a local git client (for example on a phone), publish the Release from the GitHub web UI
+instead: **Releases → Draft a new release → Choose a tag → type `vX.Y.Z` → Create new tag on
+publish (target `main`) → Publish release**. Creating the tag starts the same workflow, and
+`github-release` updates the Release it finds.
+
 The `v*` tag push triggers `.github/workflows/release.yml`. Watch the run at
 `https://github.com/Ecro/harness-maker/actions`.
 
@@ -116,7 +121,7 @@ The workflow has six required release jobs in sequence, followed by the existing
 2. **`build`** — `uv build` writes `dist/*.whl` + `dist/*.tar.gz` and uploads them as a workflow artifact.
 3. **`publish-testpypi`** (environment: `testpypi`) — `uv publish --trusted-publishing always` to TestPyPI, then installs the published package from `test.pypi.org` and runs `harness-maker --help`.
 4. **`publish-pypi`** (environment: `pypi`, `needs: publish-testpypi`) — same OIDC publish to production PyPI.
-5. **`github-release`** — creates the GitHub Release with `dist/*` assets and notes extracted from `CHANGELOG.md`.
+5. **`github-release`** — creates the GitHub Release with `dist/*` assets and notes extracted from `CHANGELOG.md`. If a Release for the tag already exists (published from the GitHub web UI, the no-local-git route), it uploads `dist/*` with `--clobber` and replaces the title and notes instead.
 6. **`release-identity`** (`needs: github-release`) — requires GitHub Release and PyPI metadata to match the already validated tag; mismatch or unavailable evidence fails the workflow.
 
 If `pypi` has a required reviewer, the workflow pauses between TestPyPI smoke and PyPI publish for
