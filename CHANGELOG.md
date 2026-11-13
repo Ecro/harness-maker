@@ -8,6 +8,13 @@ Overhaul phase 2 and the non-token improvements: wrapup requires a REVIEW, hm as
 owns, retired wiring and about 7.1k lines of unreachable modules are gone, and HOW-IT-WORKS describes
 the four-stage workflow.
 
+Cost phase 5 (SPEC-hm-cost-p5): spec-validator is skipped by default on a SPEC of at most 8 live ACs, and
+the HM-LIGHT-LANE cost target is 8x (was 5x). Tier-1 transcript ratio 10.24 -> 7.56 against the pre-registered
+8.0 bar (met); hidden tests 15/15 in both arms.
+
+Cost phase 4 (SPEC-hm-cost-p4): tier-1 transcript ratio 11.36 -> 10.24, short of the pre-registered 10.0
+bar (recorded). New lint and type errors per hm run 1.60 -> 0.73.
+
 ### Changed
 
 - **`/hm:wrapup` requires a REVIEW for a code change** (SPEC-wrapup-gate). `hm check --require-review`
@@ -34,39 +41,6 @@ the four-stage workflow.
 - **README carries the slogan "Automate the work. Elevate the engineer."**, pre-registered for
   UNDERSTANDING-HANDOFF, which closed as met (8 of the first 10 wrapups explainable from their
   `Understanding:` block alone).
-
-### Removed
-
-- **Modules no shipped entry point reaches** (SPEC-dead-modules), about 7.1k lines, among them
-  `foreign_config`, `provenance`, `review_consensus`, `lens_coverage`, `plan_verify` and
-  `spec_inventory/`. `tests/structural/test_dead_modules.py` keeps a standing static reachability
-  check: a new module that nothing ships must join its kept list with a reason.
-
-### Docs
-
-- **HOW-IT-WORKS (en/ko) rewritten** for the four-stage workflow, about 3,000 → 370 lines
-  (SPEC-docs-rewrite). ARCHITECTURE, CONTRIBUTING and README no longer present deleted modules or
-  autopilot as live.
-
-### Fixed
-
-- The `test_land_hold` `[unreadable]` row passes as root, so `hm check`'s `-x` gate no longer stops
-  in root containers.
-
-### Fixed
-
-- **`hm spec_machine mark-tested --ac` no longer binds other SPECs' tests** (SPEC-mark-tested-scope).
-  An AC with no `test_ids` used to bind every `test_ac_NNN*` in the repository (102 ids for 15 on
-  hm-cost-p5, 866 on a 10-AC SPEC). It now searches only the task's changed test files, the same
-  scope as `hm check --red`, so bind and RED agree. Contract change: after the tests are committed,
-  `--ac` alone refuses and the message names `--test-id AC-NNN=<node id>`.
-
-Cost phase 5 (SPEC-hm-cost-p5): spec-validator is skipped by default on a SPEC of at most 8 live ACs, and
-the HM-LIGHT-LANE cost target is 8x (was 5x). Tier-1 transcript ratio 10.24 -> 7.56 against the pre-registered
-8.0 bar (met); hidden tests 15/15 in both arms.
-
-### Changed
-
 - **`hm spec_machine check --all` prints `"validator": "skip"` or `"run"`** (additive key; absent when
   the yaml does not load). `skip` at 8 live ACs or fewer. `/hm:spec` Step 4.6 runs spec-validator on
   `run`, or when the DRI picks the new approval choice **"Approve after spec-validator"**. Measured on
@@ -75,12 +49,6 @@ the HM-LIGHT-LANE cost target is 8x (was 5x). Tier-1 transcript ratio 10.24 -> 7
   changed the SPEC both times, which is why the choice stays one tap away.
 - **Cost target 8x.** `.claude/intent.yaml` `hm_cost_ratio_small.target`, the bench's `TARGET`, the
   report verdict text and the HM-LIGHT-LANE objective (re-approved) all say 8.
-
-Cost phase 4 (SPEC-hm-cost-p4): tier-1 transcript ratio 11.36 -> 10.24, short of the pre-registered 10.0
-bar (recorded). New lint and type errors per hm run 1.60 -> 0.73.
-
-### Changed
-
 - **AC tests bind by name.** `hm spec_machine mark-tested` records the tests it finds for an AC whose
   `test_ids` is empty, and `hm check --red` binds them read-only: a parametrize case id `[AC-NNN]` or
   `[AC-NNN-<suffix>]` wins, otherwise a function named `test_ac_NNN` or `test_ac_NNN_*`. Recorded
@@ -92,12 +60,25 @@ bar (recorded). New lint and type errors per hm run 1.60 -> 0.73.
 - `consensus-arbiter`'s description and trigger say it merges the voters' findings and never changes a
   severity; the stage advisory and `docs/ARCHITECTURE.md` name the four stages.
 
+### Removed
+
+- **Modules no shipped entry point reaches** (SPEC-dead-modules), about 7.1k lines, among them
+  `foreign_config`, `provenance`, `review_consensus`, `lens_coverage`, `plan_verify` and
+  `spec_inventory/`. `tests/structural/test_dead_modules.py` keeps a standing static reachability
+  check: a new module that nothing ships must join its kept list with a reason.
+
 ### Fixed
 
+- The `test_land_hold` `[unreadable]` row passes as root, so `hm check`'s `-x` gate no longer stops
+  in root containers.
+- **`hm spec_machine mark-tested --ac` no longer binds other SPECs' tests** (SPEC-mark-tested-scope).
+  An AC with no `test_ids` used to bind every `test_ac_NNN*` in the repository (102 ids for 15 on
+  hm-cost-p5, 866 on a 10-AC SPEC). It now searches only the task's changed test files, the same
+  scope as `hm check --red`, so bind and RED agree. Contract change: after the tests are committed,
+  `--ac` alone refuses and the message names `--test-id AC-NNN=<node id>`.
 - **`mark-tested` and `find-unbound` collect with the gate's pytest runner**, not PATH `pytest`, which
   raised ImportError on projects without `pythonpath` and reported every test as unresolved. A failed
   collect is now reported as such instead of "no test named ...".
-
 - **harness-maker no longer creates `.venv` or `uv.lock` in your project** (SPEC-pipeline-env-fixes).
   Every rendered invocation — the stage `hm` prefix, hooks, skills, commands — is now
   `uv run --no-project --with <plugin> …`. In a Python project that is not uv-managed the old spelling
@@ -115,8 +96,16 @@ bar (recorded). New lint and type errors per hm run 1.60 -> 0.73.
 - `/hm:wrapup` names what to do on `hm check` exit 2, and its `hm intent question observe` example
   includes the required `--relation`.
 
+### Docs
+
+- **HOW-IT-WORKS (en/ko) rewritten** for the four-stage workflow, about 3,000 → 370 lines
+  (SPEC-docs-rewrite). ARCHITECTURE, CONTRIBUTING and README no longer present deleted modules or
+  autopilot as live.
+
 ### Internal
 
+- `release.yml`'s `github-release` job updates a Release that already exists, so a release can be
+  published from the GitHub web UI without a local git client (SPEC-release-ui-tolerant).
 - The bench fixture commits a `uv.lock`, so the hm arm keeps getting a `.venv` under the new prefix.
   `bench_hash` moves `569e17ef29ab` → `92672094f80e`; the task bytes are unchanged.
 - Bench arm `hm-novalidator` (hm with the spec command's spec-validator step removed) for A/B runs; it
