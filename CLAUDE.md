@@ -167,6 +167,10 @@ git push origin main vX.Y.Z
 > exists" 로 fail. 산출물·publish 는 모두 성공했지만 latest tag 가 빨갛게
 > 표시됨. push 만 하고 workflow 가 끝낼 때까지 기다리는 것이 race-free.
 
+로컬 git 이 없을 때 (폰): GitHub 웹 Releases → Draft a new release → 새 태그 `vX.Y.Z`
+(target `main`) → Publish release. 태그 생성이 같은 workflow 를 띄우고, `github-release`
+잡이 이미 있는 Release 를 갱신한다 (assets + CHANGELOG notes; SPEC-release-ui-tolerant).
+
 워크플로 실패 시:
 - `quality-gate` 실패 → ruff/mypy/pytest 로컬에서 재현, fix commit, 새 patch tag
 - 그 외 잡 실패 → `gh run view <id> --log-failed` 로 진단 후 fix patch tag.

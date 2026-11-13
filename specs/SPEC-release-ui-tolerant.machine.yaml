@@ -1,0 +1,51 @@
+schema_version: 3
+spec_slug: release-ui-tolerant
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: github-release updates an existing Release instead of failing
+  type: mechanical
+  test_ids:
+  - tests/unit/test_release_ui_tolerant.py::test_ac_001_github_release_updates_existing_release
+  executable_predicate: step_branches_on_release_view(release_yml) and create_path_kept(release_yml)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The required commands come from the gh CLI manual (release view/upload
+    --clobber/edit) and the 0.15.3 failure text recorded in CLAUDE.md, both written
+    before this change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: 6f536d2422442959468ad310fc08eebf0b4f899ef40fd45ea775a7b226dccb13
+  approved_by: null
+  approved_at: '2026-11-13T11:00:52Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: deeebd1299678295550be5170206cabd7fc55f4e12e4a26a28f39675ed71864d
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 9449754d2e7c9d294393a327bf9c6a128032c9e8f55cbc1662d2432481d9de02
+    ac_order: a1557fcfe162c5ca92cb543b3703219d932e86a98fd3ef7e4d7722599eb526d0
