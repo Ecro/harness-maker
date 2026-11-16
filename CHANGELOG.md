@@ -11,6 +11,21 @@
   takes the session id from the host's `${CLAUDE_SESSION_ID}` substitution and writes the home prefix
   as `~`; `other_session` is decided as before. Codex is unchanged. New live check:
   `INTEGRATION=1 uv run pytest tests/integration/test_boundary_maker_default_permissions.py`.
+- **Price table 4: Sonnet 5.5, Fable 5.2 and Haiku 5.5 have their own rows**
+  (SPEC-price-table-current-models). `claude-sonnet-5-5` was priced by the `sonnet-5` row, which
+  charged its cache reads at $0.20 per million tokens against a published $0.10; `fable-5-2` and
+  `haiku-5-5` fell to older rows the same way. Haiku 5.5 requests over 100,000 prompt tokens use its
+  long-prompt card. A point release priced by an older row (`claude-sonnet-5-6`) now shows up in
+  `family_priced_turns` / `family_priced_models`; before, only a bare family row did. Bench rows
+  record the count (`family_priced_turns`) and the table version, and the run warns when it is not 0.
+  A price-table key that ends in a digit no longer matches right before another digit, so
+  `fable-5-2` cannot capture the date of `claude-fable-5-20260401`.
+- **The recorded hm cost ratio is 6.98x, not 7.56x.** The 7.56 was the transcript price under the
+  wrong cache-read rate. Repriced, the transcript price of every recorded run is within 0.5% of the CLI
+  total, so the 0.65.4 notes' "10.24 -> 7.56" reads 9.44 -> 6.98 and "11.36 -> 10.24" reads 10.27 -> 9.44.
+  `docs/evals/results.jsonl` carries the repriced value and keeps the old one; the history files
+  stay as recorded. The published text no longer says the CLI total leaves out subagent spend: it
+  includes it.
 
 ## [0.65.4] - 2026-11-10
 

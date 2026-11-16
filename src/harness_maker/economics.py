@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter, defaultdict
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -27,8 +28,8 @@ if TYPE_CHECKING:
 # comment here claimed the table made "historical reports reproducible" — it never
 # did, and that claim is what made a wrong rate look safe to leave in place.) Both
 # labels move together: the version says WHICH table, the date says FROM WHEN.
-PRICE_TABLE_VERSION = "3"
-PRICE_TABLE_EFFECTIVE_DATE = "2026-09-27"
+PRICE_TABLE_VERSION = "4"
+PRICE_TABLE_EFFECTIVE_DATE = "2026-11-16"
 
 SpendCategory = Literal["REWORK", "VERIFY", "PRODUCE", "OTHER"]
 Scope = Literal["main", "subagent"]
@@ -73,6 +74,13 @@ class ModelPrice(BaseModel):
 # survived — so the claim above is pinned by
 # `test_a_family_priced_turn_is_visible_in_the_report`, which asserts through the
 # aggregated report rather than the flag.
+#
+# Table v4 widens that trace. A bare family row was not the only way to be priced by
+# someone else's row: `claude-sonnet-5-5` contains `sonnet-5`, a point-release key, so it
+# was priced at Sonnet 5's rates with no signal and its cache reads cost double the
+# published $0.10 (SPEC-price-table-current-models; the recorded hm cost ratio read 7.56
+# where the rows give 6.98). `price_turn` now also marks an id that carries one more
+# version number right after the key it matched.
 _OPUS_4_5_PLUS = ModelPrice(
     input=5.0, output=25.0, cache_read=0.5, cache_write_5m=6.25, cache_write_1h=10.0
 )
@@ -104,11 +112,18 @@ PRICE_TABLE: dict[str, ModelPrice] = {
     "fable-5-1": ModelPrice(
         input=10.0, output=50.0, cache_read=0.25, cache_write_5m=12.5, cache_write_1h=20.0
     ),
+    "fable-5-2": ModelPrice(
+        input=8.0, output=40.0, cache_read=0.2, cache_write_5m=10.0, cache_write_1h=16.0
+    ),
     "sonnet": _SONNET,
     "sonnet-4-5": _SONNET,
     # Sonnet 5 is published at 2/10 — it was priced at the 4.x 3/15 until table v3.
     "sonnet-5": ModelPrice(
         input=2.0, output=10.0, cache_read=0.2, cache_write_5m=2.5, cache_write_1h=4.0
+    ),
+    # Sonnet 5.5 keeps 2/10 and reads cache at 0.05x, half of Sonnet 5's rate.
+    "sonnet-5-5": ModelPrice(
+        input=2.0, output=10.0, cache_read=0.1, cache_write_5m=2.5, cache_write_1h=4.0
     ),
     # Pre-4.5 Haiku. The 0.25/1.25 this row carries is the Haiku 3 published rate — it
     # is NOT a stale value to overwrite. An earlier draft of this change edited it in
@@ -122,7 +137,28 @@ PRICE_TABLE: dict[str, ModelPrice] = {
     "haiku-4-5": ModelPrice(
         input=1.0, output=5.0, cache_read=0.1, cache_write_5m=1.25, cache_write_1h=2.0
     ),
+    # Haiku 5.5's card for a prompt of at most 100,000 tokens; see LONG_PROMPT_PRICES.
+    "haiku-5-5": ModelPrice(
+        input=0.1, output=0.5, cache_read=0.01, cache_write_5m=0.125, cache_write_1h=0.2
+    ),
 }
+
+# A second card for a request whose prompt is longer than the threshold: row key ->
+# (threshold, card). Prompt length counts input, cache reads and cache writes, which is
+# `TokenUsage.context_tokens`. The card applies to every token type of that request.
+LONG_PROMPT_PRICES: dict[str, tuple[int, ModelPrice]] = {
+    "haiku-5-5": (
+        100_000,
+        ModelPrice(
+            input=0.5, output=2.5, cache_read=0.05, cache_write_5m=0.625, cache_write_1h=1.0
+        ),
+    ),
+}
+
+# One more version number right after a matched key: `-6` in `claude-sonnet-5-6`, `.6` in
+# `claude-opus-5.6`. A date (`-20260601`, `-2026-06-01`), `@date` and `[1m]` are not
+# version numbers.
+_NEXT_VERSION = re.compile(r"[-.]\d{1,2}(?!\d)")
 
 _VERIFY_SKILLS = frozenset({"hm:review", "hm:verify"})
 _REVIEWER_AGENT_SUFFIXES = ("-reviewer", "-validator", "-auditor", "-arbiter", "-verifier")
@@ -198,9 +234,10 @@ class TurnCost(BaseModel):
     priced_with_fallback: bool
     # Two DISTINCT signals, never collapse them. `priced_with_fallback` means the id
     # matched no key at all (`gpt-4`) and took `fallback_model`. `priced_with_family_row`
-    # means it matched a BARE FAMILY row — the R8 recurrence path, where a model released
-    # after this table silently takes the family rate. Defaulted so existing constructors
-    # keep working.
+    # means it was priced by a row that is not its own: a BARE FAMILY row, or a
+    # point-release row when the id carries one more version number — the R8 recurrence
+    # path, where a model released after this table silently takes an older rate.
+    # Defaulted so existing constructors keep working.
     priced_with_family_row: bool = False
 
 
@@ -298,8 +335,9 @@ class EconomicsReport(BaseModel):
 
     unknown_models: dict[str, int] = Field(default_factory=dict)
     fallback_priced_turns: int = 0
-    # R8 visibility. A turn priced through a BARE FAMILY row is not "unknown" — it
-    # resolved — so it appears in neither field above. That silence is how `"opus"`
+    # R8 visibility. A turn priced through another model's row (a bare family row, or an
+    # older point release) is not "unknown" — it resolved — so it appears in neither
+    # field above. That silence is how `"opus"`
     # captured `claude-opus-5` at 15/75 for 30 days. These two fields make the next
     # occurrence loud; they change no rate.
     family_priced_turns: int = 0
@@ -411,6 +449,26 @@ def classify_turns(turns: Sequence[TurnRecord]) -> list[SpendCategory]:
 # ------------------------------------------------------------------ pricing
 
 
+def model_key_end(lowered: str, key: str) -> int | None:
+    """Where `key` ends in a lowered model id, or None when it does not match.
+
+    Keys match as substrings. A key that ends in a digit does not match right before
+    another digit: `fable-5-2` must not capture the date of `claude-fable-5-20260401`,
+    which would price a Fable 5 turn on the 5.2 card with no trace. A bare family key
+    keeps plain substring matching (`sonnet4.5` in a free-text `price_model` still
+    resolves). `cache_diagnostics` shares this rule, so the two tables cannot disagree
+    about which model an id is.
+    """
+    guarded = key[-1:].isdigit()
+    start = lowered.find(key)
+    while start != -1:
+        end = start + len(key)
+        if not guarded or end == len(lowered) or not lowered[end].isdigit():
+            return end
+        start = lowered.find(key, start + 1)
+    return None
+
+
 def resolve_model_family(model: str | None) -> str | None:
     """Map a transcript model string onto a PRICE_TABLE row, or None when unrecognised.
 
@@ -420,10 +478,16 @@ def resolve_model_family(model: str | None) -> str | None:
     if not model:
         return None
     lowered = model.lower()
-    matches = [family for family in PRICE_TABLE if family in lowered]
+    matches = [family for family in PRICE_TABLE if model_key_end(lowered, family) is not None]
     if not matches:
         return None
     return max(sorted(matches), key=len)
+
+
+def _versioned_past(model: str, key: str) -> bool:
+    lowered = model.lower()
+    end = model_key_end(lowered, key)
+    return end is not None and _NEXT_VERSION.match(lowered, end) is not None
 
 
 def price_turn(turn: TurnRecord, *, fallback_model: str = "opus") -> TurnCost:
@@ -433,13 +497,18 @@ def price_turn(turn: TurnRecord, *, fallback_model: str = "opus") -> TurnCost:
     # exact-key lookup would silently drop `claude-sonnet-4-5` onto the opus rate — a
     # 5x mispricing in a tool whose entire output is dollar figures.
     fallback_family = resolve_model_family(fallback_model) or fallback_model
-    price = PRICE_TABLE.get(family or fallback_family) or PRICE_TABLE["opus"]
-    # Every point-release key carries a hyphen; the family rows do not. No version
-    # heuristic is needed — a newly released model always brings a version suffix, so
-    # "resolved to a bare family row" is exactly the R8 population.
-    family_priced = family is not None and "-" not in family
-
+    row = family or fallback_family
+    price = PRICE_TABLE.get(row) or PRICE_TABLE["opus"]
     u = turn.usage
+    long_prompt = LONG_PROMPT_PRICES.get(row)
+    if long_prompt is not None and u.context_tokens > long_prompt[0]:
+        price = long_prompt[1]
+    # Priced by a row that is not this model's own: a bare family row (no hyphen), or a
+    # point-release row when the id goes on with one more version number.
+    family_priced = family is not None and (
+        "-" not in family or _versioned_past(turn.model or "", family)
+    )
+
     input_usd = u.input_tokens * price.input / 1e6
     output_usd = u.output_tokens * price.output / 1e6
     cache_read_usd = u.cache_read_tokens * price.cache_read / 1e6

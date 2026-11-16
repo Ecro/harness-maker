@@ -112,6 +112,11 @@ tier-1 cell, all rows claude-sonnet-5-5, hm pass rate (capped/leaked counted as 
 The pass-rate guard sits at a 15/15 ceiling and grades code only: a green AC-005 is evidence about cost, not
 proof that A or C kept SPEC quality.
 
+**Correction (2026-11-16, SPEC-price-table-current-models).** The transcript ratio below was priced
+with price table 3, which charged `claude-sonnet-5-5` cache reads at twice the published rate.
+Repriced it equals the CLI ratio, 10.27, which still misses the 10.0 bar. The history rows stay as
+recorded.
+
 **Result (2026-10-22): missed.** Transcript ratio 11.36 (CLI 10.27), every other guard held. The DRI
 landed the task with the miss recorded; the 10.0 bar is not moved. The test pins the one violation, so a later
 run that changes it fails until the record is updated.

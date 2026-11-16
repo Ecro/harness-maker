@@ -519,3 +519,13 @@ values:
     8/10 = 80%.'
   definition_hash: 3ee5d0ec70df97487ec9b52a93e742e86180d861fe15228e843c3d4984d8f6a4
   metric_id: understanding_handoff_rate
+- value: 6.984
+  observed_at: '2026-11-16T09:28:36.740050Z'
+  evidence: 'bench hm-light-lane@569e17ef29ab harness 9bba5174cd88 model claude-sonnet-5-5:
+    hm $0.426/run vs plain $0.061/run over 5 tasks x 3 runs (CLI-priced ratio 6.98,
+    transcript-priced ratio 6.98); hidden-test pass plain 15/15, hm 15/15; verdict
+    met. Correction of the 7.563 record, not a new run: the same 30 rows repriced
+    under price table 4 (claude-sonnet-5-5 cache reads at the published $0.10/Mtok,
+    table 3 charged $0.20); SPEC-price-table-current-models AC-006; rows docs/evals/results.jsonl'
+  definition_hash: 2f33cdbce23708d4578a909638e53011114411aba263fc8a454e27b97699bbd8
+  metric_id: hm_cost_ratio_small

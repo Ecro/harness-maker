@@ -312,6 +312,7 @@ class Spend:
     turns: int
     subagent_turns: int
     tokens: dict[str, int] = field(default_factory=dict)
+    family_priced_turns: int = 0  # priced by another model's row: the $ is not to be trusted
 
 
 @dataclass(frozen=True)
@@ -1751,7 +1752,8 @@ def _invoke(
 def transcript_cost(work: Path, transcript_root: Path) -> Spend:
     """Price every main and subagent transcript turn launched from `work`."""
     turns = economics_source.load_turns(work, transcript_root=transcript_root).turns
-    usd = sum(economics.price_turn(t).total_usd for t in turns)
+    costs = [economics.price_turn(t) for t in turns]
+    usd = sum(c.total_usd for c in costs)
     tokens = {
         "input": sum(t.usage.input_tokens for t in turns),
         "output": sum(t.usage.output_tokens for t in turns),
@@ -1760,7 +1762,10 @@ def transcript_cost(work: Path, transcript_root: Path) -> Spend:
             t.usage.cache_write_5m_tokens + t.usage.cache_write_1h_tokens for t in turns
         ),
     }
-    return Spend(usd, len(turns), sum(1 for t in turns if t.is_sidechain), tokens)
+    return Spend(
+        usd, len(turns), sum(1 for t in turns if t.is_sidechain), tokens,
+        family_priced_turns=sum(1 for c in costs if c.priced_with_family_row),
+    )  # fmt: skip
 
 
 def pick_cost(cli_cost: float | None, spend: Spend) -> tuple[float | None, str]:
@@ -2112,6 +2117,13 @@ def _record(
     capped = [s["subtype"] for s in sessions if s["subtype"] == BUDGET_SUBTYPE]
     subtype = capped[0] if capped else (result.get("subtype") if result else None)
     spend = transcript_cost(work, opts.transcript_root)
+    if spend.family_priced_turns:
+        print(
+            f"warning: {spend.family_priced_turns} turn(s) were priced by another model's row; "
+            "check that PRICE_TABLE has the right rates for the model before trusting "
+            "transcript_cost_usd",
+            file=sys.stderr,
+        )
     cost, source = pick_cost(cli_cost, spend)
     scratch = Path(tempfile.mkdtemp(prefix="hm-bench-grade-"))
     try:
@@ -2141,6 +2153,8 @@ def _record(
         "cost_usd": None if cost is None else round(cost, 6),
         "cost_source": source, "cli_cost_usd": cli_cost,
         "transcript_cost_usd": round(spend.usd, 6), "transcript_turns": spend.turns,
+        "price_table_version": economics.PRICE_TABLE_VERSION,
+        "family_priced_turns": spend.family_priced_turns,
         "subagent_turns": spend.subagent_turns,
         "num_turns": num_turns, "subtype": subtype, "wall_s": round(wall, 1),
         "hidden": {"tests": graded.tests, "failures": graded.failures,
@@ -2244,8 +2258,9 @@ def _show(value: float | None) -> float | None:
 def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Apply the intent's pre-registered rule (intent/HM-LIGHT-LANE.md, 판정 규칙).
 
-    The verdict compares unrounded ratios, and takes the larger of the CLI and transcript ratios
-    because it is open whether the CLI total includes subagents; when the two disagree by more
+    The verdict compares unrounded ratios, and takes the larger of the CLI and transcript ratios.
+    The CLI total includes subagent spend (SPEC-price-table-current-models), so the two differ
+    only when the price table disagrees with what the host bills; when they disagree by more
     than SUSPECT_GAP the number is not trusted at all. `ratio` is that judged number (3 places)
     and exists only for a `met`/`missed` verdict, so what is recorded is what was decided on. A
     `met` is lowered to `suspect` when a run hit the per-run budget cap or may have seen the
@@ -2276,7 +2291,7 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     elif gap > SUSPECT_GAP:
         verdict = "suspect"
         why = (f"CLI ratio {_show(ratio)} and transcript ratio {_show(t_ratio)} differ by "
-               f"{gap:.0%}; total_cost_usd may leave out subagent spend")  # fmt: skip
+               f"{gap:.0%}; the price table may be wrong for this model")  # fmt: skip
     elif judged > TARGET + TARGET_EPS:
         verdict, why = "missed", f"ratio {judged:.3f} > target {TARGET:g}"
     elif arms["hm"]["pass_rate"] < arms["plain"]["pass_rate"]:
@@ -3143,13 +3158,11 @@ def _tier3_money(rows: list[dict[str, Any]]) -> str:
 
 
 def _tier3_cost_note(t3: dict[str, Any]) -> str:
-    """Every tier-3 $ is the CLI total, which leaves out subagent spend (docs/evals/tier3/
+    """Every tier-3 $ is the CLI total, which includes subagent spend (docs/evals/tier3/
     notes.md), and an unpriced row is left out of a mean: say both rather than imply more."""
     rows = t3["pilot"] + t3["diagnostic"]
     unpriced = _cell(rows)["cost_unknown"]
-    note = "Each $ is the CLI cost per run, which excludes subagent spend"
-    if any(r["arm"] == "hm" for r in rows):
-        note += ", so an hm $ understates what the run spent"
+    note = "Each $ is the CLI cost per run, which includes subagent spend"
     if unpriced:
         has, be = ("has", "is") if unpriced == 1 else ("have", "are")
         note += f"; {unpriced} of {len(rows)} runs {has} no price and {be} left out of the $ means"

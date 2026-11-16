@@ -24,7 +24,7 @@ Plain prompt vs `/hm:` on the `timeparse` fixture. What each line means and how 
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.061 (n=15) | $0.426 (n=15) | 7.56x (CLI 6.98x, transcript 7.56x) | plain |
+| cost ratio (cells: mean CLI $/run) | $0.061 (n=15) | $0.426 (n=15) | 6.98x | plain |
 | wall time per run | 15s (n=15) | 2m 21s (n=15) | 9.15x | plain |
 | Δ solved runs | 15 (n=15) | 15 (n=15) | +0 | tie |
 | Δ hidden-case pass fraction | 1.00 (n=15) | 1.00 (n=15) | +0.00 | tie |
@@ -86,12 +86,12 @@ t3         3/3      3/3           0.068     0.387       16    125
 t4         3/3      3/3           0.055     0.404       13    133
 t5         3/3      3/3           0.069     0.501       21    174
 all       15/15    15/15          0.061     0.426       15    141
-ratio (CLI cost): 6.98    ratio (transcript price): 7.56
+ratio (CLI cost): 6.98    ratio (transcript price): 6.98
 pass rate: plain 15/15 (100%), hm 15/15 (100%)
-verdict: met — ratio 7.563 <= target 8 and hm pass rate >= plain
+verdict: met — ratio 6.984 <= target 8 and hm pass rate >= plain
 record with:
-  uv run hm intent metric record hm_cost_ratio_small --value 7.563 --evidence 'bench hm-light-lane@569e17ef29ab harness 9bba5174cd88 model claude-sonnet-5-5: hm $0.426/run vs plain $0.061/run over 5 tasks x 3 runs (CLI-priced ratio 6.98, transcript-priced ratio 7.56); hidden-test pass plain 15/15, hm 15/15; verdict met'
-hm_cost_ratio_small=7.563
+  uv run hm intent metric record hm_cost_ratio_small --value 6.984 --evidence 'bench hm-light-lane@569e17ef29ab harness 9bba5174cd88 model claude-sonnet-5-5: hm $0.426/run vs plain $0.061/run over 5 tasks x 3 runs (CLI-priced ratio 6.98, transcript-priced ratio 6.98); hidden-test pass plain 15/15, hm 15/15; verdict met'
+hm_cost_ratio_small=6.984
 ```
 
 ## Tier 3
@@ -106,7 +106,7 @@ Tasks whose prompt does not hold the answer: it sits in a file of the repo or in
 | arms | plain | hm, plain-careful, plain-continue |
 | runs started | 2026-10-15 to 2026-10-15 | 2026-10-16 to 2026-10-16 |
 
-Each $ is the CLI cost per run, which excludes subagent spend, so an hm $ understates what the run spent.
+Each $ is the CLI cost per run, which includes subagent spend.
 
 ### Plain pilot
 
@@ -191,8 +191,13 @@ Korean convention, so t20's joiner can be guessed as well as remembered. Its one
 added `lang`. In the pilot, plain failed t20 the same two ways: `", "` for Korean twice, no `lang`
 once.
 
-**Cost.** Each hm row's cost is the CLI total, which leaves out subagent spend; the
-transcript-priced total for the 17 diagnostic rows is about $22.2 against $17.7 by the CLI.
+**Cost.** Each hm row's cost is the CLI total, which includes subagent spend.
+
+**Correction (cost note, 2026-11-16).** This note said the CLI total did not include subagent spend and
+gave a transcript-priced total of about $22.2 against $17.7 by the CLI for the 17 diagnostic rows.
+The gap was the price table, which charged `claude-sonnet-5-5` cache reads at twice the published
+rate; repriced, the transcript total is $17.71. The rows are unchanged: their `transcript_cost_usd`
+is still the table-3 value, and no other published tier-3 figure used it.
 
 **Correction (plain-continue cost).** The first publish of these rows put `plain-continue` at
 $0.179/run on each task; the right figures are $0.109 (t20) and $0.107 (t21). A resumed

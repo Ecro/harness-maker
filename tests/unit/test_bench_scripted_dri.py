@@ -40,6 +40,7 @@ _TIER_TWO_ROW_KEYS = {
     "bench", "bench_hash", "harness_sha", "runner_hash", "model", "tier", "task", "arm", "rep",
     "max_budget_usd", "total_budget_usd", "started_at", "run_dir", "status", "exit_code",
     "cost_usd", "cost_source", "cli_cost_usd", "transcript_cost_usd", "transcript_turns",
+    "price_table_version", "family_priced_turns",
     "subagent_turns", "num_turns", "subtype", "wall_s", "hidden", "passed", "leak_suspect",
     "tokens", "outcome", "quality", "trap", "quality_tools", "judge", "judge_model",
 }  # fmt: skip

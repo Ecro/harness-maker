@@ -26,8 +26,13 @@ Korean convention, so t20's joiner can be guessed as well as remembered. Its one
 added `lang`. In the pilot, plain failed t20 the same two ways: `", "` for Korean twice, no `lang`
 once.
 
-**Cost.** Each hm row's cost is the CLI total, which leaves out subagent spend; the
-transcript-priced total for the 17 diagnostic rows is about $22.2 against $17.7 by the CLI.
+**Cost.** Each hm row's cost is the CLI total, which includes subagent spend.
+
+**Correction (cost note, 2026-11-16).** This note said the CLI total did not include subagent spend and
+gave a transcript-priced total of about $22.2 against $17.7 by the CLI for the 17 diagnostic rows.
+The gap was the price table, which charged `claude-sonnet-5-5` cache reads at twice the published
+rate; repriced, the transcript total is $17.71. The rows are unchanged: their `transcript_cost_usd`
+is still the table-3 value, and no other published tier-3 figure used it.
 
 **Correction (plain-continue cost).** The first publish of these rows put `plain-continue` at
 $0.179/run on each task; the right figures are $0.109 (t20) and $0.107 (t21). A resumed
