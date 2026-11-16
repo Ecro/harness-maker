@@ -16,8 +16,16 @@
 {%- set wm = config.world_model if (config is defined and config.world_model is defined and config.world_model) else {"name": "Maker", "handle": "maker"} -%}
 {%- set inv = ("$" if is_codex else "/") ~ wm.handle -%}
 {%- set sk = ".agents/skills" if is_codex else ".claude/skills" -%}
-{%- set hm = "uv run --no-project --with " ~ harness_maker_src_path ~ " hm" -%}
-{%- set digest = hm ~ " world_model digest --root . --session-id \"$HM_SESSION_ID\" 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{\"unavailable\":\"digest\"}\\n'" -%}
+{#- SPEC-maker-digest-session-id: Claude Code checks an injected `!` command before it runs. It
+    refuses one that holds a shell variable, and no `allowed-tools` rule matches a command that
+    holds `$HOME`. So the Claude line writes the home prefix as `~` and takes the session id from
+    the host's `${CLAUDE_SESSION_ID}` skill substitution; Codex runs the command itself and keeps
+    both variables. -#}
+{%- set src = harness_maker_src_path -%}
+{%- if not is_codex and (src == "$HOME" or src.startswith("$HOME/")) -%}{%- set src = "~" ~ src[5:] -%}{%- endif -%}
+{%- set hm = "uv run --no-project --with " ~ src ~ " hm" -%}
+{%- set sid = "$HM_SESSION_ID" if is_codex else "${CLAUDE_SESSION_ID}" -%}
+{%- set digest = hm ~ " world_model digest --root . --session-id \"" ~ sid ~ "\" 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{\"unavailable\":\"digest\"}\\n'" -%}
 {%- set ask = "`request_user_input`" if is_codex else "`AskUserQuestion`" -%}
 {%- macro stage(s) -%}{% if is_codex %}`$hm-{{ s }}`{% else %}`/hm:{{ s }}`{% endif %}{%- endmacro -%}
 ---

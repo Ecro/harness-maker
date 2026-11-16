@@ -1,0 +1,140 @@
+schema_version: 3
+spec_slug: maker-digest-session-id
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the Claude injection holds no shell expansion
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_digest_session_id.py::test_ac_001_claude_injection_has_no_shell_expansion[AC-001-0]
+  - tests/render/test_render_maker_digest_session_id.py::test_ac_001_claude_injection_has_no_shell_expansion[AC-001-1]
+  executable_predicate: all('--session-id "${CLAUDE_SESSION_ID}"' in injected(c) and
+    shell_expansions(injected(c).replace('${CLAUDE_SESSION_ID}', '')) == [] and injected(c).startswith(world_model_grant(c))
+    for c in ('en', 'ko'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The refusal of a shell variable in an injected command, the failure
+    of an allowed-tools rule to match a command holding $HOME and the pre-shell substitution
+    of ${CLAUDE_SESSION_ID} are Claude Code's behaviour, observed live on 2.1.325
+    on 2026-11-16 (0 model turns with either variable, 1 turn with ~ and the token);
+    none is read from the template under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the Codex command is unchanged
+  type: parametric
+  test_ids:
+  - tests/render/test_render_maker_digest_session_id.py::test_ac_002_codex_command_unchanged[AC-002-0]
+  executable_predicate: null
+  golden_table:
+  - input:
+      config: en
+      runtime: codex
+    expected:
+      command: <hm> world_model digest --root . --session-id "$HM_SESSION_ID" 2>/dev/null
+        | tail -n 1 | grep '^{.*}$' || printf '{"unavailable":"digest"}\n'
+    edge: false
+    note: read from the render of origin/main 0ccfcf09
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The row is the command the unchanged code rendered at origin/main
+    0ccfcf09, copied before any edit; it is never regenerated.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the substituted id decides other_session
+  type: parametric
+  test_ids:
+  - tests/render/test_render_maker_digest_session_id.py::test_ac_003_substituted_id_decides_other_session[AC-003-0]
+  - tests/render/test_render_maker_digest_session_id.py::test_ac_003_substituted_id_decides_other_session[AC-003-1]
+  - tests/render/test_render_maker_digest_session_id.py::test_ac_003_substituted_id_decides_other_session[AC-003-2]
+  executable_predicate: null
+  golden_table:
+  - input:
+      newest_row_session: s1
+      substituted: s1
+    expected:
+      other_session: false
+    edge: false
+    note: S1 same session
+  - input:
+      newest_row_session: s1
+      substituted: s2
+    expected:
+      other_session: true
+    edge: false
+    note: S1 another session
+  - input:
+      newest_row_session: s1
+      substituted: null
+    expected:
+      other_session: null
+    edge: true
+    note: 'S2: host did not substitute, the shell expands the token to empty'
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected values are SPEC-world-model-followups AC-004's rule
+    (same id false, different id true, missing id null), fixed before this change
+    and independent of how the id reaches the command line.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 08f574e08f206b7a65f07e9440f84afaeb6956a8f92889357e7ef3e061c21455
+  approved_by: Claude
+  approved_at: '2026-11-16T08:27:41Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: ce4d36df70a027c321bad33db331944eac7881ee1111734da9449ced02b78879
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 01f2dd989f22c8bfaf0cf428ed8ede37d84307f602d1f74d2b79c1b9529a09a5
+    AC-002: 97f70bdec215b631136669b7b4eeb06c85ca06ade107f9bd60b53e07db843bdd
+    AC-003: a053a8aa0e26065860856eebf25ec759b235bde07bae4756b4d082b4babba00b
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d

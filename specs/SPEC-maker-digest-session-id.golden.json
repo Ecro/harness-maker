@@ -1,0 +1,42 @@
+{
+  "AC-002": [
+    {
+      "expected": {
+        "command": "<hm> world_model digest --root . --session-id \"$HM_SESSION_ID\" 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{\"unavailable\":\"digest\"}\\n'"
+      },
+      "input": {
+        "config": "en",
+        "runtime": "codex"
+      }
+    }
+  ],
+  "AC-003": [
+    {
+      "expected": {
+        "other_session": false
+      },
+      "input": {
+        "newest_row_session": "s1",
+        "substituted": "s1"
+      }
+    },
+    {
+      "expected": {
+        "other_session": true
+      },
+      "input": {
+        "newest_row_session": "s1",
+        "substituted": "s2"
+      }
+    },
+    {
+      "expected": {
+        "other_session": null
+      },
+      "input": {
+        "newest_row_session": "s1",
+        "substituted": null
+      }
+    }
+  ]
+}

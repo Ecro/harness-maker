@@ -88,7 +88,7 @@ files:
   body_sha256: 3bcd7dd2162a896dd7a2a725d89784844eb81ba7b9ea3344c9aef3426593e578
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: 4d4c2c459abf3484570487250e9bd5840ada77e159d66581b27c48939efddd4b
+  body_sha256: 6b54ecb90c495e5aec4cfb2186a3eaed064723fa54b46f54f814e07992b43fed
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 98b6a525112f3a8d649f3390263ea5b2905f4da1e11260eab6aab59648546eef
