@@ -261,7 +261,8 @@ Maker (`templates/skills/world-model/SKILL.md.j2`, rendered at `skills/<handle>/
 - `hm world_model digest` stays ≤ 1,500 bytes and **always exits 0**. A new field must fit the trim order (`recent` → intents → tasks → timing → `latest_artifact`); `other_session` is never dropped.
 - `restore_pipeline` is an `.hm-autopilot*` marker field — every reader must accept it (the Python module stays; see world-model.md).
 - Always-loaded pointers: `## World model` ≤ 400 chars, `## Project knowledge` ≤ 300 chars per variant; Maker SKILL.md ≤ 4,689 chars.
-- Maker `allowed-tools` stays scoped to `hm world_model:*` (plus `tail`/`grep`/`printf`); its autopilot grant and step left with autopilot (SPEC-retired-text IRR-001). Never widen to `hm *` or `uv run:*`; the injected chain uses no `{ …; }` group, because a permission matcher that splits on `|`/`||` would see a piece starting with `{` (acceptance of the ungrouped chain is still unverified in a live session).
+- Maker `allowed-tools` stays scoped to `hm world_model:*` (plus `tail`/`grep`/`printf`); its autopilot grant and step left with autopilot (SPEC-retired-text IRR-001). Never widen to `hm *` or `uv run:*`; the injected chain uses no `{ …; }` group, because a permission matcher that splits on `|`/`||` would see a piece starting with `{` (the ungrouped chain is accepted: live on Claude Code 2.1.325, SPEC-maker-digest-session-id).
+- The Claude `!` injection holds **no shell variable**: session id from the host's `${CLAUDE_SESSION_ID}`, home prefix as `~` (never `$HM_SESSION_ID` or `$HOME`). Claude Code refuses the load otherwise (0 turns); check with `INTEGRATION=1 uv run pytest tests/integration/test_boundary_maker_default_permissions.py`.
 
 ## Second Brain 승급 파이프라인 (PLAN-second-brain-promotion)
 

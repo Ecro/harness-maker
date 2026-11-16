@@ -77,8 +77,9 @@ reopens the multi-door problem this SPEC closed.
 
 ## Briefing digest (`hm world_model digest`)
 
-`hm world_model digest --root . --session-id "$HM_SESSION_ID"` (`world_model_digest.py`,
-SPEC-world-model-followups IRR-001, extended by front-door IRR-003/004).
+`hm world_model digest --root . --session-id <id>` (`world_model_digest.py`,
+SPEC-world-model-followups IRR-001, extended by front-door IRR-003/004). The id is the host's
+session id: `"${CLAUDE_SESSION_ID}"` in Claude Code's injected line, `"$HM_SESSION_ID"` in Codex.
 
 - **Read-only on world state, ≤ 1,500 bytes (`MAX_BYTES`), always exits 0** with one JSON
   object; failure surfaces as `unavailable`, never as an exit code (followups AC-001/002).
@@ -108,11 +109,24 @@ SPEC-world-model-followups IRR-001, extended by front-door IRR-003/004).
 Claude Code injects the briefing at skill load with `!`:
 
 ```
-<hm> world_model digest --root . --session-id "$HM_SESSION_ID" 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{"unavailable":"digest"}\n'
+<hm> world_model digest --root . --session-id "${CLAUDE_SESSION_ID}" 2>/dev/null | tail -n 1 | grep '^{.*}$' || printf '{"unavailable":"digest"}\n'
 ```
 
 where `<hm>` = `uv run --no-project --with <plugin path> hm`. The chain yields exactly one JSON line even
 when the digest fails mid-output (AC-010).
+
+The line holds no shell variable (SPEC-maker-digest-session-id). Claude Code checks an injected
+command before it runs: it refuses one that holds a variable ("A variable in this command can't be
+checked before it runs"), and no `allowed-tools` rule matches a command that holds `$HOME`. Either
+way the skill does not load (0 model turns). So the session id comes from the host's
+`${CLAUDE_SESSION_ID}` skill substitution, which is replaced before the check, and a plugin path
+under the home directory is written `~/…` here, in `allowed-tools` and in Maker's "`hm` below
+means" line. Observed: the `maker_load` row carries the CLI's own session id. Inferred from the
+hook code, not observed: that id equals what `HM_SESSION_ID` holds. The SessionStart hook stores the
+payload id unchanged only when it is UUID-shaped (`sanitize_session_id`), which is what Claude Code
+issues; for another shape the two would differ and `other_session` would read true for the caller's
+own task (Maker asks once). Codex has no injection: its Maker runs the digest as a model-issued
+shell call and keeps `"$HM_SESSION_ID"` and `$HOME`.
 
 - **Why no `{ …; }` group**: a permission matcher splits the command on `|` / `||`, and a
   piece starting with `{` matches no rule, so a grouped fallback would prompt (or fail) on
@@ -122,7 +136,7 @@ when the digest fails mid-output (AC-010).
   `Bash(uv run:*)` pre-approved any `uv run` (REVIEW 24451777); `hm *` still pre-approved
   every `hm` verb (confirm-1). The scope is the one verb Maker actually runs; the
   autopilot grant left with autopilot (SPEC-retired-text IRR-001).
-- Codex runs the same command as a bash block (no `allowed-tools`). Cursor `!` support is
+- Codex runs its form of the command as a bash block (no `allowed-tools`). Cursor `!` support is
   unverified; the skill tells the model to run the command itself when no JSON appears.
 
 ## Start → scope (IRR-007/008)
@@ -193,15 +207,19 @@ topic is clipped to 200 codepoints. `--floor-entry-bytes` / `--floor-byte-cap` w
 | `tests/render/test_render_world_model.py` | render path, absent-key default, rename sweep, pointer in every always-loaded variant, onboarding order, `--ci` / flag forwarding, configure dimension (SPEC-world-model-name) |
 | `tests/render/test_render_world_model_followups.py` | router briefs from one digest, resume fields, localized errors, modular add/remove refusal, name round-trip, router name / Codex token, help listing (SPEC-world-model-followups) |
 | `tests/render/test_render_maker_front_door.py` | only-entrance flags, Codex `openai.yaml`, stage description gate, pointer routing and caps (400 / 300), help `typed only`, procedure reads, ask → end stage, injected command fail-soft and `allowed-tools`, Maker ≤ 4,500 chars, decision capture, aside |
+| `tests/render/test_render_maker_digest_session_id.py` | Claude injection holds no shell expansion and its `allowed-tools` rule is a literal prefix; Codex command unchanged; a substituted session id decides `other_session` |
+| `tests/integration/test_boundary_maker_default_permissions.py` | live (`INTEGRATION=1`): `/maker` loads in the default permission mode and the digest gets the session id |
 | `tests/unit/test_world_model_digest.py` | the followups digest contract: byte cap, exit 0, `next_stage` from artifacts, ordering and cap, base resolution |
 | `tests/unit/test_maker_digest.py` | active intents within the cap, worst-case floors, trim order keeping `other_session`, `maker_load` row (incl. no id / unwritable dir), `parked` last, `latest_artifact` |
 | `tests/unit/test_autopilot_narrow.py` | stop and restore, never widens, pre-upgrade marker validates, double narrow, undo path (armed end and absent `wrapup`), unknown stage keeps a narrowing, distinct restore causes, `superseded` |
 | `tests/unit/test_memory_retrieve_bounded.py` | 8,192-byte cap (incl. huge Hangul body / topic), lexical-first, floor fills only empty slots |
 
-## Open item
+## Live check
 
-**Permission-matcher acceptance of the ungrouped chain is unverified.** The `| tail | grep ||
-printf` form was chosen so each piece matches an `allowed-tools` rule, but whether Claude
-Code's matcher actually pre-approves the injected `!` line without a prompt can only be seen in
-a live session after release (the rendered harness runs the released plugin cache). Until then,
-a prompt or a `{"unavailable":"digest"}` briefing on load is the expected failure signal.
+The `| tail | grep || printf` chain is accepted under `allowed-tools`: on Claude Code 2.1.325
+(2026-11-16) `claude -p "/maker"` in default permission mode loads the skill and briefs.
+`tests/integration/test_boundary_maker_default_permissions.py` repeats that run (`INTEGRATION=1`,
+a signed-in `claude` on PATH, about a cent). It asserts at least one model turn and that the
+`maker_load` row carries the CLI's session id. Render tests cannot see a host refusal, and the
+bench runs with `--dangerously-skip-permissions`, so run it after any change to the injected line
+or to `allowed-tools`.

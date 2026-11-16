@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Maker loads in Claude Code's default permission mode again** (SPEC-maker-digest-session-id). The
+  injected briefing command held two shell variables, `"$HM_SESSION_ID"` and the `$HOME` prefix of the
+  plugin path. Claude Code 2.1.325 refuses an injected command with a variable, and no `allowed-tools`
+  rule matches one that holds `$HOME`, so `/maker` ended with 0 model turns. The Claude Maker now
+  takes the session id from the host's `${CLAUDE_SESSION_ID}` substitution and writes the home prefix
+  as `~`; `other_session` is decided as before. Codex is unchanged. New live check:
+  `INTEGRATION=1 uv run pytest tests/integration/test_boundary_maker_default_permissions.py`.
+
 ## [0.65.4] - 2026-11-10
 
 Overhaul phase 2 and the non-token improvements: wrapup requires a REVIEW, hm asks only what the DRI
