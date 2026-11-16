@@ -72,8 +72,8 @@ def test_opus5_rate_and_versioned_history() -> None:
     # VALUES, not `!=` relations — `PRICE_TABLE_VERSION = "banana"` satisfied a `!=`
     # arm, and a one-shot `!=` can never fire again after the first bump. Pinning means
     # the next rate edit must touch this file and cannot ship with a stale label.
-    assert PRICE_TABLE_VERSION == "3"
-    assert PRICE_TABLE_EFFECTIVE_DATE == "2026-09-27"
+    assert PRICE_TABLE_VERSION == "4"
+    assert PRICE_TABLE_EFFECTIVE_DATE == "2026-11-16"
     assert PRICE_TABLE_VERSION != _PRE_CHANGE_PRICE_TABLE_VERSION
     assert PRICE_TABLE_EFFECTIVE_DATE != _PRE_CHANGE_PRICE_TABLE_EFFECTIVE_DATE
     date.fromisoformat(PRICE_TABLE_EFFECTIVE_DATE)  # raises if not a real ISO date

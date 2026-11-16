@@ -165,7 +165,9 @@ runs, `keep` otherwise, `guard` for the exempt task. Tier-3 judge lines in the s
 **Then** `RESULTS.md` gains a tier-3 section after the unchanged tiers 1-2 render (the pilot per
 task, the drop rule and its outcome, the hm runs labelled a diagnostic, the hand-written notes),
 and the README block gains one to three tier-3 sentences after the unchanged tiers 1-2 text.
-Every $ is named as the CLI cost, which excludes subagent spend, and an unpriced row is counted.
+Every $ is named as the CLI cost, and an unpriced row is counted. (This sentence said the CLI cost
+excludes subagent spend. It includes it: SPEC-price-table-current-models AC-007 supersedes that part
+of AC-010, whose golden row keeps the old wording as a record.)
 It refuses, writing nothing, when the pilot does not cover every tier-3 task (a task whose rows
 were all dropped as unusable, a missing guard), holds an hm row or a task with fewer than 3
 runs, or when any row has another tier, a mixed `tier3_hash` or `harness_sha`, an unknown arm

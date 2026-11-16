@@ -93,7 +93,8 @@ agent output or transcripts name the hidden-test path is flagged `leak_suspect` 
 out, and the verdict, computed on the unrounded ratio, is `met` (ratio ≤ 5 and hm pass rate ≥
 plain), `missed` (ratio > 5, or hm pass rate < plain), `no_data` (an arm has no priced runs, or the
 task × arm grid is unbalanced) or `suspect` (the CLI-cost and transcript-price ratios differ by
-more than 20%, which is what a `total_cost_usd` that omits subagent spend would look like). When
+more than 20%, which is what a `total_cost_usd` that omits subagent spend would look like; answered
+2026-11-16, see Open Questions). When
 the two agree within 20% the larger one is judged. That judged ratio, to 3 places, is the
 `--value` of the record command and the last line `hm_cost_ratio_small=<ratio>`; for `suspect` and
 `no_data` the line is `n/a` and no record command is printed. A `met` becomes `suspect` when any
@@ -221,7 +222,10 @@ a rerun with the same `--out` resumes
 - Does `total_cost_usd` in `claude -p --output-format json` include subagent spend in the current
   CLI? The runner records the transcript price beside it, prints both ratios, and returns
   `suspect` instead of `met`/`missed` when they differ by more than 20%, so a gap shows up in the
-  first live run instead of being assumed away.
+  first live run instead of being assumed away. **Answered 2026-11-16
+  (SPEC-price-table-current-models):** it does. In 179 recorded rows, 79 of them with subagent turns,
+  the CLI total equals the transcript price once cache reads are priced at the published rate. The
+  gap seen until then (7.56 against 6.98) was a missing price-table row, not subagent spend.
 
 ## 🔬 Measurement procedure (after merge, stages 2b and 3 landed)
 

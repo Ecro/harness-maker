@@ -597,8 +597,10 @@ _TIER_TWO_ROW_KEYS = {
     "bench", "bench_hash", "harness_sha", "runner_hash", "model", "tier", "task", "arm", "rep",
     "max_budget_usd", "total_budget_usd", "started_at", "run_dir", "status", "exit_code",
     "cost_usd", "cost_source", "cli_cost_usd", "transcript_cost_usd", "transcript_turns",
-    "subagent_turns", "num_turns", "subtype", "wall_s", "hidden", "passed", "leak_suspect",
-    "tokens", "outcome", "quality", "trap", "quality_tools", "judge", "judge_model",
+    "price_table_version", "family_priced_turns",
+    "subagent_turns", "num_turns", "subtype", "wall_s", "hidden",
+    "passed", "leak_suspect", "tokens", "outcome", "quality", "trap", "quality_tools", "judge",
+    "judge_model",
 }  # fmt: skip
 
 
@@ -949,6 +951,8 @@ def test_the_committed_tier3_rows_carry_the_signed_tier3_hash(bench: ModuleType)
 def test_tier3_costs_say_they_are_cli_totals_without_subagent_spend(
     bench: ModuleType, tmp_path: Path
 ) -> None:
+    """The name is the node id SPEC-hm-eval-tier3 AC-010 binds, so it stays. The claim in it was
+    wrong: the CLI total includes subagent spend (SPEC-price-table-current-models AC-007)."""
     diagnostic = _diagnostic()
     diagnostic[0] = {**diagnostic[0], "cost_usd": None}
     out, repo = _tier3_repo(tmp_path, _pilot(_PILOT_SOLVED), diagnostic)
@@ -961,7 +965,7 @@ def test_tier3_costs_say_they_are_cli_totals_without_subagent_spend(
     tier3_md = readme[readme.index("**Tier 3**") : readme.index("<!-- hm:eval:end -->")]
     for text in (section, tier3_md):
         assert "CLI" in text
-        assert "excludes subagent spend" in text
+        assert "includes subagent spend" in text
         assert "1 of 36 runs has no price" in text  # counted, not averaged away
     assert 1 <= tier3_md.count(". ") + tier3_md.count(".\n") <= 3
 
@@ -972,7 +976,7 @@ def test_tier3_costs_omit_the_unpriced_note_when_every_row_is_priced(
     out, repo = _tier3_repo(tmp_path, _pilot(_PILOT_SOLVED), _diagnostic())
     assert _publish3(bench, out, repo) == 0
     results = (repo / "docs" / "evals" / "RESULTS.md").read_text()
-    assert "excludes subagent spend" in results
+    assert "includes subagent spend" in results
     assert "no price" not in results
 
 

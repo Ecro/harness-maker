@@ -1,0 +1,725 @@
+schema_version: 3
+spec_slug: price-table-current-models
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: current models are priced at their published rates
+  type: parametric
+  test_ids:
+  - tests/unit/test_price_table_current_models.py::test_ac_001_current_models_published_rates[AC-001-0]
+  - tests/unit/test_price_table_current_models.py::test_ac_001_current_models_published_rates[AC-001-1]
+  - tests/unit/test_price_table_current_models.py::test_ac_001_current_models_published_rates[AC-001-2]
+  - tests/unit/test_price_table_current_models.py::test_ac_001_current_models_published_rates[AC-001-3]
+  - tests/unit/test_price_table_current_models.py::test_ac_001_current_models_published_rates[AC-001-4]
+  - tests/unit/test_price_table_current_models.py::test_ac_001_current_models_published_rates[AC-001-5]
+  executable_predicate: null
+  golden_table:
+  - input:
+      model: claude-sonnet-5-5
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.186
+      family_priced: false
+      fallback: false
+    edge: false
+    note: 0.02+0.10+0.001+0.025+0.04
+  - input:
+      model: claude-sonnet-5-5-20261001
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.186
+      family_priced: false
+      fallback: false
+    edge: false
+    note: date suffix
+  - input:
+      model: claude-fable-5-2
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.742
+      family_priced: false
+      fallback: false
+    edge: false
+    note: 0.08+0.40+0.002+0.10+0.16
+  - input:
+      model: claude-fable-5-2[1m]
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.742
+      family_priced: false
+      fallback: false
+    edge: false
+    note: 1m suffix
+  - input:
+      model: claude-haiku-5-5
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.00935
+      family_priced: false
+      fallback: false
+    edge: false
+    note: 0.001+0.005+0.0001+0.00125+0.002; prompt 40,000
+  - input:
+      model: claude-haiku-5-5-20261015
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.00935
+      family_priced: false
+      fallback: false
+    edge: false
+    note: date suffix
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Expected dollars are hand-computed from the rates on the published
+    pricing page (read 2026-11-16: Sonnet 5.5 2/10 read 0.10 write 2.50/4; Fable 5.2
+    8/40 read 0.20 write 10/16; Haiku 5.5 base 0.10/0.50 read 0.01 write 0.125/0.20),
+    not from PRICE_TABLE.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Haiku 5.5 switches to the long-prompt card above 100,000 prompt tokens
+  type: parametric
+  test_ids:
+  - tests/unit/test_price_table_current_models.py::test_ac_002_haiku_long_prompt_card[AC-002-0]
+  - tests/unit/test_price_table_current_models.py::test_ac_002_haiku_long_prompt_card[AC-002-1]
+  - tests/unit/test_price_table_current_models.py::test_ac_002_haiku_long_prompt_card[AC-002-2]
+  - tests/unit/test_price_table_current_models.py::test_ac_002_haiku_long_prompt_card[AC-002-3]
+  - tests/unit/test_price_table_current_models.py::test_ac_002_haiku_long_prompt_card[AC-002-4]
+  - tests/unit/test_price_table_current_models.py::test_ac_002_haiku_long_prompt_card[AC-002-5]
+  - tests/unit/test_price_table_current_models.py::test_ac_002_haiku_long_prompt_card[AC-002-6]
+  - tests/unit/test_price_table_current_models.py::test_ac_002_haiku_long_prompt_card[AC-002-7]
+  - tests/unit/test_price_table_current_models.py::test_ac_002_haiku_long_prompt_card[AC-002-8]
+  executable_predicate: null
+  golden_table:
+  - input:
+      model: claude-haiku-5-5
+      usage:
+        input: 100000
+        output: 0
+        cache_read: 0
+        cache_write_5m: 0
+        cache_write_1h: 0
+    expected:
+      total_usd: 0.01
+    edge: true
+    note: 'exactly 100,000: base card'
+  - input:
+      model: claude-haiku-5-5
+      usage:
+        input: 100001
+        output: 0
+        cache_read: 0
+        cache_write_5m: 0
+        cache_write_1h: 0
+    expected:
+      total_usd: 0.0500005
+    edge: true
+    note: '100,001: long-prompt card'
+  - input:
+      model: claude-haiku-5-5
+      usage:
+        input: 100000
+        output: 50000
+        cache_read: 0
+        cache_write_5m: 0
+        cache_write_1h: 0
+    expected:
+      total_usd: 0.035
+    edge: true
+    note: output does not count toward prompt length
+  - input:
+      model: claude-haiku-5-5
+      usage:
+        input: 1
+        output: 1000
+        cache_read: 100000
+        cache_write_5m: 0
+        cache_write_1h: 0
+    expected:
+      total_usd: 0.0075005
+    edge: true
+    note: 'cache reads count: 0.0000005+0.005+0.0025'
+  - input:
+      model: claude-haiku-5-5
+      usage:
+        input: 0
+        output: 1000
+        cache_read: 60000
+        cache_write_5m: 20000
+        cache_write_1h: 20000
+    expected:
+      total_usd: 0.0076
+    edge: true
+    note: 'reads+writes = 100,000: base, 0.0006+0.0025+0.004+0.0005'
+  - input:
+      model: claude-haiku-5-5
+      usage:
+        input: 0
+        output: 1000
+        cache_read: 60000
+        cache_write_5m: 20000
+        cache_write_1h: 20001
+    expected:
+      total_usd: 0.038001
+    edge: true
+    note: 'reads+writes = 100,001: long, 0.003+0.0125+0.020001+0.0025'
+  - input:
+      model: claude-sonnet-5-5
+      usage:
+        input: 200000
+        output: 0
+        cache_read: 0
+        cache_write_5m: 0
+        cache_write_1h: 0
+    expected:
+      total_usd: 0.4
+    edge: false
+    note: no second card for Sonnet 5.5
+  - input:
+      model: claude-haiku-5-5-20261015
+      usage:
+        input: 100001
+        output: 0
+        cache_read: 0
+        cache_write_5m: 0
+        cache_write_1h: 0
+    expected:
+      total_usd: 0.0500005
+    edge: true
+    note: long-prompt card on a dated id
+  - input:
+      model: claude-haiku-5-5[1m]
+      usage:
+        input: 100000
+        output: 0
+        cache_read: 0
+        cache_write_5m: 0
+        cache_write_1h: 0
+    expected:
+      total_usd: 0.01
+    edge: true
+    note: base card on a 1m id at the boundary
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Hand-computed from the published two-tier Haiku 5.5 rates (over
+    100,000: 0.50/2.50 read 0.05 write 0.625/1) and the published rule that prompt
+    length counts input, cache reads and cache writes.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: ids that already had a row are priced as before
+  type: parametric
+  test_ids:
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-0]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-1]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-2]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-3]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-4]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-5]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-6]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-7]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-8]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-9]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-10]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-11]
+  - tests/unit/test_price_table_current_models.py::test_ac_003_existing_rows_unchanged[AC-003-12]
+  executable_predicate: null
+  golden_table:
+  - input:
+      model: claude-sonnet-5
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.187
+    edge: false
+    note: sonnet-5 row
+  - input:
+      model: claude-opus-5-5
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.372
+    edge: false
+    note: opus-5-5 row
+  - input:
+      model: claude-fable-5-1
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.9275
+    edge: false
+    note: fable-5-1 row
+  - input:
+      model: claude-haiku-4-5-20251001
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.0935
+    edge: false
+    note: haiku-4-5 row
+  - input:
+      model: claude-opus-4-1-20250805
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 1.4025
+    edge: false
+    note: opus family row
+  - input:
+      model: gpt-4
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 1.4025
+    edge: false
+    note: 'no row: fallback opus'
+  - input:
+      model: claude-fable-5
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.935
+    edge: false
+    note: 'fable-5 row: 0.10+0.50+0.01+0.125+0.20'
+  - input:
+      model: claude-fable-5-20260401
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.935
+    edge: true
+    note: 'dated Fable 5: the fable-5-2 key must not capture the date'
+  - input:
+      model: claude-fable-5-2026-04-01
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.935
+    edge: true
+    note: hyphenated date
+  - input:
+      model: claude-opus-5
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.4675
+    edge: false
+    note: opus-5 row
+  - input:
+      model: claude-opus-4-8[1m]
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.4675
+    edge: false
+    note: opus-4-8 row
+  - input:
+      model: claude-sonnet-4-5
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.2805
+    edge: false
+    note: sonnet-4-5 row
+  - input:
+      model: claude-3-haiku-20240307
+      usage:
+        input: 10000
+        output: 10000
+        cache_read: 10000
+        cache_write_5m: 10000
+        cache_write_1h: 10000
+    expected:
+      total_usd: 0.02325
+    edge: false
+    note: haiku family row
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each row is the dollar value the unchanged table at origin/main
+    0ccfcf09 gives for the same turn, hand-checked against its rates; it is never
+    regenerated. The dated Fable 5 rows were added after review found the new fable-5-2
+    key captured them.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: a point release without its own row leaves a trace
+  type: parametric
+  test_ids:
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-0]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-1]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-2]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-3]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-4]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-5]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-6]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-7]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-8]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-9]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-10]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-11]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-12]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-13]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-14]
+  - tests/unit/test_price_table_current_models.py::test_ac_004_point_release_trace[AC-004-15]
+  executable_predicate: null
+  golden_table:
+  - input:
+      model: claude-sonnet-5-6
+    expected:
+      family_priced: true
+      fallback: false
+    edge: false
+    note: priced by sonnet-5
+  - input:
+      model: claude-fable-5-3
+    expected:
+      family_priced: true
+      fallback: false
+    edge: false
+    note: priced by fable-5
+  - input:
+      model: claude-opus-5-6
+    expected:
+      family_priced: true
+      fallback: false
+    edge: false
+    note: priced by opus-5
+  - input:
+      model: claude-sonnet-5-10
+    expected:
+      family_priced: true
+      fallback: false
+    edge: true
+    note: two-digit version
+  - input:
+      model: claude-sonnet-5-5
+    expected:
+      family_priced: false
+      fallback: false
+    edge: false
+    note: own row
+  - input:
+      model: claude-sonnet-5-5-20261001
+    expected:
+      family_priced: false
+      fallback: false
+    edge: true
+    note: own row with date
+  - input:
+      model: claude-sonnet-5-20260601
+    expected:
+      family_priced: false
+      fallback: false
+    edge: true
+    note: date suffix is not a version
+  - input:
+      model: claude-sonnet-5@20260601
+    expected:
+      family_priced: false
+      fallback: false
+    edge: true
+    note: '@date'
+  - input:
+      model: claude-opus-5-5[1m]
+    expected:
+      family_priced: false
+      fallback: false
+    edge: true
+    note: 1m suffix
+  - input:
+      model: claude-haiku-4-5-20251001
+    expected:
+      family_priced: false
+      fallback: false
+    edge: false
+    note: own row with date
+  - input:
+      model: claude-opus-9
+    expected:
+      family_priced: true
+      fallback: false
+    edge: false
+    note: bare family row, as before
+  - input:
+      model: gpt-4
+    expected:
+      family_priced: false
+      fallback: true
+    edge: false
+    note: fallback signal only, as before
+  - input:
+      model: claude-haiku-5-6
+    expected:
+      family_priced: true
+      fallback: false
+    edge: false
+    note: priced by the bare haiku row
+  - input:
+      model: anthropic/claude-opus-5.6
+    expected:
+      family_priced: true
+      fallback: false
+    edge: true
+    note: dotted version, priced by opus-5
+  - input:
+      model: claude-fable-5-20260401
+    expected:
+      family_priced: false
+      fallback: false
+    edge: true
+    note: dated Fable 5 resolves to its own row
+  - input:
+      model: CLAUDE-SONNET-5-6
+    expected:
+      family_priced: true
+      fallback: false
+    edge: true
+    note: upper case
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The marks follow from the rule stated in the SPEC (matched key
+    followed by a hyphen and a 1-2 digit number). The first rows are the HR-021 failure
+    shape: before this change claude-sonnet-5-5 was priced by sonnet-5 with no signal.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: the table is version 4
+  type: mechanical
+  test_ids:
+  - tests/unit/test_price_table_current_models.py::test_ac_005_table_is_version_4
+  executable_predicate: PRICE_TABLE_VERSION == '4' and PRICE_TABLE_EFFECTIVE_DATE
+    == '2026-11-16' and aggregate([]).price_table_version == '4' and aggregate([]).price_table_effective_date
+    == '2026-11-16'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The label and date are the ones this SPEC sets (HR-021 asks for
+    the version bump; rates were read on 2026-11-16); the test also reads them through
+    an aggregated report.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: the recorded tier-1 rows agree with the CLI and give 6.984
+  type: mechanical
+  test_ids:
+  - tests/unit/test_price_table_current_models.py::test_ac_006_recorded_rows_agree_with_cli
+  executable_predicate: all(r['price_table_version'] == '4' and abs(r['transcript_cost_usd']
+    - (r['transcript_cost_usd_table_v3'] - r['tokens']['cache_read'] * 0.10 / 1e6))
+    <= 1e-6 and abs(r['transcript_cost_usd'] - r['cli_cost_usd']) / r['cli_cost_usd']
+    <= 0.005 for r in rows('docs/evals/results.jsonl')) and summarize(rows)['verdict']
+    == 'met' and summarize(rows)['ratio'] == 6.984
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: cli_cost_usd is the amount the host billed, recorded on 2026-11-10
+    and not produced by PRICE_TABLE; 6.984 was computed from the committed rows before
+    any change (CLI ratio 6.984).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: the published text says the CLI total includes subagent spend
+  type: mechanical
+  test_ids:
+  - tests/unit/test_price_table_current_models.py::test_ac_007_text_says_cli_includes_subagent_spend
+  executable_predicate: '''includes subagent spend'' in tier3_note and ''excludes
+    subagent spend'' not in tier3_note and ''understates'' not in tier3_note and ''subagent''
+    not in suspect_reason and ''price table'' in suspect_reason and committed(''docs/evals/RESULTS.md'')
+    == rendered and committed_readme_block == rendered_block'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Whether the CLI total includes subagent spend is settled by the
+    79 recorded rows with subagent turns, whose CLI total matches the repriced transcript
+    total within 0.5%; the note text is checked against that finding, not against
+    the function that prints it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 56f9221365405321ca5dc98a084f9aae676ff0c76806d21773a5cdfaf9984098
+  approved_by: Claude
+  approved_at: '2026-11-16T09:07:30Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: fe706fb4f2c7f66d07bb0822d38659cadfef30901a01413a5d5eede8855f7fc1
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: d88cb4e4ee01d95c00df6bde5db72f22b268e3dadc283686304dc18501bef7bf
+    AC-002: b47c92ee62e45ed0cd5a170f53c3d20575392a4a3a94b0761f85337f3c6929c0
+    AC-003: c49dd349776e80410fc3e3fa0a3190aafc95d0d8d6803c3104bbbb398a0b830b
+    AC-004: c32e33dbf7ceae5822b04799409ff1f7ec6722985a9ff8238710a487ba210064
+    AC-005: 9caa13e70bfaa5443518bd977f09497e09979f53b284d01e5026823b81af9254
+    AC-006: 05c0d2150282b6a2e07b6b82721b353001db593ab6d69b4ab36ac1ed0d8edc4b
+    AC-007: 3f45d395050978ad9a887e8d7f780c6c64f6479701194e20a6ce932600a64123
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c

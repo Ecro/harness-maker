@@ -159,6 +159,13 @@ hm transcript ratio ≤ 10.0 (rounded to 3 places) and hm pass rate (capped/leak
 test asserts that the SPEC's recorded result (met or missed, with the ratio) matches the counted rows; a
 miss is recorded, never rerun into a pass. hm-novalidator's ratio and judge scope are recorded, not gated.
 
+**Correction (2026-11-16, SPEC-price-table-current-models).** The transcript ratios in the result
+below were priced with price table 3, which charged `claude-sonnet-5-5` cache reads at twice the
+published rate. Repriced, they equal the CLI ratios: hm 9.437 (not 10.243), hm-novalidator 6.996
+(recorded as 7.674; the rows give 7.669 under table 3), and the earlier 11.359 was 10.267. At 9.437 the 10.0 bar would have been met. The
+recorded verdict and `docs/evals/history/hm-cost-p4.jsonl` stay as recorded, because the bar test
+pins what was decided on that day.
+
 **Result (2026-11-10): missed.** Transcript ratio 10.243 (CLI 9.44) at harness 3063ad338e06, down from
 11.359 at cdf28dce; every other guard held (pass rate 15/15 in all three arms, no capped or leaked run).
 The one batch run counts; nothing was rerun. Per stage, hm's execute fell from $0.306 and 8.1 turns per

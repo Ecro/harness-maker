@@ -20,7 +20,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from harness_maker.economics import TurnRecord
+from harness_maker.economics import TurnRecord, model_key_end
 
 # Per Anthropic prompt-caching docs: minimum tokens that must accumulate before
 # a cache write happens. Below this, cache_creation_input_tokens silently == 0.
@@ -49,7 +49,10 @@ from harness_maker.economics import TurnRecord
 # It is not fixed here because `economics.resolve_model_family` uses the same matching
 # contract and ADR-002 locks it unchanged; a date-suffixed id like
 # `claude-haiku-4-5-20251001` is real and depends on substring matching working. Making
-# only this matcher stricter would split a contract the code states is shared.
+# only this matcher stricter would split a contract the code states is shared. The one
+# rule both now share (`economics.model_key_end`): a key that ends in a digit does not
+# match right before another digit, so a key ending in `-2` cannot capture the date of a
+# `-2026…` id.
 _MIN_CACHEABLE_PREFIX: dict[str, int] = {
     "opus-5": 512,
     "opus-4-8": 1024,
@@ -100,7 +103,7 @@ def _threshold_for_model(model: str | None) -> int | None:
     if not model:
         return None
     m = model.lower()
-    matches = [key for key in _MIN_CACHEABLE_PREFIX if key in m]
+    matches = [key for key in _MIN_CACHEABLE_PREFIX if model_key_end(m, key) is not None]
     if not matches:
         return None
     return _MIN_CACHEABLE_PREFIX[max(sorted(matches), key=len)]

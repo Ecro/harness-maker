@@ -550,7 +550,7 @@ harness-maker generates and **owns the lifecycle** of your `.claude/` directory.
 
 | Metric | plain | hm | hm vs plain | Lead |
 |---|---|---|---|---|
-| cost ratio (cells: mean CLI $/run) | $0.061 (n=15) | $0.426 (n=15) | 7.56x (CLI 6.98x, transcript 7.56x) | plain |
+| cost ratio (cells: mean CLI $/run) | $0.061 (n=15) | $0.426 (n=15) | 6.98x | plain |
 | wall time per run | 15s (n=15) | 2m 21s (n=15) | 9.15x | plain |
 | Δ solved runs | 15 (n=15) | 15 (n=15) | +0 | tie |
 | Δ hidden-case pass fraction | 1.00 (n=15) | 1.00 (n=15) | +0.00 | tie |
@@ -561,7 +561,7 @@ harness-maker generates and **owns the lifecycle** of your `.claude/` directory.
 | cost per solved run | $0.061 (n=15) | $0.426 (n=15) |  | plain |
 | extra $ per additional solved run | | | n/a: no additional solved runs for the extra cost | — |
 
-**Tier 3** (the answer is in the repo or an earlier session, not the prompt): plain solved 23 of 27 pilot runs, so 1 task survived the pre-registered drop rule where 4 are needed; tier 3 is inconclusive and the per-task code-quality claim is withdrawn. A diagnostic on t20 and t21, not a verdict: hm solved t20 2/3 and t21 1/2 at $3.172/run; plain (pilot) 0/3 and 3/3 at $0.145/run; plain-careful 2/3 and 3/3 at $0.203/run; plain-continue 3/3 and 3/3 at $0.108/run ([details](docs/evals/RESULTS.md#tier-3)). Each $ is the CLI cost per run, which excludes subagent spend, so an hm $ understates what the run spent.
+**Tier 3** (the answer is in the repo or an earlier session, not the prompt): plain solved 23 of 27 pilot runs, so 1 task survived the pre-registered drop rule where 4 are needed; tier 3 is inconclusive and the per-task code-quality claim is withdrawn. A diagnostic on t20 and t21, not a verdict: hm solved t20 2/3 and t21 1/2 at $3.172/run; plain (pilot) 0/3 and 3/3 at $0.145/run; plain-careful 2/3 and 3/3 at $0.203/run; plain-continue 3/3 and 3/3 at $0.108/run ([details](docs/evals/RESULTS.md#tier-3)). Each $ is the CLI cost per run, which includes subagent spend.
 <!-- hm:eval:end -->
 
 ---

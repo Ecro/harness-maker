@@ -171,8 +171,8 @@ places when there is one) matches the counted rows. p4's rows move to
 `docs/evals/history/hm-cost-p4.jsonl` and p4's bar test reads them there. Recorded, not gated: how many
 of the 15 hm runs dispatched spec-validator (expected 0), per-stage cost, judge scores.
 
-**Result (2026-11-10): met.** Judged ratio 7.563 (transcript price; CLI 6.98) at harness 9bba5174cd88, down
-from 10.243 at 3063ad33. Pass rate 15/15 in both arms, no capped or leaking run. The one batch run counts;
+**Result (2026-11-10): met.** Judged ratio 6.984 (CLI and transcript price agree; first recorded as 7.563, see
+the correction below) at harness 9bba5174cd88, down from 9.437 at 3063ad33 (first recorded as 10.243). Pass rate 15/15 in both arms, no capped or leaking run. The one batch run counts;
 nothing was discarded or rerun. spec-validator was dispatched in 0 of the 15 hm runs (every SPEC had at
 most 8 ACs and the scripted DRI does not pick the validator-first approval); code-reviewer ran in 15 of
 15. Per stage, hm's spec fell from $0.206 to $0.130 per run and execute from $0.236 to $0.210; approve
@@ -181,6 +181,17 @@ most 8 ACs and the scripted DRI does not pick the validator-first approval); cod
 (−0.60) is where it was (−0.58). New lint and type errors per run: ruff 0.20 (plain 0.00), mypy 0.13
 (plain 1.53). The number is the cost of the default path: a DRI who picks "Approve after
 spec-validator" pays for the pass.
+
+**Correction (2026-11-16, SPEC-price-table-current-models).** The transcript price was computed with
+price table 3, which had no row for `claude-sonnet-5-5` and charged its cache reads at Sonnet 5's
+$0.20 per million tokens against a published $0.10. With the right rate the transcript price of every
+row equals the CLI total (within 0.5%), so the ratio is 6.984 by either measure and the verdict is
+unchanged. `docs/evals/results.jsonl` carries the repriced value and keeps the old one as
+`transcript_cost_usd_table_v3`. The per-stage dollars above were priced with table 3 and are not
+recomputed (the transcripts are gone); hm's table-3 transcript total was 19% above its CLI total
+(plain's 10%), so read them as upper bounds. The Intent's figures are table-3
+values as well. By CLI cost: with spec-validator 9.44x on tier 1 and 9.36x on tier 2 (both recorded
+as 10.24x), without it 7.00x and 7.61x (recorded as 7.67x and 8.42x).
 
 ### AC-007: the HM-LIGHT-LANE objective states target 8 and its approval is valid
 `intent/HM-LIGHT-LANE.md` reads "22 → 8 이하" in its statement, "8배 이하" in its proposed outcome and
