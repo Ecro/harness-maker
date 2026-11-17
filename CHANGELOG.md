@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.65.5] - 2026-11-17
+
+Two fixes: Maker loads again in Claude Code's default permission mode, and the cost numbers use the
+current models' prices (the recorded hm cost ratio is 6.98x, not 7.56x).
+
 ### Fixed
 
 - **Maker loads in Claude Code's default permission mode again** (SPEC-maker-digest-session-id). The
