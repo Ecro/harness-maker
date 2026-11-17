@@ -1,90 +1,23 @@
-"""PreCompact flush hook — snapshot autoloop progress before context compaction.
+"""Retired PreCompact/Stop hook, kept as an exit-0 stub (SPEC-opus55-stale-cuts).
 
-Why: .claude-progress.json is only written at stage wrapup boundaries. When
-Claude Code auto-compacts mid-stage, partial work (tasks completed so far,
-review findings in flight, research notes) evaporates. This hook fires before
-every compaction (auto + manual), snapshots the progress file, and appends a
-checkpoint entry to the session log so the next context window knows where the
-session was interrupted.
+Why it stays: a `settings.json` or `.codex/hooks.json` that was never re-rendered still runs
+`python -m harness_maker.hooks.flush_session`, and a missing module would print an error on
+every compaction. Why it does nothing: it snapshotted `.claude-progress.json`, which nothing
+has written since autoloop was retired, and `/hm:execute` resumes from the SPEC, the PLAN and
+the REVIEW file.
 """
 
 from __future__ import annotations
 
-import json
-import shutil
+import contextlib
 import sys
-from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
-
-from harness_maker.hook_host import is_claude_copy_in_cursor
-from harness_maker.memory_md import append_session
-
-_PROGRESS_FILE = ".claude-progress.json"
-_CHECKPOINT_PREFIX = ".claude-progress-checkpoint-"
-
-
-def _utcnow() -> datetime:
-    return datetime.now(tz=UTC)
-
-
-def _read_stdin() -> dict[str, Any]:
-    try:
-        raw = sys.stdin.read()
-        data = json.loads(raw) if raw.strip() else {}
-    except json.JSONDecodeError:
-        data = {}
-    return data if isinstance(data, dict) else {}
-
-
-def _snapshot_progress(cwd: Path, ts: str) -> Path | None:
-    """Copy .claude-progress.json to a timestamped checkpoint. Returns dest path or None."""
-    src = cwd / _PROGRESS_FILE
-    if not src.exists():
-        return None
-    dest = cwd / f"{_CHECKPOINT_PREFIX}{ts}.json"
-    shutil.copy2(src, dest)
-    return dest
-
-
-def _append_session_log(cwd: Path, ts: str, trigger: str, checkpoint: Path | None) -> None:
-    """Append a compaction checkpoint entry to today's session log.
-
-    Routes through ``memory_md.append_session`` so the write holds the same
-    flock the wrapup CLI uses (H1 — concurrent fleet sessions must not clobber
-    each other) and targets the BASE repo even when this hook fires mid-stage
-    with ``cwd`` inside a worktree (ADR-005, PLAN-multisession-fleet-reverify).
-    """
-    today = _utcnow().strftime("%Y-%m-%d")
-    checkpoint_ref = checkpoint.name if checkpoint else "no progress file"
-    entry = (
-        f"## [checkpoint:compaction] autocompact-{ts[:16].replace('T', '-')} "
-        f"| {ts[:19].replace('T', ' ')} UTC | trigger:{trigger}\n"
-        f"Context compaction fired. Progress snapshotted to `{checkpoint_ref}`.\n"
-        f"Resume: load `.claude-progress.json` and continue from `current_phase`.\n"
-    )
-    append_session(cwd, entry, today=today)
-
-
-def run(cwd: Path | None = None) -> int:
-    """Main logic — separated for testability."""
-    if cwd is None:
-        cwd = Path.cwd()
-
-    payload = _read_stdin()
-    if is_claude_copy_in_cursor(payload, "harness_maker.hooks.flush_session"):
-        return 0
-    trigger = str(payload.get("trigger", "unknown"))
-    ts = _utcnow().strftime("%Y%m%dT%H%M%SZ")
-
-    checkpoint = _snapshot_progress(cwd, ts)
-    _append_session_log(cwd, ts, trigger, checkpoint)
-    return 0
 
 
 def main() -> int:
-    """Entry point: called by PreCompact hook in hooks.json."""
-    return run()
+    """Drain the hook payload so the host never sees a broken pipe, then succeed."""
+    with contextlib.suppress(Exception):  # closed stdin is `None`; a hook must never fail here
+        sys.stdin.read()
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover

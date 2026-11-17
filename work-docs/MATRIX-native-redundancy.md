@@ -114,7 +114,6 @@ it is the substrate. The question for each row is whether the *role definition* 
 | `intent-layer` | `none` — Auto Memory ✅ stores preferences, not intent / assumptions / objective approvals; no vendor ships epistemic state | loss | loss (mention-only, `@intent-layer`) | **keep** |
 | `project-knowledge` | ⚠️ partial — Auto Memory ✅ saves "remember X" as project context, but machine-local: not in git, not read by Cursor/Codex, not in `memory_retrieve` (SPEC-mission-context-loop) | loss | loss (AGENTS.md pointer names the skill file) | **keep** — withdrawal pre-registered: 0 `[wiki:fact]` entries in 28 days after release → remove |
 | `maker` | `none` — the router skill is named by the user (`world_model.handle`, default `maker`); Claude Code skills ✅ give `/name` invocation, but no vendor ships a named front door that routes to this harness's stages, intents and project knowledge (SPEC-world-model-name) | loss | loss (AGENTS.md pointer names `$handle`) | **keep** |
-| `worktree-isolator` | ⚠️ `EnterWorktree` / `ExitWorktree` ✅ exist natively | loss | loss | **merge** — but see the warning below |
 
 ---
 
@@ -132,7 +131,9 @@ would drop mechanics we could re-adopt and, with them, safety rails that took th
 contamination incidents to build. **The honest verdict is: adopt `Workflow` as the driver
 underneath, keep the stage contract on top.** That is a merge, and it is stage-2 work.
 
-**`worktree-isolator` — the one to be most careful with.** `EnterWorktree`/`ExitWorktree`
+**The worktree layer — the one to be most careful with.** (Its `worktree-isolator` skill
+described the retired `execute-<uuid>` procedure and was removed by SPEC-opus55-stale-cuts;
+the layer itself stays.) `EnterWorktree`/`ExitWorktree`
 exist, but this harness's worktree layer is not isolation-for-convenience: it is the
 per-task feature-branch model, the session registry, the queue/dirty/UUID/fence/scope
 5-layer defense, and the landed-marker reaping. CLAUDE.md records that

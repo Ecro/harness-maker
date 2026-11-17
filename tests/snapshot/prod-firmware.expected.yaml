@@ -1,10 +1,10 @@
 preset: Production
 strictness: block
-file_count: 31
+file_count: 29
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
-  body_sha256: 4110529423a76b743cdd2b7d74ce36450df07b9722c572caa225bbfb14604a49
+  body_sha256: 780efc47bab7175f0b08eede7a2186938dabada8ecdb0d0ade623e10170d592f
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
   body_sha256: 75e6e5038df74c2b0f6a3c8321c59b685b36015caeb67ebfcd54000a0e23b564
@@ -16,7 +16,7 @@ files:
   body_sha256: c62a21e82754d5606f3beae02e5dcf47cce846662e3763708b901442a83abb9a
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: ea4c28ea27b84b9acdc48c86caf5abcb38dfdfa0ce3fcbdf2a618a3522f37f3e
+  body_sha256: 95dd549977d35ccb423484d7928ca42e13976233c011e2e6823be89288e72b97
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 7a0eb0965046757c8720bdabc17656ec1ba96bace0c29141730b4f0e6fda2e8a
@@ -43,13 +43,10 @@ files:
   body_sha256: f6b17fc8e468ea79228a78d84d42e0f20e23343bd13607662b6a132648adfa35
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
-  body_sha256: 620dc878ad6f728a05c4ee2ed8a9bb36b3ff4456034b9808971f799b1f92c698
+  body_sha256: e5be5d712cc23131767f2870a33e62d697c5f68645f1be18e04d955f78a6ef01
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: 66df0bc5b3506d8f8b4b05c7a60690a6f8651a6493659a0b7545c2322aa7c73f
-- path: memory/session/README.md
-  template: memory/session-readme.md.j2
-  body_sha256: 38ea1e63ce69271e28099f8424bdd86d6e4385917b3bbbd9e70bae0f7d2a180f
 - path: memory/wiki.md
   template: memory/wiki.en.md.j2
   body_sha256: abc6a8adfb4a2d8f78456bb1e0befbdbeff84a77a168aa092b179131fe180ebf
@@ -70,7 +67,7 @@ files:
   body_sha256: 03a7f5c424652cb4a76e2078092bc0771e655e7760b4009aca7600eeb09dc6b9
 - path: settings.json
   template: settings/Production.json.j2
-  body_sha256: 1b0716b37d3fe33b099115826d5be6e31ee150f396dcfaa3f5c9411022338f11
+  body_sha256: 970eaac65bb4c2316918efdac3cb15fb5d147db53658d77496cceb88886dadf0
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 359bd8cf20f3fcdb4e46b586733100d1643d88739bef799262438b9e4af68f8a
@@ -92,6 +89,3 @@ files:
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
   body_sha256: 98b6a525112f3a8d649f3390263ea5b2905f4da1e11260eab6aab59648546eef
-- path: skills/worktree-isolator/SKILL.md
-  template: skills/worktree-isolator/SKILL.md.j2
-  body_sha256: 05bf4ff209f91b13adc762b3338e1b46721ee393ef3cc756693e8b392cb35367

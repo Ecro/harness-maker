@@ -42,7 +42,6 @@ KEPT_SKILLS = {
     "intent-layer",
     "maker",
     "project-knowledge",
-    "worktree-isolator",
 }
 RETIRED_HOOKS = (
     "harness_maker.telemetry",

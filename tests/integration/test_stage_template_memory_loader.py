@@ -74,15 +74,14 @@ def test_session_hot_tier_dropped_in_research(stage_source: dict[str, str]) -> N
     )
 
 
-def test_execute_keeps_checkpoint_and_ignores_legacy() -> None:
-    """execute is the checkpoint consumer → keeps the read but scopes it to
-    checkpoint:compaction and ignores legacy [decision:*] blocks (ADR-001, C3)."""
+def test_execute_reads_no_session_tier() -> None:
+    """execute was the last consumer of the session tier (the compaction checkpoint and the
+    legacy `[decision:*]` blocks it was told to ignore). SPEC-opus55-stale-cuts retired the
+    hook that wrote the checkpoint, so the read left with it."""
     body = (_TEMPLATES_DIR / "execute.md.j2").read_text(encoding="utf-8")
-    assert "checkpoint:compaction" in body, "execute must keep the compaction-checkpoint read"
-    assert "legacy" in body, "execute must call the [decision:*] blocks legacy"
-    assert "[decision:*]" in body, (
-        "execute must instruct ignoring legacy [decision:*] blocks (K=2 second-opinion consensus)"
-    )
+    assert "checkpoint:compaction" not in body
+    assert "memory/session" not in body
+    assert "[decision:*]" not in body
 
 
 def test_all_three_templates_use_the_shared_cli_prefix(

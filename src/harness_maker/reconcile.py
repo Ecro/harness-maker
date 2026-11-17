@@ -821,6 +821,24 @@ def _remove_emptied_dirs(project_root: Path, rel_key: str) -> None:
             return
 
 
+def _guards_a_kept_skill(
+    project_root: Path, rel_path: Path, expected: set[str], manifest: dict[str, set[str]]
+) -> bool:
+    """True for a Codex skill's `agents/openai.yaml` whose SKILL.md the sweep keeps.
+
+    Why: the file holds `allow_implicit_invocation: false`. Deleting a pristine copy beside a
+    user-edited SKILL.md of a retired typed-only skill would make that kept copy self-trigger
+    in Codex (REVIEW-opus55-stale-cuts F-001).
+    """
+    parts = rel_path.parts
+    if parts[-2:] != ("agents", "openai.yaml") or "skills" not in parts[:-3]:
+        return False
+    skill = Path(*parts[:-2]) / "SKILL.md"
+    if skill.as_posix() in expected or not (project_root / skill).is_file():
+        return False
+    return _classify_orphan(project_root, skill, manifest)[0] != "ours-clean"
+
+
 def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport:
     """Delete blueprint-orphaned files that fingerprint as ours; keep+warn the rest.
 
@@ -860,6 +878,12 @@ def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport
         ):
             print(symlink_kept_warning(rel_key), file=sys.stdout)
             report.kept.append((rel_path, "symlink"))
+            continue
+        if classification == "ours-clean" and _guards_a_kept_skill(
+            project_root, rel_path, expected, manifest
+        ):
+            _log_orphan_kept(project_root, rel_path, "guards-kept-skill", recorded_hash)
+            report.kept.append((rel_path, "guards-kept-skill"))
             continue
         if classification == "ours-clean":
             try:

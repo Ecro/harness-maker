@@ -89,7 +89,6 @@ _ALL_REVIEWERS: list[str] = ["code-reviewer"]
 _ALL_SKILLS: list[str] = [
     "ai-readiness-rubric",
     "agent-quality-rubric",
-    "worktree-isolator",
     "context-linter",
     "intent-layer",
     "project-knowledge",

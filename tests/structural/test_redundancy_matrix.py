@@ -99,7 +99,7 @@ def test_the_inventory_is_not_empty() -> None:
     inv = inventory()
     assert len(inv["command"]) >= 9  # nine since 0.64.0
     assert len(inv["agent"]) >= 10
-    assert len(inv["skill"]) >= 8
+    assert len(inv["skill"]) >= 7  # 8 before SPEC-opus55-stale-cuts retired worktree-isolator
 
 
 def test_the_matrix_parsed_into_rows() -> None:

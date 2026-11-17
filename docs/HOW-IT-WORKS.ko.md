@@ -20,7 +20,7 @@
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `worktree-isolator`, `world-model`
+> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > <!-- hm-doc-contract:mechanisms:start -->
@@ -275,7 +275,6 @@ Bash 도 쓰기 도구도 없다.
 | `context-linter` | 항상 | CLAUDE.md·에이전트·스킬 파일이 preset 한도를 넘는지 |
 | `agent-quality-rubric` | 항상 | 에이전트 파일 등급(Platinum–Bronze) |
 | `ai-readiness-rubric` | 항상 | 저장소의 AI 작업 준비도 채점 |
-| `worktree-isolator` | 항상 | stage 가 따르는 worktree 절차 |
 | `second-opinion-gate` | `second_opinion.models` 가 비어 있지 않을 때 | 리뷰 루프의 라운드 상태·수용 절차 |
 | `trajectory-monitor` | 렌더 안 됨 (템플릿만 남음) | — |
 
@@ -291,14 +290,15 @@ Claude Code 는 프로젝트 hook 을 `.claude/settings.json` 의 `hooks` 키에
 | `PreToolUse` (Bash) | `gates.permission_gate` | 둘 다 | `curl … \| sh` 같은 위험 명령 차단 |
 | `PreToolUse` (Write/Edit) | `gates.worktree_gate` | Claude | 태스크 worktree 활성 중 base 체크아웃 편집 차단 |
 | `PreToolUse` (Write/Edit; Codex 는 `apply_patch`) | `gates.spec_gate` | 둘 다 | `spec.strictness: block` 에서 어떤 SPEC 도 언급하지 않는 테스트 파일 쓰기 차단 |
-| `PreCompact` | `hooks.flush_session`, `worktree span-end` | Claude | 컴팩션 전에 진행 상황 스냅샷 |
-| `Stop` | `worktree span-end` (Codex 는 `hooks.flush_session`) | 둘 다 | 세션 span 종료 (Codex 는 진행 상황 스냅샷) |
+| `PreCompact` | `worktree span-end` | Claude | 컴팩션 전에 stage span 종료 |
+| `Stop` | `worktree span-end` | Claude | 세션 span 종료 |
 
 ## 10. 메모리, intent, Second Brain
 
 - **메모리** (`.claude/memory/`): 오래 갈 프로젝트 사실의 위키와 발생 횟수가 붙은 실패 로그.
   stage 는 `hm memory_retrieve --topic …` 으로 읽고, wrapup 이 `hm memory_md` 로 쓴다.
-  `.claude/memory/session/<date>.md` 의 컴팩션 체크포인트로 중단된 stage 를 재개한다.
+  중단된 `/hm:execute` 는 SPEC 의 `pending_test` 플래그, PLAN, REVIEW 파일에서 재개한다
+  (세션 스냅샷은 두지 않는다).
 - **Intent** (`hm intent`): 열린 질문과 지표를 가진 목표. wrapup 이 태스크 증거로 관찰
   (`confirms` / `contradicts`)과 지표 측정을 기록한다.
 - **Second Brain** (선택, `second_brain.enabled`): 프로젝트들이 공유하는 Obsidian vault.

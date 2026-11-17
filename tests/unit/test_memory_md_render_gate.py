@@ -38,11 +38,11 @@ def test_memory_tiers_written_via_locked_cli(wrapup_text: str, subcommand: str) 
 def test_wrapup_no_longer_writes_session_tier(wrapup_text: str) -> None:
     """session-tier-slim ADR-001: the 5.5 session decision journal is removed.
 
-    The session tier is compaction-checkpoint-only now, written solely by the
-    `flush_session` hook — wrapup must NOT render an `append-session` call.
+    Nothing in a render writes the session tier any more (its last writer, the
+    `flush_session` hook, was retired) — wrapup must NOT render an `append-session` call.
     """
     assert "append-session" not in wrapup_text, (
-        "wrapup must not write the session tier (checkpoint-only — flush_session owns it)"
+        "wrapup must not write the session tier (no render writes it any more)"
     )
 
 

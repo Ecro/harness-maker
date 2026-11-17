@@ -90,7 +90,6 @@ def test_no_envless_post_commit_pop_in_any_producer(rendered: Path) -> None:
     targets = [
         rendered / "commands" / "hm" / "execute.md",
         rendered / "commands" / "hm" / "wrapup.md",
-        rendered / "skills" / "worktree-isolator" / "SKILL.md",
     ]
     for t in targets:
         if not t.exists():

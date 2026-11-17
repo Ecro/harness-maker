@@ -183,4 +183,6 @@ def test_codex_target_files_total_skill_count() -> None:
     # conditional-router, autoloop-driver and refdocs-search retired; second-opinion-gate
     # renders only with `second_opinion.models` (off in this default config). 6 base + the
     # world-model router + 4 stage + help.
-    assert len(out_paths) == 12, f"Expected 12 skill paths, got {len(out_paths)}"
+    #
+    # 12 → 11 (SPEC-opus55-stale-cuts): worktree-isolator retired.
+    assert len(out_paths) == 11, f"Expected 11 skill paths, got {len(out_paths)}"

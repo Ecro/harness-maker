@@ -85,7 +85,7 @@ def test_codex_hooks_json_passes_parser(rendered_harness_all_targets: Path) -> N
     # Codex must NOT emit PreCompact (ADR-004).
     assert "PreCompact" not in parsed["hooks"], (
         "Codex hooks template wrote PreCompact — Codex does not support it. "
-        "flush_session must be wired to Stop instead (ADR-004)."
+        "There is no Codex counterpart to wire (ADR-004)."
     )
 
 

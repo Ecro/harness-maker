@@ -20,7 +20,7 @@
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `worktree-isolator`, `world-model`
+> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > <!-- hm-doc-contract:mechanisms:start -->
@@ -287,7 +287,6 @@ have no Bash and no write tools.
 | `context-linter` | always | flags bloated CLAUDE.md, agent and skill files against the preset's limits |
 | `agent-quality-rubric` | always | grades an agent file Platinum to Bronze |
 | `ai-readiness-rubric` | always | scores how ready a repo is for AI work |
-| `worktree-isolator` | always | the worktree procedure the stages follow |
 | `second-opinion-gate` | `second_opinion.models` is non-empty | the round-state and acceptance procedure of the review loop |
 | `trajectory-monitor` | never (template kept) | — |
 
@@ -303,15 +302,15 @@ Claude Code reads project hooks only from the `hooks` key of `.claude/settings.j
 | `PreToolUse` (Bash) | `gates.permission_gate` | both | blocks dangerous commands such as `curl … \| sh` |
 | `PreToolUse` (Write/Edit) | `gates.worktree_gate` | Claude | blocks base-checkout edits while a task worktree is active |
 | `PreToolUse` (Write/Edit; Codex: `apply_patch`) | `gates.spec_gate` | both | at `spec.strictness: block`, blocks writing a test file that no SPEC references |
-| `PreCompact` | `hooks.flush_session`, `worktree span-end` | Claude | snapshots progress before compaction |
-| `Stop` | `worktree span-end` (Codex: `hooks.flush_session`) | both | closes the session's span (Codex: snapshots progress) |
+| `PreCompact` | `worktree span-end` | Claude | closes the stage span before compaction |
+| `Stop` | `worktree span-end` | Claude | closes the session's span |
 
 ## 10. Memory, intents and the Second Brain
 
 - **Memory** (`.claude/memory/`): a wiki of durable project facts and a failure log with
   occurrence counts. Stages read it with `hm memory_retrieve --topic …`; wrapup writes it with
-  `hm memory_md`. A compaction checkpoint in `.claude/memory/session/<date>.md` lets an
-  interrupted stage resume.
+  `hm memory_md`. An interrupted `/hm:execute` resumes from the SPEC's `pending_test` flags,
+  the PLAN and the REVIEW file; no session snapshot is kept.
 - **Intents** (`hm intent`): goals with open questions and metrics. Wrapup records observations
   (`confirms` / `contradicts`) and metric measurements from the task's evidence.
 - **Second Brain** (optional, `second_brain.enabled`): an Obsidian vault shared across projects.

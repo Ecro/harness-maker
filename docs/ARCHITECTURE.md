@@ -144,7 +144,7 @@ the final replacement.
         │                          conditional-router,        │
         │                          refdocs-search,            │
         │                          targeted-test-selection,   │
-        │                          worktree-isolator, ...     │
+        │                          context-linter, ...        │
         │  skills/<handle>/   ◀── Maker world-model router:   │
         │                          the only entrance to       │
         │                          intent-layer and           │

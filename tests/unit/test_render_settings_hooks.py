@@ -39,11 +39,11 @@ SETTINGS_TEMPLATES = ("settings/Side.json.j2", "settings/Production.json.j2")
 
 # ADR-006 Stage 1 — non-blocking (Phase 1).
 # 0.64.0 (SPEC-hm-overhaul-p1 IRR-005) retired telemetry, post_write_reminder and
-# autopilot_autoarm through `_HARNESS_RETIRED_HOOK_INVOCATIONS`.
+# autopilot_autoarm through `_HARNESS_RETIRED_HOOK_INVOCATIONS`; SPEC-opus55-stale-cuts
+# retired flush_session the same way.
 STAGE1_MODULES = frozenset(
     {
         "harness_maker.hooks.sessionid_envfile",
-        "harness_maker.hooks.flush_session",
     }
 )
 
@@ -617,7 +617,7 @@ def test_render_settings_merges_hooks_and_preserves_foreign_keys(tmp_path: Path)
     assert data["enabledPlugins"] == {"harness-maker@local": True}, "Claude-owned key clobbered"
     cmds = _commands(data)
     assert "/usr/local/bin/mine.sh" in cmds, "user hook wiped by re-render"
-    assert any("harness_maker.hooks.flush_session" in c for c in cmds), (
+    assert any("harness_maker.hooks.sessionid_envfile" in c for c in cmds), (
         "template hook not merged in"
     )
     assert isinstance(data["permissions"]["deny"], list), "permissions regressed"
@@ -770,7 +770,9 @@ _STALE = (
 _FRESH = (
     'uv run --no-project --with "$HOME/.cache/hm/0.51.3" python -m harness_maker.gates.spec_gate'
 )
-_FLUSH = "uv run --no-project --with /p python -m harness_maker.hooks.flush_session"
+# A second live harness command beside span-end. It was flush_session until that module was
+# retired; a retired invocation is dropped by the merge, which is not what these tests probe.
+_ENVF = "uv run --no-project --with /p python -m harness_maker.hooks.sessionid_envfile"
 _SPAN = "uv run --no-project --with /p python -m harness_maker.worktree span-end"
 
 
@@ -804,17 +806,18 @@ def test_no_stale_ref_survives_anywhere_in_the_merged_output() -> None:
 def test_scoping_one_matcher_leaves_the_sibling_entry_intact() -> None:
     """ADR-008 branch 1, against the real PreCompact shape.
 
-    `Production.json.j2` ships flush_session + span-end under BOTH `auto` and `manual`.
+    `Production.json.j2` ships span-end under BOTH `auto` and `manual` (two commands each
+    until flush_session was retired; the rule is the same for any pair).
     Event-global suppression emptied `manual`, which was then not emitted at all.
     """
-    existing = {"hooks": {"PreCompact": [_nested("auto", _FLUSH, _USER)]}}
+    existing = {"hooks": {"PreCompact": [_nested("auto", _ENVF, _USER)]}}
     new = {
-        "hooks": {"PreCompact": [_nested("auto", _FLUSH, _SPAN), _nested("manual", _FLUSH, _SPAN)]}
+        "hooks": {"PreCompact": [_nested("auto", _ENVF, _SPAN), _nested("manual", _ENVF, _SPAN)]}
     }
     merged = _merge_hooks_json(existing, new)
     manual = [e for e in merged["hooks"]["PreCompact"] if e["matcher"] == "manual"]
     assert manual, "the untouched `manual` entry was emptied and dropped"
-    assert _cmds(manual[0]) == [_FLUSH, _SPAN], (
+    assert _cmds(manual[0]) == [_ENVF, _SPAN], (
         f"`manual` lost a command the user never scoped; got {_cmds(manual[0])}"
     )
     auto_tmpl = [
@@ -898,9 +901,9 @@ def test_disjoint_matchers_are_not_warned_about(capsys: pytest.CaptureFixture[st
     match the same tool, so nothing fires twice and there is nothing to say. A warning
     keyed on 'was it suppressed?' rather than 'can both fire?' would cry wolf here — and
     a diagnostic that cries wolf is one the next reader learns to ignore."""
-    existing = {"hooks": {"PreCompact": [_nested("Custom", _FLUSH, _USER)]}}
+    existing = {"hooks": {"PreCompact": [_nested("Custom", _ENVF, _USER)]}}
     new = {
-        "hooks": {"PreCompact": [_nested("auto", _FLUSH, _SPAN), _nested("manual", _FLUSH, _SPAN)]}
+        "hooks": {"PreCompact": [_nested("auto", _ENVF, _SPAN), _nested("manual", _ENVF, _SPAN)]}
     }
     _merge_hooks_json(existing, new)
     assert capsys.readouterr().err == "", "warned about matchers that cannot both fire"
@@ -913,9 +916,9 @@ def test_the_warning_does_not_fire_when_the_command_was_suppressed_somewhere(
     fall-through, so it announced 'not suppressing' for a command branch 1 had already
     suppressed on another entry of the same event — a diagnostic that lies is worse than
     none, because the next reader trusts it."""
-    existing = {"hooks": {"PreCompact": [_nested("auto", _FLUSH, _USER)]}}
+    existing = {"hooks": {"PreCompact": [_nested("auto", _ENVF, _USER)]}}
     new = {
-        "hooks": {"PreCompact": [_nested("auto", _FLUSH, _SPAN), _nested("manual", _FLUSH, _SPAN)]}
+        "hooks": {"PreCompact": [_nested("auto", _ENVF, _SPAN), _nested("manual", _ENVF, _SPAN)]}
     }
     _merge_hooks_json(existing, new)
     assert "not suppressing" not in capsys.readouterr().err
@@ -988,3 +991,17 @@ def test_the_refresh_preserves_a_user_prefix_and_trailing_arguments() -> None:
     assert '--with "/old"' not in gate, "the stale ref survived"
     assert gate.startswith(_PREFIX), f"the user's env prefix was discarded; got {gate}"
     assert gate.endswith("--exempt projects/"), f"the user's argument was discarded; got {gate}"
+
+
+def test_an_event_emptied_by_retirement_is_not_left_behind() -> None:
+    """REVIEW-opus55-stale-cuts F-002. Codex `Stop` held only flush_session; once that is a
+    retired invocation the merge used to leave `"Stop": []` in a pristine project for good."""
+    retired = "uv run --no-project --with /p python -m harness_maker.hooks.flush_session"
+    existing = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": retired}]}]}}
+    merged = _merge_hooks_json(existing, {"hooks": {}})
+    assert "Stop" not in merged["hooks"]
+
+
+def test_an_empty_event_the_user_wrote_stays() -> None:
+    merged = _merge_hooks_json({"hooks": {"Stop": []}}, {"hooks": {}})
+    assert merged["hooks"] == {"Stop": []}

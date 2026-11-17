@@ -1,6 +1,6 @@
 {#- Codex hooks schema: PascalCase event keys (same as Claude Code) + PermissionRequest
-    (Codex-exclusive, ADR-006) + flush_session wired to Stop (no PreCompact, ADR-004) +
-    worktree_gate omitted (kernel sandbox handles isolation, ADR-005).
+    (Codex-exclusive, ADR-006) + no Stop or PreCompact hook (the session-snapshot hook was
+    retired by SPEC-opus55-stale-cuts) + worktree_gate omitted (kernel sandbox handles isolation, ADR-005).
     apply_patch is Codex's file-edit tool; use in matchers alongside Write|Edit.
     Codex's parser is strict: the only accepted top-level keys are `description`
     and `hooks`. Anything else (a `preset` provenance key, say) makes Codex reject
@@ -35,18 +35,6 @@
         "hooks": [
           {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.sessionstart_drift"},
           {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.sessionid_envfile"}
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session",
-            "timeout": 30,
-            "statusMessage": "Snapshotting session progress..."
-          }
         ]
       }
     ]

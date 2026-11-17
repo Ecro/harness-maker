@@ -70,7 +70,7 @@ def test_add_skill_creates_file(tmp_path: Path) -> None:
     assert rendered.name == "SKILL.md"
 
 
-@pytest.mark.parametrize("name", ["worktree-isolator", "context-linter"])
+@pytest.mark.parametrize("name", ["ai-readiness-rubric", "context-linter"])
 def test_add_typed_only_skill_keeps_the_flag(tmp_path: Path, name: str) -> None:
     """SPEC-hm-light-lane-s2 moved the flag out of the templates; `add` must still set it."""
     target_dotclaude = _build_side_fixture(tmp_path)

@@ -1,18 +1,8 @@
 # CLAUDE.md — {{ preset }} preset
 
-> Phase 3 stub. Phase 6에서 locale별 + preset별로 본문이 채워집니다.
-
 ## 워크플로우
 
 stage 는 4개입니다: `/hm:research` (선택), `/hm:spec`, `/hm:execute`, `/hm:wrapup`. 각 stage 는 끝나면 멈추고, 다음 stage 는 직접 입력하거나 {{ (config.world_model or {}).get('name', 'Maker') }} 가 Advance 규칙으로 이어 들어갑니다. 융합 워크플로우 명령은 없습니다. <!-- @hm:axis-removed -->
-
-## 캐싱
-
-`{{ config.caching }}` — Phase 6에서 prompt cache 전략 문서화.
-
-## 메모리
-
-per-repo memory 활성화 여부는 `harness.yaml` 참조.
 
 ## 출력 언어
 

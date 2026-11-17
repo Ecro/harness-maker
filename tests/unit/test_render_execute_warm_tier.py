@@ -7,9 +7,9 @@ recognise an instance — at the one stage where instances are created.
 The negative half is what makes this non-vacuous. A template that adds the `memory_retrieve`
 call while keeping the skim would pass a presence-only check and ship the same problem.
 
-A.4 (justified pass): `test_execute_keeps_the_compaction_checkpoint_read` passes on the
-unmodified template by design — a preservation guard that goes red if the edit removes the
-hot-tier read. Its RED positive sibling is `test_execute_warm_tier_uses_memory_retrieve`.
+The hot-tier preservation guard that sat here is now
+`test_execute_has_no_compaction_checkpoint_read`: SPEC-opus55-stale-cuts retired the
+checkpoint's writer, and the read left with it.
 """
 
 from __future__ import annotations
@@ -41,7 +41,8 @@ def test_execute_warm_tier_uses_memory_retrieve(tmp_path: Path) -> None:
     assert 'rg -F "[fail:"' not in body
 
 
-def test_execute_keeps_the_compaction_checkpoint_read(tmp_path: Path) -> None:
-    """Regression guard: the hot-tier checkpoint read must survive this edit."""
+def test_execute_has_no_compaction_checkpoint_read(tmp_path: Path) -> None:
+    """SPEC-opus55-stale-cuts retired the hook that wrote the checkpoint; the warm tier stays."""
     body = _render_execute(tmp_path)
-    assert "checkpoint:compaction" in body
+    assert "checkpoint:compaction" not in body
+    assert "hm memory_retrieve" in body

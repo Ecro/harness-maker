@@ -6,7 +6,8 @@
 
     ADR-006 staging (PLAN-permission-deny-and-hooks-wiring):
       Stage 1 (Phase 1) — non-blocking: telemetry, post_write_reminder,
-        sessionid_envfile, autopilot_autoarm, flush_session.
+        sessionid_envfile, autopilot_autoarm, flush_session (all but sessionid_envfile
+        retired since; this list is the rollout's history).
       Stage 2 (Phase 2) — control-flow, **Stop event only**: loop_gate (retired by
         SPEC-retired-wiring with /hm:loop; the notes below are its history), passing
         `--mode stop-hook` (the module dispatches on it). loop_gate on Stop is what
@@ -93,14 +94,12 @@
       {
         "matcher": "auto",
         "hooks": [
-          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting session progress..."},
           {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
         ]
       },
       {
         "matcher": "manual",
         "hooks": [
-          {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting session progress..."},
           {"type": "command", "command": "uv run --no-project --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
         ]
       }

@@ -619,3 +619,9 @@ threshold (count: 2).
 **Status (2026-10-05):** fix is in source as of review-base-and-superseded-gaps (resolve_review_base accepts HEAD on a non-base branch, with regression tests); only a plugin release is pending. The 0.62.0 plugin still stored HEAD~1 at that task's own round 1.
 **Proposed mechanism:** rule update (fix `hm freeze resolve-base` to anchor on HEAD/merge-base when the task branch has no own commits) plus a regression test
 **Rationale:** three tasks in three days had `review_base` set to HEAD~1, pulling the previously landed task into the review span until corrected by hand; a code fix removes the manual `git update-ref` step.
+
+## Proposal: a removal claim carries its render-and-grep evidence (2026-11-17)
+
+**Triggered by:** [fail:process] adr-premise-unverified-vs-source (count: 3 as of 2026-11-17; recurred in opus55-stale-cuts research, where 2 of 5 proposed cuts were withdrawn after the DRI's decision)
+**Proposed mechanism:** rule update (research and spec stage text) — a claim of the form "X costs Y" or "nothing reads X" that backs a removal must cite the command that showed it on a rendered tree (`make` into a temp dir, then grep the render and grep the consumers), before it goes on a decision card
+**Rationale:** twice a locked decision and once a DRI card rested on a reading of source or template text that the render or a consumer contradicted; the check is one render and two greps

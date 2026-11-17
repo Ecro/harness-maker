@@ -942,6 +942,9 @@ _HARNESS_RETIRED_HOOK_INVOCATIONS: frozenset[str] = frozenset(
         "<HM>:harness_maker.hooks.autopilot_autoarm",
         # SPEC-retired-wiring: the retired loop's and autopilot's Stop guard.
         "<HM>:harness_maker.hooks.loop_gate --mode stop-hook",
+        # SPEC-opus55-stale-cuts: the session-snapshot hook (Claude PreCompact, Codex Stop).
+        # Its `python -m` entry point is an exit-0 stub for kept user copies.
+        "<HM>:harness_maker.hooks.flush_session",
     }
 )
 
@@ -1527,7 +1530,13 @@ def _merge_hooks_json(
                     rebuilt.extend(_residual_entries(e, res))
                 emitted_template = rebuilt
 
-        merged_hooks[event] = emitted_template + user_entries
+        merged = emitted_template + user_entries
+        if not merged and existing_entries and event not in new_hooks:
+            # Every existing entry was dropped above (a retired harness hook, as Codex `Stop`
+            # was once flush_session left, or a malformed one). The user never wrote an empty
+            # event, so the key goes too.
+            continue
+        merged_hooks[event] = merged
 
     # Top-level: template wins on overlap; existing survives where template
     # is silent. ``hooks`` is overwritten with the merged dict explicitly.

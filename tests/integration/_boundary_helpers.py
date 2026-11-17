@@ -89,8 +89,8 @@ _CLAUDE_EVENTS: frozenset[str] = frozenset(
 # Codex's documented PascalCase event keys (ADR-004/006 in
 # PLAN-codex-target-support). Shares Claude's PascalCase + nested-hooks
 # shape but: adds ``PermissionRequest`` (Codex-exclusive), and Codex does
-# NOT support ``PreCompact`` (Stop is used instead — flush_session is
-# wired to Stop in the template).
+# NOT support ``PreCompact`` (the template ships no hook for it or for Stop
+# since flush_session was retired).
 _CODEX_EVENTS: frozenset[str] = frozenset(
     {
         "PreToolUse",
@@ -186,8 +186,7 @@ def parse_codex_hooks_json(text: str) -> dict[str, Any]:
     for event_name, entries in hooks.items():
         if event_name == "PreCompact":
             raise BoundaryParseError(
-                "event 'PreCompact' is not supported by Codex "
-                "(use 'Stop' instead — flush_session wires to Stop, ADR-004)"
+                "event 'PreCompact' is not supported by Codex (Codex has no such event, ADR-004)"
             )
         if event_name not in _CODEX_EVENTS:
             raise BoundaryParseError(

@@ -1,0 +1,221 @@
+schema_version: 3
+spec_slug: opus55-stale-cuts
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: Template and wiring removal; every AC is a golden or
+  differential check on rendered bytes, so mutation testing adds little.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: CLAUDE.md has no stub lines and keeps its live sections
+  type: mechanical
+  test_ids:
+  - tests/render/test_opus55_stale_cuts.py::test_ac_001_claude_md_has_no_stub_lines[en-Side]
+  - tests/render/test_opus55_stale_cuts.py::test_ac_001_claude_md_has_no_stub_lines[en-Production]
+  - tests/render/test_opus55_stale_cuts.py::test_ac_001_claude_md_has_no_stub_lines[ko-Side]
+  - tests/render/test_opus55_stale_cuts.py::test_ac_001_claude_md_has_no_stub_lines[ko-Production]
+  executable_predicate: all(not any(s in md for s in STUBS) and all(k in md for k
+    in KEPT) for md in claude_md_renders())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The removed and kept strings are typed from the templates at main
+    735db8fd and listed in the SPEC before any template changed; the render is the
+    product, not the test's model of it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: A fresh render is the 0.65.5 path set minus the four retired paths
+  type: mechanical
+  test_ids:
+  - tests/render/test_opus55_stale_cuts.py::test_ac_002_fresh_render_is_the_0655_set_minus_the_retired_paths[Side]
+  - tests/render/test_opus55_stale_cuts.py::test_ac_002_fresh_render_is_the_0655_set_minus_the_retired_paths[Production]
+  executable_predicate: all(rendered_paths(p) == set(PATHS_0655[p]) - RETIRED_PATHS
+    for p in ('Side', 'Production'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference path list was produced by running the unchanged 735db8fd
+    source through `make` and saved to tests/fixtures/opus55_stale_cuts/render_paths_0655.json
+    before any template changed; the four paths are named in the SPEC.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: worktree-isolator is a retired name
+  type: mechanical
+  test_ids:
+  - tests/render/test_opus55_stale_cuts.py::test_ac_003_worktree_isolator_is_a_retired_name
+  executable_predicate: N in RETIRED_SKILLS and N not in synthesize._ALL_SKILLS and
+    N not in interview._ALL_SKILLS and not template_dir(N).exists() and inert_warning_for(N)
+    and all(r in synthesize._ALL_SKILLS and r in interview._ALL_SKILLS for r in RUBRIC_SKILLS)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The name is fixed in SPEC IRR-001; the inert-key warning is the
+    existing behaviour for every name already in RETIRED_SKILLS, so the check is against
+    a rule that predates this change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: No session-snapshot hook and no hot tier in a fresh render
+  type: mechanical
+  test_ids:
+  - tests/render/test_opus55_stale_cuts.py::test_ac_004_no_session_hook_and_no_hot_tier[Side]
+  - tests/render/test_opus55_stale_cuts.py::test_ac_004_no_session_hook_and_no_hot_tier[Production]
+  executable_predicate: all('flush_session' not in c for c in hook_commands(p)) and
+    precompact_runs_span_end(p) and no_empty_event(p) and all('Hot tier' not in t
+    and 'memory/session' not in t and 'hm memory_retrieve' in t for t in execute_texts(p))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The strings are typed from the templates at main 735db8fd and listed
+    in the SPEC before any template changed; the hook files and the execute command
+    are read from a real `make` render.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: A re-render over 0.65.5 retires pristine copies and keeps the user's own
+  type: mechanical
+  test_ids:
+  - tests/render/test_opus55_stale_cuts.py::test_ac_005_rerender_over_0655_retires_pristine_copies[Side]
+  - tests/render/test_opus55_stale_cuts.py::test_ac_005_rerender_over_0655_retires_pristine_copies[Production]
+  - tests/render/test_opus55_stale_cuts.py::test_ac_005_a_user_command_inside_our_group_survives
+  - tests/render/test_opus55_stale_cuts.py::test_ac_005_an_edited_retired_skill_is_kept
+  - tests/render/test_opus55_stale_cuts.py::test_ac_005_a_pristine_rerender_leaves_no_empty_event[Side]
+  - tests/render/test_opus55_stale_cuts.py::test_ac_005_a_pristine_rerender_leaves_no_empty_event[Production]
+  - tests/render/test_opus55_stale_cuts.py::test_ac_005_an_edited_codex_copy_keeps_its_invocation_policy
+  executable_predicate: paths(rerender(ref_0655)) == paths(fresh_head) | {SESSION_README}
+    and no_flush(rerender(ref_0655)) and user_hooks_kept(rerender(ref_0655)) and user_cmd_in_our_group_kept(rerender(extend(ref_0655)))
+    and hook_commands(rerender(pristine(ref_0655))) == hook_commands(fresh_head) and
+    edited_skill_kept(rerender(edit(ref_0655))) and codex_policy_kept(rerender(edit_codex(ref_0655)))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The starting tree is rendered by the 735db8fd source extracted
+    with git archive, not by HEAD; the expected end state is a fresh HEAD render,
+    an independent path through the renderer (no prior manifest, no sweep).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: The old hook command is a harmless stub
+  type: mechanical
+  test_ids:
+  - tests/render/test_opus55_stale_cuts.py::test_ac_006_the_old_hook_command_is_a_stub
+  - tests/render/test_opus55_stale_cuts.py::test_ac_006_the_stub_survives_a_closed_stdin
+  executable_predicate: run_flush(project).returncode == 0 and run_flush(project).stdout
+    == '' and tree_bytes(project) == before and '<HM>:harness_maker.hooks.flush_session'
+    in render._HARNESS_RETIRED_HOOK_INVOCATIONS
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Exit 0, empty stdout and an unchanged tree are the stub contract
+    0.64.0 set for telemetry and autopilot_autoarm (render.py comment on _HARNESS_RETIRED_HOOK_INVOCATIONS),
+    stated in the SPEC before the module changed.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: The worktree-isolator skill, memory/session/README.md and the flush_session
+    hook wiring stop shipping; a re-render deletes pristine copies of the skill and
+    removes the shipped hook entries (an existing session README is left in place);
+    python -m harness_maker.hooks.flush_session becomes an exit-0 stub.
+  category: public API/CLI contract
+  rationale: A user who typed the skill name or relied on the session checkpoint loses
+    it on upgrade. The skill describes a retired procedure, and the checkpoint carried
+    no state since autoloop was retired.
+  source: spec
+approval:
+  kind: human
+  content_hash: 7c2360c8a600edf47216b4cc8381b5f84e5f3b948a9dea38801dccb48a2d9d7a
+  approved_by: Claude
+  approved_at: '2026-11-17T16:14:23Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 6a1c1d208e4e521bea8681b3f2b4570beac04834a0a3da139c638b40b7af1175
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    mutation_threshold_rationale: 88bb232ca32ca05f6324a00721d19fcb34045472dd314cedc92d274ca42cfb56
+    irreversible_decisions: 08f158e6855686fb47b1ff556407182403f00f23d2b27911e624df3be71e69d0
+    AC-001: 74e9e7c8ee23025ac00cd3cae56f2cc97504c884c6a90b28ca700358c967783a
+    AC-002: b159b7ef97af9734747f2cbd4a7ef414e733aa3d293f2dd14a626f25537a13d9
+    AC-003: ec72ed3c19f9dc0628dc3277f1925893ad832fd9739ee8bc4c313755d0c0c8da
+    AC-004: 19d67d09550c113ee2086a8f52de1b5578ba5fb9afab504f84d7b5ab08764c14
+    AC-005: e5cb641acd1aca4328cc54d5c67f46087bbbb6dbc6a7778c756405c94db94b63
+    AC-006: fcf8942a341acd2abb2b6c1fec83db9cafe27034a9da1146b07469461bdf24c7
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923

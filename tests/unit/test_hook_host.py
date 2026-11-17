@@ -216,7 +216,7 @@ def _tree(root: Path) -> set[str]:
 def test_settings_hooks_cover_the_modules_we_expect() -> None:
     modules = {c[0] for c in SETTINGS_HOOKS}
     assert "harness_maker.telemetry" not in modules  # retired in 0.64.0 (IRR-005)
-    assert "harness_maker.hooks.flush_session" in modules
+    assert "harness_maker.hooks.flush_session" not in modules  # SPEC-opus55-stale-cuts
     assert "harness_maker.hooks.loop_gate" not in modules  # retired (SPEC-retired-wiring)
     assert "harness_maker.worktree" in modules
 
@@ -232,15 +232,18 @@ def test_every_settings_hook_is_silent_as_the_cursor_duplicate(
     assert _tree(root) == before
 
 
-def test_flush_session_control_writes_as_the_cursor_copy(tmp_path: Path) -> None:
-    """Same payload, same project — only the host marker differs, and now a row lands.
+def test_permission_gate_control_answers_as_the_cursor_copy(tmp_path: Path) -> None:
+    """Same payload, same project — only the host marker differs, and now the gate answers.
 
-    The control was `telemetry` until its `python -m` entry became an exit-0 stub (0.64.0).
+    The control was `telemetry` until 0.64.0 and `flush_session` until SPEC-opus55-stale-cuts
+    made each an exit-0 stub. No remaining settings hook writes to the tree on this payload,
+    so the control reads stdout: a `PermissionRequest` always gets a decision line.
     """
     root = _marked_project(tmp_path, modules=SETTINGS_MODULES)
-    before = _tree(root)
-    _run(["harness_maker.hooks.flush_session"], root, _cursor_payload(root), HM_HOOK_HOST="cursor")
-    assert _tree(root) != before
+    payload = {**_cursor_payload(root), "hook_event_name": "PermissionRequest"}
+    gate = ["harness_maker.gates.permission_gate"]
+    assert _run(gate, root, payload) == ""
+    assert '"behavior"' in _run(gate, root, payload, HM_HOOK_HOST="cursor")
 
 
 @pytest.mark.parametrize("module", sorted({c[0] for c in SETTINGS_HOOKS}))

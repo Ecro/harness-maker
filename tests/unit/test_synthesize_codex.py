@@ -84,7 +84,8 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     # +1 (2026-10-02, SPEC-world-model-name): the world-model router at `.agents/skills/<handle>/`.
     # 0.64.0 (SPEC-hm-overhaul-p1): 6 base skills (six retired; second-opinion-gate only with
     # `second_opinion.models`), 4 stage skills, no loop skills; + help + the world-model router.
-    expected = 6 + 4 + 1 + 1
+    # SPEC-opus55-stale-cuts: 6 → 5 base skills (worktree-isolator retired).
+    expected = 5 + 4 + 1 + 1
     assert len(skill_paths) == expected, (
         f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
     )

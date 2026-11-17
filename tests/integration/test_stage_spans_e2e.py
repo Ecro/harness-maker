@@ -235,7 +235,8 @@ def test_span_end_is_wired_into_settings_json_not_the_dead_hooks_json(
     for entry in precompact:
         cmds = [h["command"] for h in entry["hooks"]]
         assert any("worktree span-end" in c for c in cmds), (entry.get("matcher"), cmds)
-        assert any("flush_session" in c for c in cmds), (entry.get("matcher"), cmds)
+        # SPEC-opus55-stale-cuts retired the snapshot hook that used to run beside it.
+        assert not any("flush_session" in c for c in cmds), (entry.get("matcher"), cmds)
 
 
 def test_span_end_closes_the_span_when_only_stdin_carries_the_session_id(
