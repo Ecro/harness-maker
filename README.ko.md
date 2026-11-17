@@ -15,7 +15,7 @@
 >
 > *Automate the work. Elevate the engineer.*
 
-> **Version**: 0.65.4
+> **Version**: 0.65.5
 >
 > 현재 릴리스 계약(소스에서 자동 검증):
 >
