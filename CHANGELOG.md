@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.65.6] - 2026-11-18
+
+Cleanup: three pieces of rendered surface that no longer did anything are gone. Nothing in the
+stage flow, the gates, the reviewer or the worktree lifecycle changes.
+
 ### Removed
 
 - **Stale surface found by the Opus 5.5 review** (SPEC-opus55-stale-cuts). A fresh render has 4

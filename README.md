@@ -15,7 +15,7 @@
 >
 > *Automate the work. Elevate the engineer.*
 
-> **Version**: 0.65.5
+> **Version**: 0.65.6
 >
 > Current release contract (validated from source):
 >
