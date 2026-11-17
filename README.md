@@ -28,7 +28,7 @@
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `worktree-isolator`, `world-model`
+> **Current skills:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > `world-model` renders as Maker (`.claude/skills/<handle>/`). `intent-layer` and `project-knowledge` are typed-only — not model-invocable — and are otherwise reached through Maker ([below](#maker--the-world-models-front-door)).
@@ -205,7 +205,6 @@ Hand-tune `agents/code-reviewer.md`. Add a custom skill. Edit a CLAUDE.md sectio
 **B. The harness learns your project.**
 - `.claude/memory/wiki.md` — patterns, conventions, gotchas. Each `/hm:wrapup` appends new entries.
 - `.claude/memory/failures.md` — recurring mistakes, deduplicated by slug + count.
-- `.claude/memory/session/<date>.md` — compaction checkpoints for resuming an interrupted session (written by the `flush_session` hook, not wrapup).
 - When any failure slug reaches **count ≥ 3**, wrapup writes a proposal to `pending-proposals.md` — a new skill, rule, or hook that would have prevented the recurrence. The user reviews and decides whether to ingest.
 
 **C. Defaults adapt to your overrides.**
@@ -442,7 +441,7 @@ Grouped by what they do for your project, not by component.
 ### 🌱 Self-evolving — *grows with your project*
 
 - **Block-merge preservation.** Hand-tune any agent, skill, CLAUDE.md section. Survives `--update` because content hashes per file plus `@hm:user:*` markers separate your edits from template-owned regions. `@hm:harness:*` inverted markers do the opposite for foreign config absorption.
-- **Accumulating memory.** `wiki.md` (patterns) · `failures.md` (recurring mistakes deduplicated by slug) are written automatically by each `/hm:wrapup` and surfaced by later stages. `session/<date>.md` holds compaction checkpoints only — written by the `flush_session` hook for interrupted-session resume.
+- **Accumulating memory.** `wiki.md` (patterns) · `failures.md` (recurring mistakes deduplicated by slug) are written automatically by each `/hm:wrapup` and surfaced by later stages.
 - **Code-absent project facts.** The `project-knowledge` skill captures things no diff reveals — external-system behavior, ops quirks, corrected assumptions — as a `[wiki:fact]` entry, distinct from the dev-only wiki categories above. It reuses only a `[wiki:fact]` slug (never overwrites a dev pattern/gotcha) and never records an inferred fact. It is typed-only: reach it through Maker ("remember that …") or by typing `/project-knowledge`. A ≤300-char pointer in `CLAUDE.md`/`AGENTS.md` names the Maker invocation and the procedure file, so a project fact lands in the shared wiki, not host auto-memory.
 - **Self-improving failure proposals.** When a `[fail:*]` slug recurs 3× across sessions, wrapup writes a proposal to `pending-proposals.md` — a new skill, rule, or hook that would have prevented the recurrence. You review and decide whether to ingest.
 - **ADR system as binding execute constraints.** The SPEC's `irreversible_decisions` and the ADRs `/hm:execute` Step 0 records while authoring the PLAN are hard constraints on the implementation. Conflicts surface as blockers, never silently proceed. Future sessions don't re-litigate settled decisions.
@@ -458,7 +457,7 @@ Grouped by what they do for your project, not by component.
 ### 🔁 Workflow primitives — *the rest of the toolchain*
 
 - **Deep interview before every implementation.** `/hm:spec` runs a 6-category interview (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification) scored for completeness. The decisions that cannot be cheaply undone are locked in that same interview as `irreversible_decisions`; the *how* — phases, ordering, risk — is authored by `/hm:execute` Step 0 with no human gate.
-- **3-tier context loading + compaction recovery.** Hot tier (today's session) · Warm tier (wiki/failures entries matched to the stage topic — lexical hits first, up to 3 high-recurrence failures only in slots left over, one 8 KB cap for the whole block) · Cold tier (git log / PLANs on demand). `PreCompact` hook flushes session before context compaction; next turn detects the marker and resumes from the last in-progress phase.
+- **Topic-matched context loading.** Stages load the wiki/failures entries matched to the stage topic (`hm memory_retrieve`: lexical hits first, up to 3 high-recurrence failures only in slots left over, one 8 KB cap for the whole block) and read git log / PLANs on demand. An interrupted `/hm:execute` resumes from the SPEC's `pending_test` flags, the PLAN and the REVIEW file; no session snapshot is kept.
 - **Cross-process memory safety.** `.claude/memory/` writers serialise via re-entrant POSIX flock. Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤PIPE_BUF) so concurrent Claude Code + Codex sessions cannot interleave JSONL lines.
 - **Intent layer — purpose, metrics and accountable work.** `.claude/intent.yaml` holds purpose, metrics, open questions and optional owner/dri/team roles; `intent/<ID>.md` records each intent across one or more SPECs. `hm intent status` combines gaps, revisits and withdrawal; writes remain answer-gated. Reached through Maker or by typing `/intent-layer`. Owners warnings are advisory, and `hm intent migrate` preserves legacy approvals and history. `hm world` remains a deprecated alias for one release.
 

@@ -60,7 +60,7 @@ A "skill" is a Jinja2 template under `templates/skills/<name>/SKILL.md.j2` that 
 
 Steps:
 
-1. **Pick a name.** Lowercase, hyphenated, descriptive (e.g. `worktree-isolator`, not `wkt`).
+1. **Pick a name.** Lowercase, hyphenated, descriptive (e.g. `context-linter`, not `ctxl`).
 2. **Create the template.**
 
    ```

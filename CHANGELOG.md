@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **Stale surface found by the Opus 5.5 review** (SPEC-opus55-stale-cuts). A fresh render has 4
+  fewer files per preset (2 with `claude-code` only). Nothing in the stage flow, the gates, the reviewer or the worktree
+  lifecycle changes.
+  - **`worktree-isolator` skill.** It described the retired `worktree create execute` procedure
+    with `execute-<uuid>` directories; the stages run `hm worktree task-preflight <slug>` on
+    `hm/<slug>`. A re-render deletes a pristine copy and keeps an edited one. A `harness.yaml`
+    that still lists it gets the inert-key warning.
+  - **`flush_session` hook (Claude `PreCompact`, Codex `Stop`) and `/hm:execute`'s hot tier.** The
+    hook snapshotted `.claude-progress.json`, which nothing has written since autoloop was
+    retired. `/hm:execute` resumes from the SPEC's `pending_test` flags, the PLAN and the REVIEW
+    file. A re-render removes the shipped hook entries and keeps your own hooks, also one you
+    added inside our group. `python -m harness_maker.hooks.flush_session` stays as an exit-0 stub
+    for a `settings.json` that was never re-rendered. `.claude/memory/session/README.md` is no
+    longer rendered; an existing copy and existing session files are left in place.
+  - **CLAUDE.md stub lines.** The "Phase 3 stub" quote and the one-line `## Caching`,
+    `## Memory`, `## Reviewers` and `## Worktree` sections (and their Korean forms) are gone from
+    the rendered `CLAUDE.md`.
+
 ## [0.65.5] - 2026-11-17
 
 Two fixes: Maker loads again in Claude Code's default permission mode, and the cost numbers use the

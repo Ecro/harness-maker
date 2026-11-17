@@ -6,7 +6,8 @@ RED before Phase 5 implementation:
 - _codex_target_files() does not yet include .codex/hooks.json
 
 GREEN after Phase 5:
-- hooks.json.j2 renders valid JSON with PermissionRequest + Stop(flush_session)
+- hooks.json.j2 renders valid JSON with PermissionRequest (Stop(flush_session) until
+  SPEC-opus55-stale-cuts retired it)
 - permission_gate handles PermissionRequest stdin → Codex hookSpecificOutput
 - PreToolUse path unchanged (regression guard)
 - _codex_target_files() includes .codex/hooks.json
@@ -65,8 +66,9 @@ def test_codex_hooks_json_has_permission_request_event() -> None:
     )
 
 
-def test_codex_hooks_json_has_stop_with_flush_session() -> None:
-    """Stop event must include flush_session (ADR-004: maps PreCompact → Stop for Codex)."""
+def test_codex_hooks_json_has_no_stop_event() -> None:
+    """Stop held loop_gate (retired, SPEC-retired-wiring) and flush_session
+    (retired, SPEC-opus55-stale-cuts); the key leaves rather than render an empty list."""
     env = _make_env()
     tpl = env.get_template("codex/hooks.json.j2")
     rendered = tpl.render(
@@ -74,30 +76,11 @@ def test_codex_hooks_json_has_stop_with_flush_session() -> None:
         preset="Production",
         harness_maker_src_path=_HARNESS_MAKER_PATH,
     )
-    parsed = json.loads(rendered)
-    stop_hooks = parsed.get("hooks", {}).get("Stop", [])
-    stop_commands = " ".join(
-        h.get("command", "") for entry in stop_hooks for h in entry.get("hooks", [])
-    )
-    assert "flush_session" in stop_commands, "Stop event must include flush_session (ADR-004)"
-
-
-def test_codex_hooks_json_stop_has_no_loop_gate() -> None:
-    """/hm:loop left in 0.64.0; its Codex Stop gate is retired (SPEC-retired-wiring AC-001)."""
-    env = _make_env()
-    tpl = env.get_template("codex/hooks.json.j2")
-    rendered = tpl.render(
-        config=_BASE_CONFIG,
-        preset="Production",
-        harness_maker_src_path=_HARNESS_MAKER_PATH,
-    )
-    parsed = json.loads(rendered)
-    stop_hooks = parsed.get("hooks", {}).get("Stop", [])
-    stop_commands = " ".join(
-        h.get("command", "") for entry in stop_hooks for h in entry.get("hooks", [])
-    )
-    assert "loop_gate" not in stop_commands
-    assert "harness_maker.hooks.flush_session" in stop_commands
+    hooks = json.loads(rendered).get("hooks", {})
+    assert "Stop" not in hooks
+    assert all(hooks.values()), "an event with no hook group"
+    assert "loop_gate" not in rendered
+    assert "flush_session" not in rendered
 
 
 def test_codex_hooks_json_no_worktree_gate() -> None:

@@ -90,7 +90,8 @@ def test_ac_001_rerender_retires_the_old_codex_stop_group(tmp_path: Path) -> Non
     stop = json.loads(path.read_text(encoding="utf-8"))["hooks"]["Stop"]
     commands = [h["command"] for g in stop for h in g["hooks"]]
     assert not any("loop_gate" in c for c in commands), commands
-    assert sum("hooks.flush_session" in c for c in commands) == 1, commands
+    # SPEC-opus55-stale-cuts retired flush_session too; only the user's own hook is left.
+    assert not any("hooks.flush_session" in c for c in commands), commands
     assert USER_HOOK in commands
 
 

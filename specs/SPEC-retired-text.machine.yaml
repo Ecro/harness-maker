@@ -85,6 +85,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: opus55-stale-cuts
   oracle_source: golden
   oracle_evidence: 'The before state is what main 79b16a99 renders (the shipped 0.64.0
     bytes, from git) plus one user hook the test adds; the identity rule (render._entry_identity:

@@ -277,7 +277,6 @@ _ALL_SKILLS: list[str] = [
     "agent-quality-rubric",
     "ai-readiness-rubric",
     "context-linter",
-    "worktree-isolator",
     # SPEC-intent-world-model-objective-layer S13: the discoverable surface for `hm world`.
     "intent-layer",
     # SPEC-mission-context-loop S1: the capture path for code-absent project facts. The
@@ -292,6 +291,8 @@ RETIRED_SKILLS: tuple[str, ...] = (
     "conditional-router",
     "autoloop-driver",
     "refdocs-search",
+    # SPEC-opus55-stale-cuts: it described the retired `worktree create execute` flow.
+    "worktree-isolator",
 )
 #: Stage commands and helper files that stopped rendering (IRR-002).
 RETIRED_COMMANDS: tuple[str, ...] = ("review", "verify", "configure", "loop", "loop-p5-batch")
@@ -766,7 +767,6 @@ def _base_files(
         (_localized(claude_md_stem, locale), "../CLAUDE.md", {}),
         (_localized("memory/failures", locale), "memory/failures.md", {}),
         (_localized("memory/wiki", locale), "memory/wiki.md", {}),
-        ("memory/session-readme.md.j2", "memory/session/README.md", {}),
         *_atomic_command_files(config_dump=config_dump),
         ("commands/hm/health.md.j2", "commands/hm/health.md", {}),
         # PLAN-cfr-churn-metrics (0.36.0): /hm:metrics is a manual, read-only
@@ -883,7 +883,7 @@ def _codex_skill_files(config_dump: dict[str, object] | None = None) -> list[Fil
 # `_command_frontmatter` (SPEC-hm-light-lane-s2 AC-009);
 # Codex gets `agents/openai.yaml` (policy.allow_implicit_invocation: false).
 #
-# HM-LIGHT-LANE lever 5 added the next five: no stage prompt invokes them by name and none is
+# HM-LIGHT-LANE lever 5 added the next three: no stage prompt invokes them by name and none is
 # meant to self-trigger, yet every session carried their descriptions in the skill listing.
 # `security-scanner` stays visible: security-reviewer defers to it when available.
 _TYPED_ONLY_SKILLS: tuple[str, ...] = (
@@ -892,7 +892,6 @@ _TYPED_ONLY_SKILLS: tuple[str, ...] = (
     "agent-quality-rubric",
     "ai-readiness-rubric",
     "context-linter",
-    "worktree-isolator",
 )
 
 

@@ -734,7 +734,6 @@ ac:
   - tests/unit/test_overhaul_p1_kept.py::test_ac009_stage_cli_invocations_preserved
   - tests/unit/test_overhaul_p1_kept.py::test_ac009_bench_contract
   - tests/unit/test_overhaul_p1_kept.py::test_ac009_spec_gate_keyed_on_strictness
-  - tests/unit/test_overhaul_p1_kept.py::test_ac009_compaction_checkpoint_resume
   executable_predicate: null
   golden_table: []
   rubric_id: null

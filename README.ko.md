@@ -28,7 +28,7 @@
 > <!-- hm-doc-contract:agents:end -->
 >
 > <!-- hm-doc-contract:skills:start -->
-> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `worktree-isolator`, `world-model`
+> **현재 스킬:** `agent-quality-rubric`, `ai-readiness-rubric`, `context-linter`, `intent-layer`, `project-knowledge`, `second-opinion-gate`, `trajectory-monitor`, `world-model`
 > <!-- hm-doc-contract:skills:end -->
 >
 > `world-model` 은 Maker 로 렌더된다 (`.claude/skills/<handle>/`). `intent-layer` 와 `project-knowledge` 는 직접 입력해야만 실행되고 (모델이 스스로 호출하지 않음), 그 외에는 Maker 를 거쳐 도달한다 ([아래](#maker--world-model-입구)).
@@ -187,7 +187,6 @@ Codex에서는 생성된 단계 스킬을 `$hm-research 주제`, `$hm-spec task-
 **B. 하네스가 프로젝트를 학습한다.**
 - `.claude/memory/wiki.md` — 패턴, 규약, 함정. 매 `/hm:wrapup`에서 새 항목 추가.
 - `.claude/memory/failures.md` — 반복되는 실수, slug + count로 dedup.
-- `.claude/memory/session/<date>.md` — 작업일별 non-obvious 결정사항.
 - 어떤 failure slug라도 **count ≥ 3**에 도달하면, wrapup이 `pending-proposals.md`에 제안을 작성 — 그 재발을 막을 수 있었을 새 skill / rule / hook. 사용자가 검토하고 ingest 여부 결정.
 
 **C. Default가 내 오버라이드에 적응한다.**
@@ -386,7 +385,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 ### 🌱 자기진화 — *프로젝트와 함께 성장한다*
 
 - **Block-merge 보존.** 어떤 agent, skill, CLAUDE.md 섹션이든 손편집. `--update`를 견딤 — 파일별 content hash + `@hm:user:*` 마커가 사용자 편집과 템플릿 소유 영역을 분리하기 때문. `@hm:harness:*` inverted 마커는 외부 설정 흡수용으로 반대 동작.
-- **3-tier 메모리 축적.** `wiki.md` (패턴) · `failures.md` (slug 기반 dedup된 반복 실수) · `session/<date>.md` (non-obvious 결정). Wrapup이 자동으로 쓰고, 모든 stage가 자동으로 읽음.
+- **메모리 축적.** `wiki.md` (패턴) · `failures.md` (slug 기반 dedup된 반복 실수). Wrapup이 자동으로 쓰고, 이후 stage가 주제에 맞는 항목을 읽음.
 - **자기개선 failure 제안.** `[fail:*]` slug가 세션 간 3× 재발하면, wrapup이 `pending-proposals.md`에 제안 작성 — 그 재발을 막을 수 있었을 새 skill / rule / hook. 검토 후 ingest 결정.
 - **ADR 시스템 = execute의 binding 제약.** SPEC 의 `irreversible_decisions` 와 `/hm:execute` Step 0 이 PLAN 을 쓰며 기록한 ADR 은 구현의 hard 제약. 충돌은 blocker로 surface, silent proceed 절대 없음. 미래 세션이 이미 결정된 사항을 재논의하지 않음.
 - **Refdocs search.** 아키텍처 문서, API spec, design 문서를 `harness.yaml`에 등록. `refdocs-search` skill이 무손실 full-text search 제공 — 청킹 없음, RAG 인덱스 없음.
@@ -411,7 +410,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 
 - **권장 순서.** `/hm:research` (문제가 불분명할 때) → `/hm:spec` → `/hm:execute` → `/hm:wrapup`. 각 stage는 다음 stage를 알려주고 끝나며, 실행은 사용자가 결정합니다. `/hm:execute`로 바로 건너뛰면 SPEC 게이트를 잃습니다. 0.64.0 에서 `hm:review`·`hm:verify` (리뷰는 `/hm:execute` 의 Step 6, 결정적 게이트는 `hm check`), `hm:loop`·`hm:loop-p5-batch`, autopilot 자동 진행, `hm:configure` (`.claude/harness.yaml` 을 직접 고치고 `/harness-maker:make` 재실행) 가 은퇴했습니다.
 - **구현 전 깊은 인터뷰.** `/hm:spec`이 6-카테고리 인터뷰 (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification)를 완전성 점수화하여 실행. 되돌리기 어려운 결정은 같은 인터뷰의 `irreversible_decisions` 로 잠기고, phase·순서·위험 같은 *how* 는 `/hm:execute` Step 0 이 사람 게이트 없이 직접 씁니다.
-- **3-tier 컨텍스트 로딩 + compaction 복구.** Hot tier (오늘 session) · Warm tier (stage 주제에 맞는 wiki/failures 항목 — lexical 매치 우선, 남는 슬롯에만 고재발 failure 최대 3개, 블록 전체에 8 KB 상한 하나) · Cold tier (git log / PLAN on demand). `PreCompact` hook이 context compaction 전에 session flush; 다음 turn이 마커를 감지하고 마지막 in-progress phase에서 resume.
+- **주제 매칭 컨텍스트 로딩.** stage는 주제에 맞는 wiki/failures 항목을 읽고 (`hm memory_retrieve`: lexical 매치 우선, 남는 슬롯에만 고재발 failure 최대 3개, 블록 전체에 8 KB 상한 하나), git log / PLAN은 필요할 때 읽음. 중단된 `/hm:execute`는 SPEC의 `pending_test` 플래그, PLAN, REVIEW 파일에서 재개하며 세션 스냅샷은 두지 않음.
 - **Cross-process 메모리 안전성.** `.claude/memory/` 쓰기는 re-entrant POSIX flock으로 serialize. Telemetry hook이 `O_APPEND`에 raw `os.write()`로 원자적 append (single-syscall, ≤PIPE_BUF) — concurrent Claude Code + Codex 세션이 JSONL 라인을 interleave 불가.
 
 각 기능의 완전한 메커니즘 — 모든 절차, 결정 경로, 내부 invariant — 는 [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md) 참조.

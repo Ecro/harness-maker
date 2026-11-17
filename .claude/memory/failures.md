@@ -336,7 +336,7 @@ other action with an existing narrowly-scoped module, grep the module for a func
 suggests the same job (`_post_loc`, `append_atomic_line`, etc.) and read its docstring before
 writing new code that duplicates it.
 - [2026-09-12] io_utils.atomic_append (confirm-1 repair for a P1) ported review_telemetry short-write retry logic without consulting append_atomic_line in the same module, which documents "do NOT loop" for exactly this reason; confirm-2 caught the reopened interleave race.
-## [fail:process] adr-premise-unverified-vs-source | 2026-08-21 | count:2
+## [fail:process] adr-premise-unverified-vs-source | 2026-08-21 | count:3
 ADR-006 of PLAN-bench-study-adoption locked a decision on the belief that `review_consensus.DISPOSITIONS`
 and `codex_ledger.DISPOSITION_VALUES` were two independently-declared enums. A cross-model second
 opinion (codex) read the actual source and found `DISPOSITIONS = DISPOSITION_VALUES` — a deliberate
@@ -355,6 +355,7 @@ already established for numeric claims, extended here to structural/identity cla
 codebase. A second, cross-model reader is what caught both instances here — a single author's own
 premise re-read did not.
 - [2026-09-29] intent-layer-improvements: SPEC interview recommended 'resolve only from open' without reading world.observe/world.resolve; the engine's only exit from wrong is resolve, so the rule made wrong terminal. Caught by spec-validator, corrected next round.
+- [2026-11-17] 2026-11-17 opus55-stale-cuts: research put five cuts on the DRI's decision card; two rested on premises never checked against the render or the consumers ("the rubric skills' descriptions load into every session" — they are typed-only at render time; "the reasoning template is thinking scaffolding" — code-verifier mode A reads it). Both were withdrawn after the DRI had chosen. Caught only when the SPEC stage rendered and grepped.
 ## [fail:design] land-abort-resets-foreign-paths | 2026-08-21 | count:2
 `worktree task-land`'s abort path resets the base working tree and destroys uncommitted content it did not create. Observed 2026-08-22 on `bench-study-adoption`: the squash failed with `error: Your local changes to the following files would be overwritten by merge: .claude/memory/wiki.md`, and the handler's "base reset clean" reverted that file — discarding a wiki entry `/hm:wrapup`'s own Step 5.1 had just written, with **no stash and no warning**. The other three modified memory files survived, so the reset appears scoped to the conflicting path; that scoping is what makes the loss quiet rather than obvious.
 

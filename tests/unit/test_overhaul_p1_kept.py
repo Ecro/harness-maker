@@ -207,23 +207,6 @@ def test_ac009_spec_gate_keyed_on_strictness(
     assert head == ref == want
 
 
-# ── execute hot tier ────────────────────────────────────────────────────────
-
-
-def test_ac009_compaction_checkpoint_resume(stage_renders: dict[tuple[str, str], Path]) -> None:
-    ref = _stage_text(stage_renders[("ref", "warn")], "execute").splitlines()
-    head = _stage_text(stage_renders[("head", "warn")], "execute")
-    # SPEC-retired-wiring AC-004 drops the dead `.claude-progress.json` pointer; the rest stays.
-    old = (
-        "check `.claude-progress.json` for partial state and resume from the last in-progress phase"
-    )
-    new = "resume from the last in-progress phase of the PLAN"
-    sentences = [ln.replace(old, new) for ln in ref if "checkpoint:compaction" in ln]
-    assert sentences
-    assert [s for s in sentences if s not in head] == []
-    assert ".claude-progress.json" not in head
-
-
 # ── bench contract ──────────────────────────────────────────────────────────
 
 
@@ -438,11 +421,8 @@ _HOOK_CASES: dict[str, tuple[list[str], str, dict[str, str]]] = {
         json.dumps({"hook_event_name": "Stop", "session_id": "s1", "stop_hook_active": False}),
         {},
     ),
-    "flush_session-auto": (
-        ["harness_maker.hooks.flush_session"],
-        json.dumps({"hook_event_name": "PreCompact", "trigger": "auto", "session_id": "s1"}),
-        {},
-    ),
+    # `flush_session` left this table with SPEC-opus55-stale-cuts IRR-001: it is an exit-0 stub
+    # now, so it no longer equals the reference (tests/render/test_opus55_stale_cuts.py AC-006).
     "sessionstart_drift": (
         ["harness_maker.hooks.sessionstart_drift"],
         json.dumps({"hook_event_name": "SessionStart", "source": "startup", "session_id": "s1"}),

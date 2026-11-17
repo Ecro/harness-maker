@@ -38,7 +38,6 @@ KEPT_SKILLS = (
     "intent-layer",
     "maker",
     "project-knowledge",
-    "worktree-isolator",
 )
 BASE_AGENTS = ("code-reviewer", "judgment-reviewer", "spec-validator")
 COMMANDS = (
@@ -362,9 +361,7 @@ def test_ac004_hook_commands_per_file(trees: dict[str, Path], name: str) -> None
     claude = {
         ("PreToolUse", "Bash", "gates.permission_gate --subordinate-to-deny-dangerous"),
         ("PreToolUse", edit, "gates.worktree_gate"),
-        ("PreCompact", "auto", "hooks.flush_session"),
         ("PreCompact", "auto", "worktree span-end"),
-        ("PreCompact", "manual", "hooks.flush_session"),
         ("PreCompact", "manual", "worktree span-end"),
         ("Stop", "", "worktree span-end"),
         ("SessionStart", "", "hooks.sessionid_envfile"),
@@ -376,7 +373,6 @@ def test_ac004_hook_commands_per_file(trees: dict[str, Path], name: str) -> None
             ("PreToolUse", "Bash", "gates.permission_gate"),
             ("SessionStart", "", "hooks.sessionstart_drift"),
             ("SessionStart", "", "hooks.sessionid_envfile"),
-            ("Stop", "", "hooks.flush_session"),
         } | ({("PreToolUse", "apply_patch", "gates.spec_gate")} if block else set())
         assert _hook_rows(root / ".codex" / "hooks.json") == codex
 
@@ -511,12 +507,6 @@ _ROWS: list[tuple[tuple[str, ...], str, Callable[[str], bool], str]] = [
         "spec",
         lambda t: "Only a non-code change may write `ac: []`" in t,
         "the skip path's ac rule",
-    ),
-    (
-        tuple(ARMS),
-        "execute",
-        lambda t: "checkpoint:compaction" in t and ".claude-progress.json" not in t,
-        "the hot tier",
     ),
     (
         tuple(ARMS),
