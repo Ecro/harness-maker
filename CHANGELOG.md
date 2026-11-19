@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.65.7] - 2026-11-20
+
+A plugin update no longer leaves a project's hooks dead until the next re-render, and a version
+bump merged to main now releases itself. **IRR-001: merging a version bump to `main` tags and
+publishes to PyPI and GitHub Release with no human step.**
+
 ### Added
 
 - **SessionStart self-heal of dead hook refs** (SPEC-stale-install-recovery). The plugin-bundled
