@@ -1,0 +1,538 @@
+schema_version: 3
+spec_slug: stale-install-recovery
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Dead harness-maker refs in settings.json are spliced to the live ref
+  type: property
+  test_ids:
+  - tests/unit/test_stale_ref_heal.py::test_ac_001_dead_hm_refs_spliced_rest_byte_identical
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation (only dead harness_maker tokens change; the rest round-trips)
+    is stated from the edgelog failure shape and ADR-014, not from the heal's output;
+    fixtures place real directories under a tmp HOME so liveness is a filesystem fact.
+  oracle_independence_waiver: null
+  input_domain: settings.json documents mixing harness-maker hooks (dead and live
+    --with targets) with user hooks and non-hook keys
+  transformation: run the heal against a tmp $HOME where only some --with targets
+    exist
+  expected_relation: every dead harness-maker --with token equals the live ref; reverting
+    those tokens yields a document equal to the input
+  preconditions: []
+  observable_output: the healed settings.json on disk
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: No write when there is nothing safe to heal
+  type: parametric
+  test_ids:
+  - tests/unit/test_stale_ref_heal.py::test_ac_002_no_write_when_nothing_safe_to_heal[AC-002-0]
+  - tests/unit/test_stale_ref_heal.py::test_ac_002_no_write_when_nothing_safe_to_heal[AC-002-1]
+  - tests/unit/test_stale_ref_heal.py::test_ac_002_no_write_when_nothing_safe_to_heal[AC-002-2]
+  - tests/unit/test_stale_ref_heal.py::test_ac_002_no_write_when_nothing_safe_to_heal[AC-002-3]
+  - tests/unit/test_stale_ref_heal.py::test_ac_002_no_write_when_nothing_safe_to_heal[AC-002-4]
+  - tests/unit/test_stale_ref_heal.py::test_ac_002_no_write_when_nothing_safe_to_heal[AC-002-5]
+  - tests/unit/test_stale_ref_heal.py::test_ac_002_no_write_when_nothing_safe_to_heal[AC-002-6]
+  - tests/unit/test_stale_ref_heal.py::test_ac_002_no_write_when_nothing_safe_to_heal[AC-002-7]
+  - tests/unit/test_stale_ref_heal.py::test_ac_002_no_write_when_nothing_safe_to_heal[AC-002-8]
+  executable_predicate: null
+  golden_table:
+  - input:
+      case: all_live
+    expected: no_write
+    edge: false
+    note: ''
+  - input:
+      case: dead_user_hook_only
+    expected: no_write
+    edge: false
+    note: ''
+  - input:
+      case: no_harness_yaml
+    expected: no_write
+    edge: false
+    note: ''
+  - input:
+      case: malformed_json
+    expected: no_write
+    edge: false
+    note: ''
+  - input:
+      case: running_ref_not_directory
+    expected: no_write
+    edge: false
+    note: ''
+  - input:
+      case: running_ref_is_source_checkout
+    expected: no_write
+    edge: false
+    note: ''
+  - input:
+      case: claude_plugin_root_unset
+    expected: no_write
+    edge: false
+    note: ''
+  - input:
+      case: file_changed_between_read_and_write
+    expected: no_write
+    edge: false
+    note: ''
+  - input:
+      case: module_not_in_registry_only
+    expected: no_write
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each row is a locked non-goal or safety rule from the SPEC (user
+    hooks untouched, no harness, unparseable, never heal to a non-directory ref);
+    expected values are fixed by those rules, not by running the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: .codex/hooks.json is healed by the same rule
+  type: parametric
+  test_ids:
+  - tests/unit/test_stale_ref_heal.py::test_ac_003_codex_hooks_json_same_rule[AC-003-0]
+  - tests/unit/test_stale_ref_heal.py::test_ac_003_codex_hooks_json_same_rule[AC-003-1]
+  executable_predicate: null
+  golden_table:
+  - input:
+      file: .codex/hooks.json
+      ref: dead
+    expected: spliced
+    edge: false
+    note: ''
+  - input:
+      file: .codex/hooks.json
+      ref: live
+    expected: no_write
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fixture copied from the real ~/SIDE/edgelog .codex/hooks.json command
+    shape; expectation follows AC-001/AC-002 rules.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: The SessionStart output reports the heal and the hook stays safe
+  type: parametric
+  test_ids:
+  - tests/unit/test_stale_ref_heal.py::test_ac_004_sessionstart_reports_heal_and_stays_safe[AC-004-0]
+  - tests/unit/test_stale_ref_heal.py::test_ac_004_sessionstart_reports_heal_and_stays_safe[AC-004-1]
+  - tests/unit/test_stale_ref_heal.py::test_ac_004_sessionstart_reports_heal_and_stays_safe[AC-004-2]
+  - tests/unit/test_stale_ref_heal.py::test_ac_004_main_reads_plugin_root_argument
+  executable_predicate: null
+  golden_table:
+  - input:
+      healed: 2
+      drift: true
+    expected:
+      exit: 0
+      context_mentions:
+      - settings.json
+      - restart
+      - drift
+    edge: false
+    note: ''
+  - input:
+      healed: 0
+      drift: false
+      personalization_hint: null
+    expected:
+      exit: 0
+      stdout: empty
+    edge: false
+    note: ''
+  - input:
+      heal_raises: true
+      drift: true
+    expected:
+      exit: 0
+      context_mentions:
+      - drift
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The exit-0 / never-starve-drift contract is pre-existing in sessionstart_drift.run;
+    the restart wording is a SPEC decision; neither is derived from new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Codex bootstrap falls back to the plugin source
+  type: parametric
+  test_ids:
+  - tests/unit/test_codex_setup_fallback.py::test_ac_005_fallback_to_plugin_root[AC-005-0]
+  - tests/unit/test_codex_setup_fallback.py::test_ac_005_fallback_to_plugin_root[AC-005-1]
+  - tests/unit/test_codex_setup_fallback.py::test_ac_005_fallback_to_plugin_root[AC-005-2]
+  - tests/unit/test_codex_setup_fallback.py::test_ac_005_fallback_to_plugin_root[AC-005-3]
+  - tests/unit/test_codex_setup_fallback.py::test_ac_005_fallback_to_plugin_root[AC-005-4]
+  executable_predicate: null
+  golden_table:
+  - input:
+      pypi_resolves: true
+    expected:
+      engine_source: pypi
+      runs: 1
+    edge: false
+    note: ''
+  - input:
+      pypi_resolves: false
+      plugin_pyproject: true
+    expected:
+      engine_source: plugin_root
+      runs: 2
+    edge: false
+    note: ''
+  - input:
+      pypi_resolves: false
+      plugin_pyproject: false
+    expected:
+      state_not: complete
+      runs: 1
+    edge: false
+    note: ''
+  - input:
+      pypi_resolves: true
+      engine_error: true
+    expected:
+      state_not: complete
+      runs: 1
+    edge: false
+    note: ''
+  - input:
+      pypi_resolves: false
+      plugin_pyproject: true
+      fallback_fails: true
+    expected:
+      state_not: complete
+      runs: 2
+      engine_source: plugin_root
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fake runner records argv; the uv "No solution found" message observed
+    live on 2026-11-19 defines the resolution-failure input; rows follow the locked
+    fallback rule.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: The make action honours --update
+  type: parametric
+  test_ids:
+  - tests/unit/test_codex_setup_fallback.py::test_ac_006_make_honours_update[AC-006-0]
+  - tests/unit/test_codex_setup_fallback.py::test_ac_006_make_honours_update[AC-006-1]
+  - tests/unit/test_codex_setup_fallback.py::test_ac_006_cli_flag_and_skill_doc
+  executable_predicate: null
+  golden_table:
+  - input:
+      action: make
+      update: true
+    expected: engine_argv_has_update
+    edge: false
+    note: ''
+  - input:
+      action: make
+      update: false
+    expected: engine_argv_lacks_update
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Observed defect on 2026-11-19 (make action built argv without --update);
+    expectation is the user-visible flag contract.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Auto-tag decides from the four version files
+  type: parametric
+  test_ids:
+  - tests/unit/test_release_autotag.py::test_ac_007_autotag_decision[AC-007-0]
+  - tests/unit/test_release_autotag.py::test_ac_007_autotag_decision[AC-007-1]
+  - tests/unit/test_release_autotag.py::test_ac_007_autotag_decision[AC-007-2]
+  - tests/unit/test_release_autotag.py::test_ac_007_autotag_decision[AC-007-3]
+  executable_predicate: null
+  golden_table:
+  - input:
+      versions:
+      - 0.66.0
+      - 0.66.0
+      - 0.66.0
+      - 0.66.0
+      changed_in_push: true
+      tag_exists: false
+    expected: tag v0.66.0
+    edge: false
+    note: ''
+  - input:
+      versions:
+      - 0.66.0
+      - 0.66.0
+      - 0.66.0
+      - 0.66.0
+      changed_in_push: true
+      tag_exists: true
+    expected: skip
+    edge: false
+    note: ''
+  - input:
+      versions:
+      - 0.66.0
+      - 0.66.0
+      - 0.66.0
+      - 0.66.0
+      changed_in_push: false
+      tag_exists: false
+    expected: skip
+    edge: false
+    note: ''
+  - input:
+      versions:
+      - 0.66.0
+      - 0.65.6
+      - 0.66.0
+      - 0.66.0
+      changed_in_push: true
+      tag_exists: false
+    expected: error
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The four-file rule is CLAUDE.md's version policy; the rows are
+    its direct consequences.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: The auto-tag workflow is wired to dispatch the release
+  type: mechanical
+  test_ids:
+  - tests/structural/test_autotag_workflow.py::test_ac_008_autotag_workflow_wiring
+  - tests/structural/test_autotag_workflow.py::test_ac_008_release_yml_publish_jobs_accept_a_dispatched_tag_ref
+  executable_predicate: '(lambda w: w[''permissions''] == {''contents'': ''write'',
+    ''actions'': ''write''} and ''concurrency'' in w and ''release_autotag'' in str(w)
+    and ''--ref'' in str(w) and ''workflow run release.yml'' in str(w))(__import__(''yaml'').safe_load(open(''.github/workflows/autotag.yml'')))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: GitHub's documented rule that GITHUB_TOKEN pushes trigger no workflow
+    fixes the required dispatch with --ref; the permission set and concurrency group
+    are locked in the SPEC, not read from the workflow.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: CLAUDE.md release procedure matches the new flow
+  type: mechanical
+  test_ids:
+  - tests/structural/test_update_docs.py::test_ac_009_claude_md_release_section
+  executable_predicate: '(lambda s: ''autotag'' in s and ''git tag -a'' in s and ''gh
+    release create'' in s)((lambda t: t[t.index(''## 릴리스 절차''):t.index(''## 보안'')])(open(''CLAUDE.md'').read()))'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Section-scoped; the three required mentions come from the locked
+    release decision and the pre-existing no-manual-release rule.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: README documents updating and drops stale advice
+  type: mechanical
+  test_ids:
+  - tests/structural/test_update_docs.py::test_ac_010_readme_updating_and_no_stale_advice
+  executable_predicate: '(lambda t: ''## Updating'' in t and ''rm .claude/harness.yaml''
+    not in t and ''(when published)'' not in t and ''Listings are **pending**'' not
+    in t and ''The engine must be published at the plugin'' not in t)(open(''README.md'').read())'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each banned string was read verbatim from README.md on 2026-11-19;
+    the required section is a locked outcome.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: Same-session effect of the heal is measured and documented
+  type: mechanical
+  test_ids:
+  - tests/structural/test_update_docs.py::test_ac_011_same_session_record_cited
+  executable_predicate: '__import__(''os'').path.exists(''work-docs/RESEARCH-stale-install-recovery.md'')
+    and (lambda t: ''RESEARCH-stale-install-recovery'' in t[t.index(''## Updating''):].split(''\n##
+    '')[0])(open(''README.md'').read())'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The behaviour is Claude Code's, observed in a live session and
+    recorded in a work-doc outside the stamped SPEC; the predicate checks the record
+    exists and the README Updating section cites it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: A push to main that changes the four version files tags vX.Y.Z and publishes
+    to PyPI and GitHub Release with no human step
+  category: security/permission boundary
+  rationale: DRI accepted 2026-11-19; a version bump is a deliberate release commit,
+    quality-gate runs first, and a missed tag (0.65.6) cost more than the removed
+    step. Publishes are immutable.
+  source: spec
+approval:
+  kind: human
+  content_hash: e116ee65d756be2f37dc04e5273524d5c38956373fd296929ca0b1e0a250c67a
+  approved_by: ecro
+  approved_at: '2026-11-19T14:04:04Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 86b1a659404955b4ab36615d71a9dbbb6cc041a02e0db14dcb28df27ccc9fd1f
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: d953886bf40d66b3497e295e56e8a1084822b392dbfda9811601240986b4d43e
+    AC-001: 65bf04ea53ec2a0b7febce8e78184ccc0096ecd026eed0e7b11a682c76be4915
+    AC-002: e6048fc751a42bca3acaf1a29ddf0fae9c26836dcc827fd157b9190540eb2e82
+    AC-003: f89d930631375fba947eaba62d60737c3c12d7f67937c7a443337e996396a5de
+    AC-004: 2dce5420840b48fdea30124871f7df08bd48c8d2818b738051cba60403fcf7d9
+    AC-005: bd62546ef6dae9dc6d4fcb5231e152dd2a1cc9c50cba0eab83772beb98200868
+    AC-006: 748bd2c33da72e9cdde61b5c5437b930b3fc8445a30c595ffbd55c25e71185be
+    AC-007: 98e797accf1c8f87d4b75ece809af6527323f5ebd61992f9e8b6e30d8f165bd2
+    AC-008: 42e0d5a799fee6391461a555e4ba75ccf9555dca13ee285c02a4f50e2df8c484
+    AC-009: c4785ae6252dafa5588772a6ad5ba9299dd9b0612c019dc2427b7f47dba2089a
+    AC-010: 2c72d14bad5a7f913fe4f8d6186d6e7cf87c228f294a761d0ce60915bd23828a
+    AC-011: 61f20ad5e509c0af891b94a307ba29c1b40b0e23a29afe90fdbcb81288397b09
+    ac_order: 507fc837fd64ae8964fbe1ec5bd2043668206ddae62a90d715516324c2b27cdf

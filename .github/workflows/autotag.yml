@@ -1,0 +1,48 @@
+name: autotag
+
+# SPEC-stale-install-recovery IRR-001: a push to main that changes the four version files gets
+# its vX.Y.Z tag here, then release.yml is dispatched on that tag. A tag pushed with
+# GITHUB_TOKEN starts no workflow, so the dispatch is explicit; every release.yml publish job
+# gates on `startsWith(github.ref, 'refs/tags/v')`, which a dispatch on the tag ref satisfies.
+# A manual `git tag` + push still works: this job then sees the tag and skips.
+# Recovery when the tag exists but no release ran: `gh workflow run release.yml --ref vX.Y.Z`.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: autotag
+  cancel-in-progress: false
+
+jobs:
+  autotag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - name: Decide
+        id: decide
+        run: >-
+          uv run --no-project --with . python -m harness_maker.release_autotag
+          --root . --before "${{ github.event.before }}"
+      - name: Tag and dispatch release
+        if: steps.decide.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.decide.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"
+          gh workflow run release.yml --ref "$TAG"

@@ -521,7 +521,18 @@ def _personalization_hint(cwd: Path) -> tuple[str, str] | None:
     return additional, system
 
 
-def run(cwd: Path | None = None) -> int:
+def _heal_text(cwd: Path, plugin_root: str | None) -> str | None:
+    """Repair hook refs a plugin update pruned (SPEC-stale-install-recovery).
+
+    Only the plugin-bundled hook passes `plugin_root`; it alone runs from a path a plugin
+    update cannot prune, so it is the one place a repair can be carried.
+    """
+    from harness_maker import stale_ref_heal
+
+    return stale_ref_heal.describe(stale_ref_heal.heal_project(cwd, plugin_root=plugin_root))
+
+
+def run(cwd: Path | None = None, plugin_root: str | None = None) -> int:
     if cwd is None:
         cwd = Path.cwd()
 
@@ -541,13 +552,17 @@ def run(cwd: Path | None = None) -> int:
     with contextlib.suppress(Exception):
         hint = _personalization_hint(cwd)
 
+    healed: str | None = None
+    with contextlib.suppress(Exception):
+        healed = _heal_text(cwd, plugin_root)
+
     drift = detect_version_drift(cwd)
 
-    if drift is None and hint is None:
+    if drift is None and hint is None and healed is None:
         return 0
 
     hook_output: dict[str, Any] = {"hookEventName": "SessionStart"}
-    additional_parts: list[str] = []
+    additional_parts: list[str] = [healed] if healed else []
     payload: dict[str, Any] = {}
     if drift is not None:
         additional_parts.append(_format_context(drift.stamped, drift.current, drift.direction))
@@ -572,7 +587,13 @@ def run(cwd: Path | None = None) -> int:
 
 
 def main() -> int:
-    return run()
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--plugin-root")
+    args, _ = parser.parse_known_args()
+    return run(plugin_root=args.plugin_root or os.environ.get("CLAUDE_PLUGIN_ROOT"))
 
 
 if __name__ == "__main__":  # pragma: no cover

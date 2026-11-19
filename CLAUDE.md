@@ -150,14 +150,20 @@ release.yml 의 `boundary-advisory` 잡이 tag push 후 동일 suite 를 자동 
 단 4-file version sync 와 같은 자리에 두고 같이 돌리면 release 전에 빨간 줄을
 미리 잡는다.
 
-그 다음 tag push:
+그 다음 main 에 머지/push 만 하면 된다. `.github/workflows/autotag.yml` 이 **이 push 가
+버전을 바꿨을 때만** `vX.Y.Z` 태그를 만들고 `release.yml` 을 그 태그로 dispatch 한다
+(SPEC-stale-install-recovery IRR-001 — 머지 = 되돌릴 수 없는 publish). 수동 경로도 유효하다
+(태그가 이미 있으면 autotag 는 skip):
 
 ```
 git tag -a vX.Y.Z -m "..."
 git push origin main vX.Y.Z
 ```
 
-**그 후 아무것도 더 하지 말 것.** `.github/workflows/release.yml` 이 tag push 를
+> **왜:** 0.65.6 이 태그 없이 머지돼 플러그인은 0.65.6, PyPI 는 0.65.5 로 갈라졌다.
+> 태그는 있는데 release 가 안 돌았으면 `gh workflow run release.yml --ref vX.Y.Z`.
+
+**그 후 아무것도 더 하지 말 것.** `.github/workflows/release.yml` 이 tag 를
 받아 `quality-gate → build → publish-testpypi → publish-pypi → github-release`
 순서로 모든 산출물을 만든다. github-release 잡이 GitHub Release 페이지를 자동
 생성하니, **수동으로 `gh release create` 호출 금지**.

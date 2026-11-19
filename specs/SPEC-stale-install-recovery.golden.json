@@ -1,0 +1,236 @@
+{
+  "AC-002": [
+    {
+      "expected": "no_write",
+      "input": {
+        "case": "all_live"
+      }
+    },
+    {
+      "expected": "no_write",
+      "input": {
+        "case": "dead_user_hook_only"
+      }
+    },
+    {
+      "expected": "no_write",
+      "input": {
+        "case": "no_harness_yaml"
+      }
+    },
+    {
+      "expected": "no_write",
+      "input": {
+        "case": "malformed_json"
+      }
+    },
+    {
+      "expected": "no_write",
+      "input": {
+        "case": "running_ref_not_directory"
+      }
+    },
+    {
+      "expected": "no_write",
+      "input": {
+        "case": "running_ref_is_source_checkout"
+      }
+    },
+    {
+      "expected": "no_write",
+      "input": {
+        "case": "claude_plugin_root_unset"
+      }
+    },
+    {
+      "expected": "no_write",
+      "input": {
+        "case": "file_changed_between_read_and_write"
+      }
+    },
+    {
+      "expected": "no_write",
+      "input": {
+        "case": "module_not_in_registry_only"
+      }
+    }
+  ],
+  "AC-003": [
+    {
+      "expected": "spliced",
+      "input": {
+        "file": ".codex/hooks.json",
+        "ref": "dead"
+      }
+    },
+    {
+      "expected": "no_write",
+      "input": {
+        "file": ".codex/hooks.json",
+        "ref": "live"
+      }
+    }
+  ],
+  "AC-004": [
+    {
+      "expected": {
+        "context_mentions": [
+          "settings.json",
+          "restart",
+          "drift"
+        ],
+        "exit": 0
+      },
+      "input": {
+        "drift": true,
+        "healed": 2
+      }
+    },
+    {
+      "expected": {
+        "exit": 0,
+        "stdout": "empty"
+      },
+      "input": {
+        "drift": false,
+        "healed": 0,
+        "personalization_hint": null
+      }
+    },
+    {
+      "expected": {
+        "context_mentions": [
+          "drift"
+        ],
+        "exit": 0
+      },
+      "input": {
+        "drift": true,
+        "heal_raises": true
+      }
+    }
+  ],
+  "AC-005": [
+    {
+      "expected": {
+        "engine_source": "pypi",
+        "runs": 1
+      },
+      "input": {
+        "pypi_resolves": true
+      }
+    },
+    {
+      "expected": {
+        "engine_source": "plugin_root",
+        "runs": 2
+      },
+      "input": {
+        "plugin_pyproject": true,
+        "pypi_resolves": false
+      }
+    },
+    {
+      "expected": {
+        "runs": 1,
+        "state_not": "complete"
+      },
+      "input": {
+        "plugin_pyproject": false,
+        "pypi_resolves": false
+      }
+    },
+    {
+      "expected": {
+        "runs": 1,
+        "state_not": "complete"
+      },
+      "input": {
+        "engine_error": true,
+        "pypi_resolves": true
+      }
+    },
+    {
+      "expected": {
+        "engine_source": "plugin_root",
+        "runs": 2,
+        "state_not": "complete"
+      },
+      "input": {
+        "fallback_fails": true,
+        "plugin_pyproject": true,
+        "pypi_resolves": false
+      }
+    }
+  ],
+  "AC-006": [
+    {
+      "expected": "engine_argv_has_update",
+      "input": {
+        "action": "make",
+        "update": true
+      }
+    },
+    {
+      "expected": "engine_argv_lacks_update",
+      "input": {
+        "action": "make",
+        "update": false
+      }
+    }
+  ],
+  "AC-007": [
+    {
+      "expected": "tag v0.66.0",
+      "input": {
+        "changed_in_push": true,
+        "tag_exists": false,
+        "versions": [
+          "0.66.0",
+          "0.66.0",
+          "0.66.0",
+          "0.66.0"
+        ]
+      }
+    },
+    {
+      "expected": "skip",
+      "input": {
+        "changed_in_push": true,
+        "tag_exists": true,
+        "versions": [
+          "0.66.0",
+          "0.66.0",
+          "0.66.0",
+          "0.66.0"
+        ]
+      }
+    },
+    {
+      "expected": "skip",
+      "input": {
+        "changed_in_push": false,
+        "tag_exists": false,
+        "versions": [
+          "0.66.0",
+          "0.66.0",
+          "0.66.0",
+          "0.66.0"
+        ]
+      }
+    },
+    {
+      "expected": "error",
+      "input": {
+        "changed_in_push": true,
+        "tag_exists": false,
+        "versions": [
+          "0.66.0",
+          "0.65.6",
+          "0.66.0",
+          "0.66.0"
+        ]
+      }
+    }
+  ]
+}

@@ -53,6 +53,10 @@ def _run_command(
         process.wait()
 
 
+class _NoReceiptError(Exception):
+    """The engine launch printed no JSON receipt: uv failed before the engine ran."""
+
+
 def setup(
     action: str,
     project: Path,
@@ -62,6 +66,7 @@ def setup(
     runner: Callable[..., subprocess.CompletedProcess[str]] = _run_command,
     preset: str | None = None,
     locale: str | None = None,
+    update: bool = False,
 ) -> dict[str, Any]:
     """Install the pinned engine and report each independently observed layer."""
     observed: dict[str, Any] = {"plugin": None, "engine": None, "project": None}
@@ -74,7 +79,10 @@ def setup(
             "state": status.state if status else "pending",
             "pending": list(status.pending) if status else ["plugin", "engine", "project"],
             "error": error,
+            "engine_source": engine_source,
         }
+
+    engine_source: str | None = None
 
     def run(argv: list[str], *, engine_receipt: bool = False) -> dict[str, Any]:
         try:
@@ -87,7 +95,14 @@ def setup(
             result = subprocess.CompletedProcess(argv, exc.returncode, exc.stdout, exc.stderr)
         if result.returncode and not engine_receipt:
             raise ValueError("command_failed")
-        data = json.loads(result.stdout)
+        try:
+            data = json.loads(result.stdout)
+        except ValueError:
+            # A traceback means the engine started and crashed: a real failure, not a missing
+            # release, so it must not be retried from another source.
+            if engine_receipt and "Traceback (most recent call last)" not in (result.stderr or ""):
+                raise _NoReceiptError from None
+            raise
         if not isinstance(data, dict):
             raise ValueError("invalid_receipt")
         if engine_receipt and result.returncode:
@@ -120,26 +135,29 @@ def setup(
             raise ValueError("identity_mismatch")
         observed["plugin"] = target
         step = "engine_generation"
-        argv = [
-            "uv",
-            "run",
-            "--isolated",
-            "--no-project",
-            "--with",
-            requirement,
-            "python",
-            "-I",
-            str(plugin_root / "scripts/codex_engine.py"),
-            str(project.resolve()),
-            "--expected",
-            requirement.split("==")[1],
-        ]
-        if action == "update":
-            argv.append("--update")
-        for flag, value in (("--preset", preset), ("--locale", locale)):
-            if value is not None:
-                argv.extend([flag, value])
-        engine = run(argv, engine_receipt=True)
+        expected = requirement.split("==")[1]
+
+        def engine_argv(ref: str) -> list[str]:
+            argv = ["uv", "run", "--isolated", "--no-project", "--with", ref, "python", "-I"]
+            argv += [str(plugin_root / "scripts/codex_engine.py"), str(project.resolve())]
+            argv += ["--expected", expected]
+            if action == "update" or update:
+                argv.append("--update")
+            for flag, value in (("--preset", preset), ("--locale", locale)):
+                if value is not None:
+                    argv.extend([flag, value])
+            return argv
+
+        engine_source = "pypi"
+        try:
+            engine = run(engine_argv(requirement), engine_receipt=True)
+        except _NoReceiptError:
+            # uv could not build the pinned environment (release not on the index yet, or
+            # offline). The plugin root is the same release commit, so it is the same engine.
+            if not (plugin_root / "pyproject.toml").is_file():
+                raise ValueError("engine_unavailable") from None
+            engine_source = "plugin_root"
+            engine = run(engine_argv(str(plugin_root)), engine_receipt=True)
         if not isinstance(engine.get("engine"), str):
             raise ValueError("invalid_receipt")
         observed["engine"] = engine["engine"]
@@ -154,7 +172,7 @@ def setup(
                 outcome = receipt("engine_generation_failed")
             return outcome
         return receipt()
-    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError, _NoReceiptError):
         return receipt(f"{step}_failed")
 
 
@@ -166,6 +184,7 @@ def main(plugin_root: Path) -> int:
     parser.add_argument("--marketplace", default="harness-maker")
     parser.add_argument("--preset", choices=["Side", "Production"])
     parser.add_argument("--locale")
+    parser.add_argument("--update", action="store_true")
     args = vars(parser.parse_args())
     result = setup(plugin_root=plugin_root, **args)
     print(json.dumps(result))

@@ -221,6 +221,7 @@ For the mechanics behind each step — full procedures, decision paths, internal
 - [Why harness-maker?](#why-harness-maker)
 - [How it fits your project](#how-it-fits-your-project)
 - [Quickstart](#quickstart)
+- [Updating](#updating)
 - [Maker — the world model's front door](#maker--the-world-models-front-door)
 - [Requirements](#requirements)
 - [Features](#features)
@@ -329,7 +330,7 @@ Load `hm-make` from the installed plugin to generate the project harness. It use
 
 Use `hm-update` to refresh the Git marketplace, reinstall the plugin, and regenerate the project with the matching engine. The receipt reports plugin, engine, and project versions independently: `complete` requires all three to match. Existing targets and custom blocks are preserved. A local-path marketplace has no Git upgrade operation; register a Git source for this update path.
 
-The engine must be published at the plugin's release version. Development cachebusters do not select a different engine. For engine-only setup, `uv tool install harness-maker` followed by `harness-maker make --targets codex` remains available.
+The engine version always matches the plugin release. It comes from PyPI when that release is published; otherwise (a release not yet on PyPI, or offline with a warm uv cache) the bootstrap runs the plugin's own source, which is the same release commit, and the receipt's `engine_source` says which was used. Development cachebusters do not select a different engine. For engine-only setup, `uv tool install harness-maker` followed by `harness-maker make --targets codex` remains available.
 
 For Claude second opinions, enable `second_opinion.models: [claude]` in `.claude/harness.yaml`. Optional `second_opinion.claude` keys are `model` (default: CLI selection) and `timeout` (positive seconds, default 300). The authenticated `claude` CLI must support `--safe-mode`; the invoker sends supplied context on stdin with tools disabled. Unsupported/authentication failures are recorded skips; malformed results are failures, never clean votes.
 
@@ -364,6 +365,41 @@ harness-maker make . --add NAME        # graft on a single skill/agent/command
 harness-maker make . --remove NAME     # surgically remove one component
 harness-maker make . --promote NAME    # move an ad-hoc artifact into the harness
 ```
+
+---
+
+## Updating
+
+A plugin update changes harness-maker; it does not change the harness already rendered into
+your project. Two steps keep them in line:
+
+1. **Update the plugin.** Claude Code: `/plugin update harness-maker` (or `claude plugin update
+   harness-maker@harness-maker`). Codex: run the bundled `hm-update` skill.
+2. **Re-render each project.** Claude Code: `/hm:make --update` (silent; reuses
+   `.claude/harness.yaml`). Codex: `hm-make` with `--update`. Files you never edited take the
+   new templates; files you edited are kept and listed as `KEPT` (see
+   [Reconcile rules](#reconcile-rules-re-rendering-an-existing-harness)). Commit the result.
+
+**What breaks if you skip step 2.** Every rendered hook runs
+`uv run --no-project --with "$HOME/.claude/plugins/cache/harness-maker/harness-maker/<version>" …`.
+The update deletes the old `<version>` directory, so every project hook — including the
+`PreToolUse` gates — fails in `uv` (`error: Failed to parse …`) until the project is
+re-rendered. A SessionStart message tells you when a project's harness is older than the
+installed plugin.
+
+**Self-heal (Claude Code).** The plugin's own SessionStart hook runs from the live install, so
+it survives the update. When it finds a harness-maker hook in `.claude/settings.json` or
+`.codex/hooks.json` whose `--with` directory is gone, it points that `--with` at the installed
+plugin cache and tells you. Measured on Claude Code 2.1.328, the repair takes effect in the
+same session: no restart is needed
+([record](work-docs/RESEARCH-stale-install-recovery.md)). It is a stopgap, not a re-render:
+
+- It changes only the `--with` path. Templates and the stamped version stay old, so still run
+  `/hm:make --update`.
+- It leaves a diff in a committed file. Commit it or re-render.
+- It skips hooks you wrote, a module the new release no longer ships (reported as not
+  repaired), a source checkout or `--plugin-dir` install, and Codex sessions (Codex has no
+  plugin-level hook; use `hm-update`).
 
 ---
 
@@ -728,17 +764,9 @@ Codex TOML files are rendered as pure TOML, not markdown-with-frontmatter. `AGEN
 
 ## Reconcile rules (re-rendering an existing harness)
 
-Re-running `/harness-maker:make` on an existing harness uses a hash-driven KEEP rule: if a file's `content_hash` frontmatter matches the new template's hash, it's "ours" — safe to overwrite. If it differs (user-edited), it's "theirs" — kept.
+Re-running `/hm:make --update` (or `/harness-maker:make`) on an existing harness uses a hash-driven KEEP rule. Each generated file carries a `content_hash` of what was rendered. If the file still matches it, the file is "ours" and takes the new template. If you edited it, it is "theirs": it is kept and the run prints `orphan-sweep KEPT <path> … manual review needed` or a reconcile KEEP line.
 
-**Trade-off**: when harness-maker bumps a template on a minor release, the existing file's hash no longer matches, so reconcile picks KEEP even if you didn't edit the file.
-
-To pick up template updates after a version bump:
-
-```bash
-rm .claude/harness.yaml
-/harness-maker:make
-# (previous .claude/ is auto-backed up to .backup-<ISO>/)
-```
+To take the new template for a file you edited, move your changes into an `@hm:user:*` block (preserved across renders) or delete the file, then run `/hm:make --update` again. Do not delete `.claude/harness.yaml` to force a refresh: it is the source of truth for your preset, targets and answers.
 
 **`@hm:harness:*` inverted markers (0.12.0)** — for files harness-maker owns only in part (originally the foreign-AI-config import, since deleted), content INSIDE `@hm:harness:<id>` markers is harness-owned (replaced on every render); content OUTSIDE is user-owned (byte-for-byte preserved). The block-merge parser dispatches per file extension: HTML comments for `.md`/`.mdc`, `# @hm:harness:` for `.yml`/`.yaml`, top-level `_hm_harness` JSON key for `.json`. 0.11.x files (frontmatter `generated_by: harness-maker` + zero `@hm:harness:*` markers) are treated as wholly harness-owned on first encounter post-upgrade and re-rendered into the new marker family (ADR-009 amendment).
 
@@ -765,25 +793,21 @@ Run `/hm:health` to regenerate the dashboard on demand.
 
 ## Marketplace
 
-Marketplace manifests are present for each runtime:
+Both runtimes install from this repository's marketplace (see [Quickstart](#quickstart)):
 
 - `.claude-plugin/plugin.json` — Claude Code plugin spec
 - `.codex-plugin/plugin.json` — Codex plugin spec
 
-Listings are **pending**. Until then, install locally:
+The Python engine is also on PyPI (`uv tool install harness-maker`) for CI and headless use.
+To run a local clone instead:
 
 ```bash
-# Any IDE — CLI install (recommended)
-uv tool install harness-maker          # from PyPI (when published)
-uv tool install /path/to/harness-maker # pre-PyPI, from clone
-harness-maker make . --targets claude-code,codex
-
-# Claude Code — plugin mode (optional, enables /harness-maker:make command)
-claude --plugin-dir /path/to/harness-maker
-
-# Codex — render Codex-native assets in your project harness
-harness-maker make . --targets codex
+uv tool install /path/to/harness-maker            # CLI from a clone
+claude --plugin-dir /path/to/harness-maker        # Claude Code, plugin from a clone
 ```
+
+A `--plugin-dir` install is skipped by the [self-heal](#updating): hooks rendered from a clone
+point at the clone.
 
 ---
 
@@ -828,7 +852,7 @@ Yes. `targets` is a multi-select at the interview. Claude Code uses `.claude/`; 
 No. `metrics.jsonl`, dashboard, and security findings are written to `.claude/observability/` locally. Anti-rot crawls *read* public sources (Anthropic blog, arxiv, GitHub, OSV.dev) but never uploads anything.
 
 **Q: How do I pick up template improvements after a `/plugin update`?**
-Run `/harness-maker:make` → choose **Update**. For files where your hash matches the old template, the new version is applied. For files you edited (hash mismatch), yours is kept. To force a full refresh, `rm .claude/harness.yaml` and re-run.
+Run `/hm:make --update`. Files you never edited take the new templates; files you edited are kept and listed as `KEPT`. See [Updating](#updating) for what breaks if you skip this, and [Reconcile rules](#reconcile-rules-re-rendering-an-existing-harness) for taking a template over your edits.
 
 **Q: What are `mechanical_checks` and when should I use them?**
 Shell commands listed under `reviewers.mechanical_checks` in `harness.yaml` run as part of `hm check`, which `/hm:execute` runs before its review step and `/hm:wrapup` runs as its gate — before any LLM reviewer spawns. A non-zero exit fails the check. Use them for fast, deterministic gates (lint, type-check, unit test) that shouldn't waste LLM tokens when the basics are broken. The list is user-managed; harness-maker never populates it automatically. They are a hard gate, not part of the fix loop.

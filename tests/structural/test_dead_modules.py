@@ -24,6 +24,7 @@ DELETED = (
 KEPT = (
     "permission_syntax", "release_identity", "documentation_contract", "test_runners",
     "step_sensitivity", "surface_allowance",
+    "release_autotag",  # run by .github/workflows/autotag.yml (SPEC-stale-install-recovery)
 )  # fmt: skip
 
 _ROOT_DIRS = (

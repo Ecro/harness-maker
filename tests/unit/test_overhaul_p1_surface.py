@@ -385,8 +385,13 @@ def test_ac004_plugin_hooks_unchanged() -> None:
         text=True,
         timeout=30,
     ).stdout
-    # Unchanged but for the flag that keeps uv out of the user's project (IRR-001).
-    want = ref.replace("uv run --with", _NO_PROJECT_CALL)
+    # Unchanged but for the flag that keeps uv out of the user's project (IRR-001), and the
+    # `--plugin-root` argument that lets only this plugin-bundled copy run the stale-ref
+    # self-heal (SPEC-stale-install-recovery ADR-001).
+    want = ref.replace("uv run --with", _NO_PROJECT_CALL).replace(
+        "harness_maker.hooks.sessionstart_drift",
+        "harness_maker.hooks.sessionstart_drift --plugin-root ${CLAUDE_PLUGIN_ROOT}",
+    )
     assert (REPO_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8") == want
 
 

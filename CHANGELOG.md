@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- **SessionStart self-heal of dead hook refs** (SPEC-stale-install-recovery). The plugin-bundled
+  `sessionstart_drift` hook now calls `stale_ref_heal`, which rewrites a dead plugin-cache `--with`
+  ref in a project's rendered hooks to the live plugin root (plugin-cache-shaped refs only; user
+  paths untouched). Fixes projects whose hooks pinned a cache dir pruned by `/plugin update`.
+- **`autotag.yml` workflow.** A version bump merged to main is tagged and `release.yml` is
+  dispatched on the tag ref (a tag pushed with `GITHUB_TOKEN` starts no workflow).
+- **Codex bootstrap plugin-source fallback and `make --update`** in `codex_setup`.
+
+### Changed
+
+- README `Updating` section rewritten; release procedure in CLAUDE.md updated. IRR-001: merging a
+  version bump to main now publishes.
+
 ## [0.65.6] - 2026-11-18
 
 Cleanup: three pieces of rendered surface that no longer did anything are gone. Nothing in the
