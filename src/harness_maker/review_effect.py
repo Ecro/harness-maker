@@ -28,6 +28,8 @@ SCHEMA_VERSION = 1
 
 _SEVERE = frozenset({"P0", "P1"})
 _SEVERITY_RE = re.compile(r"^(P[0-3])\b", re.IGNORECASE)
+#: Word severities a REVIEW table carried before execute named the P scale (114 of 413 rows).
+_WORD_SEVERITY = {"critical": "P0", "blocker": "P0", "major": "P1", "minor": "P2", "nit": "P3"}
 _DISPOSITION_RE = re.compile(r"^[a-z][a-z-]*")
 _DECOR = "*`_ "
 _COUNTED = ("parsed", "none")
@@ -151,8 +153,9 @@ def parse_review(text: str) -> ReviewParse:
         cells += [""] * (len(header) - len(cells))
         raw_sev = cells[si].strip(_DECOR)
         m = _SEVERITY_RE.match(raw_sev)
-        sev = m.group(1).upper() if m else "unrecognized"
-        if m is None:
+        word = _WORD_SEVERITY.get(raw_sev.lower())
+        sev = m.group(1).upper() if m else word or "unrecognized"
+        if m is None and word is None:
             unrecognized += 1
             odd.append(raw_sev)
         dm = _DISPOSITION_RE.match(cells[di].strip(_DECOR).lower())

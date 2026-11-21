@@ -202,7 +202,6 @@ MODULES: dict[str, ModuleSpec] = {
     "verifier_discrimination": ModuleSpec("manual-dispatch", _s("report", "rounds", "agents")),
     "freeze": ModuleSpec("manual-dispatch", _s("resolve-base", "commit", "read-base", "reap")),
     "spec_quality": ModuleSpec("manual-dispatch", _s("eval")),
-    "two_pass_review": ModuleSpec("manual-dispatch", _s("redact", "merge")),
     "refdocs_index": ModuleSpec("manual-dispatch", _s("build"), entry="_cli"),
     # NEW (Phase 1): down-unified from the Typer `autopilot` toggle. It uses argparse with
     # a choices-positional, not `if sub ==`, but is deliberately classed manual-dispatch so

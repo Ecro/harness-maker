@@ -14,6 +14,8 @@ parent_spec: SPEC-configuration-manifests
 summary: Auto-generated skeleton SPEC for python feature two-pass-review.
 ---
 
+> **Retired (2026-11-21).** `harness_maker.two_pass_review` and `hm two_pass_review` were removed by SPEC-review-measurement-fixes IRR-002; no rendered stage called them. This SPEC is kept as a historical record.
+
 ## 🎯 Intent
 
 `src/harness_maker/two_pass_review.py` provides the **two-pass-review** python feature. This skeleton SPEC seeds AC slots for refinement via `/hm:spec` in a follow-up batch.

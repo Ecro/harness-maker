@@ -109,7 +109,7 @@ def _invoke(key: str, args: list[str], monkeypatch: pytest.MonkeyPatch) -> int:
     fn = _entry(key)
     if "argv" in inspect.signature(fn).parameters:
         return int(fn(list(args)))
-    # entry reads sys.argv (spec_quality / two_pass_review)
+    # entry reads sys.argv (spec_quality)
     monkeypatch.setattr(sys, "argv", ["prog", *args])
     return int(fn())
 

@@ -18,61 +18,7 @@ import pytest
 from harness_maker import (
     codex_ledger,
     freeze,
-    two_pass_review,
 )
-
-# ── the injection: model-authored JSON must never reach a shell ──────────────
-
-_HOSTILE = "it's broken'; touch {marker}; echo '"
-
-
-def _payload_with(marker: Path) -> dict[str, object]:
-    text = _HOSTILE.format(marker=marker)
-    return {"pass1": [{"severity": "P1", "summary": text}], "pass2": [{"severity": "P1"}]}
-
-
-def test_merge_reads_a_file_so_a_hostile_finding_never_reaches_the_shell(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The finding text is reviewer prose ABOUT an attacker-supplied diff.
-
-    Under the old `echo '<json>' | …` the apostrophe in "it's" closed the quoting and the
-    rest of the line ran. A path argument carries no content, so there is nothing to escape
-    out of — asserted by driving the real entry point with the payload that used to work.
-    """
-    marker = tmp_path / "PWNED"
-    src = tmp_path / "merge.json"
-    src.write_text(json.dumps(_payload_with(marker)), encoding="utf-8")
-
-    monkeypatch.setattr("sys.argv", ["hm", "merge", "--file", str(src)])
-    assert two_pass_review.main() == 0
-    assert not marker.exists()
-    # And the content survived intact rather than being mangled by quoting.
-    out = json.loads(capsys.readouterr().out)
-    assert out[0]["severity"] == "P1"
-
-
-def test_redact_reads_a_file_because_its_input_is_the_diff_itself(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """`redact`'s input is more exposed than `merge`'s: it carries the raw diff."""
-    src = tmp_path / "ctx.json"
-    src.write_text(
-        json.dumps({"pr_title": "x", "diff": "- a'; touch /tmp/nope; echo '\n+ b"}),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr("sys.argv", ["hm", "redact", "--file", str(src)])
-    assert two_pass_review.main() == 0
-    assert json.loads(capsys.readouterr().out)["pr_title"] == "[REDACTED]"
-
-
-def test_the_file_arg_reports_a_missing_path_instead_of_reading_stdin(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Falling back to stdin on an unreadable path would hang, or silently use stale input."""
-    monkeypatch.setattr("sys.argv", ["hm", "merge", "--file", "/nonexistent/x.json"])
-    assert two_pass_review.main() == 1
-
 
 # ── freeze: a slug becomes both a ref and a filesystem path ──────────────────
 

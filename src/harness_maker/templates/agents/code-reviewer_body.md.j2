@@ -21,7 +21,7 @@ Read changed files end-to-end, not only the patch, and trace runtime path from e
 
 ## Output
 
-One finding per defect, most severe first, each with `severity` (P0: breaks an AC, data or security; P1: a real bug; P2: maintainability), `file`, `line`, `summary` (≤ 80 chars) and `suggestion` (≤ 200 chars). Do not invent ids; the stage assigns them. With nothing to report, say `none` and list what you checked.
+One finding per defect, most severe first, each with `severity` (P0: breaks an AC, data or security; P1: a real bug; P2: maintainability{% if (config.reviewers.verbosity | default("standard")) != "terse" %}; P3: a nit{% endif %}), `file`, `line`, `summary` (≤ 80 chars) and `suggestion` (≤ 200 chars); prefix the summary with `pre-existing:` when the defect was there before this diff. Do not invent ids; the stage assigns them. With nothing to report, say `none` and list what you checked.
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific reviewer rules / hard rules / domain heuristics. Preserved across harness-maker upgrades. -->

@@ -1,0 +1,414 @@
+schema_version: 3
+spec_slug: review-measurement-fixes
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: review_effect normalises word severities to the P scale
+  type: parametric
+  test_ids:
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-0]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-1]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-2]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-3]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-4]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-5]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-6]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-7]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-8]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-9]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-10]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_001_word_severities_map_to_p_scale[AC-001-11]
+  executable_predicate: null
+  golden_table:
+  - input:
+      severity: P0
+    expected:
+      sev: P0
+      severe_accepted: 1
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      severity: p1
+    expected:
+      sev: P1
+      severe_accepted: 1
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      severity: '**P2**'
+    expected:
+      sev: P2
+      severe_accepted: 0
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      severity: P3
+    expected:
+      sev: P3
+      severe_accepted: 0
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      severity: critical
+    expected:
+      sev: P0
+      severe_accepted: 1
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      severity: blocker
+    expected:
+      sev: P0
+      severe_accepted: 1
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      severity: major
+    expected:
+      sev: P1
+      severe_accepted: 1
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      severity: Minor
+    expected:
+      sev: P2
+      severe_accepted: 0
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      severity: nit
+    expected:
+      sev: P3
+      severe_accepted: 0
+      unrecognized_n: 0
+    edge: false
+    note: ''
+  - input:
+      severity: —
+    expected:
+      sev: unrecognized
+      severe_accepted: 0
+      unrecognized_n: 1
+    edge: false
+    note: ''
+  - input:
+      severity: design
+    expected:
+      sev: unrecognized
+      severe_accepted: 0
+      unrecognized_n: 1
+    edge: false
+    note: ''
+  - input:
+      severity: ''
+    expected:
+      sev: unrecognized
+      severe_accepted: 0
+      unrecognized_n: 1
+    edge: false
+    note: ''
+  rubric_id: null
+  note: Each row is a one-row Findings table `| F1 | <severity> | accepted |`; sev
+    is the single key of ReviewParse.counts.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: P-scale rows were computed by running the unchanged parse_review
+    (2026-11-21) and are behaviour-preserving; word rows follow code-reviewer's documented
+    scale (P0 breaks an AC/data/security, P1 real bug, P2 maintainability) and the
+    observed REVIEW corpus vocabulary (minor 69, nit 27, major 18), not the new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Rendered execute names the P0–P3 severity scale
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_002_execute_names_p_scale
+  executable_predicate: all('P0–P3' in body.split('## Step 6')[1] for body in rendered_execute_bodies)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The literal token is fixed by this SPEC and matches the scale review_effect
+    parses; rendered for both presets from the real templates.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Rendered execute caps a failing hm check at three runs
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_003_execute_caps_failing_check
+  executable_predicate: all('third exit 1' in body.split('**Bind, then gate**')[1].split('##
+    Step 4')[0] for body in rendered_execute_bodies)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The cap value 3 and its phrasing are fixed by this SPEC (DRI-approved
+    from the verification post), not derived from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Rendered execute keeps pre-existing findings out of the fix loop
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_004_execute_keeps_pre_existing_out_of_loop
+  executable_predicate: all('`pre-existing`' in s and 'not fixed' in s for s in (body.split('##
+    Step 6')[1] for body in rendered_execute_bodies))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Disposition token fixed by IRR-001; the same token hm check accepts
+    in AC-006.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Rendered execute states the flaky-test rule
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_005_execute_states_flaky_rule
+  executable_predicate: all('flaky' in body and 'ADR' in body.split('flaky')[1][:300]
+    for body in rendered_execute_bodies)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rule content (no skip/sleep/retry; fix or delete with a PLAN ADR)
+    is fixed by this SPEC from the verification post.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: hm check accepts the pre-existing disposition
+  type: parametric
+  test_ids:
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_006_check_accepts_pre_existing[AC-006-0]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_006_check_accepts_pre_existing[AC-006-1]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_006_check_accepts_pre_existing[AC-006-2]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_006_check_accepts_pre_existing[AC-006-3]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_006_check_accepts_pre_existing[AC-006-4]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_006_check_accepts_pre_existing[AC-006-5]
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_006_check_accepts_pre_existing[AC-006-6]
+  executable_predicate: null
+  golden_table:
+  - input:
+      disposition: accepted
+      authority: code-reviewer
+    expected:
+      ok: true
+    edge: false
+    note: ''
+  - input:
+      disposition: rejected
+      authority: SPEC AC-001
+    expected:
+      ok: true
+    edge: false
+    note: ''
+  - input:
+      disposition: rejected
+      authority: '-'
+    expected:
+      ok: false
+    edge: false
+    note: ''
+  - input:
+      disposition: duplicate
+      authority: '-'
+    expected:
+      ok: true
+    edge: false
+    note: ''
+  - input:
+      disposition: unresolved
+      authority: '-'
+    expected:
+      ok: false
+    edge: false
+    note: ''
+  - input:
+      disposition: wontfix
+      authority: '-'
+    expected:
+      ok: false
+    edge: false
+    note: ''
+  - input:
+      disposition: pre-existing
+      authority: '-'
+    expected:
+      ok: true
+    edge: false
+    note: ''
+  rubric_id: null
+  note: Each row is a one-row REVIEW Findings table in a tmp root, slug x.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Every row but pre-existing was computed by running the unchanged
+    check.review_section (2026-11-21); the pre-existing row is the IRR-001 decision.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Code reviewer can mark a finding pre-existing
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_007_code_reviewer_can_mark_pre_existing
+  executable_predicate: '''pre-existing'' in rendered_code_reviewer_body'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Token fixed by IRR-001; rendered from the real agent template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: two_pass_review is gone
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ac_review_measurement_fixes.py::test_ac_008_two_pass_review_is_gone
+  executable_predicate: importlib.util.find_spec('harness_maker.two_pass_review')
+    is None and 'two_pass_review' not in command_registry.MODULES and 'two_pass_review'
+    not in rendered_second_opinion_skill
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Removal fixed by IRR-002; checked against the installed package
+    and registry, not a hand list.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Add `pre-existing` to the REVIEW-table disposition vocabulary accepted
+    by hm check
+  category: schema/file format/storage layout
+  rationale: Additive; older REVIEW docs still parse. DRI chose it over rejected+authority
+    so rejection counts stay honest.
+  source: spec
+- id: IRR-002
+  decision: Remove `hm two_pass_review` (redact, merge) and the harness_maker.two_pass_review
+    module
+  category: public API/CLI contract
+  rationale: No rendered stage or skill invokes it; DRI approved removal.
+  source: spec
+approval:
+  kind: human
+  content_hash: a68accc349b202472d5957c5419ce678b8c5b6cb2f81ee9959a0acca6bda53a6
+  approved_by: ecro
+  approved_at: '2026-11-21T08:05:15Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 35ca5852dc895227e0c35ca1814e945bd02646740dd4ca8b1d9c7fb267b07035
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 9a779f5d2980e810723a7e9125fc0a2389dc7c6a9e0c76a43e954961eb4d5643
+    AC-001: 66d4819a06d7e3e7b36f7761eec60286a33129841c316a0d45318333bacbdb01
+    AC-002: efd446ca0e7b506524dfc8e3b2357fc023b2901752fc1132aa9cc14bfe968c38
+    AC-003: f2e2ebe4d1d3abcc9b770729704f4d73ff42d3cdf978844d8e94b979a0b83fed
+    AC-004: 170b5e6e72496a665ab18515355419e81fad182019d587e8d0bb1f73d74a962c
+    AC-005: d2df82cc5cce9c442e6dd120c6b436c17057bafd1ff185bba0aeb73cc02e7784
+    AC-006: fb7b35a9bdb902c78b03a693770ef40b92a03875dc8e8538adc7b63182adc0e2
+    AC-007: ea7eb9dde0e3759d81da0259cc14334b575a05387a5812d5d940c1e31a9faf02
+    AC-008: 02f9edccd81bcd42c0a0e731694881be91f75271c0c215d210066442ca83dff7
+    ac_order: b62ad8faf895c4ebdf45f3fce97982d2bcc0a3fa6daa1e45993897fb730655c6

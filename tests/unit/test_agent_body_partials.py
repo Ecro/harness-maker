@@ -85,6 +85,8 @@ def _render_body(name: str) -> str:
 # 5 reviewer entries below are the post-Phase-C hashes; the remaining 7
 # agents keep their pre-refactor hashes.
 _EXPECTED_SHA256: dict[str, str] = {
+    # Re-pinned 2026-11-21 (SPEC-review-measurement-fixes AC-007). ONE entry: `code-reviewer`
+    # prefixes a finding the diff did not introduce with `pre-existing:` and names P3 (a nit).
     # Re-pinned 2026-10-17 (SPEC-retired-text). FIVE entries: the four lens reviewers include
     # `_partials/hard_rules.md.j2`, whose "the executor agent applies them" became "the main
     # session applies them" (no executor agent since 0.64.0), and `consensus-arbiter` lost its
@@ -137,7 +139,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     # `conditional_router.LENS_DISPATCH` names as backing the seven lenses — and that the same
     # four moved, and only those four, is the check worth making: a fifth would mean the
     # deletion reached past the include.
-    "code-reviewer": "3f6ccc632fe1a1563601c10b148bbf6d3264583aef81ac237d00e812b14b958e",
+    "code-reviewer": "2411d9e270ec4363ded2116ebfec3b686e7d6e7b593e378a52aad1f24fd8088d",
     "concurrency-reviewer": "145f8e7197dd9e70f8c3ad2fc6c08fa16f915a5cec5598d93461287f982b2563",
     # consensus-arbiter + spec-validator (was plan-validator): hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.

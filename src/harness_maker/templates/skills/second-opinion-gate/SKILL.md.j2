@@ -104,8 +104,6 @@ What the gatherer enforces, so you do not have to:
    in the tree, so labelling it with every covered id would manufacture corroboration.
 5. **Redaction** — value-shaped (not keyword-shaped): API/GitHub/AWS keys, `Bearer` values,
    credentialed URLs, bare JWTs, and whole PEM blocks via a stateful mode. ANSI stripped.
-   (`hm two_pass_review redact` is **not** this control — it rewrites PR metadata fields in a
-   context JSON and cannot process a byte stream.)
 
 These commands run under the normal Bash sandbox. **Never** pass `dangerouslyDisableSandbox`
 here — that escape belongs only to the model-invoker calls.

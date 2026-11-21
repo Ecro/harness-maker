@@ -7,7 +7,7 @@ files:
   body_sha256: 780efc47bab7175f0b08eede7a2186938dabada8ecdb0d0ade623e10170d592f
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
-  body_sha256: 75e6e5038df74c2b0f6a3c8321c59b685b36015caeb67ebfcd54000a0e23b564
+  body_sha256: 991343f0735e2eedeb6bc2a40df46ab115ef58f44ca223f756577e9d5a3fbe70
 - path: agents/judgment-reviewer.md
   template: agents/judgment-reviewer.md.j2
   body_sha256: 9216a2c84e6d4365e76a45a3c2ee71fbf3717506fc171aa82dedce289f8d0985
@@ -16,7 +16,7 @@ files:
   body_sha256: c62a21e82754d5606f3beae02e5dcf47cce846662e3763708b901442a83abb9a
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 95dd549977d35ccb423484d7928ca42e13976233c011e2e6823be89288e72b97
+  body_sha256: 1efd40849a812c2adce394deeb08ac486b53562179c2ae8a913720c01a2fb8d1
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 7a0eb0965046757c8720bdabc17656ec1ba96bace0c29141730b4f0e6fda2e8a

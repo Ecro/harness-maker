@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`review_effect` counts word severities** (SPEC-review-measurement-fixes). `critical`/`blocker`
+  → P0, `major` → P1, `minor` → P2, `nit` → P3; 114 of 413 historical REVIEW rows were counted as
+  `unrecognized`, so `severe_accepted` under-reported. `/hm:execute` Step 6 now names the P0–P3 scale.
+
+### Added
+
+- **`pre-existing` disposition** (IRR-001). A real finding this diff did not introduce is recorded,
+  not fixed; `hm check` accepts it without an authority. `code-reviewer` prefixes such a summary
+  with `pre-existing:`.
+- **`/hm:execute` rules**: a third `hm check` exit 1 in a row goes to the DRI; a flaky test is never
+  skipped, slept on or retried — fix its cause, or delete it and record why as a PLAN ADR.
+
+### Removed
+
+- **`hm two_pass_review`** (`redact`, `merge`) and `harness_maker.two_pass_review` (IRR-002): no
+  rendered stage or skill called it.
+
 ## [0.65.7] - 2026-11-20
 
 A plugin update no longer leaves a project's hooks dead until the next re-render, and a version

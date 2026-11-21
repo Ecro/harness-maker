@@ -178,7 +178,7 @@ stage 도 이것을 요구하지 않는다.
 5. **바인딩과 게이트.** `hm spec_machine mark-tested` 가 테스트를 AC 에 묶고 `hm check` 가 모든
    게이트를 돌린다. diff 에 `Do not change` 경로가 있으면 멈춘다.
 6. **리뷰.** `code-reviewer` 하나가 SPEC, PLAN, diff, 테스트를 함께 읽어 약해진 테스트도 잡는다.
-   finding 마다 처분: `accepted`, `rejected`(근거 필수), `duplicate`, `unresolved`. accepted 는
+   finding 마다 처분: `accepted`, `rejected`(근거 필수), `duplicate`, `unresolved`, `pre-existing`(이 diff 이전부터 있던 실제 결함: 기록만, 수정 안 함). accepted 는
    고치고 다시 리뷰, 최대 `reviewers.max_review_rounds`(3) 라운드. REVIEW 문서는 루프가 끝난 뒤
    쓰므로, 그 존재가 execute 완료 표시다.
 

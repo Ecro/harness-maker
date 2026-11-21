@@ -1174,7 +1174,8 @@ def red_section(
 
 # ── review (ADR-007) ───────────────────────────────────────────────────────────
 
-_DISPOSITIONS = frozenset({"accepted", "rejected", "duplicate", "unresolved"})
+#: `pre-existing`: a real finding this diff did not introduce, recorded and left unfixed.
+_DISPOSITIONS = frozenset({"accepted", "rejected", "duplicate", "unresolved", "pre-existing"})
 
 
 def _cells(line: str) -> list[str]:

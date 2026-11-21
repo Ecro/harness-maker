@@ -188,7 +188,8 @@ It never commits.
    `hm check` runs every gate. A path from `Do not change` in the diff stops the stage.
 6. **Review.** One `code-reviewer` reads the SPEC, PLAN, diff and tests together, so it also
    catches a weakened test. Each finding gets a disposition: `accepted`, `rejected` (with an
-   authority), `duplicate` or `unresolved`. Accepted findings are fixed and reviewed again, up to
+   authority), `duplicate`, `unresolved` or `pre-existing` (real but older than this diff: recorded, not
+   fixed). Accepted findings are fixed and reviewed again, up to
    `reviewers.max_review_rounds` (3). The REVIEW doc is written after the loop, so its presence
    marks execute as done.
 

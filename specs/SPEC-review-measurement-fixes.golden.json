@@ -1,0 +1,189 @@
+{
+  "AC-001": [
+    {
+      "expected": {
+        "sev": "P0",
+        "severe_accepted": 1,
+        "unrecognized_n": 0
+      },
+      "input": {
+        "severity": "P0"
+      }
+    },
+    {
+      "expected": {
+        "sev": "P1",
+        "severe_accepted": 1,
+        "unrecognized_n": 0
+      },
+      "input": {
+        "severity": "p1"
+      }
+    },
+    {
+      "expected": {
+        "sev": "P2",
+        "severe_accepted": 0,
+        "unrecognized_n": 0
+      },
+      "input": {
+        "severity": "**P2**"
+      }
+    },
+    {
+      "expected": {
+        "sev": "P3",
+        "severe_accepted": 0,
+        "unrecognized_n": 0
+      },
+      "input": {
+        "severity": "P3"
+      }
+    },
+    {
+      "expected": {
+        "sev": "P0",
+        "severe_accepted": 1,
+        "unrecognized_n": 0
+      },
+      "input": {
+        "severity": "critical"
+      }
+    },
+    {
+      "expected": {
+        "sev": "P0",
+        "severe_accepted": 1,
+        "unrecognized_n": 0
+      },
+      "input": {
+        "severity": "blocker"
+      }
+    },
+    {
+      "expected": {
+        "sev": "P1",
+        "severe_accepted": 1,
+        "unrecognized_n": 0
+      },
+      "input": {
+        "severity": "major"
+      }
+    },
+    {
+      "expected": {
+        "sev": "P2",
+        "severe_accepted": 0,
+        "unrecognized_n": 0
+      },
+      "input": {
+        "severity": "Minor"
+      }
+    },
+    {
+      "expected": {
+        "sev": "P3",
+        "severe_accepted": 0,
+        "unrecognized_n": 0
+      },
+      "input": {
+        "severity": "nit"
+      }
+    },
+    {
+      "expected": {
+        "sev": "unrecognized",
+        "severe_accepted": 0,
+        "unrecognized_n": 1
+      },
+      "input": {
+        "severity": "—"
+      }
+    },
+    {
+      "expected": {
+        "sev": "unrecognized",
+        "severe_accepted": 0,
+        "unrecognized_n": 1
+      },
+      "input": {
+        "severity": "design"
+      }
+    },
+    {
+      "expected": {
+        "sev": "unrecognized",
+        "severe_accepted": 0,
+        "unrecognized_n": 1
+      },
+      "input": {
+        "severity": ""
+      }
+    }
+  ],
+  "AC-006": [
+    {
+      "expected": {
+        "ok": true
+      },
+      "input": {
+        "authority": "code-reviewer",
+        "disposition": "accepted"
+      }
+    },
+    {
+      "expected": {
+        "ok": true
+      },
+      "input": {
+        "authority": "SPEC AC-001",
+        "disposition": "rejected"
+      }
+    },
+    {
+      "expected": {
+        "ok": false
+      },
+      "input": {
+        "authority": "-",
+        "disposition": "rejected"
+      }
+    },
+    {
+      "expected": {
+        "ok": true
+      },
+      "input": {
+        "authority": "-",
+        "disposition": "duplicate"
+      }
+    },
+    {
+      "expected": {
+        "ok": false
+      },
+      "input": {
+        "authority": "-",
+        "disposition": "unresolved"
+      }
+    },
+    {
+      "expected": {
+        "ok": false
+      },
+      "input": {
+        "authority": "-",
+        "disposition": "wontfix"
+      }
+    },
+    {
+      "expected": {
+        "ok": true
+      },
+      "input": {
+        "authority": "-",
+        "disposition": "pre-existing"
+      }
+    }
+  ]
+}
