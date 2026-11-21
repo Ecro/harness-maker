@@ -103,7 +103,6 @@ skills:
   installed:
     - ai-readiness-rubric
     - agent-quality-rubric
-    - worktree-isolator
     - context-linter
     - second-opinion-gate
     - intent-layer
@@ -112,7 +111,6 @@ skills:
   enabled:
     - ai-readiness-rubric
     - agent-quality-rubric
-    - worktree-isolator
     - context-linter
     - second-opinion-gate
     - intent-layer
