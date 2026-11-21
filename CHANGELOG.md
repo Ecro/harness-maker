@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.66.0] - 2026-11-21
+
+REVIEW severities are counted on one P0–P3 scale, a finding older than the diff can be recorded
+without being fixed, and `/hm:execute` caps gate retries and bans flaky-test workarounds.
+**IRR-002: `hm two_pass_review` is removed.**
+
 ### Fixed
 
 - **`review_effect` counts word severities** (SPEC-review-measurement-fixes). `critical`/`blocker`
