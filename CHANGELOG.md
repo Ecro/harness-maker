@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Boundary suite runs before merge** (SPEC-pr-boundary-gate, repository CI only). Since autotag a
+  merge to main publishes, so ci.yml's new blocking `boundary` job runs
+  `tests/integration/test_boundary_*.py` with `INTEGRATION=1` on every PR and push to main.
+  `release.yml:boundary-advisory` is unchanged.
+- **PR template opens with a five-line `For the DRI` block** (behaviour change, host check, your
+  decision, ships a release on merge, understanding delta), readable from a phone.
+
 ## [0.66.0] - 2026-11-21
 
 REVIEW severities are counted on one P0–P3 scale, a finding older than the diff can be recorded

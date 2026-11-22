@@ -138,17 +138,17 @@ harness-maker 는 **dual plugin** — 두 marketplace 에 등록 가능:
 
 ## 릴리스 절차 (race-free)
 
-4 파일 버전 동기화 + CHANGELOG 엔트리 commit 한 뒤, **boundary-parse tests 를 로컬에서 advisory 로 실행 권장**:
+4 파일 버전 동기화 + CHANGELOG 엔트리 commit. **boundary suite 는 머지 전 게이트다** (SPEC-pr-boundary-gate):
+머지 = publish 이므로 ci.yml 의 `boundary` 잡이 모든 PR·main push 에서 blocking 으로 돈다. CI 에는
+`claude` 가 PATH 에 없어 live 테스트 2개 (`test_boundary_maker_default_permissions.py`, `test_boundary_bench_resume.py`) 가 skip 되므로,
+템플릿·settings 렌더·Maker 를 건드린 PR 은 여는 세션이 로컬에서 돌리고 (약 16초) PR 상단
+`Host check:` 줄에 결과를 적는다:
 
 ```
 INTEGRATION=1 uv run pytest tests/integration/test_boundary_*.py -v
 ```
 
-PLAN-test-fidelity-gap Layer 1 (ADR-003/004): 이 단계는 PR 을 막지 않는다.
-release.yml 의 `boundary-advisory` 잡이 tag push 후 동일 suite 를 자동 실행 +
-결과를 GitHub Release page 의 body 에 append 하므로, 로컬에서 빼먹어도 visible.
-단 4-file version sync 와 같은 자리에 두고 같이 돌리면 release 전에 빨간 줄을
-미리 잡는다.
+release.yml 의 `boundary-advisory` 잡은 그대로 tag 뒤 같은 suite 를 돌려 Release body 에 기록한다.
 
 그 다음 main 에 머지/push 만 하면 된다. `.github/workflows/autotag.yml` 이 **이 push 가
 버전을 바꿨을 때만** `vX.Y.Z` 태그를 만들고 `release.yml` 을 그 태그로 dispatch 한다
