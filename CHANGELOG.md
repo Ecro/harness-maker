@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.66.1] - 2026-11-23
+
+Repository-only release: no change to what `harness-maker make` renders. The boundary suite now
+runs before merge, and the PR template opens with a short block for the DRI.
+
 ### Changed
 
 - **Boundary suite runs before merge** (SPEC-pr-boundary-gate, repository CI only). Since autotag a
