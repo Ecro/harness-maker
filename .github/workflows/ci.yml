@@ -9,8 +9,9 @@ on:
 # Mirrors release.yml's quality-gate job by design (see release.yml lines
 # 19–21 — the release-time quality-gate intentionally duplicates ci.yml so a
 # slow regression between the last CI run and the tag push cannot reach
-# PyPI). Steps below MUST stay byte-identical to release.yml:quality-gate
-# (excluding the INTEGRATION step — that runs nightly + at tag time only).
+# PyPI). quality-gate's steps MUST stay byte-identical to release.yml:quality-gate.
+# The `boundary` job is outside that rule: it runs the INTEGRATION=1 boundary suite on
+# every PR and push to main (SPEC-pr-boundary-gate).
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -65,6 +66,34 @@ jobs:
       # runner is expected to see the same kind of win.
       - name: Pytest
         run: uv run pytest -x --tb=short -n auto --dist loadfile
+
+  boundary:
+    # SPEC-pr-boundary-gate: since autotag a merge to main is a publish, so the boundary suite
+    # (what Claude Code / Codex actually parse and load) must run before merge, not only in
+    # release.yml:boundary-advisory after the Release exists. BLOCKING. The two live tests
+    # (Maker default permissions, bench resume) skip when `claude` is not on PATH, as here;
+    # the session opening the PR runs them locally.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # Same checkout as release.yml:boundary-advisory, so both runs see the same tree.
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Boundary tests
+        env:
+          INTEGRATION: "1"
+        run: uv run pytest tests/integration/test_boundary_*.py -v --tb=short
 
   dependency-review:
     # Runs only on PRs — blocks introduction of vulnerable transitive deps.

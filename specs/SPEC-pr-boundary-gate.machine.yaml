@@ -1,0 +1,105 @@
+schema_version: 3
+spec_slug: pr-boundary-gate
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: ci.yml runs the boundary suite as a blocking job on PRs and pushes
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pr_boundary_gate.py::test_ac_001_ci_runs_boundary_blocking
+  executable_predicate: boundary_job_blocking(ci_yml) and triggers_pr_and_main_push(ci_yml)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The required command and env come from CLAUDE.md's release section
+    and release.yml boundary-advisory, written before this change; the trigger set
+    comes from the SPEC intent.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the PR template opens with a five-line DRI block
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pr_boundary_gate.py::test_ac_002_pr_template_dri_block
+  executable_predicate: first_h2(template) == 'For the DRI' and dri_labels(template)
+    == FIVE_LABELS
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The five labels are fixed in this SPEC from the 2026-11-22 plan
+    item U3, not derived from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: CLAUDE.md describes the gate
+  type: mechanical
+  test_ids:
+  - tests/unit/test_pr_boundary_gate.py::test_ac_003_claude_md_describes_gate
+  executable_predicate: '''advisory 로 실행 권장'' not in claude_md and ''`boundary`''
+    in claude_md'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The removed phrase is quoted from CLAUDE.md as it stands before
+    the change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 5840b953715b8b14a1514866fdf64e4629668f05acc696b031e38a5c96600cf7
+  approved_by: Claude
+  approved_at: '2026-11-22T14:35:54Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 321235eeea08cc800591ea6b1a51e13f785be378a269e5f4c236ef8319060773
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 811677afba424ac1ff74d70d00b73db65c85583a5cbd405da54487ede2039fc2
+    AC-002: a9d728ecc5286308bf1bef2a1426fcf5ab326c7a1707e12e4cc4963a753332cc
+    AC-003: 738b42cb376056809ff045ae9f4e02c8738dbd016d59c561726e4f780df3e9a7
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d

@@ -10,6 +10,15 @@ Expand the "Core-module changes" section ONLY if your PR touches:
 See ADR-011 in work-docs/PLAN-oss-readiness-audit.md for the rationale.
 -->
 
+## For the DRI
+
+<!-- Five lines the DRI can decide on from a phone. Keep each to one line. -->
+- Behaviour change: <!-- what a user of hm now sees differently, or "none (internal)" -->
+- Host check: <!-- `INTEGRATION=1 uv run pytest tests/integration/test_boundary_*.py` result, incl. the live Maker test; "n/a" only if no template/settings/Maker change -->
+- Your decision: <!-- what you must decide before merge, or "none" -->
+- Ships a release on merge: <!-- yes (version files changed, autotag publishes) / no -->
+- Understanding delta: <!-- the one assumption, invariant or boundary that changed, or "none" -->
+
 ## Summary
 
 <!-- One or two sentences. What does this PR change, and why? -->
