@@ -19,6 +19,9 @@ run. SPEC: `specs/SPEC-hm-eval.md`.
 from which the light check runs the gates on a repo with no CI file. Both arms start from the changed
 file, so runs before and after this date are not strictly comparable.
 
+When a new model ships, the self-prune loop reuses this bench to measure which hm instructions
+that model no longer needs: [SELF-PRUNE.md](SELF-PRUNE.md).
+
 ## Run it
 
 ```

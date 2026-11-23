@@ -709,7 +709,7 @@ def test_control_rows_stay_out_of_the_main_scorecard(bench: ModuleType) -> None:
     variants = [_row(t, "hm-novalidator", r, solved=True) for t in ("t13", "t16") for r in (1, 2)]
     assert bench.scorecard(rows + variants) == bench.scorecard(rows)
     assert set(bench.ALL_ARMS) == {
-        "plain", "hm", "plain-careful", "plain-continue", "hm-novalidator"
+        "plain", "hm", "plain-careful", "plain-continue", "hm-novalidator", "hm-variant"
     }  # fmt: skip
 
 
