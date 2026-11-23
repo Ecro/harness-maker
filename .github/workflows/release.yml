@@ -16,9 +16,10 @@ on:
 #   workflow:    release.yml
 #   environment: testpypi (for TestPyPI), pypi (for PyPI)
 #
-# The quality-gate job duplicates ci.yml's lint/type/test on purpose — it
-# re-runs at tag time so a slow regression between the last CI run and the
-# tag push cannot reach PyPI.
+# The quality-gate job re-runs ci.yml's lint/type/test on the tagged commit on purpose, so a
+# regression between the last CI run and the tag cannot reach PyPI. It uses the same three
+# parallel pytest shards as ci.yml (SPEC-ci-shard-serial-nightly); the serial full-suite run that
+# used to live here (~28 of a release's ~32 minutes) is nightly.yml's `serial` job now.
 
 concurrency:
   group: release-${{ github.ref }}
@@ -26,15 +27,20 @@ concurrency:
 
 jobs:
   quality-gate:
+    name: quality-gate (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    # The Pytest step is deliberately SERIAL — it is the one full-suite run in CI that is not
-    # `-n auto` (see ci.yml's Pytest comment), so it catches order- and isolation-dependent
-    # failures that parallel runs hide. That makes this cap track suite growth: v0.59.0's gate
-    # took 16m, and v0.60.0 was cancelled at the old 20m cap mid-Pytest before anything was
-    # built. Raise the cap rather than parallelise; revisit if a run nears it.
-    timeout-minutes: 45
+    timeout-minutes: 20
     permissions:
       contents: read
+    strategy:
+      # Every shard reports its own failures instead of being cancelled by the first red one.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      # tests/conftest.py keeps only the test files that hash to this shard; `build` needs every
+      # shard to pass. Same matrix as ci.yml:quality-gate.
+      HM_TEST_SHARD: ${{ matrix.shard }}/3
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -58,15 +64,11 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy strict
         run: uv run mypy --strict src tests
-      # SERIAL on purpose, and now the ONLY serial full-suite run in CI — ci.yml and nightly.yml
-      # both moved to `-n auto --dist loadfile`. `hm test_runners plan` warns that a suite only
-      # ever run in parallel hides order- and isolation-dependent failures; this job is what
-      # answers that warning, and a failure it catches blocks a release rather than reaching
-      # one. Do NOT add `-n` here. ~14 min against the 20-minute cap above: if that gets tight,
-      # add a second job rather than parallelising this step.
       - name: Pytest
-        run: uv run pytest -x --tb=short
+        run: uv run pytest -x --tb=short -n auto --dist loadfile
       - name: Integration test — fresh install readiness
+        # One shard is enough: the test does not depend on the shard.
+        if: matrix.shard == 1
         # PLAN-fresh-install-health-baseline Phase 5: gate the release on the
         # integration test that exercises Side+Production fresh-install
         # readiness + existing-install migration via existing render
@@ -74,6 +76,7 @@ jobs:
         # removed (565d7ce); this is the canonical gate.
         env:
           INTEGRATION: "1"
+          HM_TEST_SHARD: "" # one file: never shard it away
         run: uv run pytest tests/integration/test_fresh_install_readiness.py -x --tb=short
 
   build:

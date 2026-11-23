@@ -1,0 +1,202 @@
+schema_version: 3
+spec_slug: ci-shard-serial-nightly
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the shard filter partitions the suite by file
+  type: property
+  test_ids:
+  - tests/unit/test_ci_shard_serial_nightly.py::test_ac_001_shard_filter_partitions_by_file
+  executable_predicate: set().union(*shards) == all_tests and pairwise_disjoint(shards)
+    and same_file_same_shard(shards)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation is a set partition checked against pytest's own unsharded
+    collection, not against the hash function under test.
+  oracle_independence_waiver: null
+  input_domain: n in 1..5 over this repository's test files; HM_TEST_SHARD values
+    unset, '1/1', 'i/n', and malformed strings ('0/3', '4/3', 'x', '1/0', '')
+  transformation: collect the same test files once per shard i/n and once with HM_TEST_SHARD
+    unset
+  expected_relation: the per-shard selections are pairwise disjoint, their union equals
+    the unsharded collection, every test of one file lands in one shard, and a malformed
+    value is a usage error
+  preconditions: []
+  observable_output: the node ids pytest keeps per HM_TEST_SHARD value (collect-only
+    output) and the exit code for a malformed value
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: ci.yml shards quality-gate and keeps a summary check
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ci_shard_serial_nightly.py::test_ac_002_ci_quality_gate_sharded
+  executable_predicate: ci_quality_gate_matrix == [1, 2, 3] and ci_env['HM_TEST_SHARD']
+    == '${{ matrix.shard }}/3' and PRIMARY_RUNS <= ci_quality_gate_runs and summary_job_named_quality_gate_fails_unless_success
+    and 'needs' not in install_cmd_job
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The four run lines are the ones ci.yml runs before this change
+    (AC-005's golden list); the matrix, env name and summary name are fixed by this
+    SPEC's Constraints.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: release.yml tests with the same shards, not serially
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ci_shard_serial_nightly.py::test_ac_003_release_quality_gate_sharded
+  executable_predicate: release_quality_gate_matrix == [1, 2, 3] and all('-n' in cmd
+    for cmd in release_pytest_cmds) and release_jobs['build']['needs'] == ['quality-gate']
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The serial command `uv run pytest -x --tb=short` is quoted from
+    release.yml as it stands before this change; the build dependency is the existing
+    release chain.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: nightly owns the serial run, adds 3.13 and skips an unchanged SHA
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ci_shard_serial_nightly.py::test_ac_004_nightly_serial_py313_skip
+  executable_predicate: serial_job_runs('uv run pytest -x --tb=short') and py313_job_env['UV_PYTHON']
+    == '3.13' and both_need_gate_output and gate_compares_last_success_sha_on_schedule
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The serial command is the one release.yml runs before this change;
+    the skip rule is scenario S4 of this SPEC, written before the workflow.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: the local gate still runs the full, unsharded suite
+  type: parametric
+  test_ids:
+  - tests/unit/test_ci_shard_serial_nightly.py::test_ac_005_local_gate_unsharded[AC-005-0]
+  executable_predicate: null
+  golden_table:
+  - input:
+      root: repo
+    expected:
+    - uv run ruff check .
+    - uv run ruff format --check .
+    - uv run mypy --strict src tests
+    - uv run pytest -x --tb=short -n auto --dist loadfile
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Computed on 2026-11-23 by running verification_plan.read_plan on
+    the unchanged tree (main a0b28554); never regenerated.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: the shard variable does not leak into tests
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ci_shard_serial_nightly.py::test_ac_006_shard_env_does_not_leak
+  executable_predicate: 'inner_pytest_exit_code(env={''HM_TEST_SHARD'': ''1/1''})
+    == 0'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expectation (the variable is absent inside a test) is fixed
+    by this SPEC before the conftest change; the inner run observes os.environ directly.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: a631c4280e38111ca1cd583a05f95cebc4c8e8d20d6036c6a9dcf21615cd416a
+  approved_by: Claude
+  approved_at: '2026-11-23T01:26:30Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: d97afb581f1f627aed61629fe6289c1698deef68c9e98e85defed4e15b7e4aa3
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 3f720092212a14e76eed7e38d817cec7103130a5e793bef6f8d20e72abb64937
+    AC-002: 5ed5604be1c62bf8557b4cdcfffd3b256187dcf27242c3c2c55f80ae2d14aaa2
+    AC-003: 4b2dfbced48ee35d1b0521036e610d7cd01569df40698b25208c40e86a397a7d
+    AC-004: 42915cfdb9af79793787ba0284ad5bc886514d1814aed83cced5d7ae8754c9af
+    AC-005: 85a05a3319a6d53b89b9040cec839e7455fef664620fb055b0f1beb74424bb6c
+    AC-006: 0d3c2bb6a2833ead5d1f78ba5925e75d8c9a82a98aa5d9311be3e75c71cdbf45
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923

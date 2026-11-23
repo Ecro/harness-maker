@@ -1,0 +1,15 @@
+{
+  "AC-005": [
+    {
+      "expected": [
+        "uv run ruff check .",
+        "uv run ruff format --check .",
+        "uv run mypy --strict src tests",
+        "uv run pytest -x --tb=short -n auto --dist loadfile"
+      ],
+      "input": {
+        "root": "repo"
+      }
+    }
+  ]
+}

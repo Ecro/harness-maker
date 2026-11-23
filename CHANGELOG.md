@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **CI runs the test suite in three parallel shards; the serial run moved to nightly**
+  (SPEC-ci-shard-serial-nightly). On one 4-vCPU runner `quality-gate` took about 13 minutes per PR
+  push (pytest 12m17s) and release.yml about 32, of which ~28 was a serial pytest re-run of a
+  commit CI had just tested. `ci.yml` and `release.yml` now split pytest by test file across
+  `quality-gate (1/3)`..`(3/3)` (`HM_TEST_SHARD`, read by `tests/conftest.py`); a summary job keeps
+  the `quality-gate` check name. `nightly.yml` now runs the serial suite (the order-dependence
+  oracle), a Python 3.13 run, and fresh-install readiness, and skips a scheduled run when main has
+  not moved since the last green nightly. `install-cmd-regression` no longer waits for
+  quality-gate. Locally nothing changes: `hm check` and `uv run pytest` still run every test.
+
 ### Fixed
 
 - **Maker loads in cloud sessions and untrusted folders** (SPEC-maker-digest-bash-step, HR-023).

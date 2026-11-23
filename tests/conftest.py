@@ -24,11 +24,75 @@ fixture ordering nothing pins, and every later test copies that.
 
 from __future__ import annotations
 
+import hashlib
+import os
 from pathlib import Path
 
 import pytest
 
 _SESSION_ENV_KEYS = ("CLAUDECODE", "CLAUDE_ENV_FILE", "HM_SESSION_ID")
+
+#: CI splits the suite into parallel jobs by setting this to `i/n` (SPEC-ci-shard-serial-nightly).
+#: Unset everywhere else, so `hm check` and a bare `uv run pytest` run every test.
+_SHARD_ENV = "HM_TEST_SHARD"
+
+
+def parse_shard(spec: str) -> tuple[int, int]:
+    """`"2/3"` → `(2, 3)`; anything else is an error, never a silent full or empty run."""
+    parts = spec.split("/")
+    if len(parts) == 2 and all(p.isdigit() for p in parts):
+        index, total = int(parts[0]), int(parts[1])
+        if 1 <= index <= total:
+            return index, total
+    raise ValueError(f"{_SHARD_ENV} must be 'i/n' with 1 <= i <= n, got {spec!r}")
+
+
+def shard_of(relpath: str, total: int) -> int:
+    """By file, so `--dist loadfile`'s within-file ordering survives the split."""
+    # sha256, not hash(): xdist workers recollect in their own processes, and str hashing is
+    # salted per process, so the workers would disagree with the controller.
+    digest = hashlib.sha256(relpath.replace(os.sep, "/").encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") % total
+
+
+def _shard_from_env() -> tuple[int, int] | None:
+    spec = os.environ.get(_SHARD_ENV)
+    if not spec:
+        return None
+    try:
+        return parse_shard(spec)
+    except ValueError as exc:
+        raise pytest.UsageError(str(exc)) from None
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Fail before xdist starts workers, where the error turns into opaque INTERNALERRORs."""
+    _shard_from_env()
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    shard = _shard_from_env()
+    if shard is None:
+        return
+    index, total = shard
+    if total == 1:
+        return
+    root = config.rootpath
+    keep: list[pytest.Item] = []
+    drop: list[pytest.Item] = []
+    for item in items:
+        rel = os.path.relpath(item.path, root)
+        (keep if shard_of(rel, total) == index - 1 else drop).append(item)
+    if drop:
+        config.hook.pytest_deselected(items=drop)
+        items[:] = keep
+
+
+@pytest.fixture(autouse=True)
+def _scrub_shard_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A test that runs an inner pytest must not inherit the outer run's shard."""
+    monkeypatch.delenv(_SHARD_ENV, raising=False)
+
 
 #: The tests tree. `_redirect_ledger_writes` redirects a ledger append only when its target
 #: would CONTAIN this directory — i.e. only when it resolved to this checkout, which is the
