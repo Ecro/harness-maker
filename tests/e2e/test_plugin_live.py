@@ -83,10 +83,9 @@ def _run_make(
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def fresh_project(tmp_path: Path) -> Path:
+def _seed_project(root: Path) -> Path:
     """Minimal Python project with a git repo — matches the fresh-install path."""
-    proj = tmp_path / "myproject"
+    proj = root / "myproject"
     proj.mkdir()
     (proj / "pyproject.toml").write_text(
         '[project]\nname = "myproject"\nversion = "0.1.0"\nrequires-python = ">=3.12"\n',
@@ -106,6 +105,21 @@ def fresh_project(tmp_path: Path) -> Path:
         ["git", "commit", "-m", "seed"], cwd=proj, check=True, capture_output=True, env=git_env
     )
     return proj
+
+
+@pytest.fixture
+def fresh_project(tmp_path: Path) -> Path:
+    return _seed_project(tmp_path)
+
+
+@pytest.fixture(scope="module")
+def default_make(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[Path, subprocess.CompletedProcess[str]]:
+    """One default-args make per module: three tests only read its result, and each live
+    session costs about a minute (SPEC-test-suite-speed AC-003)."""
+    project = _seed_project(tmp_path_factory.mktemp("default_make"))
+    return project, _run_make(project)
 
 
 # ---------------------------------------------------------------------------
@@ -131,9 +145,11 @@ def test_plugin_failure_is_not_hidden_as_environment_unavailability() -> None:
 
 
 @pytest.mark.skipif(not _claude_available(), reason="claude binary not in PATH")
-def test_make_fresh_install_creates_harness_yaml(fresh_project: Path) -> None:
+def test_make_fresh_install_creates_harness_yaml(
+    default_make: tuple[Path, subprocess.CompletedProcess[str]],
+) -> None:
     """Fresh /harness-maker:make --ci must produce .claude/harness.yaml."""
-    cp = _run_make(fresh_project)
+    fresh_project, cp = default_make
     assert cp.returncode == 0, (
         f"make returned rc={cp.returncode}\nstdout={cp.stdout[:800]}\nstderr={cp.stderr[:400]}"
     )
@@ -143,9 +159,11 @@ def test_make_fresh_install_creates_harness_yaml(fresh_project: Path) -> None:
 
 
 @pytest.mark.skipif(not _claude_available(), reason="claude binary not in PATH")
-def test_make_fresh_install_file_count(fresh_project: Path) -> None:
+def test_make_fresh_install_file_count(
+    default_make: tuple[Path, subprocess.CompletedProcess[str]],
+) -> None:
     """Fresh install must produce at least 25 files under .claude/."""
-    cp = _run_make(fresh_project)
+    fresh_project, cp = default_make
     assert cp.returncode == 0, f"make failed: rc={cp.returncode} stderr={cp.stderr[:400]}"
     files = [f for f in (fresh_project / ".claude").rglob("*") if f.is_file()]
     assert len(files) >= 25, f"expected ≥25 files, got {len(files)}: {[f.name for f in files]}"
@@ -167,13 +185,15 @@ def test_make_production_preset(fresh_project: Path) -> None:
 
 
 @pytest.mark.skipif(not _claude_available(), reason="claude binary not in PATH")
-def test_make_no_interactive_prompts(fresh_project: Path) -> None:
+def test_make_no_interactive_prompts(
+    default_make: tuple[Path, subprocess.CompletedProcess[str]],
+) -> None:
     """With --ci, the session must complete without hanging on AskUserQuestion."""
-    # Use the default 180s timeout (not a tight 60s override): a real `claude -p`
-    # full `make` session legitimately runs >60s under parallel-suite load, so the
-    # tight cap produced load-induced false TIMEOUTS. A genuine AskUserQuestion
-    # hang still raises at 180s; this only removes the flaky false-positive.
-    cp = _run_make(fresh_project)
+    # The shared run uses the default 180s timeout (not a tight 60s override): a real
+    # `claude -p` full `make` session legitimately runs >60s under parallel-suite load, so
+    # the tight cap produced load-induced false TIMEOUTS. A genuine AskUserQuestion hang
+    # still raises at 180s (as a setup error of the shared fixture).
+    _, cp = default_make
     # AskUserQuestion hang → subprocess timeout (raises); error → rc != 0.
     assert cp.returncode == 0, (
         f"session hung or errored (rc={cp.returncode}); likely AskUserQuestion blocked\n"
