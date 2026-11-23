@@ -52,7 +52,6 @@ def ast_uses(names: frozenset[str], *, exclude: Path) -> list[str]:
                 continue
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
-                where = f"{path.relative_to(REPO)}:{getattr(node, 'lineno', 0)}"
                 if isinstance(node, ast.ImportFrom) and node.module:
                     from_removed = any(
                         node.module == f"harness_maker.memory.{m}" for m in REMOVED_MODULES
@@ -60,19 +59,20 @@ def ast_uses(names: frozenset[str], *, exclude: Path) -> list[str]:
                     names_removed = node.module == "harness_maker.memory" and any(
                         a.name in names or a.name in REMOVED_MODULES for a in node.names
                     )
-                    if from_removed or names_removed:
-                        hits.append(where)
+                    hit = from_removed or names_removed
                 elif isinstance(node, ast.Import):
-                    if any(
+                    hit = any(
                         a.name == f"harness_maker.memory.{m}"
                         for a in node.names
                         for m in REMOVED_MODULES
-                    ):
-                        hits.append(where)
-                elif (isinstance(node, ast.Name) and node.id in names) or (
-                    isinstance(node, ast.Attribute) and node.attr in names
-                ):
-                    hits.append(where)
+                    )
+                else:
+                    hit = (isinstance(node, ast.Name) and node.id in names) or (
+                        isinstance(node, ast.Attribute) and node.attr in names
+                    )
+                if hit:
+                    # Format on a hit only; per node it was 90% of this scan (test-suite-speed).
+                    hits.append(f"{path.relative_to(REPO)}:{getattr(node, 'lineno', 0)}")
     return hits
 
 

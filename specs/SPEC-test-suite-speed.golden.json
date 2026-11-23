@@ -1,0 +1,20 @@
+{
+  "AC-001": [
+    {
+      "expected": [
+        "src/pkg/a.py:1",
+        "src/pkg/a.py:10",
+        "src/pkg/a.py:11",
+        "src/pkg/a.py:11",
+        "src/pkg/a.py:2",
+        "src/pkg/a.py:3",
+        "src/pkg/a.py:5",
+        "src/pkg/a.py:9",
+        "tests/b.py:2"
+      ],
+      "input": {
+        "tree": "seeded"
+      }
+    }
+  ]
+}

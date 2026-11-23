@@ -1,0 +1,119 @@
+schema_version: 3
+spec_slug: test-suite-speed
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: ast_uses returns the unchanged hit list
+  type: parametric
+  test_ids:
+  - 'tests/unit/test_test_suite_speed.py::test_ac_001_ast_uses_golden[AC-001-{"tree":
+    "seeded"}]'
+  executable_predicate: null
+  golden_table:
+  - input:
+      tree: seeded
+    expected:
+    - src/pkg/a.py:1
+    - src/pkg/a.py:10
+    - src/pkg/a.py:11
+    - src/pkg/a.py:11
+    - src/pkg/a.py:2
+    - src/pkg/a.py:3
+    - src/pkg/a.py:5
+    - src/pkg/a.py:9
+    - tests/b.py:2
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Computed on 2026-11-23 by running the unchanged ast_uses (main
+    b581b44f) over the seeded tree; never regenerated.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: ast_uses formats a location only on a hit
+  type: property
+  test_ids:
+  - tests/unit/test_test_suite_speed.py::test_ac_002_location_formatted_only_on_hit
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation counts calls, independent of what the formatting code
+    looks like; the unchanged code calls relative_to once per AST node.
+  oracle_independence_waiver: null
+  input_domain: the seeded tree of AC-001
+  transformation: count Path.relative_to calls on scanned files during one ast_uses
+    call
+  expected_relation: count == len(hits)
+  preconditions: []
+  observable_output: number of location formattings vs number of hits
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the live e2e module launches claude once per argument set
+  type: mechanical
+  test_ids:
+  - tests/unit/test_test_suite_speed.py::test_ac_003_live_make_runs_once_per_args
+  executable_predicate: rc == 0 and launches == 2
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected 2 is the number of distinct _run_make argument sets
+    in the module (Side/en/task and Production/en/spec), read from the test file before
+    the change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 4bf2b46e5c79f26f7fa4a19f5bd3b195191d447ee6752bab94e8890f7b11c1a5
+  approved_by: Claude
+  approved_at: '2026-11-23T09:42:54Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: c753cf15a9ec4bc90615961df493d9922be48bb1ddf0abb5e5b15bfd0279f91c
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 1e0fd2303a5b7a88f4ea80e473ba8c267320e12e558414cc7edbdbcb90265cf3
+    AC-002: 8a983eae4d678d4389b6e189cbf21e2e0d916024e13f29aaa013e37ff4cada83
+    AC-003: d799752f0a44eaefdf72706769703dde433fe8a6af74fce48d651c22c8bd3eec
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d

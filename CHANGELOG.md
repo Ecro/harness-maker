@@ -24,6 +24,12 @@
   oracle), a Python 3.13 run, and fresh-install readiness, and skips a scheduled run when main has
   not moved since the last green nightly. `install-cmd-regression` no longer waits for
   quality-gate. Locally nothing changes: `hm check` and `uv run pytest` still run every test.
+- **Two slow tests got faster with every assertion kept** (SPEC-test-suite-speed).
+  `test_memory_tier_removed.py::test_no_imports_remain` built a location string for each of ~1 M
+  AST nodes; it now formats one only on a hit (24.5 s → 1.8 s, same hits). The three
+  default-argument tests in `tests/e2e/test_plugin_live.py` share one module-scoped live
+  `/harness-maker:make` run, so a suite run with `claude` on PATH starts 2 live sessions instead
+  of 4 (module 59 s wall). A fake-`claude` test pins the launch count, also in CI.
 
 ### Fixed
 
