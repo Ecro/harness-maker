@@ -49,7 +49,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from harness_maker import economics, economics_source
@@ -98,6 +98,7 @@ BENCH_DIR = Path(__file__).resolve().parent / "bench"
 FIXTURE_DIR = BENCH_DIR / "timeparse"
 TASKS_DIR = BENCH_DIR / "tasks"
 RESULTS = "results.jsonl"
+VARIANT_FILE = "variant.json"  # an hm-variant run's variant, read by scripts/self_prune.py
 SIGNOFF_FILE = BENCH_DIR / "tier2-signoff.json"  # the DRI's {tier2_hash, signed_by, signed_at}
 CALIBRATION_FILE = BENCH_DIR / "judge-calibration.json"  # canary --judge-calibration --record
 # Tier 3 (SPEC-hm-eval-tier3) lives apart from tasks/, so bench_hash and tier2_hash of tiers 1-2
@@ -107,7 +108,8 @@ TIER3_SIGNOFF_FILE = BENCH_DIR / "tier3-signoff.json"  # the DRI's {tier3_hash, 
 # Plain controls (SPEC-hm-eval-tier3 S8): their own arms, never part of the plain-vs-hm scorecard.
 CONTROL_ARMS = ("plain-careful", "plain-continue")
 #: hm with one step removed, for a TUNE re-measure (SPEC-hm-cost-p4 AC-008): spec-validator off.
-VARIANT_ARMS = ("hm-novalidator",)
+#: hm-variant is hm with a `--variant` file's edits applied to the render (SPEC-self-prune-loop).
+VARIANT_ARMS = ("hm-novalidator", "hm-variant")
 HM_ARMS = ("hm", *VARIANT_ARMS)
 ALL_ARMS = (*ARMS, *CONTROL_ARMS, *VARIANT_ARMS)
 # Arms whose sessions after the first resume the conversation, so the CLI's total_cost_usd is a
@@ -338,6 +340,7 @@ class Options:
     judge_budget_usd: float = DEFAULT_JUDGE_BUDGET_USD
     judge_timeout_s: int = JUDGE_TIMEOUT_S
     tier3_hash: str = ""  # recorded on tier-3 rows only
+    variant: dict[str, Any] | None = None  # the hm-variant arm's edits (SPEC-self-prune-loop)
 
 
 # --- fixture and tasks ------------------------------------------------------------------------
@@ -500,9 +503,10 @@ def runner_hash(
     judge: bool = True,
     judge_model: str = "",
     judge_budget_usd: float = DEFAULT_JUDGE_BUDGET_USD,
+    variant_sha: str = "",
 ) -> str:
     """Hash of every runner setting that changes what an arm does or how it is scored, so rows
-    never mix them."""
+    never mix them. A variant enters only when set, so every hash without one is unchanged."""
     config = {
         "hm_prefix": HM_PREFIX,
         "dri": {
@@ -533,6 +537,8 @@ def runner_hash(
             "diff_cap": JUDGE_DIFF_CAP,
         },
     }
+    if variant_sha:
+        config["variant"] = variant_sha
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:12]
 
 
@@ -1492,7 +1498,7 @@ def _git(work: Path, *args: str) -> None:
 
 def build_template(
     dest: Path, arm: str, fixture: Path = FIXTURE_DIR, seed: Path | None = None,
-    *, base: Path | None = None,
+    *, base: Path | None = None, variant: dict[str, Any] | None = None,
 ) -> None:  # fmt: skip
     """Fixture (plus a tier-3 task's base, then a task's seed) in a clean git repo; the hm arm
     adds this checkout's harness as a second commit.
@@ -1520,8 +1526,117 @@ def build_template(
         )
         if arm == "hm-novalidator":
             drop_spec_validator(dest)
+        if arm == "hm-variant":
+            if variant is None:
+                raise VariantError("the hm-variant arm needs a variant")
+            apply_variant(dest, variant)
         _git(dest, "add", "-A")
         _git(dest, "commit", "-q", "-m", "harness")
+
+
+class VariantError(ValueError):
+    """A variant edit that does not apply cleanly: refused before any model spend."""
+
+
+_HEADING = re.compile(r"^(#{1,6}) ")
+_FENCE = re.compile(r"^\s*(```|~~~)")
+
+
+def heading_matches(line: str, heading: str) -> bool:
+    """`## Step 4` names `## Step 4 — Check`, never `## Step 4.6 — …`."""
+    return line == heading or line.startswith(heading + " ")
+
+
+def headings(lines: list[str]) -> list[tuple[int, int]]:
+    """(line index, level) of every markdown heading outside a code fence."""
+    found: list[tuple[int, int]] = []
+    fenced = False
+    for i, line in enumerate(lines):
+        if _FENCE.match(line):
+            fenced = not fenced
+        elif not fenced and (m := _HEADING.match(line)):
+            found.append((i, len(m.group(1))))
+    return found
+
+
+def section_span(lines: list[str], heading: str) -> tuple[int, int]:
+    """[start, end) of the one section opened by `heading`, up to the next heading of the same
+    or a higher level."""
+    marks = headings(lines)
+    hits = [(i, level) for i, level in marks if heading_matches(lines[i], heading)]
+    if len(hits) != 1:
+        raise VariantError(f"heading {heading!r} matches {len(hits)} section(s), not 1")
+    start, level = hits[0]
+    end = next((i for i, lv in marks if i > start and lv <= level), len(lines))
+    return start, end
+
+
+def edit_rel(edit: Any) -> str:
+    """The edit's path, normalised (`./a/b` is `a/b`), so protection compares one spelling."""
+    rel = edit.get("path") if isinstance(edit, dict) else None
+    if not isinstance(rel, str) or not rel or Path(rel).is_absolute() or ".." in Path(rel).parts:
+        raise VariantError(f"edit path {rel!r} must be a relative path inside the render")
+    norm = PurePosixPath(rel).as_posix()
+    if norm in ("", "."):
+        raise VariantError(f"edit path {rel!r} names no file")
+    return norm
+
+
+def apply_edit(text: str, edit: dict[str, Any]) -> str:
+    """One edit on one file's text: `drop_heading` removes one section, `old`/`new` replaces text
+    that occurs exactly once. The edit must change the text."""
+    if "drop_heading" in edit:
+        lines = text.splitlines(keepends=True)
+        start, end = section_span([ln.rstrip("\n") for ln in lines], str(edit["drop_heading"]))
+        new_text = "".join(lines[:start] + lines[end:])
+    elif isinstance(edit.get("old"), str) and isinstance(edit.get("new"), str):
+        count = text.count(edit["old"]) if edit["old"] else 0
+        if count != 1:
+            raise VariantError(f"{edit['path']}: {edit['old']!r} occurs {count} time(s), not 1")
+        new_text = text.replace(edit["old"], edit["new"])
+    else:
+        raise VariantError(f"edit {edit!r} needs drop_heading, or old and new")
+    if new_text == text:
+        raise VariantError(f"edit {edit!r} changes nothing")
+    return new_text
+
+
+def variant_edits(variant: dict[str, Any]) -> list[dict[str, Any]]:
+    edits = variant.get("edits")
+    if not isinstance(edits, list) or not edits:
+        raise VariantError(f"variant {variant.get('id')!r} has no edits")
+    for edit in edits:
+        if not isinstance(edit, dict):
+            raise VariantError(f"edit {edit!r} is not an object")
+    return edits
+
+
+def apply_variant(root: Path, variant: dict[str, Any]) -> None:
+    """Apply a variant's edits in order, each to the file as the edits before it left it."""
+    for edit in variant_edits(variant):
+        path = root / edit_rel(edit)
+        if not path.is_file():
+            raise VariantError(f"edit path {edit['path']} is not a rendered file")
+        atomic_write(path, apply_edit(path.read_text(encoding="utf-8"), edit))
+
+
+def load_variant(path: Path) -> tuple[dict[str, Any], str]:
+    """The variant file and the sha of its bytes (the runner hash input)."""
+    raw = path.read_bytes()
+    try:
+        variant = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise VariantError(f"{path}: not JSON ({exc})") from exc
+    if not isinstance(variant, dict) or not isinstance(variant.get("id"), str):
+        raise VariantError(f"{path}: a variant is an object with a string id")
+    return variant, hashlib.sha256(raw).hexdigest()[:12]
+
+
+def variant_fields(opts: Options, arm: str) -> dict[str, Any]:
+    """The row field that names an hm-variant row's variant; nothing for every other arm."""
+    if arm == "hm-variant" and opts.variant is not None:
+        return {"variant": opts.variant["id"]}
+    return {}
 
 
 #: Where the rendered spec stage lives per target; the variant edits only these.
@@ -1798,6 +1913,7 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
         "bench": BENCH_ID, "bench_hash": opts.bench_hash, "harness_sha": opts.harness_sha,
         "runner_hash": opts.runner_hash, "model": opts.model, "tier": task.tier,
         "task": task.id, "arm": arm, "rep": rep, "max_budget_usd": opts.max_budget_usd,
+        **variant_fields(opts, arm),
         "total_budget_usd": opts.total_budget_usd,
         "started_at": datetime.now(UTC).isoformat(timespec="seconds"), "run_dir": str(run_dir),
     }  # fmt: skip
@@ -3407,7 +3523,25 @@ def _run_grid(
     return skipped
 
 
-def _make_options(args: argparse.Namespace, out: Path, digest: str, snap_root: Path) -> Options:
+def _run_variant(args: argparse.Namespace) -> tuple[dict[str, Any], str] | None:
+    """The `--variant` file and its sha, or None without one; VariantError when the arm and the
+    flag do not come together or the file is not a variant."""
+    if ("hm-variant" in args.arms.split(",")) != bool(args.variant):
+        raise VariantError(
+            f"the hm-variant arm and --variant <file> go together (arms: {args.arms})"
+        )
+    if not args.variant:
+        return None
+    try:
+        return load_variant(Path(args.variant))
+    except OSError as exc:
+        raise VariantError(str(exc)) from exc
+
+
+def _make_options(
+    args: argparse.Namespace, out: Path, digest: str, snap_root: Path,
+    variant: tuple[dict[str, Any], str] | None = None,
+) -> Options:  # fmt: skip
     transcripts = args.transcript_root or default_transcript_root()
     pass_env = tuple(n for n in args.pass_env.split(",") if n)
     tools = tool_versions()
@@ -3419,6 +3553,7 @@ def _make_options(args: argparse.Namespace, out: Path, digest: str, snap_root: P
             args.model, args.max_turns, args.timeout_s, args.max_budget_usd, pass_env,
             claude_version(args.claude_bin, pass_env), quality_tools=tools, judge=args.judge,
             judge_model=args.judge_model or args.model, judge_budget_usd=args.judge_budget_usd,
+            variant_sha=variant[1] if variant else "",
         ),
         max_budget_usd=args.max_budget_usd,
         total_budget_usd=getattr(args, "total_budget_usd", DEFAULT_TOTAL_BUDGET_USD),
@@ -3427,6 +3562,7 @@ def _make_options(args: argparse.Namespace, out: Path, digest: str, snap_root: P
         pass_env=pass_env, fixture=snap_root / "bench" / "timeparse", quality_tools=tools,
         judge=args.judge, judge_model=args.judge_model or args.model,
         judge_budget_usd=args.judge_budget_usd, tier3_hash=tier3_hash(snap_root / "bench"),
+        variant=variant[0] if variant else None,
     )  # fmt: skip
 
 
@@ -3543,6 +3679,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if os.environ.get("INTEGRATION") != "1":
         print("run calls a live model; set INTEGRATION=1 to opt in", file=sys.stderr)
         return 2
+    try:
+        variant = _run_variant(args)
+    except VariantError as exc:
+        print(f"refusing --variant: {exc}", file=sys.stderr)
+        return 2
     if sandbox_refusal(args, "run"):
         return 2
     out = _guarded_out(args)
@@ -3586,7 +3727,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         snap_root = snap.parent
         snapped = load_tier3_tasks(snap) if tier3 else load_tasks(snap / "tasks")
         tasks = {t.id: t for t in snapped if t.id in wanted}
-        opts = _make_options(args, out, digest, snap_root)
+        opts = _make_options(args, out, digest, snap_root, variant)
         rows = read_rows(out)
         try:
             ensure_consistent(rows, {
@@ -3596,6 +3737,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
         except MixedResultsError as exc:
             print(f"refusing to resume: {exc}", file=sys.stderr)
             return 2
+        if opts.variant is not None:  # after the check, so a refused run never rewrites it
+            atomic_write(out / VARIANT_FILE, json.dumps(opts.variant, indent=2) + "\n")
         cells = pending_cells(rows, list(tasks), arms, args.runs)
         (out / "runs").mkdir(exist_ok=True, mode=0o700)
         templates: dict[str, Path] = {}
@@ -3607,9 +3750,14 @@ def _cmd_run(args: argparse.Namespace) -> int:
             templates[key].parent.mkdir(exist_ok=True, mode=0o700)
             try:
                 build_template(
-                    templates[key], arm, snap / "timeparse", task.seed_dir, base=task.base_dir
+                    templates[key],
+                    arm,
+                    snap / "timeparse",
+                    task.seed_dir,
+                    base=task.base_dir,
+                    variant=opts.variant,
                 )
-            except (OSError, shutil.Error, subprocess.SubprocessError) as exc:
+            except (OSError, shutil.Error, subprocess.SubprocessError, VariantError) as exc:
                 print(f"cannot build the {key} template: {failure_text(exc)}", file=sys.stderr)
                 return 2
         hm_templates = [templates[k] for k, (_, arm) in sorted(needed.items()) if arm in HM_ARMS]
@@ -3744,6 +3892,10 @@ def _parser() -> argparse.ArgumentParser:
         help=f"comma-separated, from {', '.join(ALL_ARMS)}; the plain controls are tier-3 arms",
     )  # fmt: skip
     run.add_argument("--runs", type=int, default=3, help="runs per task and arm")
+    run.add_argument(
+        "--variant", default=None,
+        help="variant JSON for the hm-variant arm: render edits (scripts/self_prune.py plan)",
+    )  # fmt: skip
     run.add_argument(
         "--jobs", type=int, default=1,
         help="runs in parallel; runs share the user's Claude state, so smoke-test live first",

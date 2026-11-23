@@ -1,0 +1,357 @@
+schema_version: 3
+spec_slug: self-prune-loop
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: hm-variant applies drop and replace edits to the rendered harness
+  type: mechanical
+  test_ids:
+  - tests/unit/test_self_prune.py::test_ac_001_apply_variant
+  executable_predicate: section_gone(apply_variant(tree, drop("## Step 4.6"))) and
+    replaced_once(apply_variant(tree, replace("(2) rounds", "(1) rounds"))) and raises_variant_error(no_match_edit,
+    missing_file_edit, twice_old_edit)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected trees are hand-written markdown files in the test,
+    built before the code; the section boundary rule (next heading of the same or
+    higher level) is the markdown outline rule, not derived from the implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the bench wires hm-variant safely
+  type: mechanical
+  test_ids:
+  - tests/unit/test_self_prune.py::test_ac_002_bench_wiring
+  - tests/unit/test_self_prune.py::test_ac_002_variant_row_field
+  executable_predicate: '"hm-variant" in bench.HM_ARMS and run_exit(["--arms", "hm-variant"])
+    == 2 and run_exit(["--arms", "hm", "--variant", f]) == 2 and bench.runner_hash(*args)
+    == HASH_BEFORE and bench.runner_hash(*args, variant_sha="ab") != HASH_BEFORE'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: HASH_BEFORE is computed by the unchanged code at spec time on main
+    (a0b28554) and pinned in the test, so the no-variant case is checked against pre-change
+    behaviour, not the new code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: protected sections cannot be ablated
+  type: mechanical
+  test_ids:
+  - tests/unit/test_self_prune.py::test_ac_003_protected
+  - tests/unit/test_self_prune.py::test_ac_003_protected_headings_render
+  - tests/unit/test_self_prune.py::test_ac_003_protection_bypasses
+  executable_predicate: protected_hits(tree, drop_parent_of_protected) and protected_hits(tree,
+    replace_inside_protected) and not protected_hits(tree, drop_unprotected) and set(guard
+    for guard in PROTECTED_GUARDS) == SIX_NON_NEGOTIABLES and all(heading_in_render(h)
+    for h in PROTECTED)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The six non-negotiables are the DRI's list (project memory, hm
+    product principle 2026-10-15), not the code's; the render check reads a real bench-fixture
+    render, independent of the table it validates.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: plan validates the candidates file
+  type: mechanical
+  test_ids:
+  - tests/unit/test_self_prune.py::test_ac_004_plan
+  executable_predicate: plan_exit(good_two) == 0 and written(out) == {"a.json", "b.json"}
+    and all(plan_exit(bad) == 2 and written(out) == set() for bad in [four_candidates,
+    duplicate_id, no_detectable_by, edit_no_match, protected_edit])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each bad input violates one stated SPEC rule by construction; the
+    expected exit and empty output come from the SPEC text, not from running plan.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: decide applies the guard rule
+  type: parametric
+  test_ids:
+  - tests/unit/test_self_prune.py::test_ac_005_rule[AC-005-0]
+  - tests/unit/test_self_prune.py::test_ac_005_rule[AC-005-1]
+  - tests/unit/test_self_prune.py::test_ac_005_rule[AC-005-2]
+  - tests/unit/test_self_prune.py::test_ac_005_rule[AC-005-3]
+  - tests/unit/test_self_prune.py::test_ac_005_rule[AC-005-4]
+  - tests/unit/test_self_prune.py::test_ac_005_rule[AC-005-5]
+  - tests/unit/test_self_prune.py::test_ac_005_rule[AC-005-6]
+  - tests/unit/test_self_prune.py::test_ac_005_mismatch_exits_2[model]
+  - tests/unit/test_self_prune.py::test_ac_005_mismatch_exits_2[harness]
+  - tests/unit/test_self_prune.py::test_ac_005_mismatch_exits_2[bench]
+  - tests/unit/test_self_prune.py::test_ac_005_mismatch_exits_2[judge-model]
+  - tests/unit/test_self_prune.py::test_ac_005_mismatch_exits_2[variant-id]
+  - tests/unit/test_self_prune.py::test_ac_005_mismatch_exits_2[no-guard-rows]
+  - tests/unit/test_self_prune.py::test_ac_005_unequal_runs_hold
+  executable_predicate: null
+  golden_table:
+  - input:
+      solved:
+      - 6
+      - 6
+      trap:
+      - 3
+      - 3
+      judge:
+      - 3.8
+      - 3.7
+      cost:
+      - 1.0
+      - 0.9
+      stalls:
+      - 0
+      - 0
+      detectable: true
+    expected: adopt
+    edge: false
+    note: ''
+  - input:
+      solved:
+      - 6
+      - 5
+      trap:
+      - 3
+      - 3
+      judge:
+      - 3.8
+      - 3.8
+      cost:
+      - 1.0
+      - 0.8
+      stalls:
+      - 0
+      - 0
+      detectable: true
+    expected: reject
+    edge: false
+    note: ''
+  - input:
+      solved:
+      - 6
+      - 6
+      trap:
+      - 3
+      - 2
+      judge:
+      - 3.8
+      - 3.8
+      cost:
+      - 1.0
+      - 0.8
+      stalls:
+      - 0
+      - 0
+      detectable: true
+    expected: reject
+    edge: false
+    note: ''
+  - input:
+      solved:
+      - 6
+      - 6
+      trap:
+      - 3
+      - 3
+      judge:
+      - 3.8
+      - 3.4
+      cost:
+      - 1.0
+      - 0.8
+      stalls:
+      - 0
+      - 0
+      detectable: true
+    expected: hold
+    edge: false
+    note: ''
+  - input:
+      solved:
+      - 6
+      - 6
+      trap:
+      - 3
+      - 3
+      judge:
+      - 3.8
+      - 3.8
+      cost:
+      - 1.0
+      - 0.98
+      stalls:
+      - 0
+      - 0
+      detectable: true
+    expected: hold
+    edge: false
+    note: ''
+  - input:
+      solved:
+      - 6
+      - 6
+      trap:
+      - 3
+      - 3
+      judge:
+      - 3.8
+      - 3.8
+      cost:
+      - 1.0
+      - 0.8
+      stalls:
+      - 0
+      - 1
+      detectable: true
+    expected: hold
+    edge: false
+    note: ''
+  - input:
+      solved:
+      - 6
+      - 6
+      trap:
+      - 3
+      - 3
+      judge:
+      - 3.8
+      - 3.8
+      cost:
+      - 1.0
+      - 0.8
+      stalls:
+      - 0
+      - 0
+      detectable: false
+    expected: hold
+    edge: false
+    note: ''
+  - input:
+      mismatch: model
+    expected: exit 2
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each row is the SPEC's rule applied by hand to [baseline, candidate]
+    pairs written before the code; the boundary rows (0.4 judge drop, 2% saving) sit
+    on either side of the stated thresholds.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: decide records verdicts and status reads them
+  type: mechanical
+  test_ids:
+  - tests/unit/test_self_prune.py::test_ac_006_ledger_and_status
+  executable_predicate: len(ledger_rows_after(decide_two)) == 2 and keys(row) >= {"model",
+    "harness_sha", "candidate", "verdict", "reasons", "metrics", "decided_at"} and
+    "고쳐줘" in table_for_adopted and status_exit("m1") == 0 and status_exit("m2") ==
+    1
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected rows, keys and exit codes are fixed by the SPEC text and
+    a hand-written ledger fixture, not by the implementation's output.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: f91d26c9348859cf3bdef89b1e583dccb2cc07a6244db904c96ad139dc565c69
+  approved_by: Claude
+  approved_at: '2026-11-23T01:19:34Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 5067c3a1790bc83f6b81d851a84c28d08e669be441cddce199291d58b10501d5
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 4d9d0d6796538b94305605df0a8a8e09210d2cf63ac00b4eb792f7d9f7b9686e
+    AC-002: ed8bd34d2534c94cf8db3c2e1fe3e2c101a25282fdd20957f5b74337d7b03a86
+    AC-003: 1bf877d9d32023c5a5b18095785efda0b85225a0bda23e725466c62e1526865b
+    AC-004: c7c5a628daa7a42c4a422ed4d106f5257ec4c3ce61db42efe5040937b6877b0a
+    AC-005: 0c65bb668ff13083cbd261461a524911503e272531f7a21dbea4f2813c6f70b9
+    AC-006: f850f3af554d5db172560504b32ddc6cb97e2bab25e72ab38b62541e7e13e586
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923

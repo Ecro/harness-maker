@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Self-prune loop for new models** (SPEC-self-prune-loop). When a new default model ships, hm
+  ablates up to three candidate blocks of its rendered harness on the bench, one at a time, and
+  proposes the cuts that pass deterministic guards (tier-2 hidden tests and trap catches never
+  fall, judge drop <= 0.3, cost down >= 3%). Proposals only: nothing edits templates or opens a PR
+  of cuts. New `hm-variant` bench arm with `--variant <json>` (the runner hash is unchanged without
+  one), `scripts/self_prune.py plan|decide|status`, ledger `docs/evals/prune-ledger.jsonl`,
+  procedure `docs/evals/SELF-PRUNE.md`. Edits inside the per-task worktree, TDD RED gate, SDD,
+  human approval, IRR lock and understanding-delta sections are refused.
+
 ### Fixed
 
 - **Maker loads in cloud sessions and untrusted folders** (SPEC-maker-digest-bash-step, HR-023).

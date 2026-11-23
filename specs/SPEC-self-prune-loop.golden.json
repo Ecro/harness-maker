@@ -1,0 +1,192 @@
+{
+  "AC-005": [
+    {
+      "expected": "adopt",
+      "input": {
+        "cost": [
+          1.0,
+          0.9
+        ],
+        "detectable": true,
+        "judge": [
+          3.8,
+          3.7
+        ],
+        "solved": [
+          6,
+          6
+        ],
+        "stalls": [
+          0,
+          0
+        ],
+        "trap": [
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "expected": "reject",
+      "input": {
+        "cost": [
+          1.0,
+          0.8
+        ],
+        "detectable": true,
+        "judge": [
+          3.8,
+          3.8
+        ],
+        "solved": [
+          6,
+          5
+        ],
+        "stalls": [
+          0,
+          0
+        ],
+        "trap": [
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "expected": "reject",
+      "input": {
+        "cost": [
+          1.0,
+          0.8
+        ],
+        "detectable": true,
+        "judge": [
+          3.8,
+          3.8
+        ],
+        "solved": [
+          6,
+          6
+        ],
+        "stalls": [
+          0,
+          0
+        ],
+        "trap": [
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "expected": "hold",
+      "input": {
+        "cost": [
+          1.0,
+          0.8
+        ],
+        "detectable": true,
+        "judge": [
+          3.8,
+          3.4
+        ],
+        "solved": [
+          6,
+          6
+        ],
+        "stalls": [
+          0,
+          0
+        ],
+        "trap": [
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "expected": "hold",
+      "input": {
+        "cost": [
+          1.0,
+          0.98
+        ],
+        "detectable": true,
+        "judge": [
+          3.8,
+          3.8
+        ],
+        "solved": [
+          6,
+          6
+        ],
+        "stalls": [
+          0,
+          0
+        ],
+        "trap": [
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "expected": "hold",
+      "input": {
+        "cost": [
+          1.0,
+          0.8
+        ],
+        "detectable": true,
+        "judge": [
+          3.8,
+          3.8
+        ],
+        "solved": [
+          6,
+          6
+        ],
+        "stalls": [
+          0,
+          1
+        ],
+        "trap": [
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "expected": "hold",
+      "input": {
+        "cost": [
+          1.0,
+          0.8
+        ],
+        "detectable": false,
+        "judge": [
+          3.8,
+          3.8
+        ],
+        "solved": [
+          6,
+          6
+        ],
+        "stalls": [
+          0,
+          0
+        ],
+        "trap": [
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "expected": "exit 2",
+      "input": {
+        "mismatch": "model"
+      }
+    }
+  ]
+}
