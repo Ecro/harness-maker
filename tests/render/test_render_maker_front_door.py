@@ -417,7 +417,7 @@ def test_ac007_ask_to_end_stage(row: Any, runtime: str, repo: Callable[[str], Pa
 
 
 # ---------------------------------------------------------------------------
-# AC-010 — the injected digest command never aborts Maker
+# AC-010 — the digest command never aborts Maker (a bash block since SPEC-maker-digest-bash-step)
 # ---------------------------------------------------------------------------
 
 _AC010 = load_golden_table(_SPEC_YAML, "AC-010")
@@ -429,11 +429,11 @@ _FAKE_UV = {
 
 
 def _injected_command(text: str, runtime: str) -> str:
-    if runtime == "codex":
-        blocks = re.findall(r"```bash\n(.*?)\n```", text, flags=re.S)
-        cmds = [b.strip() for b in blocks if "world_model digest" in b]
-    else:
-        cmds = re.findall(r"^!`(.+)`\s*$", text, flags=re.M)
+    # SPEC-maker-digest-bash-step: both targets run the digest as a bash block; `runtime` is kept
+    # for the callers' signature.
+    del runtime
+    blocks = re.findall(r"```bash\n(.*?)\n```", text, flags=re.S)
+    cmds = [b.strip() for b in blocks if "world_model digest" in b]
     assert len(cmds) == 1, cmds
     return str(cmds[0])
 

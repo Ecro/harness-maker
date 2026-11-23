@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Maker loads in cloud sessions and untrusted folders** (SPEC-maker-digest-bash-step, HR-023).
+  Since Claude Code 2.1.326, `CLAUDE_CODE_IGNORE_PERSISTED_TRUST` (set in claude.ai cloud containers,
+  by `--trust-workspace false` runners and for untrusted VS Code folders) makes the host ignore a
+  repository skill's `allowed-tools`, so Maker's `!`-injected digest failed its permission check and
+  `/maker` ended at 0 turns. The digest is now Maker's first Bash step on both targets, under the
+  session's permission mode: one extra tool turn per call, pre-approved where the grant is honoured.
+  The live boundary test gains an arm with the variable set.
+
 ## [0.66.1] - 2026-11-23
 
 Repository-only release: no change to what `harness-maker make` renders. The boundary suite now

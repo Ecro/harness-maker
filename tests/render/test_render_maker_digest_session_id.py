@@ -1,7 +1,9 @@
-"""SPEC-maker-digest-session-id: Maker's injected digest command holds no shell variable.
+"""SPEC-maker-digest-session-id: Maker's digest command holds no shell variable.
 
-Claude Code refuses an injected `!` command that holds a shell variable, so the Claude variant
-takes the id from the host's `${CLAUDE_SESSION_ID}` substitution; Codex keeps its shell variable.
+No `allowed-tools` rule matches a command that holds a shell variable or `$HOME`, so the Claude
+variant takes the id from the host's `${CLAUDE_SESSION_ID}` substitution; Codex keeps its shell
+variable. Since SPEC-maker-digest-bash-step the command is a bash block, not a `!` injection; the
+test ids keep their "injection" names so that SPEC's `test_ids` still resolve.
 """
 
 from __future__ import annotations
