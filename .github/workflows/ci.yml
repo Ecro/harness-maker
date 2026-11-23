@@ -6,12 +6,12 @@ on:
     branches:
       - main
 
-# Mirrors release.yml's quality-gate job by design (see release.yml lines
-# 19–21 — the release-time quality-gate intentionally duplicates ci.yml so a
-# slow regression between the last CI run and the tag push cannot reach
-# PyPI). quality-gate's steps MUST stay byte-identical to release.yml:quality-gate.
-# The `boundary` job is outside that rule: it runs the INTEGRATION=1 boundary suite on
-# every PR and push to main (SPEC-pr-boundary-gate).
+# quality-gate runs the same steps as release.yml:quality-gate (release re-tests the tagged
+# commit before anything is published). Both split pytest into three file shards that run in
+# parallel (SPEC-ci-shard-serial-nightly): on one 4-vCPU runner the suite was CPU-bound at
+# ~12 min, the repository is public so extra runners cost nothing, and waiting was the only
+# cost. The one serial full-suite run moved to nightly.yml. The `boundary` job runs the
+# INTEGRATION=1 boundary suite on every PR and push to main (SPEC-pr-boundary-gate).
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -19,10 +19,21 @@ concurrency:
 
 jobs:
   quality-gate:
+    name: quality-gate (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
+    strategy:
+      # Every shard reports its own failures instead of being cancelled by the first red one.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      # tests/conftest.py keeps only the test files that hash to this shard. The pytest `run:`
+      # line below carries no shard argument on purpose: `verification_plan` derives the local
+      # gate from it, so `hm check` and a bare `uv run pytest` still run the whole suite.
+      HM_TEST_SHARD: ${{ matrix.shard }}/3
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -37,35 +48,42 @@ jobs:
         run: uv python install 3.12
       - name: Sync dependencies
         run: uv sync --frozen
+      # Ruff, format and mypy (~20 s) run in every shard, so each shard is a complete gate and
+      # the steps need no `if:`.
       - name: Ruff check
         run: uv run ruff check .
       - name: Ruff format check
         run: uv run ruff format --check .
       - name: Mypy strict
         run: uv run mypy --strict src tests
-      # `hm test_runners plan` calls pytest "the only common runner that is SERIAL by default,
-      # the one place `-n` is the whole win rather than a tweak". It also warns that a suite
-      # only ever run in parallel hides order- and isolation-dependent failures; the job that
-      # answers that warning is now `release.yml:quality-gate`, the last serial full-suite run
-      # in CI. Nightly is parallel too — its comment explains the trade.
-      #
-      # Why this changed: run 32377369255 hit the 15m cap. It was not a step-change — the six
-      # successful runs before it took 812/837/850/814/884/846s against a 900s cap, so the
-      # remaining headroom (16-88s) had been smaller than the run-to-run spread (72s) for weeks.
-      # Raising `timeout-minutes` buys time until the next commit; this attacks the cause.
-      #
       # `--dist loadfile` is load-bearing, not tuning: tests here touch cwd, temp paths and git
       # refs, and `--dist load` would spread one file's tests across workers and let them race.
-      # `-n` stays on the command line rather than in `addopts`: `uv run pytest` with no flags
-      # must stay a genuine serial run, both locally and in release.yml, which passes no flags.
-      #
-      # Measured (14-core WSL2, so read the RATIO, not the seconds): serial did not finish
-      # inside 1800s; `-n 4 --dist loadfile -m "not advisory"` finished in 331s with zero
-      # failures; `-n auto` at 14 workers took 333s. Equal times at 4 and 14 workers means the
-      # suite is bound by subprocess and filesystem waiting, not cores — which is why a 4-vCPU
-      # runner is expected to see the same kind of win.
+      # The shards split by file too, for the same reason. `-n` stays on the command line rather
+      # than in `addopts`, so a bare `uv run pytest` is still a genuine serial run (nightly's).
       - name: Pytest
         run: uv run pytest -x --tb=short -n auto --dist loadfile
+
+  quality-gate-summary:
+    # One check under the old name, green only when every shard passed, so anything that
+    # waits on `quality-gate` (a required check, an agent reading the PR) keeps its meaning.
+    # The `if:` is load-bearing: a job skipped because a need failed reports success, so the
+    # summary must run after a failed shard. `!cancelled()` rather than `always()`, so a run that
+    # `cancel-in-progress` superseded does not leave a red `quality-gate` behind.
+    # A cancelled run leaves the summary skipped, which GitHub counts as passing for a required
+    # check; switch back to `always()` if `quality-gate` is ever made required.
+    name: quality-gate
+    needs: quality-gate
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: All shards passed
+        env:
+          RESULT: ${{ needs.quality-gate.result }}
+        run: |
+          echo "quality-gate shards: $RESULT"
+          test "$RESULT" = "success"
 
   boundary:
     # SPEC-pr-boundary-gate: since autotag a merge to main is a publish, so the boundary suite
@@ -116,8 +134,8 @@ jobs:
     # against the "README overpromises IDE parity" failure class. Positive
     # install tests + README lint = BLOCKING; codex negative test = ADVISORY
     # (separate step with continue-on-error per ADR-002 Round 2). Job runs
-    # after quality-gate to avoid burning CI minutes on broken commits.
-    needs: quality-gate
+    # in parallel with quality-gate: the old `needs:` only saved CI minutes, which are free
+    # on this public repository, and made the job finish 13 minutes late.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

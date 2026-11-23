@@ -5,19 +5,54 @@ on:
     - cron: "0 6 * * *"  # 06:00 UTC daily
   workflow_dispatch:
 
-# Runs the full quality-gate (matches ci.yml steps) PLUS the integration
-# test that requires INTEGRATION=1. release.yml:quality-gate duplicates the
-# same set at tag time; this workflow catches regressions in the window
-# between PR merge and the next release.
+# What no commit-gating run covers (SPEC-ci-shard-serial-nightly). Every PR, push to main and
+# release already runs the full suite in three parallel shards, so nightly keeps only:
+# - `serial`: the one full-suite run WITHOUT `-n`. `hm test_runners plan` warns that a suite only
+#   ever run in parallel hides order- and isolation-dependent failures; this job answers that
+#   warning. It used to sit in release.yml (~28 of a release's ~32 minutes); here nobody waits on
+#   it, and a failure surfaces within a day instead of blocking a publish.
+# - `py313`: pyproject.toml declares Python 3.13 support, and nothing else tests it.
+# - the INTEGRATION=1 fresh-install readiness test, after the serial suite.
+# A scheduled run is skipped when main has not moved since the last green nightly (it ran twice
+# on 1fd6e49 on 2026-11-21/22); `workflow_dispatch` always runs.
 
 concurrency:
   group: nightly
   cancel-in-progress: false
 
 jobs:
-  full-gate:
+  changed:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - name: Decide
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          run=true
+          if [ "$EVENT" = "schedule" ]; then
+            last="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow nightly.yml --branch main \
+              --status success --limit 1 --json headSha --jq '.[0].headSha' || true)"
+            if [ "$last" = "$SHA" ]; then
+              run=false
+              echo "main is still at $SHA, which the last green nightly tested; skipping"
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+  serial:
+    needs: changed
+    if: needs.changed.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    # Serial took ~28 min in release.yml (v0.66.1); the cap leaves room for suite growth.
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -40,28 +75,36 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy strict
         run: uv run mypy --strict src tests
-      # Parallel, matching ci.yml. `hm test_runners plan` warns that a suite only ever run in
-      # parallel hides order- and isolation-dependent failures, and this job was where that
-      # warning was being honoured — for one day.
-      #
-      # The serial run did not disappear; it moved. `release.yml:quality-gate` still runs
-      # `uv run pytest -x --tb=short` with no `-n` (~14 min against a 20-minute cap), so a
-      # failure that only appears in a serial ordering now surfaces at TAG time. That is a
-      # later signal, and arguably the better place for it: such a failure blocks a release
-      # instead of reaching one. It is also the last serial run in CI — parallelising that job
-      # too would remove the oracle outright, so do not, and if its cap ever gets tight, add a
-      # separate serial job rather than adding `-n` there.
-      #
-      # `--dist loadfile` keeps each file's tests on one worker, so within-file ordering — where
-      # this suite's cwd, temp-path and git-ref coupling actually lives — is preserved either
-      # way; only cross-file ordering is given up. `addopts` still has no `-n` so a bare
-      # `uv run pytest` stays serial for local runs.
-      #
-      # What this bought is machine time, not a person's: nightly has a 30-minute cap, finished
-      # serially in 810s, and nobody waits on it.
-      - name: Pytest
-        run: uv run pytest -x --tb=short -n auto --dist loadfile
+      # SERIAL on purpose: do NOT add `-n`. If the cap gets tight, raise it rather than
+      # parallelising — parallelising removes the only order-dependence oracle.
+      - name: Pytest (serial)
+        run: uv run pytest -x --tb=short
       - name: Integration test — fresh install readiness
         env:
           INTEGRATION: "1"
         run: uv run pytest tests/integration/test_fresh_install_readiness.py -x --tb=short
+
+  py313:
+    needs: changed
+    if: needs.changed.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # Overrides .python-version (3.12) for every uv command in this job.
+      UV_PYTHON: "3.13"
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.13
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Pytest (Python 3.13)
+        run: uv run pytest -x --tb=short -n auto --dist loadfile
