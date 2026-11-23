@@ -44,7 +44,7 @@ always-loaded `## World model` pointer routes unnamed goal, metric, fact and
 status asks to Maker.
 
 Maker briefs from `world_model_digest.py` (`hm world_model digest`): one JSON
-object, ≤ 1,500 bytes, always exit 0, injected at skill load on Claude Code. On
+object, ≤ 1,500 bytes, always exit 0, run as Maker's first Bash step on both targets. On
 a start it names the entry and end stage; it no longer touches autopilot
 (retired in 0.64.0; SPEC-retired-text IRR-001). Details:
 [`docs/reference/world-model.md`](reference/world-model.md).

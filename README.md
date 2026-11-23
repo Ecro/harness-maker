@@ -429,7 +429,7 @@ The world model is what the harness keeps between sessions: **intents** (goals, 
 - active intents with their metric's `last` / `target` / `gap`;
 - recent commits.
 
-Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`). Claude Code injects the digest when Maker loads; on Codex, and wherever no digest appears, Maker runs the command itself. Each briefing appends one `maker_load` line (timestamp and session id, no request text) to `.claude/observability/world-model.jsonl`.
+Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`). Maker runs the digest as its first Bash step on every call, on both targets. Each briefing appends one `maker_load` line (timestamp and session id, no request text) to `.claude/observability/world-model.jsonl`.
 
 ---
 

@@ -351,7 +351,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 - 활성 intent 와 그 지표의 `last` / `target` / `gap`;
 - 최근 커밋.
 
-`hm/<slug>` 작업 worktree 만 나열된다 (`worktree.enabled: true`). Claude Code 는 Maker 가 로드될 때 digest 를 주입하고, Codex 나 digest 가 보이지 않는 곳에서는 Maker 가 명령을 직접 실행한다. briefing 마다 `.claude/observability/world-model.jsonl` 에 `maker_load` 한 줄 (타임스탬프와 session id, 요청 본문 없음) 이 추가된다.
+`hm/<slug>` 작업 worktree 만 나열된다 (`worktree.enabled: true`). Maker 는 호출마다 첫 Bash 단계로 digest 를 실행한다 (두 target 모두). briefing 마다 `.claude/observability/world-model.jsonl` 에 `maker_load` 한 줄 (타임스탬프와 session id, 요청 본문 없음) 이 추가된다.
 
 ---
 

@@ -7,7 +7,7 @@
     file stays <= 4,689 chars on every target. -#}
 {#- The description is YAML double-quoted by hand, not `tojson`: tojson escapes astral
     characters as surrogate pairs that YAML decodes into lone surrogates (REVIEW 8a53a1be). -#}
-{#- `allowed-tools` pre-approves the injected briefing outside auto mode, scoped to the two `hm`
+{#- `allowed-tools` pre-approves the digest step outside auto mode, where the host honours it, scoped to the two `hm`
     verbs Maker runs (REVIEW 24451777: a bare `Bash(uv run:*)` pre-approved any `uv run`; confirm-1:
     `hm *` still pre-approved every hm verb). The `| tail -n 1 | grep '^{.*}$' || printf` chain keeps
     exactly one JSON line even when the digest fails mid-output, with no `{ …; }` group: a
@@ -16,11 +16,10 @@
 {%- set wm = config.world_model if (config is defined and config.world_model is defined and config.world_model) else {"name": "Maker", "handle": "maker"} -%}
 {%- set inv = ("$" if is_codex else "/") ~ wm.handle -%}
 {%- set sk = ".agents/skills" if is_codex else ".claude/skills" -%}
-{#- SPEC-maker-digest-session-id: Claude Code checks an injected `!` command before it runs. It
-    refuses one that holds a shell variable, and no `allowed-tools` rule matches a command that
-    holds `$HOME`. So the Claude line writes the home prefix as `~` and takes the session id from
-    the host's `${CLAUDE_SESSION_ID}` skill substitution; Codex runs the command itself and keeps
-    both variables. -#}
+{#- SPEC-maker-digest-session-id: no `allowed-tools` rule matches a command that holds `$HOME`
+    or a shell variable. So the Claude command writes the home prefix as `~` and takes the session
+    id from the host's `${CLAUDE_SESSION_ID}` skill substitution (replaced in the whole body);
+    Codex has no substitution and keeps both variables. -#}
 {%- set src = harness_maker_src_path -%}
 {%- if not is_codex and (src == "$HOME" or src.startswith("$HOME/")) -%}{%- set src = "~" ~ src[5:] -%}{%- endif -%}
 {%- set hm = "uv run --no-project --with " ~ src ~ " hm" -%}
@@ -43,6 +42,16 @@ concerns first, only what changed; no persona, praise or coaching. `hm` below me
 {# SPEC-ask-less AC-001: copy of stages/_hm.md.j2 choices(). -#}
 **Choices.** The DRI decides the goal, scope, overall design, a main feature, a costly-to-undo decision and every approval, plus any question this command names: ask with {{ ask }}{% if is_codex %} where available{% endif %}, recommendation first, except approvals and equal options; without the tool, a numbered list, then wait. Decide the rest yourself and report it.
 
+{# SPEC-maker-digest-bash-step: a Bash step, never a `!` injection, on both targets. Claude Code
+    checks an injected command against the skill's `allowed-tools` only, and ignores a repository
+    skill's grant when CLAUDE_CODE_IGNORE_PERSISTED_TRUST is set (2.1.326+); the load then dies
+    at 0 turns. A model-issued call follows the session's permission mode instead. -#}
+Run this first on every call, whatever the route (read-only JSON, ≤ 1.5 KB):
+
+```bash
+{{ digest }}
+```
+
 ## Pick the route
 
 Pick ONE row for `$ARGUMENTS`; mixed: record first, then answer.
@@ -58,18 +67,6 @@ Pick ONE row for `$ARGUMENTS`; mixed: record first, then answer.
 Else answer from the briefing or name the owning {% if is_codex %}`$hm-*` skill{% else %}`/hm:` command{% endif %}.
 
 ## Briefing — read-only
-
-{% if is_codex -%}
-Run once — the whole briefing (read-only JSON, ≤ 1.5 KB):
-
-```bash
-{{ digest }}
-```
-{%- else -%}
-!`{{ digest }}`
-
-No JSON or `unavailable` above? Run `hm world_model digest --root .` once; still failing → say so.
-{%- endif %}
 
 - **tasks** (newest first, ≤ 5; `more` = rest; `parked: true` last): `next_stage` from artifacts;
   `other_session: true` = another session touched it last.

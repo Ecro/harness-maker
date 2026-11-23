@@ -109,7 +109,9 @@ def _pointer(text: str) -> str:
 def test_ac_007_router_single_digest(tmp_path: Path) -> None:
     claude = render_router(tmp_path / "c", codex=False)
     codex = render_router(tmp_path / "x", codex=True)
-    assert briefing_commands(claude) == ["!digest", "fallback:digest"]
+    # SPEC-maker-digest-bash-step: the Claude Maker runs the same bash block as Codex; the
+    # chain's `printf` is the fallback.
+    assert briefing_commands(claude) == ["bash:digest"]
     assert briefing_commands(codex) == ["bash:digest"]
 
 
