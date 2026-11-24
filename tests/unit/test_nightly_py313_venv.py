@@ -69,6 +69,8 @@ def test_ac_002_uv_run_keeps_venv_interpreter(
     uv = shutil.which("uv")
     if uv is None:
         pytest.skip("uv is not on PATH")
+    # Read before the pin below: nightly's py313 job is the one CI run with both interpreters.
+    in_py313_job = bool(os.environ.get("GITHUB_ACTIONS")) and os.environ.get("UV_PYTHON") == "3.13"
     for key in ("VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("UV_PYTHON", "3.13")
@@ -86,8 +88,7 @@ def test_ac_002_uv_run_keeps_venv_interpreter(
             check=False,
         )
         if found.returncode != 0:
-            # Nightly's py313 job is the one CI run with both interpreters; never skip there.
-            if os.environ.get("GITHUB_ACTIONS") and os.environ.get("UV_PYTHON") == "3.13":
+            if in_py313_job:
                 pytest.fail(f"uv cannot find Python {minor} in the py313 job: {found.stderr}")
             pytest.skip(f"uv cannot find Python {minor} offline")
 
