@@ -33,6 +33,12 @@
 
 ### Fixed
 
+- **Nightly Python 3.13 job no longer loses its venv mid-run** (SPEC-nightly-py313-venv). Both
+  py313 runs since it was added failed on a random test with `No module named 'hypothesis'`. Two
+  e2e tests ran `uv run` at the repo root with an env scrubbed of `UV_PYTHON`, so uv followed
+  `.python-version` (3.12) and rebuilt the shared 3.13 `.venv` under the other xdist workers. They
+  now build their env with `tests/_uv_env.py`, which forwards every `UV_*` variable.
+
 - **Maker loads in cloud sessions and untrusted folders** (SPEC-maker-digest-bash-step, HR-023).
   Since Claude Code 2.1.326, `CLAUDE_CODE_IGNORE_PERSISTED_TRUST` (set in claude.ai cloud containers,
   by `--trust-workspace false` runners and for untrusted VS Code folders) makes the host ignore a

@@ -22,6 +22,8 @@ from pathlib import Path
 
 import pytest
 
+from tests._uv_env import uv_subprocess_env
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXED_TS = "2026-05-17T12:00:00+00:00"
 
@@ -53,13 +55,7 @@ def _run_verify(
         "HARNESS_MAKER_VERIFY_TIMESTAMP": FIXED_TS,
     }
     # Inherit PATH + minimal env so `uv` resolves the project venv.
-    import os
-
-    inherited = {
-        k: os.environ[k]
-        for k in ("PATH", "HOME", "USER", "VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT")
-        if k in os.environ
-    }
+    inherited = uv_subprocess_env()
     return subprocess.run(  # noqa: S603
         cmd,
         cwd=REPO_ROOT,

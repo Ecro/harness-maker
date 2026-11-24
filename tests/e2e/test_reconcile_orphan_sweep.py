@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import subprocess
 import sys
 from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
+
+from tests._uv_env import uv_subprocess_env
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FAKE_VERSION = "0.12.0"
@@ -140,11 +141,7 @@ def _git_init(project: Path) -> None:
 
 
 def _inherited_env() -> dict[str, str]:
-    env = {
-        k: os.environ[k]
-        for k in ("PATH", "HOME", "USER", "VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT")
-        if k in os.environ
-    }
+    env = uv_subprocess_env()
     # ADR-013 bypass: e2e runs `make ... --update` from cwd=REPO_ROOT, which
     # has `.worktrees/` as ancestor during local dev. The guard would exit 1
     # before the orphan sweep runs.
