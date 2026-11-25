@@ -75,7 +75,8 @@
   py313 runs since it was added failed on a random test with `No module named 'hypothesis'`. Two
   e2e tests ran `uv run` at the repo root with an env scrubbed of `UV_PYTHON`, so uv followed
   `.python-version` (3.12) and rebuilt the shared 3.13 `.venv` under the other xdist workers. They
-  now build their env with `tests/_uv_env.py`, which forwards every `UV_*` variable.
+  now build their env with `tests/_uv_env.py`, which forwards every `UV_*` variable. The py313 job
+  also installs 3.12, which the regression test's control arm needs offline.
 
 - **Maker loads in cloud sessions and untrusted folders** (SPEC-maker-digest-bash-step, HR-023).
   Since Claude Code 2.1.326, `CLAUDE_CODE_IGNORE_PERSISTED_TRUST` (set in claude.ai cloud containers,

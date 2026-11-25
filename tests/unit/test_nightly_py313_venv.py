@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tests._uv_env import uv_subprocess_env
 
@@ -120,3 +121,15 @@ def test_ac_003_e2e_callers_use_helper(caller: Path) -> None:
     src = caller.read_text(encoding="utf-8")
     assert "uv_subprocess_env" in src
     assert '"UV_PROJECT_ENVIRONMENT"' not in src
+
+
+def test_ac_004_py313_job_installs_both_interpreters() -> None:
+    doc = yaml.safe_load((REPO_ROOT / ".github/workflows/nightly.yml").read_text(encoding="utf-8"))
+    jobs = [j for j in doc["jobs"].values() if j.get("env", {}).get("UV_PYTHON") == "3.13"]
+    assert len(jobs) == 1
+    installs = [
+        str(step["run"]).split()
+        for step in jobs[0]["steps"]
+        if str(step.get("run", "")).startswith("uv python install")
+    ]
+    assert any({"3.12", "3.13"} <= set(argv[3:]) for argv in installs), installs
