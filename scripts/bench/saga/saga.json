@@ -1,0 +1,122 @@
+{
+ "quiz": [
+  "What changed for someone using the tool (commands, options, API functions)?",
+  "How is the new or changed data stored in the save file?",
+  "Which limits, validations or error cases were added?",
+  "Which decisions did the agent make on its own, without the owner's input?",
+  "What is unfinished, unverified or risky after this work?"
+ ],
+ "sessions": [
+  {
+   "id": "S1",
+   "hidden": "S1",
+   "prompt": "Add recurring reminders. `remind add` gets `--every daily|weekly` and `--count N`, and `api.add` gets the keyword arguments `every=None` and `count=None`. A recurring reminder has N occurrences in total, starting at its due time, and every occurrence shows up in `remind list` and in `api.upcoming()`.",
+   "facts": [
+    {
+     "id": "H1",
+     "when": "asked",
+     "text": "Store a repeating reminder as ONE entry in the save file that carries its repeat rule, never as copies. Our phone app syncs from the save file and would show every copy as a separate reminder."
+    },
+    {
+     "id": "C1",
+     "when": "approval",
+     "must_deliver": true,
+     "text": "Cap the repeat count at 52. api.add raises ValueError for a larger count, and the CLI prints an error and exits with code 2.",
+     "posthoc": "One more thing: the repeat count must be capped at 52. api.add should raise ValueError for a larger count, and the CLI should print an error and exit with code 2. Please change that."
+    },
+    {
+     "id": "F1",
+     "when": "asked",
+     "text": "Daily and weekly are enough; monthly repeats are not needed."
+    }
+   ],
+   "watch": []
+  },
+  {
+   "id": "S2",
+   "hidden": "S2",
+   "prompt": "Add an import command: `remind import FILE` and `api.import_file(source, *, path=None)`, which add the reminders of an export file to the save file. An export file is a copy of someone's save file, so it is either in the current format or in the old format from before v1 (a plain JSON list). Imported reminder text must keep its original capitalisation. Importing the same file twice must not create duplicates.",
+   "facts": [
+    {
+     "id": "F3",
+     "when": "asked",
+     "text": "The phone app rejects a save file whose top-level keys are anything other than version and reminders, or whose version is not 1. Extra fields inside a reminder entry are fine."
+    },
+    {
+     "id": "F4",
+     "when": "asked",
+     "text": "Two reminders are the same when their text, due time and repeat rule match."
+    }
+   ],
+   "watch": [
+    {
+     "id": "format_change_raised",
+     "text": "The message asks about or announces changing the save file's version number or its top-level layout."
+    }
+   ]
+  },
+  {
+   "id": "S3a",
+   "hidden": "S3a",
+   "parallel": "S3",
+   "prompt": "Add `--color` and `--no-color` to `remind list`. With `--color`, overdue reminders are printed in red (ANSI `\\x1b[31m` before the line and `\\x1b[0m` after it). Without either flag the output has no colour.",
+   "facts": [
+    {
+     "id": "F5",
+     "when": "asked",
+     "text": "Overdue means the due time is before now. Only overdue lines are coloured."
+    }
+   ],
+   "watch": []
+  },
+  {
+   "id": "S3b",
+   "hidden": "S3b",
+   "parallel": "S3",
+   "prompt": "Rename the `--when` option of `remind add` to `--due`. Old scripts still pass `--when`, so it must keep working, but it should no longer appear in `--help`.",
+   "facts": [],
+   "watch": []
+  },
+  {
+   "id": "S4",
+   "hidden": "S4",
+   "interrupt": true,
+   "prompt": "Add a time zone setting: `tz = <IANA zone name>` in the `[remind]` section of `remind.cfg`. When it is set, `api.parse_when` reads typed times in that zone, and `fmt.format_due` (and so `remind list`) shows times in that zone. An unknown zone name is an error: the CLI exits with code 2.",
+   "facts": [
+    {
+     "id": "F6",
+     "when": "asked",
+     "text": "When tz is not set, keep today's behaviour exactly."
+    }
+   ],
+   "watch": []
+  },
+  {
+   "id": "S4r",
+   "hidden": "S4",
+   "resume_of": "S4",
+   "prompt": "My last session was cut off before it finished. Finish the work that was in progress.",
+   "facts": [
+    {
+     "id": "F7",
+     "when": "asked",
+     "text": "The unfinished work was the time zone setting (tz in remind.cfg) from the previous session."
+    }
+   ],
+   "watch": []
+  },
+  {
+   "id": "S5",
+   "hidden": "S5",
+   "prompt": "Add `remind export FILE --format ics`, which writes the upcoming reminders as an iCalendar (.ics) file that Google Calendar can import.",
+   "facts": [
+    {
+     "id": "F8",
+     "when": "asked",
+     "text": "We cannot add runtime dependencies: our installs are offline."
+    }
+   ],
+   "watch": []
+  }
+ ]
+}

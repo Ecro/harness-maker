@@ -14,6 +14,19 @@
   on its next `hm make`.
 ### Added
 
+- **Saga bench: hm's unique values on consecutive sessions** (SPEC-saga-bench).
+  `scripts/saga_bench.py` drives `plain`, `plain-discipline` (plain plus one fixed paragraph: ask
+  when ambiguous, show a plan, keep NOTES.md, test, one subagent review, commit) and `hm` through
+  six sessions on one small repo (`scripts/bench/saga/`): recurring reminders, import, two
+  parallel CLI changes, a time zone setting that is killed mid-work and resumed by a fresh
+  process, and an iCalendar export. A model plays the owner from a hidden fact sheet and answers
+  only what it is asked. Each run records one binary verdict per trap (hidden requirement,
+  approval-time correction, save-file format lock, frozen file, parallel loss, resume, no new
+  dependency, environment-failure recurrence) plus a handoff quiz; `report` applies the
+  pre-registered decision rule. `validator` measures spec-validator detection on 12 SPECs with
+  planted defects and 2 clean ones, against a plain review prompt. Offline tests use a fake
+  `claude`; `bench_light_lane` hashes are unchanged.
+
 - **Self-prune loop for new models** (SPEC-self-prune-loop). When a new default model ships, hm
   ablates up to three candidate blocks of its rendered harness on the bench, one at a time, and
   proposes the cuts that pass deterministic guards (tier-2 hidden tests and trap catches never

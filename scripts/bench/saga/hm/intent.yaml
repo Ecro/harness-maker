@@ -1,0 +1,12 @@
+# .claude/intent.yaml — why this project exists. Human-written; nothing here is generated.
+schema_version: 1
+purpose:
+  statement: "remind keeps a personal reminder list in one JSON file that our phone app also syncs."
+  vision: ""
+metrics: []
+rules:
+  - "No new runtime dependencies: remind runs on the standard library only."
+  - "The save file stays in format v1."
+out_of_scope: []
+open_questions: []
+owners: {}
