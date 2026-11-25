@@ -55,7 +55,7 @@ different contexts. Now:
   Autopilot and `hm:loop` were retired in 0.64.0.
 - The always-loaded `## World model` pointer (CLAUDE.md / AGENTS.md /
   `.cursor/rules/harness.mdc`, ≤ 400 chars per variant at NAME_MAX/HANDLE_MAX) routes goal,
-  metric, fact and status asks to Maker even unnamed or mid-stage; ordinary build/fix asks do
+  metric, fact, status and resume asks to Maker even unnamed or mid-stage; ordinary build/fix asks do
   not go there. It also carries decision capture and the aside rule. The 400 cap supersedes
   SPEC-world-model-followups AC-013's 200. The `## Project knowledge` pointer (≤ 300 chars)
   names the Maker invocation and the procedure file path, because the skill no longer

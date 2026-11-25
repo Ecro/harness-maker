@@ -29,7 +29,7 @@
 {%- macro stage(s) -%}{% if is_codex %}`$hm-{{ s }}`{% else %}`/hm:{{ s }}`{% endif %}{%- endmacro -%}
 ---
 name: {{ name }}
-description: "{{ (wm.name ~ " (" ~ inv ~ ") is this project's development front door: briefing, start or resume work, remember a project fact, goals and metrics. Use only when the operator addresses " ~ wm.name ~ " by name or types " ~ inv ~ ", or the World model rule routes a goal, metric, fact or status request here; do not trigger on the bare verbs make, build or fix.") | replace('\\', '\\\\') | replace('"', '\\"') }}"{% if not is_codex %}
+description: "{{ (wm.name ~ " (" ~ inv ~ ") is this project's development front door: briefing, start or resume work, remember a project fact, goals and metrics. Use only when the operator addresses " ~ wm.name ~ " by name or types " ~ inv ~ ", or the World model rule routes a goal, metric, fact, status or resume request here; do not trigger on the bare verbs make, build or fix.") | replace('\\', '\\\\') | replace('"', '\\"') }}"{% if not is_codex %}
 allowed-tools: Bash({{ hm }} world_model:*), Bash(tail:*), Bash(grep:*), Bash(printf:*){% endif %}
 ---
 

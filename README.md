@@ -415,7 +415,7 @@ The world model is what the harness keeps between sessions: **intents** (goals, 
 | a goal, metric, assumption or intent; a project fact | **Goals and facts** — recorded through the intent or knowledge procedure |
 | "what next?" | **Briefing** plus 2–4 options; starts no stage |
 
-**The only entrance.** `intent-layer` and `project-knowledge` are not model-invocable. Typing `/intent-layer` or `/project-knowledge` (`$…` on Codex) still runs them; otherwise Maker reads their procedure before any write, and their ask-before-write rule is unchanged. An always-loaded `## World model` pointer in `CLAUDE.md` / `AGENTS.md` sends goal, metric, fact and status requests to Maker even when you don't name it, and even mid-stage. Ordinary build and fix requests are not rerouted. `/hm:` stages still run when typed, or via Maker.
+**The only entrance.** `intent-layer` and `project-knowledge` are not model-invocable. Typing `/intent-layer` or `/project-knowledge` (`$…` on Codex) still runs them; otherwise Maker reads their procedure before any write, and their ask-before-write rule is unchanged. An always-loaded `## World model` pointer in `CLAUDE.md` / `AGENTS.md` sends goal, metric, fact, status and resume requests to Maker even when you don't name it, and even mid-stage. Ordinary build and fix requests are not rerouted. `/hm:` stages still run when typed, or via Maker.
 
 **Scope follows the ask.** "research X" ends at research, "spec X" at spec, "build X" / "fix X" runs the full pipeline; an unclear ask starts at research. Maker names the entry and end stage in one route line and enters the start stage, then the next ones under its Advance rule, stopping where a person is owed and never pushing.
 
