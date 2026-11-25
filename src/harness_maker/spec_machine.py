@@ -1065,6 +1065,29 @@ def golden_json_text(payload: dict[str, list[dict[str, Any]]]) -> str:
     return json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
 
 
+def inline_rows_name(ac_id: str) -> str:
+    """`AC-001` -> `AC_001_ROWS`, the module constant a test file holds its golden rows in."""
+    return ac_id.replace("-", "_") + "_ROWS"
+
+
+def golden_inline_text(payload: dict[str, list[dict[str, Any]]], spec_name: str) -> str:
+    """Each AC's rows as a Python literal to paste into its test file (SPEC-inline-golden-rows).
+
+    A test that reads a JSON file shows a reviewer neither its inputs nor its expectations; the
+    rows written into the test keep the oracle visible, and `hm check` compares them with the
+    SPEC so they cannot drift (`ast.literal_eval` reads back exactly what `repr` wrote here).
+    """
+    blocks = []
+    for ac_id in sorted(payload):
+        rows = "".join(f"    ({row['input']!r}, {row['expected']!r}),\n" for row in payload[ac_id])
+        blocks.append(
+            f"# {ac_id} golden rows from {spec_name}: (input, expected).\n"
+            "# Do not edit; `hm check` compares them with the SPEC.\n"
+            f"{inline_rows_name(ac_id)} = [\n{rows}]\n"
+        )
+    return "\n".join(blocks)
+
+
 def _run_export_golden(args: argparse.Namespace) -> int:
     try:
         payload = golden_export(load(args.yaml_path))
@@ -1076,6 +1099,9 @@ def _run_export_golden(args: argparse.Namespace) -> int:
         return 1
     if not payload:
         print("export-golden: no parametric AC; nothing written")
+        return 0
+    if args.inline:
+        print(golden_inline_text(payload, args.yaml_path.name), end="")
         return 0
     out = golden_json_path(args.yaml_path)
     atomic_write(out, golden_json_text(payload))
@@ -2496,9 +2522,15 @@ def main(argv: list[str] | None = None) -> int:
     p_check.add_argument("--strictness", choices=("block", "warn"), default="warn")
 
     p_export = sub.add_parser(
-        "export-golden", help="write SPEC-<slug>.golden.json from the parametric golden tables"
+        "export-golden",
+        help="write SPEC-<slug>.golden.json, or with --inline print AC_NNN_ROWS literals",
     )
     p_export.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_export.add_argument(
+        "--inline",
+        action="store_true",
+        help="print each AC's rows as an `AC_NNN_ROWS` list to paste into its test; write no file",
+    )
 
     p_approve = sub.add_parser("approve", help="stamp the SPEC as accepted (content-hash bound)")
     p_approve.add_argument("--yaml", dest="yaml_path", type=Path, required=True)

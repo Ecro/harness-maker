@@ -1,0 +1,136 @@
+schema_version: 3
+spec_slug: inline-golden-rows
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: export-golden --inline prints literal rows and writes no file
+  type: mechanical
+  test_ids:
+  - tests/unit/test_inline_golden_rows.py::test_ac_001_export_golden_inline_prints_literal_rows
+  executable_predicate: 'literal_assigns(stdout) == {''AC_001_ROWS'': [({''s'': ''1h''},
+    3600), ({''s'': ''bad''}, ''ValueError'')]} and not golden_json.exists()'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rows fixed in the fixture; ast.literal_eval is Python's own reader,
+    independent of the exporter.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: hm check compares inline rows with the SPEC
+  type: mechanical
+  test_ids:
+  - tests/unit/test_inline_golden_rows.py::test_ac_002_hm_check_compares_inline_rows[AC-002-0]
+  - tests/unit/test_inline_golden_rows.py::test_ac_002_hm_check_compares_inline_rows[AC-002-1]
+  - tests/unit/test_inline_golden_rows.py::test_ac_002_hm_check_compares_inline_rows[AC-002-2]
+  - tests/unit/test_inline_golden_rows.py::test_ac_002_hm_check_compares_inline_rows[AC-002-3]
+  executable_predicate: verdict(equal) == ('inline', []) and verdict(changed) == ('inline',
+    ['AC-001']) and verdict(short) == ('inline', ['AC-001']) and verdict(none) ==
+    ('absent', []) and verdict(json) == 'present'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fixture rows fixed in the test, independent of the comparison code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: execute pastes inline rows
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_003_execute_reads_golden_json
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_003_red_without_harness_maker
+  - tests/unit/test_inline_golden_rows.py::test_ac_003_execute_pastes_inline_rows
+  executable_predicate: '''export-golden --inline'' in execute() and ''`AC_NNN_ROWS`''
+    in execute() and ''golden.json'' not in execute()'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrase fixed in the SPEC before the template change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: the spec Verification table names ACs
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hm_cost_p2_templates.py::test_ac_004_categories_verbatim
+  - tests/unit/test_inline_golden_rows.py::test_ac_004_spec_verification_names_acs_not_tests
+  executable_predicate: '''Verification (scenario, mode, AC)'' in spec() and ''Verification
+    (scenario, mode, test)'' not in spec()'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrase fixed in the SPEC before the template change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: c9482c693a675ca12808522c224535951a86d39c2fd60eb96bbad72bbfe80bf3
+  approved_by: Claude
+  approved_at: '2026-11-25T13:45:44Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 8caa0908ccf87e2e13801041979ff0b5cb0567541ecae69abaa3c165c1c49257
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 2fee1bf15fc606677164148b1031efb4777a71792b09660df32d697ac64c31aa
+    AC-002: 12dfe164278cc463e158abcba7f77d376696d7e0adccb4950d6e3bd03a789e70
+    AC-003: 14e337bd455ccf47cda6cce37d5eee266b3b2fe6236fd523261235ebf14dcd60
+    AC-004: 8694eb1153673ad380d1049c458e72ce1a0260ceb5fa3a238bfd4a41a24d6ee6
+    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591

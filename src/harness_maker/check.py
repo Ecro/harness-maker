@@ -1086,6 +1086,7 @@ def red_discovery(root: Path, spec: SpecView, runner: list[str]) -> dict[str, li
     collected = {n.partition("::")[0] for n in nodeids}
     golden = spec.yaml_path.name.removesuffix(".machine.yaml") + ".golden.json"
     golden_tests: list[str] = []
+    texts: dict[str, tuple[str, list[str]]] = {}
     for rel in files:
         if rel in collected:
             continue
@@ -1095,13 +1096,21 @@ def red_discovery(root: Path, spec: SpecView, runner: list[str]) -> dict[str, li
             continue
         names = _static_test_names(text)
         nodeids += [f"{rel}::{n}" for n in names]
+        texts[rel] = (text, names)
         if golden in text:  # the recipe's literal file name; a computed path is not detected
             golden_tests += [f"{rel}::{n}" for n in names]
     found: dict[str, list[str]] = {}
     for ac in empty:
         ids = spec_machine.ac_tests_for(ac.id, nodeids)
         if not ids and ac.type == "parametric":
-            ids = golden_tests
+            # An inline `AC_NNN_ROWS` binds only its own AC: the name repeats across SPECs.
+            rows = re.compile(rf"\b{spec_machine.inline_rows_name(ac.id)}\b")
+            ids = golden_tests + [
+                f"{rel}::{n}"
+                for rel, (text, names) in texts.items()
+                if rows.search(text)
+                for n in names
+            ]
         if ids:
             found[ac.id] = ids
     return found
@@ -1553,11 +1562,13 @@ def harness_section(root: Path) -> Section:
 # ── golden JSON (SPEC-hm-cost-p2 AC-002) ───────────────────────────────────────
 
 
-def with_golden(section: Section, spec: SpecView) -> Section:
-    """Add the golden-JSON verdict to an `ac` section, in either mode.
+def with_golden(section: Section, spec: SpecView, root: Path | None = None) -> Section:
+    """Add the golden-rows verdict to an `ac` section, in either mode.
 
-    A SPEC with no live parametric AC gets nothing, so its output is unchanged. An absent JSON
-    is not a failure: SPECs and tests from before the file read `load_golden_table`. Drift fails
+    A SPEC with no live parametric AC gets nothing, so its output is unchanged. With no JSON,
+    `AC_NNN_ROWS` literals in the bound test files are compared instead (`golden: inline`,
+    SPEC-inline-golden-rows). Absent both is not a failure: SPECs and tests from before either
+    read `load_golden_table`. Drift fails
     the section even when it already passed, because a parametric test reading a stale JSON
     passes against rows the SPEC no longer holds.
     """
@@ -1574,12 +1585,17 @@ def with_golden(section: Section, spec: SpecView) -> Section:
     path = spec_machine.golden_json_path(spec.yaml_path)
     fix = f"hm spec_machine export-golden --yaml {spec.yaml_path}"
     body = dict(section.body)
+    inline = None
+    if root is not None and not unexportable:
+        inline = _inline_golden_drift(root, spec, want)
+    if inline is not None and not path.is_file():
+        return _golden_verdict(section, body, "inline", inline, f"{fix} --inline")
     if not path.is_file():
         body["golden"] = "absent"
         body["hint"] = (
             f"{unexportable}; export-golden refuses it, so its test cannot read {path.name}"
             if unexportable
-            else f"parametric tests read {path.name}; write it with `{fix}`"
+            else f"paste the output of `{fix} --inline` into each parametric AC's test file"
         )
         return Section(body, section.code)
     body["golden"] = "present"
@@ -1593,11 +1609,80 @@ def with_golden(section: Section, spec: SpecView) -> Section:
         drift = [unexportable]  # `want` is empty here, so a comparison would name every AC
     else:
         drift = sorted(a for a in set(want) | set(have) if want.get(a) != have.get(a))
+    if inline:
+        # Both exist (an old SPEC re-run under the inline recipe): the rows the test shows must
+        # hold too, or rewriting the JSON would pass while the pasted rows still drift.
+        drift, fix = sorted(set(drift) | set(inline)), f"{fix} (and `--inline` for the test rows)"
+    return _golden_verdict(section, body, "present", drift, fix)
+
+
+def _golden_verdict(
+    section: Section, body: dict[str, Any], state: str, drift: list[str], fix: str
+) -> Section:
+    body["golden"] = state
     if not drift:
         return Section(body, section.code)
     body["ok"] = False
     body["golden_drift"] = {"acs": drift, "fix": fix}
     return Section(body, EXIT_FAILED if section.code == EXIT_OK else section.code)
+
+
+def _literal_rows(files: list[Path], name: str) -> list[list[Any]]:
+    """Every top-level `name = [...]` literal in `files`, one list per file that defines it."""
+    found: list[list[Any]] = []
+    for path in files:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, ValueError):
+            continue
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                target, expr = node.targets[0], node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                target, expr = node.target, node.value
+            else:
+                continue
+            if not (isinstance(target, ast.Name) and target.id == name):
+                continue
+            try:
+                value = ast.literal_eval(expr)
+            except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+                value = _UNREADABLE
+            found.append(list(value) if isinstance(value, (list, tuple)) else [_UNREADABLE])
+            break
+    return found
+
+
+_UNREADABLE = object()
+
+
+def _inline_golden_drift(
+    root: Path, spec: SpecView, want: dict[str, list[dict[str, Any]]]
+) -> list[str] | None:
+    """ACs whose bound test files hold `AC_NNN_ROWS` rows that differ from the SPEC.
+
+    None when no bound test file holds any such constant, so a SPEC that predates inline rows
+    keeps the JSON verdict it had. An AC with rows nowhere, next to ACs that have them, is drift:
+    its test reads its oracle from somewhere `hm check` cannot see.
+    """
+    from harness_maker import spec_machine
+
+    found_any, drift = False, []
+    for ac in spec.live():
+        if ac.id not in want or not ac.test_ids:
+            continue
+        files = sorted({root / tid.partition("::")[0] for tid in ac.test_ids})
+        copies = _literal_rows(files, spec_machine.inline_rows_name(ac.id))
+        if not copies:
+            drift.append(ac.id)
+            continue
+        found_any = True
+        expected = [(r["input"], r["expected"]) for r in want[ac.id]]
+        for rows in copies:
+            if [tuple(r) if isinstance(r, (list, tuple)) else r for r in rows] != expected:
+                drift.append(ac.id)
+                break
+    return sorted(drift) if found_any else None
 
 
 # ── compact output (SPEC-hm-cost-p2 AC-006) ────────────────────────────────────
@@ -1806,7 +1891,7 @@ def run(opts: Options, *, reuse: bool = False, cve_query: QueryFn | None = None)
         if opts.harness:
             sections["harness"] = harness_section(root)
     if spec is not None:
-        sections["ac"] = with_golden(sections["ac"], spec)
+        sections["ac"] = with_golden(sections["ac"], spec, root)
     tree_changed = tree_delta(before, snapshot(root))
     codes = {s.code for s in sections.values()}
     if tree_changed:

@@ -38,6 +38,15 @@
 
 ### Changed
 
+- **Golden rows live in the test file** (SPEC-inline-golden-rows). `/hm:execute` now pastes the
+  `AC_NNN_ROWS` list printed by `hm spec_machine export-golden --inline` into a parametric AC's
+  test instead of reading `SPEC-<slug>.golden.json`, so a reader sees inputs and expectations.
+  `hm check` compares those rows with the SPEC (`ac.golden: inline`) and fails on drift, as it
+  does for the JSON. Existing golden JSON files keep the JSON verdict. The 2026-11-25 pairwise
+  judgement named the JSON indirection as the main reason hm lost on maintainability.
+- The SPEC Verification table maps scenarios to ACs, not test names, so it can no longer drift
+  from `test_ids` (the reviewer flagged that drift in 6 of 12 bench tasks).
+
 - **CI runs the test suite in three parallel shards; the serial run moved to nightly**
   (SPEC-ci-shard-serial-nightly). On one 4-vCPU runner `quality-gate` took about 13 minutes per PR
   push (pytest 12m17s) and release.yml about 32, of which ~28 was a serial pytest re-run of a

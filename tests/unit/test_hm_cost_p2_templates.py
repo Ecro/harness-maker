@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 import subprocess
 import sys
@@ -31,30 +30,27 @@ def _render(stage: str, *, is_codex: bool = False, second_brain: bool = True) ->
 
 
 def test_ac_003_execute_reads_golden_json() -> None:
+    # SPEC-inline-golden-rows: the rows are pasted into the test file (`AC_NNN_ROWS`) instead of
+    # read from the JSON; the test keeps its name so this SPEC's `test_ids` stay bound.
     text = _render("execute")
     for banned in ("import harness_maker", "from harness_maker", "load_golden_table"):
         assert banned not in text
-    assert "golden.json" in text
-    assert "export-golden" in text
+    assert "`AC_NNN_ROWS`" in text
+    assert "export-golden --inline" in text
 
 
 def test_ac_003_red_without_harness_maker(tmp_path: Path) -> None:
-    """A test written as the render says (stdlib JSON) is RED with harness_maker unimportable."""
+    """A test written as the render says (pasted rows) is RED with harness_maker unimportable."""
     proj = tmp_path / "proj"
-    (proj / "specs").mkdir(parents=True)
-    (proj / "tests").mkdir()
-    (proj / "specs" / "SPEC-demo.golden.json").write_text(
-        json.dumps({"AC-001": [{"input": {"s": "1h"}, "expected": 3600}]})
-    )
+    (proj / "tests").mkdir(parents=True)
     (proj / "conftest.py").write_text("import sys\nsys.modules['harness_maker'] = None\n")
     (proj / "tests" / "test_ac.py").write_text(
-        "import json\nfrom pathlib import Path\n\nimport pytest\n\n"
-        "ROWS = json.loads((Path(__file__).parents[1] / 'specs' / 'SPEC-demo.golden.json')"
-        ".read_text())['AC-001']\n\n\n"
-        "@pytest.mark.parametrize('row', ROWS)\n"
-        "def test_ac_001_parse(row):\n"
+        "import pytest\n\n"
+        "AC_001_ROWS = [\n    ({'s': '1h'}, 3600),\n]\n\n\n"
+        "@pytest.mark.parametrize(('given', 'expected'), AC_001_ROWS)\n"
+        "def test_ac_001_parse(given, expected):\n"
         "    from demo.parse import parse\n\n"
-        "    assert parse(**row['input']) == row['expected']\n"
+        "    assert parse(**given) == expected\n"
     )
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/test_ac.py"],
