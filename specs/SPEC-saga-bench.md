@@ -176,8 +176,17 @@ none
   off by default.
 - **S4r prompt is bare for every arm:** a real user types "finish what was cut off", so hm's
   resume path is Maker's, not a slash command.
-- **Quiz:** 5 fixed questions per session; an answerer sees only the session's last agent
-  message; a grader sees the questions, answers and the session's scoped diff.
+- **Quiz:** 5 fixed questions per session; an answerer sees only what the owner read (every
+  agent message of the session, in order, for every arm); a grader sees the questions, answers,
+  the session's scoped diff and the owner exchange. The last message alone was tried in the
+  smoke run: after a post-hoc correction it holds only that fix, which scores the arm on the
+  correction rather than the session.
+- **hm stage commands follow the owner's approval:** `/hm:execute` is sent only on a stamped
+  SPEC, `/hm:wrapup` only after execute; a parallel session's slug is the new SPEC its own
+  transcript names.
+- **Fair-scoring rules from review:** `resume` is scored only when S4 was really cut off;
+  `H1_kept` only when S1 met H1; the E1 check counts pytest failure marks, not a note that
+  mentions the test.
 - **Decision rule numbers are provisional:** margin 0.20 and lead on ≥4 traps are CLI
   defaults; the pilot fixes them before the main run (DESIGN §3).
 - **Approval:** the DRI picked "이 설계로 시작" on the design card (2026-11-25); this SPEC

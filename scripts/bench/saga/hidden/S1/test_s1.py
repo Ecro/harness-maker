@@ -39,7 +39,15 @@ def test_c1_count_capped_at_52(save_file: Path, capsys: pytest.CaptureFixture[st
     with pytest.raises(ValueError):
         api.add("Too many", START, every="weekly", count=53)
     argv = ["add", "Too many", "--when", "2026-01-05 09:00", "--every", "daily", "--count", "53"]
-    assert main(argv) == 2
+    assert _exit_code(argv) == 2
+
+
+def _exit_code(argv: list[str]) -> int | str | None:
+    """A return value or an argparse-style SystemExit: both are "exits with code 2"."""
+    try:
+        return main(argv)
+    except SystemExit as exc:
+        return exc.code
 
 
 def test_save_file_stays_v1(save_file: Path) -> None:

@@ -44,6 +44,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bench_light_lane as bll  # noqa: E402 - a sibling script, not a package
 
+from harness_maker import economics, economics_source  # noqa: E402
+
 BENCH_ID = "hm-saga"
 SAGA_DIR = bll.BENCH_DIR / "saga"
 ARMS = ("plain", "plain-discipline", "hm")
@@ -371,25 +373,42 @@ def source_map(root: Path) -> dict[str, str]:
     return found
 
 
-def code_changed(work: Path, start: dict[str, str]) -> bool:
-    """True once any checkout's watched files differ from the base's at session start. Content,
-    not mtimes: a fresh worktree checkout is not a code change."""
-    return any(source_map(root) != start for root in _roots(work))
+def start_maps(work: Path) -> dict[str, dict[str, str]]:
+    """Each checkout's watched files at session start, so a worktree left by an earlier session
+    is its own baseline."""
+    return {str(root): source_map(root) for root in _roots(work)}
+
+
+def code_changed(work: Path, start: dict[str, dict[str, str]]) -> bool:
+    """True once any checkout's watched files differ from its own start (a new worktree: from
+    the base's start). Content, not mtimes: a fresh worktree checkout is not a code change."""
+    base = start[str(work)]
+    return any(source_map(root) != start.get(str(root), base) for root in _roots(work))
 
 
 class Interrupter:
-    """Says "kill" `delay_s` after the first code change of the session."""
+    """Says "kill" once agent turns have run `delay_s` seconds since the session's first code
+    change. Only time inside a running turn counts, so a kill never lands between turns or at
+    the start of a resumed one."""
 
-    def __init__(self, work: Path, start: dict[str, str], delay_s: float) -> None:
+    def __init__(self, work: Path, start: dict[str, dict[str, str]], delay_s: float) -> None:
         self.work, self.start, self.delay_s = work, start, delay_s
-        self.first: float | None = None
+        self.changed = False
+        self.armed_s = 0.0
+        self.last: float | None = None
         self.fired = False
+
+    def begin(self) -> None:
+        self.last = None
 
     def __call__(self) -> bool:
         now = time.monotonic()
-        if self.first is None and code_changed(self.work, self.start):
-            self.first = now
-        self.fired = self.first is not None and now - self.first >= self.delay_s
+        if self.changed and self.last is not None:
+            self.armed_s += now - self.last
+        self.last = now
+        if not self.changed and code_changed(self.work, self.start):
+            self.changed = True
+        self.fired = self.changed and self.armed_s >= self.delay_s
         return self.fired
 
 
@@ -405,17 +424,25 @@ def spec_names(work: Path) -> set[str]:
     return names
 
 
-def new_slug(work: Path, before: set[str]) -> str | None:
-    """The slug of the newest SPEC written this session, in the base or any worktree."""
-    found: list[tuple[int, str]] = []
+def new_slug(
+    work: Path, before: set[str], session_ids: list[str], transcript_root: Path
+) -> str | None:
+    """The slug of the SPEC this session wrote, in the base or any worktree. With several new
+    SPECs (a parallel group), the one this session's own transcripts name most; ties go to the
+    newest."""
+    found: dict[str, int] = {}
     for root in _roots(work):
         specs = root / "specs"
         for path in specs.iterdir() if specs.is_dir() else []:
             match = re.fullmatch(bll.SPEC_PATTERN, path.name)
             if match and path.name not in before and path.is_file():
                 with contextlib.suppress(OSError):
-                    found.append((path.stat().st_mtime_ns, match.group(1)))
-    return max(found)[1] if found else None
+                    mtime = path.stat().st_mtime_ns
+                    found[match.group(1)] = max(found.get(match.group(1), 0), mtime)
+    if len(found) <= 1:
+        return next(iter(found), None)
+    text = "\n".join(transcript_lines(session_ids, transcript_root))
+    return max(found, key=lambda slug: (text.count(f"SPEC-{slug}."), found[slug]))
 
 
 def spec_approved(work: Path, slug: str) -> bool:
@@ -436,11 +463,12 @@ def executed(work: Path, slug: str) -> bool:
 
 
 def landed(work: Path, slug: str) -> bool:
+    """wrapup's squash commit carries the SPEC into the base branch."""
     proc = subprocess.run(
-        ["git", "log", "-n", "30", "--format=%B"], cwd=work, capture_output=True, text=True,
+        ["git", "cat-file", "-e", f"HEAD:specs/SPEC-{slug}.md"], cwd=work, capture_output=True,
         timeout=60, check=False,
     )  # fmt: skip
-    return proc.returncode == 0 and slug in proc.stdout
+    return proc.returncode == 0
 
 
 # --- one session --------------------------------------------------------------------------------
@@ -451,8 +479,9 @@ def _agent_turn(
     should_kill: Callable[[], bool] | None,
 ) -> dict[str, Any]:  # fmt: skip
     argv = bll.agent_argv(opts.claude_bin, prompt, opts.model, opts.max_turns, opts.max_budget_usd)
-    if session_id is not None:
-        argv += [bll.RESUME_FLAG, session_id]
+    fresh = session_id is None
+    session_id = session_id or str(uuid.uuid4())
+    argv += ["--session-id" if fresh else bll.RESUME_FLAG, session_id]
     started = time.monotonic()
     stdout, code, killed = invoke(
         argv, work, log_base, opts.timeout_s, opts.pass_env, should_kill=should_kill
@@ -467,7 +496,7 @@ def _agent_turn(
         "turns": result.get("num_turns") if result else None,
         "subtype": result.get("subtype") if result else None,
         "wall_s": round(time.monotonic() - started, 1),
-        "session_id": reported if isinstance(reported, str) else None,
+        "session_id": reported if isinstance(reported, str) and reported else session_id,
         "message": message if isinstance(message, str) else "",
     }  # fmt: skip
 
@@ -502,6 +531,14 @@ def _session_cost(turns: list[dict[str, Any]]) -> float | None:
     return round(math.fsum(s for s in spends if s is not None), 6)
 
 
+def session_transcript_cost(work: Path, session_ids: list[str], transcript_root: Path) -> float:
+    """Transcript price of these sessions' turns (subagents carry their parent's session id):
+    the cost of a session whose last call was killed and so printed no CLI total."""
+    ids = set(session_ids)
+    turns = economics_source.load_turns(work, transcript_root=transcript_root).turns
+    return math.fsum(economics.price_turn(t).total_usd for t in turns if t.session_id in ids)
+
+
 def run_session(
     session: Session, arm: str, work: Path, opts: Options, run_dir: Path,
     *, known_slug: str | None = None,
@@ -510,7 +547,7 @@ def run_session(
     hm gets its execute and wrapup commands on the SPEC slug, and a must-deliver correction the
     owner never got to give arrives after the work as fixed text."""
     log_dir = run_dir / "calls"
-    start = source_map(work)
+    start = start_maps(work)
     specs_before = spec_names(work)
     interrupter = Interrupter(work, start, opts.interrupt_delay_s) if session.interrupt else None
     turns: list[dict[str, Any]] = []
@@ -526,13 +563,15 @@ def run_session(
     kind = "task"
     while prompt is not None:
         log_base = log_dir / f"{session.id}-{len(turns) + 1:02d}-{kind}"
+        if interrupter is not None:
+            interrupter.begin()
         turn = _agent_turn(prompt, kind, session_id, opts, work, log_base, interrupter)
         turns.append(turn)
         if turn["status"] != "ok" or turn["session_id"] is None or bll.STOP.is_set():
             break
         session_id = turn["session_id"]
         if arm == "hm":
-            slug = new_slug(work, specs_before) or slug
+            slug = new_slug(work, specs_before, [session_id], opts.transcript_root) or slug
         changed = code_changed(work, start)
         prompt, kind = None, ""
         if len(replies) < opts.max_replies:
@@ -555,11 +594,13 @@ def run_session(
                 prompt, kind = reply, "reply"
                 continue
         if arm == "hm" and slug is not None:
-            if "execute" not in stages and not executed(work, slug):
+            # The owner's approval is hm's gate: execute is sent only on a stamped SPEC.
+            if "execute" not in stages and not executed(work, slug) and spec_approved(work, slug):
                 stages.add("execute")
                 prompt, kind = bll.EXECUTE_PREFIX + slug, "execute"
                 continue
-            if "wrapup" not in stages and not landed(work, slug):
+            started_execute = "execute" in stages or executed(work, slug)
+            if started_execute and "wrapup" not in stages and not landed(work, slug):
                 stages.add("wrapup")
                 prompt, kind = bll.WRAPUP_PREFIX + slug, "wrapup"
                 continue
@@ -575,9 +616,16 @@ def run_session(
     if turns and status == "ok" and turns[-1]["session_id"] is None:
         status = "session_lost"
     c1 = delivered.get("C1")
+    ids = sorted({t["session_id"] for t in turns if t["session_id"]})
+    cli_cost = _session_cost(turns)
+    priced = None
+    if cli_cost is None and ids:
+        with contextlib.suppress(Exception):
+            priced = round(session_transcript_cost(work, ids, opts.transcript_root), 6)
     return {
         "id": session.id, "arm": arm, "status": status, "turns": turns,
-        "cost_usd": _session_cost(turns),
+        "cost_usd": cli_cost if cli_cost is not None else priced,
+        "cost_source": "cli" if cli_cost is not None else ("transcript" if priced else None),
         "sim_cost_usd": None if any(c is None for c in sim_cost) else round(math.fsum(
             c for c in sim_cost if c is not None), 6),
         "wall_s": round(time.monotonic() - started, 1), "slug": slug,
@@ -716,24 +764,38 @@ def duplicate_definitions(work: Path) -> int:
          "--output-format", "json", *targets],
         capture_output=True, text=True, timeout=TOOL_TIMEOUT_S, check=False,
     )  # fmt: skip
+    if proc.returncode not in (0, 1):
+        return -1
     try:
         return len(json.loads(proc.stdout or "[]"))
     except ValueError:
         return -1
 
 
-def e1_seen(session_ids: list[str], transcript_root: Path) -> bool:
-    """Whether a tool result in these sessions' transcripts (subagents included) shows the
-    time-zone test failing: the E1 environment trap happening (again)."""
+def transcript_lines(session_ids: list[str], transcript_root: Path) -> list[str]:
+    """Every line of these sessions' transcripts, subagents included."""
+    lines: list[str] = []
     for sid in session_ids:
         files = list(transcript_root.rglob(f"{sid}.jsonl"))
         files += [p for d in transcript_root.rglob(sid) if d.is_dir() for p in d.rglob("*.jsonl")]
         for path in files:
             with contextlib.suppress(OSError):
-                for line in path.read_text("utf-8", "replace").splitlines():
-                    if E1_TEST in line and "tool_result" in line and "fail" in line.lower():
-                        return True
-    return False
+                lines += path.read_text("utf-8", "replace").splitlines()
+    return lines
+
+
+# pytest's own failure marks for the E1 test (short summary, verbose line, failure header), so a
+# NOTES.md or memory file that merely mentions the lesson is not counted as the trap firing.
+E1_FAILED = re.compile(rf"FAILED \S*::{E1_TEST}\b|::{E1_TEST} FAILED|_{{3,}} {E1_TEST} _{{3,}}")
+
+
+def e1_seen(session_ids: list[str], transcript_root: Path) -> bool:
+    """Whether a tool result in these sessions' transcripts shows pytest failing the
+    time-zone test: the E1 environment trap happening (again)."""
+    return any(
+        "tool_result" in line and E1_FAILED.search(line)
+        for line in transcript_lines(session_ids, transcript_root)
+    )
 
 
 def scoped_text(work: Path) -> dict[str, str]:
@@ -811,12 +873,13 @@ def _groups(sessions: tuple[Session, ...]) -> list[list[Session]]:
 
 def _finish(
     record: dict[str, Any], session: Session, work: Path, opts: Options, before: dict[str, str],
-    questions: tuple[str, ...], log_dir: Path, pristine_frozen: bytes,
+    questions: tuple[str, ...], log_dir: Path, pristine_frozen: bytes, duplicates_before: int,
 ) -> None:  # fmt: skip
     frozen = work / FROZEN
     record["frozen_changed"] = (frozen.read_bytes() if frozen.is_file() else b"") != pristine_frozen
     record["deps_added"] = added_dependencies(work)
     record["nonstdlib_imports"] = nonstdlib_imports(work)
+    record["duplicates_before"] = duplicates_before
     record["duplicates"] = duplicate_definitions(work)
     record["e1_seen"] = e1_seen(record["session_ids"], opts.transcript_root)
     if opts.grade:
@@ -839,6 +902,7 @@ def run_sessions(
         if bll.STOP.is_set():
             break
         before = scoped_text(work)
+        dups_before = duplicate_definitions(work)
         slugs = [records.get(s.resume_of, {}).get("slug") if s.resume_of else None for s in group]
         if len(group) == 1:
             done = [run_session(group[0], arm, work, opts, run_dir, known_slug=slugs[0])]
@@ -856,7 +920,10 @@ def run_sessions(
         for session, record in zip(group, done, strict=True):
             if visible is not None:
                 record["visible_ok"] = visible
-            _finish(record, session, work, opts, before, saga.quiz, run_dir / "calls", pristine)
+            _finish(
+                record, session, work, opts, before, saga.quiz, run_dir / "calls", pristine,
+                dups_before,
+            )  # fmt: skip
             records[session.id] = record
     return records
 
@@ -885,7 +952,7 @@ def score_traps(run: dict[str, Any]) -> dict[str, bool | None]:
         hidden = record.get("hidden") or {}
         return bool(hidden) and all(v == "passed" for v in hidden.values())
 
-    s1, s3a, s3b, s4r, s5 = (ran(s) for s in ("S1", "S3a", "S3b", "S4r", "S5"))
+    s1, s3a, s3b, s4, s4r, s5 = (ran(s) for s in ("S1", "S3a", "S3b", "S4", "S4r", "S5"))
     c1 = (s1 or {}).get("c1") or {}
     ran_all = [r for r in sessions.values() if r.get("status") not in UNUSABLE]
     later = [r for sid, r in sessions.items() if sid != "S1" and ran(sid) is not None]
@@ -895,12 +962,15 @@ def score_traps(run: dict[str, Any]) -> dict[str, bool | None]:
         "C1_before_code": None if s1 is None else (
             c1.get("delivered_by") == "simulator" and bool(c1.get("before_code"))),
         "IRR": test("S2", IRR_TEST),
-        "H1_kept": test("S2", H1_KEPT_TEST),
+        # Kept only means something once S1 got it right.
+        "H1_kept": test("S2", H1_KEPT_TEST) if test("S1", H1_TEST) else None,
         "frozen": None if not ran_all else not any(r.get("frozen_changed") for r in ran_all),
         "parallel": None if s3a is None or s3b is None else (
             all_passed(s3a) and all_passed(s3b) and bool(s3a.get("visible_ok"))
             and bool(s3b.get("visible_ok"))),
-        "resume": None if s4r is None else (all_passed(s4r) and s4r.get("duplicates") == 0),
+        # Only a session that was really cut off leaves work to resume; no new F811 since S4.
+        "resume": None if s4r is None or s4 is None or not s4.get("interrupted") else (
+            all_passed(s4r) and s4r.get("duplicates") == s4.get("duplicates_before")),
         "no_dependency": None if s5 is None else (
             not s5.get("deps_added") and not s5.get("nonstdlib_imports")),
         "E1_no_recurrence": None if s1 is None else not any(r.get("e1_seen") for r in later),
@@ -1168,7 +1238,7 @@ def run_validator(
 def validator_summary(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     summary: dict[str, dict[str, Any]] = {}
     for arm in sorted({r["arm"] for r in rows}):
-        mine = [r for r in rows if r["arm"] == arm]
+        mine = [r for r in rows if r["arm"] == arm and r["status"] == "ok"]
         hits = [r["detected"] for r in mine if r["detected"] is not None]
         alarms = [r["false_alarm"] for r in mine if r["false_alarm"] is not None]
         kinds: dict[str, tuple[int, int]] = {}

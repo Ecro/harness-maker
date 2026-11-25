@@ -19,7 +19,20 @@ def _v1_export(tmp_path: Path) -> Path:
     return source
 
 
+def _plain_v1_export(tmp_path: Path) -> Path:
+    """A v1 export written as fixed JSON, so it does not depend on how S1 stored repeats."""
+    source = tmp_path / "plain-export.json"
+    entry = {"id": "r1", "text": "Rent", "due": "2026-01-05T09:00:00Z", "done": False}
+    source.write_text(json.dumps({"version": 1, "reminders": [entry]}))
+    return source
+
+
 def test_import_v1_file(save_file: Path, tmp_path: Path) -> None:
+    api.import_file(_plain_v1_export(tmp_path))
+    assert [(due, text) for due, text, _id in api.upcoming()] == [(START, "Rent")]
+
+
+def test_import_recurring_v1_file(save_file: Path, tmp_path: Path) -> None:
     api.import_file(_v1_export(tmp_path))
     texts = sorted(text for _due, text, _id in api.upcoming(limit=100))
     assert texts == ["Rent", "Standup", "Standup", "Standup"]
@@ -40,18 +53,18 @@ def test_import_v0_keeps_case(save_file: Path, tmp_path: Path) -> None:
 def test_import_twice_no_duplicates(save_file: Path, tmp_path: Path) -> None:
     old = tmp_path / "old.json"
     old.write_text(json.dumps(V0))
-    current = _v1_export(tmp_path)
+    current = _plain_v1_export(tmp_path)
     for _ in range(2):
         api.import_file(old)
         api.import_file(current)
-    assert len(api.upcoming(limit=100)) == 5
+    assert len(api.upcoming(limit=100)) == 2
 
 
 def test_irr_top_level_unchanged(save_file: Path, tmp_path: Path) -> None:
     old = tmp_path / "old.json"
     old.write_text(json.dumps(V0))
     api.import_file(old)
-    api.import_file(_v1_export(tmp_path))
+    api.import_file(_plain_v1_export(tmp_path))
     api.import_file(old)
     data = json.loads(save_file.read_text())
     assert set(data) == {"version", "reminders"}

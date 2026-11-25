@@ -277,6 +277,17 @@ def test_ac_005_hm_walks_execute_and_wrapup(saga: ModuleType, tmp_path: Path) ->
     )
     assert [c["prompt"] for c in _log(home2)] == ["/hm:spec Add alarms."]
 
+    tmp3 = tmp_path / "unapproved"
+    tmp3.mkdir()
+    draft = {".worktrees/x/specs/SPEC-alarm.md": "# SPEC\n"}
+    claude3, home3 = _fake(
+        tmp3, {"agent": [{"match": "", "write": draft, "result": "Approve?"}], "reply": [silent]}
+    )
+    saga.run_session(
+        _session(saga), "hm", _work(tmp3), _opts(saga, tmp3, claude3, home3), tmp3 / "run"
+    )
+    assert [c["prompt"] for c in _log(home3)] == ["/hm:spec Add alarms."]
+
 
 # --- AC-006 -------------------------------------------------------------------------------------
 
@@ -370,11 +381,12 @@ def test_ac_007_trap_verdicts_golden(saga: ModuleType) -> None:
                 "interrupted": True,
                 "frozen_changed": False,
                 "e1_seen": False,
+                "duplicates_before": 1,
             },
             "S4r": {
                 "status": "ok",
                 "hidden": _passed("test_t1"),
-                "duplicates": 0,
+                "duplicates": 1,
                 "frozen_changed": False,
                 "e1_seen": False,
             },
@@ -385,7 +397,7 @@ def test_ac_007_trap_verdicts_golden(saga: ModuleType) -> None:
         "C1": True,
         "C1_before_code": True,
         "IRR": True,
-        "H1_kept": False,
+        "H1_kept": None,
         "frozen": False,
         "parallel": False,
         "resume": True,
