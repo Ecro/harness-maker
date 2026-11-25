@@ -34,7 +34,7 @@ import threading
 import time
 import tomllib
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -73,6 +73,10 @@ H1_KEPT_TEST = "test_h1_kept_on_import"
 # Which reference overlay makes each hidden-test dir pass (S3a and S3b share one).
 REFERENCE = {"S1": "S1", "S2": "S2", "S3a": "S3", "S3b": "S3", "S4": "S4", "S5": "S5"}
 UNUSABLE = ("setup_error", "runner_error")
+# 1.0 in every arm of the pilot (2026-11-25, 3 arms x 2): reported, not in the verdict.
+SATURATED = ("IRR", "frozen", "no_dependency", "parallel", "H1_kept")
+MARGIN = 0.2
+MIN_TRAPS = 3
 POLL_S = 0.5
 SCHEMA_TIMEOUT_S = 300
 TOOL_TIMEOUT_S = 300
@@ -212,7 +216,7 @@ class Options:
     sim_budget_usd: float = 0.5
     total_budget_usd: float = 60.0
     pass_env: tuple[str, ...] = ()
-    interrupt_delay_s: float = 60.0
+    interrupt_delay_s: float = 5.0
     max_replies: int = 3
     grade: bool = True
     quiz: bool = True
@@ -501,11 +505,33 @@ def _agent_turn(
     }  # fmt: skip
 
 
-def sim_input(session: Session, delivered: set[str], replies: list[str], message: str) -> str:
+def carried_facts(earlier: Sequence[Session]) -> tuple[Fact, ...]:
+    """What the owner already knows from earlier sessions: every fact once, as an "asked" fact
+    with no must-deliver, so it answers questions but never triggers a post-hoc correction
+    (SPEC-saga-pilot-fixes AC-002)."""
+    known: dict[str, Fact] = {}
+    for session in earlier:
+        for fact in session.facts:
+            known.setdefault(fact.id, Fact(id=fact.id, when="asked", text=fact.text))
+    return tuple(known.values())
+
+
+def group_carried(saga: Saga, group: Sequence[Session]) -> tuple[Fact, ...]:
+    """The facts of every session before the group in the full saga order. A `--sessions`
+    subset still carries what the skipped sessions would have taught: the owner remembers."""
+    return carried_facts(saga.sessions[: saga.sessions.index(group[0])])
+
+
+def sim_input(
+    session: Session, delivered: set[str], replies: list[str], message: str,
+    carried: Sequence[Fact] = (),
+) -> str:  # fmt: skip
+    own = {f.id for f in session.facts}
+    facts = [*session.facts, *(f for f in carried if f.id not in own)]
     sheet = (
         "\n".join(
             f"- {f.id} ({f.when}{', already delivered' if f.id in delivered else ''}): {f.text}"
-            for f in session.facts
+            for f in facts
         )
         or "- (no facts)"
     )
@@ -541,7 +567,7 @@ def session_transcript_cost(work: Path, session_ids: list[str], transcript_root:
 
 def run_session(
     session: Session, arm: str, work: Path, opts: Options, run_dir: Path,
-    *, known_slug: str | None = None,
+    *, known_slug: str | None = None, carried: Sequence[Fact] = (),
 ) -> dict[str, Any]:  # fmt: skip
     """One session as the owner sees it: the agent works, the simulator answers what it asks,
     hm gets its execute and wrapup commands on the SPEC slug, and a must-deliver correction the
@@ -575,7 +601,7 @@ def run_session(
         changed = code_changed(work, start)
         prompt, kind = None, ""
         if len(replies) < opts.max_replies:
-            text = sim_input(session, set(delivered), replies, turn["message"])
+            text = sim_input(session, set(delivered), replies, turn["message"], carried)
             data, cost = schema_call(
                 text, SIM_SCHEMA, opts, log_base.with_name(log_base.name + "-owner")
             )
@@ -583,9 +609,14 @@ def run_session(
             sim = data or {"reply": None, "delivered": [], "approved": False, "observed": []}
             turn["sim"] = {**sim, "code_changed": changed, "cost_usd": cost, "ok": data is not None}
             facts = {f.id for f in session.facts}
+            background = {f.id for f in carried} - facts
             for fid in sim.get("delivered") or []:
                 if fid in facts and fid not in delivered:
                     delivered[fid] = {"delivered_by": "simulator", "before_code": not changed}
+                elif fid in background and fid not in delivered:
+                    delivered[fid] = {
+                        "delivered_by": "simulator", "before_code": not changed, "carried": True,
+                    }  # fmt: skip
             for event in sim.get("observed") or []:
                 observed.setdefault(str(event), not changed)
             reply = sim.get("reply")
@@ -904,12 +935,15 @@ def run_sessions(
         before = scoped_text(work)
         dups_before = duplicate_definitions(work)
         slugs = [records.get(s.resume_of, {}).get("slug") if s.resume_of else None for s in group]
+        carried = group_carried(saga, group)
         if len(group) == 1:
-            done = [run_session(group[0], arm, work, opts, run_dir, known_slug=slugs[0])]
+            done = [run_session(group[0], arm, work, opts, run_dir, known_slug=slugs[0],
+                                carried=carried)]  # fmt: skip
         else:
             with ThreadPoolExecutor(max_workers=len(group)) as pool:
                 futures = [
-                    pool.submit(run_session, s, arm, work, opts, run_dir, known_slug=slug)
+                    pool.submit(run_session, s, arm, work, opts, run_dir, known_slug=slug,
+                                carried=carried)
                     for s, slug in zip(group, slugs, strict=True)
                 ]  # fmt: skip
                 done = [f.result() for f in futures]
@@ -956,6 +990,7 @@ def score_traps(run: dict[str, Any]) -> dict[str, bool | None]:
     c1 = (s1 or {}).get("c1") or {}
     ran_all = [r for r in sessions.values() if r.get("status") not in UNUSABLE]
     later = [r for sid, r in sessions.items() if sid != "S1" and ran(sid) is not None]
+    whole = [r for r in later if not r.get("interrupted")]
     return {
         "H1": test("S1", H1_TEST),
         "C1": test("S1", C1_TEST),
@@ -968,12 +1003,17 @@ def score_traps(run: dict[str, Any]) -> dict[str, bool | None]:
         "parallel": None if s3a is None or s3b is None else (
             all_passed(s3a) and all_passed(s3b) and bool(s3a.get("visible_ok"))
             and bool(s3b.get("visible_ok"))),
-        # Only a session that was really cut off leaves work to resume; no new F811 since S4.
+        # Only a session that was really cut off leaves work to resume; no new F811 since S4;
+        # and the owner did not have to say what was unfinished (S4r's own fact).
         "resume": None if s4r is None or s4 is None or not s4.get("interrupted") else (
-            all_passed(s4r) and s4r.get("duplicates") == s4.get("duplicates_before")),
+            all_passed(s4r) and s4r.get("duplicates") == s4.get("duplicates_before")
+            and not any(not d.get("carried") for d in (s4r.get("delivered") or {}).values())),
         "no_dependency": None if s5 is None else (
             not s5.get("deps_added") and not s5.get("nonstdlib_imports")),
-        "E1_no_recurrence": None if s1 is None else not any(r.get("e1_seen") for r in later),
+        # FAILED marks in fewer than half of the later sessions that ran to the end; a session
+        # cut off seconds after its first write rarely reaches a test run (SPEC-saga-pilot-fixes).
+        "E1_no_recurrence": None if s1 is None or not whole else (
+            2 * sum(bool(r.get("e1_seen")) for r in whole) < len(whole)),
     }  # fmt: skip
 
 
@@ -1131,13 +1171,13 @@ def trap_rates(rows: list[dict[str, Any]]) -> dict[str, dict[str, float | None]]
     return {arm: {t: _rate(v) for t, v in traps.items()} for arm, traps in by_arm.items()}
 
 
-def verdict(rows: list[dict[str, Any]], margin: float = 0.2, min_traps: int = 4) -> str:
+def verdict(rows: list[dict[str, Any]], margin: float = MARGIN, min_traps: int = MIN_TRAPS) -> str:
     """`hm_unique` when hm's mean trap rate beats plain-discipline's by `margin` and hm is ahead
-    on at least `min_traps` traps; otherwise `reproduced` (DESIGN §3, numbers fixed after the
-    pilot)."""
+    on at least `min_traps` traps, over the traps the pilot did not saturate; otherwise
+    `reproduced` (DESIGN §3, numbers fixed by SPEC-saga-pilot-fixes)."""
     rates = trap_rates(rows)
     hm, ctl = rates.get("hm", {}), rates.get(CONTROL, {})
-    common = [t for t in hm if hm[t] is not None and ctl.get(t) is not None]
+    common = [t for t in hm if t not in SATURATED and hm[t] is not None and ctl.get(t) is not None]
     if not common:
         return "insufficient"
     hm_mean = math.fsum(hm[t] or 0.0 for t in common) / len(common)
@@ -1151,7 +1191,7 @@ def _fmt(value: float | None, digits: int = 2) -> str:
     return "-" if value is None else f"{value:.{digits}f}"
 
 
-def report(rows: list[dict[str, Any]], margin: float = 0.2, min_traps: int = 4) -> str:
+def report(rows: list[dict[str, Any]], margin: float = MARGIN, min_traps: int = MIN_TRAPS) -> str:
     ok = [r for r in rows if r.get("status") == "ok"]
     arms = [a for a in ARMS if any(r["arm"] == a for r in ok)]
     rates = trap_rates(ok)
@@ -1176,7 +1216,8 @@ def report(rows: list[dict[str, Any]], margin: float = 0.2, min_traps: int = 4) 
             values = [r["traps"].get(trap) for r in ok if r["arm"] == arm]
             known = [v for v in values if v is not None]
             cells.append(f"{sum(known)}/{len(known)} ({_fmt(rates[arm].get(trap))})")
-        lines.append(f"{trap:18} " + "  ".join(f"{c:>16}" for c in cells))
+        mark = "  saturated (not in verdict)" if trap in SATURATED else ""
+        lines.append(f"{trap:18} " + "  ".join(f"{c:>16}" for c in cells) + mark)
     lines += ["", f"verdict (margin {margin}, min traps {min_traps}): "
               f"{verdict(ok, margin, min_traps)}"]  # fmt: skip
     return "\n".join(lines)
@@ -1320,14 +1361,14 @@ def _on_signal(_signum: int, _frame: object) -> None:
     bll.kill_live()
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="saga_bench", description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("check", help="check the fixture's own contract (no model calls)")
     rep = sub.add_parser("report", help="aggregate a results dir")
     rep.add_argument("--out", required=True)
-    rep.add_argument("--margin", type=float, default=0.2)
-    rep.add_argument("--min-traps", type=int, default=4)
+    rep.add_argument("--margin", type=float, default=MARGIN)
+    rep.add_argument("--min-traps", type=int, default=MIN_TRAPS)
     for name in ("run", "validator"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--out", required=True)
@@ -1338,13 +1379,18 @@ def main(argv: list[str] | None = None) -> int:
         cmd.add_argument("--max-budget-usd", type=float, default=6.0)
         cmd.add_argument("--total-budget-usd", type=float, default=60.0)
         cmd.add_argument("--pass-env", action="append", default=[])
-        cmd.add_argument("--interrupt-delay-s", type=float, default=60.0)
+        cmd.add_argument("--interrupt-delay-s", type=float, default=Options.interrupt_delay_s)
         cmd.add_argument("--timeout-s", type=int, default=2400)
         cmd.add_argument("--no-quiz", action="store_true")
         cmd.add_argument("--sessions", default="", help="comma-separated ids (smoke runs)")
     sub.choices["run"].add_argument("--arms", default=",".join(ARMS))
     sub.choices["run"].add_argument("--jobs", type=int, default=3)
     sub.choices["validator"].add_argument("--arms", default=",".join(VALIDATOR_ARMS))
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "check":
         problems = check_fixture()

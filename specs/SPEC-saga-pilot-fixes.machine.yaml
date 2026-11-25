@@ -1,0 +1,125 @@
+schema_version: 3
+spec_slug: saga-pilot-fixes
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: every arm's S4 gets cut off
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_pilot_ac_001_interrupt_delay_default
+  executable_predicate: delay == 5.0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Pilot timing: plain S4 took 25 s end to end.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the owner keeps earlier facts
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_pilot_ac_002_owner_keeps_earlier_facts
+  executable_predicate: delivered['H1']['carried'] is True
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fact ids typed from saga.json; expected record written from this
+    SPEC.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: resume and E1 score what they measure
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_pilot_ac_003_resume_and_e1
+  executable_predicate: traps == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected values typed from the SPEC thresholds, not from the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: the verdict skips saturated traps
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_pilot_ac_004_verdict_skips_saturated
+  executable_predicate: verdict(with_saturated) == verdict(without_saturated)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Saturated list is the pilot report's all-1.0 rows.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 55d4cebad504f63f33aa41c0c934bf42c2ecd3de1dafea64dcb788cc7a68bbe6
+  approved_by: Claude
+  approved_at: '2026-11-25T14:43:56Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: df65117d7e55331b336810ebd410f957e00ae221a8ef12e61f50e867c483449b
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: efa3eb46203748796e83d742e94f677d1047cc7df4a8d8e75c4327b7bb106ca1
+    AC-002: 1293d0eaf943baa60cccf616162cb59d4159cd33f1f0cd6ca283651115ffdcb6
+    AC-003: 19bbddf60dd93d293db5b2a0329509c50bb3a650a4c4ef470469592456f7d7db
+    AC-004: 5ee76f683dfee02da1c4f0f557a8f11676ac4d726e48c4eb33c681ac86550528
+    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591

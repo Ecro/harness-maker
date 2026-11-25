@@ -12,6 +12,12 @@
 - **Memory lock files are gitignored in rendered projects.** `.claude/memory/*.lock` joins the
   harness gitignore block; `.wiki.lock` was committed in 30 of 36 bench runs. A project picks it up
   on its next `hm make`.
+- **Saga bench scoring after its pilot** (SPEC-saga-pilot-fixes). The interrupt lands 5 s after
+  the first write (was 60 s, longer than plain's whole session); the owner keeps every fact of
+  earlier sessions; `resume` fails when the owner had to say what was unfinished;
+  `E1_no_recurrence` passes when the failure recurs in fewer than half of the later sessions; the
+  five traps every pilot arm passed (IRR, frozen, no_dependency, parallel, H1_kept) stay in the
+  report but leave the verdict (margin 0.2, lead on 3 of the other 5).
 ### Added
 
 - **Saga bench: hm's unique values on consecutive sessions** (SPEC-saga-bench).
