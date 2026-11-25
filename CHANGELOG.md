@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Wrapup with isolation off commits the code on the first try** (SPEC-bench-wrapup-defects). The
+  stage now says to `git add` the task's code and tests before `hm wrapup_land`; the 2026-11-25
+  bench saw the first commit miss them in 35 of 36 runs (the model amended or added a commit).
+  The land receipt gains `steps.left_out`, the changed or untracked paths the commit did not take,
+  with one stderr line when it is not empty.
+- **Memory lock files are gitignored in rendered projects.** `.claude/memory/*.lock` joins the
+  harness gitignore block; `.wiki.lock` was committed in 30 of 36 bench runs. A project picks it up
+  on its next `hm make`.
 ### Added
 
 - **Self-prune loop for new models** (SPEC-self-prune-loop). When a new default model ships, hm

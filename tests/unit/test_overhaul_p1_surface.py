@@ -251,7 +251,9 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 # (BASELINE-DELTA-pipeline-env-fixes.md, PLAN ADR-009, DRI card 2026-11-10).
 # All three raised by their measured growth in SPEC-ask-less: rule R (+150 each), plus spec's
 # interview rules (+27) and wrapup's split of intent writes (+61) (BASELINE-DELTA-ask-less.md).
-_STAGE_BUDGET = {"spec": (7140, 1500, 800), "execute": (7773, 1500, 0), "wrapup": (4285, 2800, 0)}
+# wrapup raised by SPEC-bench-wrapup-defects' measured growth: isolation off swaps "`index_after`
+# must hold the code." for the stage-your-code sentence (+15; the worktree-on arm is unchanged).
+_STAGE_BUDGET = {"spec": (7140, 1500, 800), "execute": (7773, 1500, 0), "wrapup": (4300, 2785, 0)}
 _OPT_IN = 1500
 
 

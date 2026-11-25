@@ -287,6 +287,30 @@ def _staged_paths(worktree: Path) -> list[str]:
     return [ln for ln in r.stdout.splitlines() if ln.strip()]
 
 
+def left_out_paths(worktree: Path) -> list[str]:
+    """Changed or untracked (not ignored) paths the commit did not take.
+
+    With isolation off nothing sweeps the shared tree, so a code file the caller forgot to
+    stage stays behind while the receipt says `created` (35 of 36 bench runs,
+    SPEC-bench-wrapup-defects). Reported, not staged: only the caller knows which are its own.
+    """
+    r = _git(worktree, "status", "--porcelain", "-z", "--untracked-files=normal")
+    # `-z`: paths stay unquoted, so the receipt names a path `git add` accepts. A rename record
+    # is followed by its source path as a separate entry, which is not a left-out path.
+    entries = r.stdout.split("\0")
+    paths: list[str] = []
+    i = 0
+    while i < len(entries):
+        entry = entries[i]
+        i += 1
+        if len(entry) < 4:
+            continue
+        paths.append(entry[3:])
+        if entry[0] in "RC" or entry[1] in "RC":
+            i += 1
+    return paths
+
+
 def _head_message(worktree: Path) -> tuple[str, str]:
     """HEAD's subject and full body from ONE read.
 
@@ -417,6 +441,14 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         # Classify what actually landed — HEAD's body, which `task-land` will reuse — not a
         # message file that may have been edited since the commit happened.
         landed = head_body
+    left_out = left_out_paths(worktree)
+    receipt["steps"]["left_out"] = left_out
+    if left_out:
+        print(
+            f"[wrapup_land] left out of the commit: {', '.join(left_out)} — if one is this "
+            "task's, `git add` it and `git commit --amend --no-edit`",
+            file=sys.stderr,
+        )
     understanding = check_understanding_block(landed)
     receipt["steps"]["understanding"] = understanding.as_json()
     receipt["steps"]["understanding_block"] = understanding.text
