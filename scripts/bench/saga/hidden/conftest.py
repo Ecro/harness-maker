@@ -1,0 +1,16 @@
+"""Shared fixture of the hidden tests: an empty save file, a clean home and cwd."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+
+@pytest.fixture
+def save_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    path = tmp_path / "reminders.json"
+    monkeypatch.setenv("REMIND_FILE", str(path))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    return path

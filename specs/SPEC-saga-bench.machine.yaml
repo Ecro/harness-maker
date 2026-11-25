@@ -1,0 +1,233 @@
+schema_version: 3
+spec_slug: saga-bench
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the fixture checks out and leaves the existing bench alone
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_ac_001_fixture_checks_and_hashes_unchanged
+  executable_predicate: problems == [] and hashes == pinned
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The pinned hashes were computed on main a8ed0a0c before the fixture
+    existed; the reference overlays are written independently of the hidden tests.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: prompts per arm
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_ac_002_prompts_per_arm
+  executable_predicate: prompts == expected
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The paragraph is the DESIGN §2.4 text translated literally; the
+    prefix rule is typed from this SPEC.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the owner loop resumes the same session and caps replies
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_ac_003_owner_loop_resumes_and_caps
+  executable_predicate: agent_calls == 4 and resumed == calls[1:]
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: DESIGN §2.3 caps a session at 3 round trips; the fake logs every
+    argv.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: the fixed correction is sent once, only when undelivered
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_ac_004_correction_sent_once_when_undelivered
+  executable_predicate: posthoc_sends == (0 if delivered else 1)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'DESIGN §2.3: without an approval request, C1 arrives after completion.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: the hm arm walks execute and wrapup on the SPEC slug
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_ac_005_hm_walks_execute_and_wrapup
+  executable_predicate: prompts == ['/hm:spec ' + task, '/hm:execute alarm', '/hm:wrapup
+    alarm']
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The stage commands are the existing bench's prefixes (bench_light_lane
+    EXECUTE_PREFIX, WRAPUP_PREFIX).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: parallel sessions overlap, the interrupted session is killed and resumed
+    fresh
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_ac_006_parallel_overlap_and_interrupt_resume
+  executable_predicate: overlap and interrupted and wall_s < 20 and not resumed_flags
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Timestamps and argv are logged by the fake, independent of the
+    runner.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: trap verdicts from a session record
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_ac_007_trap_verdicts_golden
+  executable_predicate: score_traps(run) == golden
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The golden dict is written by hand from the crafted record and
+    the trap definitions in this SPEC, never from the function's output.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: report verdict and validator scoring
+  type: mechanical
+  test_ids:
+  - tests/unit/test_saga_bench.py::test_ac_008_verdict_and_validator
+  executable_predicate: hm_unique == 'hm_unique' and reproduced == 'reproduced' and
+    rows == cells
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Crafted rows with leads of 0.25 and 0.1 bracket the 0.2 margin.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 9fdb24da13bf4bd298a7afafe4ffc3a61b9d9433e96d728a52c82d6d58de7ce3
+  approved_by: Claude
+  approved_at: '2026-11-25T13:39:03Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 09d155e2dd9c6089c35c3df49ea3ff26053ae0d479ccabc7db0514672e6ecb05
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 98ff2e80f62b81cfa2910f7646eae9757a1b744942397cbb2eafb2ebf4f5f41a
+    AC-002: 9dcddd54d787be789790ed68d833c823329c307c33d1f90af10c7b345630e432
+    AC-003: 8f980d6bd35a5dfb79e75c9f70339adcfecd1a1bbf079aa579215379cd105c0a
+    AC-004: c302ff4988c92c186db12f8895b424ea2dbd6582d7e88348ad7b656d4dee2efa
+    AC-005: 21e5382d09cbaad7dde2f216eb9f249dfd940950f24bf46ee01c8b218814934c
+    AC-006: 938e09d677a7693cfbd9569addb51f74fd3621d08542a7ac46462f040116aca3
+    AC-007: cf151393eaea357641b69b23a77236beb60c45e4ec1546fbcc5a75ab1c2b28fe
+    AC-008: a1375f7a91240be083fffba510d5f3761e706e664a81d2cb89c0efb9363eed25
+    ac_order: b62ad8faf895c4ebdf45f3fce97982d2bcc0a3fa6daa1e45993897fb730655c6

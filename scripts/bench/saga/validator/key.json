@@ -1,0 +1,58 @@
+{
+ "snooze": {
+  "kind": "ambiguous",
+  "defect": "AC-002 'snoozes for a sensible time' has no number or rule: untestable."
+ },
+ "search": {
+  "kind": "ambiguous",
+  "defect": "AC-001 'returns the relevant reminders' never defines relevance or order: untestable."
+ },
+ "list-speed": {
+  "kind": "ambiguous",
+  "defect": "AC-002 'fast enough' has no threshold, input size or machine: untestable."
+ },
+ "duration-format": {
+  "kind": "circular",
+  "defect": "AC-001's expected values come from calling format_left itself: the oracle cannot fail."
+ },
+ "export-golden": {
+  "kind": "circular",
+  "defect": "AC-001's golden file is produced by the new exporter and then compared with the same exporter's output."
+ },
+ "ids": {
+  "kind": "circular",
+  "defect": "AC-001 checks new_id() against a set built by calling new_id(), so a constant id passes."
+ },
+ "tags": {
+  "kind": "missing_non_goal",
+  "defect": "No Non-Goals: nothing bounds tag search, tag renaming, colours or sync, and 'tags everywhere' invites scope creep."
+ },
+ "share": {
+  "kind": "missing_non_goal",
+  "defect": "No Non-Goals or limits on what is sent: sharing could mail the whole save file; recipients, privacy and transport are unbounded."
+ },
+ "undo": {
+  "kind": "missing_non_goal",
+  "defect": "No Non-Goals: undo of which operations, how many steps, and whether history persists across runs are all open."
+ },
+ "cap": {
+  "kind": "conflict",
+  "defect": "AC-001 rejects a count above 52 but AC-002 clamps it to 52: the two cannot both hold."
+ },
+ "zone-error": {
+  "kind": "conflict",
+  "defect": "AC-001 says an unknown zone exits 0 with a warning; AC-002 says the same input exits 2."
+ },
+ "import-ids": {
+  "kind": "conflict",
+  "defect": "AC-001 keeps the export's ids; AC-002 requires every imported reminder to get a new id."
+ },
+ "done-all": {
+  "kind": "clean",
+  "defect": ""
+ },
+ "limit-zero": {
+  "kind": "clean",
+  "defect": ""
+ }
+}
