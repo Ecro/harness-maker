@@ -1,0 +1,107 @@
+schema_version: 3
+spec_slug: bench-wrapup-defects
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: isolation-off wrapup tells the model to stage its code first
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_wrapup_defects.py::test_ac_001_isolation_off_wrapup_stages_the_code_first
+  executable_predicate: phrase in wrapup(worktree=False) and old not in wrapup(worktree=False)
+    and phrase not in wrapup(worktree=True) and old in wrapup(worktree=True)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The phrase is fixed in the SPEC before the template change; 35
+    of 36 bench wrapup commits (2026-11-25 transcripts) lacked the code with isolation
+    off.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the receipt lists what the commit left out
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_wrapup_defects.py::test_ac_002_the_receipt_lists_what_the_commit_left_out
+  executable_predicate: '''stray.py'' in receipt[''steps''][''left_out''] and ''src/impl.py''
+    not in receipt[''steps''][''left_out''] and ''[wrapup_land] left out of the commit:''
+    in stderr and isolated_receipt[''steps''][''left_out''] == []'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: git status --porcelain on a fixture repo whose files the test fixes;
+    independent of wrapup_land's code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: memory lock files are ignored in rendered projects
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_wrapup_defects.py::test_ac_003_memory_lock_files_are_ignored_and_never_committed
+  executable_predicate: '''.claude/memory/*.lock'' in _HARNESS_GITIGNORE_PATTERNS
+    and check_ignore(''.claude/memory/.wiki.lock'') and not check_ignore(''.claude/memory/wiki.md'')
+    and committed == {''.claude/memory/wiki.md'', ''work-docs/PLAN-slug.md''}'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: git's own check-ignore and commit contents on a fixture repo.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: d85237e4f3ff044316ced0578a5eca5740592c0e196ebd2f5aecb952ac5eb5b1
+  approved_by: Claude
+  approved_at: '2026-11-25T13:39:25Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 1983d58cc8f1bb1c2e87ed7e478a6dce53dc732db5f9e23668b1eb1bd3728526
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 7da7d9fb413b6b2b18b390b4e2833c0ba3fb94eeb3898b039be0a9e24e8a6651
+    AC-002: cd9c2485e9ba7f109b5e44e0e3b4892683b6bf169df5ffd258ec256b83fe2ada
+    AC-003: e0c6d85c113e9ed3b8765ab4007ff46378d0b70e3e07a8ffe55679261355bc6c
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d

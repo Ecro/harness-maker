@@ -150,6 +150,11 @@ _HARNESS_CHURN_GLOBS: tuple[str, ...] = (
     ".claude/.hm-review-run-*",
     _TASK_MARKER_GITIGNORE_PATTERN,
     _COPY_PENDING_GITIGNORE_PATTERN,
+    # SPEC-bench-wrapup-defects AC-003: `memory_md` leaves `.wiki.lock` beside `wiki.md`, and
+    # wrapup stages `.claude/memory/` whole, so 30 of 36 bench commits carried the lock.
+    # Gitignore-only, with no `_HARNESS_ARTIFACT_PREFIXES` twin: an ignored file never reaches
+    # the porcelain the dirt filters read.
+    ".claude/memory/*.lock",
 )
 # Patterns appended to the user's .gitignore (ADR-002) — dirs + exact files + globs.
 # The Phase 2 sync test asserts this equals the dir+file+glob union so the gitignore
