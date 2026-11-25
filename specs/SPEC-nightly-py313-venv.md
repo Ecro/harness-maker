@@ -40,7 +40,7 @@ because `.python-version` already matches. PR #74's own note ("a venv I shared b
 
 ## Non-Goals
 
-- Changing nightly.yml, `.python-version` or how the py313 job selects its interpreter.
+- Changing `.python-version` or how the py313 job selects its interpreter (`UV_PYTHON`).
 - Auditing tests that inherit the full `os.environ` (they already forward `UV_PYTHON`).
 - The `SyncHttpxClientWrapper` unraisable warning in the same log (a warning, not a failure).
 
@@ -76,6 +76,12 @@ both interpreters offline, except in nightly's py313 job (`GITHUB_ACTIONS` set a
 `tests/e2e/test_verify_health_dashboard.py` and `tests/e2e/test_reconcile_orphan_sweep.py` build
 their subprocess env with `uv_subprocess_env()` and no longer list the forwarded keys themselves.
 
+### AC-004: nightly's py313 job installs both interpreters AC-002 needs
+In `.github/workflows/nightly.yml`, the job with `UV_PYTHON: "3.13"` has a `uv python install`
+step that installs both 3.12 and 3.13, so AC-002 runs there instead of failing on a missing 3.12.
+The 2026-11-25 nightly (45652457533) failed only that test (10619 passed): uv found no 3.12 offline
+from AC-002's scrubbed env (the job installs only 3.13).
+
 ## Verification
 
 | scenario | mode | test |
@@ -83,6 +89,7 @@ their subprocess env with `uv_subprocess_env()` and no longer list the forwarded
 | S1, S2 | unit | tests/unit/test_nightly_py313_venv.py::test_ac_001_helper_forwards_interpreter_pin |
 | S1 | subprocess | tests/unit/test_nightly_py313_venv.py::test_ac_002_uv_run_keeps_venv_interpreter |
 | S1 | unit (source) | tests/unit/test_nightly_py313_venv.py::test_ac_003_e2e_callers_use_helper |
+| S1 | unit (workflow parse) | tests/unit/test_nightly_py313_venv.py::test_ac_004_py313_job_installs_both_interpreters |
 | S1 | manual | a `workflow_dispatch` nightly on main after merge shows a green `py313` |
 
 ## Open Questions
@@ -97,4 +104,7 @@ none
 - One shared helper that forwards every `UV_*` variable (review F2) instead of adding `UV_PYTHON` to
   two tuples, so no future uv setting needs an edit. Cost: one small module under `tests/`.
 - Small revertible test-only fix: approved by the project rule (auto-merge on green CI); no card.
-- Intent: none. spec-validator skipped (3 ACs, default skip at <= 8).
+- AC-004 (added 2026-11-25 after the first post-merge nightly): install 3.12 in the py313 job
+  rather than let AC-002 download one or skip; one more `uv python install` argument, cached by
+  setup-uv. Undo: drop the argument and AC-004.
+- Intent: none. spec-validator skipped (4 ACs, default skip at <= 8).

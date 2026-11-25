@@ -103,7 +103,8 @@ jobs:
         with:
           enable-cache: true
       - name: Set up Python
-        run: uv python install 3.13
+        # 3.12 too: test_nightly_py313_venv's AC-002 control arm needs 3.12 offline.
+        run: uv python install 3.13 3.12
       - name: Sync dependencies
         run: uv sync --frozen
       - name: Pytest (Python 3.13)
