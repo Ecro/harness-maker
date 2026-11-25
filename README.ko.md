@@ -337,7 +337,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 | 목표·지표·가정·intent; 프로젝트 사실 | **Goals and facts** — intent 또는 knowledge 절차로 기록 |
 | "뭐 하지?", "what next?" | **Briefing** + 선택지 2–4개; 어떤 단계도 시작하지 않음 |
 
-**유일한 입구.** `intent-layer` 와 `project-knowledge` 는 모델이 스스로 호출하지 않는다. `/intent-layer` 나 `/project-knowledge` (Codex 는 `$…`) 를 직접 입력하면 여전히 실행되고, 그 외에는 Maker 가 쓰기 전에 해당 절차를 읽는다. 쓰기 전에 묻는 규칙은 그대로다. `CLAUDE.md` / `AGENTS.md` 에 항상 로드되는 `## World model` 포인터가 목표·지표·사실·현황 요청을 이름을 부르지 않아도, 단계 진행 중에도 Maker 로 보낸다. 일반적인 만들기·고치기 요청은 경로가 바뀌지 않는다. `/hm:` 단계는 여전히 직접 입력하거나 Maker 를 통해 실행된다.
+**유일한 입구.** `intent-layer` 와 `project-knowledge` 는 모델이 스스로 호출하지 않는다. `/intent-layer` 나 `/project-knowledge` (Codex 는 `$…`) 를 직접 입력하면 여전히 실행되고, 그 외에는 Maker 가 쓰기 전에 해당 절차를 읽는다. 쓰기 전에 묻는 규칙은 그대로다. `CLAUDE.md` / `AGENTS.md` 에 항상 로드되는 `## World model` 포인터가 목표·지표·사실·현황·재개 요청을 이름을 부르지 않아도, 단계 진행 중에도 Maker 로 보낸다. 일반적인 만들기·고치기 요청은 경로가 바뀌지 않는다. `/hm:` 단계는 여전히 직접 입력하거나 Maker 를 통해 실행된다.
 
 **범위는 요청을 따른다.** "X 리서치해줘" 는 research 에서, "X 스펙 잡자" 는 spec 에서 끝나고, "만들어줘" / "고쳐줘" 는 전체 파이프라인을 돈다. 불분명한 요청은 research 에서 시작한다. Maker 는 시작 stage 와 끝 stage 를 한 줄로 밝히고 시작 stage 에 들어간다. 다음 stage 로 넘어가는 것은 사용자가 정한다.
 

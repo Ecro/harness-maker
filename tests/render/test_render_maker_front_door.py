@@ -58,7 +58,10 @@ _POINTER_OPENER_BY_LOCALE: dict[str, str] = {
 }
 _MAKER_OPENER = "Mid-stage asides start `{name} —`"
 _EXCLUSION_BY_LOCALE: dict[str, str] = {"en": "not build/fix", "ko": "만들기·고치기 제외"}
-_DESCRIPTION_ROUTE = "or the World model rule routes a goal, metric, fact or status request here"
+# SPEC-maker-resume-route AC-002: an unnamed "finish the interrupted work" ask reaches Resume.
+_DESCRIPTION_ROUTE = (
+    "or the World model rule routes a goal, metric, fact, status or resume request here"
+)
 _NARROW = "hm autopilot narrow --until"
 _UNCLEAR = "unclear → research"
 # codex a1231bf6: an ask that ends at research must also ENTER research, never spec.
@@ -550,6 +553,8 @@ _ROUTING_GROUPS: dict[str, tuple[str, ...]] = {
     "metric": ("metric", "지표"),
     "fact": ("fact", "사실"),
     "status": ("status", "상태", "현황"),
+    # SPEC-maker-resume-route AC-001: a fresh session's resume ask must reach Maker's Resume.
+    "resume": ("resume", "재개"),
     "unnamed": ("unnamed", "named or not", "not named", "이름을 부르지", "부르지 않아도"),
     "mid-stage": ("mid-stage", "while a stage", "during a stage", "단계 중", "단계 진행 중"),
 }

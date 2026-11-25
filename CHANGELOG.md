@@ -12,6 +12,11 @@
 - **Memory lock files are gitignored in rendered projects.** `.claude/memory/*.lock` joins the
   harness gitignore block; `.wiki.lock` was committed in 30 of 36 bench runs. A project picks it up
   on its next `hm make`.
+- **A fresh "finish the interrupted work" ask now reaches Maker** (SPEC-maker-resume-route). The
+  `## World model` pointer and Maker's description route resume asks too. In the saga bench a
+  fresh session never loaded Maker (0 of 7) and missed a task left in its worktree in 4 of 7
+  runs; a replay of that state on the new render loads Maker and names the task 5 of 5 times.
+  Rendered projects pick it up on their next `hm make`.
 - **Saga bench scoring after its pilot** (SPEC-saga-pilot-fixes). The interrupt lands 5 s after
   the first write (was 60 s, longer than plain's whole session); the owner keeps every fact of
   earlier sessions; `resume` fails when the owner had to say what was unfinished;

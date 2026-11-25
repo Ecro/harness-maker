@@ -1,0 +1,74 @@
+schema_version: 3
+spec_slug: maker-resume-route
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the pointer routes resume asks
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac014_pointer_routes_unnamed
+  executable_predicate: missing == [] and len(section) <= 400
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Routing word typed from this SPEC; 400-char cap from SPEC-maker-front-door-improvements.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the description routes resume requests
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_ac005_maker_reads_procedures
+  executable_predicate: _DESCRIPTION_ROUTE in description and len(text) <= 4689
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Literal typed from this SPEC; cap from CLAUDE.md.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 466c5fb142c337ff2878b11fd35274b43b865ffc6b4bb99c213eaa56ffe1915f
+  approved_by: Claude
+  approved_at: '2026-11-25T22:21:31Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: b97cd0abc9ff2dbcdafcede964f9592651ee2c2d244b8037ee8d85001fa79371
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 1a4cd42c5a6b26124ec1c2a33156653646fa03c8a3c6a46f8eed32c9c192bddf
+    AC-002: d26385b1c68b59de76678b7201524b61b9552635c49bb52f5b440c3dd16402c3
+    ac_order: acedf6abc72ca928b69febf10f5e209a5243efc125aa0e9150bcf4ce39705bd5

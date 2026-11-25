@@ -4,7 +4,7 @@ file_count: 29
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
-  body_sha256: 780efc47bab7175f0b08eede7a2186938dabada8ecdb0d0ade623e10170d592f
+  body_sha256: 0fca79e042dcba6bb487076f8be8193135e4fb811ae8491e3969db03d3a43762
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
   body_sha256: 991343f0735e2eedeb6bc2a40df46ab115ef58f44ca223f756577e9d5a3fbe70

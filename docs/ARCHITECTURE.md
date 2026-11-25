@@ -40,8 +40,8 @@ rendered from `templates/skills/world-model/SKILL.md.j2` at
 `project-knowledge` are not model-invocable (`disable-model-invocation: true`;
 Codex `agents/openai.yaml` with `allow_implicit_invocation: false`); Maker Reads
 their SKILL.md before any write, and typing their names still runs them. The
-always-loaded `## World model` pointer routes unnamed goal, metric, fact and
-status asks to Maker.
+always-loaded `## World model` pointer routes unnamed goal, metric, fact,
+status and resume asks to Maker.
 
 Maker briefs from `world_model_digest.py` (`hm world_model digest`): one JSON
 object, ≤ 1,500 bytes, always exit 0, run as Maker's first Bash step on both targets. On
