@@ -402,7 +402,8 @@ def test_ac_007_trap_verdicts_golden(saga: ModuleType) -> None:
         "parallel": False,
         "resume": True,
         "no_dependency": None,
-        "E1_no_recurrence": False,
+        # 1 FAILED mark in 5 later sessions (SPEC-saga-pilot-fixes: fewer than half passes).
+        "E1_no_recurrence": True,
     }
 
 
@@ -446,3 +447,102 @@ def test_ac_008_verdict_and_validator(saga: ModuleType, tmp_path: Path) -> None:
     summary = saga.validator_summary(rows)
     assert summary["plain-review"]["detected"] == (2, 2)
     assert summary["plain-review"]["false_alarms"] == (0, 2)
+
+
+# --- SPEC-saga-pilot-fixes ----------------------------------------------------------------------
+
+
+def test_pilot_ac_001_interrupt_delay_default(saga: ModuleType, tmp_path: Path) -> None:
+    assert saga.Options(out=tmp_path).interrupt_delay_s == 5.0
+    assert saga.build_parser().parse_args(["run", "--out", "x"]).interrupt_delay_s == 5.0
+
+
+def test_pilot_ac_002_owner_keeps_earlier_facts(saga: ModuleType, tmp_path: Path) -> None:
+    shipped = saga.load_saga(_SAGA)
+    order = [s.id for s in shipped.sessions]
+    before_s2 = shipped.sessions[: order.index("S2")]
+    carried = saga.carried_facts(before_s2)
+    assert [f.id for f in carried] == ["H1", "C1", "F1"]
+    assert all(f.when == "asked" and not f.must_deliver for f in carried)
+    groups = {tuple(s.id for s in g): g for g in saga._groups(shipped.sessions)}
+    # The parallel group carries S1 and S2 only, never one member's facts into the other.
+    assert [f.id for f in saga.group_carried(shipped, groups[("S3a", "S3b")])] == [
+        "H1", "C1", "F1", "F3", "F4",
+    ]  # fmt: skip
+    assert [f.id for f in saga.group_carried(shipped, groups[("S4r",)])] == [
+        "H1", "C1", "F1", "F3", "F4", "F5", "F6",
+    ]  # fmt: skip
+
+    told = {"reply": "One entry, please.", "delivered": ["H1"], "approved": False, "observed": []}
+    silent: dict[str, Any] = {"reply": None, "delivered": [], "approved": False, "observed": []}
+    claude, home = _fake(
+        tmp_path,
+        {"agent": [{"match": "", "result": "Copies or one entry?"}], "reply": [told, silent]},
+    )
+    record = saga.run_session(
+        _session(saga, id="S2"),
+        "plain",
+        _work(tmp_path),
+        _opts(saga, tmp_path, claude, home),
+        tmp_path / "run",
+        carried=tuple(carried),
+    )
+    stdin = sorted((tmp_path / "run" / "calls").glob("S2-01-task-owner*.stdin"))
+    assert stdin
+    assert "Our phone app syncs" in stdin[0].read_text()
+    assert record["delivered"]["H1"]["carried"] is True
+    prompts = [c["prompt"] for c in _log(home)]
+    assert prompts == ["Add alarms.", "One entry, please."]
+
+
+def _resume_run(s4r_delivered: dict[str, Any], e1_later: list[bool]) -> dict[str, Any]:
+    """S1 plus later sessions S2, S3a, S3b, S4r with the given E1 marks; S4 was cut off and
+    shows a mark that must not count."""
+    sessions: dict[str, Any] = {
+        "S1": {"status": "ok", "hidden": {}, "e1_seen": True},
+        "S2": {"status": "ok", "hidden": {}},
+        "S3a": {"status": "ok", "hidden": {}},
+        "S3b": {"status": "ok", "hidden": {}},
+        "S4": {"status": "interrupted", "hidden": {}, "interrupted": True,
+               "duplicates_before": 0, "e1_seen": True},
+        "S4r": {"status": "ok", "hidden": {"t": "passed"}, "duplicates": 0,
+                "delivered": s4r_delivered},
+    }  # fmt: skip
+    for sid, seen in zip(["S2", "S3a", "S3b", "S4r"], e1_later, strict=True):
+        sessions[sid]["e1_seen"] = seen
+    return {"sessions": sessions}
+
+
+def test_pilot_ac_003_resume_and_e1(saga: ModuleType) -> None:
+    own = {"F7": {"delivered_by": "simulator", "before_code": True}}
+    carried = {"F6": {"delivered_by": "simulator", "before_code": True, "carried": True}}
+    one_of_four = [True, False, False, False]
+    two_of_four = [True, True, False, False]
+    assert saga.score_traps(_resume_run(own, one_of_four))["resume"] is False
+    assert saga.score_traps(_resume_run(carried, one_of_four))["resume"] is True
+    assert saga.score_traps(_resume_run({}, one_of_four))["E1_no_recurrence"] is True
+    assert saga.score_traps(_resume_run({}, two_of_four))["E1_no_recurrence"] is False
+
+
+def test_pilot_ac_004_verdict_skips_saturated(saga: ModuleType) -> None:
+    assert saga.SATURATED == ("IRR", "frozen", "no_dependency", "parallel", "H1_kept")
+    active = {"hm": range(5), "plain-discipline": range(2)}  # hm leads on T2-T4: 0.6 over 5
+
+    def rows(with_saturated: bool) -> list[dict[str, Any]]:
+        out = []
+        for arm, true in active.items():
+            traps = {f"T{i}": i in true for i in range(5)}
+            if with_saturated:
+                # hm "loses" every saturated trap; the verdict must not see it.
+                traps |= dict.fromkeys(saga.SATURATED, arm != "hm")
+            out.append({"arm": arm, "status": "ok", "traps": traps})
+        return out
+
+    assert saga.verdict(rows(False)) == "hm_unique"
+    assert saga.verdict(rows(True)) == "hm_unique"
+    text = saga.report(rows(True))
+    for trap in saga.SATURATED:
+        line = next(ln for ln in text.splitlines() if ln.startswith(trap))
+        assert "saturated" in line
+    assert "saturated" not in next(ln for ln in text.splitlines() if ln.startswith("T0"))
+    assert "min traps 3" in text
