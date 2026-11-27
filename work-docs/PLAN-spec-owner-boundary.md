@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: spec-owner-boundary
-status: planning
+status: complete
 created: 2026-11-27
 spec: "[[SPEC-spec-owner-boundary]]"
 summary: Spec stage names the owner-only scope boundary and asks it once; Step 0 needs five conditions; hm check restores SIGINT for gate commands.
@@ -35,4 +35,6 @@ SPEC: `specs/SPEC-spec-owner-boundary.md` (approved).
 - [x] Revision 2: the Boundary is open unless the ask states it or nothing old is kept, and an open
       one is asked (not only written down); Step 0 "no **Boundary** left open". Budgets +151:
       spec stage 7620 → 7771, `_GRANTED = 640`, allowance 622.
-- [ ] Live (revision 2): replay R3 + R4 hm × 2, spec-stage turns.
+- [x] Live (revision 2): replay R3 + R4 hm × 2, spec-stage turns: owner facts before code 2, 3 of 5;
+      boundary asked as a question 0/6. The DRI chose "지금 상태로 머지" (2026-11-27 19:09Z); merged #83.
+- [x] Fold: surface baseline re-frozen at the merge commit.
