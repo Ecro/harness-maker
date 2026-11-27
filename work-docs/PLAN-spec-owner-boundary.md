@@ -1,3 +1,19 @@
+---
+type: plan
+task_slug: spec-owner-boundary
+status: planning
+created: 2026-11-27
+spec: "[[SPEC-spec-owner-boundary]]"
+summary: Spec stage names the owner-only scope boundary and asks it once; Step 0 needs five conditions; hm check restores SIGINT for gate commands.
+surface_allowance:
+  chars: 471
+  reason: "SPEC-spec-owner-boundary: the fifth Step 0 condition and the Step 2 Boundary rule (+471 in spec/hm-spec). The DRI chose this fix on a decision card (2026-11-27); budgets raised by the measured growth only, after trimming a +550 first draft."
+  delta_doc: BASELINE-DELTA-spec-owner-boundary.md
+  commands:
+    spec: 471
+    hm-spec: 471
+---
+
 # PLAN — spec-owner-boundary
 
 SPEC: `specs/SPEC-spec-owner-boundary.md` (approved).
