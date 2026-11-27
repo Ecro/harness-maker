@@ -12,6 +12,6 @@ SPEC: `specs/SPEC-spec-owner-boundary.md` (approved).
       `tests/unit/test_check_sigint_inherit.py[ignore]` fail on main.
 - [x] `stages/spec.md.j2`: Step 0 five conditions; Step 2 Boundary paragraph before the questions.
 - [x] `check._run`: `preexec_fn` sets SIGINT to SIG_DFL in the gate child.
-- [x] Budgets: spec stage 7140 → 7560, SPEC-ask-less AC-007 `_GRANTED = 420` (measured +418).
+- [x] Budgets: spec stage 7140 → 7620, SPEC-ask-less AC-007 `_GRANTED = 480` (measured +475, after review fixes).
 - [x] Snapshots regenerated; HOW-IT-WORKS (en/ko), CHANGELOG.
 - [ ] Live: replay bench R3 + R4 hm arm × 2 on this branch.

@@ -153,7 +153,7 @@ recommends a direction, which the SPEC is free to overrule. No stage requires it
 The only interview. With `worktree.enabled`, it runs in a per-task worktree (see
 [§6](#6-per-task-worktrees)).
 
-1. **Skip check.** A one-file (docs count), obviously-scoped, reversible change with no API,
+1. **Skip check.** A one-file (docs count, tests do not), obviously-scoped, reversible change with no API,
    format, CLI-output or user-facing message change and no open scope boundary gets a minimal
    SPEC with one testable AC and is stamped exempt, without an interview. A detailed ask is not
    a small one.

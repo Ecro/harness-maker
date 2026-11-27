@@ -219,7 +219,7 @@ def _run(argv: list[str], root: Path, env: dict[str, str]) -> tuple[int, str]:
             start_new_session=True,
             preexec_fn=_default_sigint,
         )
-    except OSError as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         return 127, f"{type(exc).__name__}: {exc}"
     try:
         out, _ = proc.communicate(timeout=GATE_TIMEOUT_S)

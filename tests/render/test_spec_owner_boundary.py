@@ -22,14 +22,16 @@ ARMS = {
 SKIP_RULE = (
     "Skip the interview only when all five hold: one file or config (docs count, tests do not); "
     "acceptance obvious from the title; no API, IPC, schema, file-format, CLI-output or "
-    "user-facing message change; reversible within an hour with no user impact; no open "
-    "**Boundary** (Step 2). A detailed ask is not a small one; when unsure, interview."
+    "user-facing message change (a typo fix is not one); reversible within an hour with no user "
+    "impact; no open **Boundary** (read the code as Step 2 says). A detailed ask is not a small "
+    "one; when unsure, interview."
 )
 #: SPEC AC-002, verbatim.
 BOUNDARY_RULE = (
     "**Boundary.** Before the SPEC, read the code the ask touches: which inputs take the new "
     "behaviour, which keep the old, and which existing behaviour must stay? If neither the ask "
-    "nor the code settles that, ask the DRI in round 1: one question, recommendation first."
+    "nor the code settles that, ask the DRI in round 1 (one of its 3 questions), recommendation "
+    "first."
 )
 
 Renders = Callable[[str], Path]
@@ -75,3 +77,5 @@ def test_ac_002_boundary_before_the_interview(arm: str, runtime: str, rendered: 
     interview = _step(text, "Step 2")
     assert BOUNDARY_RULE in interview
     assert interview.index(BOUNDARY_RULE) < interview.index("Ask only what the DRI owns")
+    if "**Design brief" in interview:
+        assert interview.index(BOUNDARY_RULE) < interview.index("**Design brief")

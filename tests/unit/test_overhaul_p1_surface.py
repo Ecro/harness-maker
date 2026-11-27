@@ -254,8 +254,8 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 # wrapup raised by SPEC-bench-wrapup-defects' measured growth: isolation off swaps "`index_after`
 # must hold the code." for the stage-your-code sentence (+15; the worktree-on arm is unchanged).
 # spec raised by SPEC-spec-owner-boundary's measured growth: the fifth skip condition and the
-# Boundary rule (+418 on every arm).
-_STAGE_BUDGET = {"spec": (7560, 1500, 800), "execute": (7773, 1500, 0), "wrapup": (4300, 2785, 0)}
+# Boundary rule (+475 on every arm).
+_STAGE_BUDGET = {"spec": (7620, 1500, 800), "execute": (7773, 1500, 0), "wrapup": (4300, 2785, 0)}
 _OPT_IN = 1500
 
 

@@ -9,9 +9,10 @@
   inputs take the new behaviour, which keep the old, and which existing behaviour must stay; if
   neither the ask nor the code settles that, it asks one round-1 question. The skip check gains
   a fifth condition (no open boundary), counts docs as files, and treats a CLI-output or
-  user-facing message change as disqualifying. In the 2026-11-26 replay bench, hm got 3 of 10
-  owner-only facts before code (a fixed "discipline" prompt got 8) because 4 of 10 spec sessions
-  skipped the interview on detailed asks. Rendered projects pick it up on their next `hm make`.
+  user-facing message change (other than a typo fix) as disqualifying. In the 2026-11-26 replay bench, hm got 3 of 10
+  owner-only facts before code (a fixed "discipline" prompt got 8): 4 of 10 spec sessions
+  skipped the interview on detailed asks, and 4 more wrote the whole SPEC and asked only for
+  approval. Rendered projects pick it up on their next `hm make`.
 - **`hm check` run as a background job no longer fails tests that interrupt their own child.**
   A non-interactive shell starts a background job with SIGINT ignored and exec keeps that, so
   two tests here failed only under `hm check &` and blocked wrapup. Gate commands now start with
