@@ -488,7 +488,8 @@ _ROWS: list[tuple[tuple[str, ...], str, Callable[[str], bool], str]] = [
     (
         tuple(ARMS),
         "spec",
-        lambda t: "spec_machine check --all" in t and "spec_machine approve" in t,
+        # SPEC-cli-bookkeeping AC-006: `finalize` is the check and, with --approve, the stamp.
+        lambda t: "spec_machine finalize --slug" in t and "--approve" in t,
         "check and approve",
     ),
     (
@@ -503,8 +504,8 @@ _ROWS: list[tuple[tuple[str, ...], str, Callable[[str], bool], str]] = [
         "spec",
         lambda t: (
             re.search(
-                r"--exempt` only when `irreversible_decisions: \[\]`, Step 4 passed, "
-                r"`status: approved`, and the DRI was not asked",
+                r"`--exempt` only when `irreversible_decisions: \[\]` and the DRI was not "
+                r"asked",
                 t,
             )
             is not None

@@ -780,6 +780,7 @@ def mark_tested(
     ac_test_ids: dict[str, list[str]],
     *,
     validate_after: bool = True,
+    skipped: list[str] | None = None,
 ) -> list[str]:
     """Locked wrapper — see `_mark_tested_locked` for the contract.
 
@@ -812,7 +813,12 @@ def mark_tested(
             discovered = check.red_discovery(root, spec, collect_runner(root))
     with _spec_write_lock(yaml_path):
         errors = _mark_tested_locked(
-            yaml_path, md_path, ac_test_ids, validate_after=validate_after, discovered=discovered
+            yaml_path,
+            md_path,
+            ac_test_ids,
+            validate_after=validate_after,
+            discovered=discovered,
+            skipped=skipped,
         )
     if errors or not validate_after:
         return errors
@@ -826,6 +832,7 @@ def _mark_tested_locked(
     *,
     validate_after: bool = True,
     discovered: dict[str, list[str]] | None = None,
+    skipped: list[str] | None = None,
 ) -> list[str]:
     """Flip ``pending_test→false`` + record test_ids for the named ACs, then cross_validate.
 
@@ -869,6 +876,12 @@ def _mark_tested_locked(
         if not ids and discovered:
             merged_by_ac[ac_id] = list(discovered.get(ac_id, []))
 
+    # `skipped` (the no-`--ac` default, SPEC-cli-bookkeeping AC-002) leaves an AC with no test yet
+    # pending instead of refusing the rest; it still refuses when nothing at all would bind.
+    if skipped is not None and any(merged_by_ac.values()):
+        for ac_id in sorted(a for a, ids in merged_by_ac.items() if not ids):
+            skipped.append(ac_id)
+            del merged_by_ac[ac_id]
     # Refuse to flip an AC to non-pending with no test to back it (REVIEW C-P2d).
     empty = sorted(ac_id for ac_id, ids in merged_by_ac.items() if not ids)
     if empty:
@@ -1088,7 +1101,80 @@ def golden_inline_text(payload: dict[str, list[dict[str, Any]]], spec_name: str)
     return "\n".join(blocks)
 
 
+def write_inline_rows(path: Path, payload: dict[str, list[dict[str, Any]]], spec_name: str) -> bool:
+    """Put each AC's `AC_NNN_ROWS` block into `path`: replace a block already there, else append.
+
+    The model used to read these rows back from `--inline` and type them into the test again, so
+    the same data sat in its context three times (SPEC-cli-bookkeeping). Only the block between
+    its two comment lines and the closing `]` is touched; every other byte of the file stays.
+    Returns True when the file changed.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        text = ""
+    new = text
+    missing: dict[str, list[dict[str, Any]]] = {}
+    for ac_id in sorted(payload):
+        name = re.escape(inline_rows_name(ac_id))
+        pattern = re.compile(
+            rf"(?:^# {re.escape(ac_id)} golden rows from [^\n]*\n(?:^# Do not edit[^\n]*\n)?)?"
+            rf"^{name} = \[\n(?:^ {{4}}[^\n]*\n)*^\](?:\n|\Z)",
+            re.M,
+        )
+        m = pattern.search(new)
+        if m:
+            block = golden_inline_text({ac_id: payload[ac_id]}, spec_name)
+            new = new[: m.start()] + block + new[m.end() :]
+        else:
+            missing[ac_id] = payload[ac_id]
+    if missing:
+        block = golden_inline_text(missing, spec_name)
+        # Above the first top-level def/class/decorator: a parametrize decorator reads the rows at
+        # import time, so rows appended after the test would raise NameError at collection.
+        first = re.search(r"^(?:@|def |async def |class )", new, re.M)
+        if not new.strip():
+            new = block
+        elif first:
+            new = new[: first.start()] + block + "\n\n" + new[first.start() :]
+        else:
+            new = new.rstrip("\n") + "\n\n\n" + block
+    if new == text:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write(path, new)
+    return True
+
+
+def _slug_paths(root: Path, slug: str) -> tuple[Path, Path]:
+    """`--slug` → (machine.yaml, md) through the reader `approval_state` uses (ADR-003)."""
+    spec_dir = _named_spec_dir(root, slug, root)
+    return spec_dir / f"SPEC-{slug}.machine.yaml", spec_dir / f"SPEC-{slug}.md"
+
+
+def _resolve_paths(args: argparse.Namespace, cmd: str, *, need_md: bool) -> str | None:
+    """Fill `yaml_path` / `md_path` from `--slug`; an error line when neither form is complete."""
+    slug = getattr(args, "slug", None)
+    if slug:
+        if not _is_plain_slug(slug):
+            return f"{cmd}: --slug {slug!r} is not a plain name"
+        yaml_path, md_path = _slug_paths(args.root, slug)
+        args.yaml_path = args.yaml_path or yaml_path
+        if need_md:
+            args.md_path = args.md_path or md_path
+    if args.yaml_path is None or (need_md and args.md_path is None):
+        return f"{cmd}: give --slug, or --yaml{' and --md' if need_md else ''}"
+    return None
+
+
 def _run_export_golden(args: argparse.Namespace) -> int:
+    error = _resolve_paths(args, "export-golden", need_md=False)
+    if error:
+        print(error, file=sys.stderr)
+        return 2
+    if args.write is not None and not args.inline:
+        print("export-golden: --write needs --inline", file=sys.stderr)
+        return 2
     try:
         payload = golden_export(load(args.yaml_path))
     except GoldenTableError as e:
@@ -1099,6 +1185,12 @@ def _run_export_golden(args: argparse.Namespace) -> int:
         return 1
     if not payload:
         print("export-golden: no parametric AC; nothing written")
+        return 0
+    if args.inline and args.write is not None:
+        target = args.write if args.write.is_absolute() else args.root / args.write
+        changed = write_inline_rows(target, payload, args.yaml_path.name)
+        print(f"export-golden: {'wrote' if changed else 'unchanged'} {args.write} "
+              f"({', '.join(inline_rows_name(a) for a in sorted(payload))})")  # fmt: skip
         return 0
     if args.inline:
         print(golden_inline_text(payload, args.yaml_path.name), end="")
@@ -1891,6 +1983,78 @@ def _run_check_all(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+_STATUS_LINE = re.compile(r"^status:[^\n]*$", re.M)
+
+
+def _md_status(md_path: Path) -> str | None:
+    from harness_maker.frontmatter import split_frontmatter
+
+    try:
+        mapping = split_frontmatter(md_path.read_bytes()).mapping
+    except Exception:  # noqa: BLE001 — an unreadable SPEC has no status to report
+        return None
+    value = mapping.get("status") if isinstance(mapping, dict) else None
+    return value if isinstance(value, str) else None
+
+
+def _set_md_status(md_path: Path, status: str) -> None:
+    """Rewrite the frontmatter `status:` line only; the body is never touched."""
+    text = md_path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        raise ApprovalError(f"{md_path.name} has no frontmatter to carry a status")
+    end = text.find("\n---", 4)
+    if end < 0:
+        raise ApprovalError(f"{md_path.name} has an unterminated frontmatter")
+    head, body = text[:end], text[end:]
+    if _STATUS_LINE.search(head):
+        head = _STATUS_LINE.sub(f"status: {status}", head, count=1)
+    else:
+        head = f"{head}\nstatus: {status}"
+    atomic_write(md_path, head + body)
+
+
+def _run_finalize(args: argparse.Namespace) -> int:
+    """`check --all`, then on a pass the stamp and the SPEC.md status, in one call.
+
+    The spec stage used to run check, approve, a `sed` on `status:` and a second check: four
+    calls of bookkeeping the model typed by hand (SPEC-cli-bookkeeping). The verdict is
+    `check --all`'s own line, captured rather than recomputed (ADR-001), so the two cannot drift.
+    """
+    import io
+
+    error = _resolve_paths(args, "finalize", need_md=True)
+    if error:
+        print(error, file=sys.stderr)
+        return 2
+    check_args = argparse.Namespace(
+        all_=True, yaml_path=args.yaml_path, md_path=args.md_path, strictness=args.strictness
+    )
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = _run_check_all(check_args)
+    lines = buf.getvalue().strip().splitlines()
+    try:
+        payload: dict[str, Any] = json.loads(lines[-1]) if lines else {}
+    except json.JSONDecodeError:
+        print(buf.getvalue(), end="")
+        return rc or 1
+    if rc == 0 and (args.approve or args.exempt) and _md_status(args.md_path) is None:
+        # Checked before the stamp, so a SPEC whose status cannot be set is never half-finalized.
+        print(f"finalize: {args.md_path} has no frontmatter `status:` line", file=sys.stderr)
+        rc = 1
+    elif rc == 0 and (args.approve or args.exempt):
+        try:
+            approve(args.yaml_path, exempt=args.exempt)
+            _set_md_status(args.md_path, "approved")
+        except (ApprovalError, OSError, yaml.YAMLError, ValidationError) as exc:
+            print(f"finalize: {exc}", file=sys.stderr)
+            rc = 1
+        payload["approval"] = _check_approval(check_args)
+    payload["status"] = _md_status(args.md_path)
+    print(json.dumps(payload, ensure_ascii=False))
+    return rc
+
+
 # ── SPEC approval (SPEC-ai-native-sdlc-vs-intent-world) ─────────────────────────────────────
 
 #: Tooling-written fields. Everything else — including keys this model does not know — is the
@@ -2458,8 +2622,12 @@ def main(argv: list[str] | None = None) -> int:
     p_mark = sub.add_parser(
         "mark-tested", help="flip pending_test→false + record test_ids (forward write-back)"
     )
-    p_mark.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
-    p_mark.add_argument("--md", dest="md_path", type=Path, required=True)
+    p_mark.add_argument("--yaml", dest="yaml_path", type=Path, default=None)
+    p_mark.add_argument("--md", dest="md_path", type=Path, default=None)
+    p_mark.add_argument(
+        "--slug", default=None, help="find both files by slug; with no --ac, every testable AC"
+    )
+    p_mark.add_argument("--root", type=Path, default=Path.cwd())
     p_mark.add_argument(
         "--ac", dest="acs", action="append", default=[], help="AC id to flip (repeatable)"
     )
@@ -2525,7 +2693,15 @@ def main(argv: list[str] | None = None) -> int:
         "export-golden",
         help="write SPEC-<slug>.golden.json, or with --inline print AC_NNN_ROWS literals",
     )
-    p_export.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_export.add_argument("--yaml", dest="yaml_path", type=Path, default=None)
+    p_export.add_argument("--slug", default=None, help="find the machine.yaml by slug")
+    p_export.add_argument("--root", type=Path, default=Path.cwd())
+    p_export.add_argument(
+        "--write",
+        type=Path,
+        default=None,
+        help="with --inline: put the AC_NNN_ROWS blocks into this test file instead of printing",
+    )
     p_export.add_argument(
         "--inline",
         action="store_true",
@@ -2537,6 +2713,19 @@ def main(argv: list[str] | None = None) -> int:
     p_approve.add_argument(
         "--exempt", action="store_true", help="Step 0 skip: exempt stamp, no identity"
     )
+
+    p_final = sub.add_parser(
+        "finalize",
+        help="check --all, and with --approve/--exempt also stamp and set SPEC.md status",
+    )
+    p_final.add_argument("--slug", default=None)
+    p_final.add_argument("--yaml", dest="yaml_path", type=Path, default=None)
+    p_final.add_argument("--md", dest="md_path", type=Path, default=None)
+    p_final.add_argument("--root", type=Path, default=Path.cwd())
+    p_final.add_argument("--strictness", choices=("block", "warn"), default="warn")
+    stamp = p_final.add_mutually_exclusive_group()
+    stamp.add_argument("--approve", action="store_true", help="stamp the DRI's approval")
+    stamp.add_argument("--exempt", action="store_true", help="Step 0 skip: exempt stamp")
 
     p_status = sub.add_parser("approval-status", help="approval state + land/gate verdict (JSON)")
     p_status.add_argument("--root", type=Path, default=Path.cwd())
@@ -2555,6 +2744,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "check":
         return _run_check_all(args)
+
+    if args.cmd == "finalize":
+        return _run_finalize(args)
 
     if args.cmd == "export-golden":
         return _run_export_golden(args)
@@ -2576,14 +2768,27 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "cross-validate":
         errors = cross_validate(args.md_path, args.yaml_path)
     else:  # mark-tested
-        ac_test_ids: dict[str, list[str]] = {ac: [] for ac in args.acs}
+        error = _resolve_paths(args, "mark-tested", need_md=True)
+        if error:
+            print(error, file=sys.stderr)
+            return 2
+        acs = list(args.acs)
+        if args.slug and not acs and not args.test_ids:
+            # The model used to list every AC by hand (SPEC-cli-bookkeeping AC-002).
+            try:
+                acs = [ac.id for ac in select_pytest_bindable(load(args.yaml_path))]
+            except Exception as exc:  # noqa: BLE001 — an unloadable yaml is a usage error
+                print(f"mark-tested: cannot load {args.yaml_path}: {exc}", file=sys.stderr)
+                return 1
+        ac_test_ids: dict[str, list[str]] = {ac: [] for ac in acs}
         for ac_id, node in args.test_ids:
             ac_test_ids.setdefault(ac_id, []).append(node)
         if not ac_test_ids:
             print("mark-tested: no --ac or --test-id given (nothing to do)", file=sys.stderr)
             return 2
+        skipped: list[str] | None = [] if args.slug and not args.acs and not args.test_ids else None
         try:
-            errors = mark_tested(args.yaml_path, args.md_path, ac_test_ids)
+            errors = mark_tested(args.yaml_path, args.md_path, ac_test_ids, skipped=skipped)
         except (ApprovalError, OSError) as exc:
             # The lock this change added raises here too, and only `_run_approve` was
             # catching it — the other two writers printed a traceback on ordinary
@@ -2592,6 +2797,8 @@ def main(argv: list[str] | None = None) -> int:
             # polling loop and so never a `LockTimeoutError` (confirmation pass, P2).
             print(f"mark-tested: {exc}", file=sys.stderr)
             return 1
+        if skipped and not errors:
+            print(f"mark-tested: left pending, no test yet: {', '.join(skipped)}", file=sys.stderr)
 
     for e in errors:
         print(e, file=sys.stderr)

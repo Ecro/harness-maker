@@ -42,7 +42,7 @@ Take `test_framework`, the scenarios and the testable ACs (not superseded, not `
 
 ### Phase A — Write every AC test
 
-Before any code, write a test for every testable AC in the SPEC, across all phases, named `test_ac_NNN_<short>`; ACs sharing a call shape share one parametrized test with ids `AC-NNN-<i>`. Its assertion is the AC's oracle on the real code: a mechanical AC asserts its `executable_predicate`; a parametric AC pastes `AC_NNN_ROWS` from `hm spec_machine export-golden --inline --yaml specs/SPEC-<slug>.machine.yaml` unchanged at its test file's top level and parametrizes over it; a property AC uses Hypothesis `@given` over `input_domain` (no Hypothesis: a seeded stdlib `random` loop; never add it) and asserts `expected_relation`. No tautology, no mock-only body; never copy the implementation into a test; never regenerate golden rows. Importing a first-party name that does not exist yet is a valid RED; that name must exist by GREEN.
+Before any code, write a test for every testable AC in the SPEC, across all phases, named `test_ac_NNN_<short>`; ACs sharing a call shape share one parametrized test with ids `AC-NNN-<i>`. Its assertion is the AC's oracle on the real code: a mechanical AC asserts its `executable_predicate`; a parametric AC parametrizes over `AC_NNN_ROWS`, which `hm spec_machine export-golden --inline --write <test file> --slug <slug>` writes into that file before its tests (then Edit, never Write over, the file; never type the rows); a property AC uses Hypothesis `@given` over `input_domain` (no Hypothesis: a seeded stdlib `random` loop; never add it) and asserts `expected_relation`. No tautology, no mock-only body; never copy the implementation into a test; never regenerate golden rows. Importing a first-party name that does not exist yet is a valid RED; that name must exist by GREEN.
 
 Tests bind by these names; leave `test_ids` alone.
 
@@ -54,7 +54,7 @@ Per PLAN phase, make the smallest change that turns its ACs' tests GREEN, within
 
 A flaky test is never skipped, slept on or retried: fix its cause, or delete it and record why as an agent-decided PLAN ADR.
 
-**Bind, then gate**, after the last phase: run `hm spec_machine mark-tested --yaml specs/SPEC-<slug>.machine.yaml --md specs/SPEC-<slug>.md` once with one `--ac AC-NNN` per AC, then run `hm check --slug <slug>`{{ hm.long_gate() }}. By exit code:
+**Bind, then gate**, after the last phase: run `hm spec_machine mark-tested --slug <slug>` once (it binds every testable AC), then run `hm check --slug <slug>`{{ hm.long_gate() }}. By exit code:
 - 0: proceed.
 - 1: fix what it names and rerun; a third exit 1 in a row goes to the DRI with what it names.
 - 2: fix the call.

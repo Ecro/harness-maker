@@ -64,12 +64,21 @@ def _text(commands: Path, stage: str) -> str:
 def test_the_verdict_reaches_no_branch(commands: Path) -> None:
     """Advisory means nothing downstream reads it — assert the absence where it would live."""
     spec = _text(commands, "spec")
-    approve_idx = spec.find("spec_machine approve")
+    approve_idx = spec.find("--approve`")  # SPEC-cli-bookkeeping: `finalize … --approve`
     assert approve_idx > 0, "the spec stage no longer stamps acceptance at all"
-    # The window immediately before the stamp is where a gate would have to sit.
-    window = spec[max(0, approve_idx - 1500) : approve_idx]
-    for banned in ("MAJOR_REVISION", "NEEDS_REVISION", "spec-validator"):
+    # Where a gate would have to sit. (On main the first `spec_machine approve` was Step 0's
+    # exempt stamp, so the old fixed 1500-char window never reached Step 4.6.)
+    # The verdict tokens are banned from the validator step through the stamp; the validator's
+    # own name is banned only inside the stamp step, since Step 4.6 is named after it.
+    step46 = spec.rfind("## Step 4.6", 0, approve_idx)
+    step5 = spec.rfind("## Step 5", 0, approve_idx)
+    assert 0 < step46 < step5, "the validator step or the stamp step moved"
+    for banned, window in (
+        ("MAJOR_REVISION", spec[step46:approve_idx]),
+        ("NEEDS_REVISION", spec[step46:approve_idx]),
+        ("spec-validator", spec[step5:approve_idx]),
+    ):
         assert banned not in window, (
-            f"`{banned}` appears in the 1500 characters before the acceptance stamp — the "
+            f"`{banned}` appears between the validator step and the acceptance stamp — the "
             "critic's verdict must not stand between the DRI and the stamp"
         )
