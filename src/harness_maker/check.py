@@ -199,6 +199,13 @@ def gate_env(extra: dict[str, str] | None = None, *, root: Path | None = None) -
     return env
 
 
+def _default_sigint() -> None:
+    """A background job of a non-interactive shell starts with SIGINT ignored, and exec keeps
+    that, so a test that interrupts its own child would fail only under `hm check &`. The gate
+    runs in its own session, so no terminal can send it SIGINT anyway."""
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+
 def _run(argv: list[str], root: Path, env: dict[str, str]) -> tuple[int, str]:
     """Run in its own process group; any abnormal exit kills the whole group."""
     try:
@@ -210,6 +217,7 @@ def _run(argv: list[str], root: Path, env: dict[str, str]) -> tuple[int, str]:
             stderr=subprocess.STDOUT,
             text=True,
             start_new_session=True,
+            preexec_fn=_default_sigint,
         )
     except OSError as exc:
         return 127, f"{type(exc).__name__}: {exc}"

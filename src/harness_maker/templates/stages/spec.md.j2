@@ -14,7 +14,7 @@
 
 ## Step 0 — Skip check
 
-Skip the interview only when all four hold: one file or config; acceptance obvious from the title; no API, IPC, schema or file-format change; reversible within an hour with no user impact. Then write a minimal SPEC (Intent, one Given-When-Then scenario, Verification), the reason under Refinement Decisions, `irreversible_decisions: []`. Only a non-code change may write `ac: []`; a code change gets one testable AC. Stamp it unasked: `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml --exempt`.
+Skip the interview only when all five hold: one file or config (docs count, tests do not); acceptance obvious from the title; no API, IPC, schema, file-format, CLI-output or user-facing message change; reversible within an hour with no user impact; no open **Boundary** (Step 2). A detailed ask is not a small one; when unsure, interview. Then write a minimal SPEC (Intent, one Given-When-Then scenario, Verification), the reason under Refinement Decisions, `irreversible_decisions: []`. Only a non-code change may write `ac: []`; a code change gets one testable AC. Stamp it unasked: `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml --exempt`.
 
 ## Step 0.5 — Intent
 
@@ -29,6 +29,8 @@ Grep `specs/SPEC-*.md` and `work-docs/PLAN-*.md` for key terms; run `hm memory_r
 <!-- @hm:comprehension:brief -->
 **Design brief, before round 1:** what research or a prior SPEC settled, the draft ACs, and which categories are open or defaulted (with why). One screen.
 {% endif %}
+**Boundary.** Before the SPEC, read the code the ask touches: which inputs take the new behaviour, which keep the old, and which existing behaviour must stay? If neither the ask nor the code settles that, ask the DRI in round 1: one question, recommendation first.
+
 Ask only what the DRI owns: categories 1–4 and each irreversible decision, with {{ hm.ask() }}, at most 3 questions per round; always offer "Other — let me describe". At most {{ _cap }} open-ended follow-up(s) per turn. Settle categories 5–6 and every oracle yourself. Once nothing the DRI owns is open (round 1 included), one question per round offers **"Approve this SPEC and end interview"** and "Approve after spec-validator": the DRI's only approval (silence never counts). Show your Refinement Decisions with the approval question. Stop when the DRI approves or after `interview.main_loop.max_rounds` ({{ _rounds if _rounds else 'unlimited' }}) rounds.
 
 Categories: 1. **Intent** (why now); 2. **Outcomes** ("done", observably); 3. **In-scope scenarios** (2–4 Given-When-Then: normal, edge, failure); 4. **Non-goals**; 5. **Constraints** (the test framework is mandatory); 6. **Verification** (each scenario → unit, integration or manual).
