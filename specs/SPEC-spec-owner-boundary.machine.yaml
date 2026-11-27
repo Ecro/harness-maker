@@ -1,0 +1,103 @@
+schema_version: 3
+spec_slug: spec-owner-boundary
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the skip check has five conditions
+  type: mechanical
+  test_ids:
+  - tests/render/test_spec_owner_boundary.py::test_ac_001_skip_check_has_five_conditions
+  executable_predicate: step0.count(SKIP_RULE) == 1 and 'all four hold' not in text
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rule text typed verbatim from this SPEC's AC-001, not read from
+    the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the Boundary rule comes before the interview questions
+  type: mechanical
+  test_ids:
+  - tests/render/test_spec_owner_boundary.py::test_ac_002_boundary_before_the_interview
+  executable_predicate: interview.index(BOUNDARY_RULE) < interview.index('Ask only
+    what the DRI owns')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rule text typed verbatim from this SPEC's AC-002, not read from
+    the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: gate commands get SIGINT back
+  type: mechanical
+  test_ids:
+  - tests/unit/test_check_sigint_inherit.py::test_ac_003_gate_child_has_default_sigint
+  executable_predicate: stdout.split() == ['0', 'True', 'True']
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The child reports Python's own handler identity (signal.default_int_handler),
+    which only an inherited SIG_DFL produces; independent of check.py.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 3c47c832dba2c5b66b47d2cdbbb2c1bb155c90d58892cd9c5327d3e1b691518e
+  approved_by: Claude
+  approved_at: '2026-11-27T09:59:28Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 60e731165128350a6d41570557b0afbd79dccaaebced235f1cf2bd861f604217
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 3e41ce1be54fa4bc0ba9856b0a347a2f87bf2216dc81894c50e385eb645a8e1c
+    AC-002: 59d652c22faf883a1de5bd344e1e296e732bab61936743ac652e0978bd5748be
+    AC-003: 39827e4819e0557f814fc9882541bace432f84bf8098c0f18763f61be4356c41
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d

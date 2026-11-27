@@ -4,6 +4,21 @@
 
 ### Fixed
 
+- **`/hm:spec` asks the scope boundary only the owner knows, and skips the interview less**
+  (SPEC-spec-owner-boundary). Before the SPEC it reads the code the ask touches and names which
+  inputs take the new behaviour, which keep the old, and which existing behaviour must stay;
+  unless the ask states that (or nothing old is kept), it asks one round-1 question (the code shows today's behaviour, not
+  which of it the owner wants kept). The skip check gains a fifth condition (no boundary
+  left open), counts docs as files, and treats a CLI-output or
+  user-facing message change (other than a typo fix) as disqualifying. In the 2026-11-26 replay bench, hm got 3 of 10
+  owner-only facts before code (a fixed "discipline" prompt got 8): 4 of 10 spec sessions
+  skipped the interview on detailed asks, and 4 more wrote the whole SPEC and asked only for
+  approval. Rendered projects pick it up on their next `hm make`.
+- **`hm check` run as a background job no longer fails tests that interrupt their own child.**
+  A non-interactive shell starts a background job with SIGINT ignored and exec keeps that, so
+  two tests here failed only under `hm check &` and blocked wrapup. Gate commands now start with
+  SIGINT at its default; they run in their own session, so no terminal can send it.
+
 - **Wrapup with isolation off commits the code on the first try** (SPEC-bench-wrapup-defects). The
   stage now says to `git add` the task's code and tests before `hm wrapup_land`; the 2026-11-25
   bench saw the first commit miss them in 35 of 36 runs (the model amended or added a commit).

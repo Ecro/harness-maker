@@ -34,7 +34,7 @@ files:
   body_sha256: ad6837a5349458a5ef491d9296df6f7da6a9eab831586b281c8c37b6cb9b73bb
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: f2a5dc2c4492d392c3f5c0fdeba2c055f9c8ed01e7e2af90373ed6d2d20d67cd
+  body_sha256: a46d2337c2c2e5979e19735cd4867c07ce411ee6e0cdd93ac3890debce6e30a3
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: c4364aa3896fdafbf4dc60b60eac7b06481f9e9ef15a87cfbbf685904d365b62

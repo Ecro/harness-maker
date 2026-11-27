@@ -253,7 +253,9 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 # interview rules (+27) and wrapup's split of intent writes (+61) (BASELINE-DELTA-ask-less.md).
 # wrapup raised by SPEC-bench-wrapup-defects' measured growth: isolation off swaps "`index_after`
 # must hold the code." for the stage-your-code sentence (+15; the worktree-on arm is unchanged).
-_STAGE_BUDGET = {"spec": (7140, 1500, 800), "execute": (7773, 1500, 0), "wrapup": (4300, 2785, 0)}
+# spec raised by SPEC-spec-owner-boundary's measured growth: the fifth skip condition and the
+# Boundary rule (+475 on every arm), then revision 2 "ask unless the ask states it" (+151).
+_STAGE_BUDGET = {"spec": (7771, 1500, 800), "execute": (7773, 1500, 0), "wrapup": (4300, 2785, 0)}
 _OPT_IN = 1500
 
 
