@@ -240,9 +240,10 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # again with spec after #46 folded SPEC-hm-cost-p4's (BASELINE-DELTA-hm-cost-p4.md).
     "execute": 8894,
     # research, spec and wrapup re-measured after #54 folded SPEC-ask-less' allowance
-    # (BASELINE-DELTA-ask-less.md, "Folded into the baseline from main").
+    # (BASELINE-DELTA-ask-less.md, "Folded into the baseline from main"); spec again after #83
+    # folded SPEC-spec-owner-boundary's (BASELINE-DELTA-spec-owner-boundary.md).
     "research": 4810,
-    "spec": 7728,
+    "spec": 8350,
     "wrapup": 5354,
 }
 

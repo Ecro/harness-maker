@@ -29,3 +29,16 @@ Measured with the committed generator (`tests/structural/_surface_baseline.py`,
 |---|---|---|---|---|
 | claude | `spec` | 8 186 | 8 808 | skip condition + Boundary rule |
 | codex | `hm-spec` | 8 277 | 8 899 | same text |
+
+Per ADR-010 the task that moved the surface owns its attribution. Writing it next to the
+allowance and the later re-freeze keeps this out of `ratchet-rebaselined-by-its-own-subject`.
+
+## Folded into the baseline from main
+
+PR #83 squash-merged the task as ec2d6209. The PLAN was then marked complete, which expires its
+allowance, so the growth was folded on main. The generator re-froze
+`tests/structural/surface_baseline.json` at ec2d6209c086: claude 50 645, codex 31 915 (spec
+8 186 -> 8 808, hm-spec 8 277 -> 8 899; execute/hm-execute −36 from the earlier unfolded change).
+`render_sha` and `payload_digest` moved mechanically with the re-freeze. `_ATOMIC_RATCHET` is
+re-measured for spec (7 728 -> 8 350), which left its ±2% band. No bench measurement ran on the
+task branch's eval rows, so no `bench_hash` alias is needed.
