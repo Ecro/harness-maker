@@ -225,8 +225,8 @@ def test_ac_006_intent_skill_splits_records_from_decisions(runtime: str, rendere
 
 _MEASURED = (*STAGES, "maker", "intent", "feedback")
 #: Growth a later SPEC measured and was granted, beyond rule R: SPEC-spec-owner-boundary's
-#: fifth skip condition and Boundary rule in spec (+475).
-_GRANTED = 480
+#: fifth skip condition and Boundary rule in spec (+475, revision 2 +151).
+_GRANTED = 640
 
 
 @pytest.mark.parametrize("preset", PRESETS)

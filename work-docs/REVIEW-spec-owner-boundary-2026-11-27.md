@@ -24,3 +24,17 @@ Round 1: one reviewer over the SPEC and commit 199e7574; new tests and AC-007 gr
 | F8 | P3 | SPEC Verification S3 | the two real tests via `check._run` are not automated | accepted | marked manual |
 
 Growth after fixes: +475 chars per spec render; budgets set to the measured value.
+
+## Revision 2 review (2026-11-27)
+
+Scope: Boundary "unless the code settles it" → asked unless the ask states it (live re-measure:
+asked 0/3). One reviewer round.
+
+| # | Sev | Finding | Disposition |
+|---|---|---|---|
+| R1 | P1 | Step 0 "the ask states its Boundary" almost never holds, so trivial asks lose the skip | Fixed: "no **Boundary** left open (Step 2)" |
+| R2 | P1 | "unless the ask states it" forces an empty question on greenfield changes | Fixed: open unless the ask states it "or the change keeps no existing behaviour" |
+| R3 | P2 | three ambiguous "it" | Fixed: "Ask an open boundary in round 1 …; a Refinement Decision alone is not enough." |
+| R4 | P2 | BASELINE-DELTA quoted the old Step 0 text | Fixed |
+| R5 | P3 | Boundary not tied to categories 1–4 | Not taken: adds chars; Boundary is already "one of its 3 questions" |
+| R6 | P3 | HOW-IT-WORKS grammar | Fixed |

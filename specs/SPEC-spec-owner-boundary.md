@@ -36,13 +36,13 @@ The DRI chose "경계 질문 추가 + Step 0 좁히기" on the decision card (20
 ## Outcomes
 
 - Before writing the SPEC, `/hm:spec` names the ask's scope boundary: which inputs take the new
-  behaviour, which keep the old, and which existing behaviour must stay. When neither the ask nor
-  the code settles it, hm asks the DRI that one question in round 1. This is LLM judgement, not
+  behaviour, which keep the old, and which existing behaviour must stay. Unless the ask states it (or
+  the change keeps no existing behaviour), hm asks the DRI that one question in round 1. This is LLM judgement, not
   a rule match. It stays inside the 2026-11-10 "ask only big things" rule (SPEC-ask-less rule R:
   scope is the DRI's).
 - The Step 0 skip needs five conditions, not four. Docs count as files and tests do not. A
-  CLI-output or user-facing message change disqualifies the skip. An open Boundary disqualifies
-  it. The rule says that a detailed ask is not a small one.
+  CLI-output or user-facing message change disqualifies the skip. So does a Boundary the ask
+  leaves open. The rule says that a detailed ask is not a small one.
 - `hm check` gate commands start with SIGINT at its default even when `hm check` itself started
   with it ignored.
 
@@ -57,7 +57,8 @@ The DRI chose "경계 질문 추가 + Step 0 좁히기" on the decision card (20
   non-interactive shell), a gate command's Python child has `signal.default_int_handler`.
   `hm check`'s own handler is left unchanged.
 - **S4 (live, manual):** Given the replay bench R3 and R4 tasks, the hm arm (2 runs) gets more
-  owner-only facts before code than 3/10. Measured with `replay.py` after the change.
+  owner-only facts before code than the old hm (0–1 of 5 on these tasks) and asks the boundary as
+  a question. Measured on the spec-stage turns with `replay.py` after the change.
 
 ## Non-Goals
 
@@ -88,9 +89,8 @@ On every arm in S1, Step 0 contains exactly once, before `--exempt`:
 
 > Skip the interview only when all five hold: one file or config (docs count, tests do not);
 > acceptance obvious from the title; no API, IPC, schema, file-format, CLI-output or user-facing
-> message change (a typo fix is not one); reversible within an hour with no user impact; no open
-> **Boundary** (read the code as Step 2 says). A detailed ask is not a small one; when unsure,
-> interview.
+> message change (a typo fix is not one); reversible within an hour with no user impact; no
+> **Boundary** left open (Step 2). A detailed ask is not a small one; when unsure, interview.
 
 and the render has no `all four hold`.
 
@@ -100,8 +100,10 @@ On every arm in S1, the render contains exactly once, inside Step 2, before the 
 (when the depth renders one) and before `Ask only what the DRI owns`:
 
 > **Boundary.** Before the SPEC, read the code the ask touches: which inputs take the new
-> behaviour, which keep the old, and which existing behaviour must stay? If neither the ask nor
-> the code settles that, ask the DRI in round 1 (one of its 3 questions), recommendation first.
+> behaviour, which keep the old, and which existing behaviour must stay? The code shows today's
+> behaviour, not which of it the DRI wants kept, so the boundary is open unless the ask states it
+> or the change keeps no existing behaviour. Ask an open boundary in round 1 (one of its 3
+> questions), recommendation first; a Refinement Decision alone is not enough.
 
 ### AC-003: gate commands get SIGINT back
 
@@ -117,7 +119,7 @@ both times, and its own SIGINT handler is unchanged afterwards.
 | S2 | render | AC-002 `tests/render/test_spec_owner_boundary.py::test_ac_002_boundary_before_the_interview` |
 | S3 | unit | AC-003 `tests/unit/test_check_sigint_inherit.py::test_ac_003_gate_child_has_default_sigint` |
 | S3 | manual | the two real tests (`test_stop_signal_kills_live_agents_and_skips_queued_cells[sigint]`, `test_external_caller_cancellation_cleans_owned_processes`) run through `check._run` from a background job: pass |
-| S4 | live, manual | replay bench R3 + R4 hm arm × 2 (`replay.py`, tasks.json), facts before code vs 3/10 |
+| S4 | live, manual | replay bench R3 + R4 hm arm × 2 (`replay.py`, tasks.json), spec-stage turns: owner facts before code (old hm 0–1 of 5) and boundary asked as a question |
 
 ## Open Questions
 
@@ -129,6 +131,15 @@ none
   already offers approval when nothing is open. The failure was that hm judged nothing open on a
   detailed ask. Naming the boundary (inputs new/old, behaviour that must stay) gives the
   judgement something specific to look for. Cost to undo: one paragraph.
+- **Revision 2 (2026-11-27, DRI "이어서 진행해"): ask unless the ask states it, not "unless the
+  code settles it".** The first wording's re-measure (replay R3 + R4, hm, run 1) raised owner facts
+  before code from 0–1 to 3 of 5, but hm asked the boundary as a question 0 of 3 times: it read
+  the code, judged it settled, and wrote the boundary down as its own assumption, which the owner
+  then corrected. That works only when the owner reads the SPEC closely (the 2026-11-26 sim recheck:
+  stated assumption 3/5 or 0/4, explicit question 4/4). The owner-only facts were policy (which
+  files count as a Python setup; never sweep the shared tree), which code cannot settle. "Or the change keeps no existing behaviour" keeps a greenfield change
+  from spending a round-1 slot on an empty question, and Step 0 keeps "no Boundary left open" so a
+  trivial change still skips (review rev 2, P1 ×2).
 - **One question, recommendation first, counted inside the 3 per round:** it keeps the
   "ask only big things" rule; scope is already the DRI's under rule R.
 - **Step 0 points at the Boundary instead of restating it:** one definition, so the skip and the

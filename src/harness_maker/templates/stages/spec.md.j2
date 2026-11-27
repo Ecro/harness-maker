@@ -14,7 +14,7 @@
 
 ## Step 0 — Skip check
 
-Skip the interview only when all five hold: one file or config (docs count, tests do not); acceptance obvious from the title; no API, IPC, schema, file-format, CLI-output or user-facing message change (a typo fix is not one); reversible within an hour with no user impact; no open **Boundary** (read the code as Step 2 says). A detailed ask is not a small one; when unsure, interview. Then write a minimal SPEC (Intent, one Given-When-Then scenario, Verification), the reason under Refinement Decisions, `irreversible_decisions: []`. Only a non-code change may write `ac: []`; a code change gets one testable AC. Stamp it unasked: `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml --exempt`.
+Skip the interview only when all five hold: one file or config (docs count, tests do not); acceptance obvious from the title; no API, IPC, schema, file-format, CLI-output or user-facing message change (a typo fix is not one); reversible within an hour with no user impact; no **Boundary** left open (Step 2). A detailed ask is not a small one; when unsure, interview. Then write a minimal SPEC (Intent, one Given-When-Then scenario, Verification), the reason under Refinement Decisions, `irreversible_decisions: []`. Only a non-code change may write `ac: []`; a code change gets one testable AC. Stamp it unasked: `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml --exempt`.
 
 ## Step 0.5 — Intent
 
@@ -26,7 +26,7 @@ Grep `specs/SPEC-*.md` and `work-docs/PLAN-*.md` for key terms; run `hm memory_r
 
 ## Step 2 — Interview
 
-**Boundary.** Before the SPEC, read the code the ask touches: which inputs take the new behaviour, which keep the old, and which existing behaviour must stay? If neither the ask nor the code settles that, ask the DRI in round 1 (one of its 3 questions), recommendation first.
+**Boundary.** Before the SPEC, read the code the ask touches: which inputs take the new behaviour, which keep the old, and which existing behaviour must stay? The code shows today's behaviour, not which of it the DRI wants kept, so the boundary is open unless the ask states it or the change keeps no existing behaviour. Ask an open boundary in round 1 (one of its 3 questions), recommendation first; a Refinement Decision alone is not enough.
 {% if _depth != 'minimal' %}
 <!-- @hm:comprehension:brief -->
 **Design brief, before round 1:** what research or a prior SPEC settled, the draft ACs, and which categories are open or defaulted (with why). One screen.

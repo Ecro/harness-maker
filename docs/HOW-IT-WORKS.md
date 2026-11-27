@@ -154,13 +154,14 @@ The only interview. With `worktree.enabled`, it runs in a per-task worktree (see
 [§6](#6-per-task-worktrees)).
 
 1. **Skip check.** A one-file (docs count, tests do not), obviously-scoped, reversible change with no API,
-   format, CLI-output or user-facing message change and no open scope boundary gets a minimal
+   format, CLI-output or user-facing message change and no scope boundary left open gets a minimal
    SPEC with one testable AC and is stamped exempt, without an interview. A detailed ask is not
    a small one.
 2. **Intent.** If the project has active intents, it asks which one this task serves.
 3. **Interview.** First it reads the code the ask touches and names the scope boundary: which
    inputs take the new behaviour, which keep the old, and which existing behaviour must stay.
-   If neither the ask nor the code settles that, it asks you that one question in round 1. It
+   The code shows today's behaviour, not which of it you want kept, so unless the ask states the
+   boundary (or nothing old is kept), it asks you that one question in round 1, recommendation first. It
    asks only what you own: why now, what "done" looks like, the scenarios, the
    non-goals, and every irreversible decision; at most 3 questions per round. It settles
    constraints, verification and each AC's oracle itself and shows them as **Refinement

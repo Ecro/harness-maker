@@ -6,9 +6,10 @@
 
 - **`/hm:spec` asks the scope boundary only the owner knows, and skips the interview less**
   (SPEC-spec-owner-boundary). Before the SPEC it reads the code the ask touches and names which
-  inputs take the new behaviour, which keep the old, and which existing behaviour must stay; if
-  neither the ask nor the code settles that, it asks one round-1 question. The skip check gains
-  a fifth condition (no open boundary), counts docs as files, and treats a CLI-output or
+  inputs take the new behaviour, which keep the old, and which existing behaviour must stay;
+  unless the ask states that (or nothing old is kept), it asks one round-1 question (the code shows today's behaviour, not
+  which of it the owner wants kept). The skip check gains a fifth condition (no boundary
+  left open), counts docs as files, and treats a CLI-output or
   user-facing message change (other than a typo fix) as disqualifying. In the 2026-11-26 replay bench, hm got 3 of 10
   owner-only facts before code (a fixed "discipline" prompt got 8): 4 of 10 spec sessions
   skipped the interview on detailed asks, and 4 more wrote the whole SPEC and asked only for
