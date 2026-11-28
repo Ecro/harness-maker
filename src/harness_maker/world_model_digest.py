@@ -15,8 +15,8 @@ MAX_TASKS = 5
 MIN_OPEN_INTENTS = 3
 MIN_TASKS = 3
 # Dropped per task, group by group, before the task floor gives way (REVIEW dbe5ddc7). Timing
-# goes first; `other_session` is never dropped — Maker reads its absence as "unknown, ask once",
-# so dropping it would cost a question on every resume (REVIEW confirm-1).
+# goes first; `other_session` and `interrupted` are never dropped — Briefing shows the first and
+# Resume picks the single cut-off task by the second (SPEC-maker-resume-no-ask).
 _OPTIONAL_TASK_FIELDS: tuple[tuple[str, ...], ...] = (
     ("last_seen", "last_stage"),
     ("latest_artifact",),
@@ -114,6 +114,19 @@ def last_stage_and_session(
     else:
         other = row_session != session_id
     return last_stage, ts if isinstance(ts, str) else None, other
+
+
+def interrupted(rows: list[dict[str, Any]]) -> bool:
+    """The task's newest span row is a `start` with no `end` after it.
+
+    Claude Code's Stop hook writes `end` when a turn finishes, so an open `start` means the
+    stage was cut off (or is running right now) — the task a resume ask is about. Codex
+    writes no `end`, so its Maker does not read this field.
+    """
+    if not rows:
+        return False
+    newest = max(enumerate(rows), key=lambda ir: (str(ir[1].get("ts") or ""), ir[0]))[1]
+    return newest.get("event") == "start"
 
 
 def _spec_done(base: Path, slug: str, wt: Path) -> bool:
@@ -289,7 +302,7 @@ def digest(root: Path, session_id: str | None = None) -> dict[str, Any]:
         for slug in worktrees:
             mine = [r for r in rows if r.get("task_slug") == slug]
             last_stage, last_seen, other = last_stage_and_session(mine, session_id)
-            entries.append((slug, last_stage, last_seen, other))
+            entries.append((slug, last_stage, last_seen, other, interrupted(mine)))
         entries.sort(key=lambda e: e[2] or "", reverse=True)
         deadline = time.monotonic() + DEADLINE_S
         # `parked` decides the order, so it is computed for every task before the cut; its git
@@ -302,19 +315,21 @@ def digest(root: Path, session_id: str | None = None) -> dict[str, Any]:
         # The stage checks (git + tool-version subprocesses) run only for the tasks shown, and
         # stop at DEADLINE_S — a slow host yields `null`, never a stalled briefing.
         tasks = []
-        for slug, last_stage, last_seen, other in entries[:MAX_TASKS]:
+        for slug, last_stage, last_seen, other, cut in entries[:MAX_TASKS]:
             stage = next_stage(base, slug, worktrees[slug]) if time.monotonic() < deadline else None
-            tasks.append(
-                {
-                    "slug": slug,
-                    "next_stage": stage,
-                    "last_stage": last_stage,
-                    "last_seen": last_seen,
-                    "other_session": other,
-                    "parked": park[slug],
-                    "latest_artifact": latest_artifact(files[slug]),
-                }
-            )
+            task: dict[str, Any] = {
+                "slug": slug,
+                "next_stage": stage,
+                "last_stage": last_stage,
+                "last_seen": last_seen,
+                "other_session": other,
+                "parked": park[slug],
+                "latest_artifact": latest_artifact(files[slug]),
+            }
+            # Only when true: 19 bytes a task, and Maker reads absence as "not cut off".
+            if cut:
+                task["interrupted"] = True
+            tasks.append(task)
         payload: dict[str, Any] = {
             "tasks": tasks,
             "more": max(0, len(entries) - MAX_TASKS),

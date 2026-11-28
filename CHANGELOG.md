@@ -42,6 +42,14 @@
 
 ### Fixed
 
+- **Maker resumes cut-off work without asking first** (SPEC-maker-resume-no-ask). The saga bench
+  (2026-11-28) scored hm 0/5 on resume: Maker found the task every time, then asked "resume?"
+  because the cut-off session counted as "another session" (a fresh session always does), and in
+  2 of 5 runs said the PLAN/SPEC were missing after looking in the base checkout. A resume ask is
+  now the consent; Maker checks no files (they live in `.worktrees/<slug>/`, which the stage
+  opens). The digest adds `interrupted: true` for a task whose last stage never got its Stop-hook
+  `end`, and Claude Maker resumes that one when several tasks are open.
+
 - **`/hm:spec` asks the scope boundary only the owner knows, and skips the interview less**
   (SPEC-spec-owner-boundary). Before the SPEC it reads the code the ask touches and names which
   inputs take the new behaviour, which keep the old, and which existing behaviour must stay;

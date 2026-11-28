@@ -1,0 +1,102 @@
+schema_version: 3
+spec_slug: maker-resume-no-ask
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the digest marks a cut-off stage
+  type: mechanical
+  test_ids:
+  - tests/unit/test_maker_digest.py::test_ac001_interrupted_from_open_span
+  executable_predicate: rows['cut'].get('interrupted', False) is expected and 'interrupted'
+    not in rows['other']
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Golden table in this SPEC, typed from the Stop-hook contract (end
+    at every turn end); rows written by the shipped emit_event and worktree span-end.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Resume enters without asking and checks no files
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_resume_no_ask_ac002_enters_without_asking
+  executable_predicate: consent and no_look in resume and 'ask once first' not in
+    maker and len(maker) <= 4689
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Literals typed from this SPEC; cap from CLAUDE.md.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: the cut-off rule is Claude-only
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_maker_front_door.py::test_resume_no_ask_ac003_interrupted_claude_only
+  executable_predicate: (cut_rule in resume) is (runtime != 'codex')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Codex templates ship no span-end hook (grep of templates/codex).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 785df1450de320ba351270430e3e1be2b9c6f30ab7b1b7fe1df16fe38ef12cb2
+  approved_by: Claude
+  approved_at: '2026-11-28T02:44:56Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: c5d90a4f0020a9163681bca40137299c7a3ca47a35e60b0b5adc8748a0775790
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 631f0bb8519215d0b980e1c6878b034f24b6f2d88fff6d38063f72f13092125b
+    AC-002: cc285cf5b150581be5fa5fac774b14242520a1a63b903288292daf3cc1704137
+    AC-003: 6d8ed02de17ef45d8734edf3e9ec4b57abd392b7c3542e956c23111ca1f24ee2
+    ac_order: 5caa4d9f63483ea958e9d04272eba724e676653229cf881759750f2e0c70b79d

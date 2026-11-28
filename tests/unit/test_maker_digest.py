@@ -19,6 +19,7 @@ import io
 import json
 import os
 import subprocess
+import sys
 from contextlib import redirect_stdout
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -649,3 +650,59 @@ def test_ac006_trim_drops_optional_fields_in_order_and_keeps_other_session(
         assert "last_stage" not in t, t
         assert ("latest_artifact" in t) is (groups_dropped == 1), t
         assert t["other_session"] is True, t
+
+
+# ── SPEC-maker-resume-no-ask AC-001: `interrupted` marks a stage cut off mid-turn ────────────
+
+
+def _span_start(base: Path, slug: str, session: str, stage: str) -> None:
+    spans = importlib.import_module("harness_maker.stage_spans")
+    spans.emit_event(
+        "start", stage=stage, cwd=base, session_id=session, task_slug=slug, git_branch=f"hm/{slug}"
+    )
+
+
+def _stop_hook(base: Path, session: str) -> None:
+    # The shipped Stop hook command, with the session id on stdin as Claude Code sends it.
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness_maker.worktree", "span-end", str(base)],
+        input=json.dumps({"session_id": session}),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+
+
+@pytest.mark.parametrize(
+    ("history", "expected"),
+    [
+        ((), False),  # no span rows at all
+        (("start",), True),  # killed before its Stop hook ran
+        (("start", "end"), False),  # the turn finished
+        (("start", "end", "start"), True),  # the next stage was cut off
+        (("start", "end", "start", "end"), False),
+    ],
+    ids=["no-rows", "cut", "ended", "second-cut", "second-ended"],
+)
+def test_ac001_interrupted_from_open_span(
+    tmp_path: Path, history: tuple[str, ...], expected: bool
+) -> None:
+    base = _base(tmp_path)
+    _task(base, "cut")
+    _task(base, "other")
+    _span_start(base, "other", "s0", "hm:spec")  # a peer task's span must not leak in
+    _stop_hook(base, "s0")
+    stages = iter(("hm:spec", "hm:execute"))
+    for event in history:
+        if event == "start":
+            _span_start(base, "cut", "s0", next(stages))
+        else:
+            _stop_hook(base, "s0")
+    _, d = _rendered(base)
+    rows = {t["slug"]: t for t in d["tasks"]}
+    assert rows["cut"].get("interrupted", False) is expected, rows["cut"]
+    assert "interrupted" not in rows["other"], rows["other"]
+    # Only ever `true`: absence is "not cut off", so the key never appears as `false`.
+    assert all(t.get("interrupted", True) is True for t in d["tasks"]), d["tasks"]
