@@ -1,0 +1,24 @@
+schema_version: 3
+spec_slug: intent-model-progress-rule
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac: []
+irreversible_decisions: []
+approval:
+  kind: exempt
+  content_hash: 4cf4dda96a2437ad4d19d0913058a53fc8663ce4f7f94f231475fa3e75cd7286
+  approved_by: null
+  approved_at: '2026-11-28T00:15:00Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: db96bde1f3b19b237c0dc9db1e71c3115a1baae78f1ec641742d4b586e656a2a
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    ac_order: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
