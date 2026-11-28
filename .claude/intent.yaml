@@ -119,9 +119,10 @@ metrics:
   description: 'saga 벤치에서 출시된 변경 1건당 주인이 읽은 글자 수, hm 팔 / plain-discipline 팔 (배수)'
   target: 1.0
   higher_is_better: false
-  how_measured: 'scripts/saga_bench.py run (3팔 x 3회 이상) 뒤 report 의 owner 표. 읽은 글자 = 에이전트 메시지 + hm 주인이
-    승인한 SPEC.md. 출시 = 끊기지 않고 자기 숨은 테스트를 모두 통과한 세션. baseline 2.50 (2026-11-28, hm 11,509 /
-    discipline 4,612, claude-sonnet-5-5 — /mnt/project-files/hm-owner-metrics/RESULTS-2026-11-28.md). 반대 신호, 하나라도
+  how_measured: 'scripts/saga_bench.py run (3팔 x 3회 이상) 뒤 report 의 owner 표. 읽은 글자 = 에이전트 메시지 (hm 주인은 변경 카드로
+    승인하고 SPEC.md 는 참고라 세지 않는다 — 사용자 결정 2026-11-28, SPEC-change-card). 출시 = 끊기지 않고 자기 숨은 테스트를
+    모두 통과한 세션. baseline 1.50 (2026-11-28 같은 행을 메시지만으로 다시 셈: hm 6,920 / discipline 4,612,
+    claude-sonnet-5-5; SPEC 를 세던 옛 정의로는 2.50 — /mnt/project-files/hm-owner-metrics/RESULTS-2026-11-28.md). 반대 신호, 하나라도
     어기면 배수가 목표 안이어도 통과가 아니다: (1) 이해 퀴즈 hm <= discipline (baseline 0.73 vs 0.54); (2) judge 의
     maintainability 에서 hm 패가 승보다 많음 (baseline 0-2); (3) replay 벤치의 깨진 기존 테스트 hm > discipline. 이해는
     벤치의 모의 독자 퀴즈로만 잰다 — 실제 주인에게 퀴즈·확인을 요구하지 않는다 (사용자 2026-11-28). 질문·확인을 늘려 퀴즈를

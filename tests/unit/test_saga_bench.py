@@ -561,7 +561,8 @@ def test_owner_ac_001_attention_from_turns(saga: ModuleType) -> None:
         ]
     }  # fmt: skip
     assert saga.attention(record) == {"read_chars": 30, "replies": 2, "approvals": 1}
-    assert saga.attention({**record, "doc_chars": 5})["read_chars"] == 35
+    # SPEC-change-card AC-007 (DRI 2026-11-28): the SPEC is reference, so doc_chars is not read.
+    assert saga.attention({**record, "doc_chars": 5})["read_chars"] == 30
 
 
 def test_owner_ac_002_doc_chars(saga: ModuleType, tmp_path: Path) -> None:
@@ -640,16 +641,16 @@ def test_owner_ac_004_owner_summary(saga: ModuleType) -> None:
     old = saga.owner_summary(rows)
     assert old["hm"] == {
         "runs": 2, "shipped": 1.0, "read_per_ship": 160.0, "replies_per_ship": 1.0,
-        "approvals_per_ship": 1.0, "quiz": 0.8, "escaped": None, "docs_counted": False,
+        "approvals_per_ship": 1.0, "quiz": 0.8, "escaped": None, "spec_per_ship": None,
     }  # fmt: skip
-    assert old["plain"]["docs_counted"] is True
     assert old["hm"]["escaped"] is None
     assert old["plain"]["runs"] == 1
     assert old["plain"]["escaped"] == 1.0
     text = saga.report(rows)
     assert "owner" in text
     assert "read/ship" in text
-    assert "SPEC documents not counted: hm" in text
+    # SPEC-change-card AC-007: SPEC chars are a reference column, never counted as read.
+    assert "spec/ship (reference, not read)" in text
 
 
 def test_owner_ac_005_judge(saga: ModuleType, tmp_path: Path) -> None:

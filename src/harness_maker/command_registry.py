@@ -104,6 +104,8 @@ MODULES: dict[str, ModuleSpec] = {
     "second_opinion_invoke": ModuleSpec("flagonly"),
     # SPEC-hm-overhaul-p1 AC-005: one exit code for every deterministic gate.
     "check": ModuleSpec("flagonly"),
+    # SPEC-change-card: the owner's card at SPEC approval (`spec`) and at land (`land`).
+    "change_card": ModuleSpec("subparser", _s("spec", "land")),
     "wrapup_brief": ModuleSpec("flagonly"),
     "wrapup_land": ModuleSpec("flagonly"),
     "wrapup_receipt": ModuleSpec("flagonly"),

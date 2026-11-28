@@ -27,7 +27,7 @@ Grep `specs/SPEC-*.md` and `work-docs/PLAN-*.md` for key terms; run `hm memory_r
 <!-- @hm:comprehension:brief -->
 **Design brief, before round 1:** what research or a prior SPEC settled, the draft ACs, and which categories are open or defaulted (with why). One screen.
 {% endif %}
-Ask only what the DRI owns: categories 1–4 and each irreversible decision, with {{ hm.ask() }}, at most 3 questions per round; always offer "Other — let me describe". At most {{ _cap }} open-ended follow-up(s) per turn. Settle categories 5–6 and every oracle yourself. Once nothing the DRI owns is open (round 1 included), one question per round offers **"Approve this SPEC and end interview"** and "Approve after spec-validator": the DRI's only approval (silence never counts). Show your Refinement Decisions with the approval question. Stop when the DRI approves or after `interview.main_loop.max_rounds` ({{ _rounds if _rounds else 'unlimited' }}) rounds.
+Ask only what the DRI owns: categories 1–4 and each irreversible decision, with {{ hm.ask() }}, at most 3 questions per round; always offer "Other — let me describe". At most {{ _cap }} open-ended follow-up(s) per turn. Settle categories 5–6 and every oracle yourself. Once nothing the DRI owns is open (round 1 included), one question per round offers **"Approve this SPEC and end interview"** and "Approve after spec-validator": the DRI's only approval (silence never counts). Show your Refinement Decisions with the approval question as the change card: write the SPEC and its yaml (Steps 3–3.5) first, then ask it with `hm change_card spec --slug <slug>`'s output as your message, verbatim{% if config.locale != 'en' %} (its free-text lines in `{{ config.locale }}`){% endif %}, rerun after any SPEC edit (the validator's too, before the stamp); add no other summary: the DRI approves from it, the SPEC file is reference. Stop when the DRI approves or after `interview.main_loop.max_rounds` ({{ _rounds if _rounds else 'unlimited' }}) rounds.
 
 Categories: 1. **Intent** (why now); 2. **Outcomes** ("done", observably); 3. **In-scope scenarios** (2–4 Given-When-Then: normal, edge, failure); 4. **Non-goals**; 5. **Constraints** (the test framework is mandatory); 6. **Verification** (each scenario → unit, integration or manual).
 
@@ -44,7 +44,7 @@ Categories: 1. **Intent** (why now); 2. **Outcomes** ("done", observably); 3. **
 **Per-question envelope.** For each question: what it decides, which sections each option rewrites, your recommended option and why, and what undoing it later costs (minutes, a phase, a migration).
 
 <!-- @hm:comprehension:teach_back -->
-**Closing readback.** Before ending, restate the locked design in the user's terms: what is built, in what order, what was rejected and why. It needs no reply and gates nothing.
+**Closing readback.** The change card is the readback; add no restatement.
 {% endif %}
 ## Step 3 — Write the SPEC
 
