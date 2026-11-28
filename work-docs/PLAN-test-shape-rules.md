@@ -5,6 +5,15 @@ status: planning
 created: 2026-11-28
 spec: "[[SPEC-test-shape-rules]]"
 summary: Print one AC's rows for an existing list; spec/execute/reviewer text for the three confirmed test-side causes.
+surface_allowance:
+  chars: 147
+  reason: "golden rows are call -> return value, change-rules are Constraints (spec); paste rows into an existing same-column parametrize (execute)"
+  delta_doc: BASELINE-DELTA-test-shape-rules.md
+  commands:
+    execute: 129
+    hm-execute: 129
+    spec: 24
+    hm-spec: 24
 ---
 
 # PLAN — test-shape-rules
