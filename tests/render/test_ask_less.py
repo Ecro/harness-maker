@@ -178,6 +178,8 @@ def test_ac_008_fewer_tool_mentions(runtime: str, rendered: Renders) -> None:
         return _read(root, runtime, name).count(TOOL[runtime])
 
     assert count(head, "spec") == count(base, "spec") - 1
-    for name in ("wrapup", "research", "execute", "maker"):
+    for name in ("wrapup", "research", "execute"):
         assert count(head, name) == count(base, name), name
+    # SPEC-maker-resume-no-ask dropped Resume's "ask once first" mention.
+    assert count(head, "maker") <= count(base, "maker")
     assert count(head, "intent") <= count(base, "intent")

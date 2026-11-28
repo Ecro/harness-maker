@@ -71,7 +71,7 @@ Else answer from the briefing or name the owning {% if is_codex %}`$hm-*` skill{
 - **tasks** (newest first, ≤ 5; `more` = rest; `parked: true` last): `next_stage` from artifacts;
   `other_session: true` = another session touched it last.
 - **intents.open** (`last`/`target`/`gap`), **recent** commits.
-- Only `hm/<slug>` worktrees (`worktree.enabled: true`); else or on failure use `work-docs/`, `specs/`.
+- A task's files are in `.worktrees/<slug>/`, not the base; `worktree.enabled` off or digest failure: `work-docs/`, `specs/`.
 
 Answer read-only goal and status questions from the briefing; read a procedure only to change something.
 Reply in at most 8 lines, changed or blocking first. Write nothing here. Never Read `wiki.md`,
@@ -96,12 +96,13 @@ is unfamiliar or the ask vague, else {{ stage("spec") }}, topic X. One route lin
 
 ## Resume
 
+The ask is consent: never ask first, even if `other_session` is true.
+
 1. No task → say so, offer **Start** with {{ ask }}.
 2. One → name its latest_artifact and time before entering its `next_stage`
-   ({{ stage("<stage>") }} `<slug>`); `latest_artifact` absent or null → say "no artifact
-   recorded", list its `work-docs/`/`specs/` files. `other_session` true or absent (unknown, not
-   false) → ask once first with {{ ask }}. `next_stage: wrapup` → ready to land.
-3. Two or more → ONE closed question with {{ ask }}: each slug with its `next_stage`.
+   ({{ stage("<stage>") }} `<slug>`; the stage opens the worktree, check no files); absent or null →
+   "no artifact recorded". `next_stage: wrapup` → ready to land.
+3. Two or more → ONE closed question with {{ ask }}: each slug with its `next_stage`.{% if not is_codex %} Exactly one `interrupted: true` → as 2 instead.{% endif %}
 
 ## Advance
 

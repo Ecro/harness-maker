@@ -49,6 +49,10 @@ def _renders_of(template: str) -> list[tuple[str, str]]:
     raise AssertionError(template)
 
 
+#: Choice sites a later SPEC removed; the golden table stays as approved.
+_RETIRED_SITES = {"h2": "SPEC-maker-resume-no-ask: a resume ask is the consent, no ask first"}
+
+
 def _sites() -> list[tuple[str, str, str]]:
     """(site, template, anchor) rows from AC-002's golden table — the SPEC is the oracle."""
     acs = yaml.safe_load(_SPEC.read_text(encoding="utf-8"))["ac"]
@@ -99,6 +103,8 @@ def test_ac_002_choice_sites_name_the_question_tool(
     assert len(sites) == 13
     bad = []
     for site, template, anchor in sites:
+        if site in _RETIRED_SITES:
+            continue
         for runtime, rel in _renders_of(template):
             text = (root / rel).read_text("utf-8")
             if anchor not in text:

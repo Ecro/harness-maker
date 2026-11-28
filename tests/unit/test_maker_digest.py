@@ -19,6 +19,7 @@ import io
 import json
 import os
 import subprocess
+import sys
 from contextlib import redirect_stdout
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -649,3 +650,92 @@ def test_ac006_trim_drops_optional_fields_in_order_and_keeps_other_session(
         assert "last_stage" not in t, t
         assert ("latest_artifact" in t) is (groups_dropped == 1), t
         assert t["other_session"] is True, t
+
+
+# ── SPEC-maker-resume-no-ask AC-001: `interrupted` marks a stage cut off mid-turn ────────────
+
+
+def _span_start(base: Path, slug: str, session: str | None, stage: str) -> None:
+    spans = importlib.import_module("harness_maker.stage_spans")
+    spans.emit_event(
+        "start", stage=stage, cwd=base, session_id=session, task_slug=slug, git_branch=f"hm/{slug}"
+    )
+
+
+def _stop_hook(base: Path, session: str) -> None:
+    # The shipped Stop hook command, with the session id on stdin as Claude Code sends it.
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness_maker.worktree", "span-end", str(base)],
+        input=json.dumps({"session_id": session}),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+
+
+@pytest.mark.parametrize(
+    ("history", "expected"),
+    [
+        ((), False),  # no span rows at all
+        (("start",), True),  # killed before its Stop hook ran
+        (("start", "end"), False),  # the turn finished
+        (("start", "end", "start"), True),  # the next stage was cut off
+        (("start", "end", "start", "end"), False),
+    ],
+    ids=["no-rows", "cut", "ended", "second-cut", "second-ended"],
+)
+def test_ac001_interrupted_from_open_span(
+    tmp_path: Path, history: tuple[str, ...], expected: bool
+) -> None:
+    base = _base(tmp_path)
+    _task(base, "cut")
+    _task(base, "other")
+    _span_start(base, "other", "s0", "hm:spec")  # a peer task's span must not leak in
+    _stop_hook(base, "s0")
+    stages = iter(("hm:spec", "hm:execute"))
+    for event in history:
+        if event == "start":
+            _span_start(base, "cut", "s0", next(stages))
+        else:
+            _stop_hook(base, "s0")
+    _, d = _rendered(base)
+    rows = {t["slug"]: t for t in d["tasks"]}
+    assert rows["cut"].get("interrupted", False) is expected, rows["cut"]
+    assert "interrupted" not in rows["other"], rows["other"]
+    # Only ever `true`: absence is "not cut off", so the key never appears as `false`.
+    assert all(t.get("interrupted", True) is True for t in d["tasks"]), d["tasks"]
+
+
+def _flags(base: Path) -> dict[str, bool]:
+    _, d = _rendered(base)
+    return {t["slug"]: t.get("interrupted", False) for t in d["tasks"]}
+
+
+def test_ac001_undecidable_reads_not_interrupted(tmp_path: Path) -> None:
+    """REVIEW F1/F5: a start without a session id, or a ledger with no `end` at all (Codex
+    ships no span-end hook), is undecidable — never `interrupted`."""
+    base = _base(tmp_path)
+    _task(base, "codexlike")
+    _span_start(base, "codexlike", "s0", "hm:spec")
+    assert _flags(base) == {"codexlike": False}  # no `end` anywhere in the ledger
+    _task(base, "noid")
+    _span_start(base, "noid", None, "hm:spec")
+    _stop_hook(base, "s0")  # the hook has an id, so it cannot close the id-less start
+    assert _flags(base) == {"codexlike": False, "noid": False}
+
+
+def test_ac001_one_turn_two_tasks_both_closed(tmp_path: Path) -> None:
+    """REVIEW F2: one Stop `end` carries only the turn's last slug; a start its session
+    followed with any later row is closed, whatever task that row names."""
+    base = _base(tmp_path)
+    _task(base, "a")
+    _task(base, "b")
+    _span_start(base, "a", "s0", "hm:spec")
+    _span_start(base, "b", "s0", "hm:spec")
+    _stop_hook(base, "s0")
+    assert _flags(base) == {"a": False, "b": False}
+    _span_start(base, "a", "s1", "hm:execute")  # a peer session's later row must not close it
+    _span_start(base, "b", "s0", "hm:execute")
+    assert _flags(base) == {"a": True, "b": True}

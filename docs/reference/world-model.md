@@ -84,21 +84,28 @@ session id: `"${CLAUDE_SESSION_ID}"` in Claude Code's digest step, `"$HM_SESSION
 - **Read-only on world state, ≤ 1,500 bytes (`MAX_BYTES`), always exits 0** with one JSON
   object; failure surfaces as `unavailable`, never as an exit code (followups AC-001/002).
 - **Fields**: `tasks` (≤ 5, newest first: `slug`, `next_stage`, `last_stage`, `last_seen`,
-  `other_session`, `parked`, `latest_artifact {name, at}`), `more`, `autopilot`, `intents`
+  `other_session`, `parked`, `latest_artifact {name, at}`, `interrupted` — present only when
+  `true`), `more`, `autopilot`, `intents`
   (`open[] {id, metric_id, last, target, gap}` — open goals with values mirrored from
   `hm intent status`, `—` when absent; SPEC-intent-lean), `recent` commits.
 - `next_stage` is derived from artifacts, not spans: approved SPEC → REVIEW →
   wrapup (review and verify retired in 0.64.0). execute writes the REVIEW only after its fix loop
   (SPEC-review-after-fixes), so an execute interrupted before then resumes in execute. Past the 5 s artifact budget (`DEADLINE_S`) a task reports `null`.
 - Only `hm/<slug>` task worktrees are listed (`worktree.enabled`). Root resolves to the base,
-  so the digest reads the base ledger from any worktree.
+  so the digest reads the base ledger from any worktree. A task's artifacts live in
+  `.worktrees/<slug>/`, never the base checkout (SPEC-maker-resume-no-ask).
+- **`interrupted`** (SPEC-maker-resume-no-ask): the task's newest span row is a `start` that its
+  session never followed with any row. Claude Code's Stop hook writes `end` for the session's
+  open span at turn end, so this is a stage cut off mid-turn (or running now). Undecidable reads
+  absent: a start without a session id, or a ledger with no `end` at all (Codex writes none).
+  Emitted only when true; the key is never dropped from a shown task.
 - **`parked`**: RESEARCH is the task's only artifact, its frontmatter `created` is older than
   7 days (`PARK_DAYS`), and there is no commit beyond base. Parked tasks sort last. An absent
   `created` is **not** parked — unknown is never parked.
 - **Trim order over the cap**: drop `recent` → intents beyond 3 → tasks down to 3 →
-  `last_seen`/`last_stage` → `latest_artifact`. **`other_session` is never dropped**: Maker
-  reads its absence as "unknown, ask once", so dropping it would cost a question on every
-  resume. A new field must slot into this order (or be cheaper than everything above it), or
+  `last_seen`/`last_stage` → `latest_artifact`. **`other_session` and `interrupted` are never
+  dropped** from a shown task: Briefing shows `other_session`, and Resume picks the single
+  `interrupted` task. A new field must slot into this order (or be cheaper than everything above it), or
   the cap starts cutting what Resume depends on.
 - **`maker_load`**: each run appends `{ts, event: "maker_load", session_id}` to
   `.claude/observability/world-model.jsonl` — no request text, best-effort (IRR-004). Measured
@@ -189,8 +196,11 @@ that parses the marker on its own and rejects unknown keys turns every narrowed 
 ## Resume, decision capture, mid-stage aside
 
 - **Resume** names the task's `latest_artifact` and its time before entering `next_stage`. A
-  missing or null artifact → "no artifact recorded" plus a listing of `work-docs/` / `specs/`
-  files. A missing `other_session` is "unknown" → ask once. Resume first runs
+  null artifact → "no artifact recorded". The resume ask is the consent: Maker never asks first,
+  even when `other_session` is true (a fresh session always has a new id, so the old rule asked on
+  every cross-session resume; SPEC-maker-resume-no-ask). It checks no files: the stage's preflight
+  opens the worktree. Two or more tasks: the single `interrupted: true` one is resumed (Claude
+  only), else one closed question. Resume first runs
   `narrow --until wrapup` to undo a leftover narrowing.
 - **Decision capture** (AC-016): a decision or scope change made in conversation about an
   in-flight task is written to its most downstream artifact (PLAN, else SPEC, else RESEARCH)
