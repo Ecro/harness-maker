@@ -631,7 +631,7 @@ def test_ac017_mid_stage_aside(
 
 _RESUME_CONSENT = "The ask is consent: never ask first, even if `other_session` is true."
 _RESUME_NO_LOOK = "the stage opens the worktree, check no files"
-_RESUME_CUT = "exactly one `interrupted: true` (cut off) → as 2"
+_RESUME_CUT = "Exactly one `interrupted: true` → as 2 instead."
 _WORKTREE_FILES = "A task's files are in `.worktrees/<slug>/`, not the base"
 
 

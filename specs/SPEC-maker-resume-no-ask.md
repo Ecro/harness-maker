@@ -106,7 +106,7 @@ file stays ≤ 4,689 chars.
 
 ### AC-003: the cut-off rule is Claude-only
 
-Resume contains `exactly one `interrupted: true` (cut off) → as 2` on the Claude arms and not on
+Resume contains `Exactly one `interrupted: true` → as 2 instead.` on the Claude arms and not on
 the Codex arms.
 
 ## Verification
