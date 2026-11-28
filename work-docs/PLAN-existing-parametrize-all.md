@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: existing-parametrize-all
-status: planning
+status: complete
 created: 2026-11-28
 spec: "[[SPEC-existing-parametrize-all]]"
 summary: One Phase A clause so every AC's cases join an existing parametrize of the same call.

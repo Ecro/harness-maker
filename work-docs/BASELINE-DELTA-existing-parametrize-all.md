@@ -19,3 +19,12 @@ Measured with `tests/fixtures/cli_bookkeeping/main_chars.json` renders against t
 
 Per ADR-010 the task that moved the surface owns its attribution. Writing it next to the
 allowance and the later re-freeze keeps this out of `ratchet-rebaselined-by-its-own-subject`.
+
+## Folded into the baseline from main
+
+PR #96 was squash-merged as a1a08d19. The PLAN was then marked complete, which expires its
+allowance, so the growth was folded on main. The generator re-froze
+`tests/structural/surface_baseline.json` at a1a08d195995: claude 50 891, codex 32 161 (execute and
+hm-execute +99 each, nothing else moved). `render_sha` and `payload_digest` moved mechanically with
+the re-freeze. The per-command `_ATOMIC_RATCHET` bands still hold, so they were not re-measured. No
+eval rows came from the task branch, so no `bench_hash` alias is needed.
