@@ -36,7 +36,7 @@ import tomllib
 import uuid
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -48,7 +48,8 @@ from harness_maker import economics, economics_source  # noqa: E402
 
 BENCH_ID = "hm-saga"
 SAGA_DIR = bll.BENCH_DIR / "saga"
-ARMS = ("plain", "plain-discipline", "hm")
+DEFAULT_ARMS = ("plain", "plain-discipline", "hm")
+ARMS = (*DEFAULT_ARMS, *bll.EXTERNAL_ARMS)  # omc: SPEC-bench-omc-arm
 CONTROL = "plain-discipline"  # the arm hm must beat (DESIGN §2.4)
 VALIDATOR_ARMS = ("hm", "plain-review")
 DEFAULT_MODEL = "claude-sonnet-5-5"
@@ -222,6 +223,9 @@ class Options:
     quiz: bool = True
     root: Path = SAGA_DIR
     only: tuple[str, ...] = ()  # session ids to run (a smoke run); empty runs them all
+    omc_dir: Path | None = None  # the omc arm's OMC checkout (SPEC-bench-omc-arm)
+    omc_sha: str = ""
+    omc_version: str = ""
 
 
 def load_saga(root: Path = SAGA_DIR) -> Saga:
@@ -248,6 +252,8 @@ def prompt_for(session: Session, arm: str) -> str:
         return f"{session.prompt}\n\n{DISCIPLINE}"
     if arm == "hm":
         return bll.HM_PREFIX + session.prompt
+    if arm == "omc":
+        return bll.OMC_PREFIX + session.prompt
     return session.prompt
 
 
@@ -266,6 +272,7 @@ def tree_hash(root: Path) -> str:
 def invoke(
     argv: list[str], cwd: Path, log_base: Path, timeout_s: int, extra_env: tuple[str, ...] = (),
     *, stdin: Path | None = None, should_kill: Callable[[], bool] | None = None,
+    env_overrides: dict[str, str] | None = None,
 ) -> tuple[str, int | None, bool]:  # fmt: skip
     """(stdout, exit code or None on timeout/kill, killed) of one call in its own process group,
     with output in `log_base`.stdout/.stderr so parallel calls never share a file."""
@@ -277,7 +284,8 @@ def invoke(
         err_f = stack.enter_context(err_path.open("w"))
         in_f: Any = stack.enter_context(stdin.open("rb")) if stdin else subprocess.DEVNULL
         proc = subprocess.Popen(
-            argv, cwd=cwd, env=bll.agent_env(extra_env), stdin=in_f, stdout=out_f, stderr=err_f,
+            argv, cwd=cwd, env=bll.agent_env(extra_env, env_overrides), stdin=in_f, stdout=out_f,
+            stderr=err_f,
             text=True, start_new_session=True,
         )  # fmt: skip
         with bll._LIVE_LOCK:
@@ -480,16 +488,22 @@ def landed(work: Path, slug: str) -> bool:
 
 def _agent_turn(
     prompt: str, kind: str, session_id: str | None, opts: Options, work: Path, log_base: Path,
-    should_kill: Callable[[], bool] | None,
+    should_kill: Callable[[], bool] | None, *, arm: str = "", home: Path | None = None,
 ) -> dict[str, Any]:  # fmt: skip
+    """One agent call; the omc arm loads its plugin and runs in the run's own HOME."""
     argv = bll.agent_argv(opts.claude_bin, prompt, opts.model, opts.max_turns, opts.max_budget_usd)
+    overrides = None
+    if arm == "omc":
+        argv = bll.omc_argv(argv, opts.omc_dir)
+        overrides = bll.omc_env(home if home is not None else work.parent / "home")
     fresh = session_id is None
     session_id = session_id or str(uuid.uuid4())
     argv += ["--session-id" if fresh else bll.RESUME_FLAG, session_id]
     started = time.monotonic()
     stdout, code, killed = invoke(
-        argv, work, log_base, opts.timeout_s, opts.pass_env, should_kill=should_kill
-    )
+        argv, work, log_base, opts.timeout_s, opts.pass_env, should_kill=should_kill,
+        env_overrides=overrides,
+    )  # fmt: skip
     result = bll.parse_cli_result(stdout)
     message = result.get("result") if result else None
     reported = result.get("session_id") if result else None
@@ -591,7 +605,8 @@ def run_session(
         log_base = log_dir / f"{session.id}-{len(turns) + 1:02d}-{kind}"
         if interrupter is not None:
             interrupter.begin()
-        turn = _agent_turn(prompt, kind, session_id, opts, work, log_base, interrupter)
+        turn = _agent_turn(prompt, kind, session_id, opts, work, log_base, interrupter, arm=arm,
+                           home=run_dir / "home")  # fmt: skip
         turns.append(turn)
         if turn["status"] != "ok" or turn["session_id"] is None or bll.STOP.is_set():
             break
@@ -1051,6 +1066,8 @@ def runner_hash(opts: Options, claude_version: str) -> str:
         opts.interrupt_delay_s, "max_replies": opts.max_replies, "agent_tz": AGENT_TZ,
         "pass_env": sorted(opts.pass_env), "claude_version": claude_version, "only": opts.only,
     }  # fmt: skip
+    if opts.omc_sha:  # only when set, so every hash without the omc arm is unchanged
+        config["omc"] = {"sha": opts.omc_sha, "prefix": bll.OMC_PREFIX}
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:12]
 
 
@@ -1063,6 +1080,8 @@ def run_saga(
         **base, "arm": arm, "rep": rep, "run_dir": str(run_dir),
         "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }  # fmt: skip
+    if arm == "omc":
+        row |= {"omc_sha": opts.omc_sha, "omc_version": opts.omc_version}
     try:
         run_dir.mkdir(parents=True)
         bll.prepare_work(work, template)
@@ -1218,9 +1237,26 @@ def report(rows: list[dict[str, Any]], margin: float = MARGIN, min_traps: int = 
             cells.append(f"{sum(known)}/{len(known)} ({_fmt(rates[arm].get(trap))})")
         mark = "  saturated (not in verdict)" if trap in SATURATED else ""
         lines.append(f"{trap:18} " + "  ".join(f"{c:>16}" for c in cells) + mark)
+    if "hm" in arms and "omc" in arms:
+        lines += ["", compare_line(rates, "hm", "omc")]
     lines += ["", f"verdict (margin {margin}, min traps {min_traps}): "
               f"{verdict(ok, margin, min_traps)}"]  # fmt: skip
     return "\n".join(lines)
+
+
+def compare_line(rates: dict[str, dict[str, float | None]], a: str, b: str) -> str:
+    """Mean trap rate of two arms over the non-saturated traps both have, and how many each
+    leads: a description beside the verdict, which stays hm vs plain-discipline."""
+    ra, rb = rates.get(a, {}), rates.get(b, {})
+    common = [t for t in ra if t not in SATURATED and ra[t] is not None and rb.get(t) is not None]
+    if not common:
+        return f"{a} vs {b}: no common non-saturated trap"
+    mean_a = math.fsum(ra[t] or 0.0 for t in common) / len(common)
+    mean_b = math.fsum(rb[t] or 0.0 for t in common) / len(common)
+    ahead = sum((ra[t] or 0.0) > (rb[t] or 0.0) for t in common)
+    behind = sum((ra[t] or 0.0) < (rb[t] or 0.0) for t in common)
+    return (f"{a} vs {b} over {len(common)} non-saturated traps: {a} {mean_a:.2f}, {b} "
+            f"{mean_b:.2f}; {a} ahead on {ahead}, behind on {behind}")  # fmt: skip
 
 
 # --- spec-validator detection -------------------------------------------------------------------
@@ -1356,6 +1392,14 @@ def _options(args: argparse.Namespace) -> Options:
     )  # fmt: skip
 
 
+def _with_omc(opts: Options, found: tuple[str, str] | None, omc_dir: str | None) -> Options:
+    """The options with the OMC checkout's path, sha and version."""
+    if found is None:
+        return opts
+    return replace(opts, omc_dir=Path(str(omc_dir)).resolve(), omc_sha=found[0],
+                   omc_version=found[1])  # fmt: skip
+
+
 def _on_signal(_signum: int, _frame: object) -> None:
     bll.STOP.set()
     bll.kill_live()
@@ -1383,7 +1427,10 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--timeout-s", type=int, default=2400)
         cmd.add_argument("--no-quiz", action="store_true")
         cmd.add_argument("--sessions", default="", help="comma-separated ids (smoke runs)")
-    sub.choices["run"].add_argument("--arms", default=",".join(ARMS))
+    sub.choices["run"].add_argument("--arms", default=",".join(DEFAULT_ARMS))
+    sub.choices["run"].add_argument(
+        "--omc-dir", default=None, help="oh-my-claudecode checkout for the omc arm"
+    )
     sub.choices["run"].add_argument("--jobs", type=int, default=3)
     sub.choices["validator"].add_argument("--arms", default=",".join(VALIDATOR_ARMS))
     return parser
@@ -1406,17 +1453,24 @@ def main(argv: list[str] | None = None) -> int:
     if os.environ.get("INTEGRATION") != "1":
         print("saga_bench: model calls need INTEGRATION=1", file=sys.stderr)
         return 2
+    arms = tuple(a for a in args.arms.split(",") if a)
+    omc = None
+    if args.command == "run":  # before TZ and the signal handlers: a refusal changes nothing
+        try:
+            omc = bll.omc_setup(arms, args.omc_dir)
+        except bll.OmcError as exc:
+            print(f"saga_bench: refusing --omc-dir: {exc}", file=sys.stderr)
+            return 2
     os.environ["TZ"] = AGENT_TZ
     time.tzset()
     signal.signal(signal.SIGINT, _on_signal)
     signal.signal(signal.SIGTERM, _on_signal)
     opts = _options(args)
-    arms = tuple(a for a in args.arms.split(",") if a)
     if args.command == "run":
         unknown = [a for a in arms if a not in ARMS]
         if unknown:
             parser.error(f"unknown arm(s): {unknown}")
-        return run(opts, arms, args.runs, args.jobs)
+        return run(_with_omc(opts, omc, args.omc_dir), arms, args.runs, args.jobs)
     rows = run_validator(opts, arms, args.runs)
     print(json.dumps(validator_summary(rows), indent=1))
     return 0

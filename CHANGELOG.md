@@ -40,6 +40,15 @@
   report but leave the verdict (margin 0.2, lead on 3 of the other 5).
 ### Added
 
+- **An oh-my-claudecode arm in the bench and the saga bench** (SPEC-bench-omc-arm). `--arms
+  ...,omc --omc-dir <checkout>` runs oh-my-claudecode (a popular open-source Claude Code
+  harness) in its lightest execution mode, `/oh-my-claudecode:execute`, loaded per call with
+  `--plugin-dir` from a pinned git checkout (sha and version on every row, sha in the runner
+  hash) and in a HOME of its own, so its global `~/.omc` state never crosses cells. `report`
+  shows it beside plain and hm (tier 1/2: $/run and wall time as multiples of plain; saga: an
+  hm-vs-omc trap line); it stays out of the plain-vs-hm scorecard, the saga verdict and the
+  published README block.
+
 - **Saga bench: hm's unique values on consecutive sessions** (SPEC-saga-bench).
   `scripts/saga_bench.py` drives `plain`, `plain-discipline` (plain plus one fixed paragraph: ask
   when ambiguous, show a plan, keep NOTES.md, test, one subagent review, commit) and `hm` through

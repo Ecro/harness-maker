@@ -111,7 +111,14 @@ CONTROL_ARMS = ("plain-careful", "plain-continue")
 #: hm-variant is hm with a `--variant` file's edits applied to the render (SPEC-self-prune-loop).
 VARIANT_ARMS = ("hm-novalidator", "hm-variant")
 HM_ARMS = ("hm", *VARIANT_ARMS)
-ALL_ARMS = (*ARMS, *CONTROL_ARMS, *VARIANT_ARMS)
+#: Another harness on the same host (SPEC-bench-omc-arm): oh-my-claudecode in its lightest
+#: execution mode, loaded per call from a pinned checkout. Reported beside plain and hm, never
+#: in the plain-vs-hm scorecard or the published README block.
+EXTERNAL_ARMS = ("omc",)
+ALL_ARMS = (*ARMS, *CONTROL_ARMS, *VARIANT_ARMS, *EXTERNAL_ARMS)
+OMC_PREFIX = "/oh-my-claudecode:execute "
+OMC_PLUGIN = "oh-my-claudecode"
+EXTERNAL_TITLE = "External harness arms (beside plain and hm, not in their verdict)"
 # Arms whose sessions after the first resume the conversation, so the CLI's total_cost_usd is a
 # running total for the run and a session's own cost is the difference (as in the DRI path).
 RESUMED_ARMS = ("plain-continue",)
@@ -341,6 +348,9 @@ class Options:
     judge_timeout_s: int = JUDGE_TIMEOUT_S
     tier3_hash: str = ""  # recorded on tier-3 rows only
     variant: dict[str, Any] | None = None  # the hm-variant arm's edits (SPEC-self-prune-loop)
+    omc_dir: Path | None = None  # the omc arm's OMC checkout (SPEC-bench-omc-arm)
+    omc_sha: str = ""
+    omc_version: str = ""
 
 
 # --- fixture and tasks ------------------------------------------------------------------------
@@ -504,9 +514,11 @@ def runner_hash(
     judge_model: str = "",
     judge_budget_usd: float = DEFAULT_JUDGE_BUDGET_USD,
     variant_sha: str = "",
+    omc_sha: str = "",
 ) -> str:
     """Hash of every runner setting that changes what an arm does or how it is scored, so rows
-    never mix them. A variant enters only when set, so every hash without one is unchanged."""
+    never mix them. A variant or an OMC checkout enters only when set, so every hash without
+    one is unchanged."""
     config = {
         "hm_prefix": HM_PREFIX,
         "dri": {
@@ -539,6 +551,8 @@ def runner_hash(
     }
     if variant_sha:
         config["variant"] = variant_sha
+    if omc_sha:
+        config["omc"] = {"sha": omc_sha, "prefix": OMC_PREFIX}
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:12]
 
 
@@ -1749,6 +1763,8 @@ def prompt_for(task: Task, arm: str, session: int = 0) -> str:
     prompt = task.session_prompts[session]
     if arm == "plain-careful":
         return f"{prompt}\n\n{CAREFUL_SENTENCE}"
+    if arm == "omc":
+        return OMC_PREFIX + prompt
     return HM_PREFIX + prompt if arm in HM_ARMS else prompt
 
 
@@ -1759,6 +1775,8 @@ def session_argv(task: Task, arm: str, session: int, opts: Options) -> list[str]
         opts.claude_bin, prompt_for(task, arm, session), opts.model, opts.max_turns,
         opts.max_budget_usd,
     )  # fmt: skip
+    if arm == "omc":
+        argv = omc_argv(argv, opts.omc_dir)
     return [*argv, "--continue"] if arm in RESUMED_ARMS and session > 0 else argv
 
 
@@ -1784,11 +1802,84 @@ def claude_version(claude_bin: str, extra_env: tuple[str, ...] = ()) -> str:
     return proc.stdout.strip() or "unavailable"
 
 
-def agent_env(extra: tuple[str, ...] = ()) -> dict[str, str]:
+def agent_env(
+    extra: tuple[str, ...] = (), overrides: dict[str, str] | None = None
+) -> dict[str, str]:
     """Allowlisted environment: auth, proxy and locale only, never the operator's other secrets."""
     keep = {*_AGENT_ENV, *extra}
     env = {k: v for k, v in os.environ.items() if k in keep or k.startswith("LC_")}
-    return {k: v for k, v in env.items() if k not in _SESSION_ENV}
+    return {**{k: v for k, v in env.items() if k not in _SESSION_ENV}, **(overrides or {})}
+
+
+# --- the omc arm (SPEC-bench-omc-arm) -----------------------------------------------------------
+
+
+class OmcError(ValueError):
+    """An omc setup that would spend on the wrong plugin: refused before any model call."""
+
+
+def omc_setup(
+    arms: list[str] | tuple[str, ...], omc_dir: str | Path | None
+) -> tuple[str, str] | None:
+    """(checkout sha, plugin version) when the omc arm runs, None when it does not."""
+    if ("omc" in arms) != bool(omc_dir):
+        raise OmcError(f"the omc arm and --omc-dir <checkout> go together (arms: {list(arms)})")
+    if not omc_dir:
+        return None
+    root = Path(omc_dir)
+    try:
+        manifest = json.loads((root / ".claude-plugin" / "plugin.json").read_text("utf-8"))
+    except (OSError, ValueError) as exc:
+        raise OmcError(f"{root} is not a Claude Code plugin checkout: {exc}") from exc
+    if not isinstance(manifest, dict) or manifest.get("name") != OMC_PLUGIN:
+        raise OmcError(f"{root} is not the {OMC_PLUGIN} plugin")
+    if not (root / ".git").exists():
+        raise OmcError(f"{root} is not a git checkout, so its version cannot be pinned")
+
+    def git(*args: str) -> str:
+        proc = subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, text=True, timeout=30, check=False
+        )
+        if proc.returncode != 0:
+            raise OmcError(f"git {' '.join(args)} failed in {root}: {proc.stderr.strip()}")
+        return proc.stdout.strip()
+
+    sha = git("rev-parse", "HEAD") + ("-dirty" if git("status", "--porcelain") else "")
+    return sha, str(manifest.get("version", ""))
+
+
+def omc_argv(argv: list[str], omc_dir: Path | None) -> list[str]:
+    if omc_dir is None:
+        raise OmcError("the omc arm needs --omc-dir")
+    return [*argv, "--plugin-dir", str(omc_dir)]
+
+
+#: Operator HOME entries an omc cell links to, so its tools find the same caches and
+#: user installs as plain and hm do; OMC's own state (`.omc`, `.config/claude-omc`) stays out.
+OMC_HOME_LINKS = (".cache", ".local", ".npm", ".bun", ".cargo", ".rustup", ".nix-profile")
+
+
+def omc_env(home: Path) -> dict[str, str]:
+    """A HOME of the cell's own, because OMC keeps global state under homedir()/.omc that
+    parallel cells would share; the config dir stays the operator's, where auth lives and the
+    bench reads transcripts. Idempotent, so a saga run reuses one HOME across its turns."""
+    operator = Path.home()
+    home.mkdir(parents=True, exist_ok=True)
+    gitconfig = operator / ".gitconfig"
+    if gitconfig.is_file() and not (home / ".gitconfig").exists():
+        shutil.copy(gitconfig, home / ".gitconfig")
+    for name in OMC_HOME_LINKS:
+        link = home / name
+        if (operator / name).exists() and not (link.exists() or link.is_symlink()):
+            link.symlink_to(operator / name)
+    config = os.environ.get("CLAUDE_CONFIG_DIR") or str(operator / ".claude")
+    return {"HOME": str(home), "CLAUDE_CONFIG_DIR": config}
+
+
+def omc_fields(opts: Options, arm: str) -> dict[str, Any]:
+    if arm != "omc":
+        return {}
+    return {"omc_sha": opts.omc_sha, "omc_version": opts.omc_version}
 
 
 def parse_cli_result(stdout: str) -> dict[str, Any] | None:
@@ -1826,6 +1917,7 @@ def _invoke(
     timeout_s: int,
     extra_env: tuple[str, ...] = (),
     stdin: Path | None = None,
+    env_overrides: dict[str, str] | None = None,
 ) -> tuple[str, str, int | None]:
     """Run the agent in its own process group so a timeout or interrupt also stops its children.
 
@@ -1839,7 +1931,7 @@ def _invoke(
         err_f = stack.enter_context(stderr_path.open("w"))
         in_f: Any = stack.enter_context(stdin.open("rb")) if stdin else subprocess.DEVNULL
         proc = subprocess.Popen(
-            argv, cwd=work, env=agent_env(extra_env), stdin=in_f,
+            argv, cwd=work, env=agent_env(extra_env, env_overrides), stdin=in_f,
             stdout=out_f, stderr=err_f, text=True, start_new_session=True,
         )  # fmt: skip
         with _LIVE_LOCK:
@@ -1913,7 +2005,7 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
         "bench": BENCH_ID, "bench_hash": opts.bench_hash, "harness_sha": opts.harness_sha,
         "runner_hash": opts.runner_hash, "model": opts.model, "tier": task.tier,
         "task": task.id, "arm": arm, "rep": rep, "max_budget_usd": opts.max_budget_usd,
-        **variant_fields(opts, arm),
+        **variant_fields(opts, arm), **omc_fields(opts, arm),
         "total_budget_usd": opts.total_budget_usd,
         "started_at": datetime.now(UTC).isoformat(timespec="seconds"), "run_dir": str(run_dir),
     }  # fmt: skip
@@ -1933,11 +2025,14 @@ def run_cell(task: Task, arm: str, rep: int, opts: Options) -> dict[str, Any]:
     clobbered: list[str] = []
     for index in range(len(task.session_prompts)):
         try:
+            overrides = omc_env(run_dir / "home") if arm == "omc" else None
             if index and (overlay := task.sessions[index].overlay) is not None:
                 clobbered += land_teammate(work, overlay)
             argv = session_argv(task, arm, index, opts)
             start = time.monotonic()
-            stdout, stderr, code = _invoke(argv, work, opts.timeout_s, opts.pass_env)
+            stdout, stderr, code = _invoke(
+                argv, work, opts.timeout_s, opts.pass_env, env_overrides=overrides
+            )
         except (OSError, shutil.Error, subprocess.SubprocessError) as exc:
             if not ran:
                 return {**row, "status": "setup_error", "error": failure_text(exc)}
@@ -3049,7 +3144,44 @@ def report_text(rows: list[dict[str, Any]]) -> str:
     summary = summarize(rows)
     text = f"{render_scorecard(scorecard(rows))}\n\n{METRIC_HEADER}\n{render_report(summary)}"
     block = tier3_block(rows)
-    return text + "\n\n" + "\n".join(block) if block else text
+    text = text + "\n\n" + "\n".join(block) if block else text
+    external = external_block(rows)
+    return text + "\n\n" + "\n".join(external) if external else text
+
+
+def _times(value: float | None, base: float | None) -> str:
+    return "-" if value is None or not base else f"{value / base:.2f}x"
+
+
+def external_block(rows: list[dict[str, Any]]) -> list[str]:
+    """Per tier, plain, hm and each external arm over the tasks that external arm ran: runs,
+    solved, mean $/run and wall s, each with its ratio to plain. Empty without external rows."""
+    usable = [r for r in rows if r.get("status") not in UNUSABLE and tier_of(r) in (1, 2)]
+    external = [r for r in usable if r.get("arm") in EXTERNAL_ARMS]
+    if not external:
+        return []
+    lines = [f"{EXTERNAL_TITLE}:",
+             f"  {'tier':<6}{'arm':<10}{'runs':>6}{'solved':>8}{'$/run':>9}{'x plain':>9}"
+             f"{'wall s':>8}{'x plain':>9}"]  # fmt: skip
+    for tier in sorted({tier_of(r) for r in external}):
+        tasks = {r["task"] for r in external if tier_of(r) == tier}
+        mine = [r for r in usable if tier_of(r) == tier and r["task"] in tasks]
+        plain = _cell([r for r in mine if r.get("arm") == "plain"]) if mine else None
+        for arm in ("plain", "hm", *EXTERNAL_ARMS):
+            arm_rows = [r for r in mine if r.get("arm") == arm]
+            if not arm_rows:
+                continue
+            cell = _cell(arm_rows)
+            solved = sum(1 for r in arm_rows if outcome_of(r) == "solved")
+            base_cost = plain["mean_cost"] if plain and plain["runs"] else None
+            base_wall = plain["mean_wall_s"] if plain and plain["runs"] else None
+            ratio = f"{solved}/{cell['runs']}"
+            lines.append(
+                f"  {tier:<6}{arm:<10}{cell['runs']:>6}{ratio:>8}"
+                f"{'$' + _money(cell['mean_cost']):>9}{_times(cell['mean_cost'], base_cost):>9}"
+                f"{_secs(cell['mean_wall_s']):>8}{_times(cell['mean_wall_s'], base_wall):>9}"
+            )
+    return lines
 
 
 # --- publish (SPEC-hm-eval S9-S12) ------------------------------------------------------------
@@ -3067,7 +3199,9 @@ def publish_rows(out: Path) -> list[dict[str, Any]]:
     `report` but never published, because its figures would compare different task mixes."""
     rows = read_rows(out)
     ensure_consistent(rows)
-    usable = [r for r in rows if r.get("status") not in UNUSABLE]
+    usable = [
+        r for r in rows if r.get("status") not in UNUSABLE and r.get("arm") not in EXTERNAL_ARMS
+    ]
     if not usable:
         raise PublishError(f"no usable rows in {out / RESULTS}")
     for tier in scorecard(usable)["tiers"]:
@@ -3541,6 +3675,7 @@ def _run_variant(args: argparse.Namespace) -> tuple[dict[str, Any], str] | None:
 def _make_options(
     args: argparse.Namespace, out: Path, digest: str, snap_root: Path,
     variant: tuple[dict[str, Any], str] | None = None,
+    omc: tuple[str, str] | None = None,
 ) -> Options:  # fmt: skip
     transcripts = args.transcript_root or default_transcript_root()
     pass_env = tuple(n for n in args.pass_env.split(",") if n)
@@ -3554,6 +3689,7 @@ def _make_options(
             claude_version(args.claude_bin, pass_env), quality_tools=tools, judge=args.judge,
             judge_model=args.judge_model or args.model, judge_budget_usd=args.judge_budget_usd,
             variant_sha=variant[1] if variant else "",
+            omc_sha=omc[0] if omc else "",
         ),
         max_budget_usd=args.max_budget_usd,
         total_budget_usd=getattr(args, "total_budget_usd", DEFAULT_TOTAL_BUDGET_USD),
@@ -3563,6 +3699,8 @@ def _make_options(
         judge=args.judge, judge_model=args.judge_model or args.model,
         judge_budget_usd=args.judge_budget_usd, tier3_hash=tier3_hash(snap_root / "bench"),
         variant=variant[0] if variant else None,
+        omc_dir=Path(args.omc_dir).resolve() if omc else None,
+        omc_sha=omc[0] if omc else "", omc_version=omc[1] if omc else "",
     )  # fmt: skip
 
 
@@ -3684,6 +3822,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
     except VariantError as exc:
         print(f"refusing --variant: {exc}", file=sys.stderr)
         return 2
+    try:
+        omc = omc_setup(args.arms.split(","), args.omc_dir)
+    except OmcError as exc:
+        print(f"refusing --omc-dir: {exc}", file=sys.stderr)
+        return 2
     if sandbox_refusal(args, "run"):
         return 2
     out = _guarded_out(args)
@@ -3727,7 +3870,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         snap_root = snap.parent
         snapped = load_tier3_tasks(snap) if tier3 else load_tasks(snap / "tasks")
         tasks = {t.id: t for t in snapped if t.id in wanted}
-        opts = _make_options(args, out, digest, snap_root, variant)
+        opts = _make_options(args, out, digest, snap_root, variant, omc)
         rows = read_rows(out)
         try:
             ensure_consistent(rows, {
@@ -3892,6 +4035,11 @@ def _parser() -> argparse.ArgumentParser:
         help=f"comma-separated, from {', '.join(ALL_ARMS)}; the plain controls are tier-3 arms",
     )  # fmt: skip
     run.add_argument("--runs", type=int, default=3, help="runs per task and arm")
+    run.add_argument(
+        "--omc-dir", default=None, dest="omc_dir",
+        help="oh-my-claudecode git checkout for the omc arm (loaded with --plugin-dir); its sha "
+        "enters the runner hash, so start plain/hm/omc together in one fresh --out",
+    )  # fmt: skip
     run.add_argument(
         "--variant", default=None,
         help="variant JSON for the hm-variant arm: render edits (scripts/self_prune.py plan)",
