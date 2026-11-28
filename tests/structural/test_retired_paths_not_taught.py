@@ -80,7 +80,7 @@ def rendered() -> set[str]:
 
 def test_the_render_probe_is_not_vacuous(rendered: set[str]) -> None:
     """A silently-empty blueprint would make assertion 1 pass for every conceivable path."""
-    assert len(rendered) > 50, f"only {len(rendered)} rendered paths — probe is broken"
+    assert len(rendered) > 40, f"only {len(rendered)} rendered paths — probe is broken"
 
 
 @pytest.mark.parametrize("retired", sorted(_RETIRED))

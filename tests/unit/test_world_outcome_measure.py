@@ -23,8 +23,8 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harness_maker import world
-from tests.unit import world_fixture as fx
+from harness_maker import intent_cli
+from tests.unit import intent_fixture as fx
 
 settings.register_profile("ci", derandomize=True, max_examples=8, deadline=None)
 settings.register_profile("dev", max_examples=40, deadline=None)
@@ -50,7 +50,7 @@ def _probe(root: Path, name: str, body: str) -> None:
 
 
 def _rows(root: Path) -> list[dict[str, Any]]:
-    return list(fx.load(fx.outcomes_path(root))["values"])
+    return list(fx.load(fx.metrics_path(root))["values"])
 
 
 def _tree_hash(root: Path) -> dict[str, str]:
@@ -75,7 +75,7 @@ def _committed_root(tmp_path: Path, *outcomes: dict[str, Any]) -> tuple[Path, st
 
 
 def _run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return fx.run_cli(["--root", str(root), "outcome", "measure", *args, "--json"], cwd=root)
+    return fx.run_cli(["--root", str(root), "metric", "measure", *args, "--json"], cwd=root)
 
 
 # ── AC-002 ───────────────────────────────────────────────────────────────────
@@ -102,8 +102,8 @@ def test_ac_002_measure_records_the_extracted_number_with_auto_evidence(tmp_path
     assert _run(root, "rx").returncode == 0
     assert _run(root, "ln").returncode == 0
     regex_row, last_number_row = _rows(root)[-2:]
-    assert (regex_row["outcome_id"], regex_row["value"]) == ("rx", 0.672)
-    assert (last_number_row["outcome_id"], last_number_row["value"]) == ("ln", 0.672)
+    assert (regex_row["metric_id"], regex_row["value"]) == ("rx", 0.672)
+    assert (last_number_row["metric_id"], last_number_row["value"]) == ("ln", 0.672)
 
 
 def test_ac_002_the_recorded_row_is_what_record_value_would_write(tmp_path: Path) -> None:
@@ -113,9 +113,9 @@ def test_ac_002_the_recorded_row_is_what_record_value_would_write(tmp_path: Path
     _probe(root, "probe.py", 'import json; print(json.dumps({"report": {"carry_ratio": 0.672}}))')
     assert _run(root, "carry").returncode == 0
     measured = _rows(root)[-1]
-    manual = world.record_value(
+    manual = intent_cli.record_value(
         root,
-        outcome_id="carry",
+        metric_id="carry",
         value=0.672,
         observed_at=measured["observed_at"],
         evidence=f"auto: measure#{fx.definition_hash(carry)[:12]} @ {sha} exit=0 cwd=base",
@@ -156,7 +156,7 @@ def test_ac_002_stdout_never_reaches_the_row_and_diagnostics_are_bounded(tmp_pat
 def test_ac_002_selectors_parse_every_valid_number_form(
     text: str, select: str, expected: float
 ) -> None:
-    got = world.select_number(text, select)
+    got = intent_cli.select_number(text, select)
     assert got == expected
     assert isinstance(got, int) == float(expected).is_integer()
 
@@ -178,8 +178,8 @@ def test_ac_002_selectors_parse_every_valid_number_form(
     ],
 )
 def test_ac_002_selectors_refuse_non_numbers_as_select(text: str, select: str) -> None:
-    with pytest.raises(world.WorldError) as exc:
-        world.select_number(text, select)
+    with pytest.raises(intent_cli.IntentWriteError) as exc:
+        intent_cli.select_number(text, select)
     assert exc.value.field == "select"
     assert "super-secret" not in str(exc.value)
     assert "9" * 20 not in str(exc.value)
@@ -250,7 +250,7 @@ def test_ac_003_failures_write_nothing_and_name_the_cause(tmp_path: Path) -> Non
     _probe(root, "exit3.py", "print(7); raise SystemExit(3)")
     _probe(root, "words.py", "print('no digits')")
     _probe(root, "slow.py", "import time; time.sleep(5); print(1)")
-    before = fx.outcomes_path(root).read_bytes()
+    before = fx.metrics_path(root).read_bytes()
     failures = [
         (_run(root, "bad_exit"), "exit"),
         (_run(root, "no_number"), "select"),
@@ -262,14 +262,14 @@ def test_ac_003_failures_write_nothing_and_name_the_cause(tmp_path: Path) -> Non
     ), [(p.returncode, p.stdout[-200:], c) for p, c in failures]
     for proc, cause in failures:
         assert json.loads(proc.stdout)["error"]["field"] == cause
-    assert fx.outcomes_path(root).read_bytes() == before
+    assert fx.metrics_path(root).read_bytes() == before
 
 
 def test_ac_003_an_unknown_outcome_id_is_refused(tmp_path: Path) -> None:
     root, _ = _committed_root(tmp_path, fx.outcome("carry", measure=_measure()))
     proc = _run(root, "nope")
     assert proc.returncode != 0
-    assert json.loads(proc.stdout)["error"]["field"] == "outcome_id"
+    assert json.loads(proc.stdout)["error"]["field"] == "metric_id"
 
 
 # ── AC-004 ───────────────────────────────────────────────────────────────────
@@ -301,7 +301,7 @@ def test_ac_004_dry_run_writes_nothing(
     assert proc.returncode in (0, 1), proc.stdout + proc.stderr
     assert _tree_hash(root) == before
     payload = json.loads(proc.stdout)
-    assert [r["outcome"] for r in payload["results"]] == [f"o{i}" for i in range(len(kinds))]
+    assert [r["metric"] for r in payload["results"]] == [f"o{i}" for i in range(len(kinds))]
 
 
 def test_ac_004_all_reports_every_outcome_and_records_only_successes(tmp_path: Path) -> None:
@@ -320,7 +320,7 @@ def test_ac_004_all_reports_every_outcome_and_records_only_successes(tmp_path: P
     assert [r["status"] for r in results] == ["recorded", "failed", "manual"]
     assert results[0]["value"] == 1
     rows = _rows(root)
-    assert [r["outcome_id"] for r in rows] == ["o0"]
+    assert [r["metric_id"] for r in rows] == ["o0"]
 
     ok_only = _world_of(tmp_path / "ok", ["measurable-ok"])
     assert _run(ok_only, "--all").returncode == 0
@@ -359,7 +359,7 @@ def test_gap_report_marks_measurable_outcomes(tmp_path: Path) -> None:
     root = fx.build_root(
         tmp_path, intent=fx.intent_doc(fx.outcome("m", measure=_measure()), fx.outcome("h"))
     )
-    outcomes = world.gap_report(root)["outcomes"]
+    outcomes = intent_cli.status_report(root)["metrics"]
     assert outcomes["m"]["measure"] is True
     assert outcomes["h"]["measure"] is False
     assert outcomes["m"]["observed_at"] is None
@@ -367,8 +367,8 @@ def test_gap_report_marks_measurable_outcomes(tmp_path: Path) -> None:
 
 def test_concurrent_writers_never_lose_a_row(tmp_path: Path) -> None:
     """Confirm-1 finding: `_rmw_lock` serializes the read-modify-write of outcomes.yaml across
-    processes — eight parallel `outcome record` CLIs must leave eight rows, and the lock lives
-    under the gitignored observability dir, never as dirt in `.claude/world/`."""
+    processes — eight parallel `metric record` CLIs must leave eight rows, and the lock leaves no
+    file behind as dirt."""
     outcomes = [fx.outcome(f"o{i}") for i in range(8)]
     root, _ = _committed_root(tmp_path, *outcomes)
     procs = [
@@ -377,10 +377,10 @@ def test_concurrent_writers_never_lose_a_row(tmp_path: Path) -> None:
                 sys.executable,
                 "-m",
                 "harness_maker.hm",
-                "world",
+                "intent",
                 "--root",
                 str(root),
-                "outcome",
+                "metric",
                 "record",
                 f"o{i}",
                 "--value",
@@ -399,11 +399,11 @@ def test_concurrent_writers_never_lose_a_row(tmp_path: Path) -> None:
     ]
     outs = [p.communicate(timeout=120) for p in procs]
     assert all(p.returncode == 0 for p in procs), [o[1][-200:] for o in outs]
-    assert sorted(r["outcome_id"] for r in _rows(root)) == [f"o{i}" for i in range(8)]
-    assert not list((root / ".claude" / "world").glob("*.lock"))
-    assert (root / ".claude" / "observability" / ".hm-world-outcomes.lock").exists()
+    assert sorted(r["metric_id"] for r in _rows(root)) == [f"o{i}" for i in range(8)]
+    # SPEC-intent-lean: writers share one flock on the checkout directory, so no lock file.
+    assert not list((root / ".claude").rglob("*.lock"))
     status = subprocess.run(
-        ["git", "-C", str(root), "status", "--porcelain", "--", ".claude/world"],
+        ["git", "-C", str(root), "status", "--porcelain", "--", ".claude"],
         capture_output=True,
         text=True,
         timeout=60,

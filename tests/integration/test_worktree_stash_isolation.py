@@ -87,6 +87,13 @@ def _extract_wrapup_git_add_args() -> str:
         .replace("'", "")
     )
     paths = _MANIFEST_FLAG_RE.findall(flags)
+    if not paths and "--worktree" in flags:
+        # SPEC-cli-bookkeeping AC-005: the template passes no list; the CLI's default is the
+        # manifest that call lands, so the replay stages exactly that.
+        from harness_maker.wrapup_land import default_manifest
+
+        required, optional = default_manifest("phase4-integration")
+        paths = [*required, *optional]
     if not paths:
         raise AssertionError(
             "the wrapup_land call carries no --required/--optional manifest — an empty "

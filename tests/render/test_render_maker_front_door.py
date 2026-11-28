@@ -38,7 +38,8 @@ _POINTER_CAP = 400
 _PK_POINTER_CAP = 300
 _TRIGGER_PHRASES = ("invoke when", "use when", "use this when")
 
-_CONSENT = "Its consent rule applies unchanged."
+#: SPEC-intent-lean reworded the consent hand-off: the skill now says when it asks.
+_CONSENT = "follow it, including when it asks."
 _BRIEFING_FIRST = (
     "Answer read-only goal and status questions from the briefing; "
     "read a procedure only to change something."
@@ -622,3 +623,35 @@ def test_ac017_mid_stage_aside(
     assert _MAKER_OPENER.format(name=maker_name) in maker
     missing = [c for c in _MAKER_ASIDE if c not in maker]
     assert missing == [], missing
+
+
+# ---------------------------------------------------------------------------
+# SPEC-maker-resume-no-ask — the resume ask is the consent; files live in the worktree
+# ---------------------------------------------------------------------------
+
+_RESUME_CONSENT = "The ask is consent: never ask first, even if `other_session` is true."
+_RESUME_NO_LOOK = "the stage opens the worktree, check no files"
+_RESUME_CUT = "Exactly one `interrupted: true` → as 2 instead."
+_WORKTREE_FILES = "A task's files are in `.worktrees/<slug>/`, not the base"
+
+
+@pytest.mark.parametrize(("config", "runtime"), _MAKER_ARMS, ids=_MAKER_IDS)
+def test_resume_no_ask_ac002_enters_without_asking(
+    config: str, runtime: str, repo: Callable[[str], Path]
+) -> None:
+    maker = _maker(repo, config, runtime)
+    resume = _section(maker, "## Resume")
+    assert _RESUME_CONSENT in resume, resume
+    assert _RESUME_NO_LOOK in resume, resume
+    assert "ask once first" not in maker, resume
+    assert _WORKTREE_FILES in _section(maker, "## Briefing"), maker
+    assert len(maker) <= _MAKER_CAP, len(maker)
+
+
+@pytest.mark.parametrize(("config", "runtime"), _MAKER_ARMS, ids=_MAKER_IDS)
+def test_resume_no_ask_ac003_interrupted_claude_only(
+    config: str, runtime: str, repo: Callable[[str], Path]
+) -> None:
+    # Codex writes no span `end`, so every Codex task would read as cut off.
+    resume = _section(_maker(repo, config, runtime), "## Resume")
+    assert (_RESUME_CUT in resume) is (runtime != "codex"), resume

@@ -145,13 +145,6 @@ REGISTRY: tuple[StepEntry, ...] = (
     _u("spec", "Step 3.5", "INV", "spec Step 4", note="machine.yaml write"),
     _e("spec", "Step 4", "INV", "**", f"{_R}; deterministic spec_machine check"),
     _u("spec", "Step 4.5", "INV", "spec Step 4", note="quality gate over the same payload"),
-    _u(
-        "spec",
-        "Step 0.5",
-        "INV",
-        "plan Step 0.5",
-        note="objective context; human lock-in that survives model change",
-    ),
     _e(
         "spec",
         "Step 4.6",

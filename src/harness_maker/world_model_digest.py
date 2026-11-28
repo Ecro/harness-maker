@@ -12,12 +12,11 @@ from typing import Any
 PIPELINE: tuple[str, ...] = ("research", "spec", "execute", "review", "verify", "wrapup")
 MAX_BYTES = 1500
 MAX_TASKS = 5
-MAX_INTENT_ITEMS = 3
-MIN_ACTIVE_INTENTS = 3
+MIN_OPEN_INTENTS = 3
 MIN_TASKS = 3
 # Dropped per task, group by group, before the task floor gives way (REVIEW dbe5ddc7). Timing
-# goes first; `other_session` is never dropped — Maker reads its absence as "unknown, ask once",
-# so dropping it would cost a question on every resume (REVIEW confirm-1).
+# goes first; `other_session` and `interrupted` are never dropped — Briefing shows the first and
+# Resume picks the single cut-off task by the second (SPEC-maker-resume-no-ask).
 _OPTIONAL_TASK_FIELDS: tuple[tuple[str, ...], ...] = (
     ("last_seen", "last_stage"),
     ("latest_artifact",),
@@ -28,12 +27,6 @@ _SUBJECT_MAX = 60
 _ID_MAX = 40
 # Total budget for the artifact checks; past it a task reports `next_stage: null` (REVIEW 6d4374d1).
 DEADLINE_S = 5.0
-_INTENT_KEYS: tuple[str, ...] = (
-    "conflicts",
-    "fired_revisits",
-    "needs_revalidation",
-    "stale_evidence",
-)
 
 
 def _git(cwd: Path, *args: str) -> str | None:
@@ -121,6 +114,35 @@ def last_stage_and_session(
     else:
         other = row_session != session_id
     return last_stage, ts if isinstance(ts, str) else None, other
+
+
+def interrupted(rows: list[dict[str, Any]], slug: str) -> bool:
+    """The task's newest span row is a `start` that its session never followed with any row.
+
+    Claude Code's Stop hook writes one `end` for the session's open span when a turn finishes,
+    so a `start` its session never followed means the stage was cut off (or is running now) —
+    the task a resume ask is about. Undecidable cases read False: a start with no session id
+    (its `end` may be session-less too, and session-less ends carry no slug), and a ledger with
+    no `end` at all (Codex writes none, so every Codex task would read as cut off).
+    """
+    if not any(r.get("event") == "end" for r in rows):
+        return False
+    mine = [(i, r) for i, r in enumerate(rows) if r.get("task_slug") == slug]
+    if not mine:
+        return False
+
+    def key(ir: tuple[int, dict[str, Any]]) -> tuple[str, int]:
+        return str(ir[1].get("ts") or ""), ir[0]  # the order last_stage_and_session uses
+
+    at, newest = max(mine, key=key)
+    session = newest.get("session_id")
+    if newest.get("event") != "start" or not isinstance(session, str) or not session:
+        return False
+    # One `end` closes a turn that started stages on two tasks; it carries only the last slug.
+    after = key((at, newest))
+    return not any(
+        r.get("session_id") == session and key((i, r)) > after for i, r in enumerate(rows)
+    )
 
 
 def _spec_done(base: Path, slug: str, wt: Path) -> bool:
@@ -248,7 +270,7 @@ def autopilot_state(base: Path, session_id: str | None) -> dict[str, Any]:
 
 
 def intent_items(base: Path) -> dict[str, Any] | None:
-    """Only what needs a decision, mirrored from `hm intent status --json` (SPEC S7)."""
+    """Open goals with their metric's last/target/gap, from `hm intent status --json`."""
     if not (base / ".claude/intent.yaml").is_file():
         return None
     from harness_maker import intent_cli
@@ -259,24 +281,15 @@ def intent_items(base: Path) -> dict[str, Any] | None:
         return {"unavailable": "intent status failed"}
     if not isinstance(status, dict) or status.get("state") == "invalid":
         return {"unavailable": "intent state invalid"}
-    counts: dict[str, int] = {}
-    items: list[str] = []
-    for key in _INTENT_KEYS:
-        value = status.get(key) or []
-        ids = list(value) if isinstance(value, (list, dict)) else []
-        counts[key] = len(ids)
-        for i in ids:
-            if isinstance(i, str) and i not in items:
-                items.append(i)
-    return {"counts": counts, "items": items[:MAX_INTENT_ITEMS], "active": _active_rows(status)}
+    return {"open": _open_rows(status)}
 
 
-def _active_rows(status: dict[str, Any]) -> list[dict[str, Any]]:
-    """Active intents in status order with their metric fields copied verbatim (SPEC S3)."""
+def _open_rows(status: dict[str, Any]) -> list[dict[str, Any]]:
+    """Open goals in status order with their metric fields copied verbatim."""
     records = status.get("intents") or {}
     metrics = status.get("metrics") or {}
     rows: list[dict[str, Any]] = []
-    for oid in status.get("active") or []:
+    for oid in status.get("open") or []:
         record = records.get(oid) if isinstance(records, dict) else None
         metric_id = record.get("metric_id") if isinstance(record, dict) else None
         metric = metrics.get(metric_id) if isinstance(metrics, dict) and metric_id else None
@@ -305,7 +318,7 @@ def digest(root: Path, session_id: str | None = None) -> dict[str, Any]:
         for slug in worktrees:
             mine = [r for r in rows if r.get("task_slug") == slug]
             last_stage, last_seen, other = last_stage_and_session(mine, session_id)
-            entries.append((slug, last_stage, last_seen, other))
+            entries.append((slug, last_stage, last_seen, other, interrupted(rows, slug)))
         entries.sort(key=lambda e: e[2] or "", reverse=True)
         deadline = time.monotonic() + DEADLINE_S
         # `parked` decides the order, so it is computed for every task before the cut; its git
@@ -318,19 +331,21 @@ def digest(root: Path, session_id: str | None = None) -> dict[str, Any]:
         # The stage checks (git + tool-version subprocesses) run only for the tasks shown, and
         # stop at DEADLINE_S — a slow host yields `null`, never a stalled briefing.
         tasks = []
-        for slug, last_stage, last_seen, other in entries[:MAX_TASKS]:
+        for slug, last_stage, last_seen, other, cut in entries[:MAX_TASKS]:
             stage = next_stage(base, slug, worktrees[slug]) if time.monotonic() < deadline else None
-            tasks.append(
-                {
-                    "slug": slug,
-                    "next_stage": stage,
-                    "last_stage": last_stage,
-                    "last_seen": last_seen,
-                    "other_session": other,
-                    "parked": park[slug],
-                    "latest_artifact": latest_artifact(files[slug]),
-                }
-            )
+            task: dict[str, Any] = {
+                "slug": slug,
+                "next_stage": stage,
+                "last_stage": last_stage,
+                "last_seen": last_seen,
+                "other_session": other,
+                "parked": park[slug],
+                "latest_artifact": latest_artifact(files[slug]),
+            }
+            # Only when true: 19 bytes a task, and Maker reads absence as "not cut off".
+            if cut:
+                task["interrupted"] = True
+            tasks.append(task)
         payload: dict[str, Any] = {
             "tasks": tasks,
             "more": max(0, len(entries) - MAX_TASKS),
@@ -364,7 +379,7 @@ def _clip_artifact(task: Any) -> Any:
     return {**task, "latest_artifact": {**art, "name": _clip(art["name"], _ID_MAX)}}
 
 
-def _clip_active(row: Any) -> Any:
+def _clip_open(row: Any) -> Any:
     if not isinstance(row, dict):
         return row
     return {
@@ -374,9 +389,10 @@ def _clip_active(row: Any) -> Any:
 
 
 def render(payload: dict[str, Any]) -> str:
-    """Compact JSON within MAX_BYTES (ADR-003): clip fields, then drop `recent`, then active
+    """Compact JSON within MAX_BYTES (ADR-003): clip fields, then drop `recent`, then open
     intents beyond 3, then clip artifact names, then tasks down to 3, then each task's optional
-    fields (`last_seen`/`last_stage`, then `latest_artifact`; `other_session` is kept) — past
+    fields (`last_seen`/`last_stage`, then `latest_artifact`; `other_session` and `interrupted`
+    are kept) — past
     that, the old last resort (fewer tasks, then `unavailable`). Never raises."""
     try:
         return _render(payload)
@@ -389,15 +405,9 @@ def _render(payload: dict[str, Any]) -> str:
     if isinstance(p.get("recent"), list):
         p["recent"] = [_clip(str(s), _SUBJECT_MAX) for s in p["recent"]]
     intents = p.get("intents")
-    if isinstance(intents, dict) and isinstance(intents.get("items"), list):
-        intents = {
-            **intents,
-            "items": [_clip(str(i), _ID_MAX) for i in intents["items"][:MAX_INTENT_ITEMS]],
-        }
-        p["intents"] = intents
-    # Active ids are sized like `items`: an unclipped id alone could push past the cap (9df6b033).
-    if isinstance(intents, dict) and isinstance(intents.get("active"), list):
-        intents = {**intents, "active": [_clip_active(r) for r in intents["active"]]}
+    # Ids are clipped: an unclipped id alone could push past the cap (9df6b033).
+    if isinstance(intents, dict) and isinstance(intents.get("open"), list):
+        intents = {**intents, "open": [_clip_open(r) for r in intents["open"]]}
         p["intents"] = intents
     if isinstance(p.get("tasks"), list):
         p["tasks"] = list(p["tasks"])
@@ -405,8 +415,8 @@ def _render(payload: dict[str, Any]) -> str:
     if _over(text) and "recent" in p:
         p.pop("recent")
         text = _dumps(p)
-    if _over(text) and isinstance(intents, dict) and isinstance(intents.get("active"), list):
-        p["intents"] = {**intents, "active": intents["active"][:MIN_ACTIVE_INTENTS]}
+    if _over(text) and isinstance(intents, dict) and isinstance(intents.get("open"), list):
+        p["intents"] = {**intents, "open": intents["open"][:MIN_OPEN_INTENTS]}
         text = _dumps(p)
     if _over(text) and isinstance(p.get("tasks"), list):
         p["tasks"] = [_clip_artifact(t) for t in p["tasks"]]

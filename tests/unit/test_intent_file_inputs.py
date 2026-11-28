@@ -34,7 +34,7 @@ from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Targe
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.spec_machine import GoldenRow, load_golden_table
 from harness_maker.synthesize import synthesize
-from tests.unit import world_fixture as fx
+from tests.unit import intent_fixture as fx
 from tests.unit.test_intent_vocabulary import LEGACY
 
 SPEC_YAML = Path(__file__).parents[2] / "specs" / "SPEC-intent-file-inputs.machine.yaml"
@@ -73,9 +73,8 @@ def _with_question(root: Path) -> Path:
 
 
 def _with_active_intent(root: Path) -> Path:
+    # SPEC-intent-lean: a new goal is open at once; no approve/activate step.
     _ok(root, "new", "W", "--title", "t", "--statement", "s", "--scope", "p", "--metric", "latency")
-    _ok(root, "approve", "W", "--json")
-    _ok(root, "activate", "W", "--json")
     return root
 
 
@@ -393,15 +392,13 @@ def test_refused_inputs(row: GoldenRow, tmp_path: Path) -> None:
 
 # ── AC-004 ───────────────────────────────────────────────────────────────────
 
-_LIST_FLAGS = {"scope": "scope", "out-of-scope": "out_of_scope", "declined": "rejected"}
+_LIST_FLAGS = {"scope": "scope", "out-of-scope": "out_of_scope"}
 
 
 def _new_with_list(root: Path, flag: str, path: Path) -> tuple[int, str, str]:
     argv = ["new", "N", "--title", "t", "--statement", "s", "--metric", "latency"]
     if flag != "scope":
         argv += ["--scope", "p"]
-    if flag == "declined":
-        argv += ["--from-proposal", "--candidates", "3"]
     return _run(root, *argv, f"--{flag}-file", str(path))
 
 
@@ -425,7 +422,7 @@ def test_scope_file_lines(tmp_path: Path) -> None:
             rc_empty != 0 and f"--{flag}" in err_empty and _snapshot(empty_root) == before
         )
     # AC-004 predicate, one conjunct per assert.
-    lists = ("scope", "out_of_scope", "declined")
+    lists = ("scope", "out_of_scope")
     assert all(parsed[flag] == ["alpha item", "beta item"] for flag in lists), parsed
     assert all(zero_item_refused[flag] for flag in lists), zero_item_refused
 
@@ -489,7 +486,7 @@ def test_pair_refuses_a_twin_missing_from_the_table() -> None:
 
 _WRITE_VERB = re.compile(r"hm intent (question (?:add|observe|resolve)|metric record|close|new)\b")
 _COVERED_INLINE = re.compile(
-    r"--(claim|text|note|evidence|title|statement|scope|out-of-scope|declined)(?![-\w])"
+    r"--(claim|text|note|evidence|title|statement|scope|out-of-scope)(?![-\w])"
 )
 #: `spec` left this table with Step 4.9 (SPEC-intent-surface-diet AC-002): it no longer runs
 #: `hm intent new`, so it has no free-text write recipe to check.
@@ -507,8 +504,8 @@ SURFACES = {
 #: first unclaimed line of its surface and verb that carries every flag, so the synopsis `new`
 #: and the proposal-path `new` must be two lines, and the more specific site goes first.
 CALL_SITES: tuple[tuple[tuple[str, str, str], tuple[str, ...]], ...] = (
-    (("wrapup", "question observe", "observe"), ("--text-file", "--claim-file")),
-    (("wrapup", "question add", "add"), ("--claim-file", "--text-file")),
+    (("wrapup", "question observe", "observe"), ("--text-file",)),
+    (("wrapup", "question add", "add"), ("--claim-file",)),
     (("wrapup", "close", "close"), ("--note-file",)),
     (("intent-layer", "question add", "synopsis"), ("--claim-file", "--text-file")),
     (("intent-layer", "question observe", "synopsis"), ("--text-file", "--claim-file")),
@@ -518,9 +515,6 @@ CALL_SITES: tuple[tuple[tuple[str, str, str], tuple[str, ...]], ...] = (
         ("intent-layer", "new", "synopsis"),
         ("--title-file", "--statement-file", "--scope-file", "--out-of-scope-file"),
     ),
-    # `[`: the declined file is optional — every candidate accepted leaves nothing to write,
-    # and an empty file is refused.
-    (("intent-layer", "new", "proposal"), ("--from-proposal", "[--declined-file")),
     (("intent-layer", "close", "synopsis"), ("--note-file",)),
 )
 EXPECTED_CALL_SITES = {key for key, _ in CALL_SITES}
@@ -533,7 +527,7 @@ _SCAN = {
 }
 _SECTION = {
     **_SCAN,
-    "intent-layer": re.compile(r"## The rule for every write.*?(?=\n## )", re.S),
+    "intent-layer": re.compile(r"## The verbs.*?(?=\n## )", re.S),
 }
 
 

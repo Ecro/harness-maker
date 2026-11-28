@@ -1,6 +1,6 @@
 preset: Production
 strictness: block
-file_count: 29
+file_count: 28
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
@@ -16,7 +16,7 @@ files:
   body_sha256: c62a21e82754d5606f3beae02e5dcf47cce846662e3763708b901442a83abb9a
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 4825c8740c42a9b4894b3f3592895620d9f32fd909cd2975630437e77ddc2ead
+  body_sha256: b55eee32e4db1336e8f24dd6221027f0b6b84db15522a533e72253a44a284c38
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 7a0eb0965046757c8720bdabc17656ec1ba96bace0c29141730b4f0e6fda2e8a
@@ -34,13 +34,13 @@ files:
   body_sha256: ad6837a5349458a5ef491d9296df6f7da6a9eab831586b281c8c37b6cb9b73bb
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: a46d2337c2c2e5979e19735cd4867c07ce411ee6e0cdd93ac3890debce6e30a3
+  body_sha256: 34fe00b6e1e1122c9dc62ea2b96f7b9a0660c7607124ffda955c6a8a8b933966
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: c4364aa3896fdafbf4dc60b60eac7b06481f9e9ef15a87cfbbf685904d365b62
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: f6b17fc8e468ea79228a78d84d42e0f20e23343bd13607662b6a132648adfa35
+  body_sha256: 662a63c5da064525a61f1f1ef42aabf961a156524c4d6833320f69696b39a208
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
   body_sha256: e5be5d712cc23131767f2870a33e62d697c5f68645f1be18e04d955f78a6ef01
@@ -79,13 +79,10 @@ files:
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 - path: skills/intent-layer/SKILL.md
   template: skills/intent-layer/SKILL.md.j2
-  body_sha256: f6253c911604f9b5c6159e4c2a472d80361d7454300fed4b98b2c553ba8a07ae
-- path: skills/intent-layer/references/workflow-feedback.md
-  template: skills/intent-layer/references/workflow-feedback.md.j2
-  body_sha256: 3bcd7dd2162a896dd7a2a725d89784844eb81ba7b9ea3344c9aef3426593e578
+  body_sha256: 4469e06df97dfc5e50791b42c18f4dabc20c1d3b84b6eaa8cf755c7d997ed202
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: d01a00f376f15ef4cfd076b5b53ef8af9424997eddca291230476a85dfdb250a
+  body_sha256: 9284f27754432a48e73d5bd940d41fb71ddcb9866345e0118d688defe5f7d7f8
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
-  body_sha256: 98b6a525112f3a8d649f3390263ea5b2905f4da1e11260eab6aab59648546eef
+  body_sha256: dc8aa4212398e47e605aac6a393a3d872467f5798947a4a305d595e99363a267

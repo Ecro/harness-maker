@@ -54,7 +54,8 @@ REPLACEMENTS = (
     (".claude/commands/hm/health.md", "## Non-interactive behavior"),
     (
         ".claude/skills/intent-layer/SKILL.md",
-        "`hm intent status` reports the approval you record",
+        # SPEC-intent-lean: no approval step exists any more; status is the read-only entry.
+        "`hm intent status --json` is read-only and LLM-free",
     ),
 )
 

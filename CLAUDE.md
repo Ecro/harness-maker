@@ -220,7 +220,7 @@ plan-validator, fan-out) — `remeasure_on`/`measure_cmd` 필드가 재측정 �
   strictness) 렌더의 모든 헤딩이 레지스트리에 있어야 하고(무분류 헤딩 = 테스트 실패), Side 기본값은 knob 을
   가진 어떤 엔트리(HOST 포함)에서도 Production 보다 공격적일 수 없다 (`knob`/`ordering`, 비공허 바닥 ≥3).
   렌더는 레지스트리를 읽지 않는다 — 검사이지 파생이 아니다 (ADR-005).
-- **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 20` 는 기준을 충족하는 근거가
+- **증거 등급**: `***`/`**`/`*` 는 harness-bench 관례, `unsourced: 19` 는 기준을 충족하는 근거가
   없는 항목 수 — RESEARCH 행 없이 이웃에서 상속했거나 (ADR-009), 조사했지만 찾지 못했다
   (`RESEARCH-source-plan-steps`). TUNE 수치는 전부 **Side-preset only, n=** 표기 —
   stage-agent ledger 에 Production 행이 0 이다. FAIL 율은 가치 증명이 아니다 (plan-validator 는
@@ -266,7 +266,7 @@ Full specification (per-task model, 5-layer defense, loop-marker and per-session
 
 Maker (`templates/skills/world-model/SKILL.md.j2`, rendered at `skills/<handle>/`) is the one front door to the intent layer, project knowledge and task state. Full text: [`docs/reference/world-model.md`](docs/reference/world-model.md). Invariants that break most often:
 - **Only entrance.** `intent-layer` / `project-knowledge` stay `disable-model-invocation: true` (Codex: `openai.yaml` `allow_implicit_invocation: false`); Maker Reads their SKILL.md before any write. Never make them model-invocable again or add another self-triggering entrance.
-- `hm world_model digest` stays ≤ 1,500 bytes and **always exits 0**. A new field must fit the trim order (`recent` → intents → tasks → timing → `latest_artifact`); `other_session` is never dropped.
+- `hm world_model digest` stays ≤ 1,500 bytes and **always exits 0**. A new field must fit the trim order (`recent` → intents → tasks → timing → `latest_artifact`); `other_session` and `interrupted` are never dropped.
 - `restore_pipeline` is an `.hm-autopilot*` marker field — every reader must accept it (the Python module stays; see world-model.md).
 - Always-loaded pointers: `## World model` ≤ 400 chars, `## Project knowledge` ≤ 300 chars per variant; Maker SKILL.md ≤ 4,689 chars.
 - Maker `allowed-tools` stays scoped to `hm world_model:*` (plus `tail`/`grep`/`printf`); its autopilot grant and step left with autopilot (SPEC-retired-text IRR-001). Never widen to `hm *` or `uv run:*`; the digest chain uses no `{ …; }` group, because a permission matcher that splits on `|`/`||` would see a piece starting with `{`.

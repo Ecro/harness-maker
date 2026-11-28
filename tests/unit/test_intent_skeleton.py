@@ -2,9 +2,7 @@
 
 Module-level half of the predicate: raw YAML types, key set, `schema_version` filled, the same
 `validate_intent` AC-001 uses accepts the file, `is_not_filled_in` is true, and the half-filled
-file (empty mission, one outcome) is an error naming `mission`. The `hm world status --json`
-clauses of AC-002 are exercised in `test_world_status_and_revisit.py` once the `world` module
-exists (PLAN P2) — the skeleton must not be judged through a CLI that P1 does not ship.
+file (empty purpose statement, one metric) is an error naming `purpose.statement`.
 """
 
 from __future__ import annotations
@@ -55,14 +53,16 @@ def test_ac_002_skeleton_carries_no_generated_prose_only_comments_and_empties(
         assert value.strip() in {"", '""', "[]", "{}", str(KNOWN_MAJOR)}, line
 
 
-def test_ac_002_half_filled_file_is_an_error_naming_mission_not_a_skeleton(tmp_path: Path) -> None:
+def test_ac_002_half_filled_file_is_an_error_naming_statement_not_a_skeleton(
+    tmp_path: Path,
+) -> None:
     p = tmp_path / "intent.yaml"
     p.write_text(
         yaml.safe_dump(
             {
                 "schema_version": 1,
-                "mission": "",
-                "outcomes": [
+                "purpose": {"statement": "", "vision": ""},
+                "metrics": [
                     {
                         "id": "x",
                         "description": "d",
@@ -77,4 +77,4 @@ def test_ac_002_half_filled_file_is_an_error_naming_mission_not_a_skeleton(tmp_p
     )
     errors = intent.validate_intent(p)
     assert errors
-    assert errors[0].field == "mission"
+    assert errors[0].field == "purpose.statement"

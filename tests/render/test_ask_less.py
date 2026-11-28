@@ -89,12 +89,6 @@ def _step(text: str, heading: str) -> str:
     return text[start : nxt if nxt != -1 else len(text)]
 
 
-def _intent_block(wrapup: str) -> str:
-    start = wrapup.index("An intent in use")
-    nxt = wrapup.find("\n## ", start)
-    return wrapup[start : nxt if nxt != -1 else len(wrapup)]
-
-
 @pytest.mark.parametrize("preset", PRESETS)
 def test_ac_001_one_rule_everywhere(preset: str, rendered: Renders) -> None:
     root = rendered(preset, "head")
@@ -107,12 +101,9 @@ def test_ac_001_one_rule_everywhere(preset: str, rendered: Renders) -> None:
                 assert "never choose for the user" not in path.read_text(errors="replace"), path
 
 
-@pytest.mark.parametrize("runtime", RUNTIMES)
-def test_ac_002_intent_link_is_picked(runtime: str, rendered: Renders) -> None:
-    step = _step(_read(rendered("Side", "head"), runtime, "spec"), "Step 0.5")
-    assert TOOL[runtime] not in step
-    assert "pick the one this task plainly serves, else none, without asking" in step
-    assert "Step 3 writes `intent: <id>` and lists the pick under Refinement Decisions" in step
+# AC-002 (spec Step 0.5 picks an intent link), AC-005 (wrapup records plain writes) and AC-006
+# (the intent skill splits records from decisions) were retired by SPEC-intent-lean: Step 0.5 is
+# gone and the skill asks at three moments only (tests/unit/test_intent_lean.py).
 
 
 @pytest.mark.parametrize("runtime", RUNTIMES)
@@ -158,82 +149,23 @@ def test_ac_004_decisions_listed_and_shown(runtime: str, depth: str) -> None:
     assert "Show your Refinement Decisions with the approval question" in _step(spec, "Step 2")
 
 
-@pytest.mark.parametrize("runtime", RUNTIMES)
-def test_ac_005_wrapup_records_plain_writes(runtime: str, rendered: Renders) -> None:
-    wrapup = _read(rendered("Side", "head"), runtime, "wrapup")
-    block = _intent_block(wrapup)
-    asked = "Anything else, and every write under an exempt SPEC: ask once with " + TOOL[runtime]
-    asked_at = block.index(asked)
-    for literal in (
-        "Under an approved SPEC (not `--exempt`), write without asking",
-        "`hm intent question add <id> … --status open` with `--claim-file <f>`",
-        "`hm intent question observe <id> --relation <confirms|contradicts>",
-        "`hm intent metric measure`",
-        "`metric record` with an `--evidence-file` from this task",
-    ):
-        assert -1 < block.find(literal) < asked_at, literal
-    assert block.count(TOOL[runtime]) == 1
-    assert "then each intent write of Step 5" in _step(wrapup, "Step 8")
-    assert "ask the DRI once (" not in wrapup
-
-
-_ASKED = (
-    "`question add --status confirmed|wrong`",
-    "`question observe --relation supersedes`",
-    "`question resolve`",
-    "`new`",
-    "`approve`",
-    "`activate`",
-    "`drop`",
-    "`reopen`",
-    "`close`",
-)
-_RECORDS = (
-    "`question add --status open`",
-    "`question observe --relation confirms|contradicts`",
-    "`metric measure`",
-    "`metric record` with an `--evidence-file` from this task",
-)
-
-
-@pytest.mark.parametrize("runtime", RUNTIMES)
-def test_ac_006_intent_skill_splits_records_from_decisions(runtime: str, rendered: Renders) -> None:
-    root = rendered("Side", "head")
-    skill = _read(root, runtime, "intent")
-    rule = _step(skill, "The rule for every write")
-    for literal in (*_RECORDS, *_ASKED, "showing the exact arguments"):
-        assert literal in rule, literal
-    assert "written without asking under an approved SPEC" in rule
-    asked_at = rule.index("showing the exact arguments")
-    assert rule.index("on any other answer or no answer — write nothing") > asked_at
-    for literal in (
-        "ask about all candidates in one multi-select question",
-        "an unticked candidate is declined; no answer writes nothing and records no decline",
-        "answer every candidate before the first write",
-    ):
-        assert literal in skill, literal
-    feedback = _read(root, runtime, "feedback")
-    for gone in (
-        "Ask before writes",
-        "Mutation verbs write only after consent",
-        "Workflow writes are consented once",
-        "ask about each candidate in turn",
-    ):
-        assert gone not in skill, gone
-        assert gone not in feedback, gone
-
-
 _MEASURED = (*STAGES, "maker", "intent", "feedback")
 #: Growth a later SPEC measured and was granted, beyond rule R: SPEC-spec-owner-boundary's
 #: fifth skip condition and Boundary rule in spec (+475, revision 2 +151).
 _GRANTED = 640
 
 
+def _size(root: Path, runtime: str, name: str) -> int:
+    """A file SPEC-intent-lean deleted (the workflow-feedback reference) counts as empty."""
+    path = root / _PATHS[runtime][name]
+    return len(path.read_text(encoding="utf-8")) if path.is_file() else 0
+
+
 @pytest.mark.parametrize("preset", PRESETS)
 @pytest.mark.parametrize("runtime", RUNTIMES)
 def test_ac_007_nothing_else_grows(preset: str, runtime: str, rendered: Renders) -> None:
     head, base = rendered(preset, "head"), rendered(preset, "base")
-    grew = sum(len(_read(head, runtime, n)) - len(_read(base, runtime, n)) for n in _MEASURED)
+    grew = sum(_size(head, runtime, n) - _size(base, runtime, n) for n in _MEASURED)
     allowance = 5 * (len(RULE[runtime]) - len(OLD_RULE[runtime])) + _GRANTED
     assert grew <= allowance, (grew, allowance)
 
@@ -246,6 +178,8 @@ def test_ac_008_fewer_tool_mentions(runtime: str, rendered: Renders) -> None:
         return _read(root, runtime, name).count(TOOL[runtime])
 
     assert count(head, "spec") == count(base, "spec") - 1
-    for name in ("wrapup", "research", "execute", "maker"):
+    for name in ("wrapup", "research", "execute"):
         assert count(head, name) == count(base, name), name
+    # SPEC-maker-resume-no-ask dropped Resume's "ask once first" mention.
+    assert count(head, "maker") <= count(base, "maker")
     assert count(head, "intent") <= count(base, "intent")

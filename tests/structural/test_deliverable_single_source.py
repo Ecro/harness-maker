@@ -76,18 +76,18 @@ def test_the_guard_still_rejects_non_deliverables() -> None:
         assert not _is_deliverable_path(path), path
 
 
-def test_the_rendered_wrapup_command_still_carries_its_own_paths() -> None:
+def test_the_land_still_carries_its_own_paths() -> None:
     """The derivation ADDS to the caller's list; it must not have replaced it.
 
-    A non-default `work_docs.dir` is not covered by the derivation (same accepted limit as
-    `_DELIVERABLE_RE`), so the template's explicit paths are the fallback that keeps a
-    customised layout working.
+    Since SPEC-cli-bookkeeping the wrapup template passes no list and `wrapup_land` fills in
+    `default_manifest`, the list the template used to type. It must still name memory (not a
+    deliverable glob) and require the PLAN; an explicit list still replaces it.
     """
-    template = (
-        _REPO / "src" / "harness_maker" / "templates" / "stages" / "wrapup.md.j2"
-    ).read_text(encoding="utf-8")
-    assert "--required" in template
-    assert "--optional .claude/memory/" in template, "memory is not a deliverable glob"
+    from harness_maker.wrapup_land import default_manifest
+
+    required, optional = default_manifest("some-task")
+    assert required == ["work-docs/PLAN-some-task.md"]
+    assert ".claude/memory/" in optional, "memory is not a deliverable glob"
 
 
 # ── SPEC-intent-world-model-objective-layer ADR-012: the state paths ride the same source ──

@@ -529,3 +529,10 @@ values:
     table 3 charged $0.20); SPEC-price-table-current-models AC-006; rows docs/evals/results.jsonl'
   definition_hash: 2f33cdbce23708d4578a909638e53011114411aba263fc8a454e27b97699bbd8
   metric_id: hm_cost_ratio_small
+- value: 2.5
+  observed_at: '2026-11-28T02:40:00Z'
+  evidence: 'saga bench 3 arms x 3, branch claude/project-thread-tkd6md (PR #89):
+    read chars per shipped change hm 11509 / plain-discipline 4612; quiz 0.73 vs 0.54;
+    judge maintainability hm 0-2 vs discipline; /mnt/project-files/hm-owner-metrics/RESULTS-2026-11-28.md'
+  definition_hash: b10a9cc6fa51ddd618d1f6ba9eb630896650ff40234311558368e3444dc5492b
+  metric_id: owner_read_ratio_saga

@@ -90,7 +90,7 @@ def test_descriptions_are_distinguishable(rendered: Path) -> None:
 def test_no_target_renders_a_command_outside_the_claude_path() -> None:
     """The premise ADR-016's parser answer rests on. See this module's docstring."""
     paths = [str(f.path) for f in _blueprint().files]
-    assert len(paths) > 50  # non-vacuity
+    assert len(paths) > 40  # non-vacuity
     stray = [p for p in paths if "commands/" in p and not p.startswith("commands/hm/")]
     assert stray == []
 

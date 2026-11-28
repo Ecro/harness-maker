@@ -1,0 +1,241 @@
+schema_version: 3
+spec_slug: cli-bookkeeping
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: export-golden --write puts the rows in the test file
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cli_bookkeeping.py::test_ac_001_export_golden_write_puts_rows_in_the_test_file
+  - tests/unit/test_cli_bookkeeping.py::test_ac_001_write_puts_a_missing_block_above_the_tests
+  - tests/unit/test_cli_bookkeeping.py::test_ac_001_write_creates_the_same_text_as_inline_for_several_acs
+  executable_predicate: created(f) == golden_inline_text(rows) and replaced(f_old)
+    == prefix + golden_inline_text(rows) + suffix and second_run_unchanged(f) and
+    inline_drift(root) == []
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected file bytes are the fixture's prefix and suffix plus the
+    existing golden_inline_text output (shipped in
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: mark-tested binds every testable AC by default
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cli_bookkeeping.py::test_ac_002_mark_tested_binds_every_testable_ac_by_default
+  - tests/unit/test_cli_bookkeeping.py::test_ac_002_default_leaves_an_ac_with_no_test_pending
+  executable_predicate: marked_default == {"AC-001", "AC-002"} and "AC-003" not in
+    marked_default and marked_with_ac == {"AC-001"}
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fixture SPEC fixes which ACs are testable (AC-003 is judgment)
+    and which convention-named tests exist; the expected set is read off the fixture,
+    not the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: finalize without a flag is the check
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cli_bookkeeping.py::test_ac_003_finalize_without_a_flag_is_the_check
+  - tests/unit/test_cli_bookkeeping.py::test_ac_003_finalize_reports_a_failing_check_with_its_exit
+  executable_predicate: set(check_keys) <= set(finalize_out) and {"approval", "status"}
+    <= set(finalize_out) and finalize_rc == check_rc and files_unchanged
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Compared with spec_machine check --all on the same files, an existing
+    command this task does not change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: finalize --approve stamps and sets status in one call
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cli_bookkeeping.py::test_ac_004_finalize_approve_stamps_and_sets_status
+  - tests/unit/test_cli_bookkeeping.py::test_ac_004_finalize_exempt_and_its_refusal
+  - tests/unit/test_cli_bookkeeping.py::test_ac_004_finalize_on_a_failing_check_stamps_nothing
+  - tests/unit/test_cli_bookkeeping.py::test_ac_004_finalize_never_stamps_a_spec_whose_status_it_cannot_set
+  executable_predicate: approval_state(ok, "--approve") == "approved" and md_status(ok)
+    == "approved" and approval_state(ok2, "--exempt") == "exempt" and exempt_rc(with_irr)
+    != 0 and not stamped(bad) and md_status(bad) == "draft" and bad_rc == 1
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: States come from approval_state, the one existing reader every
+    land entry uses; the --exempt refusal is the rule approve --exempt already enforces.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: wrapup_land has a default manifest
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cli_bookkeeping.py::test_ac_005_wrapup_land_has_a_default_manifest
+  executable_predicate: default_manifest("s") == (["work-docs/PLAN-s.md"], [".claude/memory/",
+    "work-docs/REVIEW-s-*.md", "work-docs/RESEARCH-s.md", "specs/SPEC-s.md", "specs/SPEC-s.golden.json",
+    "specs/SPEC-s.machine.yaml"]) and explicit_flags_replace_default
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected list is copied from the wrapup template on main (124c4c8c),
+    Steps 6-7.6.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: the stages call the CLI instead of doing the bookkeeping
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cli_bookkeeping.py::test_ac_006_the_stages_call_the_cli[claude-Side]
+  - tests/unit/test_cli_bookkeeping.py::test_ac_006_the_stages_call_the_cli[claude-Production]
+  - tests/unit/test_cli_bookkeeping.py::test_ac_006_the_stages_call_the_cli[codex-Side]
+  - tests/unit/test_cli_bookkeeping.py::test_ac_006_the_stages_call_the_cli[codex-Production]
+  executable_predicate: all("spec_machine finalize" in spec and "spec_machine check"
+    not in spec and "spec_machine approve" not in spec and "--write" in execute and
+    "--ac AC-NNN" not in execute and "--required" not in wrapup and "approval-status"
+    not in steps_6_7(wrapup) and len(r) <= len(main_r) for (spec, execute, wrapup,
+    r, main_r) in renders)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Substrings come from this SPEC's AC text; the char baseline is
+    the main (124c4c8c) render of the same arm.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: tier-1 bench shows fewer calls, less cost and less time
+  type: mechanical
+  test_ids:
+  - tests/integration/test_cli_bookkeeping_bench.py::test_ac_007_tier1_bench_verdict_is_recorded
+  executable_predicate: complete(rows) and mean_cost(new) <= 0.93 * mean_cost(main)
+    and mean_wall(new) <= 0.90 * mean_wall(main) and passes(new) >= passes(plain)
+    and hm_bash_calls(new) < hm_bash_calls(main) and spec_records(verdict(rows))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Thresholds are fixed in this SPEC before any code; rows come from
+    the bench runner and transcripts, not from the code under test; the first complete
+    batch counts.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: Add spec_machine finalize, --slug and --write to export-golden, --slug
+    to mark-tested with all testable ACs as the default when no --ac is given, and
+    a default manifest to wrapup_land when no --required/--optional is given. Additive
+    only.
+  category: public API/CLI contract
+  rationale: Rendered harnesses in user projects will call these; once shipped they
+    cannot be renamed without breaking those renders.
+  source: spec
+approval:
+  kind: human
+  content_hash: 1668024b67148d22cbf34b2221333173ef70e4faef7024291d31caf5de408154
+  approved_by: Claude
+  approved_at: '2026-11-27T19:07:40Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 6bc1702847833aebc6e4cb6d619c60a19fd73d161e6e1b8a166508ca5f520f0a
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 6d57cd2ba4fd8fe037c33cec9996f763c8bc5a3a6ba7840a821315818b82f925
+    AC-001: cfa082398dd04ff355536e1c6eae732ddcb20f1fe8a654f10a38c84b8062d361
+    AC-002: 8222790ec8c4e284ad7e6340a5ef56b448bf34c43ff9f4c5b38a342761960d4d
+    AC-003: 89ea583c8eada1b61026a81a2b38fa319d66517bc749766d3734f341aef1308c
+    AC-004: 37c08ec74feb8c3259b703cce65b0c7ee43f0902ac98d634216430f29b27bfa1
+    AC-005: 95ffb5cc810eae73cd2a6c84e151ee01abee1e327a5a5753fd55a5f97834b053
+    AC-006: d86aae7ec5119debc0d744707f83dba3c7d20efcb378c6bb2b4d8b158f5c4022
+    AC-007: 34bd59836088e3b63b7f4e0152acb41d9058f79b3d95b5702f45f14dfbcceaa2
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c

@@ -502,6 +502,24 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     return EXIT_OK, receipt
 
 
+def default_manifest(slug: str) -> tuple[list[str], list[str]]:
+    """The deliverables wrapup lands when the caller names none (SPEC-cli-bookkeeping AC-005).
+
+    The same list the wrapup template typed into every call; the model no longer has to.
+    """
+    return (
+        [f"work-docs/PLAN-{slug}.md"],
+        [
+            ".claude/memory/",
+            f"work-docs/REVIEW-{slug}-*.md",
+            f"work-docs/RESEARCH-{slug}.md",
+            f"specs/SPEC-{slug}.md",
+            f"specs/SPEC-{slug}.golden.json",
+            f"specs/SPEC-{slug}.machine.yaml",
+        ],
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     guard = command_registry.guard_or_none("wrapup_land", argv)
     if guard is not None:
@@ -524,6 +542,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     args = parser.parse_args(argv)
+    if not args.required and not args.optional:
+        args.required, args.optional = default_manifest(args.slug)
 
     try:
         rc, receipt = run(args)

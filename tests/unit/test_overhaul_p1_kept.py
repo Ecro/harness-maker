@@ -96,11 +96,19 @@ _DROPPED: tuple[tuple[str, str, str], ...] = (
     # SPEC-hm-cost-p4 AC-004: tests bind by name, so execute no longer edits the yaml it
     # used to re-validate; `check --red` and `mark-tested` still load and validate it.
     ("execute", "spec_machine", "validate"),
+    # SPEC-cli-bookkeeping AC-006: `finalize` runs the check and the stamp in one call, and the
+    # land's own hold line replaces wrapup's separate approval-status call.
+    ("spec", "spec_machine", "check"),
+    ("spec", "spec_machine", "approve"),
+    ("wrapup", "spec_machine", "approval-status"),
+    # SPEC-intent-lean removed spec Step 0.5, the stage's only intent call.
+    ("spec", "intent", "status"),
 )
 _ADDED: dict[str, set[tuple[str, str]]] = {
     # SPEC-hm-cost-p2 AC-003 adds `export-golden` for parametric tests.
     "execute": {("check", ""), ("spec_machine", "mark-tested"), ("spec_machine", "export-golden")},
     "wrapup": {("check", "")},
+    "spec": {("spec_machine", "finalize")},
 }
 
 
@@ -153,7 +161,7 @@ def test_ac009_stage_cli_invocations_preserved(
 def test_ac009_invocation_diff_negative_control() -> None:
     """A dropped kept call shows up: the comparison is set equality."""
     ref = {("memory_retrieve", ""), ("autopilot", "on")}
-    assert expected_invocations("spec", ref) == {("memory_retrieve", "")}
+    assert expected_invocations("spec", ref) == {("memory_retrieve", "")} | _ADDED["spec"]
     assert expected_invocations("spec", ref) != set()
     assert invocations(
         "run `hm …` then `hm check --slug x` and hm spec_machine approve --yaml"
@@ -498,6 +506,13 @@ def _without_approval(stdout: str) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n"
 
 
+def _without_intents(stdout: str) -> str:
+    """SPEC-intent-lean IRR-003 reshapes the digest's `intents`; every other key is unchanged."""
+    payload = json.loads(stdout)
+    payload["intents"] = None
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
+
+
 @pytest.mark.parametrize("name", list(_CLI_CASES))
 def test_ac009_digest_and_spec_machine_equal_reference(
     hook_fixture: Path, ref_src: Path, tmp_path: Path, name: str
@@ -508,6 +523,9 @@ def test_ac009_digest_and_spec_machine_equal_reference(
     head = _run(HEAD_SRC, hook_fixture, work, argv, "", {})
     if name == "check-all":
         head = (head[0], _without_approval(head[1]), head[2])
+    if name == "digest":
+        ref = (ref[0], _without_intents(ref[1]), ref[2])
+        head = (head[0], _without_intents(head[1]), head[2])
     assert (head[0], head[1]) == (ref[0], ref[1]), name
     assert head[2] == ref[2], _first_diff(ref[2], head[2])
 
@@ -655,9 +673,9 @@ def test_wrapup_prints_the_understanding_block_and_gates_intent_writes(
     assert "`steps.understanding.status`" in text[close - 300 : close + 300]
     ask = "`request_user_input`" if codex else "`AskUserQuestion`"
     intents = text[text.index("hm intent status --json") :]
-    # SPEC-ask-less AC-005 moves these pins: plain records unasked under an approved SPEC.
-    assert "Under an approved SPEC (not `--exempt`), write without asking" in intents
-    assert f"every write under an exempt SPEC: ask once with {ask} (multi-select)" in intents
+    # SPEC-intent-lean moves these pins: records on an open goal are unasked; only a close asks.
+    assert "write unasked" in intents
+    assert f"ask once with {ask} met / missed / no_data / keep open" in intents
 
 
 @pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
@@ -733,7 +751,8 @@ def test_spec_and_wrapup_carry_the_acceptance_flow(tmp_path: Path, codex: bool) 
     for marker in (
         "Approve this SPEC and end interview",
         "silence never counts",
-        "spec_machine approve --yaml",
+        "spec_machine finalize --slug",
+        "--approve",
         "--exempt",
         "schema_version: 3",
         "irreversible_decisions:",
@@ -742,7 +761,8 @@ def test_spec_and_wrapup_carry_the_acceptance_flow(tmp_path: Path, codex: bool) 
     assert "SPEC is sufficiently clear — end interview" not in spec
     assert "No mandatory gate — spec may auto-advance" not in spec
     wrapup = _rule_stage(root, "wrapup", codex=codex)
-    assert wrapup.index("spec_machine approval-status") < wrapup.index("hm wrapup_land")
+    # SPEC-cli-bookkeeping: the land checks approval itself; wrapup acts on its hold line.
+    assert wrapup.index("hm wrapup_land") < wrapup.index("On `land: hold`")
     assert "spec_machine approve --yaml" in wrapup
     assert "silence is never approval" in wrapup
 
@@ -769,13 +789,11 @@ def test_test_reviewer_rule_is_per_observable(tmp_path: Path, codex: bool) -> No
 
 @pytest.mark.parametrize("codex", [False, True], ids=["claude", "codex"])
 def test_spec_links_an_intent_and_writes_none(tmp_path: Path, codex: bool) -> None:
-    """SPEC-intent-surface-diet AC-002: the spec stage only links; intent writes are wrapup's."""
+    """SPEC-intent-surface-diet AC-002, narrowed by SPEC-intent-lean: the spec stage neither links
+    nor writes an intent; intent writes are wrapup's."""
     spec = _rule_stage(_render_rules(tmp_path, codex=codex), "spec", codex=codex)
-    status = spec.index("hm intent status --json")
-    assert "With no `active` or `proposed` intent, print `[intent] none`" in spec[status:]
-    assert "`intent: <id>`" in spec[status:]
-    for write in ("hm intent question", "hm intent metric", "hm intent close"):
-        assert write not in spec, write
+    assert "hm intent " not in spec
+    assert "`intent: <id>`" not in spec
 
 
 @pytest.mark.parametrize(("codex", "wt"), RULE_ARMS, ids=RULE_IDS)
@@ -806,19 +824,18 @@ def test_intent_skill_and_wrapup_call_the_intent_verbs(tmp_path: Path, codex: bo
     root = _render_rules(tmp_path, codex=codex)
     wrapup = _rule_stage(root, "wrapup", codex=codex)
     intents = wrapup[wrapup.index("hm intent status --json") :]
-    # SPEC-ask-less AC-005: `measure` is a plain record; `record` needs task evidence.
-    assert "`hm intent metric measure`" in intents
-    assert "`metric record` with an `--evidence-file` from this task" in intents
+    # SPEC-intent-lean: `measure` when the metric has one, else `record` with evidence.
+    assert "`hm intent metric measure <id>`" in intents
+    assert "`metric record <id> --value <n> --evidence-file <f>`" in intents
     # SPEC-pipeline-env-fixes AC-007: the example names `--relation`, which the parser requires.
-    # SPEC-ask-less AC-005 narrows wrapup's unasked forms; `supersedes` and `close` are asked, and
-    # their full forms live in the skill's verb list.
+    # `supersedes` is the skill's (its full form lives in the verb list); `close` is asked.
     unasked = "`hm intent question observe <id> --relation <confirms|contradicts> --text-file <f>`"
     assert unasked in intents
-    assert "`hm intent question add <id> … --status open`" in intents
-    assert "`hm intent close <id> … --note-file <f>`" in intents
+    assert "`hm intent question add <id> --status open --claim-file <f>`" in intents
+    assert "`hm intent close <id> --observed <v> --note-file <f>`" in intents
     skill_dir = root / (".agents/skills" if codex else ".claude/skills") / "intent-layer"
     skill = _flat_rule(skill_dir / "SKILL.md")
-    assert "hm intent metric measure --all" in skill
+    assert "hm intent metric measure <id>|--all" in skill
     observe = re.search(
         r"hm intent question observe <id> --relation <[^>]*supersedes[^>]*>.*?\n",
         (skill_dir / "SKILL.md").read_text(encoding="utf-8"),

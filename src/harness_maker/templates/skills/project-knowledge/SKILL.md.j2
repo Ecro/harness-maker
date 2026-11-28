@@ -11,7 +11,7 @@ decision stands, the correction of something previously believed — belongs in 
 Personal working preferences are the host's business: leave those to its auto-memory.
 
 **Fact or question.** A claim that bears on an intent's metric or decision is an intent question (`hm intent question`, open → confirmed or wrong); any other domain fact is a `[wiki:fact]`. Record each claim in one place only and link to it from the other. An intent question belongs to the intent-layer skill and is
-written under its consent rule — this skill never writes one.
+written by it — this skill never writes one.
 {% if is_codex %}On Codex this skill starts only when the operator mentions `${{ name }}`, or when `AGENTS.md` points here.{% endif %}
 
 ## When to write — and when not
@@ -25,8 +25,8 @@ written under its consent rule — this skill never writes one.
 ## Procedure
 
 1. **Route first.** If a new claim bears on an intent's metric or decision, stop here and follow
-   the intent-layer skill instead; a correction to an existing `[wiki:fact]` stays here. When that question rests on an existing `[wiki:fact]`, it cites
-   the fact with `--locator .claude/memory/wiki.md:<A-B>` rather than restating it.
+   the intent-layer skill instead; a correction to an existing `[wiki:fact]` stays here. When that question rests on an existing `[wiki:fact]`, its
+   `--text-file` cites the fact as `.claude/memory/wiki.md:<A-B>` rather than restating it.
    That write follows intent-layer's write rule: the claim is written with the Write tool to a
    file and passed by path (`--claim-file`), never inline on the command line.
 2. **Search first**, so a correction replaces the old truth instead of sitting beside it.

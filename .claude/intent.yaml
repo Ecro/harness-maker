@@ -115,13 +115,24 @@ metrics:
     22 (2026-10-14, timeparse 5과제, claude-sonnet-5-5, Side preset — work-docs/RESEARCH-hm-light-lane.md).
     반대 신호: /hm: 팔의 숨은 테스트 통과율이 plain 팔보다 낮으면 배수가 목표 안이어도 통과가 아니다. 벤치 러너가 repo 에 들어오기
     전에는 측정하지 않는다.'
+- id: owner_read_ratio_saga
+  description: 'saga 벤치에서 출시된 변경 1건당 주인이 읽은 글자 수, hm 팔 / plain-discipline 팔 (배수)'
+  target: 1.0
+  higher_is_better: false
+  how_measured: 'scripts/saga_bench.py run (3팔 x 3회 이상) 뒤 report 의 owner 표. 읽은 글자 = 에이전트 메시지 + hm 주인이
+    승인한 SPEC.md. 출시 = 끊기지 않고 자기 숨은 테스트를 모두 통과한 세션. baseline 2.50 (2026-11-28, hm 11,509 /
+    discipline 4,612, claude-sonnet-5-5 — /mnt/project-files/hm-owner-metrics/RESULTS-2026-11-28.md). 반대 신호, 하나라도
+    어기면 배수가 목표 안이어도 통과가 아니다: (1) 이해 퀴즈 hm <= discipline (baseline 0.73 vs 0.54); (2) judge 의
+    maintainability 에서 hm 패가 승보다 많음 (baseline 0-2); (3) replay 벤치의 깨진 기존 테스트 hm > discipline. 이해는
+    벤치의 모의 독자 퀴즈로만 잰다 — 실제 주인에게 퀴즈·확인을 요구하지 않는다 (사용자 2026-11-28). 질문·확인을 늘려 퀴즈를
+    올린 변경은 답장 수와 읽은 글자로 드러나므로 실패로 본다.'
 rules:
 - 품질 하한(결정적 검증·리뷰 게이트)은 크기나 속도를 줄이는 대가로 낮추지 않는다
 - hm 은 모델이 지금도 앞으로도 하지 않는 것만 가볍게 더한다 (세션 간 기억, 전체 테스트 게이트, 강제 리뷰, 사람 승인과 IRR 잠금, SPEC·테스트 누적, 작업별 worktree, 이해 변화 요약). 모델이 발전해 스스로 하게 된 기능은 측정한 뒤 걷어내거나 CLI 로 옮기고, 남은 것은 간결하게 유지한다
 - TUNE 값은 재측정 없이 새 모델로 이전하지 않는다
 - 사용자가 손댄 파일·hook·deny 규칙은 재렌더에서 보존한다
 - render 는 결정적이다 — render 중 shell-out 없음
-- Claude Code·Cursor·Codex 를 한 소스에서 렌더한다
+- Claude Code·Codex 를 한 소스에서 렌더한다
 - Python only, 텔레메트리 100% 로컬, 사용자 요청 없는 push 금지
 - README를 포함한 사용자 대상 문서는 현재 최신 릴리스의 실제 동작과 항상 일치해야 한다. 각 릴리스에서 버전 표기, 설치법, 명령어와 옵션을
   검증한다

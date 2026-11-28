@@ -2,7 +2,54 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The saga bench reports the owner's side** (SPEC-owner-attention-metrics). Per arm and per
+  shipped change: characters the owner read (agent messages plus the SPEC an hm owner
+  approved), replies (post-hoc corrections included) and approvals, next to the quiz score;
+  per run, hidden tests that passed in their own session but fail on the final tree (escaped
+  regressions). A new `judge` command compares hm's final tree with each other arm's at the
+  same rep (Opus, order swapped, a pick counts only when both orders agree) on correctness,
+  test protection, maintainability, scope and overall. Attention is computed from stored
+  turns, so older result rows get it too. Bench-only; no change to rendered harnesses.
+
+### Changed
+
+- **The CLI does the SPEC bookkeeping the stages used to run by hand** (SPEC-cli-bookkeeping).
+  New `hm spec_machine finalize --slug S [--approve|--exempt]` runs `check --all` and, on a
+  pass, stamps the yaml and sets SPEC.md `status: approved` in one call (nothing is stamped on a
+  failing check). `export-golden --slug S --inline --write F` writes the `AC_NNN_ROWS` blocks into
+  the test file (replacing a stale block in place, new blocks above the first test).
+  `mark-tested --slug S` with no `--ac` binds every testable AC that has a test and leaves the rest
+  pending. `wrapup_land` lands the stage's usual manifest when given no `--required`/`--optional`,
+  so wrapup's pre-land `approval-status` call is gone (the land's own hold names the IRR ids).
+  Old commands and flags keep working. Tier-1 bench vs main: bookkeeping subcommands 7.6 -> 5.9
+  per run, but the pre-registered bar (mean cost -7%, wall -10%) was **missed** (+3% / +4%; medians
+  -7% / -2%); review-and-fix loops set the mean. See `docs/evals/cli-bookkeeping-2026-11-27.md`.
+- **The intent layer asks three things and keeps what is read** (SPEC-intent-lean). The intent
+  skill asks only to create a goal (one round, at most 3 questions), to change a metric target, or
+  to close a goal; measurements and observations are recorded without asking and print one line.
+  A goal record is `open` or `closed` (old `proposed`/`active` read as open, `dropped` as closed
+  with `no_data`; closed records are never rewritten). `hm intent status --json` returns
+  `state, purpose, metrics, intents, open_questions, open`, and the Maker digest shows
+  `intents.open`. Removed: `hm intent approve|activate|drop|reopen` (each exits 2 naming its
+  replacement), `--from-proposal`, `--candidates`, `--declined-file`, `--locator`, the `hm world`
+  module and its never-fired revisit, revalidation, withdrawal and evidence-locator checks, the
+  autopilot objective gate, spec Step 0.5 and the SPEC `intent:` field, and the workflow-feedback
+  reference. An unmigrated layout now reads as `invalid` naming `hm intent migrate`. Rendered
+  projects pick it up on their next `hm make`. README's intent-layer bullet is updated in the
+  release PR, since README describes the latest release.
+
 ### Fixed
+
+- **Maker resumes cut-off work without asking first** (SPEC-maker-resume-no-ask). The saga bench
+  (2026-11-28) scored hm 0/5 on resume: Maker found the task every time, then asked "resume?"
+  because the cut-off session counted as "another session" (a fresh session always does), and in
+  2 of 5 runs said the PLAN/SPEC were missing after looking in the base checkout. A resume ask is
+  now the consent; Maker checks no files (they live in `.worktrees/<slug>/`, which the stage
+  opens). The digest adds `interrupted: true` for a task whose last stage its session never followed
+  with an `end` (or any row), and when several tasks are open Claude Maker resumes the one
+  interrupted task if exactly one is.
 
 - **`/hm:spec` asks the scope boundary only the owner knows, and skips the interview less**
   (SPEC-spec-owner-boundary). Before the SPEC it reads the code the ask touches and names which

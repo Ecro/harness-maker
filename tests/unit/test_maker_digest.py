@@ -19,6 +19,7 @@ import io
 import json
 import os
 import subprocess
+import sys
 from contextlib import redirect_stdout
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -188,8 +189,7 @@ def _intent_yaml(metrics: list[dict[str, Any]], *, bump_stale: bool) -> str:
 
 
 def _intent_record(intent: dict[str, Any], target: int) -> dict[str, Any]:
-    from harness_maker import world
-
+    """Legacy `active`/`proposed` records (SPEC-intent-lean reads both as open)."""
     rec: dict[str, Any] = {
         "id": intent["id"],
         "title": intent["title"].strip() or "제목",
@@ -210,7 +210,7 @@ def _intent_record(intent: dict[str, Any], target: int) -> dict[str, Any]:
     }
     if intent["state"] == "active":
         rec["approval"] = {
-            "content_hash": world.approval_hash(rec, target),
+            "content_hash": "a" * 64,
             "approved_by": "t",
             "approved_at": "2026-09-02T00:00:00Z",
             "approved_target": target,
@@ -268,9 +268,9 @@ def test_ac006_active_intents_within_cap(tmp_path_factory: pytest.TempPathFactor
     base = _build_intent_project(tmp_path_factory.mktemp("ac006"), w)
     status = intent_cli.status_report(base)
     assert status.get("state") == "ok", status
-    active_ids = list(status["active"])
-    # The fixture is valid: every generated active record is active per the reference.
-    assert sorted(active_ids) == sorted(i["id"] for i in w["intents"] if i["state"] == "active")
+    active_ids = list(status["open"])
+    # The fixture is valid: every generated record (active or proposed) is open per the reference.
+    assert sorted(active_ids) == sorted(i["id"] for i in w["intents"])
     n_active, n_tasks = len(active_ids), len(w["slugs"])
 
     text, d = _rendered(base)
@@ -278,9 +278,8 @@ def test_ac006_active_intents_within_cap(tmp_path_factory: pytest.TempPathFactor
 
     intents = d.get("intents")
     assert isinstance(intents, dict), f"digest has no intents block: {d}"
-    if n_active:
-        assert "active" in intents, f"intents block lacks `active`: {intents}"
-    listed = intents.get("active", [])
+    assert "open" in intents, f"intents block lacks `open`: {intents}"
+    listed = intents.get("open", [])
     assert isinstance(listed, list)
     listed_ids = [row["id"] for row in listed]
     assert len(listed_ids) == len(set(listed_ids)), listed_ids
@@ -289,7 +288,7 @@ def test_ac006_active_intents_within_cap(tmp_path_factory: pytest.TempPathFactor
     assert set(active_ids[: min(3, n_active)]) <= set(listed_ids), (active_ids, listed_ids)
     for row in listed:
         assert set(row) >= {"id", "metric_id", "last", "target", "gap"}, row
-        assert row["id"] in status["active"], row
+        assert row["id"] in status["open"], row
         metric_id = status["intents"][row["id"]]["metric_id"]
         assert row["metric_id"] == metric_id, row
         metric = status["metrics"].get(metric_id)
@@ -326,11 +325,7 @@ def test_ac006_worst_case_payload_keeps_floors() -> None:
         "autopilot": {"active": True, "level": "auto_safe", "pipeline": ["research", "wrapup"]},
         "recent": ["abc1234 " + "긴 커밋 제목 " * 30] * 3,
         "intents": {
-            "counts": dict.fromkeys(
-                ("conflicts", "fired_revisits", "needs_revalidation", "stale_evidence"), 20
-            ),
-            "items": ids[:3],
-            "active": [
+            "open": [
                 {"id": i, "metric_id": "m_" + "x" * 78, "last": 123456, "target": 1000, "gap": -1}
                 for i in ids
             ],
@@ -341,8 +336,8 @@ def test_ac006_worst_case_payload_keeps_floors() -> None:
     d = json.loads(out)
     assert "unavailable" not in d, d
     assert len(d["tasks"]) >= 3, d["tasks"]
-    assert len(d["intents"]["active"]) >= 3, d["intents"]
-    assert [r["id"][:6] for r in d["intents"]["active"][:3]] == [i[:6] for i in ids[:3]]
+    assert len(d["intents"]["open"]) >= 3, d["intents"]
+    assert [r["id"][:6] for r in d["intents"]["open"][:3]] == [i[:6] for i in ids[:3]]
 
 
 def test_ac006_worst_case_end_to_end_through_cli(tmp_path: Path) -> None:
@@ -396,7 +391,7 @@ def test_ac006_worst_case_end_to_end_through_cli(tmp_path: Path) -> None:
     assert len(text.encode("utf-8")) <= MAX_BYTES, len(text.encode("utf-8"))
     assert "unavailable" not in text, text
     assert len(d["tasks"]) >= 3, d["tasks"]
-    assert len(d["intents"]["active"]) >= 3, d["intents"]
+    assert len(d["intents"]["open"]) >= 3, d["intents"]
     for t in d["tasks"]:
         assert "other_session" in t, f"`other_session` trimmed from {t}"
         assert isinstance(t["other_session"], bool), t
@@ -655,3 +650,92 @@ def test_ac006_trim_drops_optional_fields_in_order_and_keeps_other_session(
         assert "last_stage" not in t, t
         assert ("latest_artifact" in t) is (groups_dropped == 1), t
         assert t["other_session"] is True, t
+
+
+# ── SPEC-maker-resume-no-ask AC-001: `interrupted` marks a stage cut off mid-turn ────────────
+
+
+def _span_start(base: Path, slug: str, session: str | None, stage: str) -> None:
+    spans = importlib.import_module("harness_maker.stage_spans")
+    spans.emit_event(
+        "start", stage=stage, cwd=base, session_id=session, task_slug=slug, git_branch=f"hm/{slug}"
+    )
+
+
+def _stop_hook(base: Path, session: str) -> None:
+    # The shipped Stop hook command, with the session id on stdin as Claude Code sends it.
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness_maker.worktree", "span-end", str(base)],
+        input=json.dumps({"session_id": session}),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+
+
+@pytest.mark.parametrize(
+    ("history", "expected"),
+    [
+        ((), False),  # no span rows at all
+        (("start",), True),  # killed before its Stop hook ran
+        (("start", "end"), False),  # the turn finished
+        (("start", "end", "start"), True),  # the next stage was cut off
+        (("start", "end", "start", "end"), False),
+    ],
+    ids=["no-rows", "cut", "ended", "second-cut", "second-ended"],
+)
+def test_ac001_interrupted_from_open_span(
+    tmp_path: Path, history: tuple[str, ...], expected: bool
+) -> None:
+    base = _base(tmp_path)
+    _task(base, "cut")
+    _task(base, "other")
+    _span_start(base, "other", "s0", "hm:spec")  # a peer task's span must not leak in
+    _stop_hook(base, "s0")
+    stages = iter(("hm:spec", "hm:execute"))
+    for event in history:
+        if event == "start":
+            _span_start(base, "cut", "s0", next(stages))
+        else:
+            _stop_hook(base, "s0")
+    _, d = _rendered(base)
+    rows = {t["slug"]: t for t in d["tasks"]}
+    assert rows["cut"].get("interrupted", False) is expected, rows["cut"]
+    assert "interrupted" not in rows["other"], rows["other"]
+    # Only ever `true`: absence is "not cut off", so the key never appears as `false`.
+    assert all(t.get("interrupted", True) is True for t in d["tasks"]), d["tasks"]
+
+
+def _flags(base: Path) -> dict[str, bool]:
+    _, d = _rendered(base)
+    return {t["slug"]: t.get("interrupted", False) for t in d["tasks"]}
+
+
+def test_ac001_undecidable_reads_not_interrupted(tmp_path: Path) -> None:
+    """REVIEW F1/F5: a start without a session id, or a ledger with no `end` at all (Codex
+    ships no span-end hook), is undecidable — never `interrupted`."""
+    base = _base(tmp_path)
+    _task(base, "codexlike")
+    _span_start(base, "codexlike", "s0", "hm:spec")
+    assert _flags(base) == {"codexlike": False}  # no `end` anywhere in the ledger
+    _task(base, "noid")
+    _span_start(base, "noid", None, "hm:spec")
+    _stop_hook(base, "s0")  # the hook has an id, so it cannot close the id-less start
+    assert _flags(base) == {"codexlike": False, "noid": False}
+
+
+def test_ac001_one_turn_two_tasks_both_closed(tmp_path: Path) -> None:
+    """REVIEW F2: one Stop `end` carries only the turn's last slug; a start its session
+    followed with any later row is closed, whatever task that row names."""
+    base = _base(tmp_path)
+    _task(base, "a")
+    _task(base, "b")
+    _span_start(base, "a", "s0", "hm:spec")
+    _span_start(base, "b", "s0", "hm:spec")
+    _stop_hook(base, "s0")
+    assert _flags(base) == {"a": False, "b": False}
+    _span_start(base, "a", "s1", "hm:execute")  # a peer session's later row must not close it
+    _span_start(base, "b", "s0", "hm:execute")
+    assert _flags(base) == {"a": True, "b": True}

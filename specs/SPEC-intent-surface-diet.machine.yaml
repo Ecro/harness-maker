@@ -249,6 +249,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: The three phrases are today's collection instructions in SKILL.md.j2
     and references/workflow-feedback.md.j2, enumerated by spec-validator and accepted

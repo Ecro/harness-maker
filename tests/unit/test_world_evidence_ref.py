@@ -30,8 +30,8 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from harness_maker import world
-from tests.unit import world_fixture as fx
+from harness_maker import intent_cli
+from tests.unit import intent_fixture as fx
 
 settings.register_profile(
     "ci",
@@ -68,7 +68,7 @@ def _committed(root: Path, *outcomes: dict[str, Any]) -> str:
 
 
 def _rows(root: Path) -> list[dict[str, Any]]:
-    return list(fx.load(fx.outcomes_path(root))["values"])
+    return list(fx.load(fx.metrics_path(root))["values"])
 
 
 @given(pad=st.integers(min_value=0, max_value=600))
@@ -80,7 +80,7 @@ def test_ac_001_measured_evidence_references_the_definition_not_the_command(
     carry = fx.outcome("carry", measure={"cmd": cmd, "select": "last-number"})
     sha = _committed(root, carry)
 
-    proc = fx.run_cli(["--root", str(root), "outcome", "measure", "carry", "--json"], cwd=root)
+    proc = fx.run_cli(["--root", str(root), "metric", "measure", "carry", "--json"], cwd=root)
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
     row = _rows(root)[-1]
@@ -102,7 +102,7 @@ def test_ac_001_manual_record_keeps_the_operators_evidence_verbatim(tmp_path: Pa
         [
             "--root",
             str(tmp_path),
-            "outcome",
+            "metric",
             "record",
             "carry",
             "--value",
@@ -122,22 +122,22 @@ def test_ac_001_manual_record_keeps_the_operators_evidence_verbatim(tmp_path: Pa
 def test_ac_001_a_tool_written_row_is_a_byte_prefix_after_the_next_measure(tmp_path: Path) -> None:
     carry = fx.outcome("carry", measure={"cmd": "python -c 'print(3)'", "select": "last-number"})
     _committed(tmp_path, carry)
-    world.record_value(
+    intent_cli.record_value(
         tmp_path,
-        outcome_id="carry",
+        metric_id="carry",
         value=1,
         observed_at="2026-09-01T00:00:00Z",
         evidence="auto: python probe.py @ abc1234 exit=0 cwd=base",  # an old-format row
     )
-    before = fx.outcomes_path(tmp_path).read_bytes()
+    before = fx.metrics_path(tmp_path).read_bytes()
     first = _rows(tmp_path)[0]
 
     proc = fx.run_cli(
-        ["--root", str(tmp_path), "outcome", "measure", "carry", "--json"], cwd=tmp_path
+        ["--root", str(tmp_path), "metric", "measure", "carry", "--json"], cwd=tmp_path
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
-    after = fx.outcomes_path(tmp_path).read_bytes()
+    after = fx.metrics_path(tmp_path).read_bytes()
     assert after.startswith(before), "the earlier row was rewritten"
     assert _rows(tmp_path)[0] == first
     assert _rows(tmp_path)[-1]["evidence"].startswith("auto: measure#")

@@ -55,7 +55,6 @@ _DISPATCHABLE: frozenset[str] = frozenset(
         "proposals",
         "review_churn",
         "review_effect",
-        "world",
         "intent",
         "run_classify",
         "second_brain",

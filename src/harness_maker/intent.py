@@ -19,14 +19,21 @@ from harness_maker.io_utils import atomic_write
 #: read of a foreign version corrupts approvals downstream.
 KNOWN_MAJOR = 1
 
-REQUIRED_FIELDS: frozenset[str] = frozenset({"schema_version", "mission", "outcomes"})
-OPTIONAL_FIELDS: frozenset[str] = frozenset(
-    {"vision", "non_negotiables", "non_scope", "unknowns", "owners"}
-)
+REQUIRED_FIELDS: frozenset[str] = frozenset({"schema_version", "purpose", "metrics"})
+OPTIONAL_FIELDS: frozenset[str] = frozenset({"rules", "out_of_scope", "open_questions", "owners"})
 RECOGNISED_FIELDS: frozenset[str] = REQUIRED_FIELDS | OPTIONAL_FIELDS
-LIST_FIELDS: frozenset[str] = frozenset({"outcomes", "non_negotiables", "non_scope", "unknowns"})
+#: Pre-0.58 top-level keys: a file carrying any of them has not been migrated.
+LEGACY_FIELDS: frozenset[str] = frozenset(
+    {"mission", "vision", "outcomes", "non_negotiables", "non_scope", "unknowns"}
+)
+STRING_LIST_FIELDS: frozenset[str] = frozenset({"rules", "out_of_scope"})
 OWNER_ROLES = frozenset({"owner", "dri", "team"})
-STRING_FIELDS: frozenset[str] = frozenset({"mission", "vision"})
+QUESTION_STATUSES: tuple[str, ...] = ("open", "confirmed", "wrong")
+RELATIONS: tuple[str, ...] = ("confirms", "supersedes", "contradicts")
+_QUESTION_KEYS: frozenset[str] = frozenset(
+    {"id", "claim", "status", "evidence", "history", "revisit_when"}
+)
+MIGRATE_HINT = "legacy intent layout: run `hm intent migrate` first"
 OUTCOME_FIELDS: tuple[str, ...] = (
     "id",
     "description",
@@ -51,11 +58,6 @@ SKELETON = """\
 # `hm intent status`
 # reports `not_filled_in`. A file with metrics but no purpose statement is a validation error.
 #
-# Withdrawal criterion (SPEC-withdrawal-criterion-window): if 10 wrapups land with no signal
-# from this layer — nothing measured, no intent created, approved or closed — and no
-# `revisit_when` currently reads `candidate`, this layer is unused and is removed. The count
-# runs from the last signal, or from the day the file was filled in when there has never been
-# one. `hm intent status --json` measures it: `withdrawal.due` is true when the criterion holds.
 schema_version: 1
 purpose:
   statement: ""
@@ -119,30 +121,12 @@ class Outcome:
 @dataclass(frozen=True)
 class Intent:
     schema_version: int
-    mission: str
-    vision: str
-    outcomes: tuple[Outcome, ...]
-    non_negotiables: tuple[str, ...]
-    non_scope: tuple[str, ...]
-    unknowns: tuple[str, ...]
-    owners: dict[str, str]
-    open_questions: tuple[dict[str, Any], ...] = field(default_factory=tuple)
-
-    @property
-    def purpose(self) -> dict[str, str]:
-        return {"statement": self.mission, "vision": self.vision}
-
-    @property
-    def metrics(self) -> tuple[Outcome, ...]:
-        return self.outcomes
-
-    @property
-    def rules(self) -> tuple[str, ...]:
-        return self.non_negotiables
-
-    @property
-    def out_of_scope(self) -> tuple[str, ...]:
-        return self.non_scope
+    purpose: dict[str, str]
+    metrics: tuple[Outcome, ...]
+    rules: tuple[str, ...] = ()
+    out_of_scope: tuple[str, ...] = ()
+    owners: dict[str, str] = field(default_factory=dict)
+    open_questions: tuple[dict[str, Any], ...] = ()
 
 
 def skeleton_text() -> str:
@@ -174,7 +158,7 @@ def _major_of(found: Any) -> int | None:
 def schema_version_error(
     path: Path, raw: Any, *, field: str = "schema_version"
 ) -> IntentError | None:
-    """Shared with `world`: refuse a missing or foreign-major `schema_version`, naming the file.
+    """Shared with records and migrate: refuse a missing or foreign-major `schema_version`.
 
     The message names the path, the found version and the known major, because the refusal
     is the only diagnostic a hand-editor gets.
@@ -262,7 +246,7 @@ def _validate_measure(prefix: str, raw: Any, errors: list[IntentError]) -> None:
 
 
 def _validate_outcome(i: int, raw: Any, seen: set[str], errors: list[IntentError]) -> None:
-    prefix = f"outcomes[{i}]"
+    prefix = f"metrics[{i}]"
     if not isinstance(raw, dict):
         errors.append(IntentError(prefix, "must be a mapping"))
         return
@@ -271,13 +255,13 @@ def _validate_outcome(i: int, raw: Any, seen: set[str], errors: list[IntentError
             errors.append(IntentError(f"{prefix}.{key}", "missing"))
     for key in raw:
         if key not in OUTCOME_FIELDS:
-            errors.append(IntentError(f"{prefix}.{key}", "unknown outcome field"))
+            errors.append(IntentError(f"{prefix}.{key}", "unknown metric field"))
     oid = raw.get("id")
     if "id" in raw:
         if not isinstance(oid, str) or not _ID_RE.match(oid):
             errors.append(IntentError(f"{prefix}.id", "must match [a-z0-9_]+"))
         elif oid in seen:
-            errors.append(IntentError("outcomes[].id", f"duplicate id {oid!r}"))
+            errors.append(IntentError("metrics[].id", f"duplicate id {oid!r}"))
         else:
             seen.add(oid)
     if "description" in raw and not isinstance(raw["description"], str):
@@ -292,16 +276,52 @@ def _validate_outcome(i: int, raw: Any, seen: set[str], errors: list[IntentError
         _validate_measure(f"{prefix}.measure", raw["measure"], errors)
 
 
+def _validate_question(i: int, raw: Any, seen: set[str], errors: list[IntentError]) -> None:
+    """Shape only: evidence keys beyond text/observed_at/relation (an old `locator`) are kept."""
+    prefix = f"open_questions[{i}]"
+    if not isinstance(raw, dict):
+        errors.append(IntentError(prefix, "must be a mapping"))
+        return
+    for key in raw:
+        if key not in _QUESTION_KEYS:
+            errors.append(IntentError(f"{prefix}.{key}", "unknown key"))
+    qid = raw.get("id")
+    if not isinstance(qid, str) or not _ID_RE.match(qid):
+        errors.append(IntentError(f"{prefix}.id", "must match [a-z0-9_]+"))
+    elif qid in seen:
+        errors.append(IntentError("open_questions[].id", f"duplicate id {qid!r}"))
+    else:
+        seen.add(qid)
+    if not isinstance(raw.get("claim"), str) or not raw["claim"].strip():
+        errors.append(IntentError(f"{prefix}.claim", "must be a non-empty string"))
+    if raw.get("status") not in QUESTION_STATUSES:
+        errors.append(IntentError(f"{prefix}.status", f"must be one of {QUESTION_STATUSES}"))
+    evidence = raw.get("evidence", [])
+    if not isinstance(evidence, list):
+        errors.append(IntentError(f"{prefix}.evidence", "must be a list"))
+    else:
+        for j, ev in enumerate(evidence):
+            ep = f"{prefix}.evidence[{j}]"
+            if not isinstance(ev, dict):
+                errors.append(IntentError(ep, "must be a mapping"))
+                continue
+            if not isinstance(ev.get("text"), str) or not ev["text"].strip():
+                errors.append(IntentError(f"{ep}.text", "must be a non-empty string"))
+            if ev.get("relation") not in RELATIONS:
+                errors.append(IntentError(f"{ep}.relation", f"must be one of {RELATIONS}"))
+            if "observed_at" not in ev and "locator" not in ev:
+                errors.append(IntentError(f"{ep}.observed_at", "missing"))
+    history = raw.get("history", [])
+    if not isinstance(history, list) or not all(isinstance(h, str) for h in history):
+        errors.append(IntentError(f"{prefix}.history", "must be a list of strings"))
+
+
 def _validate_raw(path: Path, raw: Any) -> list[IntentError]:
-    errors: list[IntentError] = []
     if not isinstance(raw, dict):
         return [IntentError("file", f"{path}: top level must be a mapping")]
-    from harness_maker.intent_vocabulary import legacy_project
-
-    try:
-        raw = legacy_project(raw)
-    except ValueError as exc:
-        return [IntentError("file", str(exc))]
+    if set(raw) & LEGACY_FIELDS:
+        return [IntentError("layout", f"{path}: {MIGRATE_HINT}")]
+    errors: list[IntentError] = []
     sv = schema_version_error(path, raw)
     if sv is not None:
         errors.append(sv)
@@ -311,9 +331,13 @@ def _validate_raw(path: Path, raw: Any) -> list[IntentError]:
     for key in sorted(REQUIRED_FIELDS - {"schema_version"}):
         if key not in raw:
             errors.append(IntentError(key, "missing required key"))
-    for key in STRING_FIELDS:
-        if key in raw and not isinstance(raw[key], str):
-            errors.append(IntentError(key, "must be a string"))
+    purpose = raw.get("purpose")
+    if "purpose" in raw and (
+        not isinstance(purpose, dict)
+        or set(purpose) != {"statement", "vision"}
+        or not all(isinstance(v, str) for v in purpose.values())
+    ):
+        errors.append(IntentError("purpose", "must be {statement: str, vision: str}"))
     if "owners" in raw:
         owners = raw["owners"]
         if isinstance(owners, dict):
@@ -323,28 +347,36 @@ def _validate_raw(path: Path, raw: Any) -> list[IntentError]:
                 elif not isinstance(person, str):
                     errors.append(IntentError(f"owners.{role}", "must be a string"))
         elif isinstance(owners, list):
-            for j, person in enumerate(owners):
-                if not isinstance(person, str):
-                    errors.append(IntentError(f"owners[{j}]", "must be a string"))
+            errors.extend(
+                IntentError(f"owners[{i}]", "must be a string")
+                for i, person in enumerate(owners)
+                if not isinstance(person, str)
+            )
         else:
-            errors.append(IntentError("owners", "must be a role map or legacy list of strings"))
-    for key in LIST_FIELDS:
-        if key in raw and not isinstance(raw[key], list):
-            errors.append(IntentError(key, "must be a list"))
-    for key in LIST_FIELDS - {"outcomes"}:
-        if isinstance(raw.get(key), list):
-            for j, item in enumerate(raw[key]):
-                if not isinstance(item, str):
-                    errors.append(IntentError(f"{key}[{j}]", "must be a string"))
-    outcomes = raw.get("outcomes")
-    if isinstance(outcomes, list):
+            errors.append(IntentError("owners", "must be a role map"))
+    for key in STRING_LIST_FIELDS:
+        val = raw.get(key, [])
+        if not isinstance(val, list) or not all(isinstance(x, str) for x in val):
+            errors.append(IntentError(key, "must be a list of strings"))
+    questions = raw.get("open_questions", [])
+    if not isinstance(questions, list):
+        errors.append(IntentError("open_questions", "must be a list"))
+    else:
+        seen_q: set[str] = set()
+        for i, q in enumerate(questions):
+            _validate_question(i, q, seen_q, errors)
+    metrics = raw.get("metrics")
+    if "metrics" in raw and not isinstance(metrics, list):
+        errors.append(IntentError("metrics", "must be a list"))
+    elif isinstance(metrics, list):
         seen: set[str] = set()
-        for i, item in enumerate(outcomes):
+        for i, item in enumerate(metrics):
             _validate_outcome(i, item, seen, errors)
-        # Skeleton-validity row: the non-empty mission rule is waived ONLY when outcomes is
-        # empty too. A half-filled file must not hide as a skeleton.
-        if isinstance(raw.get("mission"), str) and not raw["mission"].strip() and outcomes:
-            errors.append(IntentError("mission", "must be non-empty once outcomes exist"))
+        # The non-empty statement rule is waived ONLY when metrics is empty too: a half-filled
+        # file must not hide as a skeleton.
+        statement = purpose.get("statement") if isinstance(purpose, dict) else None
+        if isinstance(statement, str) and not statement.strip() and metrics:
+            errors.append(IntentError("purpose.statement", "must be non-empty once metrics exist"))
     return errors
 
 
@@ -378,23 +410,16 @@ def load_intent(path: Path) -> Intent:
 
 
 def intent_from_raw(path: Path, raw: Any) -> Intent:
-    """The one construction rule, shared with readers of historical blobs (`world` withdrawal)."""
     errors = _validate_raw(path, raw)
     if errors:
         raise IntentInvalidError(path, errors)
     assert isinstance(raw, dict)
-    from harness_maker.intent_vocabulary import legacy_project, project_questions
-
-    questions = project_questions(raw)
-    raw = legacy_project(raw)
     major = _major_of(raw["schema_version"])
     assert major is not None  # validated above
     return Intent(
         schema_version=major,
-        open_questions=tuple(questions),
-        mission=raw["mission"],
-        vision=raw.get("vision") or "",
-        outcomes=tuple(
+        purpose=dict(raw["purpose"]),
+        metrics=tuple(
             Outcome(
                 id=o["id"],
                 description=o["description"],
@@ -403,19 +428,20 @@ def intent_from_raw(path: Path, raw: Any) -> Intent:
                 how_measured=o["how_measured"],
                 measure=_measure_of(o.get("measure")),
             )
-            for o in raw["outcomes"]
+            for o in raw["metrics"]
         ),
-        non_negotiables=_strs(raw, "non_negotiables"),
-        non_scope=_strs(raw, "non_scope"),
-        unknowns=_strs(raw, "unknowns"),
-        owners=(
-            dict(raw["owners"])
-            if isinstance(raw.get("owners"), dict)
-            else {"team": ", ".join(raw["owners"])}
-            if raw.get("owners")
-            else {}
-        ),
+        rules=_strs(raw, "rules"),
+        out_of_scope=_strs(raw, "out_of_scope"),
+        owners=_owners(raw.get("owners")),
+        open_questions=tuple(raw.get("open_questions") or []),
     )
+
+
+def _owners(raw: Any) -> dict[str, str]:
+    """A legacy list of names reads as the team role; the file is never rewritten for it."""
+    if isinstance(raw, list):
+        return {"team": ", ".join(raw)} if raw else {}
+    return dict(raw or {})
 
 
 def _measure_of(raw: Any) -> Measure | None:
@@ -430,8 +456,8 @@ def _measure_of(raw: Any) -> Measure | None:
 
 
 def is_not_filled_in(intent: Intent) -> bool:
-    """The skeleton state: mission empty AND no outcomes — the one state where that is legal."""
-    return not intent.mission.strip() and not intent.outcomes
+    """The skeleton state: empty statement AND no metrics — the one state where that is legal."""
+    return not intent.purpose.get("statement", "").strip() and not intent.metrics
 
 
 #: Every free-text argument of the write verbs and its file twin: (dest, file dest, flag, multi).
@@ -442,11 +468,22 @@ FILE_TWINS: tuple[tuple[str, str, str, bool], ...] = (
     ("evidence", "evidence_file", "--evidence", False),
     ("note", "note_file", "--note", False),
     ("title", "title_file", "--title", False),
-    ("hypothesis", "hypothesis_file", "--statement", False),
+    ("statement", "statement_file", "--statement", False),
     ("scope", "scope_file", "--scope", True),
-    ("non_scope", "non_scope_file", "--out-of-scope", True),
-    ("declined", "declined_file", "--declined", True),
+    ("out_of_scope", "out_of_scope_file", "--out-of-scope", True),
 )
+
+OBSERVED_VALUES: tuple[str, ...] = ("met", "missed", "no_data")
+
+#: Verbs SPEC-intent-lean removed (IRR-001): each stays a subcommand that names its replacement
+#: and exits 2, so a stale script or recipe fails loudly instead of being guessed at.
+REMOVED_VERBS: dict[str, str] = {
+    "approve": "a new goal is open from the start, no step needed",
+    "activate": "a new goal is open from the start, no step needed",
+    "reopen": "no step needed to keep working; for a closed goal, record a new one with "
+    "`hm intent new`",
+    "drop": "use `hm intent close <id> --observed no_data --note-file <f>`",
+}
 
 
 def _pair(
@@ -525,8 +562,6 @@ def resolve_file_args(parser: argparse.ArgumentParser, args: argparse.Namespace)
 
 
 def _parser() -> argparse.ArgumentParser:
-    from harness_maker import world
-
     parser = argparse.ArgumentParser(prog="hm intent")
     parser.add_argument("--root", default=None, help="checkout root (default: git toplevel of cwd)")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -540,23 +575,21 @@ def _parser() -> argparse.ArgumentParser:
     asub = a.add_subparsers(dest="verb", required=True)
     ob = asub.add_parser("observe")
     ob.add_argument("id")
-    ob.add_argument("--relation", required=True, choices=world.RELATIONS)
+    ob.add_argument("--relation", required=True, choices=RELATIONS)
     _pair(ob, "--text", dest="text", required=True)
     ob.add_argument("--observed-at", default=None, dest="observed_at")
     _pair(ob, "--claim", dest="claim", required=False)
-    ob.add_argument("--locator", default=None)
     ob.add_argument("--json", action="store_true")
     ad = asub.add_parser("add")
     ad.add_argument("id")
     _pair(ad, "--claim", dest="claim", required=True)
-    ad.add_argument("--status", required=True, choices=("open", "confirmed", "wrong"))
+    ad.add_argument("--status", required=True, choices=QUESTION_STATUSES)
     _pair(ad, "--text", dest="text", required=False)
     ad.add_argument("--observed-at", default=None, dest="observed_at")
-    ad.add_argument("--locator", default=None)
     ad.add_argument("--json", action="store_true")
     rs = asub.add_parser("resolve")
     rs.add_argument("id")
-    rs.add_argument("--status", required=True, choices=("open", "confirmed", "wrong"))
+    rs.add_argument("--status", required=True, choices=QUESTION_STATUSES)
     _pair(rs, "--claim", dest="claim", required=True)
     rs.add_argument("--json", action="store_true")
 
@@ -570,38 +603,36 @@ def _parser() -> argparse.ArgumentParser:
     rc.add_argument("--json", action="store_true")
     ms = osub.add_parser("measure")
     ms.add_argument("id", nargs="?", default=None)
-    ms.add_argument("--all", action="store_true", dest="all_outcomes")
+    ms.add_argument("--all", action="store_true", dest="all_metrics")
     ms.add_argument("--dry-run", action="store_true", dest="dry_run")
     ms.add_argument("--json", action="store_true")
 
-    jsub = sub
     # Literal `add_parser` names on purpose: the command-surface gate reads them by AST and
-    # the registry must list every one, so a loop over a tuple would hide six verbs from it.
-    nw = jsub.add_parser("new")
+    # the registry must list every one, so a loop over a tuple would hide verbs from it.
+    nw = sub.add_parser("new")
     nw.add_argument("id")
     _pair(nw, "--title", dest="title", required=True)
-    _pair(nw, "--statement", dest="hypothesis", required=True)
-    _pair(nw, "--scope", dest="scope", required=True, multi=True)
-    nw.add_argument("--metric", required=True, dest="outcome_id")
-    _pair(nw, "--out-of-scope", dest="non_scope", required=False, multi=True)
-    nw.add_argument("--from-proposal", action="store_true", dest="from_proposal")
-    nw.add_argument("--candidates", type=int, default=None)
-    _pair(nw, "--declined", dest="declined", required=False, multi=True)
+    _pair(nw, "--statement", dest="statement", required=True)
+    nw.add_argument("--metric", required=True, dest="metric_id")
+    _pair(nw, "--scope", dest="scope", required=False, multi=True)
+    _pair(nw, "--out-of-scope", dest="out_of_scope", required=False, multi=True)
     nw.add_argument("--json", action="store_true")
-    ap = jsub.add_parser("approve")
-    ac = jsub.add_parser("activate")
-    ac.add_argument("--cap", type=int, default=1)
-    dr = jsub.add_parser("drop")
-    ro = jsub.add_parser("reopen")
-    sh = jsub.add_parser("show")
-    for p in (ap, ac, dr, ro, sh):
-        p.add_argument("id")
-        p.add_argument("--json", action="store_true")
-    cl = jsub.add_parser("close")
+    sh = sub.add_parser("show")
+    sh.add_argument("id")
+    sh.add_argument("--json", action="store_true")
+    cl = sub.add_parser("close")
     cl.add_argument("id")
-    cl.add_argument("--observed", required=True, choices=world.OBSERVED_VALUES)
+    cl.add_argument("--observed", required=True, choices=OBSERVED_VALUES)
     _pair(cl, "--note", dest="note", required=True)
     cl.add_argument("--json", action="store_true")
+    removed = (
+        sub.add_parser("approve", add_help=False),
+        sub.add_parser("activate", add_help=False),
+        sub.add_parser("drop", add_help=False),
+        sub.add_parser("reopen", add_help=False),
+    )
+    for p in removed:
+        p.add_argument("rest", nargs=argparse.REMAINDER)
     return parser
 
 
