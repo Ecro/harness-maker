@@ -29,6 +29,11 @@
 
 ### Changed
 
+- **`/hm:execute` closes in at most three lines** (SPEC-execute-report-short): the `hm check`
+  result, the REVIEW path and the next step, then each `unresolved` and P0/P1 `pre-existing` row;
+  no other summary, because wrapup's change card carries what was verified and the changed
+  assumptions. The saga bench showed this report (about 1,460 chars per shipped change) repeated the
+  land card one step later.
 - **The CLI does the SPEC bookkeeping the stages used to run by hand** (SPEC-cli-bookkeeping).
   New `hm spec_machine finalize --slug S [--approve|--exempt]` runs `check --all` and, on a
   pass, stamps the yaml and sets SPEC.md `status: approved` in one call (nothing is stamped on a
