@@ -60,8 +60,8 @@ earlier work broke later, or how maintainable the result is.
 
 ## Non-Goals
 
-- A new intent metric in `.claude/intent.yaml` (out of scope for LLM writing; proposed to the
-  user with the measured baseline).
+- Choosing the intent metric's baseline (the user chose plain-discipline on a decision card,
+  2026-11-28; recorded as `owner_read_ratio_saga` and goal OWNER-ATTENTION, baseline 2.50).
 - Changing the fixture, sessions, owner rules, traps or verdict.
 - Counting time in seconds: the bench has no human, so reading is counted in characters.
 
