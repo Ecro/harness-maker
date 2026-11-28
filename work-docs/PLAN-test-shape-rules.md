@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: test-shape-rules
-status: planning
+status: complete
 created: 2026-11-28
 spec: "[[SPEC-test-shape-rules]]"
 summary: Print one AC's rows for an existing list; spec/execute/reviewer text for the three confirmed test-side causes.

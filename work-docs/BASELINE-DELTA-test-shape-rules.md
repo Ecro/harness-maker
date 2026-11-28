@@ -23,7 +23,7 @@ and execute stages, so it cannot be paid for elsewhere without cutting a rule:
   the trim of "note drift … as a finding" (the reviewer checklist carries drift).
 
 Measured with the committed generator (`tests/structural/_surface_baseline.py`, `build_baseline()`)
-against the frozen baseline. wrapup/hm-wrapup −6 comes from the same PR.
+against the frozen baseline. wrapup/hm-wrapup −6 comes from an earlier change on main that had not been folded.
 
 | variant | command | delta (chars) | cause |
 |---|---|---|---|
@@ -31,9 +31,20 @@ against the frozen baseline. wrapup/hm-wrapup −6 comes from the same PR.
 | claude | `spec` | +24 | call → return rule, Constraint rule, net of trims |
 | codex | `hm-execute` | +129 | same text |
 | codex | `hm-spec` | +24 | same text |
+| claude | `wrapup` | −6 | an earlier change on main, not folded until now |
+| codex | `hm-wrapup` | −6 | same text |
 
 Result that pays for it: tier 1+2 ×3 vs plain + tests, maintainability 8-27 → 13-7, overall
 13-18 → 25-8 (`/mnt/project-files/hm-blog-cost/CAUSES-maintainability-2026-11-28.md`).
 
-Per ADR-010 the task that moved the surface owns its attribution; the re-freeze follows on main
-after merge.
+Per ADR-010 the task that moved the surface owns its attribution. Writing it next to the
+allowance and the later re-freeze keeps this out of `ratchet-rebaselined-by-its-own-subject`.
+
+## Folded into the baseline from main
+
+PR #94 was squash-merged as 964fbf73. The PLAN was then marked complete, which expires its
+allowance, so the growth was folded on main. The generator re-froze
+`tests/structural/surface_baseline.json` at 964fbf730cbd: claude 50 792, codex 32 062 (execute and
+hm-execute +129, spec and hm-spec +24, wrapup and hm-wrapup −6 from an earlier unfolded change). `render_sha` and `payload_digest`
+moved mechanically with the re-freeze. The per-command `_ATOMIC_RATCHET` bands still hold, so they
+were not re-measured. No eval rows came from the task branch, so no `bench_hash` alias is needed.
