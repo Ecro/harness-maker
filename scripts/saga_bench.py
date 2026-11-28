@@ -736,12 +736,13 @@ def doc_chars(work: Path, arm: str, slug: str | None) -> int:
 
 def attention(record: dict[str, Any]) -> dict[str, int]:
     """What one session cost the owner. Post-hoc corrections count as replies; the runner's
-    execute/wrapup prompts do not (Maker's Advance rule chains them without the owner)."""
+    execute/wrapup prompts do not (Maker's Advance rule chains them without the owner). The
+    owner approves from the change card in the messages; the SPEC file is reference, so
+    `doc_chars` is not read (SPEC-change-card AC-007, DRI 2026-11-28)."""
     turns = record.get("turns") or []
     sims = [t.get("sim") or {} for t in turns]
     return {
-        "read_chars": sum(len(t.get("message") or "") for t in turns)
-        + int(record.get("doc_chars") or 0),
+        "read_chars": sum(len(t.get("message") or "") for t in turns),
         "replies": sum(isinstance(s.get("reply"), str) and bool(s["reply"].strip()) for s in sims)
         + sum(t.get("kind") == "posthoc" for t in turns),
         "approvals": sum(bool(s.get("approved")) for s in sims),
@@ -1314,14 +1315,16 @@ def owner_summary(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
                   for k in ("read_chars", "replies", "approvals")}  # fmt: skip
         ships = sum(shipped(s) for s in records)
         known = [len(r["escaped"]) for r in mine if r.get("escaped") is not None]
-        # Rows written before doc_chars existed hold only the messages an hm owner read.
-        docs = arm != "hm" or all("doc_chars" in s for s in records)
+        # Rows written before doc_chars existed carry no SPEC size: unknown, not 0.
+        known_docs = arm != "hm" or all("doc_chars" in s for s in records)
+        spec_chars = sum(int(s.get("doc_chars") or 0) for s in records)
         per = {k: (v / ships if ships else None) for k, v in totals.items()}
         summary[arm] = {
             "runs": len(mine), "shipped": ships / len(mine), "read_per_ship": per["read_chars"],
             "replies_per_ship": per["replies"], "approvals_per_ship": per["approvals"],
             "quiz": _rate_mean([r.get("quiz_mean") for r in mine]),
-            "escaped": math.fsum(known) / len(known) if known else None, "docs_counted": docs,
+            "escaped": math.fsum(known) / len(known) if known else None,
+            "spec_per_ship": spec_chars / ships if ships and known_docs else None,
         }  # fmt: skip
     return summary
 
@@ -1362,17 +1365,14 @@ def report(rows: list[dict[str, Any]], margin: float = MARGIN, min_traps: int = 
     lines += ["", f"verdict (margin {margin}, min traps {min_traps}): "
               f"{verdict(ok, margin, min_traps)}"]  # fmt: skip
     lines += ["", "owner (per shipped change)  runs  shipped  read/ship  replies  approvals  quiz  "
-              "escaped"]  # fmt: skip
+              "escaped  spec/ship (reference, not read)"]  # fmt: skip
     owners = owner_summary(ok)
     for arm, o in owners.items():
         lines.append(
             f"{arm:27} {o['runs']:5}  {_fmt(o['shipped'], 1):>7}  {_fmt(o['read_per_ship'], 0):>9}"
             f"  {_fmt(o['replies_per_ship'], 1):>7}  {_fmt(o['approvals_per_ship'], 1):>9}"
-            f"  {_fmt(o['quiz']):>4}  {_fmt(o['escaped'], 1):>7}"
+            f"  {_fmt(o['quiz']):>4}  {_fmt(o['escaped'], 1):>7}  {_fmt(o['spec_per_ship'], 0):>9}"
         )
-    missing = [arm for arm, o in owners.items() if not o["docs_counted"]]
-    if missing:
-        lines.append(f"(SPEC documents not counted: {', '.join(missing)}; rows predate doc_chars)")
     return "\n".join(lines)
 
 

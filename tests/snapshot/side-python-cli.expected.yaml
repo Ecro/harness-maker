@@ -16,7 +16,7 @@ files:
   body_sha256: c62a21e82754d5606f3beae02e5dcf47cce846662e3763708b901442a83abb9a
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 4d5598a1b52cedd857e4b7d959c0c444b2939fa2dc4abfc135f8dae92154cb38
+  body_sha256: 453d027b7f3a6051942e4ad0e093569a0046a4b65ed23abea7bce3fd16ad9c9e
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 7a0eb0965046757c8720bdabc17656ec1ba96bace0c29141730b4f0e6fda2e8a
@@ -34,13 +34,13 @@ files:
   body_sha256: c1c942d4c8ec48ea693f6374f42895d0e630cf84e4300d320055e48b434986dc
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: be938858d42938b28f0abc8668f2a51b197df2eacac62c76a6134e177954dc04
+  body_sha256: a7fb3745666e44d08781995f91bd613482a1a35e5d51a7456770e3662e3cb683
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: c4364aa3896fdafbf4dc60b60eac7b06481f9e9ef15a87cfbbf685904d365b62
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 2fb82bcc67cd9b69bae92f32a88ccc8ba5b197c38d132e9ca965b77687188c92
+  body_sha256: 5da404d60d4ec6dd5c16680b7023d29d6b4784a6fd0f90027aadebc3c42fbab3
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: d53ebb7f8817cab74c70cb4d7bc5f615e6b3b5ccce16b4f77fc6d05e8c1bd073

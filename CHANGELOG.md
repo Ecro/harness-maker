@@ -4,6 +4,20 @@
 
 ### Added
 
+- **A short change card at SPEC approval and at land** (SPEC-change-card). New `hm change_card
+  spec|land` builds the card from files, never from model prose: at approval the SPEC summary,
+  one golden example, the AC titles, every irreversible decision, the agent's Refinement
+  Decisions, non-goals and open questions (<= 1,500 chars; IRRs and open questions are never
+  trimmed); at land "Verified" (gates and AC tests from a current, passing `hm check` record, a
+  closed REVIEW) next to "Not verified" (judgment ACs, manual Verification rows, a missing, failed
+  or stale record, an open review), then the commit's changed assumptions, unknowns and agent
+  decisions. Labels follow `harness.yaml` `locale` (en, ko; others en). `/hm:spec` asks for
+  approval with the card instead of its own summary, and `/hm:wrapup` closes with it
+  (`wrapup_land` puts it in `steps.change_card` and in `.claude/observability/change-card-<slug>.txt`).
+  The saga bench counts what the owner reads as agent messages only; the SPEC is reference
+  (`spec/ship` column). Saga hm x3: card shown at approval 18/19 and at land 17/17; read per
+  shipped change 6,826 vs 6,920 before (ratio vs discipline 1.48 vs 1.50, no real drop); quiz
+  0.84 vs 0.73.
 - **The saga bench reports the owner's side** (SPEC-owner-attention-metrics). Per arm and per
   shipped change: characters the owner read (agent messages plus the SPEC an hm owner
   approved), replies (post-hoc corrections included) and approvals, next to the quiz score;
@@ -15,6 +29,11 @@
 
 ### Changed
 
+- **`/hm:execute` closes in at most three lines** (SPEC-execute-report-short): the `hm check`
+  result, the REVIEW path and the next step, then each `unresolved` and P0/P1 `pre-existing` row;
+  no other summary, because wrapup's change card carries what was verified and the changed
+  assumptions. The saga bench showed this report (about 1,460 chars per shipped change) repeated the
+  land card one step later.
 - **The CLI does the SPEC bookkeeping the stages used to run by hand** (SPEC-cli-bookkeeping).
   New `hm spec_machine finalize --slug S [--approve|--exempt]` runs `check --all` and, on a
   pass, stamps the yaml and sets SPEC.md `status: approved` in one call (nothing is stamped on a

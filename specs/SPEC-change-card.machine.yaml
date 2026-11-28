@@ -1,0 +1,242 @@
+schema_version: 3
+spec_slug: change-card
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: spec card holds the approval facts in order
+  type: mechanical
+  test_ids:
+  - tests/unit/test_change_card.py::test_ac_001_spec_card_order
+  executable_predicate: positions == sorted(positions) and -1 not in positions
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Section order and fixture strings typed from this SPEC's S1 and
+    the research order (reason first, examples, decisions); not derived from the card
+    code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: spec card stays short and keeps what gates approval
+  type: mechanical
+  test_ids:
+  - tests/unit/test_change_card.py::test_ac_002_spec_card_short_keeps_gating_items
+  executable_predicate: len(card) <= 1500 and all(i in card for i in irr_ids) and
+    all(q in card for q in questions) and '+' in card
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The 1,500 cap and never-trim set are typed from this SPEC's Constraints;
+    the fixture is built by the test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: land card puts verified and not verified side by side
+  type: mechanical
+  test_ids:
+  - tests/unit/test_change_card.py::test_ac_003_land_card_verified_and_not
+  executable_predicate: verified_ok and not_verified_ok and understanding_ok and missing_ok
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected lines typed from S3 and S4 and the Refinement Decision
+    defining verified; fixtures are hand-built files.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: labels follow the harness locale
+  type: parametric
+  test_ids:
+  - tests/unit/test_change_card.py::test_ac_004_labels_follow_harness_locale[AC-004-0]
+  - tests/unit/test_change_card.py::test_ac_004_labels_follow_harness_locale[AC-004-1]
+  - tests/unit/test_change_card.py::test_ac_004_labels_follow_harness_locale[AC-004-2]
+  - tests/unit/test_change_card.py::test_ac_004_labels_follow_harness_locale[AC-004-3]
+  executable_predicate: label == expected
+  golden_table:
+  - input:
+      locale: ko
+    expected: 검증함
+    edge: false
+    note: ''
+  - input:
+      locale: en
+    expected: Verified
+    edge: false
+    note: ''
+  - input:
+      locale: ja
+    expected: Verified
+    edge: true
+    note: ''
+  - input:
+      locale: null
+    expected: Verified
+    edge: true
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Korean label chosen in this SPEC (prototype wording, user locale
+    rule 05:32Z); fallback rule from CLAUDE.md "unknown locale -> en".
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: wrapup_land carries the card and never fails on it
+  type: mechanical
+  test_ids:
+  - tests/unit/test_change_card.py::test_ac_005_wrapup_land_carries_card
+  executable_predicate: isinstance(card, str) and broken_exit == ok_exit and broken_card
+    is None and '[wrapup_land] change_card:' in stderr
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Contract typed from this SPEC's Constraints (a card failure never
+    changes the land); compared against the same land without the fault.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: stages show the card in place of the old text
+  type: mechanical
+  test_ids:
+  - tests/unit/test_change_card.py::test_ac_006_stages_show_the_card[claude]
+  - tests/unit/test_change_card.py::test_ac_006_stages_show_the_card[codex]
+  executable_predicate: spec_ok and wrapup_ok and fallback_ok and locale_ok and 'change_card'
+    in dispatchable
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Literal phrases typed from this SPEC and the current templates'
+    removed sentences.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: the saga bench counts messages only
+  type: mechanical
+  test_ids:
+  - tests/unit/test_change_card.py::test_ac_007_saga_counts_messages_only
+  executable_predicate: read_with_doc == read_without_doc == 30 and summary['hm']['spec_per_ship']
+    == expected_spec
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: DRI decision 05:34Z (SPEC is reference, not counted); expected
+    values hand-computed from the fixture.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: New CLI `hm change_card spec|land` and receipt key `steps.change_card`,
+    both read by rendered stage commands
+  category: public API/CLI contract
+  rationale: Rendered harnesses in user repos call them; removing or renaming later
+    breaks those renders until re-render
+  source: spec
+approval:
+  kind: human
+  content_hash: e8dde669dbfe13907fe45eeb33945bfbbf1c02b4fc5a85aa09c64fc551209f0f
+  approved_by: Claude
+  approved_at: '2026-11-28T05:37:54Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: c3225884c926e28f3262bdff057fdc4bb8e558a076cb649ca51a7e82ef87cb2e
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 29191e780783988f435c6763f094e1da8ffc7fd0e8be50c5ef7b833c12e80b9f
+    AC-001: e8eb1a6d1917c4da9cfdc214b988507c9f057509692389ffb69487d44a93d954
+    AC-002: eaf8ece48dc3390df698bc074646345a450b14d9b1951b556d3dc1b649e61420
+    AC-003: be0d473178001d08ece1bdfe40cd155370ed10bb1c752c829e7293d9074fc593
+    AC-004: 36c1e8f77ee82966486bc64c5387454183317c854a8c2c4abe767a0fa6165184
+    AC-005: b92100c42a80cd86e57e8f8bf92ec8b6b8cc22a6bfe51190d49b89317c345ec2
+    AC-006: a74ef5b98be16389ba1d5378cae057c614f6f12fb8e2cfc0e55e5ead36df4a5c
+    AC-007: a5bc7ae98562c3569af997683f3a6dee4e4d309941d44ee6ddeacd1569baba49
+    ac_order: 5e69fa0a74f515bb71a937f4880dd2604977cc2c2dd6ea6704cb98a3d7a4a80c

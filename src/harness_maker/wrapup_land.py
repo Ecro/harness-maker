@@ -25,8 +25,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from harness_maker import command_registry, review_effect
+from harness_maker import change_card, command_registry, i18n, review_effect
 from harness_maker import worktree as wt
+from harness_maker.io_utils import atomic_write
 from harness_maker.spec_machine import hold_lines, land_states
 
 #: Exit codes are part of the contract the stage prose reads.
@@ -458,6 +459,27 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
             f"{_UNDERSTANDING_WARN} {problem} (warning only — the commit is unaffected)",
             file=sys.stderr,
         )
+
+    # SPEC-change-card AC-005: built here because `task-land` removes the worktree that holds
+    # the `hm check` verdict record. Best-effort: a card fault never changes what lands.
+    # The card is also written to a file the closing step Reads: a receipt is one JSON line,
+    # and a model that pipes it through `cut -c1-600` (seen in the saga bench) loses the card.
+    card_file = change_card.card_path(base, args.slug)
+    try:
+        card: str | None = change_card.land_card(
+            worktree, args.slug, landed, i18n.resolve_locale(base)
+        )
+    except Exception as exc:  # noqa: BLE001 — the card must not fail the land
+        card = None
+        print(f"[wrapup_land] change_card: not built ({exc})", file=sys.stderr)
+    receipt["steps"]["change_card"] = card
+    try:
+        if card is None:
+            card_file.unlink(missing_ok=True)  # never leave an earlier land's card to be read
+        else:
+            atomic_write(card_file, card + "\n")
+    except OSError as exc:
+        print(f"[wrapup_land] change_card: file not written ({exc})", file=sys.stderr)
 
     # SPEC-review-effect-measurement AC-002/003: after the commit exists (both the created and
     # the already-present path reach here) and before the pop. Best-effort: a ledger fault is

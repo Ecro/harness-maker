@@ -237,8 +237,9 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # after #42 folded SPEC-maker-advance's hand-off line (BASELINE-DELTA-maker-advance.md),
     # and again after SPEC-hm-cost-p2's allowance folded (BASELINE-DELTA-hm-cost-p2.md), and
     # again with spec and wrapup after SPEC-hm-cost-p3's (BASELINE-DELTA-hm-cost-p3.md), and
-    # again with spec after #46 folded SPEC-hm-cost-p4's (BASELINE-DELTA-hm-cost-p4.md).
-    "execute": 8894,
+    # again with spec after #46 folded SPEC-hm-cost-p4's (BASELINE-DELTA-hm-cost-p4.md), and
+    # re-measured by SPEC-execute-report-short (+93: the three-line closing report).
+    "execute": 9103,
     # research, spec and wrapup re-measured after #54 folded SPEC-ask-less' allowance
     # (BASELINE-DELTA-ask-less.md, "Folded into the baseline from main"); spec again after #83
     # folded SPEC-spec-owner-boundary's (BASELINE-DELTA-spec-owner-boundary.md).

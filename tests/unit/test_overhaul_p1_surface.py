@@ -255,7 +255,9 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 # must hold the code." for the stage-your-code sentence (+15; the worktree-on arm is unchanged).
 # spec raised by SPEC-spec-owner-boundary's measured growth: the fifth skip condition and the
 # Boundary rule (+475 on every arm), then revision 2 "ask unless the ask states it" (+151).
-_STAGE_BUDGET = {"spec": (7771, 1500, 800), "execute": (7773, 1500, 0), "wrapup": (4300, 2785, 0)}
+# execute raised by SPEC-execute-report-short's measured growth: the three-line closing report
+# naming what the DRI must still see (+93 on every arm; 53 came from slack, so the budget rises 40).
+_STAGE_BUDGET = {"spec": (7771, 1500, 800), "execute": (7813, 1500, 0), "wrapup": (4300, 2785, 0)}
 _OPT_IN = 1500
 
 

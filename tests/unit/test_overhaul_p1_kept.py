@@ -108,7 +108,8 @@ _ADDED: dict[str, set[tuple[str, str]]] = {
     # SPEC-hm-cost-p2 AC-003 adds `export-golden` for parametric tests.
     "execute": {("check", ""), ("spec_machine", "mark-tested"), ("spec_machine", "export-golden")},
     "wrapup": {("check", "")},
-    "spec": {("spec_machine", "finalize")},
+    # SPEC-change-card AC-006: the approval question shows `hm change_card spec`'s card.
+    "spec": {("spec_machine", "finalize"), ("change_card", "spec")},
 }
 
 

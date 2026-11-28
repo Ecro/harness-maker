@@ -536,3 +536,29 @@ values:
     judge maintainability hm 0-2 vs discipline; /mnt/project-files/hm-owner-metrics/RESULTS-2026-11-28.md'
   definition_hash: b10a9cc6fa51ddd618d1f6ba9eb630896650ff40234311558368e3444dc5492b
   metric_id: owner_read_ratio_saga
+- value: 1.5
+  observed_at: '2026-11-28T02:40:00Z'
+  evidence: 'Definition change (SPEC-change-card, user 2026-11-28 05:34Z: owner approves
+    from the change card, SPEC.md is reference): the same 2026-11-28 saga rows (3
+    arms x 3, claude-sonnet-5-5) recounted with agent messages only: read chars per
+    shipped change hm 6920 / plain-discipline 4612 = 1.50 (old definition with SPEC
+    chars: 2.50). Quiz 0.73 vs 0.54 unchanged. /mnt/project-files/hm-owner-metrics/RESULTS-2026-11-28.md'
+  definition_hash: 12c7602396f8d738090308505d115544803a3a059c29df9f59d06474ace37e31
+  metric_id: owner_read_ratio_saga
+- value: 1.48
+  observed_at: '2026-11-28T07:08:04.470859Z'
+  evidence: 'SPEC-change-card saga run v2 (hm arm x3, claude-sonnet-5-5, branch claude/project-thread-bwfh51):
+    read chars per shipped change hm 6826 vs plain-discipline 4612 from the 2026-11-28
+    owner-metrics rows (same saga and model; discipline not rerun) = 1.48. Quiz hm
+    0.84 vs 0.73 before; every trap 3/3; escaped 0. Card shown at approval 18/19,
+    at land 17/17. /mnt/project-files/hm-change-card/RESULTS-2026-11-28.md'
+  definition_hash: 12c7602396f8d738090308505d115544803a3a059c29df9f59d06474ace37e31
+  metric_id: owner_read_ratio_saga
+- value: 1.3
+  observed_at: '2026-11-28T08:03:19.258158Z'
+  evidence: 'SPEC-execute-report-short saga run (hm arm x3, claude-sonnet-5-5): read
+    chars per shipped change hm 5980 vs plain-discipline 4612 (2026-11-28 owner-metrics
+    rows) = 1.30 (was 1.48). Execute report 1459 -> 733 per ship. Quiz 0.75 (v2 0.84,
+    before 0.73). E1 2/3, other traps 3/3, escaped 0. /mnt/project-files/hm-change-card/RESULTS-2026-11-28.md'
+  definition_hash: 12c7602396f8d738090308505d115544803a3a059c29df9f59d06474ace37e31
+  metric_id: owner_read_ratio_saga

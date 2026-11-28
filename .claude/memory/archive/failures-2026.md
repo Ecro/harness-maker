@@ -438,3 +438,84 @@ true`). Prevention: before shipping a "return field X alongside your output" con
 whose response is prose, verify against ONE live prose response (not a JSON-envelope fixture)
 that there is a place for X to land, or specify the parsing/marker mechanism explicitly. Related:
 [[wiki:architecture narrative-output-needs-explicit-envelope]].
+## [fail:other] reviewer-reasons-instead-of-diffing | 2026-08-23 | count:1
+A python string-replacement meant to cut one target from a comment to end-of-file also deleted
+`test_every_agent_declares_a_non_empty_tools_list`, sitting past the intended cut point.
+`probe-envelope-contract` (0.54.0): `tools:` is this repo's ONLY enforced agent security
+boundary (frontmatter `permissions:` is silent-ignored by Claude Code), so the deleted test's
+absence meant an agent declaring `tools: ""` would pass silently, and `tools:` absent would raise
+`AssertionError: unhandled tools: shape NoneType` instead of the security-explaining message the
+deleted test asserted. Two rounds of `/hm:execute` A.5 and both human reviewers missed it. The
+tests-lens was asked, in so many words, whether the new test set was a strict superset of the
+deleted one; it answered "by construction, yes" — a TRUE statement about the dangerous-grant
+check (which genuinely IS a superset of the old one) applied to a DIFFERENT property (whether
+every original `def test_` name still exists in the file). A construction argument about property
+A does not certify property B, even when both properties concern the same file and the same edit.
+Only the cross-model voter (codex) caught it, and not by reasoning about the change — by comparing
+the before/after `def test_` name sets, the mechanical check nobody else ran. Root-cause class: a
+deletion's reviewable artifact is the before/after SET of what existed, and a reviewer answering
+in prose about what "should" have survived is answering a different, weaker question than "what
+disappeared" — the weaker question can be answered correctly and still miss the defect, because
+"looks fine" and "nothing extra vanished" are not the same claim. Prevention: when a diff includes
+a deletion of code (not just a net-negative line count — a string-replace cut, a rewritten
+function, a collapsed block), run the mechanical before/after diff (`comm -23 <(before) <(after)`
+over defined names, or equivalent) BEFORE any prose reasoning about intent, and do not accept "I
+reasoned it through and it looks fine" as verification of what was removed — only a diff verifies
+a diff. See `[wiki:convention] deletion-diff-is-the-reviewable-artifact` for the general rule.
+## [fail:design] render-pin-outlives-the-worktree | 2026-08-23 | count:1
+Re-rendering a harness with `hm make . --directory <worktree>` bakes that worktree's absolute
+path into every generated command's `uv run --with <path>` pin, and the worktree is deleted by
+`task-land` at the end of the same task — so the base repo is left with commands that resolve to
+a path that no longer exists. `probe-envelope-contract` Phase 3's exit criterion said only
+"`uv run python -m harness_maker.cli make .` applies"; it did not say which cwd to render FROM,
+and the render was run with `--directory .worktrees/probe-envelope-contract` because that was the
+directory the phase's other work was happening in. The install-ref/pin machinery
+(`synthesize._compute_install_ref`, `_HARNESS_MAKER_PKG_ROOT`) resolves via the render-time
+CWD/`__file__`, and nothing in it treats "am I rendering from a task worktree that will be
+deleted" as a distinguishable case — it is the same code path as rendering from a permanent
+checkout. The result was caught before landing (recorded as a "carried into wrapup" item in the
+PLAN itself, fixed by re-rendering from the plugin cache after `task-land`), but nothing in the
+render path would have caught it had the operator not read their own PLAN's execution notes.
+Root-cause class: a render/pin mechanism keyed on "where am I running from" cannot distinguish a
+permanent location from an ephemeral one without being told, and the per-task worktree model
+makes every task worktree ephemeral by contract (`task-land` deletes it). This is a sibling of the
+snapshot-goldens-baking-worktree-paths family (`[wiki:pattern]` entries on `regenerate.py`
+pinning), but distinct in kind: those are committed TEST FIXTURES where portability is asserted by
+a gate; this is a LIVE render of the harness a real user runs next, with no gate at all. Prevention:
+any task/phase whose exit criterion invokes `hm make` (or `/harness-maker:make`) should either (a)
+explicitly require running from the BASE repo, never a task worktree, or (b) if run from a
+worktree is unavoidable mid-task, name re-rendering-from-base as an explicit follow-up step in the
+same phase, not an item discovered by reading execution notes after the fact. A cheap detector:
+grep the rendered `.claude/commands/hm/*.md` for `.worktrees/` after any `make` invocation — a hit
+means the pin is worktree-scoped and will not survive `task-land`.
+## [fail:process] self-contradiction-never-self-caught-a-different-reviewer-each-time | 2026-08-23 | count:1
+Four times in one work unit (`a5-duplicate-coverage-block`) the builder wrote a statement the
+artifact contradicted, and each time a DIFFERENT reviewer caught it — never the builder, never the
+same lens twice: (1) a judgment subject named `.claude/agents/test-reviewer.md`, a path that does
+not exist in this repo (the real one is under `templates/agents/`) — caught by `plan-validator` at
+plan time; (2) a comment asserting `comprehension.depth: deep` while the committed config actually
+read `standard` — caught by `codex`, a cross-model voter, not any of the seven same-model lenses;
+(3) a stale judgment hash left in the PLAN after the judged subject changed — caught by the
+`consistency` lens; (4) an overclaim of "fixed" answered by adding a retraction sentence while
+leaving the original claim in place, so one paragraph asserted and un-asserted the same fact —
+also caught by `consistency`, a different round than (3). No instance was self-caught, and no two
+instances shared a catching mechanism. The shape in common: each is a claim ABOUT an artifact
+(a path, a config value, a hash, a prior sentence) made in a document adjacent to that artifact,
+where the writer's own next read of the sentence reads as true because it is checked against
+INTENT, not against the artifact itself — the same blind spot `[wiki:convention]
+deletion-diff-is-the-reviewable-artifact` names for code deletion, here generalized to any
+"X states a fact about Y" pair. Cross-model review (`codex`) and `plan-validator`'s independent
+verification-against-source both did real work here — instance (2) is the sharpest case, because
+it is a disagreement between two copies of ONE file (comment vs. shipped value), invisible inside
+a unified diff, which is exactly why seven Claude lenses reviewing the same diff all missed it.
+Prevention: when a document makes a claim about a SEPARATE artifact's current state (a path
+exists, a config equals X, a hash matches, "this is now fixed"), that claim is not reviewable by
+reading the document alone — it requires opening the referenced artifact and comparing, which is
+mechanical and cheap but only happens if someone treats "quote the artifact you're describing, at
+review time, not from memory" as a required step rather than an optional diligence.
+## [fail:test] hardcoded-date-fixture-window-expires | 2026-08-26 | count:1
+`tests/unit/test_run_classify.py` hardcoded fixture timestamps to `2026-07-26`, and `_cmd_boundaries` falls back to `window_days=30` when no window is given. The test passed on the day it was written and failed silently 31 days later (2026-08-26), with all three turns dropped as `outside_window` — the test's own failure mode was exactly what it should have been asserting against. The cause was invisible in git history: nothing changed in the test or the source between passing and failing, only wall-clock time. Root-cause class: a fixture that encodes an absolute date next to a production code path that computes relative-to-now windows has a built-in expiry the test author cannot see at write time. Fixed by anchoring the fixture to `now` (computed once, offsets applied relative to it) rather than widening the window, since widening treats the symptom (this fixture) without removing the class (the next hardcoded-date fixture ships the same bomb). Prevention: any fixture timestamp compared against a `now()`-relative window must be generated as `now() - timedelta(...)`, never a literal date string; grep for `datetime(202\d` / ISO date literals in test files that exercise window/expiry logic as a review signal.
+## [fail:design] find-unbound-gate-never-fires-parse-miss | 2026-08-26 | count:1
+`spec_machine._pytest_collect_nodeids` filters `pytest --collect-only -q` output on `"::" in ln`, but that command prints per-file summary lines (`tests/e2e/foo.py: 2`), not node ids — node ids only appear with `--collect-only -q` in some pytest configurations/plugins, not the bare invocation used here. The helper therefore always returns `[]` in this repo, so `find_unbound_closed_type_acs` always returns `[]`, and the Production wrapup `find-unbound` gate has never fired — despite its docstring promising it "fails closed (never a false PASS by missing inputs)". A gate that structurally cannot fail is indistinguishable from a correctly-passing gate in every wrapup receipt, and this one shipped that way from day one. Discovered incidentally while verifying a real missed write-back during PLAN-render-observability-audit's wrapup, not by any test targeting the gate itself. Root-cause class: a fail-closed gate's OWN input-collection path is untested against the actual shell output of the tool it wraps — the docstring's guarantee was never exercised by a test that runs real `pytest --collect-only` and checks the helper parses it. Prevention: any helper that parses another CLI's stdout needs a fixture captured from a REAL invocation of that CLI (not a hand-written string shaped like what the author assumed the output looks like), and the "fails closed" claim needs a test that intentionally starves the helper's input and asserts it does not silently return an empty success. Left unfixed — out of scope for the render-observability-audit unit; recorded so the next session doesn't rediscover it from zero.
+## [fail:design] instruction-not-derived-from-config | 2026-08-26 | count:1
+An instruction ABOUT the project's configuration was authored by hand instead of derived from it, and nothing ever compared the two — so it drifted, and the drift was invisible in the direction that matters. Two instances, one root cause. (1) The verify and wrapup stages prescribed `mypy --strict src/` while `.github/workflows/ci.yml` ran `mypy --strict src tests`, and `ruff check src/ tests/` while CI ran `ruff check .`. Type and lint errors in test code were therefore structurally unreachable from every local verification pass: the local gate went green over a subset and said nothing about the rest. Two consecutive commits (`bd61ab57`, `12253460`) shipped a red CI through it — the second built on the first because the first's CI result was never read — with all six errors in `tests/`. (2) `hm test_runners plan` tells the reader to "read the project's CI selection and mirror it" and names `-m "not advisory"` for this harness, while ci.yml's Pytest step carries no `-m` filter at all; the measurement COMMENT above that step used the filter and the shipped command does not. The dangerous direction is always NARROWING, because a gate that checks less than it claims produces exactly the same green output as one that checks everything. Fix: `hm verification_plan {show,commands}` derives the gate commands from the project's CI, and the stages run what it prints (SPEC-ci-derived-verification-plan). It reports what it could not classify, carries `continue-on-error` through so an advisory CI step never becomes a blocking local gate, and degrades EXPLICITLY with a reason so an empty plan cannot read as "this project has no gates". Prevention, generalised beyond CI: when shipping an instruction that describes another artifact's contents (a config file, a workflow, another tool's flags), either derive it from that artifact at runtime or write a test that compares the instruction to it — and make that test read the real artifact, never a fixture shaped like what the author assumes it contains. The fixture is where this hides: every existing collect test in this repo built a pristine sandbox with no config file, so not one of them could reproduce a defect whose cause was the host project's own configuration.

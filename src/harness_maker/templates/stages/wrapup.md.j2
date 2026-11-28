@@ -61,4 +61,4 @@ Only on an `hm/<slug>` branch. From `<BASE>`, run `hm worktree task-land <slug> 
 
 ## Step 8 — Close
 
-Print the receipt's `steps.understanding_block` verbatim (its warning if `steps.understanding.status` is not `ok`/`none`), then each intent write of Step 5. Never push unasked.
+Open your closing message with the change card verbatim{% if config.locale != 'en' %} (its free-text lines in `{{ config.locale }}`){% endif %}: Read `.claude/observability/change-card-<slug>.txt` (= `steps.change_card`); if that file is missing, `steps.understanding_block` verbatim; and the warning if `steps.understanding.status` is not `ok`/`none`. Then Step 5's intent writes; no other summary. Never push unasked.

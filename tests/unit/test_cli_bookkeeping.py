@@ -308,6 +308,8 @@ def test_ac_005_wrapup_land_has_a_default_manifest(monkeypatch: pytest.MonkeyPat
 
 # ── AC-006 ──────────────────────────────────────────────────────────────────────────────────
 
+# execute keys re-pinned by SPEC-execute-report-short's measured growth (+93: the three-line closing
+# report that names what the DRI must still see); the other stages are untouched.
 MAIN_CHARS_PATH = REPO / "tests" / "fixtures" / "cli_bookkeeping" / "main_chars.json"
 
 
