@@ -363,7 +363,9 @@ def test_ac_006_the_stages_call_the_cli(rendered: dict[str, str], preset: str, t
     assert "spec_machine check" not in spec
     assert "spec_machine approve" not in spec
     assert "--write" in execute
-    assert "--ac AC-NNN" not in execute
+    # mark-tested binds every AC itself; `--ac AC-NNN` now appears only in export-golden's
+    # one-AC write (SPEC-behaviour-named-tests), so the pin names mark-tested.
+    assert not re.search(r"mark-tested[^`\n]*--ac", execute)
     assert "--required" not in wrapup
     assert "approval-status" not in _steps_6_7(wrapup)
     for stage, text in (("spec", spec), ("execute", execute), ("wrapup", wrapup)):

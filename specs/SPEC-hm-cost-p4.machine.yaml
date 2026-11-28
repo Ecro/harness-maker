@@ -270,6 +270,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: behaviour-named-tests
   oracle_source: golden
   oracle_evidence: The rendered command text is what the agent reads; the required
     and removed phrases are fixed here before the template changes.

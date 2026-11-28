@@ -1,0 +1,196 @@
+schema_version: 3
+spec_slug: behaviour-named-tests
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: bind records an AC's tests before RED
+  type: mechanical
+  test_ids:
+  - tests/unit/test_behaviour_named_tests.py::test_bind_records_tests_before_red
+  - tests/unit/test_behaviour_named_tests.py::test_bind_refuses_missing_tests_and_unknown_acs
+  - tests/unit/test_behaviour_named_tests.py::test_bind_again_replaces_a_renamed_test_and_refuses_non_tests
+  executable_predicate: 'bind(yaml, {''AC-001'': [node]}) == [] and load(yaml).ac[0].test_ids
+    == [node] and load(yaml).ac[0].pending_test and approval_state(yaml) == ''approved''
+    and bind(yaml, {''AC-001'': [missing]}) and yaml.read_bytes() == before'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fixture SPEC, test files and expected yaml state are fixed in the
+    test; presence is read from the fixture text, not from the code under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: export-golden writes one AC's rows under a chosen name
+  type: mechanical
+  test_ids:
+  - tests/unit/test_behaviour_named_tests.py::test_export_golden_writes_one_acs_rows_under_a_chosen_name
+  - tests/unit/test_behaviour_named_tests.py::test_export_golden_name_needs_an_ac_and_an_identifier
+  - tests/unit/test_behaviour_named_tests.py::test_export_golden_never_shadows_or_crashes_on_an_existing_name
+  executable_predicate: run(write_args + ['--ac', 'AC-001', '--name', 'MAX_UNITS_CASES'])
+    == 0 and f.read_text() == EXPECTED and run(write_args + ['--ac', 'AC-001', '--name',
+    'TAKEN']) == 1 and run(write_args + ['--name', 'X']) == 2
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected file bytes, with double-quoted strings and no comment
+    line, are written by hand in the test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: printed rows read back exactly
+  type: property
+  test_ids:
+  - tests/unit/test_behaviour_named_tests.py::test_printed_rows_read_back_exactly
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: ast.literal_eval is Python's own reader, independent of the printer
+    under test.
+  oracle_independence_waiver: null
+  input_domain: nested values of str (quotes, backslashes, newlines, non-ASCII), int,
+    float, bool, None, list, tuple and dict, depth <= 3, from a seeded random generator
+  transformation: v -> ast.literal_eval(py_literal(v))
+  expected_relation: equals v, and a str without '"' prints starting and ending with
+    '"'
+  preconditions: []
+  observable_output: the printed literal text
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: hm check finds rows through the bound test's parametrize
+  type: mechanical
+  test_ids:
+  - tests/unit/test_behaviour_named_tests.py::test_check_finds_rows_through_the_bound_tests_parametrize
+  - tests/unit/test_behaviour_named_tests.py::test_check_names_the_ac_when_a_parametrized_row_changes
+  - tests/unit/test_behaviour_named_tests.py::test_check_leaves_a_load_golden_table_test_to_the_legacy_verdict
+  - tests/unit/test_behaviour_named_tests.py::test_check_reads_only_cases_the_test_really_runs
+  executable_predicate: all(_inline_golden_drift(root, spec, want) == [] for root
+    in (const_tree, inline_tree, extended_tree, enumerate_tree)) and _inline_golden_drift(edited_tree,
+    spec, want) == ['AC-001'] and _inline_golden_drift(legacy_tree, spec, want) is
+    None
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fixture SPEC rows and test files are fixed in the test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: execute names tests for behaviour and binds them
+  type: mechanical
+  test_ids:
+  - tests/unit/test_behaviour_named_tests.py::test_execute_names_tests_for_behaviour_and_binds_them
+  executable_predicate: all(not any(w in t for w in ('test_ac_NNN', 'AC-NNN-<i>',
+    'AC_NNN_ROWS', 'spec_machine validate')) and all(w in t for w in EXECUTE_PHRASES)
+    and t.index('spec_machine bind --slug') < t.index('**RED**') for t in (claude_execute,
+    codex_execute))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrases fixed in this SPEC before the template change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: spec keeps a golden table to one call shape
+  type: mechanical
+  test_ids:
+  - tests/unit/test_behaviour_named_tests.py::test_spec_keeps_a_golden_table_to_one_call_shape
+  executable_predicate: all(SPEC_PHRASE in t for t in (claude_spec, codex_spec))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrase fixed in this SPEC before the template change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 7cfe57f3d4dcb1c5ca99b16e716c28c53ace1df3db940d7ce2d08ffa52fd046a
+  approved_by: Claude
+  approved_at: '2026-11-28T12:22:11Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 11ea38ccfda84fdc62126ae2676705edf4c2e9810775e0af4bc435a82344fe6a
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 7099f312a1a574704483bc2d12578f0143f254a036491a9e59eb3a008bc6d45f
+    AC-002: a4ba3c112666f167d98fe4bfa4e81748dd5b09555ee3c45711a91eb5649b63ec
+    AC-003: f53e7b77111803dc3639b7003864778a0b7581af1951ff185438374252e88124
+    AC-004: 8bc24887a52383bd629abe8d2bf865a52fe2d37f334ae84206bcd6dd4e6d544b
+    AC-005: 064108a7a699246e708b271c133d52bbaf724a6ab048ad860dd275409088f887
+    AC-006: e15e0ba858b0425ee2de5d65b7b0bd02ed812e3c5658fb2b8a2aa7377acb4b9f
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923

@@ -1187,6 +1187,132 @@ def write_inline_rows(path: Path, payload: dict[str, list[dict[str, Any]]]) -> b
     return True
 
 
+def py_literal(value: Any) -> str:
+    """`value` as Python source in the quote style of hand-written tests (double quotes).
+
+    `repr` prints `'2h'`; the 0.67.x judge read single-quoted pasted rows as foreign to a file
+    whose own literals use `"` (SPEC-behaviour-named-tests). Only the quoting differs from
+    `repr`, so `ast.literal_eval` reads back the same value.
+    """
+    if isinstance(value, str):
+        text = repr(value)
+        if text.startswith("'") and '"' not in value:
+            return '"' + text[1:-1].replace("\\'", "'") + '"'
+        return text
+    if isinstance(value, list):
+        return "[" + ", ".join(py_literal(v) for v in value) + "]"
+    if isinstance(value, tuple):
+        inner = ", ".join(py_literal(v) for v in value)
+        return f"({inner},)" if len(value) == 1 else f"({inner})"
+    if isinstance(value, dict):
+        return "{" + ", ".join(f"{py_literal(k)}: {py_literal(v)}" for k, v in value.items()) + "}"
+    return repr(value)
+
+
+def write_named_rows(path: Path, name: str, rows: list[dict[str, Any]]) -> str:
+    """Put one AC's rows into `path` as `name = [...]`: "wrote", "unchanged" or "taken".
+
+    The test author names the constant for the behaviour; no AC id lands in the file. A block
+    already holding these rows is left as it is; one holding other rows is someone else's, so it
+    is never overwritten ("taken").
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        text = ""
+    shaped = inline_rows_projection(rows)
+    block = f"{name} = [\n" + "".join(f"    {py_literal(r)},\n" for r in shaped) + "]\n"
+    m = re.search(rf"^{re.escape(name)} = \[\n(?:^ {{4}}[^\n]*\n)*^\](?:\n|\Z)", text, re.M)
+    if m:
+        try:
+            held = [tuple(r) for r in ast.literal_eval(m.group(0).split(" = ", 1)[1])]
+        except (ValueError, SyntaxError, TypeError):
+            return "taken"
+        same = [py_literal(r) for r in held] == [py_literal(r) for r in shaped]
+        return "unchanged" if same else "taken"
+    if re.search(rf"^{re.escape(name)}\s*(?::[^=\n]*)?=", text, re.M):
+        return "taken"  # assigned in a form the block pattern does not read: never shadow it
+    first = re.search(r"^(?:@|def |async def |class )", text, re.M)
+    if not text.strip():
+        new = block
+    elif first:
+        head = text[: first.start()].rstrip("\n")
+        new = (head + "\n\n\n" if head else "") + block + "\n\n" + text[first.start() :]
+    else:
+        new = text.rstrip("\n") + "\n\n\n" + block
+    path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write(path, new)
+    return "wrote"
+
+
+def bind(yaml_path: Path, root: Path, ac_test_ids: dict[str, list[str]]) -> list[str]:
+    """Record each AC's tests before RED; errors, or [] with the yaml updated.
+
+    The link used to live in the test name (`test_ac_NNN_*`), which put AC ids in every test
+    file (SPEC-behaviour-named-tests). `test_ids` is tooling state outside the approval hash,
+    so writing it early keeps the approval; `pending_test` stays true until mark-tested, which
+    still collects them after GREEN. A test is checked by reading its file, not by importing it:
+    before GREEN its imports may not exist yet. Each named AC's list is replaced, not extended,
+    so a test renamed after the first bind is fixed by binding again.
+    """
+    from harness_maker.check import _statically_present
+
+    with _spec_write_lock(yaml_path):
+        model = load(yaml_path)
+        by_id = {ac.id: ac for ac in model.ac}
+        errors: list[str] = []
+        for ac_id, ids in ac_test_ids.items():
+            ac = by_id.get(ac_id)
+            if ac is None:
+                errors.append(f"bind: unknown ac id {ac_id!r}")
+            elif ac.superseded_by is not None:
+                errors.append(f"bind: {ac_id} is superseded")
+            errors += [
+                f"bind: {tid} is not a test in the tree"
+                for tid in ids
+                if not _bindable(root, tid) or _statically_present(root, tid) is not True
+            ]
+        if errors:
+            return errors
+        for ac_id, ids in ac_test_ids.items():
+            ac = by_id[ac_id]
+            ac.test_ids = list(dict.fromkeys(ids))
+        _dump_machine_yaml(yaml_path, model)
+    return []
+
+
+def _bindable(root: Path, test_id: str) -> bool:
+    """A node id inside the tree whose last part names a test (`test_*`), not any top-level name."""
+    file, _, rest = test_id.partition("::")
+    if not rest or Path(file).is_absolute():
+        return False
+    try:
+        (root / file).resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return re.sub(r"\[.*\]$", "", rest).split("::")[-1].startswith("test")
+
+
+def _run_bind(args: argparse.Namespace) -> int:
+    error = _resolve_paths(args, "bind", need_md=False)
+    if error:
+        print(error, file=sys.stderr)
+        return 2
+    ac_test_ids: dict[str, list[str]] = {}
+    for ac_id, node in args.test_ids:
+        ac_test_ids.setdefault(ac_id, []).append(node)
+    try:
+        errors = bind(args.yaml_path, args.root, ac_test_ids)
+    except Exception as exc:  # noqa: BLE001 — a lock, I/O or broken-yaml error is a refusal
+        errors = [f"bind: {exc}"]
+    for e in errors:
+        print(e, file=sys.stderr)
+    if errors:
+        return 1
+    print(f"bind: OK ({sum(len(v) for v in ac_test_ids.values())} test id(s))")
+    return 0
+
+
 def _slug_paths(root: Path, slug: str) -> tuple[Path, Path]:
     """`--slug` → (machine.yaml, md) through the reader `approval_state` uses (ADR-003)."""
     spec_dir = _named_spec_dir(root, slug, root)
@@ -1241,6 +1367,12 @@ def _run_export_golden(args: argparse.Namespace) -> int:
     if args.write is not None and not args.inline:
         print("export-golden: --write needs --inline", file=sys.stderr)
         return 2
+    if (args.name is None) != (args.ac_id is None) or (args.name and args.write is None):
+        print("export-golden: --name and --ac go together, with --inline --write", file=sys.stderr)
+        return 2
+    if args.name is not None and not (args.name.isidentifier() and not iskeyword(args.name)):
+        print(f"export-golden: --name {args.name!r} is not a Python name", file=sys.stderr)
+        return 2
     try:
         payload = golden_export(load(args.yaml_path))
     except GoldenTableError as e:
@@ -1249,8 +1381,22 @@ def _run_export_golden(args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001 — an unloadable yaml is a usage error, not a trace
         print(f"export-golden: cannot load {args.yaml_path}: {e}", file=sys.stderr)
         return 1
-    if not payload:
+    if not payload and args.name is None:
         print("export-golden: no parametric AC; nothing written")
+        return 0
+    if args.name is not None:
+        if args.ac_id not in payload:
+            print(
+                f"export-golden: {args.ac_id} is not a parametric AC of this SPEC", file=sys.stderr
+            )
+            return 1
+        target = args.write if args.write.is_absolute() else args.root / args.write
+        outcome = write_named_rows(target, args.name, payload[args.ac_id])
+        if outcome == "taken":
+            print(f"export-golden: {args.write} already holds other rows as {args.name}; "
+                  "choose another name", file=sys.stderr)  # fmt: skip
+            return 1
+        print(f"export-golden: {outcome} {args.write} ({args.name})")
         return 0
     if args.inline and args.write is not None:
         target = args.write if args.write.is_absolute() else args.root / args.write
@@ -2711,6 +2857,21 @@ def main(argv: list[str] | None = None) -> int:
         help="AC-ID=test_node to record (repeatable)",
     )
 
+    p_bind = sub.add_parser(
+        "bind", help="record which tests check which AC, before RED (no pytest run)"
+    )
+    p_bind.add_argument("--yaml", dest="yaml_path", type=Path, default=None)
+    p_bind.add_argument("--slug", default=None, help="find the machine.yaml by slug")
+    p_bind.add_argument("--root", type=Path, default=Path.cwd())
+    p_bind.add_argument(
+        "--test-id",
+        dest="test_ids",
+        action="append",
+        required=True,
+        type=_parse_ac_test_id,
+        help="AC-ID=test_node to record (repeatable)",
+    )
+
     p_retire = sub.add_parser(
         "retire", help="mark one AC superseded by an approved SPEC (or --clear it)"
     )
@@ -2778,6 +2939,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="print each AC's rows as an `AC_NNN_ROWS` list to paste into its test; write no file",
     )
+    p_export.add_argument("--ac", dest="ac_id", default=None, help="with --name: this AC only")
+    p_export.add_argument(
+        "--name",
+        default=None,
+        help="with --write and --ac: the rows' constant, named for behaviour",
+    )
 
     p_approve = sub.add_parser("approve", help="stamp the SPEC as accepted (content-hash bound)")
     p_approve.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
@@ -2807,6 +2974,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "retire":
         return _run_retire(args)
+    if args.cmd == "bind":
+        return _run_bind(args)
     if args.cmd == "approve":
         return _run_approve(args)
 

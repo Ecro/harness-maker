@@ -31,7 +31,7 @@ Ask only what the DRI owns: categories 1–4 and each irreversible decision, wit
 
 Categories: 1. **Intent** (why now); 2. **Outcomes** ("done", observably); 3. **In-scope scenarios** (2–4 Given-When-Then: normal, edge, failure); 4. **Non-goals**; 5. **Constraints** (the test framework is mandatory); 6. **Verification** (each scenario → unit, integration or manual).
 
-**Oracle, for every AC.** Choose `oracle_source` (golden, differential, property, rubric or consensus; a property also needs `input_domain`, `transformation`, `expected_relation`) and write `oracle_evidence`: why it is independent of the code. "The test will check it" is circular.
+**Oracle, for every AC.** Choose `oracle_source` (golden, differential, property, rubric or consensus; a property also needs `input_domain`, `transformation`, `expected_relation`) and write `oracle_evidence`: why it is independent of the code.
 
 **Irreversible decisions** (not cheaply undone): `category` is exactly one of {{ hm.irr_categories() }}. Each is `{id: IRR-NNN, decision, category, rationale, source: spec}`; `irreversible_decisions: []` is valid.
 
@@ -70,7 +70,7 @@ ac:
     oracle_evidence: <why it is independent>
 ```
 
-A behaviour-unchanged AC covers only what no existing test asserts; it is parametric, its golden rows computed at spec time by running the unchanged code and never regenerated. A raising case is a mechanical AC (`pytest.raises`), not a golden row. `/hm:execute` writes each testable AC's test.
+A behaviour-unchanged AC covers only what no existing test asserts; it is parametric, its golden rows computed at spec time by running the unchanged code and never regenerated. A raising case is a mechanical AC (`pytest.raises`), not a golden row. One golden table per function: no column naming the function or scripting steps.
 
 ## Step 4 — Check
 

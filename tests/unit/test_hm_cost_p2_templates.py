@@ -32,10 +32,11 @@ def _render(stage: str, *, is_codex: bool = False, second_brain: bool = True) ->
 def test_ac_003_execute_reads_golden_json() -> None:
     # SPEC-inline-golden-rows: the rows are pasted into the test file (`AC_NNN_ROWS`) instead of
     # read from the JSON; the test keeps its name so this SPEC's `test_ids` stay bound.
+    # SPEC-behaviour-named-tests: the rows are written under a behaviour name (`--name`).
     text = _render("execute")
     for banned in ("import harness_maker", "from harness_maker", "load_golden_table"):
         assert banned not in text
-    assert "`AC_NNN_ROWS`" in text
+    assert "--ac AC-NNN --name <NAME>" in text
     assert "export-golden --inline" in text
 
 

@@ -4,6 +4,13 @@
 
 ### Changed
 
+- Tests written by `/hm:execute` are named for the behaviour they check, with no AC id in a test
+  name, case id or row constant. The AC link moves into the SPEC: `hm spec_machine bind` records
+  each AC's tests before RED. `export-golden --inline --write <file> --ac AC-NNN --name NAME`
+  writes one AC's rows under a chosen name in double quotes, and `hm check` finds rows through the
+  bound test's own `parametrize`. `/hm:spec` keeps one golden table per function. On the
+  evidence-citing pairwise judge, the 0.67.x requirement-id names were the decisive
+  maintainability evidence in 17 of 27 losses to plain + "write tests" (SPEC-behaviour-named-tests).
 - **Golden rows read like ordinary pytest parameters** (SPEC-readable-golden-rows). `hm
   spec_machine export-golden --inline` now prints a column header such as
   `# (seconds, max_units, expected)` and flat tuples `(5430, 2, '2h')` when every row's input has

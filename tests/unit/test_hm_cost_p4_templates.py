@@ -36,13 +36,8 @@ def _step(text: str, number: str) -> str:
     return text.split(head, 1)[1].split("\n## ", 1)[0]
 
 
-@pytest.mark.parametrize("is_codex", [False, True])
-def test_ac_004_phase_a_names_tests(is_codex: bool) -> None:
-    text = _render("stages/execute.md.j2", is_codex=is_codex)
-    assert "AC-NNN-<i>" in text
-    assert "never copy the implementation" in text
-    assert "Put each test's node id in its AC's `test_ids`" not in text
-    assert "spec_machine validate" not in text
+# AC-004 (Phase A names tests by AC) is retired by SPEC-behaviour-named-tests; its other
+# assertions moved to test_behaviour_named_tests (execute names tests for behaviour).
 
 
 @pytest.mark.parametrize("is_codex", [False, True])

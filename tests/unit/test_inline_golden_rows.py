@@ -134,11 +134,8 @@ def test_ac_002_a_sibling_without_rows_is_drift(tmp_path: Path) -> None:
     assert ac["golden_drift"]["acs"] == ["AC-002"], ac
 
 
-def test_ac_003_execute_pastes_inline_rows() -> None:
-    text = _render("execute")
-    assert "export-golden --inline" in text
-    assert "`AC_NNN_ROWS`" in text
-    assert "golden.json" not in text
+# AC-003 (execute pastes `AC_NNN_ROWS`) is retired by SPEC-behaviour-named-tests; its
+# assertions moved to test_behaviour_named_tests (execute names tests for behaviour).
 
 
 def test_ac_004_spec_verification_names_acs_not_tests() -> None:

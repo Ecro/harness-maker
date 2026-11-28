@@ -1671,6 +1671,143 @@ def _has_line_pair(path: Path, text: str) -> bool:
         return False
 
 
+def _parametrized_values(root: Path, test_ids: list[str]) -> list[list[Any]]:
+    """The case lists the bound tests' `parametrize` decorators read, where they are literals.
+
+    A list written in the decorator, a module constant, or a comprehension over a constant
+    (`[pytest.param(*r, ...) for i, r in enumerate(CASES)]`) resolves; anything computed, such as
+    `load_golden_table(...)`, does not, so a test reading rows that way keeps the JSON verdict.
+    """
+    found: list[list[Any]] = []
+    trees: dict[str, ast.Module | None] = {}
+    for tid in test_ids:
+        file, _, rest = tid.partition("::")
+        if file not in trees:
+            try:
+                trees[file] = ast.parse((root / file).read_text(encoding="utf-8"))
+            except (OSError, SyntaxError, ValueError):
+                trees[file] = None
+        tree = trees[file]
+        if tree is None or not rest:
+            continue
+        consts = _module_literals(tree)
+        func = _find_function(tree, re.sub(r"\[.*\]$", "", rest).split("::"))
+        if func is None:
+            continue
+        for deco in func.decorator_list:
+            if not (isinstance(deco, ast.Call) and _call_name(deco.func) == "parametrize"):
+                continue
+            node = deco.args[1] if len(deco.args) > 1 else None
+            for kw in deco.keywords:
+                if kw.arg == "argvalues":
+                    node = kw.value
+            values = _resolve_cases(node, consts)
+            if values is not None:
+                found.append([tuple(v) if isinstance(v, list) else v for v in values])
+    return found
+
+
+def _legacy_reader(files: list[Path], ac_id: str, test_ids: list[str]) -> bool:
+    """Tests from before inline rows: named by the AC convention, or reading the SPEC's rows
+    through `load_golden_table` or the golden JSON. They keep the JSON verdict."""
+    from harness_maker import spec_machine
+
+    if spec_machine.ac_tests_for(ac_id, test_ids) == list(test_ids):
+        return True
+    for path in files:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if "load_golden_table" in text or ".golden.json" in text:
+            return True
+    return False
+
+
+def _module_literals(tree: ast.Module) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target, expr = node.targets[0], node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            target, expr = node.target, node.value
+        else:
+            continue
+        if isinstance(target, ast.Name):
+            with contextlib.suppress(
+                ValueError, TypeError, SyntaxError, MemoryError, RecursionError
+            ):
+                out[target.id] = ast.literal_eval(expr)
+    return out
+
+
+def _find_function(
+    tree: ast.Module, path: list[str]
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    body: list[ast.stmt] = tree.body
+    for i, name in enumerate(path):
+        hit = next((n for n in body if getattr(n, "name", None) == name), None)
+        if hit is None:
+            return None
+        if i == len(path) - 1:
+            return hit if isinstance(hit, (ast.FunctionDef, ast.AsyncFunctionDef)) else None
+        if not isinstance(hit, ast.ClassDef):
+            return None
+        body = hit.body
+    return None
+
+
+def _call_name(func: ast.expr) -> str:
+    return func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+
+
+def _resolve_cases(node: ast.expr | None, consts: dict[str, Any]) -> list[Any] | None:
+    if node is None:
+        return None
+    if isinstance(node, ast.Name):
+        value = consts.get(node.id)
+        return list(value) if isinstance(value, (list, tuple)) else None
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _resolve_cases(node.left, consts), _resolve_cases(node.right, consts)
+        return None if left is None or right is None else left + right
+    if isinstance(node, (ast.ListComp, ast.GeneratorExp)):
+        return _resolve_comprehension(node, consts)
+    try:
+        value = ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        return None
+    return list(value) if isinstance(value, (list, tuple)) else None
+
+
+def _resolve_comprehension(
+    node: ast.ListComp | ast.GeneratorExp, consts: dict[str, Any]
+) -> list[Any] | None:
+    """Only a comprehension that passes each row through unchanged: `r` or `pytest.param(*r, …)`
+    over `CASES` or `enumerate(CASES)`, with no `if`. Any other element computes new values."""
+    if len(node.generators) != 1 or node.generators[0].ifs:
+        return None
+    gen = node.generators[0]
+    it, target = gen.iter, gen.target
+    if isinstance(it, ast.Call) and _call_name(it.func) == "enumerate" and len(it.args) == 1:
+        it = it.args[0]
+        if not (isinstance(target, ast.Tuple) and len(target.elts) == 2):
+            return None
+        target = target.elts[1]
+    if not isinstance(target, ast.Name):
+        return None
+    row, elt = target.id, node.elt
+    plain = isinstance(elt, ast.Name) and elt.id == row
+    wrapped = (
+        isinstance(elt, ast.Call)
+        and _call_name(elt.func) == "param"
+        and len(elt.args) == 1
+        and isinstance(elt.args[0], ast.Starred)
+        and isinstance(elt.args[0].value, ast.Name)
+        and elt.args[0].value.id == row
+    )
+    return _resolve_cases(it, consts) if plain or wrapped else None
+
+
 def _inline_golden_drift(
     root: Path, spec: SpecView, want: dict[str, list[dict[str, Any]]]
 ) -> list[str] | None:
@@ -1683,12 +1820,35 @@ def _inline_golden_drift(
     from harness_maker import spec_machine
 
     found_any, drift = False, []
+    json_rows = spec_machine.golden_json_path(spec.yaml_path).is_file()
     for ac in spec.live():
         if ac.id not in want or not ac.test_ids:
             continue
         files = sorted({root / tid.partition("::")[0] for tid in ac.test_ids})
         copies = _literal_rows(files, spec_machine.inline_rows_name(ac.id))
         if not copies:
+            # Behaviour-named tests (SPEC-behaviour-named-tests): no AC id names the rows, so they
+            # are read through the bound test's own `parametrize`, extra cases allowed.
+            lists = _parametrized_values(root, ac.test_ids)
+            if lists:
+                found_any = True
+                shapes = (
+                    [(r["input"], r["expected"]) for r in want[ac.id]],
+                    spec_machine.inline_rows_projection(want[ac.id]),
+                )
+                # Compared as printed literals, so `1`, `1.0` and `True` stay different rows.
+                texts = [{spec_machine.py_literal(v) for v in vals} for vals in lists]
+                if not any(
+                    all(spec_machine.py_literal(r) in have for r in rows)
+                    for have in texts
+                    for rows in shapes
+                ):
+                    drift.append(ac.id)
+                continue
+            if not json_rows and not _legacy_reader(files, ac.id, ac.test_ids):
+                # A behaviour-named test whose cases `hm check` cannot read would otherwise
+                # pass as `golden: absent` however its rows drift.
+                found_any = True
             drift.append(ac.id)
             continue
         found_any = True
