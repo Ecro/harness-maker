@@ -1,0 +1,261 @@
+schema_version: 3
+spec_slug: bench-omc-arm
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the omc arm and --omc-dir come together and are checked before spend
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_omc_arm.py::test_ac_001_omc_setup
+  - tests/unit/test_bench_omc_arm.py::test_ac_001_runners_refuse_before_spend
+  executable_predicate: omc_setup(['plain'], None) is None and omc_setup(['omc'],
+    plugin_dir) == (sha, version) and refused == 3
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The plugin name oh-my-claudecode and the version come from OMC's
+    own .claude-plugin/plugin.json (v5.8.9 at b8fe868, read 2026-11-28), not from
+    the runner.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the omc prompt is OMC's execute mode; other prompts are unchanged
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_omc_arm.py::test_ac_002_prompts[AC-002-0]
+  - tests/unit/test_bench_omc_arm.py::test_ac_002_prompts[AC-002-1]
+  - tests/unit/test_bench_omc_arm.py::test_ac_002_prompts[AC-002-2]
+  - tests/unit/test_bench_omc_arm.py::test_ac_002_saga_prompts
+  executable_predicate: null
+  golden_table:
+  - input:
+      runner: bench_light_lane
+      task: t1
+      arm: plain
+    expected: Add an optional `max_units` parameter to `format_duration` i
+    edge: false
+    note: first 60 chars, computed on main 593a6ac5 before the change
+  - input:
+      runner: bench_light_lane
+      task: t1
+      arm: hm
+    expected: /hm:spec Add an optional `max_units` parameter to `format_du
+    edge: false
+    note: first 60 chars, computed on main 593a6ac5 before the change
+  - input:
+      runner: bench_light_lane
+      task: t1
+      arm: omc
+    expected: /oh-my-claudecode:execute Add an optional `max_units` parame
+    edge: false
+    note: OMC's documented slash form /oh-my-claudecode:<skill> (README)
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: plain/hm rows were computed by running the unchanged code at spec
+    time; the omc prefix is the skill name OMC ships (skills/execute/SKILL.md, name
+    execute).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: omc agent calls load the plugin; other argv are unchanged
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_omc_arm.py::test_ac_003_argv[AC-003-0]
+  - tests/unit/test_bench_omc_arm.py::test_ac_003_session_argv_per_arm
+  executable_predicate: null
+  golden_table:
+  - input:
+      claude_bin: c
+      prompt: p
+      model: m
+      max_turns: 5
+      max_budget_usd: 1.0
+    expected:
+    - c
+    - -p
+    - p
+    - --output-format
+    - json
+    - --dangerously-skip-permissions
+    - --max-turns
+    - '5'
+    - --model
+    - m
+    - --max-budget-usd
+    - '1'
+    - --setting-sources
+    - project,local
+    - --strict-mcp-config
+    edge: false
+    note: agent_argv on main 593a6ac5 before the change; the omc arm appends --plugin-dir
+      <dir>
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Computed by running the unchanged agent_argv at spec time; --plugin-dir
+    is the Claude Code 2.1.332 flag (claude --help), verified headless on 2026-11-28.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: omc runs in its own HOME, keeping the config dir
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_omc_arm.py::test_ac_004_own_home
+  - tests/unit/test_bench_omc_arm.py::test_ac_004_saga_turn_env
+  - tests/unit/test_bench_omc_arm.py::test_ac_004_run_cell_wiring
+  executable_predicate: env['HOME'] == str(cell / 'home') and (cell / 'home' / '.gitconfig').is_file()
+    and env['CLAUDE_CONFIG_DIR'] == config_dir and plain_env == agent_env()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: OMC writes homedir()/.omc (scripts/session-start.mjs:1585, dist/hooks/*/constants.js);
+    the transcript reader uses CLAUDE_CONFIG_DIR/projects (default_transcript_root).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: provenance and hashes
+  type: parametric
+  test_ids:
+  - tests/unit/test_bench_omc_arm.py::test_ac_005_saga_options
+  - tests/unit/test_bench_omc_arm.py::test_ac_005_hashes[AC-005-0]
+  - tests/unit/test_bench_omc_arm.py::test_ac_005_hashes[AC-005-1]
+  - tests/unit/test_bench_omc_arm.py::test_ac_005_row_fields
+  executable_predicate: null
+  golden_table:
+  - input:
+      runner: bench_light_lane
+      model: claude-sonnet-5-5
+      max_turns: 200
+      timeout_s: 1800
+      max_budget_usd: 2.0
+      pass_env: []
+      claude_version: v1
+    expected: c2140abbf394
+    edge: false
+    note: runner_hash on main 593a6ac5 before the change
+  - input:
+      runner: saga_bench
+      options: default with out=/x
+      claude_version: v1
+    expected: 3ad4cf9e1937
+    edge: false
+    note: runner_hash on main 593a6ac5 before the change
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Computed by running the unchanged runner_hash functions at spec
+    time; an omc sha must move the hash, its absence must not.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: reports
+  type: mechanical
+  test_ids:
+  - tests/unit/test_bench_omc_arm.py::test_ac_006_report_and_publish
+  - tests/unit/test_bench_omc_arm.py::test_ac_006_saga_report
+  executable_predicate: (EXTERNAL_TITLE in report_text(rows)) and report_text(base_rows)
+    == unchanged_text and not [r for r in publish_rows(out) if r['arm'] == 'omc']
+    and verdict(rows) == verdict(base_rows)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Each check compares the output with and without omc rows on the
+    same fixture rows, so the oracle is the unchanged output itself.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: f411b58a0a68f9dd335b3c3b53ba4aac074b3b7fad92bb9494b2b983b32f18e1
+  approved_by: Claude
+  approved_at: '2026-11-28T01:05:45Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 9480db63293b7cb03aef6feb5127b7c1ab84947a0a5cf7981852796c9163c0dc
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 3e5ec7eb9d18fe122e3fe64bce15c95d16708de536627d3695ad40ef76d1ef07
+    AC-002: 5ffc6154b82a793201c63a336dd4ce874aebba975e433bf46e1bbe3b946e15fc
+    AC-003: 572b3df9351244a257ada9ec9e0c330cd129550b7a4c5b13d947a1938abe897c
+    AC-004: b37011295385a6d7c9065a5e37d0e5aee1864f926758b9c49372b43be735d8c3
+    AC-005: 03383f58b71478d8c5997d1bb6d3cd146fe9d87a2786b2eb7871b4e7bf1b8910
+    AC-006: 6215dbfe982fc68f43ac459594445e58d4d4b9c87efb179541bc55d187dd7b71
+    ac_order: 9b3a779b899b7e8e9fae9079dfa19c53330be02580dee49daa84fb637d4e3923
