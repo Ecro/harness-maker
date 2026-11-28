@@ -15,7 +15,7 @@
 >
 > *Automate the work. Elevate the engineer.*
 
-> **Version**: 0.66.1
+> **Version**: 0.67.0
 >
 > Current release contract (validated from source):
 >
@@ -426,7 +426,7 @@ The world model is what the harness keeps between sessions: **intents** (goals, 
 **The briefing** is one digest (`hm world_model digest`), at most 1.5 KB and read-only on project state. It shows:
 
 - up to 5 tasks, newest first: next stage (derived from the task's artifacts), last stage, latest artifact, whether another session touched it last, and `parked` (only a RESEARCH older than 7 days, no commits; sorted last);
-- active intents with their metric's `last` / `target` / `gap`;
+- open goals with their metric's `last` / `target` / `gap`;
 - recent commits.
 
 Only `hm/<slug>` task worktrees are listed (`worktree.enabled: true`). Maker runs the digest as its first Bash step on every call, on both targets. Each briefing appends one `maker_load` line (timestamp and session id, no request text) to `.claude/observability/world-model.jsonl`.
@@ -494,7 +494,7 @@ Grouped by what they do for your project, not by component.
 - **Deep interview before every implementation.** `/hm:spec` runs a 6-category interview (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification) scored for completeness. The decisions that cannot be cheaply undone are locked in that same interview as `irreversible_decisions`; the *how* — phases, ordering, risk — is authored by `/hm:execute` Step 0 with no human gate.
 - **Topic-matched context loading.** Stages load the wiki/failures entries matched to the stage topic (`hm memory_retrieve`: lexical hits first, up to 3 high-recurrence failures only in slots left over, one 8 KB cap for the whole block) and read git log / PLANs on demand. An interrupted `/hm:execute` resumes from the SPEC's `pending_test` flags, the PLAN and the REVIEW file; no session snapshot is kept.
 - **Cross-process memory safety.** `.claude/memory/` writers serialise via re-entrant POSIX flock. Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤PIPE_BUF) so concurrent Claude Code + Codex sessions cannot interleave JSONL lines.
-- **Intent layer — purpose, metrics and accountable work.** `.claude/intent.yaml` holds purpose, metrics, open questions and optional owner/dri/team roles; `intent/<ID>.md` records each intent across one or more SPECs. `hm intent status` combines gaps, revisits and withdrawal; writes remain answer-gated. Reached through Maker or by typing `/intent-layer`. Owners warnings are advisory, and `hm intent migrate` preserves legacy approvals and history. `hm world` remains a deprecated alias for one release.
+- **Intent layer — goals, metrics and measurement history.** `.claude/intent.yaml` holds purpose, metrics, open questions and optional owner/dri/team roles; `intent/<ID>.md` records each goal as `open` or `closed`, with its measurements and observations. It asks you only three things: to create a goal (one round, at most 3 questions), to change a metric target, or to close a goal; measurements and observations are recorded without asking. `hm intent status --json` shows open goals with each metric's last / target / gap. Reached through Maker or by typing `/intent-layer`. `hm intent migrate` converts an older layout, which otherwise reads as `invalid`.
 
 ### 🔧 Advanced features — *background mechanisms, tunable but not in the way*
 

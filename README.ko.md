@@ -15,7 +15,7 @@
 >
 > *Automate the work. Elevate the engineer.*
 
-> **Version**: 0.66.1
+> **Version**: 0.67.0
 >
 > 현재 릴리스 계약(소스에서 자동 검증):
 >
@@ -348,7 +348,7 @@ World model 은 하네스가 세션을 넘어 유지하는 것이다: **intent**
 **Briefing** 은 digest 하나 (`hm world_model digest`) 로, 최대 1.5 KB 이며 프로젝트 상태를 바꾸지 않는다. 보여주는 것:
 
 - 작업 최대 5개, 최신순: 다음 단계 (산출물에서 도출), 마지막 단계, 최신 산출물, 다른 세션이 마지막으로 손댔는지, `parked` (7일 넘은 RESEARCH 하나뿐이고 커밋 없음; 맨 뒤로 정렬);
-- 활성 intent 와 그 지표의 `last` / `target` / `gap`;
+- 열린 목표와 그 지표의 `last` / `target` / `gap`;
 - 최근 커밋.
 
 `hm/<slug>` 작업 worktree 만 나열된다 (`worktree.enabled: true`). Maker 는 호출마다 첫 Bash 단계로 digest 를 실행한다 (두 target 모두). briefing 마다 `.claude/observability/world-model.jsonl` 에 `maker_load` 한 줄 (타임스탬프와 session id, 요청 본문 없음) 이 추가된다.
