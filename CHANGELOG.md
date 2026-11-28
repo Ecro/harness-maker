@@ -5,7 +5,7 @@
 ### Changed
 
 - `/hm:execute` puts any AC's cases (raising cases too, not only golden rows) into a test that
-  already parametrizes the same call instead of writing a parallel test
+  already parametrizes the same call, one per line, instead of writing a parallel test
   (SPEC-existing-parametrize-all).
 - `/hm:spec` keeps golden tables to one function's arguments and its return value; printed
   output, exit codes, call sequences and one-case checks become mechanical ACs, and a rule about

@@ -43,7 +43,7 @@ none
 ## Acceptance Criteria
 
 ### AC-001: execute puts every AC's cases into an existing parametrize of the same call
-The rendered `/hm:execute` (Claude and Codex) says that cases for a call that a test there already parametrizes go into its list, not a new test. It says this before the AC-type clauses, so it covers mechanical ACs too. It keeps the SPEC-test-shape-rules and SPEC-behaviour-named-tests execute phrases.
+The rendered `/hm:execute` (Claude and Codex) says that cases for a call that a test there already parametrizes go into its list, one per line, not a new test. It says this before the AC-type clauses, so it covers mechanical ACs too. It keeps the SPEC-test-shape-rules and SPEC-behaviour-named-tests execute phrases.
 - oracle_source: golden. Phrase fixed here before the template change.
 
 ## Verification
@@ -60,3 +60,4 @@ none
 ## Refinement Decisions
 
 - **Text only** (agent-decided): the cause is the missing rule, and the template change is the smallest fix. Undo: one clause.
+- **One per line** (agent-decided, after the t7 ×3 bench): t7-3 put its cases into the existing list but left all eight on one 140-character line. The judge's only decisive evidence on both orders was that line (A → B). With only that line wrapped, the pair went to tie (`cf-epa-t7-3-wrap.json`). Hence ", one per line" (+14 chars). Undo: those words.

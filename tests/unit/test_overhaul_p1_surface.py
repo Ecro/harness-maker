@@ -262,9 +262,9 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 # rises 87). The two older rules it touches stay verbatim because their pins hold them.
 # execute raised by the same SPEC (+43 after trims): paste printed rows into an existing list
 # with the same columns, and the restored "never type the rows" (review F2, F3).
-# execute +85 by SPEC-existing-parametrize-all: any AC's cases join a test that already
+# execute +99 by SPEC-existing-parametrize-all: any AC's cases join a test that already
 # parametrizes the same call (t7-1's confirmed cause).
-_STAGE_BUDGET = {"spec": (7858, 1500, 800), "execute": (7941, 1500, 0), "wrapup": (4300, 2785, 0)}
+_STAGE_BUDGET = {"spec": (7858, 1500, 800), "execute": (7955, 1500, 0), "wrapup": (4300, 2785, 0)}
 _OPT_IN = 1500
 
 

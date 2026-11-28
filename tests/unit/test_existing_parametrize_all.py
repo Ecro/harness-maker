@@ -13,7 +13,8 @@ from tests.unit.test_hm_cost_p2_templates import _render
 from tests.unit.test_test_shape_rules import EXTEND_PHRASES
 
 ALL_AC_PHRASE = (
-    "Cases for a call a test there already parametrizes go into its list, not a new test"
+    "Cases for a call a test there already parametrizes go into its list, one per line,"
+    " not a new test"
 )
 
 
