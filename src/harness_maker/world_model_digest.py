@@ -116,17 +116,33 @@ def last_stage_and_session(
     return last_stage, ts if isinstance(ts, str) else None, other
 
 
-def interrupted(rows: list[dict[str, Any]]) -> bool:
-    """The task's newest span row is a `start` with no `end` after it.
+def interrupted(rows: list[dict[str, Any]], slug: str) -> bool:
+    """The task's newest span row is a `start` that its session never followed with any row.
 
-    Claude Code's Stop hook writes `end` when a turn finishes, so an open `start` means the
-    stage was cut off (or is running right now) — the task a resume ask is about. Codex
-    writes no `end`, so its Maker does not read this field.
+    Claude Code's Stop hook writes one `end` for the session's open span when a turn finishes,
+    so a `start` its session never followed means the stage was cut off (or is running now) —
+    the task a resume ask is about. Undecidable cases read False: a start with no session id
+    (its `end` may be session-less too, and session-less ends carry no slug), and a ledger with
+    no `end` at all (Codex writes none, so every Codex task would read as cut off).
     """
-    if not rows:
+    if not any(r.get("event") == "end" for r in rows):
         return False
-    newest = max(enumerate(rows), key=lambda ir: (str(ir[1].get("ts") or ""), ir[0]))[1]
-    return newest.get("event") == "start"
+    mine = [(i, r) for i, r in enumerate(rows) if r.get("task_slug") == slug]
+    if not mine:
+        return False
+
+    def key(ir: tuple[int, dict[str, Any]]) -> tuple[str, int]:
+        return str(ir[1].get("ts") or ""), ir[0]  # the order last_stage_and_session uses
+
+    at, newest = max(mine, key=key)
+    session = newest.get("session_id")
+    if newest.get("event") != "start" or not isinstance(session, str) or not session:
+        return False
+    # One `end` closes a turn that started stages on two tasks; it carries only the last slug.
+    after = key((at, newest))
+    return not any(
+        r.get("session_id") == session and key((i, r)) > after for i, r in enumerate(rows)
+    )
 
 
 def _spec_done(base: Path, slug: str, wt: Path) -> bool:
@@ -302,7 +318,7 @@ def digest(root: Path, session_id: str | None = None) -> dict[str, Any]:
         for slug in worktrees:
             mine = [r for r in rows if r.get("task_slug") == slug]
             last_stage, last_seen, other = last_stage_and_session(mine, session_id)
-            entries.append((slug, last_stage, last_seen, other, interrupted(mine)))
+            entries.append((slug, last_stage, last_seen, other, interrupted(rows, slug)))
         entries.sort(key=lambda e: e[2] or "", reverse=True)
         deadline = time.monotonic() + DEADLINE_S
         # `parked` decides the order, so it is computed for every task before the cut; its git
@@ -375,7 +391,8 @@ def _clip_open(row: Any) -> Any:
 def render(payload: dict[str, Any]) -> str:
     """Compact JSON within MAX_BYTES (ADR-003): clip fields, then drop `recent`, then open
     intents beyond 3, then clip artifact names, then tasks down to 3, then each task's optional
-    fields (`last_seen`/`last_stage`, then `latest_artifact`; `other_session` is kept) — past
+    fields (`last_seen`/`last_stage`, then `latest_artifact`; `other_session` and `interrupted`
+    are kept) — past
     that, the old last resort (fewer tasks, then `unavailable`). Never raises."""
     try:
         return _render(payload)

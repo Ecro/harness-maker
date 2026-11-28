@@ -94,16 +94,18 @@ session id: `"${CLAUDE_SESSION_ID}"` in Claude Code's digest step, `"$HM_SESSION
 - Only `hm/<slug>` task worktrees are listed (`worktree.enabled`). Root resolves to the base,
   so the digest reads the base ledger from any worktree. A task's artifacts live in
   `.worktrees/<slug>/`, never the base checkout (SPEC-maker-resume-no-ask).
-- **`interrupted`** (SPEC-maker-resume-no-ask): the task's newest span row is a `start` with no
-  `end` after it. Claude Code's Stop hook writes `end` at every turn end, so this is a stage cut
-  off mid-turn (or running now). Emitted only when true, never trimmed. Codex writes no `end`,
-  so Codex Maker does not read it.
+- **`interrupted`** (SPEC-maker-resume-no-ask): the task's newest span row is a `start` that its
+  session never followed with any row. Claude Code's Stop hook writes `end` for the session's
+  open span at turn end, so this is a stage cut off mid-turn (or running now). Undecidable reads
+  absent: a start without a session id, or a ledger with no `end` at all (Codex writes none).
+  Emitted only when true; the key is never dropped from a shown task.
 - **`parked`**: RESEARCH is the task's only artifact, its frontmatter `created` is older than
   7 days (`PARK_DAYS`), and there is no commit beyond base. Parked tasks sort last. An absent
   `created` is **not** parked — unknown is never parked.
 - **Trim order over the cap**: drop `recent` → intents beyond 3 → tasks down to 3 →
-  `last_seen`/`last_stage` → `latest_artifact`. **`other_session` and `interrupted` are never dropped**:
-  Briefing shows `other_session`, and Resume picks the single `interrupted` task. A new field must slot into this order (or be cheaper than everything above it), or
+  `last_seen`/`last_stage` → `latest_artifact`. **`other_session` and `interrupted` are never
+  dropped** from a shown task: Briefing shows `other_session`, and Resume picks the single
+  `interrupted` task. A new field must slot into this order (or be cheaper than everything above it), or
   the cap starts cutting what Resume depends on.
 - **`maker_load`**: each run appends `{ts, event: "maker_load", session_id}` to
   `.claude/observability/world-model.jsonl` — no request text, best-effort (IRR-004). Measured

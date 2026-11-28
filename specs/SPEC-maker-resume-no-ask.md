@@ -78,8 +78,9 @@ none
 
 ### AC-001: the digest marks a cut-off stage
 
-`interrupted` is `true` exactly when the task's newest span row (ts, then file order) is a `start`;
-otherwise the key is absent. Rows come from the real `emit_event` start and the shipped
+`interrupted` is `true` exactly when the task's newest span row (ts, then file order) is a `start`
+with a session id, its session wrote no later row (on any task), and the ledger holds at least one
+`end`; otherwise the key is absent. Rows come from the real `emit_event` start and the shipped
 `worktree span-end` Stop hook. Golden table over the task's history:
 
 | history | interrupted |
@@ -90,7 +91,11 @@ otherwise the key is absent. Rows come from the real `emit_event` start and the 
 | start, end, start | true |
 | start, end, start, end | absent |
 
-A peer task's ended span never sets it.
+| start, start on another task, one Stop `end` (same session) | absent for both |
+| start without a session id, then a Stop `end` with one | absent |
+| starts only, no `end` in the ledger (Codex) | absent |
+
+A peer task's ended span never sets it, and a peer session's later row never clears it.
 
 ### AC-002: Resume enters without asking and checks no files
 
@@ -108,7 +113,7 @@ the Codex arms.
 
 | Scenario | Mode | Test |
 |---|---|---|
-| S3 | unit | `tests/unit/test_maker_digest.py::test_ac001_interrupted_from_open_span` |
+| S3 | unit | `tests/unit/test_maker_digest.py::test_ac001_interrupted_from_open_span`, `::test_ac001_undecidable_reads_not_interrupted`, `::test_ac001_one_turn_two_tasks_both_closed` |
 | S1, S2 | render | `tests/render/test_render_maker_front_door.py::test_resume_no_ask_ac002_enters_without_asking` |
 | S4 | render | `tests/render/test_render_maker_front_door.py::test_resume_no_ask_ac003_interrupted_claude_only` |
 | S5 | live, manual | a replay of the saga S4r state; recorded in the REVIEW |
@@ -125,6 +130,14 @@ none
 - **`interrupted` from the span ledger:** the Stop hook already writes `end` at every turn end, so
   an open `start` is a free, exact "cut off mid-turn" signal. Emitted only when true (about 19
   bytes a task) and never dropped by the trimmer, so its absence always means "not cut off".
+- **A live peer reads as cut off too (REVIEW F3, accepted risk):** a stage running right now in
+  another session also has an open `start`, so with several tasks Resume can pick it. There is no
+  liveness signal to tell them apart (see Non-Goals); "not `other_session`" would exclude every
+  real resume, since the cut-off session is always another one. Concurrent sessions on one repo
+  are rare for a solo owner, and the stage's own preflight still warns on a same-task session.
+- **Trimmed tasks (REVIEW F4, accepted):** "exactly one" is judged on the shown tasks. Hiding an
+  interrupted task needs more than 5 tasks or a payload over 1,500 bytes, and an interrupted task
+  is normally the newest, so it sorts first and survives the cut.
 - **Worktree path in prose, not in the digest:** the path is always `.worktrees/<slug>/`, so one
   Briefing line costs nothing per task, where a digest field would cost bytes on every task.
 - **Approval:** the DRI's "고쳐" on the reported defect. Small fix, no irreversible decision.

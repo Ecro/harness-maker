@@ -47,8 +47,9 @@
   because the cut-off session counted as "another session" (a fresh session always does), and in
   2 of 5 runs said the PLAN/SPEC were missing after looking in the base checkout. A resume ask is
   now the consent; Maker checks no files (they live in `.worktrees/<slug>/`, which the stage
-  opens). The digest adds `interrupted: true` for a task whose last stage never got its Stop-hook
-  `end`, and Claude Maker resumes that one when several tasks are open.
+  opens). The digest adds `interrupted: true` for a task whose last stage its session never followed
+  with an `end` (or any row), and when several tasks are open Claude Maker resumes the one
+  interrupted task if exactly one is.
 
 - **`/hm:spec` asks the scope boundary only the owner knows, and skips the interview less**
   (SPEC-spec-owner-boundary). Before the SPEC it reads the code the ask touches and names which

@@ -655,7 +655,7 @@ def test_ac006_trim_drops_optional_fields_in_order_and_keeps_other_session(
 # ── SPEC-maker-resume-no-ask AC-001: `interrupted` marks a stage cut off mid-turn ────────────
 
 
-def _span_start(base: Path, slug: str, session: str, stage: str) -> None:
+def _span_start(base: Path, slug: str, session: str | None, stage: str) -> None:
     spans = importlib.import_module("harness_maker.stage_spans")
     spans.emit_event(
         "start", stage=stage, cwd=base, session_id=session, task_slug=slug, git_branch=f"hm/{slug}"
@@ -706,3 +706,36 @@ def test_ac001_interrupted_from_open_span(
     assert "interrupted" not in rows["other"], rows["other"]
     # Only ever `true`: absence is "not cut off", so the key never appears as `false`.
     assert all(t.get("interrupted", True) is True for t in d["tasks"]), d["tasks"]
+
+
+def _flags(base: Path) -> dict[str, bool]:
+    _, d = _rendered(base)
+    return {t["slug"]: t.get("interrupted", False) for t in d["tasks"]}
+
+
+def test_ac001_undecidable_reads_not_interrupted(tmp_path: Path) -> None:
+    """REVIEW F1/F5: a start without a session id, or a ledger with no `end` at all (Codex
+    ships no span-end hook), is undecidable — never `interrupted`."""
+    base = _base(tmp_path)
+    _task(base, "codexlike")
+    _span_start(base, "codexlike", "s0", "hm:spec")
+    assert _flags(base) == {"codexlike": False}  # no `end` anywhere in the ledger
+    _task(base, "noid")
+    _span_start(base, "noid", None, "hm:spec")
+    _stop_hook(base, "s0")  # the hook has an id, so it cannot close the id-less start
+    assert _flags(base) == {"codexlike": False, "noid": False}
+
+
+def test_ac001_one_turn_two_tasks_both_closed(tmp_path: Path) -> None:
+    """REVIEW F2: one Stop `end` carries only the turn's last slug; a start its session
+    followed with any later row is closed, whatever task that row names."""
+    base = _base(tmp_path)
+    _task(base, "a")
+    _task(base, "b")
+    _span_start(base, "a", "s0", "hm:spec")
+    _span_start(base, "b", "s0", "hm:spec")
+    _stop_hook(base, "s0")
+    assert _flags(base) == {"a": False, "b": False}
+    _span_start(base, "a", "s1", "hm:execute")  # a peer session's later row must not close it
+    _span_start(base, "b", "s0", "hm:execute")
+    assert _flags(base) == {"a": True, "b": True}
