@@ -4,7 +4,7 @@
 
 > **Audience**: developers who use harness-maker and want to know what each stage does, what it
 > writes, and where it stops for a person.
-> **Version**: 0.66.1
+> **Version**: 0.67.0
 >
 > This guide describes the current release only. What changed between releases is in
 > [CHANGELOG.md](../CHANGELOG.md); the design record is in [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -157,8 +157,7 @@ The only interview. With `worktree.enabled`, it runs in a per-task worktree (see
    format, CLI-output or user-facing message change and no scope boundary left open gets a minimal
    SPEC with one testable AC and is stamped exempt, without an interview. A detailed ask is not
    a small one.
-2. **Intent.** If the project has active intents, it asks which one this task serves.
-3. **Interview.** First it reads the code the ask touches and names the scope boundary: which
+2. **Interview.** First it reads the code the ask touches and names the scope boundary: which
    inputs take the new behaviour, which keep the old, and which existing behaviour must stay.
    The code shows today's behaviour, not which of it you want kept, so unless the ask states the
    boundary (or nothing old is kept), it asks you that one question in round 1, recommendation first. It
@@ -166,14 +165,14 @@ The only interview. With `worktree.enabled`, it runs in a per-task worktree (see
    non-goals, and every irreversible decision; at most 3 questions per round. It settles
    constraints, verification and each AC's oracle itself and shows them as **Refinement
    Decisions** for you to veto.
-4. **SPEC + machine.yaml.** Each AC has an oracle independent of the code it checks (golden,
+3. **SPEC + machine.yaml.** Each AC has an oracle independent of the code it checks (golden,
    differential, property, rubric or consensus). "The test will check it" is rejected as
    circular.
-5. **Checks.** `hm spec_machine check` validates the pair and scores its quality; at
+4. **Checks.** `hm spec_machine check` validates the pair and scores its quality; at
    `spec.strictness: block` a blocked score stops the stage, at `warn` it only warns. `spec-validator` performs one conditional, advisory critique of the
    SPEC: skipped by default for a SPEC with 8 or fewer live ACs, run when you choose "Approve
    after spec-validator".
-6. **Approval.** Only your explicit "Approve this SPEC" stamps it (`hm spec_machine approve`);
+5. **Approval.** Only your explicit "Approve this SPEC" stamps it (`hm spec_machine approve`);
    silence never counts. `--exempt` is reserved for a SPEC with no irreversible decision under
    `autonomy.level: auto_full`, or the skip path.
 

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.67.0] - 2026-11-28
+
+Owner-facing release. You approve a SPEC and read a landed change from a short change card in
+your locale; `/hm:execute` closes in three lines; the CLI does the SPEC bookkeeping; the intent
+layer asks only three things (some `hm intent` subcommands and `hm world` are removed); Maker
+resumes cut-off work without asking and loads in cloud sessions; `/hm:spec` asks the owner-only
+scope boundary. Rendered projects pick these up on their next `hm make`.
+
 ### Added
 
 - **A short change card at SPEC approval and at land** (SPEC-change-card). New `hm change_card
@@ -26,6 +34,37 @@
   same rep (Opus, order swapped, a pick counts only when both orders agree) on correctness,
   test protection, maintainability, scope and overall. Attention is computed from stored
   turns, so older result rows get it too. Bench-only; no change to rendered harnesses.
+
+- **An oh-my-claudecode arm in the bench and the saga bench** (SPEC-bench-omc-arm). `--arms
+  ...,omc --omc-dir <checkout>` runs oh-my-claudecode (a popular open-source Claude Code
+  harness) in its lightest execution mode, `/oh-my-claudecode:execute`, loaded per call with
+  `--plugin-dir` from a pinned git checkout (sha and version on every row, sha in the runner
+  hash) and in a HOME of its own, so its global `~/.omc` state never crosses cells. `report`
+  shows it beside plain and hm (tier 1/2: $/run and wall time as multiples of plain; saga: an
+  hm-vs-omc trap line); it stays out of the plain-vs-hm scorecard, the saga verdict and the
+  published README block.
+
+- **Saga bench: hm's unique values on consecutive sessions** (SPEC-saga-bench).
+  `scripts/saga_bench.py` drives `plain`, `plain-discipline` (plain plus one fixed paragraph: ask
+  when ambiguous, show a plan, keep NOTES.md, test, one subagent review, commit) and `hm` through
+  six sessions on one small repo (`scripts/bench/saga/`): recurring reminders, import, two
+  parallel CLI changes, a time zone setting that is killed mid-work and resumed by a fresh
+  process, and an iCalendar export. A model plays the owner from a hidden fact sheet and answers
+  only what it is asked. Each run records one binary verdict per trap (hidden requirement,
+  approval-time correction, save-file format lock, frozen file, parallel loss, resume, no new
+  dependency, environment-failure recurrence) plus a handoff quiz; `report` applies the
+  pre-registered decision rule. `validator` measures spec-validator detection on 12 SPECs with
+  planted defects and 2 clean ones, against a plain review prompt. Offline tests use a fake
+  `claude`; `bench_light_lane` hashes are unchanged.
+
+- **Self-prune loop for new models** (SPEC-self-prune-loop). When a new default model ships, hm
+  ablates up to three candidate blocks of its rendered harness on the bench, one at a time, and
+  proposes the cuts that pass deterministic guards (tier-2 hidden tests and trap catches never
+  fall, judge drop <= 0.3, cost down >= 3%). Proposals only: nothing edits templates or opens a PR
+  of cuts. New `hm-variant` bench arm with `--variant <json>` (the runner hash is unchanged without
+  one), `scripts/self_prune.py plan|decide|status`, ledger `docs/evals/prune-ledger.jsonl`,
+  procedure `docs/evals/SELF-PRUNE.md`. Edits inside the per-task worktree, TDD RED gate, SDD,
+  human approval, IRR lock and understanding-delta sections are refused.
 
 ### Changed
 
@@ -56,8 +95,32 @@
   module and its never-fired revisit, revalidation, withdrawal and evidence-locator checks, the
   autopilot objective gate, spec Step 0.5 and the SPEC `intent:` field, and the workflow-feedback
   reference. An unmigrated layout now reads as `invalid` naming `hm intent migrate`. Rendered
-  projects pick it up on their next `hm make`. README's intent-layer bullet is updated in the
-  release PR, since README describes the latest release.
+  projects pick it up on their next `hm make`.
+
+- **Golden rows live in the test file** (SPEC-inline-golden-rows). `/hm:execute` now pastes the
+  `AC_NNN_ROWS` list printed by `hm spec_machine export-golden --inline` into a parametric AC's
+  test instead of reading `SPEC-<slug>.golden.json`, so a reader sees inputs and expectations.
+  `hm check` compares those rows with the SPEC (`ac.golden: inline`) and fails on drift, as it
+  does for the JSON. Existing golden JSON files keep the JSON verdict. The 2026-11-25 pairwise
+  judgement named the JSON indirection as the main reason hm lost on maintainability.
+- The SPEC Verification table maps scenarios to ACs, not test names, so it can no longer drift
+  from `test_ids` (the reviewer flagged that drift in 6 of 12 bench tasks).
+
+- **CI runs the test suite in three parallel shards; the serial run moved to nightly**
+  (SPEC-ci-shard-serial-nightly). On one 4-vCPU runner `quality-gate` took about 13 minutes per PR
+  push (pytest 12m17s) and release.yml about 32, of which ~28 was a serial pytest re-run of a
+  commit CI had just tested. `ci.yml` and `release.yml` now split pytest by test file across
+  `quality-gate (1/3)`..`(3/3)` (`HM_TEST_SHARD`, read by `tests/conftest.py`); a summary job keeps
+  the `quality-gate` check name. `nightly.yml` now runs the serial suite (the order-dependence
+  oracle), a Python 3.13 run, and fresh-install readiness, and skips a scheduled run when main has
+  not moved since the last green nightly. `install-cmd-regression` no longer waits for
+  quality-gate. Locally nothing changes: `hm check` and `uv run pytest` still run every test.
+- **Two slow tests got faster with every assertion kept** (SPEC-test-suite-speed).
+  `test_memory_tier_removed.py::test_no_imports_remain` built a location string for each of ~1 M
+  AST nodes; it now formats one only on a hit (24.5 s → 1.8 s, same hits). The three
+  default-argument tests in `tests/e2e/test_plugin_live.py` share one module-scoped live
+  `/harness-maker:make` run, so a suite run with `claude` on PATH starts 2 live sessions instead
+  of 4 (module 59 s wall). A fake-`claude` test pins the launch count, also in CI.
 
 ### Fixed
 
@@ -104,67 +167,6 @@
   `E1_no_recurrence` passes when the failure recurs in fewer than half of the later sessions; the
   five traps every pilot arm passed (IRR, frozen, no_dependency, parallel, H1_kept) stay in the
   report but leave the verdict (margin 0.2, lead on 3 of the other 5).
-### Added
-
-- **An oh-my-claudecode arm in the bench and the saga bench** (SPEC-bench-omc-arm). `--arms
-  ...,omc --omc-dir <checkout>` runs oh-my-claudecode (a popular open-source Claude Code
-  harness) in its lightest execution mode, `/oh-my-claudecode:execute`, loaded per call with
-  `--plugin-dir` from a pinned git checkout (sha and version on every row, sha in the runner
-  hash) and in a HOME of its own, so its global `~/.omc` state never crosses cells. `report`
-  shows it beside plain and hm (tier 1/2: $/run and wall time as multiples of plain; saga: an
-  hm-vs-omc trap line); it stays out of the plain-vs-hm scorecard, the saga verdict and the
-  published README block.
-
-- **Saga bench: hm's unique values on consecutive sessions** (SPEC-saga-bench).
-  `scripts/saga_bench.py` drives `plain`, `plain-discipline` (plain plus one fixed paragraph: ask
-  when ambiguous, show a plan, keep NOTES.md, test, one subagent review, commit) and `hm` through
-  six sessions on one small repo (`scripts/bench/saga/`): recurring reminders, import, two
-  parallel CLI changes, a time zone setting that is killed mid-work and resumed by a fresh
-  process, and an iCalendar export. A model plays the owner from a hidden fact sheet and answers
-  only what it is asked. Each run records one binary verdict per trap (hidden requirement,
-  approval-time correction, save-file format lock, frozen file, parallel loss, resume, no new
-  dependency, environment-failure recurrence) plus a handoff quiz; `report` applies the
-  pre-registered decision rule. `validator` measures spec-validator detection on 12 SPECs with
-  planted defects and 2 clean ones, against a plain review prompt. Offline tests use a fake
-  `claude`; `bench_light_lane` hashes are unchanged.
-
-- **Self-prune loop for new models** (SPEC-self-prune-loop). When a new default model ships, hm
-  ablates up to three candidate blocks of its rendered harness on the bench, one at a time, and
-  proposes the cuts that pass deterministic guards (tier-2 hidden tests and trap catches never
-  fall, judge drop <= 0.3, cost down >= 3%). Proposals only: nothing edits templates or opens a PR
-  of cuts. New `hm-variant` bench arm with `--variant <json>` (the runner hash is unchanged without
-  one), `scripts/self_prune.py plan|decide|status`, ledger `docs/evals/prune-ledger.jsonl`,
-  procedure `docs/evals/SELF-PRUNE.md`. Edits inside the per-task worktree, TDD RED gate, SDD,
-  human approval, IRR lock and understanding-delta sections are refused.
-
-### Changed
-
-- **Golden rows live in the test file** (SPEC-inline-golden-rows). `/hm:execute` now pastes the
-  `AC_NNN_ROWS` list printed by `hm spec_machine export-golden --inline` into a parametric AC's
-  test instead of reading `SPEC-<slug>.golden.json`, so a reader sees inputs and expectations.
-  `hm check` compares those rows with the SPEC (`ac.golden: inline`) and fails on drift, as it
-  does for the JSON. Existing golden JSON files keep the JSON verdict. The 2026-11-25 pairwise
-  judgement named the JSON indirection as the main reason hm lost on maintainability.
-- The SPEC Verification table maps scenarios to ACs, not test names, so it can no longer drift
-  from `test_ids` (the reviewer flagged that drift in 6 of 12 bench tasks).
-
-- **CI runs the test suite in three parallel shards; the serial run moved to nightly**
-  (SPEC-ci-shard-serial-nightly). On one 4-vCPU runner `quality-gate` took about 13 minutes per PR
-  push (pytest 12m17s) and release.yml about 32, of which ~28 was a serial pytest re-run of a
-  commit CI had just tested. `ci.yml` and `release.yml` now split pytest by test file across
-  `quality-gate (1/3)`..`(3/3)` (`HM_TEST_SHARD`, read by `tests/conftest.py`); a summary job keeps
-  the `quality-gate` check name. `nightly.yml` now runs the serial suite (the order-dependence
-  oracle), a Python 3.13 run, and fresh-install readiness, and skips a scheduled run when main has
-  not moved since the last green nightly. `install-cmd-regression` no longer waits for
-  quality-gate. Locally nothing changes: `hm check` and `uv run pytest` still run every test.
-- **Two slow tests got faster with every assertion kept** (SPEC-test-suite-speed).
-  `test_memory_tier_removed.py::test_no_imports_remain` built a location string for each of ~1 M
-  AST nodes; it now formats one only on a hit (24.5 s → 1.8 s, same hits). The three
-  default-argument tests in `tests/e2e/test_plugin_live.py` share one module-scoped live
-  `/harness-maker:make` run, so a suite run with `claude` on PATH starts 2 live sessions instead
-  of 4 (module 59 s wall). A fake-`claude` test pins the launch count, also in CI.
-
-### Fixed
 
 - **Nightly Python 3.13 job no longer loses its venv mid-run** (SPEC-nightly-py313-venv). Both
   py313 runs since it was added failed on a random test with `No module named 'hypothesis'`. Two

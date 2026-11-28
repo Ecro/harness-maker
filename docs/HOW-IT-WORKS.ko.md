@@ -4,7 +4,7 @@
 
 > **대상 독자**: harness-maker 를 쓰면서 각 stage 가 무엇을 하고, 무엇을 쓰고, 어디서 사람을
 > 기다리는지 알고 싶은 개발자.
-> **Version**: 0.66.1
+> **Version**: 0.67.0
 >
 > 이 문서는 현재 릴리스만 설명한다. 릴리스 간 변경은 [CHANGELOG.md](../CHANGELOG.md), 설계
 > 기록은 [ARCHITECTURE.md](ARCHITECTURE.md) 에 있다.
@@ -151,18 +151,17 @@ stage 도 이것을 요구하지 않는다.
 1. **건너뛰기 판정.** 파일 하나(문서는 세고 테스트는 안 센다), 범위가 뻔하고, 되돌릴 수 있고, API·포맷·CLI 출력·
    사용자 메시지 변경이 없고, 열린 범위 경계가 없으면 인터뷰 없이 테스트 가능한 AC 하나짜리 최소
    SPEC 을 쓰고 exempt 로 찍는다. 요청이 자세하다고 작은 변경은 아니다.
-2. **Intent.** 프로젝트에 활성 intent 가 있으면 이 태스크가 어느 것을 위한 것인지 묻는다.
-3. **인터뷰.** 먼저 요청이 건드리는 코드를 읽고 범위 경계를 짚는다: 어떤 입력이 새 동작을 타고
+2. **인터뷰.** 먼저 요청이 건드리는 코드를 읽고 범위 경계를 짚는다: 어떤 입력이 새 동작을 타고
    어떤 입력이 옛 동작을 지키는지, 어떤 기존 동작을 바꾸면 안 되는지. 코드는 지금 동작을 보여줄 뿐
    그중 무엇을 지킬지는 사람이 정하므로, 요청이 경계를 밝히지 않았고 지킬 기존 동작이 있으면 그 질문 하나를 1라운드에 추천과 함께 묻는다. 사람이 소유한 것만 묻는다: 왜 지금인지, "끝" 이 어떻게 보이는지, 시나리오,
    비목표, 그리고 모든 비가역 결정. 라운드당 최대 3문항. 제약·검증·각 AC 의 oracle 은 직접 정하고
    **Refinement Decisions** 로 보여줘서 사람이 거부할 수 있게 한다.
-4. **SPEC + machine.yaml.** 각 AC 는 검사 대상 코드와 독립인 oracle(golden, differential,
+3. **SPEC + machine.yaml.** 각 AC 는 검사 대상 코드와 독립인 oracle(golden, differential,
    property, rubric, consensus)을 갖는다. "테스트가 확인한다" 는 순환이라 거부된다.
-5. **검사.** `hm spec_machine check` 가 두 파일을 검증하고 품질을 채점한다.
+4. **검사.** `hm spec_machine check` 가 두 파일을 검증하고 품질을 채점한다.
    `spec.strictness: block` 이면 blocked 점수에서 멈추고, `warn` 이면 경고만 한다. `spec-validator` 에이전트가 SPEC 을 한 번 비평한다(권고만; live AC 가 8개 이하면
    기본 생략, "Approve after spec-validator" 를 고르면 실행).
-6. **승인.** 사람이 명시적으로 "Approve this SPEC" 을 골라야만 찍힌다(`hm spec_machine
+5. **승인.** 사람이 명시적으로 "Approve this SPEC" 을 골라야만 찍힌다(`hm spec_machine
    approve`). 침묵은 승인이 아니다. `--exempt` 는 건너뛰기 경로, 또는 `autonomy.level: auto_full`
    에서 비가역 결정이 없는 SPEC 에만 쓴다.
 
