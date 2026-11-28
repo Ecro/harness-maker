@@ -188,8 +188,7 @@ def _intent_yaml(metrics: list[dict[str, Any]], *, bump_stale: bool) -> str:
 
 
 def _intent_record(intent: dict[str, Any], target: int) -> dict[str, Any]:
-    from harness_maker import world
-
+    """Legacy `active`/`proposed` records (SPEC-intent-lean reads both as open)."""
     rec: dict[str, Any] = {
         "id": intent["id"],
         "title": intent["title"].strip() or "제목",
@@ -210,7 +209,7 @@ def _intent_record(intent: dict[str, Any], target: int) -> dict[str, Any]:
     }
     if intent["state"] == "active":
         rec["approval"] = {
-            "content_hash": world.approval_hash(rec, target),
+            "content_hash": "a" * 64,
             "approved_by": "t",
             "approved_at": "2026-09-02T00:00:00Z",
             "approved_target": target,
@@ -268,9 +267,9 @@ def test_ac006_active_intents_within_cap(tmp_path_factory: pytest.TempPathFactor
     base = _build_intent_project(tmp_path_factory.mktemp("ac006"), w)
     status = intent_cli.status_report(base)
     assert status.get("state") == "ok", status
-    active_ids = list(status["active"])
-    # The fixture is valid: every generated active record is active per the reference.
-    assert sorted(active_ids) == sorted(i["id"] for i in w["intents"] if i["state"] == "active")
+    active_ids = list(status["open"])
+    # The fixture is valid: every generated record (active or proposed) is open per the reference.
+    assert sorted(active_ids) == sorted(i["id"] for i in w["intents"])
     n_active, n_tasks = len(active_ids), len(w["slugs"])
 
     text, d = _rendered(base)
@@ -278,9 +277,8 @@ def test_ac006_active_intents_within_cap(tmp_path_factory: pytest.TempPathFactor
 
     intents = d.get("intents")
     assert isinstance(intents, dict), f"digest has no intents block: {d}"
-    if n_active:
-        assert "active" in intents, f"intents block lacks `active`: {intents}"
-    listed = intents.get("active", [])
+    assert "open" in intents, f"intents block lacks `open`: {intents}"
+    listed = intents.get("open", [])
     assert isinstance(listed, list)
     listed_ids = [row["id"] for row in listed]
     assert len(listed_ids) == len(set(listed_ids)), listed_ids
@@ -289,7 +287,7 @@ def test_ac006_active_intents_within_cap(tmp_path_factory: pytest.TempPathFactor
     assert set(active_ids[: min(3, n_active)]) <= set(listed_ids), (active_ids, listed_ids)
     for row in listed:
         assert set(row) >= {"id", "metric_id", "last", "target", "gap"}, row
-        assert row["id"] in status["active"], row
+        assert row["id"] in status["open"], row
         metric_id = status["intents"][row["id"]]["metric_id"]
         assert row["metric_id"] == metric_id, row
         metric = status["metrics"].get(metric_id)
@@ -326,11 +324,7 @@ def test_ac006_worst_case_payload_keeps_floors() -> None:
         "autopilot": {"active": True, "level": "auto_safe", "pipeline": ["research", "wrapup"]},
         "recent": ["abc1234 " + "긴 커밋 제목 " * 30] * 3,
         "intents": {
-            "counts": dict.fromkeys(
-                ("conflicts", "fired_revisits", "needs_revalidation", "stale_evidence"), 20
-            ),
-            "items": ids[:3],
-            "active": [
+            "open": [
                 {"id": i, "metric_id": "m_" + "x" * 78, "last": 123456, "target": 1000, "gap": -1}
                 for i in ids
             ],
@@ -341,8 +335,8 @@ def test_ac006_worst_case_payload_keeps_floors() -> None:
     d = json.loads(out)
     assert "unavailable" not in d, d
     assert len(d["tasks"]) >= 3, d["tasks"]
-    assert len(d["intents"]["active"]) >= 3, d["intents"]
-    assert [r["id"][:6] for r in d["intents"]["active"][:3]] == [i[:6] for i in ids[:3]]
+    assert len(d["intents"]["open"]) >= 3, d["intents"]
+    assert [r["id"][:6] for r in d["intents"]["open"][:3]] == [i[:6] for i in ids[:3]]
 
 
 def test_ac006_worst_case_end_to_end_through_cli(tmp_path: Path) -> None:
@@ -396,7 +390,7 @@ def test_ac006_worst_case_end_to_end_through_cli(tmp_path: Path) -> None:
     assert len(text.encode("utf-8")) <= MAX_BYTES, len(text.encode("utf-8"))
     assert "unavailable" not in text, text
     assert len(d["tasks"]) >= 3, d["tasks"]
-    assert len(d["intents"]["active"]) >= 3, d["intents"]
+    assert len(d["intents"]["open"]) >= 3, d["intents"]
     for t in d["tasks"]:
         assert "other_session" in t, f"`other_session` trimmed from {t}"
         assert isinstance(t["other_session"], bool), t

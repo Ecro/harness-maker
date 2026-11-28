@@ -249,20 +249,3 @@ def test_a_mark_pass_marker_does_not_skip(tmp_path: Path) -> None:
     before = len(_rows(root))
     obs = fx.observe(root, argv)
     _no_skip(obs, obs["rows"][before:])
-
-
-def test_no_stage_skipped_row_before_an_objective_halt(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    root = tmp_path / "repo"
-    argv = fx.build(root, fx.Case("light", "passed", "execute", "auto_safe", None, "then_spec"))
-    (root / "work-docs" / f"PLAN-{fx.SLUG}.md").write_text(
-        "---\ntype: plan\nobjective: OBJ-NOPE\n---\n", encoding="utf-8"
-    )
-    monkeypatch.chdir(root)
-    before = len(_rows(root))
-    obs = fx.observe(root, argv)
-    new_rows = obs["rows"][before:]
-    assert obs["json"]["halt_kind"] == "objective_gate"
-    assert "stage_skipped" not in [r["event"] for r in new_rows]
-    assert "lane light" not in obs["json"]["reason"]

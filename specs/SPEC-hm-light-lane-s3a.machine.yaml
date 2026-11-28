@@ -272,7 +272,6 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_autopilot_caps_light_lane.py::test_skip_respects_pipeline_shape
-  - tests/unit/test_autopilot_caps_light_lane.py::test_no_stage_skipped_row_before_an_objective_halt
   executable_predicate: all(boundary(pipeline, narrowed)[key] == expected for pipeline,
     narrowed, key, expected in SHAPE_TABLE)
   golden_table:

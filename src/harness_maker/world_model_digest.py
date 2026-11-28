@@ -12,8 +12,7 @@ from typing import Any
 PIPELINE: tuple[str, ...] = ("research", "spec", "execute", "review", "verify", "wrapup")
 MAX_BYTES = 1500
 MAX_TASKS = 5
-MAX_INTENT_ITEMS = 3
-MIN_ACTIVE_INTENTS = 3
+MIN_OPEN_INTENTS = 3
 MIN_TASKS = 3
 # Dropped per task, group by group, before the task floor gives way (REVIEW dbe5ddc7). Timing
 # goes first; `other_session` is never dropped — Maker reads its absence as "unknown, ask once",
@@ -28,12 +27,6 @@ _SUBJECT_MAX = 60
 _ID_MAX = 40
 # Total budget for the artifact checks; past it a task reports `next_stage: null` (REVIEW 6d4374d1).
 DEADLINE_S = 5.0
-_INTENT_KEYS: tuple[str, ...] = (
-    "conflicts",
-    "fired_revisits",
-    "needs_revalidation",
-    "stale_evidence",
-)
 
 
 def _git(cwd: Path, *args: str) -> str | None:
@@ -248,7 +241,7 @@ def autopilot_state(base: Path, session_id: str | None) -> dict[str, Any]:
 
 
 def intent_items(base: Path) -> dict[str, Any] | None:
-    """Only what needs a decision, mirrored from `hm intent status --json` (SPEC S7)."""
+    """Open goals with their metric's last/target/gap, from `hm intent status --json`."""
     if not (base / ".claude/intent.yaml").is_file():
         return None
     from harness_maker import intent_cli
@@ -259,24 +252,15 @@ def intent_items(base: Path) -> dict[str, Any] | None:
         return {"unavailable": "intent status failed"}
     if not isinstance(status, dict) or status.get("state") == "invalid":
         return {"unavailable": "intent state invalid"}
-    counts: dict[str, int] = {}
-    items: list[str] = []
-    for key in _INTENT_KEYS:
-        value = status.get(key) or []
-        ids = list(value) if isinstance(value, (list, dict)) else []
-        counts[key] = len(ids)
-        for i in ids:
-            if isinstance(i, str) and i not in items:
-                items.append(i)
-    return {"counts": counts, "items": items[:MAX_INTENT_ITEMS], "active": _active_rows(status)}
+    return {"open": _open_rows(status)}
 
 
-def _active_rows(status: dict[str, Any]) -> list[dict[str, Any]]:
-    """Active intents in status order with their metric fields copied verbatim (SPEC S3)."""
+def _open_rows(status: dict[str, Any]) -> list[dict[str, Any]]:
+    """Open goals in status order with their metric fields copied verbatim."""
     records = status.get("intents") or {}
     metrics = status.get("metrics") or {}
     rows: list[dict[str, Any]] = []
-    for oid in status.get("active") or []:
+    for oid in status.get("open") or []:
         record = records.get(oid) if isinstance(records, dict) else None
         metric_id = record.get("metric_id") if isinstance(record, dict) else None
         metric = metrics.get(metric_id) if isinstance(metrics, dict) and metric_id else None
@@ -364,7 +348,7 @@ def _clip_artifact(task: Any) -> Any:
     return {**task, "latest_artifact": {**art, "name": _clip(art["name"], _ID_MAX)}}
 
 
-def _clip_active(row: Any) -> Any:
+def _clip_open(row: Any) -> Any:
     if not isinstance(row, dict):
         return row
     return {
@@ -374,7 +358,7 @@ def _clip_active(row: Any) -> Any:
 
 
 def render(payload: dict[str, Any]) -> str:
-    """Compact JSON within MAX_BYTES (ADR-003): clip fields, then drop `recent`, then active
+    """Compact JSON within MAX_BYTES (ADR-003): clip fields, then drop `recent`, then open
     intents beyond 3, then clip artifact names, then tasks down to 3, then each task's optional
     fields (`last_seen`/`last_stage`, then `latest_artifact`; `other_session` is kept) — past
     that, the old last resort (fewer tasks, then `unavailable`). Never raises."""
@@ -389,15 +373,9 @@ def _render(payload: dict[str, Any]) -> str:
     if isinstance(p.get("recent"), list):
         p["recent"] = [_clip(str(s), _SUBJECT_MAX) for s in p["recent"]]
     intents = p.get("intents")
-    if isinstance(intents, dict) and isinstance(intents.get("items"), list):
-        intents = {
-            **intents,
-            "items": [_clip(str(i), _ID_MAX) for i in intents["items"][:MAX_INTENT_ITEMS]],
-        }
-        p["intents"] = intents
-    # Active ids are sized like `items`: an unclipped id alone could push past the cap (9df6b033).
-    if isinstance(intents, dict) and isinstance(intents.get("active"), list):
-        intents = {**intents, "active": [_clip_active(r) for r in intents["active"]]}
+    # Ids are clipped: an unclipped id alone could push past the cap (9df6b033).
+    if isinstance(intents, dict) and isinstance(intents.get("open"), list):
+        intents = {**intents, "open": [_clip_open(r) for r in intents["open"]]}
         p["intents"] = intents
     if isinstance(p.get("tasks"), list):
         p["tasks"] = list(p["tasks"])
@@ -405,8 +383,8 @@ def _render(payload: dict[str, Any]) -> str:
     if _over(text) and "recent" in p:
         p.pop("recent")
         text = _dumps(p)
-    if _over(text) and isinstance(intents, dict) and isinstance(intents.get("active"), list):
-        p["intents"] = {**intents, "active": intents["active"][:MIN_ACTIVE_INTENTS]}
+    if _over(text) and isinstance(intents, dict) and isinstance(intents.get("open"), list):
+        p["intents"] = {**intents, "open": intents["open"][:MIN_OPEN_INTENTS]}
         text = _dumps(p)
     if _over(text) and isinstance(p.get("tasks"), list):
         p["tasks"] = [_clip_artifact(t) for t in p["tasks"]]

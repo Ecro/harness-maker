@@ -1,6 +1,6 @@
 preset: Production
 strictness: block
-file_count: 29
+file_count: 28
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
@@ -34,13 +34,13 @@ files:
   body_sha256: ad6837a5349458a5ef491d9296df6f7da6a9eab831586b281c8c37b6cb9b73bb
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 8ea8311fc229c7f157b3e8c368f428c1114db93eafac5e8ecc602708f0f7074c
+  body_sha256: 34fe00b6e1e1122c9dc62ea2b96f7b9a0660c7607124ffda955c6a8a8b933966
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: c4364aa3896fdafbf4dc60b60eac7b06481f9e9ef15a87cfbbf685904d365b62
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 4318af34caf48beda380b556c3316e8560073c24ca7c68a1be441d579b5bbb0a
+  body_sha256: 662a63c5da064525a61f1f1ef42aabf961a156524c4d6833320f69696b39a208
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
   body_sha256: e5be5d712cc23131767f2870a33e62d697c5f68645f1be18e04d955f78a6ef01
@@ -79,13 +79,10 @@ files:
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 - path: skills/intent-layer/SKILL.md
   template: skills/intent-layer/SKILL.md.j2
-  body_sha256: f6253c911604f9b5c6159e4c2a472d80361d7454300fed4b98b2c553ba8a07ae
-- path: skills/intent-layer/references/workflow-feedback.md
-  template: skills/intent-layer/references/workflow-feedback.md.j2
-  body_sha256: 3bcd7dd2162a896dd7a2a725d89784844eb81ba7b9ea3344c9aef3426593e578
+  body_sha256: 4469e06df97dfc5e50791b42c18f4dabc20c1d3b84b6eaa8cf755c7d997ed202
 - path: skills/maker/SKILL.md
   template: skills/world-model/SKILL.md.j2
-  body_sha256: d01a00f376f15ef4cfd076b5b53ef8af9424997eddca291230476a85dfdb250a
+  body_sha256: b2a7b4f2958983cfe9be95c7921a8f3e2765c3e8b283bc1ac801b634831c68c3
 - path: skills/project-knowledge/SKILL.md
   template: skills/project-knowledge/SKILL.md.j2
-  body_sha256: 98b6a525112f3a8d649f3390263ea5b2905f4da1e11260eab6aab59648546eef
+  body_sha256: dc8aa4212398e47e605aac6a393a3d872467f5798947a4a305d595e99363a267

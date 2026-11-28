@@ -277,7 +277,7 @@ _ALL_SKILLS: list[str] = [
     "agent-quality-rubric",
     "ai-readiness-rubric",
     "context-linter",
-    # SPEC-intent-world-model-objective-layer S13: the discoverable surface for `hm world`.
+    # The typed-only surface for `hm intent` (reached through Maker).
     "intent-layer",
     # SPEC-mission-context-loop S1: the capture path for code-absent project facts. The
     # always-loaded pointer (CLAUDE.md / AGENTS.md) names it in every preset.
@@ -628,12 +628,6 @@ def _skill_files(config_dump: dict[str, object] | None = None) -> list[FileSpec]
             {"name": n},
         )
         for n in rendered_skills(config_dump)
-    ] + [
-        (
-            "skills/intent-layer/references/workflow-feedback.md.j2",
-            "skills/intent-layer/references/workflow-feedback.md",
-            {},
-        )
     ]
 
 
@@ -859,23 +853,13 @@ def _codex_target_files(
 
 def _codex_skill_files(config_dump: dict[str, object] | None = None) -> list[FileSpec]:
     """The rendered skills, dual-rendered to .agents/skills/ for Codex."""
-    return (
-        [
-            (f"skills/{n}/SKILL.md.j2", f".agents/skills/{n}/SKILL.md", {"name": n})
-            for n in rendered_skills(config_dump)
-        ]
-        + [
-            (
-                "skills/intent-layer/references/workflow-feedback.md.j2",
-                ".agents/skills/intent-layer/references/workflow-feedback.md",
-                {},
-            )
-        ]
-        + [
-            ("skills/_codex/openai.yaml.j2", f".agents/skills/{n}/agents/openai.yaml", {})
-            for n in _TYPED_ONLY_SKILLS
-        ]
-    )
+    return [
+        (f"skills/{n}/SKILL.md.j2", f".agents/skills/{n}/SKILL.md", {"name": n})
+        for n in rendered_skills(config_dump)
+    ] + [
+        ("skills/_codex/openai.yaml.j2", f".agents/skills/{n}/agents/openai.yaml", {})
+        for n in _TYPED_ONLY_SKILLS
+    ]
 
 
 # SPEC-maker-front-door-improvements IRR-001/002: reachable only by typing their name or through

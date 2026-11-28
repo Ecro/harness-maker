@@ -49,8 +49,8 @@ MODULES: dict[str, ModuleSpec] = {
     # Not a user-facing verb: mutmut runs it as `python -m` around the SPEC's test
     # command (see spec_mutation._normalised_runner), so it takes the command as argv.
     "mutation_runner": ModuleSpec("flagonly"),
-    # SPEC-intent-world-model-objective-layer ADR-001: one module, four verbs; `assume`,
-    # `outcome` and `objective` carry their own sub-verbs (add/observe/resolve, record, approve…).
+    # `question` and `metric` carry sub-verbs; approve/activate/drop/reopen are removed verbs
+    # that stay parseable so they exit 2 with their replacement (SPEC-intent-lean ADR-004).
     "intent": ModuleSpec(
         "subparser",
         _s(
@@ -70,29 +70,6 @@ MODULES: dict[str, ModuleSpec] = {
             "reopen",
             "close",
             "show",
-        ),
-    ),
-    "world": ModuleSpec(
-        "subparser",
-        _s(
-            "status",
-            "gap",
-            "assume",
-            "outcome",
-            "objective",
-            "observe",
-            "resolve",
-            "add",
-            "record",
-            "measure",
-            "new",
-            "approve",
-            "activate",
-            "drop",
-            "reopen",
-            "show",
-            "revisit",
-            "close",
         ),
     ),
     "verification_plan": ModuleSpec("subparser", _s("show", "commands")),

@@ -38,7 +38,8 @@ _POINTER_CAP = 400
 _PK_POINTER_CAP = 300
 _TRIGGER_PHRASES = ("invoke when", "use when", "use this when")
 
-_CONSENT = "Its consent rule applies unchanged."
+#: SPEC-intent-lean reworded the consent hand-off: the skill now says when it asks.
+_CONSENT = "follow it, including when it asks."
 _BRIEFING_FIRST = (
     "Answer read-only goal and status questions from the briefing; "
     "read a procedure only to change something."

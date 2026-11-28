@@ -226,13 +226,10 @@ def test_ac001_digest_size_bound(
         "more": 0,
         "autopilot": {"active": True, "level": "auto_safe", "pipeline": ["research", "spec"]},
         "intents": {
-            "counts": {
-                "conflicts": len(intent_ids),
-                "fired_revisits": 0,
-                "needs_revalidation": 0,
-                "stale_evidence": 0,
-            },
-            "items": intent_ids,
+            "open": [
+                {"id": i, "metric_id": "m_" + i.lower(), "last": 1, "target": 2, "gap": "x"}
+                for i in intent_ids
+            ],
         },
         "recent": subjects,
     }
@@ -494,7 +491,8 @@ def test_ac006_root_resolves_to_base(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# AC-009 — digest intent items match hm intent status (differential)
+# AC-009 — digest intent rows match hm intent status (differential)
+# SPEC-intent-lean IRR-003: the block is `open[]` rows, not counts/items of never-fired checks.
 # ---------------------------------------------------------------------------
 
 _IDS = st.lists(st.from_regex(r"[A-Z][A-Z0-9-]{0,12}", fullmatch=True), max_size=6, unique=True)
@@ -506,48 +504,40 @@ _IDS = st.lists(st.from_regex(r"[A-Z][A-Z0-9-]{0,12}", fullmatch=True), max_size
     deadline=None,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-@given(
-    conflicts=_IDS,
-    fired=_IDS,
-    reval=_IDS,
-    stale=st.dictionaries(
-        st.from_regex(r"[a-z]{1,8}", fullmatch=True),
-        st.sampled_from(["changed", "missing"]),
-        max_size=5,
-    ),
-)
+@given(open_ids=_IDS, closed_ids=_IDS, last=st.none() | st.integers(0, 100))
 def test_ac009_intents_match_status(
     shared_base: Path,
     monkeypatch: pytest.MonkeyPatch,
-    conflicts: list[str],
-    fired: list[str],
-    reval: list[str],
-    stale: dict[str, str],
+    open_ids: list[str],
+    closed_ids: list[str],
+    last: int | None,
 ) -> None:
     from harness_maker import intent_cli
 
+    closed_ids = [i for i in closed_ids if i not in open_ids]
     status = {
         "state": "ok",
-        "conflicts": conflicts,
-        "fired_revisits": fired,
-        "needs_revalidation": reval,
-        "stale_evidence": stale,
+        "metrics": {"m": {"last": last, "target": 8, "gap": "unevaluable"}},
+        "intents": {
+            **{i: {"state": "open", "metric_id": "m"} for i in open_ids},
+            **{i: {"state": "closed", "metric_id": "m"} for i in closed_ids},
+        },
+        "open": open_ids,
     }
     (shared_base / ".claude").mkdir(exist_ok=True)
     (shared_base / ".claude/intent.yaml").write_text("schema_version: 1\n", encoding="utf-8")
     monkeypatch.setattr(intent_cli, "status_report", lambda _root: dict(status))
     intents = _digest_mod().digest(shared_base, session_id=None)["intents"]
-    expected_counts = {
-        "conflicts": len(conflicts),
-        "fired_revisits": len(fired),
-        "needs_revalidation": len(reval),
-        "stale_evidence": len(stale),
-    }
-    assert intents["counts"] == expected_counts
-    reference = set(conflicts) | set(fired) | set(reval) | set(stale)
-    assert len(intents["items"]) <= 3
-    assert set(intents["items"]) <= reference
-    assert len(intents["items"]) == min(3, len(reference))
+    assert set(intents) == {"open"}
+    assert [r["id"] for r in intents["open"]] == open_ids
+    for row in intents["open"]:
+        assert row == {
+            "id": row["id"],
+            "metric_id": "m",
+            "last": "—" if last is None else last,
+            "target": 8,
+            "gap": "unevaluable",
+        }
 
 
 def test_hm_console_script_dispatches_world_model_digest(tmp_path: Path) -> None:
