@@ -2,9 +2,10 @@
 joins the definition hash only when present.
 
 AC-001's oracle is golden: every refused fixture is hand-written from SPEC S1's list and the
-field name is fixed by the SPEC (`outcomes[i].measure.<field>`), never read back from the
-validator. AC-005 is differential: the reference for "stale" is the shipped `gap_report`
-reason, and the block-less hash is a literal taken from HEAD before this change
+field name is fixed by the SPEC (`metrics[i].measure.<field>`, once `outcomes[i]`), never read
+back from the validator. AC-005 is differential: the reference for "stale" is the shipped
+status `reason` (once `gap_report`), and the block-less hash is a literal taken from HEAD
+before this change
 (`definition_hash(10, "stopwatch", False)` at 6ef0bcf9) so the new hashing cannot move it.
 
 Phase A.4 note: `test_ac_005_a_block_less_outcome_hashes_exactly_as_before` passes before the
@@ -23,8 +24,9 @@ from typing import Any
 
 import pytest
 
-from harness_maker import intent, world
-from tests.unit import world_fixture as fx
+from harness_maker import intent, intent_cli
+from harness_maker.intent import Outcome
+from tests.unit import intent_fixture as fx
 
 LEGACY_HASH_WITHOUT_MEASURE = "43b3d603a9ba25f94acd47be9bf220585ee5d47525127d68a9685279618fcd61"
 
@@ -47,7 +49,7 @@ def _write_intent(path: Path, measure: Any) -> Path:
 def test_ac_001_measure_block_validates_with_the_outcome(tmp_path: Path) -> None:
     good = _write_intent(tmp_path / "good.yaml", GOOD_MEASURE)
     loaded = intent.load_intent(good)
-    block = loaded.outcomes[0].measure
+    block = loaded.metrics[0].measure
     assert block is not None
     assert block.cmd == "python probe.py"
     assert block.select == "json:report.carry_ratio"
@@ -68,7 +70,7 @@ def test_ac_001_measure_block_validates_with_the_outcome(tmp_path: Path) -> None
     ]
     bad_paths = [_write_intent(tmp_path / f"bad{i}.yaml", b) for i, b in enumerate(bad_blocks)]
     assert all(
-        any(e.field.startswith("outcomes[0].measure") for e in intent.validate_intent(bad))
+        any(e.field.startswith("metrics[0].measure") for e in intent.validate_intent(bad))
         for bad in bad_paths
     ), [[e.field for e in intent.validate_intent(bad)] for bad in bad_paths]
 
@@ -85,17 +87,17 @@ def test_ac_001_defaults_and_overrides_load(tmp_path: Path) -> None:
         tmp_path / "i.yaml",
         {"cmd": "python probe.py", "select": "last-number", "cwd": "checkout", "timeout_s": 5},
     )
-    block = intent.load_intent(path).outcomes[0].measure
+    block = intent.load_intent(path).metrics[0].measure
     assert block is not None
     assert (block.cwd, block.timeout_s) == ("checkout", 5)
     minimal = _write_intent(
         tmp_path / "m.yaml", {"cmd": "python probe.py", "select": "last-number"}
     )
-    block = intent.load_intent(minimal).outcomes[0].measure
+    block = intent.load_intent(minimal).metrics[0].measure
     assert block is not None
     assert (block.cwd, block.timeout_s) == ("base", 300)
     fx.dump(tmp_path / "a.yaml", fx.intent_doc(fx.outcome("carry")))
-    assert intent.load_intent(tmp_path / "a.yaml").outcomes[0].measure is None
+    assert intent.load_intent(tmp_path / "a.yaml").metrics[0].measure is None
 
 
 # ── AC-005 ───────────────────────────────────────────────────────────────────
@@ -103,7 +105,7 @@ def test_ac_001_defaults_and_overrides_load(tmp_path: Path) -> None:
 
 def _measured_row(outcome_doc: dict[str, Any], value: float = 0.5) -> dict[str, Any]:
     return {
-        "outcome_id": outcome_doc["id"],
+        "metric_id": outcome_doc["id"],
         "value": value,
         "observed_at": "2026-09-10T00:00:00Z",
         "evidence": "fixture",
@@ -114,7 +116,7 @@ def _measured_row(outcome_doc: dict[str, Any], value: float = 0.5) -> dict[str, 
 def _edit_measure(root: Path, **over: Any) -> None:
     path = root / ".claude" / "intent.yaml"
     doc = fx.load(path)
-    doc["outcomes"][0]["measure"] = {**doc["outcomes"][0]["measure"], **over}
+    doc["metrics"][0]["measure"] = {**doc["metrics"][0]["measure"], **over}
     fx.dump(path, doc)
 
 
@@ -123,18 +125,19 @@ def test_ac_005_editing_measure_stales_history(tmp_path: Path) -> None:
     root = fx.build_root(
         tmp_path, intent=fx.intent_doc(outcome_doc), values=[_measured_row(outcome_doc)]
     )
-    assert world.gap_report(root)["outcomes"]["carry"]["reason"] == "measured"
+    assert intent_cli.status_report(root)["metrics"]["carry"]["reason"] == "measured"
 
     _edit_measure(root, cmd="python other.py")
-    gap_after_edit = world.gap_report(root)
-    assert gap_after_edit["outcomes"]["carry"]["reason"] == "stale_definition"
+    gap_after_edit = intent_cli.status_report(root)
+    assert gap_after_edit["metrics"]["carry"]["reason"] == "stale_definition"
 
     _edit_measure(root, cmd="python probe.py")
-    gap_after_revert = world.gap_report(root)
-    assert gap_after_revert["outcomes"]["carry"]["reason"] == "measured"
+    gap_after_revert = intent_cli.status_report(root)
+    assert gap_after_revert["metrics"]["carry"]["reason"] == "measured"
 
     assert (
-        world.definition_hash(10, "stopwatch", False, measure=None) == LEGACY_HASH_WITHOUT_MEASURE
+        intent_cli.definition_hash(Outcome("x", "d", 10, False, "stopwatch"))
+        == LEGACY_HASH_WITHOUT_MEASURE
     )
 
 
@@ -149,7 +152,7 @@ def test_ac_005_every_measure_field_is_hashed(tmp_path: Path, edit: dict[str, An
         tmp_path, intent=fx.intent_doc(outcome_doc), values=[_measured_row(outcome_doc)]
     )
     _edit_measure(root, **edit)
-    assert world.gap_report(root)["outcomes"]["carry"]["reason"] == "stale_definition"
+    assert intent_cli.status_report(root)["metrics"]["carry"]["reason"] == "stale_definition"
 
 
 def test_ac_005_a_block_less_outcome_hashes_exactly_as_before(tmp_path: Path) -> None:
@@ -158,12 +161,12 @@ def test_ac_005_a_block_less_outcome_hashes_exactly_as_before(tmp_path: Path) ->
         "carry"
     )  # target 10, stopwatch, lower is better — the literal's inputs
     legacy_row = {
-        "outcome_id": "carry",
+        "metric_id": "carry",
         "value": 9,
         "observed_at": "2026-09-10T00:00:00Z",
         "evidence": "fixture",
         "definition_hash": LEGACY_HASH_WITHOUT_MEASURE,
     }
     root = fx.build_root(tmp_path, intent=fx.intent_doc(outcome_doc), values=[legacy_row])
-    assert world.gap_report(root)["outcomes"]["carry"]["reason"] == "measured"
+    assert intent_cli.status_report(root)["metrics"]["carry"]["reason"] == "measured"
     assert fx.definition_hash(outcome_doc) == LEGACY_HASH_WITHOUT_MEASURE

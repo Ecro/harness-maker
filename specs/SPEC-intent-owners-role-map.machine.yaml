@@ -73,6 +73,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: DRI handoff sections 2 and 9 define advisory approval; test values
     are chosen independently of implementation.
@@ -98,6 +99,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: DRI handoff sections 2 and 9 define silent solo approval; test
     values are chosen independently of implementation.
@@ -123,6 +125,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: DRI handoff sections 2 and 9 define rendered guidance; test values
     are chosen independently of implementation.

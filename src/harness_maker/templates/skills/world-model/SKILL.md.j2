@@ -70,7 +70,7 @@ Else answer from the briefing or name the owning {% if is_codex %}`$hm-*` skill{
 
 - **tasks** (newest first, ≤ 5; `more` = rest; `parked: true` last): `next_stage` from artifacts;
   `other_session: true` = another session touched it last.
-- **intents.active** (`last`/`target`/`gap`), **recent** commits.
+- **intents.open** (`last`/`target`/`gap`), **recent** commits.
 - Only `hm/<slug>` worktrees (`worktree.enabled: true`); else or on failure use `work-docs/`, `specs/`.
 
 Answer read-only goal and status questions from the briefing; read a procedure only to change something.
@@ -79,7 +79,7 @@ Reply in at most 8 lines, changed or blocking first. Write nothing here. Never R
 
 ## Goals and facts
 
-Read `{{ sk }}/intent-layer/SKILL.md` (goals, metrics, intents) or `{{ sk }}/project-knowledge/SKILL.md` (facts) before any write; follow it. Its consent rule applies unchanged.
+Read `{{ sk }}/intent-layer/SKILL.md` (goals, metrics, intents) or `{{ sk }}/project-knowledge/SKILL.md` (facts) before any write; follow it, including when it asks.
 
 A decision or scope change on an in-flight task: write it into that task's most downstream artifact (PLAN, else SPEC, else RESEARCH) before replying.
 

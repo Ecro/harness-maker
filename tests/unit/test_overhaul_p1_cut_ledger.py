@@ -95,9 +95,16 @@ def ref(tmp_path_factory: pytest.TempPathFactory) -> ModuleType:
     return _ref_registry(tmp_path_factory.mktemp("ref-ss"))
 
 
+#: Headings a later approved SPEC removed, with that SPEC's DRI decision as the disposition. The
+#: phase-1 ledger is an approved document, so later cuts are listed here instead of edited into it.
+LATER_CUTS: list[tuple[list[tuple[str, str]], str, str]] = [
+    ([("spec", "Step 0.5")], "INV", "DRI: approved SPEC-intent-lean removed spec Step 0.5"),
+]
+
+
 @pytest.fixture(scope="module")
 def ledger() -> list[tuple[list[tuple[str, str]], str, str]]:
-    return ledger_rows(SPEC.read_text(encoding="utf-8"))
+    return ledger_rows(SPEC.read_text(encoding="utf-8")) + LATER_CUTS
 
 
 @pytest.fixture(scope="module")

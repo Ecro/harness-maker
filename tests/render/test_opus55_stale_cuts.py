@@ -29,6 +29,14 @@ RETIRED_PATHS = frozenset(
         SESSION_README,
     }
 )
+#: Paths a later SPEC removed from the render: SPEC-intent-lean deleted the workflow-feedback
+#: reference of the intent-layer skill.
+LATER_REMOVED = frozenset(
+    {
+        ".claude/skills/intent-layer/references/workflow-feedback.md",
+        ".agents/skills/intent-layer/references/workflow-feedback.md",
+    }
+)
 RUBRIC_SKILLS = ("agent-quality-rubric", "ai-readiness-rubric", "context-linter")
 _PHASES = ("Phase 3 stub", "Phase 6", "Phase 9")
 STUBS = {
@@ -115,7 +123,7 @@ def test_ac_002_fresh_render_is_the_0655_set_minus_the_retired_paths(
     # The recorded list holds the render's date-stamped orphan log; drop it on both sides.
     reference = {p for p in PATHS_0655[preset] if not p.startswith(_RERENDER_STATE)}
     assert reference >= RETIRED_PATHS
-    assert _paths(fresh[(preset, "en")]) == reference - RETIRED_PATHS
+    assert _paths(fresh[(preset, "en")]) == reference - RETIRED_PATHS - LATER_REMOVED
 
 
 def test_ac_003_worktree_isolator_is_a_retired_name() -> None:

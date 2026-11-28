@@ -76,6 +76,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: Handoff hazards H1-H4 and acceptance section 9; fixed legacy bytes
     and independent expected values for historical withdrawal clock.
@@ -151,6 +152,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: Handoff hazards H1-H4 and acceptance section 9; fixed legacy bytes
     and independent expected values for canonical cli and compatibility alias.
