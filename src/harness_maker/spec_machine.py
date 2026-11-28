@@ -1367,8 +1367,16 @@ def _run_export_golden(args: argparse.Namespace) -> int:
     if args.write is not None and not args.inline:
         print("export-golden: --write needs --inline", file=sys.stderr)
         return 2
-    if (args.name is None) != (args.ac_id is None) or (args.name and args.write is None):
-        print("export-golden: --name and --ac go together, with --inline --write", file=sys.stderr)
+    # `--ac` alone prints that AC's rows, to grow a list a test already parametrizes over.
+    printing = args.ac_id is not None and args.name is None and args.write is None
+    if not printing and (
+        (args.name is None) != (args.ac_id is None) or (args.name and args.write is None)
+    ):
+        print("export-golden: --name and --ac go together, with --inline --write "
+              "(--ac alone, without --write, prints the rows)", file=sys.stderr)  # fmt: skip
+        return 2
+    if printing and not args.inline:
+        print("export-golden: --ac needs --inline", file=sys.stderr)
         return 2
     if args.name is not None and not (args.name.isidentifier() and not iskeyword(args.name)):
         print(f"export-golden: --name {args.name!r} is not a Python name", file=sys.stderr)
@@ -1381,15 +1389,17 @@ def _run_export_golden(args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001 — an unloadable yaml is a usage error, not a trace
         print(f"export-golden: cannot load {args.yaml_path}: {e}", file=sys.stderr)
         return 1
-    if not payload and args.name is None:
+    if not payload and args.ac_id is None:
         print("export-golden: no parametric AC; nothing written")
         return 0
+    if args.ac_id is not None and args.ac_id not in payload:
+        print(f"export-golden: {args.ac_id} is not a parametric AC of this SPEC", file=sys.stderr)
+        return 1
+    if printing:
+        rows = inline_rows_projection(payload[args.ac_id])
+        print("".join(f"    {py_literal(r)},\n" for r in rows), end="")
+        return 0
     if args.name is not None:
-        if args.ac_id not in payload:
-            print(
-                f"export-golden: {args.ac_id} is not a parametric AC of this SPEC", file=sys.stderr
-            )
-            return 1
         target = args.write if args.write.is_absolute() else args.root / args.write
         outcome = write_named_rows(target, args.name, payload[args.ac_id])
         if outcome == "taken":

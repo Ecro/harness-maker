@@ -37,7 +37,7 @@ EXECUTE_PHRASES = (
     "never copy the implementation",
     "export-golden --inline",
 )
-SPEC_PHRASE = "One golden table per function: no column naming the function or scripting steps."
+SPEC_PHRASE = "A golden table maps one function's arguments to its return value"
 
 
 def _venv(root: Path) -> None:

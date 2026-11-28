@@ -139,7 +139,9 @@ _EXPECTED_SHA256: dict[str, str] = {
     # `conditional_router.LENS_DISPATCH` names as backing the seven lenses — and that the same
     # four moved, and only those four, is the check worth making: a fifth would mean the
     # deletion reached past the include.
-    "code-reviewer": "2411d9e270ec4363ded2116ebfec3b686e7d6e7b593e378a52aad1f24fd8088d",
+    # Re-pinned by SPEC-test-shape-rules AC-004: the drift bullet names the SPEC's Constraints
+    # (files touched, no secret committed), which /hm:spec no longer turns into tests.
+    "code-reviewer": "3c9a5fafba0a443f229cfd8dd1dcdb2681eb06d5f19f6f50f9a49f5b009acc4d",
     "concurrency-reviewer": "145f8e7197dd9e70f8c3ad2fc6c08fa16f915a5cec5598d93461287f982b2563",
     # consensus-arbiter + spec-validator (was plan-validator): hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.

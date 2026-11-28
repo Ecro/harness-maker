@@ -1,14 +1,14 @@
 {
-  "Production:execute:claude": 8410,
-  "Production:execute:codex": 8420,
-  "Production:spec:claude": 8350,
-  "Production:spec:codex": 8441,
+  "Production:execute:claude": 8453,
+  "Production:execute:codex": 8463,
+  "Production:spec:claude": 8447,
+  "Production:spec:codex": 8538,
   "Production:wrapup:claude": 5354,
   "Production:wrapup:codex": 5404,
-  "Side:execute:claude": 7813,
-  "Side:execute:codex": 7823,
-  "Side:spec:claude": 7724,
-  "Side:spec:codex": 7815,
+  "Side:execute:claude": 7856,
+  "Side:execute:codex": 7866,
+  "Side:spec:claude": 7820,
+  "Side:spec:codex": 7911,
   "Side:wrapup:claude": 4299,
   "Side:wrapup:codex": 4349
 }

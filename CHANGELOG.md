@@ -4,6 +4,13 @@
 
 ### Changed
 
+- `/hm:spec` keeps golden tables to one function's arguments and its return value; printed
+  output, exit codes, call sequences and one-case checks become mechanical ACs, and a rule about
+  the change itself (files touched, no secret committed) becomes a Constraint the reviewer checks
+  instead of a test. `/hm:execute` pastes an AC's rows into a test that already parametrizes the
+  same call (`hm spec_machine export-golden --inline --ac AC-NNN` prints them) instead of adding a
+  parallel table. Each of the three causes was confirmed by a counterfactual judge run
+  (SPEC-test-shape-rules).
 - Tests written by `/hm:execute` are named for the behaviour they check, with no AC id in a test
   name, case id or row constant. The AC link moves into the SPEC: `hm spec_machine bind` records
   each AC's tests before RED. `export-golden --inline --write <file> --ac AC-NNN --name NAME`
