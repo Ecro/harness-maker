@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.66.0
+harness_maker_version: 0.67.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: cd3500cb92760a83880494cd9ef8b8678a720534aacdc2ce686c6014cda38938
+content_hash: 88d48b1d04d3289e289a6150418edf737567bef5915f8f40410caddf8987cb58
 ---
 preset: Production
 locale: ko
