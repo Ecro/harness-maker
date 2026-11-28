@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Golden rows read like ordinary pytest parameters** (SPEC-readable-golden-rows). `hm
+  spec_machine export-golden --inline` now prints a column header such as
+  `# (seconds, max_units, expected)` and flat tuples `(5430, 2, '2h')` when every row's input has
+  the same keys, and no "Do not edit; `hm check` …" note. `hm check` compares flat rows (and their
+  header) as it does pairs; a 0.67.0 pair block stays in pair form when rewritten, and `--write`
+  refuses a test file whose same-numbered rows belong to another SPEC. `/hm:execute` adds tests to
+  the module's existing test file and calls the code plainly; `/hm:spec` keeps raising cases and
+  already-tested behaviour out of golden rows. On the 0.67.0 bench (36 tier 1+2 pairs, Opus 5.5
+  position-swapped judge vs plain + "write tests") hm moved from scope 0-30 to 2-11 and
+  maintainability 3-29 to 8-27; new test files without a new module fell from 20/36 to 2/36.
+
 ## [0.67.0] - 2026-11-28
 
 Owner-facing release. You approve a SPEC and read a landed change from a short change card in

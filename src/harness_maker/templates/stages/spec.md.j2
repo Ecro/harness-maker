@@ -70,11 +70,11 @@ ac:
     oracle_evidence: <why it is independent>
 ```
 
-A behaviour-unchanged AC is parametric, its golden rows computed at spec time by running the unchanged code and never regenerated. `/hm:execute` writes and binds each non-judgment AC's test.
+A behaviour-unchanged AC covers only what no existing test asserts; it is parametric, its golden rows computed at spec time by running the unchanged code and never regenerated. A raising case is a mechanical AC (`pytest.raises`), not a golden row. `/hm:execute` writes each testable AC's test.
 
 ## Step 4 — Check
 
-Run `hm spec_machine finalize --slug <slug> --strictness {{ _strict }}` (the check; it writes nothing). On exit 1, fix and rerun once; if it still fails, report and stop.
+Run `hm spec_machine finalize --slug <slug> --strictness {{ _strict }}` (a check; writes nothing). On exit 1, fix and rerun once; if it still fails, report and stop.
 
 ## Step 4.5 — Quality score
 
@@ -88,4 +88,4 @@ One advisory pass, only on Step 4's `"validator": "run"` or "Approve after spec-
 
 With Open Questions empty: if the DRI chose "Approve this SPEC and end interview", or the validator one with no critical critique, run `hm spec_machine finalize --slug <slug> --strictness {{ _strict }} --approve`; else `--exempt` only when `irreversible_decisions: []` and the DRI was not asked (`auto_full`). Either re-checks, stamps and sets `status: approved`; on exit 1 nothing is stamped. Else leave `status: draft`, unstamped.
 
-Print the SPEC path, status and approval (from the last `finalize`), then STOP. `/hm:execute <slug>` is the user's call; if the world model began this run, enter it now unless its Advance rule stops.
+Print the SPEC path, status and approval, then STOP. `/hm:execute <slug>` is the user's call; if the world model began this run, enter it now unless its Advance rule stops.

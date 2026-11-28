@@ -7,7 +7,6 @@ the oracle visible; the comparison keeps the "never regenerate golden rows" guar
 
 from __future__ import annotations
 
-import ast
 import subprocess
 import sys
 from pathlib import Path
@@ -36,19 +35,8 @@ def _export(root: Path) -> subprocess.CompletedProcess[str]:
     )  # fmt: skip
 
 
-def test_ac_001_export_golden_inline_prints_literal_rows(tmp_path: Path) -> None:
-    root = init_project(tmp_path / "p")
-    write_spec(root, [param_ac("AC-001", ROWS)])
-    r = _export(root)
-    assert r.returncode == 0, r.stderr
-    assert not (root / "specs" / "SPEC-demo.golden.json").exists()
-    tree = ast.parse(r.stdout)
-    assigns = {
-        n.targets[0].id: ast.literal_eval(n.value)
-        for n in tree.body
-        if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)
-    }
-    assert assigns == {"AC_001_ROWS": WANT}
+# AC-001 was retired by SPEC-readable-golden-rows (single-key rows now print flat); its test
+# moved to tests/unit/test_readable_golden_rows.py.
 
 
 def _project(tmp_path: Path, rows_literal: str | None) -> Path:

@@ -10,7 +10,7 @@
 
 {{ hm.choices() }}
 
-Chain independent shell steps with `&&` in one Bash call, except `hm check`, the RED run and any step marked as its own call; a chain stops at its first failure, so report it.
+Chain independent shell steps with `&&` in one Bash call, except `hm check`, the RED run and any step marked as its own call; report a chain's first failure.
 
 **Resume.** No REVIEW yet, at least one testable AC, and every testable AC is `pending_test: false`: after Step 2, rerun Bind's gate, then Step 4.
 
@@ -32,7 +32,7 @@ Confirm each phase line has all four fields and `### Do not change` is non-empty
 
 ## Step 1 — Load the PLAN
 
-Read the PLAN, its RESEARCH doc and the SPEC only on Resume or when this session did not write them; ADRs bind. Restate `Do not change` once.
+Read the PLAN, its RESEARCH doc and the SPEC only on Resume or when this session did not write them; ADRs bind.
 
 ## Step 2 — Load the SPEC
 
@@ -42,17 +42,17 @@ Take `test_framework`, the scenarios and the testable ACs (not superseded, not `
 
 ### Phase A — Write every AC test
 
-Before any code, write a test for every testable AC in the SPEC, across all phases, named `test_ac_NNN_<short>`; ACs sharing a call shape share one parametrized test with ids `AC-NNN-<i>`. Its assertion is the AC's oracle on the real code: a mechanical AC asserts its `executable_predicate`; a parametric AC parametrizes over `AC_NNN_ROWS`, which `hm spec_machine export-golden --inline --write <test file> --slug <slug>` writes into that file before its tests (then Edit, never Write over, the file; never type the rows); a property AC uses Hypothesis `@given` over `input_domain` (no Hypothesis: a seeded stdlib `random` loop; never add it) and asserts `expected_relation`. No tautology, no mock-only body; never copy the implementation into a test; never regenerate golden rows. Importing a first-party name that does not exist yet is a valid RED; that name must exist by GREEN.
+Before any code, write a test for every testable AC in the SPEC, across all phases, named `test_ac_NNN_<short>`; ACs sharing a call shape share one parametrized test with ids `AC-NNN-<i>`. Add each test to its module's existing test file (a new file only for a new module). Its assertion is the AC's oracle on the real code: a mechanical AC asserts its `executable_predicate`; a parametric AC parametrizes over `AC_NNN_ROWS`, which `hm spec_machine export-golden --inline --write <test file> --slug <slug>` writes into that file before its tests (then Edit, never Write over, the file; never type the rows); parametrize by its columns and call the code plainly (no `eval`, `getattr` or stand-ins); a property AC uses Hypothesis `@given` over `input_domain` (no Hypothesis: a seeded stdlib `random` loop; never add it) and asserts `expected_relation`. No tautology, no mock-only body; never copy the implementation into a test; never regenerate golden rows. A not-yet-existing first-party import is a valid RED; it must exist by GREEN.
 
-Tests bind by these names; leave `test_ids` alone.
+Leave `test_ids` alone.
 
-**RED**, once, before any code: run `hm check --red --slug <slug>`. Exit 0: every one has a test failing for a real reason. On exit 1, fix what it names: a test already passing, a syntax error, a missing fixture or node id. An AC whose behaviour already exists may be waived with `--green-ok AC-NNN`; the reason goes to the reviewer. Keep the RED summary for the commit body.
+**RED**, once, before any code: run `hm check --red --slug <slug>`. Exit 0: every AC test fails for a real reason. On exit 1, fix what it names. An AC whose behaviour already exists may be waived with `--green-ok AC-NNN`; the reason goes to the reviewer. Keep the RED summary for the commit.
 
 ### Phase C — Implement, phase by phase
 
 Per PLAN phase, make the smallest change that turns its ACs' tests GREEN, within the ADRs and outside `Do not change`, and run the phase's `exit:` command. A choice in an irreversible category ({{ hm.irr_categories() }}) that the SPEC's `irreversible_decisions` does not list: append it as `{id: IRR-<next>, decision, category, rationale, source: execute}` (voiding the approval), then stop and ask the DRI with {{ hm.ask() }}: approve runs `hm spec_machine approve --yaml specs/SPEC-<slug>.machine.yaml`, anything else stops the stage.
 
-A flaky test is never skipped, slept on or retried: fix its cause, or delete it and record why as an agent-decided PLAN ADR.
+Never skip, sleep on or retry a flaky test: fix its cause, or delete it with an agent-decided PLAN ADR saying why.
 
 **Bind, then gate**, after the last phase: run `hm spec_machine mark-tested --slug <slug>` once (it binds every testable AC), then run `hm check --slug <slug>`{{ hm.long_gate() }}. By exit code:
 - 0: proceed.
