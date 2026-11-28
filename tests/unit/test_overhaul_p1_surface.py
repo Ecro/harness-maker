@@ -257,7 +257,12 @@ def test_ac004_file_set_negative_control(trees: dict[str, Path], tmp_path: Path)
 # Boundary rule (+475 on every arm), then revision 2 "ask unless the ask states it" (+151).
 # execute raised by SPEC-execute-report-short's measured growth: the three-line closing report
 # naming what the DRI must still see (+93 on every arm; 53 came from slack, so the budget rises 40).
-_STAGE_BUDGET = {"spec": (7771, 1500, 800), "execute": (7813, 1500, 0), "wrapup": (4300, 2785, 0)}
+# spec raised by SPEC-test-shape-rules' measured growth: golden rows are call -> return value, a
+# rule about the change itself is a reviewed Constraint (+97; 10 came from slack, so the budget
+# rises 87). The two older rules it touches stay verbatim because their pins hold them.
+# execute raised by the same SPEC (+43 after trims): paste printed rows into an existing list
+# with the same columns, and the restored "never type the rows" (review F2, F3).
+_STAGE_BUDGET = {"spec": (7858, 1500, 800), "execute": (7856, 1500, 0), "wrapup": (4300, 2785, 0)}
 _OPT_IN = 1500
 
 

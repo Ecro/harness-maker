@@ -7,7 +7,7 @@ files:
   body_sha256: bf9666168ae2df6834fb9d55206a35fce0953b3929fd549b914280466bb8bdc9
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
-  body_sha256: 991343f0735e2eedeb6bc2a40df46ab115ef58f44ca223f756577e9d5a3fbe70
+  body_sha256: d0de48ca5866b563f8818a1ec0cae225ef632f8c5462d33199488096e034c4d1
 - path: agents/judgment-reviewer.md
   template: agents/judgment-reviewer.md.j2
   body_sha256: 9216a2c84e6d4365e76a45a3c2ee71fbf3717506fc171aa82dedce289f8d0985
@@ -16,7 +16,7 @@ files:
   body_sha256: c62a21e82754d5606f3beae02e5dcf47cce846662e3763708b901442a83abb9a
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 253bfa28092a9e128368fb91226f0dcce44bdb2bfcd6067a2d19b239a2a5d769
+  body_sha256: 9de749727714f7120322768dd9edfb8eff74f94c1a43be3d09d26354b1d1f3b4
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 7a0eb0965046757c8720bdabc17656ec1ba96bace0c29141730b4f0e6fda2e8a
@@ -34,7 +34,7 @@ files:
   body_sha256: c1c942d4c8ec48ea693f6374f42895d0e630cf84e4300d320055e48b434986dc
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: ff46f56b50a9db3690d2ca5b33c6bdc5906213fb4b407145ad5ee3a7cee11d51
+  body_sha256: ed4699bea307c6fbab7cc568d90f54e03cf55e125bf5d81dbcf3857de48f8c65
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: c4364aa3896fdafbf4dc60b60eac7b06481f9e9ef15a87cfbbf685904d365b62

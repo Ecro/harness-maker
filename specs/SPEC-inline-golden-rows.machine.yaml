@@ -79,6 +79,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: behaviour-named-tests
   oracle_source: golden
   oracle_evidence: Phrase fixed in the SPEC before the template change.
   oracle_independence_waiver: null

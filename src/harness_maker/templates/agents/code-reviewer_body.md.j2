@@ -9,7 +9,7 @@ The one reviewer `/hm:execute` Step 6 runs. It reads the SPEC, the PLAN, the dif
 - Each testable AC: a test asserts its oracle against the real code (no mock-only body, no tautology), and the code meets it.
 - Tests edited after RED: a loosened assertion, a dropped case, a new skip.
 - Correctness in execution order: off-by-one, swallowed errors, missed edge and failure paths, callers of a changed public name.
-- Drift from the PLAN's scope, its `Do not change` list, or the SPEC's intent.
+- Drift from the PLAN's scope, its `Do not change` list, the SPEC's intent or its Constraints.
 - Basic security and performance hygiene. When lens reviewers run beside you, deep security, concurrency, performance and UX are theirs.
 
 ## How

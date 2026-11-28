@@ -31,7 +31,7 @@ Ask only what the DRI owns: categories 1–4 and each irreversible decision, wit
 
 Categories: 1. **Intent** (why now); 2. **Outcomes** ("done", observably); 3. **In-scope scenarios** (2–4 Given-When-Then: normal, edge, failure); 4. **Non-goals**; 5. **Constraints** (the test framework is mandatory); 6. **Verification** (each scenario → unit, integration or manual).
 
-**Oracle, for every AC.** Choose `oracle_source` (golden, differential, property, rubric or consensus; a property also needs `input_domain`, `transformation`, `expected_relation`) and write `oracle_evidence`: why it is independent of the code. "The test will check it" is circular.
+**Oracle, for every AC.** Choose `oracle_source` (golden, differential, property, rubric or consensus; a property also needs `input_domain`, `transformation`, `expected_relation`) and write `oracle_evidence`: why it is independent of the code.
 
 **Irreversible decisions** (not cheaply undone): `category` is exactly one of {{ hm.irr_categories() }}. Each is `{id: IRR-NNN, decision, category, rationale, source: spec}`; `irreversible_decisions: []` is valid.
 
@@ -70,11 +70,11 @@ ac:
     oracle_evidence: <why it is independent>
 ```
 
-A behaviour-unchanged AC covers only what no existing test asserts; it is parametric, its golden rows computed at spec time by running the unchanged code and never regenerated. A raising case is a mechanical AC (`pytest.raises`), not a golden row. `/hm:execute` writes each testable AC's test.
+A behaviour-unchanged AC covers only what no existing test asserts, its expected values computed at spec time by running the unchanged code and never regenerated. A raising case is a mechanical AC (`pytest.raises`), not a golden row. A golden table maps one function's arguments to its return value; printed output, exit code, call sequence or lone case is a mechanical AC too. A rule about the change itself (files touched, no secret committed) is a Constraint for the review, not an AC.
 
 ## Step 4 — Check
 
-Run `hm spec_machine finalize --slug <slug> --strictness {{ _strict }}` (a check; writes nothing). On exit 1, fix and rerun once; if it still fails, report and stop.
+Run `hm spec_machine finalize --slug <slug> --strictness {{ _strict }}`. On exit 1, fix and rerun once; if it still fails, report and stop.
 
 ## Step 4.5 — Quality score
 
@@ -86,6 +86,6 @@ One advisory pass, only on Step 4's `"validator": "run"` or "Approve after spec-
 
 ## Step 5 — Status and stamp
 
-With Open Questions empty: if the DRI chose "Approve this SPEC and end interview", or the validator one with no critical critique, run `hm spec_machine finalize --slug <slug> --strictness {{ _strict }} --approve`; else `--exempt` only when `irreversible_decisions: []` and the DRI was not asked (`auto_full`). Either re-checks, stamps and sets `status: approved`; on exit 1 nothing is stamped. Else leave `status: draft`, unstamped.
+With Open Questions empty: if the DRI chose "Approve this SPEC and end interview", or the validator one with no critical critique, run `hm spec_machine finalize --slug <slug> --strictness {{ _strict }} --approve`; else `--exempt` only when `irreversible_decisions: []` and the DRI was not asked (`auto_full`). Either re-checks, then stamps `status: approved`. Else leave `status: draft`, unstamped.
 
 Print the SPEC path, status and approval, then STOP. `/hm:execute <slug>` is the user's call; if the world model began this run, enter it now unless its Advance rule stops.

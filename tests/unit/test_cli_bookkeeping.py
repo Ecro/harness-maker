@@ -310,6 +310,8 @@ def test_ac_005_wrapup_land_has_a_default_manifest(monkeypatch: pytest.MonkeyPat
 
 # execute keys re-pinned by SPEC-execute-report-short's measured growth (+93: the three-line closing
 # report that names what the DRI must still see); the other stages are untouched.
+# spec and execute keys re-pinned by SPEC-test-shape-rules' measured growth (spec +97: the
+# golden-row and Constraint rules; execute +43: paste rows into an existing same-column list).
 MAIN_CHARS_PATH = REPO / "tests" / "fixtures" / "cli_bookkeeping" / "main_chars.json"
 
 
@@ -363,7 +365,9 @@ def test_ac_006_the_stages_call_the_cli(rendered: dict[str, str], preset: str, t
     assert "spec_machine check" not in spec
     assert "spec_machine approve" not in spec
     assert "--write" in execute
-    assert "--ac AC-NNN" not in execute
+    # mark-tested binds every AC itself; `--ac AC-NNN` now appears only in export-golden's
+    # one-AC write (SPEC-behaviour-named-tests), so the pin names mark-tested.
+    assert not re.search(r"mark-tested[^`\n]*--ac", execute)
     assert "--required" not in wrapup
     assert "approval-status" not in _steps_6_7(wrapup)
     for stage, text in (("spec", spec), ("execute", execute), ("wrapup", wrapup)):

@@ -1,0 +1,134 @@
+schema_version: 3
+spec_slug: test-shape-rules
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: export-golden prints one AC's rows for pasting into an existing list
+  type: mechanical
+  test_ids:
+  - tests/unit/test_test_shape_rules.py::test_export_golden_prints_one_acs_rows_for_an_existing_list
+  - tests/unit/test_test_shape_rules.py::test_export_golden_print_refuses_a_spec_with_no_parametric_ac
+  executable_predicate: run(['export-golden', '--inline', '--slug', 's', '--ac', 'AC-001']).stdout
+    == EXPECTED_LINES and run(['export-golden', '--inline', '--slug', 's', '--ac',
+    'AC-009']).returncode == 1 and run(['export-golden', '--inline', '--slug', 's',
+    '--ac', 'AC-001', '--name', 'X']).returncode == 2
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected stdout lines are written by hand in the test from
+    the fixture rows, not produced by the printer.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: execute extends an existing parametrize before writing a new block
+  type: mechanical
+  test_ids:
+  - tests/unit/test_test_shape_rules.py::test_execute_grows_an_existing_parametrize_before_writing_a_block
+  executable_predicate: all(p in text for p in EXTEND_PHRASES + BEHAVIOUR_NAMED_PHRASES
+    for text in (claude_execute, codex_execute))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrases are fixed in the test before the template edit; the render
+    is read as text.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: spec keeps golden tables to call to return value and the diff rules out of
+    ACs
+  type: mechanical
+  test_ids:
+  - tests/unit/test_test_shape_rules.py::test_spec_keeps_golden_rows_to_return_values_and_diff_rules_out_of_acs
+  executable_predicate: all(p in spec for p in SPEC_PHRASES) and 'it is parametric'
+    not in spec
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrases are fixed in the test before the template edit; the render
+    is read as text.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: the reviewer checks SPEC Constraints
+  type: mechanical
+  test_ids:
+  - tests/unit/test_test_shape_rules.py::test_reviewer_checks_spec_constraints
+  executable_predicate: REVIEWER_PHRASE in reviewer
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrase fixed in the test before the template edit.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 971d6c44165b7d6a1ccb2ac508826395dfc127d2996e0f9602c46f57303feb64
+  approved_by: Claude
+  approved_at: '2026-11-28T13:34:36Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 1f00f5a92cc869b929e14ba631037e66b69081e45bc27a7ac468614bac2a7306
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: a06b36c370cb1573f1a5e09c1e978f67bb8d6385d543e80fa36f3a7769b61974
+    AC-002: 5753f930ac0cdf7537e2b779060e195e390b3fdf5aa6276857bc81a76948ca81
+    AC-003: 9882ba037da5f7cc5139bc1323d139834dd30b78da132a4d1741615bccde2383
+    AC-004: 8d1b6be1a810740799b2e45c731fcf59f509d6148aeba7db17fd0e36381654b4
+    ac_order: 32957f12083cec28f3243a6685d2c8df92c7fb6e446f68d95abf306b6b0ad591

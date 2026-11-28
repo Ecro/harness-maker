@@ -115,6 +115,7 @@ MODULES: dict[str, ModuleSpec] = {
             "validate",
             "cross-validate",
             "mark-tested",
+            "bind",
             "waiver-check",
             "find-unbound",
             "mark-judged",
