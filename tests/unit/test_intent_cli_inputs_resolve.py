@@ -23,7 +23,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from tests.unit import world_fixture as fx
+from tests.unit import intent_fixture as fx
 from tests.unit.test_intent_file_inputs import (
     _LIST_FLAGS,
     _TEXT,
@@ -97,8 +97,6 @@ def test_stdin_list_flags(flag: str, tmp_path: Path, monkeypatch: pytest.MonkeyP
     argv = ["new", "N", "--title", "t", "--statement", "s", "--metric", "latency"]
     if flag != "scope":
         argv += ["--scope", "p"]
-    if flag == "declined":
-        argv += ["--from-proposal", "--candidates", "3"]
     monkeypatch.setattr("sys.stdin", _Stdin(raw.encode("utf-8")))
     _ok(root, *argv, f"--{flag}-file", "-")
     assert _intent(root, "N")[_LIST_FLAGS[flag]] == expected

@@ -85,8 +85,8 @@ session id: `"${CLAUDE_SESSION_ID}"` in Claude Code's digest step, `"$HM_SESSION
   object; failure surfaces as `unavailable`, never as an exit code (followups AC-001/002).
 - **Fields**: `tasks` (≤ 5, newest first: `slug`, `next_stage`, `last_stage`, `last_seen`,
   `other_session`, `parked`, `latest_artifact {name, at}`), `more`, `autopilot`, `intents`
-  (`counts`, `items`, `active[] {id, metric_id, last, target, gap}` — values mirrored from
-  `hm intent status`, `—` when absent), `recent` commits.
+  (`open[] {id, metric_id, last, target, gap}` — open goals with values mirrored from
+  `hm intent status`, `—` when absent; SPEC-intent-lean), `recent` commits.
 - `next_stage` is derived from artifacts, not spans: approved SPEC → REVIEW →
   wrapup (review and verify retired in 0.64.0). execute writes the REVIEW only after its fix loop
   (SPEC-review-after-fixes), so an execute interrupted before then resumes in execute. Past the 5 s artifact budget (`DEADLINE_S`) a task reports `null`.

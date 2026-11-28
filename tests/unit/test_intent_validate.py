@@ -1,10 +1,9 @@
 """AC-001 (intent half) — an invalid intent file is refused with the offending field named.
 
-Property over the defect classes the SPEC Constraints rows enumerate for `intent.yaml`:
-unknown top-level key, missing required key, duplicate outcome id, non-numeric target,
-missing outcome sub-field, empty mission beside non-empty outcomes. The expected field name
-is the input's own, so the oracle never reads the validator. The objective / assumptions
-halves of AC-001 live in the `test_world_*` files (PLAN P2).
+Property over the defect classes of the canonical `intent.yaml` (SPEC-intent-lean): unknown
+top-level key, missing required key, duplicate metric id, non-numeric target, missing metric
+sub-field, empty purpose statement beside non-empty metrics. The expected field name is the
+input's own, so the oracle never reads the validator.
 """
 
 from __future__ import annotations
@@ -26,8 +25,9 @@ settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ci"))
 
 # The reference field sets are restated HERE from the SPEC Constraints table, not imported,
 # so a validator that shrinks its own constants cannot shrink the oracle with them.
-REQUIRED = ("schema_version", "mission", "outcomes")
-OPTIONAL = ("vision", "non_negotiables", "non_scope", "unknowns", "owners")
+REQUIRED = ("schema_version", "purpose", "metrics")
+OPTIONAL = ("rules", "out_of_scope", "open_questions", "owners")
+LEGACY = ("mission", "vision", "outcomes", "non_negotiables", "non_scope", "unknowns")
 OUTCOME_FIELDS = ("id", "description", "target", "higher_is_better", "how_measured")
 
 
@@ -46,11 +46,11 @@ def _outcome(i: int, **over: Any) -> dict[str, Any]:
 def _valid(n_outcomes: int, optional_subset: tuple[str, ...]) -> dict[str, Any]:
     doc: dict[str, Any] = {
         "schema_version": 1,
-        "mission": "ship a harness people keep",
-        "outcomes": [_outcome(i) for i in range(n_outcomes)],
+        "purpose": {"statement": "ship a harness people keep", "vision": ""},
+        "metrics": [_outcome(i) for i in range(n_outcomes)],
     }
     for k in optional_subset:
-        doc[k] = "" if k == "vision" else []
+        doc[k] = {} if k == "owners" else []
     return doc
 
 
@@ -64,10 +64,10 @@ _defect = st.sampled_from(
     [
         "unknown_key",
         "missing_required",
-        "duplicate_outcome_id",
+        "duplicate_metric_id",
         "non_numeric_target",
         "missing_outcome_subfield",
-        "empty_mission_with_outcomes",
+        "empty_statement_with_metrics",
     ]
 )
 
@@ -78,7 +78,7 @@ _defect = st.sampled_from(
     which_required=st.sampled_from(REQUIRED),
     which_sub=st.sampled_from(OUTCOME_FIELDS),
     unknown=st.from_regex(r"[a-z]{3,8}", fullmatch=True).filter(
-        lambda k: k not in REQUIRED + OPTIONAL
+        lambda k: k not in REQUIRED + OPTIONAL + LEGACY
     ),
 )
 def test_ac_001_intent_defect_names_its_field(
@@ -97,18 +97,18 @@ def test_ac_001_intent_defect_names_its_field(
     elif defect == "missing_required":
         del doc[which_required]
         expected = which_required
-    elif defect == "duplicate_outcome_id":
-        doc["outcomes"].append(_outcome(0))
-        expected = "outcomes[].id"
+    elif defect == "duplicate_metric_id":
+        doc["metrics"].append(_outcome(0))
+        expected = "metrics[].id"
     elif defect == "non_numeric_target":
-        doc["outcomes"][0]["target"] = "ten"
-        expected = "outcomes[0].target"
+        doc["metrics"][0]["target"] = "ten"
+        expected = "metrics[0].target"
     elif defect == "missing_outcome_subfield":
-        del doc["outcomes"][0][which_sub]
-        expected = f"outcomes[0].{which_sub}"
+        del doc["metrics"][0][which_sub]
+        expected = f"metrics[0].{which_sub}"
     else:
-        doc["mission"] = ""
-        expected = "mission"
+        doc["purpose"]["statement"] = ""
+        expected = "purpose.statement"
     errors = intent.validate_intent(_write(tmp_path, doc))
     assert errors, f"{defect}: accepted a defective file"
     assert errors[0].field == expected, (defect, errors[0])

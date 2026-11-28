@@ -208,8 +208,6 @@ ac:
   title: Inline invocations unchanged
   type: mechanical
   test_ids:
-  - tests/unit/test_intent_doc_new.py
-  - tests/unit/test_intent_doc_record.py
   - tests/unit/test_intent_vocabulary.py
   executable_predicate: existing_intent_tests_exit_code == 0
   golden_table: []

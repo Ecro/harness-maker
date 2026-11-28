@@ -251,7 +251,7 @@ def has_trial_duty(text: str) -> bool:
 @pytest.mark.parametrize("preset", [Preset.PRODUCTION, Preset.SIDE], ids=lambda p: p.value)
 def test_no_trial_duty_in_rendered_prose(preset: Preset) -> None:
     files = _trial_duty_files(preset)
-    assert any("references" in f.parts for f in files)
+    assert any(f.name == "SKILL.md" and "intent-layer" in f.parts for f in files)
     offenders = [str(f) for f in files if has_trial_duty(f.read_text(encoding="utf-8"))]
     assert not offenders, offenders
 

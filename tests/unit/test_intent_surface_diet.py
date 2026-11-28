@@ -20,8 +20,6 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from harness_maker.models import (
     DelegationConfig,
     InterviewAnswers,
@@ -85,7 +83,6 @@ S33_CONTRACT = (
 )
 EVIDENCE_PHRASE = "from this task's PLAN, SPEC, REVIEW and diff"
 ABSENT_TABLE_PHRASE = "creating the table when it is absent"
-COLLECTION_PHRASES = ("stages only collect", "in every stage", "where it was observed")
 CONSENT_TOKEN = {"claude": "`multiSelect: true`", "codex": "numbered list"}
 
 _UNDERSTANDING_PATTERNS = (
@@ -323,17 +320,6 @@ def s33_ok(s33: str, golden_bytes: int) -> bool:
     return all(t in s33 for t in S33_CONTRACT) and len(s33.encode()) <= 0.6 * golden_bytes
 
 
-PRESERVATION_PHRASE = "preserve existing IDs, paths, history and approvals"
-
-
-def skill_no_collection(texts: list[str]) -> bool:
-    return all(p not in t.lower() for t in texts for p in COLLECTION_PHRASES)
-
-
-def skill_names_57_and_preserves(skill: str, reference: str) -> bool:
-    return "Step 5.7" in skill and "Step 5.7" in reference and PRESERVATION_PHRASE in reference
-
-
 # ── AC-001 ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -402,25 +388,5 @@ def test_ac004_control() -> None:
 # ── AC-008 ──────────────────────────────────────────────────────────────────────────────
 
 
-# ── AC-009 ──────────────────────────────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(("preset", "host"), ARMS, ids=ARM_IDS)
-def test_ac009_skill_no_stage_collection(preset: Preset, host: str) -> None:
-    files = _skill_files(preset, host)
-    assert all(f.is_file() for f in files)
-    skill, reference = (f.read_text(encoding="utf-8") for f in files)
-    assert skill_no_collection([skill, reference])
-    assert skill_names_57_and_preserves(skill, reference)
-
-
-def test_ac009_control() -> None:
-    assert not skill_no_collection(["Workflow stages only collect `pending` rows"])
-    assert not skill_no_collection(["Stages Only Collect pending rows"])
-    assert not skill_no_collection(["in every stage, an observation becomes a row"])
-    assert skill_no_collection(["wrapup Step 5.7 proposes observations once"])
-    ref = f"wrapup Step 5.7 is the one moment; {PRESERVATION_PHRASE}."
-    assert skill_names_57_and_preserves("see Step 5.7", ref)
-    assert not skill_names_57_and_preserves("see wrapup", ref)
-    assert not skill_names_57_and_preserves("see Step 5.7", ref.replace(PRESERVATION_PHRASE, ""))
-    assert not skill_names_57_and_preserves("see Step 5.7", ref.replace("Step 5.7", "wrapup"))
+# AC-009 (the skill and its workflow-feedback reference name wrapup Step 5.7) was retired by
+# SPEC-intent-lean: the reference is gone and wrapup no longer has a feedback step.

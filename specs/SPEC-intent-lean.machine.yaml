@@ -1,0 +1,471 @@
+schema_version: 3
+spec_slug: intent-lean
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: the intent skill asks only at the three moments
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_001_intent_skill_asks_three_moments
+  executable_predicate: all(s.count(ask_tool(s)) == 1 and ask_rule_moments(s) == {"create",
+    "target", "close"} and "one round" in s and "at most 3 questions" in s and not
+    any(v in s for v in ("approve", "activate", "drop", "reopen", "revisit", "--from-proposal",
+    "workflow-feedback")) and len(s) <= 4000 for s in rendered_intent_skills())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The three ask moments and the removed verbs come from the DRI 2026-11-28
+    card choice and the 2026-11-10 ask-less rule, not from the template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: removed verbs exit 2 with a replacement and write nothing
+  type: parametric
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_002_removed_verbs
+  - tests/unit/test_intent_lean.py::test_ac_002_removed_verb_through_hm_without_root
+  executable_predicate: null
+  golden_table:
+  - input:
+      verb: approve
+    expected:
+      exit: 2
+      message_contains: no step needed
+      message_excludes: spec_machine
+      unchanged: true
+    edge: false
+    note: ''
+  - input:
+      verb: activate
+    expected:
+      exit: 2
+      message_contains: no step needed
+      message_excludes: spec_machine
+      unchanged: true
+    edge: false
+    note: ''
+  - input:
+      verb: drop
+    expected:
+      exit: 2
+      message_contains: close
+      message_excludes: spec_machine
+      unchanged: true
+    edge: false
+    note: ''
+  - input:
+      verb: reopen
+    expected:
+      exit: 2
+      message_contains: no step needed
+      message_excludes: spec_machine
+      unchanged: true
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: IRR-001 fixes the removed verb set; exit 2 is argparse's usage-error
+    code, independent of the implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: one state mapping on every read surface; nothing the user wrote is lost
+  type: parametric
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_003_state_mapping_and_preservation
+  executable_predicate: null
+  golden_table:
+  - input:
+      state: proposed
+    expected:
+      state: open
+    edge: false
+    note: ''
+  - input:
+      state: active
+    expected:
+      state: open
+    edge: false
+    note: ''
+  - input:
+      state: closed
+      observed: met
+    expected:
+      state: closed
+      observed: met
+      bytes_unchanged: true
+    edge: false
+    note: ''
+  - input:
+      state: dropped
+    expected:
+      state: closed
+      observed: no_data
+      bytes_unchanged: true
+    edge: false
+    note: ''
+  - input:
+      other_question_has_locator: true
+    expected:
+      other_entries_equal: true
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The mapping and the preservation rule are IRR-002, decided in this
+    SPEC before any code; dropped is a stored terminal state on main (world.OBJECTIVE_STATES).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: status JSON shape
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_004_status_shape
+  executable_predicate: set(s := status_json(filled_project())) == {"state", "purpose",
+    "metrics", "intents", "open_questions", "open"} and all(set(v) == {"state", "title",
+    "metric_id", "observed"} for v in s["intents"].values()) and all(set(v) == {"last",
+    "target", "gap", "observed_at", "reason", "how_measured", "higher_is_better",
+    "measure"} for v in s["metrics"].values()) and s["open"] == [k for k, v in s["intents"].items()
+    if v["state"] == "open"]
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The key sets are IRR-001; the metrics keys are the ones status
+    reports on main today.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: new then close round-trip
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_005_new_then_close
+  executable_predicate: (r := new_then_close()).new_state == "open" and not r.new_has_approval
+    and r.closed_state == "closed" and r.observed == "met" and r.note_written and
+    r.second_close_rc != 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Two states and terminal close are O2/IRR-002; the terminal rule
+    predates this SPEC (closed records never change).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: gap rule unchanged
+  type: parametric
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_006_gap_rule
+  executable_predicate: null
+  golden_table:
+  - input:
+      last: 6.984
+      target: 8
+      higher_is_better: false
+    expected: at_or_better
+    edge: false
+    note: ''
+  - input:
+      last: 9
+      target: 8
+      higher_is_better: false
+    expected: above_target
+    edge: false
+    note: ''
+  - input:
+      last: 80
+      target: 80
+      higher_is_better: true
+    expected: at_or_better
+    edge: false
+    note: ''
+  - input:
+      last: 70
+      target: 80
+      higher_is_better: true
+    expected: below_target
+    edge: false
+    note: ''
+  - input:
+      last: null
+      target: 8
+      higher_is_better: false
+    expected: unevaluable
+    edge: false
+    note: ''
+  - input:
+      last: 6.984
+      target: 8
+      higher_is_better: false
+      stale_definition: true
+    expected: unevaluable
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rows computed at spec time by running the unchanged world.gap (main
+    593a6ac5), including its stale_definition branch; never regenerated.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: digest intents block is lean and capped
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_007_digest_intents_lean_and_capped
+  executable_predicate: set(digest_with_open_goals(1)["intents"]) == {"open"} and
+    set(digest_with_open_goals(1)["intents"]["open"][0]) == {"id", "metric_id", "last",
+    "target", "gap"} and len(json.dumps(d := digest_with_open_goals(12, tasks=5)).encode())
+    <= 1500 and "unavailable" not in d and all("other_session" in t for t in d["tasks"])
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The shape is IRR-003; the 1,500-byte cap and other_session rule
+    are standing Maker invariants in CLAUDE.md.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: stages and Maker carry the lean surface
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_008_lean_surface_rendered
+  executable_predicate: all(spec_has_no_intent_step(r) and wrapup_step5_ok(r) and
+    not r.exists("references/workflow-feedback.md") and maker_ok(r) for r in fresh_renders())
+  golden_table: []
+  rubric_id: null
+  note: 'wrapup_step5_ok: names metric measure, metric record, question add, question
+    observe, the "intent: <verb> <id>" line, and exactly one ask (close). maker_ok:
+    names intents.open, not intents.active, <= 4689 chars.'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The removed headings come from O3 and the analysis report; the
+    Maker cap is the CLAUDE.md invariant; the kept wrapup verbs are the measurement
+    path this SPEC keeps.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: the engine modules are gone
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_009_engine_modules_gone
+  executable_predicate: not importable("harness_maker.world") and not importable("harness_maker.intent_vocabulary")
+    and "world" not in registered_modules() and not hasattr(autopilot_caps, "_objective_check")
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The removed module set is O3/IRR-001.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: project data fixed
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_010_project_data_fixed
+  executable_predicate: not any("Cursor" in r for r in project_rules()) and record_state("HM-LIGHT-LANE")
+    == ("closed", "met")
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Cursor was removed in 0.63.0; hm_cost_ratio_small measured 6.984
+    against target 8 (PR
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: legacy layout path
+  type: mechanical
+  test_ids:
+  - tests/unit/test_intent_lean.py::test_ac_011_legacy_layout
+  executable_predicate: (s := status_json(unmigrated_fixture()))["state"] == "invalid"
+    and "hm intent migrate" in str(s) and vocabulary_migrate_tests_pass() and migrate_ok_with_open_record()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The migrate results are the assertions of tests/unit/test_intent_vocabulary.py
+    written before this SPEC, kept unchanged.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions:
+- id: IRR-001
+  decision: hm intent keeps status, show, new (--title-file --statement-file --metric,
+    optional --scope-file --out-of-scope-file), close (--observed --note-file), metric
+    measure/record, question add|observe|resolve (without --locator), migrate; removed
+    verbs approve, activate, drop, reopen; removed flags --from-proposal, --candidates,
+    --declined-file, --locator; the hm world module is removed; status --json top-level
+    keys become state, purpose, metrics, intents, open_questions, open; status on
+    an unmigrated layout returns invalid naming migrate
+  category: public API/CLI contract
+  rationale: Rendered skills, wrapup and user scripts call these; the removed parts
+    only fed the approval state machine, the proposal path or the never-fired staleness
+    check
+  source: spec
+- id: IRR-002
+  decision: Goal record state written as open or closed; read proposed/active as open
+    and closed/dropped as closed; approval, revisit_when, depends_on, rejected are
+    not written on new records; existing entries and records keep every key they have
+  category: schema/file format/storage layout
+  rationale: Removes the approval hash that forced re-approval; old data stays readable
+    and intact
+  source: spec
+- id: IRR-003
+  decision: 'hm world_model digest intents becomes {"open": [{id, metric_id, last,
+    target, gap}]}; open takes the old intents slot in the trim order'
+  category: public API/CLI contract
+  rationale: The rendered Maker skill briefs from it
+  source: spec
+approval:
+  kind: human
+  content_hash: ef066b2fd668b184dce5a70fbfb563907fd29719db35b0cbafc86f26376f2b24
+  approved_by: Ecro
+  approved_at: '2026-11-28T00:29:31Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 88c80646ea16e5f85724b251432ca31cea78e09371e55e4a927296ffcd48f651
+    verification_tier: d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+    irreversible_decisions: 7e2cd35a98e3e5fe958c27f537be532e406a10b1302678ad1b14cb11a450f0af
+    AC-001: 2d0bc2b32729c50421320509531f9ca19b3f6a7e64278debbc481158876fa9cd
+    AC-002: 3a9861cbc29f35ac60687876003aac7b3ff488855077f7a10cec2e4cef548623
+    AC-003: 05b268f9e6ef238cf3178246166d90254b1d0e0b3a273cfed97d2fad03eb62bb
+    AC-004: b9915d7d311a6f7c27641ff1f83f54aa50d4599924511d0d6c3313d88202fad4
+    AC-005: e5afdd856381910c91be1cd50e9d89e47164206cfc89df77331476a3f400838a
+    AC-006: c1c4dbf2e6696b393c09588c5f6a11ff256a34b75d0a14c199f5f2d4bce946e1
+    AC-007: 617e04aff731bb0d373ddf7106bf59b73118816ff0eca948209a85af274f7fd9
+    AC-008: 6206cd542a6d7c8119766613b016d1d145cae2ba0130478f02fcae481ab34e87
+    AC-009: 0339579322b7b63b35a418fd859567ce71fc2dc93da7b8ab46b9b9227416f753
+    AC-010: 8d4e124a621b1c45338bfaadc7ce36e9046fb9d1b901dc047850f03fcb9f67e6
+    AC-011: 2b440348b15dc36c7a621e0f6c6d239a6733ab51da4e52ef34c461b242a9493e
+    ac_order: 507fc837fd64ae8964fbe1ec5bd2043668206ddae62a90d715516324c2b27cdf

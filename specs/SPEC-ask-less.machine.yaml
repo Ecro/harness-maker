@@ -61,6 +61,7 @@ ac:
   note: 'step(text, name): from the `## <name>` heading to the next `## ` heading.
     ask_tool(runtime): what hm.ask() renders.'
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: Scenario S3 of this SPEC, from the DRI's complaint that intent
     questions come too often; the literals are fixed here before the template changes.
@@ -165,6 +166,7 @@ ac:
   rubric_id: null
   note: 'intent_block(text): from ''An intent in use'' to the next `## ` heading.'
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: Scenarios S4, S5 and S6 and IRR-001 of this SPEC; the removed literal
     is the 0.65.3 template's.
@@ -201,6 +203,7 @@ ac:
   rubric_id: null
   note: 'skill: the rendered intent-layer SKILL.md; reference: its references/workflow-feedback.md.'
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: IRR-001 and outcome O6 of this SPEC name the unasked and the asked
     forms; the CLI's verbs and flags were read with `hm intent --help` and the skill's

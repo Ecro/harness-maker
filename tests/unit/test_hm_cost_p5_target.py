@@ -12,7 +12,6 @@ from typing import Any
 import pytest
 import yaml
 
-from harness_maker import world
 from tests.unit import hm_cost_p5_fixture as fx
 from tests.unit import test_bench_light_lane as bench_tests
 
@@ -84,5 +83,5 @@ def test_ac_007_objective_states_target_8_and_is_approved() -> None:
     assert "AC 8개 이하 SPEC 은 기본 생략, 승인 때 DRI 가 고르면 실행" in doc
     front = yaml.safe_load(doc.split("---", 2)[1])
     assert front["approval"]["approved_target"] == 8
-    loaded = world.load_world(fx.REPO_ROOT)
-    assert world.derive(loaded, "HM-LIGHT-LANE").approval_valid is True
+    # SPEC-intent-lean removed the approval check and closed the goal as met (6.984 <= 8).
+    assert (front["state"], front["observed"]) == ("closed", "met")

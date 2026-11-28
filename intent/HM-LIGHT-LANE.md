@@ -18,7 +18,7 @@ scope:
 - 'spec-validator: AC 8개 이하 SPEC 은 기본 생략, 승인 때 DRI 가 고르면 실행 (DRI 2026-11-10)'
 - 'step_sensitivity: A.5 근거에 벤치 ground-truth 팔을 반영'
 - 벤치 러너(픽스처 + 숨은 테스트 + plain/hm 팔)를 repo 로 올려 지표를 다시 잰다
-state: proposed
+state: closed
 created_at: '2026-10-14T10:30:49Z'
 schema_version: 1
 rejected: []
@@ -29,9 +29,11 @@ approval:
   approved_at: '2026-11-10T13:04:09Z'
   approved_target: 8
 revisit_when: null
-observed: null
-note: null
-closed_at: null
+observed: met
+note: 'hm_cost_ratio_small 6.984 <= target 8 (price table v4, PR #66; Opus 5.5 bench
+  6.21x). The light/full lanes were later removed by the overhaul; the cost goal was
+  met by the cost p4/p5 cuts. Closed on DRI approval of SPEC-intent-lean (2026-11-28).'
+closed_at: '2026-11-28T00:44:27Z'
 statement: '/hm: 실행 비용의 약 75% 는 단계 프롬프트와 도구 출력이 메인 컨텍스트에 쌓여 매 호출 다시 읽히는 데서 나온다. spec
   Step 0 이 작은 작업(약 5개 파일 이하, 한 세션, 되돌리기 어려운 결정 없음)을 light lane 으로 보내 A.5 와 반복 리뷰를
   빼고, 단계를 새 컨텍스트로 위임하고, 단계 본문과 도구 출력을 줄이면, 벤치의 숨은 테스트 통과율을 plain 아래로 낮추지 않으면서 hm_cost_ratio_small
