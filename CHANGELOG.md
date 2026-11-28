@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The saga bench reports the owner's side** (SPEC-owner-attention-metrics). Per arm and per
+  shipped change: characters the owner read (agent messages plus the SPEC an hm owner
+  approved), replies (post-hoc corrections included) and approvals, next to the quiz score;
+  per run, hidden tests that passed in their own session but fail on the final tree (escaped
+  regressions). A new `judge` command compares hm's final tree with each other arm's at the
+  same rep (Opus, order swapped, a pick counts only when both orders agree) on correctness,
+  test protection, maintainability, scope and overall. Attention is computed from stored
+  turns, so older result rows get it too. Bench-only; no change to rendered harnesses.
+
 ### Changed
 
 - **The CLI does the SPEC bookkeeping the stages used to run by hand** (SPEC-cli-bookkeeping).

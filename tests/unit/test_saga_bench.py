@@ -66,15 +66,14 @@ def log(prompt, role):
                             "end": time.time(), "cwd": os.getcwd()}) + "\n")
 if "--json-schema" in argv:
     schema = json.loads(argv[argv.index("--json-schema") + 1])
-    role = next(r for r in ("reply", "answers", "correct", "detected")
+    role = next(r for r in ("reply", "answers", "correct", "detected", "maintainability")
                 if r in schema["properties"])
     counter = home / f"count-{role}"
     n = int(counter.read_text()) if counter.exists() else 0
     counter.write_text(str(n + 1))
     answers = cfg[role]
     data = answers[min(n, len(answers) - 1)]
-    sys.stdin.read()
-    log("", role)
+    log(sys.stdin.read(), role)
     out({"structured_output": data, "total_cost_usd": 0.01, "session_id": "s-" + role})
     raise SystemExit(0)
 prompt = argv[argv.index("-p") + 1]
@@ -546,3 +545,150 @@ def test_pilot_ac_004_verdict_skips_saturated(saga: ModuleType) -> None:
         assert "saturated" in line
     assert "saturated" not in next(ln for ln in text.splitlines() if ln.startswith("T0"))
     assert "min traps 3" in text
+
+
+# --- SPEC-owner-attention-metrics ---------------------------------------------------------------
+
+
+def test_owner_ac_001_attention_from_turns(saga: ModuleType) -> None:
+    record = {
+        "turns": [
+            {"kind": "task", "message": "a" * 10,
+             "sim": {"reply": "Approved, go ahead.", "approved": True}},
+            {"kind": "reply", "message": "b" * 10, "sim": {"reply": None, "approved": False}},
+            {"kind": "execute", "message": "", "sim": {"reply": "  ", "approved": False}},
+            {"kind": "posthoc", "message": "c" * 10},
+        ]
+    }  # fmt: skip
+    assert saga.attention(record) == {"read_chars": 30, "replies": 2, "approvals": 1}
+    assert saga.attention({**record, "doc_chars": 5})["read_chars"] == 35
+
+
+def test_owner_ac_002_doc_chars(saga: ModuleType, tmp_path: Path) -> None:
+    work = _work(tmp_path)
+    specs = work / "specs"
+    specs.mkdir()
+    spec_md = "# SPEC\n\nAC-001: x\n"
+    (specs / "SPEC-x.md").write_text(spec_md)
+    (specs / "SPEC-x.machine.yaml").write_text("spec_slug: x\n")
+    unapproved_chars = saga.doc_chars(work, "hm", "x")
+    (specs / "SPEC-x.machine.yaml").write_text("approval:\n  approved_at: '2026-11-28'\n")
+    approved_chars = saga.doc_chars(work, "hm", "x")
+    assert (approved_chars, unapproved_chars) == (len(spec_md), 0)
+    assert saga.doc_chars(work, "plain", "x") == 0
+    assert saga.doc_chars(work, "hm", None) == 0
+
+
+def test_owner_ac_003_escaped_regressions(
+    saga: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hidden = tmp_path / "hidden"
+    (hidden / "S1").mkdir(parents=True)
+    (hidden / "S4").mkdir()
+    (hidden / "conftest.py").write_text("")
+    (hidden / "S1" / "test_s1.py").write_text(
+        "import remind\n\ndef test_a():\n    assert remind.X == 1\n\n"
+        "def test_b():\n    assert remind.X == 3\n\n"
+        "def test_d():\n    assert remind.X in (1, 2)\n"
+    )
+    (hidden / "S4" / "test_s4.py").write_text(
+        "import remind\n\ndef test_c():\n    assert remind.X == 1\n"
+    )
+    work = _work(tmp_path)
+    (work / "remind" / "__init__.py").write_text("X = 1\n")
+    at_s1 = saga.grade_hidden(work, hidden, "S1")
+    at_s4 = saga.grade_hidden(work, hidden, "S4")
+    assert sorted(at_s1.values()) == ["failed", "passed", "passed"]
+    (work / "remind" / "__init__.py").write_text("X = 2\n")
+    records = {
+        "S1": {"hidden": at_s1},
+        "S4": {"hidden": at_s4, "interrupted": True},
+        "S5": {"status": "ok"},
+    }
+    name_a = next(k for k in at_s1 if k.endswith("test_a"))
+    name_c = next(k for k in at_s4 if k.endswith("test_c"))
+    assert saga.escaped_regressions(records, work, hidden) == [f"S1::{name_a}"]
+    # S4r grades S4's dir; a final run that itself failed (timeout) is unknown, not a regression.
+    records["S4r"] = {"hidden": at_s4, "hidden_dir": "S4"}
+    assert saga.escaped_regressions(records, work, hidden) == [f"S1::{name_a}", f"S4::{name_c}"]
+    real = saga.grade_hidden
+    monkeypatch.setattr(saga, "grade_hidden", lambda w, h, n: (
+        {"<run>": "error"} if n == "S4" else real(w, h, n)))  # fmt: skip
+    assert saga.escaped_regressions(records, work, hidden) == [f"S1::{name_a}"]
+
+
+def _owner_row(arm: str, escaped: list[str] | None = None) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "arm": arm, "status": "ok", "quiz_mean": 0.8,
+        "sessions": {
+            "S1": {"hidden": {"t": "passed"}, "turns": [
+                {"kind": "task", "message": "m" * 100, "sim": {"reply": "ok", "approved": True}}]},
+            "S2": {"hidden": {"t": "failed"}, "turns": [
+                {"kind": "task", "message": "m" * 50, "sim": {"reply": None, "approved": False}}]},
+            "S4": {"hidden": {"t": "passed"}, "interrupted": True, "turns": [
+                {"kind": "task", "message": "m" * 10}]},
+        },
+    }  # fmt: skip
+    if escaped is not None:
+        row["escaped"] = escaped
+    return row
+
+
+def test_owner_ac_004_owner_summary(saga: ModuleType) -> None:
+    rows = [_owner_row("hm"), _owner_row("hm"), _owner_row("plain", ["S1::t"]),
+            {"arm": "plain", "status": "runner_error"}]  # fmt: skip
+    old = saga.owner_summary(rows)
+    assert old["hm"] == {
+        "runs": 2, "shipped": 1.0, "read_per_ship": 160.0, "replies_per_ship": 1.0,
+        "approvals_per_ship": 1.0, "quiz": 0.8, "escaped": None, "docs_counted": False,
+    }  # fmt: skip
+    assert old["plain"]["docs_counted"] is True
+    assert old["hm"]["escaped"] is None
+    assert old["plain"]["runs"] == 1
+    assert old["plain"]["escaped"] == 1.0
+    text = saga.report(rows)
+    assert "owner" in text
+    assert "read/ship" in text
+    assert "SPEC documents not counted: hm" in text
+
+
+def test_owner_ac_005_judge(saga: ModuleType, tmp_path: Path) -> None:
+    root = tmp_path / "saga"
+    shutil.copytree(_SAGA / "repo", root / "repo")
+    shutil.copy(_SAGA / "saga.json", root / "saga.json")
+    first = dict.fromkeys(saga.JUDGE_AXES, "first")
+    second = dict.fromkeys(first, "second")
+    claude, home = _fake(tmp_path, {
+        "agent": [{"match": ""}],
+        "maintainability": [{**first, "reason": "r"}, {**second, "reason": "r"},
+                            {**first, "reason": "r"}, {**first, "reason": "r"}],
+    })  # fmt: skip
+    opts = _opts(saga, tmp_path, claude, home, root=root)
+    opts.out.mkdir(parents=True)
+    rows = []
+    for arm in ("hm", "plain"):
+        for rep in (1, 2):
+            run_dir = opts.out / "runs" / f"{arm}-{rep}"
+            shutil.copytree(root / "repo", run_dir / "work")
+            (run_dir / "work" / "remind" / "extra.py").write_text(f"CELL = '{arm}-{rep}'\n")
+            rows.append({"arm": arm, "rep": rep, "status": "ok", "run_dir": str(run_dir)})
+    (opts.out / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    judged = saga.run_judge(opts, "opus")
+    assert [(r["other"], r["rep"]) for r in judged] == [("plain", 1), ("plain", 2)]
+    row = judged[0]
+    assert row["axes"]["maintainability"] == "A"
+    assert judged[1]["axes"]["maintainability"] == "split"
+    calls = [c["prompt"] for c in _log(home, "maintainability")]
+    assert len(calls) == 4
+    for n, rep in ((0, 1), (2, 2)):  # hm first, then hm second, on the same rep
+        hm_at, other_at = calls[n].index(f"'hm-{rep}'"), calls[n].index(f"'plain-{rep}'")
+        assert hm_at < other_at
+        assert calls[n + 1].index(f"'plain-{rep}'") < calls[n + 1].index(f"'hm-{rep}'")
+    assert saga.read_rows(opts.out / "judge.jsonl") == judged
+    summary = saga.judge_summary(judged)
+    assert summary["plain"]["maintainability"] == (1, 0)
+    assert summary["plain"]["overall"] == (1, 0)
+    assert (summary["plain"]["n"], summary["plain"]["failed"]) == (2, 0)
+    # A second run judges nothing new.
+    assert saga.run_judge(opts, "opus") == []
+    assert len(_log(home, "maintainability")) == 4
