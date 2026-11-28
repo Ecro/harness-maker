@@ -21,6 +21,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: readable-golden-rows
   oracle_source: golden
   oracle_evidence: Rows fixed in the fixture; ast.literal_eval is Python's own reader,
     independent of the exporter.

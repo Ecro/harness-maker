@@ -39,7 +39,7 @@ def _hm(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
 def _rows_text(root: Path) -> str:
     yaml_path = root / "specs" / "SPEC-demo.machine.yaml"
     payload = spec_machine.golden_export(spec_machine.load(yaml_path))
-    return spec_machine.golden_inline_text(payload, yaml_path.name)
+    return spec_machine.golden_inline_text(payload)
 
 
 # ── AC-001 ──────────────────────────────────────────────────────────────────────────────────

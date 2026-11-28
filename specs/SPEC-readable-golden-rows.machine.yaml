@@ -1,0 +1,158 @@
+schema_version: 3
+spec_slug: readable-golden-rows
+parent_spec: null
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: ''
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: inline rows print flat under a column header
+  type: mechanical
+  test_ids:
+  - tests/unit/test_readable_golden_rows.py::test_ac_001_inline_rows_print_flat_under_a_column_header
+  - tests/unit/test_readable_golden_rows.py::test_ac_001_pair_form_for_rows_that_cannot_flatten
+  executable_predicate: golden_inline_text(flat_payload, 'SPEC-x.machine.yaml') ==
+    FLAT_TEXT and golden_inline_text(mixed_payload, 'SPEC-x.machine.yaml') == PAIR_TEXT
+    and not any(w in FLAT_TEXT + PAIR_TEXT for w in ('Do not edit', 'hm check', 'SPEC-x'))
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected text is written by hand in the test from fixed rows; ast.literal_eval
+    is Python's own reader, independent of the printer.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: --write replaces old and new blocks in place
+  type: mechanical
+  test_ids:
+  - tests/unit/test_readable_golden_rows.py::test_ac_002_write_replaces_old_and_new_blocks_in_place
+  executable_predicate: write_inline_rows(old_file, payload, name) and old_file.read_text()
+    == EXPECTED_AFTER_OLD and write_inline_rows(new_file, changed, name) and new_file.read_text().count('AC_001_ROWS
+    =') == 1
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fixture files and their expected bytes are fixed in the test, including
+    the exact 0.67.0 header lines.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: hm check accepts flat rows and still catches drift
+  type: mechanical
+  test_ids:
+  - tests/unit/test_readable_golden_rows.py::test_ac_003_check_accepts_flat_rows_and_still_catches_drift
+  executable_predicate: drift(flat_equal) == [] and drift(pair_equal) == [] and drift(flat_changed)
+    == ['AC-001'] and drift(flat_short) == ['AC-001']
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fixture SPEC rows and test-file rows are fixed by hand in the test,
+    independent of the comparison code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: execute asks for placement, unpacked rows and plain calls
+  type: mechanical
+  test_ids:
+  - tests/unit/test_readable_golden_rows.py::test_ac_004_execute_asks_for_placement_unpacked_rows_and_plain_calls
+  executable_predicate: all(p in rendered_execute for p in EXECUTE_PHRASES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrases fixed in this SPEC before the template change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: spec keeps raising cases and already-tested behaviour out of golden rows
+  type: mechanical
+  test_ids:
+  - tests/unit/test_readable_golden_rows.py::test_ac_005_spec_keeps_raising_and_already_tested_cases_out_of_golden_rows
+  executable_predicate: all(p in rendered_spec for p in SPEC_PHRASES)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Phrases fixed in this SPEC before the template change.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+irreversible_decisions: []
+approval:
+  kind: human
+  content_hash: 903278d2f739a536893964dea5f6bd2fdb8fd7ebae499e9e0cf17c5bbc7df065
+  approved_by: Claude
+  approved_at: '2026-11-28T10:26:00Z'
+  field_hashes:
+    schema_version: 4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+    spec_slug: 46b3e5ee9460f0c2b71825c33e61bcd39d15691b4c1a40c6458e3ea8488142db
+    verification_tier: 6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+    irreversible_decisions: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+    AC-001: 9814af711189244399147fc3d86d09f4b5a1ed56102a88075c02c88822e2254d
+    AC-002: de42970585e51858abbb1bb6feb1d33025fea0013cad2283dc29c7cae9e406f6
+    AC-003: a16a38047919f4b30df26e0edc028cacae52206b012515b92b4007f054b9b5d6
+    AC-004: f5255adcc4b846b6a900eda5c87ae2571a619c8e3463b6a4f5a461e13819229d
+    AC-005: b4f259e718b201d4940b1c59ef12e302dea64b595a77645a32e7e33f0934756f
+    ac_order: cfc9fb435de75930cafd810096796d10be9ac4c71f34dd372a974dea553fb9bd

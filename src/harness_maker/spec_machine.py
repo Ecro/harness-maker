@@ -24,6 +24,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
+from keyword import iskeyword
 from pathlib import Path
 from typing import Any, Literal
 
@@ -1083,30 +1084,66 @@ def inline_rows_name(ac_id: str) -> str:
     return ac_id.replace("-", "_") + "_ROWS"
 
 
-def golden_inline_text(payload: dict[str, list[dict[str, Any]]], spec_name: str) -> str:
-    """Each AC's rows as a Python literal to paste into its test file (SPEC-inline-golden-rows).
+def _flat_columns(rows: list[dict[str, Any]]) -> tuple[str, ...] | None:
+    """The input keys shared by every row, when they can name pytest parameters; else None.
 
-    A test that reads a JSON file shows a reviewer neither its inputs nor its expectations; the
-    rows written into the test keep the oracle visible, and `hm check` compares them with the
-    SPEC so they cannot drift (`ast.literal_eval` reads back exactly what `repr` wrote here).
+    A flat row `(5430, 2, '2h')` is parametrized as `seconds, max_units, expected` and called
+    plainly; an `(input_dict, expected)` pair makes the test unpack a dict (`f(**kwargs)`), which
+    the 0.67.0 pairwise judge counted against maintainability (SPEC-readable-golden-rows).
+    """
+    if not rows or not isinstance(rows[0]["input"], dict) or not rows[0]["input"]:
+        return None
+    keys = tuple(rows[0]["input"])
+    if not all(isinstance(k, str) and k.isidentifier() and not iskeyword(k) for k in keys):
+        return None
+    if "expected" in keys:
+        return None
+    if any(not isinstance(r["input"], dict) or tuple(r["input"]) != keys for r in rows):
+        return None
+    return keys
+
+
+def _pairs(rows: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+    return [(r["input"], r["expected"]) for r in rows]
+
+
+def inline_rows_projection(rows: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+    """The tuples an `AC_NNN_ROWS` literal holds for `rows`: flat when possible, else pairs."""
+    if _flat_columns(rows) is None:
+        return _pairs(rows)
+    return [(*r["input"].values(), r["expected"]) for r in rows]
+
+
+def inline_rows_header(rows: list[dict[str, Any]]) -> str | None:
+    """The column header a flat block carries, or None when `rows` print as pairs."""
+    cols = _flat_columns(rows)
+    return f"# ({', '.join(cols)}, expected)" if cols else None
+
+
+def golden_inline_text(payload: dict[str, list[dict[str, Any]]], *, flat: bool = True) -> str:
+    """Each AC's rows as a Python literal for its test file, under a one-line column header.
+
+    The rows stay visible in the test and `hm check` compares them with the SPEC, so they cannot
+    drift (`ast.literal_eval` reads back exactly what `repr` wrote). The header names columns
+    only: a note pointing at the SPEC or the tool read as process residue to the next developer.
     """
     blocks = []
     for ac_id in sorted(payload):
-        rows = "".join(f"    ({row['input']!r}, {row['expected']!r}),\n" for row in payload[ac_id])
-        blocks.append(
-            f"# {ac_id} golden rows from {spec_name}: (input, expected).\n"
-            "# Do not edit; `hm check` compares them with the SPEC.\n"
-            f"{inline_rows_name(ac_id)} = [\n{rows}]\n"
-        )
+        cols = _flat_columns(payload[ac_id]) if flat else None
+        header = f"# ({', '.join(cols)}, expected)" if cols else "# (input, expected)"
+        shaped = inline_rows_projection(payload[ac_id]) if cols else _pairs(payload[ac_id])
+        rows = "".join(f"    {row!r},\n" for row in shaped)
+        blocks.append(f"{header}\n{inline_rows_name(ac_id)} = [\n{rows}]\n")
     return "\n".join(blocks)
 
 
-def write_inline_rows(path: Path, payload: dict[str, list[dict[str, Any]]], spec_name: str) -> bool:
+def write_inline_rows(path: Path, payload: dict[str, list[dict[str, Any]]]) -> bool:
     """Put each AC's `AC_NNN_ROWS` block into `path`: replace a block already there, else append.
 
     The model used to read these rows back from `--inline` and type them into the test again, so
     the same data sat in its context three times (SPEC-cli-bookkeeping). Only the block between
-    its two comment lines and the closing `]` is touched; every other byte of the file stays.
+    its header comment (a 0.67.0 two-line header included) and the closing `]` is touched; every
+    other byte of the file stays.
     Returns True when the file changed.
     """
     try:
@@ -1118,18 +1155,22 @@ def write_inline_rows(path: Path, payload: dict[str, list[dict[str, Any]]], spec
     for ac_id in sorted(payload):
         name = re.escape(inline_rows_name(ac_id))
         pattern = re.compile(
-            rf"(?:^# {re.escape(ac_id)} golden rows from [^\n]*\n(?:^# Do not edit[^\n]*\n)?)?"
+            rf"(?:^# {re.escape(ac_id)} golden rows from [^\n]*\n(?:^# Do not edit[^\n]*\n)?"
+            rf"|^# \((?:input|[A-Za-z_]\w*(?:, [A-Za-z_]\w*)*), expected\)\n)?"
             rf"^{name} = \[\n(?:^ {{4}}[^\n]*\n)*^\](?:\n|\Z)",
             re.M,
         )
         m = pattern.search(new)
         if m:
-            block = golden_inline_text({ac_id: payload[ac_id]}, spec_name)
+            # A block a test already parametrizes as pairs stays pairs: flattening it would hand
+            # that test a scalar where it unpacks a dict. Only a column-header block is flat.
+            flat = m.group(0).startswith("# (") and not m.group(0).startswith("# (input,")
+            block = golden_inline_text({ac_id: payload[ac_id]}, flat=flat)
             new = new[: m.start()] + block + new[m.end() :]
         else:
             missing[ac_id] = payload[ac_id]
     if missing:
-        block = golden_inline_text(missing, spec_name)
+        block = golden_inline_text(missing)
         # Above the first top-level def/class/decorator: a parametrize decorator reads the rows at
         # import time, so rows appended after the test would raise NameError at collection.
         first = re.search(r"^(?:@|def |async def |class )", new, re.M)
@@ -1167,6 +1208,31 @@ def _resolve_paths(args: argparse.Namespace, cmd: str, *, need_md: bool) -> str 
     return None
 
 
+def _rows_owner(
+    root: Path, yaml_path: Path, target: Path, payload: dict[str, list[dict[str, Any]]]
+) -> str | None:
+    """Another SPEC whose same-numbered AC is bound to `target`, so its rows would be overwritten.
+
+    `AC_NNN_ROWS` carries no slug; with tests added to a module's existing file, two SPECs can
+    meet in one file, and `hm check --slug` of this SPEC alone would not notice the other's loss.
+    """
+    try:
+        rel = target.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return None
+    for other in sorted((root / "specs").glob("SPEC-*.machine.yaml")):
+        if other.resolve() == yaml_path.resolve():
+            continue
+        try:
+            acs = load(other).ac
+        except Exception:  # noqa: BLE001 — an unreadable SPEC cannot own rows here
+            continue
+        for ac in acs:
+            if ac.id in payload and any(t.partition("::")[0] == rel for t in ac.test_ids):
+                return f"{other.name} {ac.id}"
+    return None
+
+
 def _run_export_golden(args: argparse.Namespace) -> int:
     error = _resolve_paths(args, "export-golden", need_md=False)
     if error:
@@ -1188,12 +1254,17 @@ def _run_export_golden(args: argparse.Namespace) -> int:
         return 0
     if args.inline and args.write is not None:
         target = args.write if args.write.is_absolute() else args.root / args.write
-        changed = write_inline_rows(target, payload, args.yaml_path.name)
+        owner = _rows_owner(args.root, args.yaml_path, target, payload)
+        if owner:
+            print(f"export-golden: {args.write} already holds {owner}'s rows under the same "
+                  "name; put this SPEC's test in its own file", file=sys.stderr)  # fmt: skip
+            return 1
+        changed = write_inline_rows(target, payload)
         print(f"export-golden: {'wrote' if changed else 'unchanged'} {args.write} "
               f"({', '.join(inline_rows_name(a) for a in sorted(payload))})")  # fmt: skip
         return 0
     if args.inline:
-        print(golden_inline_text(payload, args.yaml_path.name), end="")
+        print(golden_inline_text(payload), end="")
         return 0
     out = golden_json_path(args.yaml_path)
     atomic_write(out, golden_json_text(payload))

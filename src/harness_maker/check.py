@@ -1664,6 +1664,13 @@ def _literal_rows(files: list[Path], name: str) -> list[list[Any]]:
 _UNREADABLE = object()
 
 
+def _has_line_pair(path: Path, text: str) -> bool:
+    try:
+        return text in path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
 def _inline_golden_drift(
     root: Path, spec: SpecView, want: dict[str, list[dict[str, Any]]]
 ) -> list[str] | None:
@@ -1685,9 +1692,19 @@ def _inline_golden_drift(
             drift.append(ac.id)
             continue
         found_any = True
-        expected = [(r["input"], r["expected"]) for r in want[ac.id]]
+        # Rows written before SPEC-readable-golden-rows are pairs; new ones may be flat.
+        pairs = [(r["input"], r["expected"]) for r in want[ac.id]]
+        flat = spec_machine.inline_rows_projection(want[ac.id])
+        header = spec_machine.inline_rows_header(want[ac.id])
+        name = spec_machine.inline_rows_name(ac.id)
         for rows in copies:
-            if [tuple(r) if isinstance(r, (list, tuple)) else r for r in rows] != expected:
+            got = [tuple(r) if isinstance(r, (list, tuple)) else r for r in rows]
+            if got not in (pairs, flat):
+                drift.append(ac.id)
+                break
+            # Flat rows are positional: a renamed or reordered SPEC key keeps the values, so the
+            # column header must name today's keys too.
+            if got != pairs and not any(_has_line_pair(f, f"{header}\n{name} = [") for f in files):
                 drift.append(ac.id)
                 break
     return sorted(drift) if found_any else None
