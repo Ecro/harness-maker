@@ -3,7 +3,8 @@
 AC-007: six defect classes refused by field name with the file bytes untouched; a complete
 record with a non-zero offset persists in UTC `Z` form carrying the TEST-computed definition
 hash. AC-018: latest-value selection by normalised instant (ties → later index), staleness by
-definition hash, gap by direction — expected values computed test-side (`world_fixture`).
+definition hash, gap by direction — expected values computed test-side (`intent_fixture`).
+Ported to the lean runtime by SPEC-intent-lean (`hm world` removed; same oracles).
 """
 
 from __future__ import annotations
@@ -17,15 +18,15 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harness_maker import world
-from tests.unit import world_fixture as fx
+from harness_maker import intent_cli
+from tests.unit import intent_fixture as fx
 
 settings.register_profile("ci", derandomize=True, max_examples=40, deadline=None)
 settings.register_profile("dev", max_examples=200, deadline=None)
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ci"))
 
 GOOD: dict[str, Any] = {
-    "outcome_id": "onboarding_minutes",
+    "metric_id": "onboarding_minutes",
     "value": 17,
     "observed_at": "2026-09-10T09:00:00+09:00",
     "evidence": "timed three onboardings",
@@ -41,7 +42,7 @@ GOOD: dict[str, Any] = {
         ({"evidence": None}, "evidence"),
         ({"evidence": ""}, "evidence"),
         ({"value": "seventeen"}, "value"),
-        ({"outcome_id": "nope"}, "outcome_id"),
+        ({"metric_id": "nope"}, "metric_id"),
     ],
     ids=[
         "ts-missing",
@@ -57,20 +58,21 @@ def test_ac_007_each_defect_is_refused_by_field_and_writes_nothing(
     tmp_path: Path, over: dict[str, Any], expected_field: str
 ) -> None:
     root = fx.build_root(tmp_path, git=False)
-    before = fx.outcomes_path(root).read_bytes()
+    before = fx.metrics_path(root).read_bytes()
     rec = {**GOOD, **over}
-    with pytest.raises(world.WorldError) as exc:
-        world.record_value(root, **rec)
+    with pytest.raises(intent_cli.IntentWriteError) as exc:
+        intent_cli.record_value(root, rec.pop("metric_id"), **rec)
     assert exc.value.field == expected_field
-    assert fx.outcomes_path(root).read_bytes() == before
+    assert fx.metrics_path(root).read_bytes() == before
 
 
 def test_ac_007_complete_record_persists_in_utc_z_with_the_test_computed_hash(
     tmp_path: Path,
 ) -> None:
     root = fx.build_root(tmp_path, git=False)
-    world.record_value(root, **GOOD)
-    rows = fx.load(fx.outcomes_path(root))["values"]
+    good = dict(GOOD)
+    intent_cli.record_value(root, good.pop("metric_id"), **good)
+    rows = fx.load(fx.metrics_path(root))["values"]
     assert len(rows) == 1
     assert rows[0]["observed_at"] == "2026-09-10T00:00:00Z"
     assert rows[0]["value"] == 17
@@ -113,9 +115,9 @@ def test_ac_018_latest_by_instant_ties_to_later_index_and_staleness_by_hash(
         instant = base + timedelta(seconds=s)
         frac = 0.5 if forms[i] == "frac" else 0.0
         rendered = _render(instant, forms[i])
-        world.record_value(
+        intent_cli.record_value(
             root,
-            outcome_id="onboarding_minutes",
+            "onboarding_minutes",
             value=values[i],
             observed_at=rendered,
             evidence="e",
@@ -127,9 +129,9 @@ def test_ac_018_latest_by_instant_ties_to_later_index_and_staleness_by_hash(
     assert expected_idx is not None
     if flip_direction:
         doc = fx.load(root / ".claude" / "intent.yaml")
-        doc["outcomes"][0]["higher_is_better"] = True
+        doc["metrics"][0]["higher_is_better"] = True
         fx.dump(root / ".claude" / "intent.yaml", doc)
-    out = fx.stdout_json(fx.run_cli(["status", "--json"], cwd=root))["outcomes"][
+    out = fx.stdout_json(fx.run_cli(["status", "--json"], cwd=root))["metrics"][
         "onboarding_minutes"
     ]
     exp = records[expected_idx]
@@ -138,7 +140,7 @@ def test_ac_018_latest_by_instant_ties_to_later_index_and_staleness_by_hash(
         exp["observed_at"]
     )
     assert out["observed_at"].endswith("Z")
-    assert out["stale_definition"] is flip_direction
+    assert (out["reason"] == "stale_definition") is flip_direction
     if flip_direction:
         assert out["gap"] == "unevaluable"
     else:
@@ -153,16 +155,15 @@ def test_ac_009_malformed_value_row_is_reported_not_raised(tmp_path: Path) -> No
     """The review found `last_value` raising `KeyError('value')` on a row `validate_outcomes` had
     already flagged; the row must leave `values` while its error stays visible."""
     bad = {
-        "outcome_id": "onboarding_minutes",
+        "metric_id": "onboarding_minutes",
         "observed_at": "2026-09-11T09:00:00Z",
         "evidence": "no value recorded",
     }
     good = dict(GOOD, value=12, definition_hash=fx.definition_hash(fx.outcome()))
     root = fx.build_root(tmp_path, values=[good, bad])
-    w = world.load_world(root)
-    assert len(w.values) == 1
-    assert any(e.field == "outcomes.yaml:values[1].value" for e in w.errors)
-    latest = world.last_value(w, "onboarding_minutes")
+    snap = intent_cli.load(root)
+    assert len(snap.values) == 1
+    latest = intent_cli.last_value(snap.intent.metrics[0], snap.values)
     assert latest is not None
     assert latest.value == 12
-    assert isinstance(world.status_report(root), dict)
+    assert intent_cli.status_report(root)["metrics"]["onboarding_minutes"]["last"] == 12

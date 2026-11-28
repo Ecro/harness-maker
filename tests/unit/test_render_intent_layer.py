@@ -1,96 +1,20 @@
-"""AC-011 (render half), AC-015 (render half), AC-019 — the rendered prose and the skill.
+"""AC-019 — the intent-layer skill renders for every target.
 
-Both variants are rendered from this repo's own `harness.yaml` through
-`tests/structural/_surface_baseline.render_surface` (the same path the ratchet measures), so
-a clause that passes here passes against what ships. Mandated-call lines are matched by the
-shipped call form per target — a bare `uv run` line is inert on both and must not count.
+The skill's contract (verbs, the three ask moments) moved to SPEC-intent-lean and is pinned in
+`tests/unit/test_intent_lean.py`; the gap-proposal, measure-first and approve/drop prose this file
+used to pin were retired with it.
 """
 
 from __future__ import annotations
 
-import re
-import sys
 import tempfile
 from pathlib import Path
-from typing import cast
 
 import pytest
-import yaml
 
 from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
-
-_REPO = Path(__file__).parents[2]
-sys.path.insert(0, str(_REPO / "tests" / "structural"))
-from _surface_baseline import render_surface  # noqa: E402
-
-MANDATED_CALL_PREFIXES = {
-    "claude": ("!uv run", "!python -m", "!hm "),
-    "codex": ('Bash("uv run', 'Bash("python -m', 'Bash("hm '),
-}
-ASK_TOKEN = {"claude": "AskUserQuestion", "codex": "request_user_input"}
-VERB_ARGUMENT_FORMS = (
-    "hm intent question observe <id> --relation <confirms|supersedes|contradicts> --text-file"
-    " [--observed-at]",
-    "hm intent question resolve <id> --status --claim-file",
-    "hm intent metric record <id> --value [--observed-at] --evidence-file",
-    "hm intent new <id> --title-file --statement-file --scope-file --metric",
-    "hm intent <approve|activate|drop|reopen> <id>",
-    "hm intent close <id> --observed <met|missed|no_data> --note-file",
-)
-TRIGGER_PHRASES = ("observed", "close", "approve", "drop", "record", "where")
-ORDERED_RULE = (
-    "AskUserQuestion",
-    "showing the exact arguments",
-    "affirmative",
-    "run the write once",
-    "on any other answer or no answer",
-    "write nothing",
-)
-
-
-@pytest.fixture(scope="module")
-def surface() -> dict[str, dict[str, str]]:
-    return cast(dict[str, dict[str, str]], render_surface())
-
-
-def _command(surface: dict[str, dict[str, str]], target: str, name: str) -> str:
-    return surface[target][name if target == "claude" else f"hm-{name}"]
-
-
-def _mandated_lines(text: str, target: str) -> list[str]:
-    return [ln for ln in text.splitlines() if ln.strip().startswith(MANDATED_CALL_PREFIXES[target])]
-
-
-def _in_order(text: str, needles: tuple[str, ...] | list[str]) -> bool:
-    pos = -1
-    for n in needles:
-        nxt = text.find(n, pos + 1)
-        if nxt < 0:
-            return False
-        pos = nxt
-    return True
-
-
-# ── AC-011 render half ────────────────────────────────────────────────────────
-
-
-# Retired by SPEC-intent-surface-diet (AC-002): spec Step 0.5 no longer compares against
-# `rejected[]` or reads `revisits` (the revisit path never fired); it only links an intent.
-# tests/unit/test_intent_surface_diet.py::test_ac002_spec_link_only owns that contract.
-
-
-# ── AC-015 render half ────────────────────────────────────────────────────────
-
-
-def _block(text: str, open_marker: str) -> str:
-    start = text.index(open_marker)
-    end = text.index("<!-- /@hm:answer-gated -->", start)
-    return text[start:end]
-
-
-# ── AC-019 ───────────────────────────────────────────────────────────────────
 
 
 def _render_target(targets: list[Target]) -> dict[str, str]:
@@ -107,136 +31,9 @@ def _render_target(targets: list[Target]) -> dict[str, str]:
         }
 
 
-_FRONTMATTER_BLOCK = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL | re.MULTILINE)
-
-
-def _frontmatter_description(skill: str) -> str:
-    """The renderer prepends its provenance block; the skill's own block follows it."""
-    for block in _FRONTMATTER_BLOCK.findall(skill):
-        meta = yaml.safe_load(block)
-        if isinstance(meta, dict) and "description" in meta:
-            return str(meta["description"])
-    raise AssertionError("no description in any frontmatter block")
-
-
 @pytest.mark.parametrize("target", [Target.CLAUDE_CODE, Target.CODEX])
 def test_ac_019_the_skill_renders_for_every_target(target: Target) -> None:
     files = _render_target([target])
     assert ".claude/skills/intent-layer/SKILL.md" in files
     if target == Target.CODEX:
         assert ".agents/skills/intent-layer/SKILL.md" in files
-
-
-def test_ac_019_the_skill_description_and_body_carry_the_contract() -> None:
-    files = _render_target([Target.CLAUDE_CODE])
-    skill = files[".claude/skills/intent-layer/SKILL.md"]
-    description = _frontmatter_description(skill)
-    assert len(description) <= 200, len(description)
-    for phrase in TRIGGER_PHRASES:
-        assert phrase in description, phrase
-    body = skill[skill.index("# intent-layer") :]
-    for form in VERB_ARGUMENT_FORMS:
-        assert form in body, form
-    assert _in_order(body, ORDERED_RULE), body
-
-
-# ── AC-007 (SPEC-playbook-alignment): the supersedes branch names --claim ────────────────────
-
-
-# ── AC-004 / AC-005 (SPEC-objective-gap-proposal): the proposer's rules and the plan draft ────
-#
-# Phrase and ordering pins fixed by SPEC S4/S5 BEFORE the templates were edited (golden oracle):
-# the test greps the rendered skill / plan for both arms, so an author cannot satisfy it by
-# emitting whatever the template happens to say.
-
-GAP_SKILL_PHRASES_BOTH = (
-    "hm intent status --json",
-    "at most three",
-    "overlaps-with",
-    "ask about all candidates in one multi-select question",  # SPEC-ask-less AC-006
-    "answer every candidate before the first write",
-)
-GAP_SKILL_PHRASES_CLAUDE = (
-    "evidence: none — statement only",
-    "measure first",
-    "never runs `approve`",
-    "--from-proposal --candidates",
-)
-GAP_SKILL_TRIGGER = ("what to do next", "gaps")
-
-
-def _skill_body(files: dict[str, str], path: str) -> str:
-    skill = files[path]
-    return skill[skill.index("# intent-layer") :]
-
-
-@pytest.mark.parametrize(
-    ("target", "path"),
-    [
-        (Target.CLAUDE_CODE, ".claude/skills/intent-layer/SKILL.md"),
-        (Target.CODEX, ".agents/skills/intent-layer/SKILL.md"),
-    ],
-    ids=["claude", "codex"],
-)
-def test_ac_004_skill_renders_gap_situation_and_candidate_rules(target: Target, path: str) -> None:
-    files = _render_target([target])
-    body = _skill_body(files, path)
-    for phrase in GAP_SKILL_PHRASES_BOTH:
-        assert phrase in body, phrase
-    for phrase in GAP_SKILL_PHRASES_CLAUDE:
-        assert phrase in body, phrase
-    description = _frontmatter_description(files[path])
-    for phrase in GAP_SKILL_TRIGGER:
-        assert phrase in description, phrase
-    # ordering: collect every answer, THEN the write, and the proposer never approves
-    assert _in_order(
-        body,
-        (
-            "ask about all candidates in one multi-select question",  # SPEC-ask-less AC-006
-            "answer every candidate before the first write",
-            "--from-proposal --candidates",
-            "never runs `approve`",
-        ),
-    ), body
-
-
-# test_ac_005_spec_offers_draft_after_none_and_creates_at_step_4_9 was retired by
-# SPEC-intent-surface-diet (AC-002): spec Step 4.9 and its draft-consent question are gone;
-# intents are created only through Maker / the intent-layer skill.
-
-
-# ── AC-007 (SPEC-outcome-measure) — the prose calls the verb ─────────────────
-
-
-@pytest.mark.parametrize(
-    ("target", "path"),
-    [
-        (Target.CLAUDE_CODE, ".claude/skills/intent-layer/SKILL.md"),
-        (Target.CODEX, ".agents/skills/intent-layer/SKILL.md"),
-    ],
-    ids=["claude", "codex"],
-)
-def test_ac_007_the_skill_measure_first_step_runs_the_verb(target: Target, path: str) -> None:
-    body = _skill_body(_render_target([target]), path)
-    # SPEC S7 names THE existing "measure first" step of "Proposing objectives" (SKILL.md.j2 step 2,
-    # the one unique `**measure first**` block); the step runs to the next numbered item, the next
-    # heading, or the end of the body — whichever comes first.
-    anchor = "**measure first**"
-    assert body.count(anchor) == 1, "the measure-first step must stay a single block"
-    step = body[body.index(anchor) :]
-    call = step.index("hm intent metric measure --all --dry-run")
-    end = re.search(r"\n(?:\d+\. |#)", step[call:])
-    item = step[: call + (end.start() if end else len(step) - call)]
-    assert re.search(r"hm intent metric measure --all(?! --dry-run)", item), (
-        "the record call (without --dry-run) is missing from the measure-first step"
-    )
-    assert "The rule for every write" in item, "the ask is deferred to the shared write rule"
-
-
-# ── AC-005 (SPEC-intent-layer-ops) — wrapup surfaces the withdrawal criterion ──
-
-
-def _step57(wrapup: str) -> str:
-    start = wrapup.index("#### 5.7 Intent state")
-    end = wrapup.index("\n### ", start)
-    return wrapup[start:end]

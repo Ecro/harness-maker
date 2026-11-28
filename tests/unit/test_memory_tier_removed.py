@@ -182,7 +182,9 @@ def test_project_knowledge_routes_intent_claims(target: Target) -> None:
     # AC-005 predicate, one conjunct per assert.
     assert "intent-layer" in pk_description
     assert "intent-layer" in pk_procedure
-    assert "--locator .claude/memory/wiki.md" in project_knowledge_md
+    # SPEC-intent-lean removed `--locator`; the citation rides in the evidence text instead.
+    assert "--locator" not in project_knowledge_md
+    assert "cites the fact as `.claude/memory/wiki.md:<A-B>`" in project_knowledge_md
     assert "name that question's id in the body" in pk_procedure
     # The hand-off must precede the wiki write, or the unconditional upsert still runs first.
     assert pk_procedure.index("intent-layer") < pk_procedure.index("upsert-wiki")

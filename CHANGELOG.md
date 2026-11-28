@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The intent layer asks three things and keeps what is read** (SPEC-intent-lean). The intent
+  skill asks only to create a goal (one round, at most 3 questions), to change a metric target, or
+  to close a goal; measurements and observations are recorded without asking and print one line.
+  A goal record is `open` or `closed` (old `proposed`/`active` read as open, `dropped` as closed
+  with `no_data`; closed records are never rewritten). `hm intent status --json` returns
+  `state, purpose, metrics, intents, open_questions, open`, and the Maker digest shows
+  `intents.open`. Removed: `hm intent approve|activate|drop|reopen` (each exits 2 naming its
+  replacement), `--from-proposal`, `--candidates`, `--declined-file`, `--locator`, the `hm world`
+  module and its never-fired revisit, revalidation, withdrawal and evidence-locator checks, the
+  autopilot objective gate, spec Step 0.5 and the SPEC `intent:` field, and the workflow-feedback
+  reference. An unmigrated layout now reads as `invalid` naming `hm intent migrate`. Rendered
+  projects pick it up on their next `hm make`. README's intent-layer bullet is updated in the
+  release PR, since README describes the latest release.
+
 ### Fixed
 
 - **`/hm:spec` asks the scope boundary only the owner knows, and skips the interview less**

@@ -12,14 +12,7 @@ Three design commitments shape every decision below:
 2. **Two presets, deep override.** `Side` (1 reviewer, lean) and `Production` (5 reviewers, verify-required) cover ~90% of cases. The remaining 10% comes from 10+ override dimensions surfaced in the interview.
 3. **Brownfield-safe.** harness-maker never silently overwrites user edits. Provenance frontmatter (M13) and the Reconciler (M2) form a hash-based ours/theirs decision system.
 
-### Feedback and host-specific continuation
-
-Stage entry/resume, material observations and closeout follow the existing
-intent-layer workflow-feedback reference (a file stages read; the `intent-layer`
-skill itself is typed-only and is reached through Maker, below). Authoritative records stay in
-`intent/`, `specs/`, `work-docs/` and shared intent state; PLAN Feedback holds
-evidence locators, write/readback or pending dispositions and the next decision.
-Measurements precede closure; existing consent applies only to the same scope.
+### Host-specific continuation
 
 Codex executes the next local stage skill after the shared boundary authorizes
 it. Auto-answered judgments are recorded before a terminal halt, and missing
@@ -493,21 +486,17 @@ The runner reuses the `rubric_loader` pattern from `ai_readiness.py` so the v0 c
 
 **Key files**: `src/harness_maker/personalization_audit.py`, `src/harness_maker/rubrics/personalization.yaml`, `src/harness_maker/templates/commands/hm/personalization-audit.md.j2`.
 
-### Intent storage and migration (2026-09-21)
+### Intent layer (SPEC-intent-lean, 2026-11-28)
 
-`intent.py` validates canonical and legacy project definitions; `world.py` keeps
-compatible lifecycle and ledger behavior; `intent_cli.py` exposes canonical
-`hm intent` verbs. `intent_vocabulary.py` translates field names and
-`intent_migrate.py` preflights, publishes and retires legacy storage.
-
-Project questions have one store in `.claude/intent.yaml`, measurements live in
-`.claude/intent/metrics.yaml`, and intent records live in `intent/<ID>.md`. The
-record folder identifies type rather than lifecycle state. On POSIX, migration
-and leaf writers share a checkout-directory lock acquired before storage-path
-selection. Per-file atomic replacement does not imply a multi-file transaction:
-a failed publication leaves sources available, and the layout guard refuses
-writes until explicit migration retry finishes. Frozen approval payload keys
-keep historical approvals valid across the vocabulary change.
+`intent.py` validates `.claude/intent.yaml` (purpose, metrics, rules, out_of_scope, open
+questions) and parses the CLI; `intent_cli.py` is the whole runtime: goal records
+(`intent/<ID>.md`, written `open` or `closed`; legacy `proposed`/`active` read as open and
+`closed`/`dropped` as closed), metric values in `.claude/intent/metrics.yaml` (each row bound to
+its metric's definition hash), `metric measure`, open questions and `status`. Only
+`intent_migrate.py` reads the pre-0.58 vocabulary and storage; every other read of an
+unmigrated layout returns `invalid` naming `hm intent migrate`. Writers share one
+checkout-directory lock. The approval stamp, activation, revisit, revalidation, withdrawal and
+evidence-locator staleness were removed with `world.py`: none had fired.
 
 ## 4. Preset Comparison
 

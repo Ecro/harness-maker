@@ -1,5 +1,3 @@
-# Historical contract: vocabulary/storage superseded by SPEC-intent-vocabulary-rename;
-# owners shape by SPEC-intent-owners-role-map. Authored ACs and approval hash are unchanged.
 schema_version: 3
 spec_slug: withdrawal-criterion-window
 parent_spec: null
@@ -27,6 +25,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: property
   oracle_evidence: A rule that reads a bounded window must be blind to everything
     outside it; the relation holds for any correct windowed implementation regardless
@@ -60,6 +59,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: property
   oracle_evidence: Reachability of the `due` state is the defining difference from
     the retired rule, which was absorbing - once any objective carried `observed`,
@@ -91,6 +91,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: The expected maximum is read off a hand-built fixture whose four
     sources carry known, deliberately unordered instants plus one unparseable string;
@@ -119,6 +120,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: differential
   oracle_evidence: The reference is the existing contract of the same block, already
     enforced for `wrapups_since_fill` by tests/unit/test_world_withdrawal.py - an
@@ -147,6 +149,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: The fixture is a shallow clone, which `_filled_at` already refuses
     by contract, plus one measurement row. The expected outcome is fixed by the rule
@@ -222,6 +225,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: The six values are the enum the retired implementation already
     shipped and the instrument's wiki entry already documents; the table pins which
@@ -278,6 +282,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: The six keys are IRR-001's declared observable, fixed in this SPEC
     before the code is written. Equality against the whole set, not membership, is

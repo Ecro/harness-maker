@@ -1,5 +1,3 @@
-# Historical contract: vocabulary/storage superseded by SPEC-intent-vocabulary-rename;
-# owners shape by SPEC-intent-owners-role-map. Authored ACs and approval hash are unchanged.
 schema_version: 2
 spec_slug: intent-world-model-objective-layer
 parent_spec: null
@@ -29,8 +27,6 @@ ac:
   test_ids:
   - tests/unit/test_intent_validate.py::test_ac_001_intent_defect_names_its_field
   - tests/unit/test_intent_validate.py::test_ac_001_valid_file_with_optional_keys_absent_passes
-  - tests/unit/test_world_assumptions.py::test_ac_001_assumptions_defect_names_its_field
-  - tests/unit/test_world_objectives.py::test_ac_001_objective_defect_names_its_field
   executable_predicate: null
   golden_table: []
   rubric_id: null
@@ -71,8 +67,6 @@ ac:
   test_ids:
   - tests/unit/test_intent_skeleton.py::test_ac_002_skeleton_is_typed_empty_and_loads_under_the_strict_validator
   - tests/unit/test_intent_skeleton.py::test_ac_002_skeleton_carries_no_generated_prose_only_comments_and_empties
-  - tests/unit/test_intent_skeleton.py::test_ac_002_half_filled_file_is_an_error_naming_mission_not_a_skeleton
-  - tests/unit/test_world_status_and_revisit.py::test_ac_002_status_on_a_half_filled_intent_names_mission
   executable_predicate: set(raw_yaml(made_path).keys()) == REQUIRED_FIELDS | OPTIONAL_FIELDS
     and raw_yaml(made_path)['mission'] == '' and raw_yaml(made_path)['vision'] ==
     '' and all(raw_yaml(made_path)[k] == [] for k in LIST_FIELDS) and raw_yaml(made_path)['schema_version']
@@ -153,6 +147,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: 'Retention is asserted after a save-and-reload round trip as an
     ordered list of full (text, observed_at, relation) tuples, so deleting E1 and
@@ -194,6 +189,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: 'The relation is asserted by the caller, so the expected effect
     of each relation is the Constraints row''s definition. Evidence and history are
@@ -232,6 +228,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: 'The resolve contract is the Constraints row. Each resolve(...)
     call in the predicate denotes the same single invocation''s persisted result (the
@@ -306,6 +303,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: property
   oracle_evidence: 'The table is enumerated in this SPEC before any state machine
     exists, and quantifying over all 16 pairs catches the permissive implementation
@@ -353,6 +351,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: property
   oracle_evidence: '"Any edit to a hashed input invalidates, and only those" is a
     relation over the whole field set, so a hash that omits one field fails. The hash
@@ -395,6 +394,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: 'RESULT is the single return value of one activate(OBJS.second,
     cap=1) call made after OBJS.first is already active; all three result clauses
@@ -445,6 +445,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: 'The three results and four unevaluable causes are the Constraints
     row. The CLI clause runs the shipped verb on a fixture objective and compares
@@ -502,6 +503,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: differential
   oracle_evidence: 'BASELINE is a boundary-result matrix captured from the pre-change
     autopilot_caps module at the commit before this work and stored as a fixture,
@@ -551,6 +553,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: differential
   oracle_evidence: 'NEW_PATHS is the three fixed files plus two real .claude/world/objectives/<id>.yaml
     files, so an anchored matcher that only knows the directory fails. git''s own
@@ -597,6 +600,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: 'OUT is one subprocess run of the shipped CLI entrypoint with --json,
     so a status that prints nothing, or a module-level helper that is never wired,
@@ -645,6 +649,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: 'The observed vocabulary and the two required fields are the Constraints
     row; CLOSED_OK is one successful close reloaded from disk. The render clause requires
@@ -806,7 +811,6 @@ ac:
   type: mechanical
   test_ids:
   - tests/unit/test_render_intent_layer.py::test_ac_019_the_skill_renders_for_every_target
-  - tests/unit/test_render_intent_layer.py::test_ac_019_the_skill_description_and_body_carry_the_contract
   - tests/unit/test_overhaul_p1_kept.py::test_help_lists_the_intent_layer_skill
   executable_predicate: all(skill_exists(target, '.claude/skills/intent-layer/SKILL.md')
     for target in TARGETS) and skill_exists('codex', '.agents/skills/intent-layer/SKILL.md')

@@ -107,6 +107,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: differential
   oracle_evidence: The intent and world tests predate this change; the only allowed
     edits are the objective_proposed assertions enumerated in the SPEC before implementation,
@@ -162,6 +163,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: golden
   oracle_evidence: RESEARCH found no reader of objective_proposed in src (caller map
     2026-10-04); the expected record state comes from the intent-layer skill contract
@@ -190,6 +192,7 @@ ac:
   rubric_id: null
   note: ''
   pending_test: false
+  superseded_by: intent-lean
   oracle_source: differential
   oracle_evidence: Goldens for a current-layout fixture (questions, owners) and a
     legacy mission/outcomes fixture are captured with a pinned clock and isolated
