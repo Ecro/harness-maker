@@ -4,6 +4,17 @@
 
 ### Changed
 
+- **The CLI does the SPEC bookkeeping the stages used to run by hand** (SPEC-cli-bookkeeping).
+  New `hm spec_machine finalize --slug S [--approve|--exempt]` runs `check --all` and, on a
+  pass, stamps the yaml and sets SPEC.md `status: approved` in one call (nothing is stamped on a
+  failing check). `export-golden --slug S --inline --write F` writes the `AC_NNN_ROWS` blocks into
+  the test file (replacing a stale block in place, new blocks above the first test).
+  `mark-tested --slug S` with no `--ac` binds every testable AC that has a test and leaves the rest
+  pending. `wrapup_land` lands the stage's usual manifest when given no `--required`/`--optional`,
+  so wrapup's pre-land `approval-status` call is gone (the land's own hold names the IRR ids).
+  Old commands and flags keep working. Tier-1 bench vs main: bookkeeping subcommands 7.6 -> 5.9
+  per run, but the pre-registered bar (mean cost -7%, wall -10%) was **missed** (+3% / +4%; medians
+  -7% / -2%); review-and-fix loops set the mean. See `docs/evals/cli-bookkeeping-2026-11-27.md`.
 - **The intent layer asks three things and keeps what is read** (SPEC-intent-lean). The intent
   skill asks only to create a goal (one round, at most 3 questions), to change a metric target, or
   to close a goal; measurements and observations are recorded without asking and print one line.

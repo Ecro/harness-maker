@@ -121,7 +121,8 @@ def test_ac_008_short_plan(tmp_path: Path) -> None:
 
 def test_ac_010_wrapup_lands_golden_json(tmp_path: Path) -> None:
     assert "specs/SPEC-demo.golden.json" in wrapup_land.derive_deliverable_globs("demo")
-    assert "--optional specs/SPEC-<slug>.golden.json" in _render("wrapup")
+    # SPEC-cli-bookkeeping: the template passes no list; `wrapup_land` fills in its default.
+    assert "specs/SPEC-demo.golden.json" in wrapup_land.default_manifest("demo")[1]
     # --manifest-only: with the worktree sweep on, any untracked file lands without the glob.
     staged = _land(tmp_path, short_plan=False, manifest_only=True)
     assert "specs/SPEC-demo.golden.json" in staged

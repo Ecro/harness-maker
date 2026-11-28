@@ -96,6 +96,11 @@ _DROPPED: tuple[tuple[str, str, str], ...] = (
     # SPEC-hm-cost-p4 AC-004: tests bind by name, so execute no longer edits the yaml it
     # used to re-validate; `check --red` and `mark-tested` still load and validate it.
     ("execute", "spec_machine", "validate"),
+    # SPEC-cli-bookkeeping AC-006: `finalize` runs the check and the stamp in one call, and the
+    # land's own hold line replaces wrapup's separate approval-status call.
+    ("spec", "spec_machine", "check"),
+    ("spec", "spec_machine", "approve"),
+    ("wrapup", "spec_machine", "approval-status"),
     # SPEC-intent-lean removed spec Step 0.5, the stage's only intent call.
     ("spec", "intent", "status"),
 )
@@ -103,6 +108,7 @@ _ADDED: dict[str, set[tuple[str, str]]] = {
     # SPEC-hm-cost-p2 AC-003 adds `export-golden` for parametric tests.
     "execute": {("check", ""), ("spec_machine", "mark-tested"), ("spec_machine", "export-golden")},
     "wrapup": {("check", "")},
+    "spec": {("spec_machine", "finalize")},
 }
 
 
@@ -155,7 +161,7 @@ def test_ac009_stage_cli_invocations_preserved(
 def test_ac009_invocation_diff_negative_control() -> None:
     """A dropped kept call shows up: the comparison is set equality."""
     ref = {("memory_retrieve", ""), ("autopilot", "on")}
-    assert expected_invocations("spec", ref) == {("memory_retrieve", "")}
+    assert expected_invocations("spec", ref) == {("memory_retrieve", "")} | _ADDED["spec"]
     assert expected_invocations("spec", ref) != set()
     assert invocations(
         "run `hm …` then `hm check --slug x` and hm spec_machine approve --yaml"
@@ -745,7 +751,8 @@ def test_spec_and_wrapup_carry_the_acceptance_flow(tmp_path: Path, codex: bool) 
     for marker in (
         "Approve this SPEC and end interview",
         "silence never counts",
-        "spec_machine approve --yaml",
+        "spec_machine finalize --slug",
+        "--approve",
         "--exempt",
         "schema_version: 3",
         "irreversible_decisions:",
@@ -754,7 +761,8 @@ def test_spec_and_wrapup_carry_the_acceptance_flow(tmp_path: Path, codex: bool) 
     assert "SPEC is sufficiently clear — end interview" not in spec
     assert "No mandatory gate — spec may auto-advance" not in spec
     wrapup = _rule_stage(root, "wrapup", codex=codex)
-    assert wrapup.index("spec_machine approval-status") < wrapup.index("hm wrapup_land")
+    # SPEC-cli-bookkeeping: the land checks approval itself; wrapup acts on its hold line.
+    assert wrapup.index("hm wrapup_land") < wrapup.index("On `land: hold`")
     assert "spec_machine approve --yaml" in wrapup
     assert "silence is never approval" in wrapup
 

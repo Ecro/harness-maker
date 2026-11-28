@@ -167,7 +167,7 @@ def test_every_dispatched_agent_resolves_on_the_target_that_gets_it() -> None:
 
 def test_spec_issues_one_check_call_instead_of_three() -> None:
     body = _commands(_CLAUDE_ONLY)["spec"]
-    assert "hm spec_machine check --all" in body
+    assert "hm spec_machine finalize --slug" in body  # SPEC-cli-bookkeeping
     assert "hm spec_machine validate" not in body
     assert "from harness_maker.spec_machine import cross_validate" not in body
     assert "hm spec_quality eval" not in body
